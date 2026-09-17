@@ -15,6 +15,8 @@
  * Ответ всегда HTTP 200; настоящий статус лежит внутри тела в поле ok.
  */
 
+import { getInitData } from './telegram.js';
+
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export class ApiError extends Error {
@@ -112,10 +114,8 @@ async function getJson(payload) {
   return resp.json();
 }
 
-/** Импорт по требованию, чтобы api.js не тянул за собой SDK Telegram
- *  в тестах и при рендере вне мессенджера */
+/** Подпись берём там же, где и весь остальной код — в telegram.js.
+ *  Второй источник истины рано или поздно разошёлся бы с первым. */
 function getInitDataLazy() {
-  const app = typeof window !== 'undefined' && window.Telegram ? window.Telegram.WebApp : null;
-  if (app && app.initData) return app.initData;
-  return import.meta.env.VITE_DEV_INIT_DATA || '';
+  return getInitData();
 }

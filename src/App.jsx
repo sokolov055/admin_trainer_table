@@ -52,12 +52,12 @@ export default function App() {
             <summary style={{ cursor: 'pointer', textAlign: 'center' }}>Подробности</summary>
             <div style={{ marginTop: 10, lineHeight: 1.7 }}>
               {reason && <div style={{ marginBottom: 10 }}>{reason}</div>}
-              <div>Скрипт Telegram: {info.sdkLoaded ? 'загружен' : 'не загружен'}</div>
+              <div>Параметры запуска: {info.hasLaunchParams ? 'получены' : 'нет'}</div>
+              <div>Подпись в адресе: {info.fromHash ? 'есть' : 'нет'}</div>
+              <div>Длина подписи: {info.initDataLength}</div>
               <div>Платформа: {info.platform}</div>
               <div>Версия: {info.version}</div>
-              <div>Длина подписи: {info.initDataLength}</div>
-              <div>Данные пользователя: {info.hasUser ? 'есть' : 'нет'}</div>
-              <div>Метка запуска в адресе: {info.hasTgFragment ? 'есть' : 'нет'}</div>
+              <div>Скрипт Telegram: {info.sdkLoaded ? 'загружен' : 'не загружен (не обязателен)'}</div>
             </div>
           </details>
         </main>
