@@ -216,6 +216,27 @@ const MOCK = {
     ],
   }),
 
+  'payment.list': () => ({
+    payments: [
+      { id: 'P12', date: daysAgo(3), client: 'Анна Морозова', amount: 30000, cancellable: true },
+      { id: 'P8', date: daysAgo(34), client: 'Анна Морозова', amount: 30000, cancellable: true },
+      { id: '', date: daysAgo(70), client: 'Анна Морозова', amount: 28000, cancellable: false },
+    ],
+  }),
+
+  'payment.create': (params) => ({
+    ok: true,
+    paymentId: 'P13',
+    amount: Math.round((params.price || 0) * (params.count || 0)),
+    clientName: 'Анна Морозова',
+  }),
+
+  'payment.cancel': (params) => ({
+    ok: true,
+    paymentId: params.paymentId,
+    amount: 30000,
+  }),
+
   'trainer.sheet': (params) => ({
     name: params.name,
     headers: ['Дата оплаты', 'Имя клиента', 'Сумма', 'Строка'],

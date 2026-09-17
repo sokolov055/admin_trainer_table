@@ -1025,3 +1025,95 @@ code {
   padding: 1px 5px;
   border-radius: 5px;
 }
+
+/* ==========================================================================
+   Оплата
+   Единственный экран, который меняет деньги, поэтому сумма здесь крупнее
+   всего остального и видна до нажатия.
+   ========================================================================== */
+
+.pay-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.pay-field { flex: 1 1 auto; min-width: 0; }
+.pay-field--narrow { flex: 0 0 96px; }
+
+.pay-field__label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.pay-field__input {
+  width: 100%;
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.pay-field__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pay-field__input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pay-times {
+  color: var(--text-muted);
+  font-size: var(--text-md);
+  padding-bottom: 12px;
+  flex: 0 0 auto;
+}
+
+.pay-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.pay-total__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.pay-total__value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Подтверждение отмены: раскрывается в строке платежа, чтобы сумма и дата
+   оставались перед глазами */
+.pay-confirm {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--critical-fill);
+  border: 1px solid var(--critical-line);
+  border-radius: var(--radius-sm);
+  color: var(--critical-text);
+}
+
+.pay-confirm__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}

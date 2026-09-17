@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Clients, Finance, Processes, Lost, Logs, Sheets, ClientCard } from './screens.jsx';
 import { Overview, Measurements, Plan, Progress, Nutrition } from '../client/screens.jsx';
+import { Payments } from './Payments.jsx';
 import { Chips } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import {
@@ -24,8 +25,17 @@ const TABS = [
   { id: 'sheets', label: 'Листы', Icon: IconSheet },
 ];
 
+/**
+ * Разделы карточки клиента.
+ *
+ * «Оплаты» есть только здесь, в панели тренера: это единственное место,
+ * где данные меняются, и клиенту такой экран не нужен и не должен быть
+ * доступен. Права всё равно проверяет сервер, но и показывать кнопку,
+ * которая заведомо откажет, незачем.
+ */
 const CLIENT_VIEWS = [
   { value: 'overview', label: 'Обзор', Screen: Overview },
+  { value: 'payments', label: 'Оплаты', Screen: null },
   { value: 'plan', label: 'План', Screen: Plan },
   { value: 'progress', label: 'Прогресс', Screen: Progress },
   { value: 'measurements', label: 'Замеры', Screen: Measurements },
@@ -83,6 +93,7 @@ function ClientDetail({ client, onBack }) {
   const [view, setView] = useState('overview');
   const current = CLIENT_VIEWS.find((v) => v.value === view) || CLIENT_VIEWS[0];
   const Screen = current.Screen;
+  const isPayments = current.value === 'payments';
 
   return (
     <div className="app">
@@ -101,7 +112,9 @@ function ClientDetail({ client, onBack }) {
           <Chips items={CLIENT_VIEWS} value={view} onChange={setView} />
         </div>
         <div key={view}>
-          <Screen clientRow={client.row} />
+          {isPayments
+            ? <Payments client={client} />
+            : <Screen clientRow={client.row} />}
         </div>
       </main>
     </div>
