@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../api.js';
+import React, { useState } from 'react';
+import { useData } from '../useData.js';
 import { LineChart } from '../charts.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
@@ -7,31 +7,12 @@ import {
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert } from '../icons.jsx';
 
-/**
- * Общий жизненный цикл загрузки. Вынесен сюда, потому что повторять его в
- * пяти экранах — это пять мест, где можно забыть обработать ошибку.
- */
-function useApi(action, params, deps = []) {
-  const [state, setState] = useState({ loading: true, data: null, error: null });
-
-  const load = (fresh = false) => {
-    setState({ loading: true, data: null, error: null });
-    api(action, params, { fresh })
-      .then((data) => setState({ loading: false, data, error: null }))
-      .catch((error) => setState({ loading: false, data: null, error }));
-  };
-
-  useEffect(load, deps);
-
-  return { ...state, reload: () => load(true) };
-}
-
 /* ==================================================================
  * Обзор
  * ================================================================== */
 
 export function Overview({ clientRow }) {
-  const { loading, data, error, reload } = useApi(
+  const { loading, data, error, reload } = useData(
     'client.overview', clientRow ? { clientRow } : {}, [clientRow]
   );
 
@@ -122,7 +103,7 @@ export function Overview({ clientRow }) {
  * ================================================================== */
 
 export function Measurements({ clientRow }) {
-  const { loading, data, error, reload } = useApi(
+  const { loading, data, error, reload } = useData(
     'client.measurements', clientRow ? { clientRow } : {}, [clientRow]
   );
   const [field, setField] = useState('Вес');
@@ -242,7 +223,7 @@ function MeasureTable({ rows, fields }) {
 export function Plan({ clientRow }) {
   const [month, setMonth] = useState('');
   const params = { ...(clientRow ? { clientRow } : {}), ...(month ? { month } : {}) };
-  const { loading, data, error, reload } = useApi('client.plan', params, [clientRow, month]);
+  const { loading, data, error, reload } = useData('client.plan', params, [clientRow, month]);
 
   if (loading) return <Loading lead={false} rows={4} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -308,7 +289,7 @@ export function Plan({ clientRow }) {
  * ================================================================== */
 
 export function Progress({ clientRow }) {
-  const { loading, data, error, reload } = useApi(
+  const { loading, data, error, reload } = useData(
     'client.progress', clientRow ? { clientRow } : {}, [clientRow]
   );
 
@@ -443,7 +424,7 @@ export function Progress({ clientRow }) {
  * ================================================================== */
 
 export function Nutrition({ clientRow }) {
-  const { loading, data, error, reload } = useApi(
+  const { loading, data, error, reload } = useData(
     'client.nutrition', clientRow ? { clientRow } : {}, [clientRow]
   );
 

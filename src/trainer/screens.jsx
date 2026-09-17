@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../api.js';
+import React, { useState } from 'react';
+import { useData } from '../useData.js';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
   DataTable, Delta, formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
@@ -8,27 +8,12 @@ import {
   IconUsers, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart,
 } from '../icons.jsx';
 
-function useApi(action, params, deps = []) {
-  const [state, setState] = useState({ loading: true, data: null, error: null });
-
-  const load = (fresh = false) => {
-    setState({ loading: true, data: null, error: null });
-    api(action, params, { fresh })
-      .then((data) => setState({ loading: false, data, error: null }))
-      .catch((error) => setState({ loading: false, data: null, error }));
-  };
-
-  useEffect(load, deps);
-
-  return { ...state, reload: () => load(true) };
-}
-
 /* ==================================================================
  * Клиенты
  * ================================================================== */
 
 export function Clients({ onOpenClient }) {
-  const { loading, data, error, reload } = useApi('trainer.clients', {}, []);
+  const { loading, data, error, reload } = useData('trainer.clients', {}, []);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
 
@@ -150,7 +135,7 @@ export function ClientCard({ client }) {
  * ================================================================== */
 
 export function Finance() {
-  const { loading, data, error, reload } = useApi('trainer.finance', {}, []);
+  const { loading, data, error, reload } = useData('trainer.finance', {}, []);
   const [showYears, setShowYears] = useState(false);
 
   if (loading) return <Loading rows={4} />;
@@ -211,7 +196,7 @@ export function Finance() {
  * ================================================================== */
 
 export function Processes() {
-  const { loading, data, error, reload } = useApi('trainer.processes', {}, []);
+  const { loading, data, error, reload } = useData('trainer.processes', {}, []);
 
   if (loading) return <Loading rows={4} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -270,7 +255,7 @@ function MetricTable({ metrics, columns }) {
  * ================================================================== */
 
 export function Lost() {
-  const { loading, data, error, reload } = useApi('trainer.lost', {}, []);
+  const { loading, data, error, reload } = useData('trainer.lost', {}, []);
 
   if (loading) return <Loading lead={false} rows={3} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -313,7 +298,7 @@ export function Lost() {
  * ================================================================== */
 
 export function Logs() {
-  const { loading, data, error, reload } = useApi('trainer.logs', { limit: 150 }, []);
+  const { loading, data, error, reload } = useData('trainer.logs', { limit: 150 }, []);
 
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -364,7 +349,7 @@ export function Logs() {
  * ================================================================== */
 
 export function Sheets() {
-  const list = useApi('trainer.sheets', {}, []);
+  const list = useData('trainer.sheets', {}, []);
   const [selected, setSelected] = useState(null);
 
   if (list.loading) return <Loading lead={false} rows={5} />;
@@ -389,7 +374,7 @@ export function Sheets() {
 }
 
 function SheetView({ name, onBack }) {
-  const { loading, data, error, reload } = useApi('trainer.sheet', { name, limit: 300 }, [name]);
+  const { loading, data, error, reload } = useData('trainer.sheet', { name, limit: 300 }, [name]);
 
   return (
     <>

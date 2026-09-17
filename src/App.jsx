@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, clearApiCache } from './api.js';
+import { api, apiBatch, apiStale } from './api.js';
 import { isInsideTelegram, getInitData, environmentInfo, diagnoseMissingInitData } from './telegram.js';
 import { Loading, ErrorState, Empty } from './ui.jsx';
 import { IconPhone } from './icons.jsx';
@@ -7,22 +7,64 @@ import ClientApp from './client/ClientApp.jsx';
 import TrainerApp from './trainer/TrainerApp.jsx';
 
 /**
- * Корень приложения. Делает ровно одно: спрашивает сервер «кто я» и по
- * ответу показывает панель клиента или панель тренера.
+ * Корень приложения: спрашивает сервер «кто я» и по ответу показывает
+ * панель клиента или панель тренера.
  *
  * Роль приходит С СЕРВЕРА и нигде на клиенте не вычисляется. Всё, что
  * знает фронт, — какую панель рисовать; доступ к данным всё равно
  * проверяется на каждом запросе заново.
+ *
+ * Про скорость. Каждый поход к Apps Script стоит секунды, поэтому запуск
+ * устроен так:
+ *
+ * — если роль уже известна с прошлого раза, панель рисуется мгновенно,
+ *   а проверка уходит в фон;
+ * — если человек здесь впервые, «кто я» и данные первого экрана
+ *   запрашиваются ОДНИМ запросом вместо двух последовательных. Лишнее
+ *   действие в пакете отвалится по правам, не выполняясь, — это дешевле,
+ *   чем ещё один поход на сервер.
  */
 export default function App() {
   const [state, setState] = useState({ loading: true, me: null, error: null });
 
   const load = () => {
+    const cached = apiStale('me', {});
+
+    if (cached.data) {
+      // Роль известна — показываем панель немедленно, проверяем в фоне
+      setState({ loading: false, me: cached.data, error: null });
+
+      cached.promise
+        .then((me) => setState({ loading: false, me, error: null }))
+        .catch(() => { /* не достучались — остаёмся на том, что уже показали */ });
+
+      return;
+    }
+
     setState({ loading: true, me: null, error: null });
-    clearApiCache();
-    api('me', {}, { fresh: true })
-      .then((me) => setState({ loading: false, me, error: null }))
-      .catch((error) => setState({ loading: false, me: null, error }));
+
+    apiBatch([
+      { action: 'me' },
+      { action: 'client.overview' },
+      { action: 'trainer.clients' },
+    ])
+      .then((res) => {
+        if (res.me && res.me.ok) {
+          setState({ loading: false, me: res.me.data, error: null });
+        } else {
+          setState({
+            loading: false,
+            me: null,
+            error: (res.me && res.me.error) || new Error('Сервер не ответил, кто вы.'),
+          });
+        }
+      })
+      .catch((error) => {
+        // Пакет целиком не прошёл — пробуем хотя бы узнать роль
+        api('me', {}, { fresh: true })
+          .then((me) => setState({ loading: false, me, error: null }))
+          .catch(() => setState({ loading: false, me: null, error }));
+      });
   };
 
   useEffect(load, []);
