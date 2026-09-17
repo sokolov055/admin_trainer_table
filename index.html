@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
     <meta name="color-scheme" content="light dark" />
     <title>Личный кабинет</title>
+    <!-- ПЕРВЫМ ДЕЛОМ сохраняем фрагмент адреса.
+         Telegram передаёт в нём подпись (tgWebAppData), а SDK при запуске
+         вычищает адрес через history.replaceState. Если наш код прочитает
+         фрагмент позже SDK, читать будет уже нечего — и приложение решит,
+         что его открыли не из мессенджера.
+         Поэтому забираем строку до того, как выполнится что-либо ещё. -->
+    <script>
+      (function () {
+        try {
+          var h = window.location.hash || '';
+          if (h.indexOf('tgWebApp') !== -1) {
+            window.__tgLaunchHash = h;
+            sessionStorage.setItem('tg_launch_hash', h);
+          }
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- SDK Telegram.
          На телефоне подпись приезжает во фрагменте адреса, и SDK не нужен.
          А вот в настольном клиенте фрагмент бывает пустым, и подпись живёт

@@ -39,7 +39,14 @@ function readLaunchParams() {
 
   let fromHash = {};
   try {
-    const hash = String(window.location.hash || '').replace(/^#/, '');
+    // Строку перехватывает inline-скрипт в index.html: к моменту, когда
+    // выполняется этот модуль, SDK уже мог вычистить адрес.
+    const raw = window.__tgLaunchHash
+      || sessionStorage.getItem('tg_launch_hash')
+      || window.location.hash
+      || '';
+
+    const hash = String(raw).replace(/^#/, '');
     if (hash) {
       const params = new URLSearchParams(hash);
       params.forEach((value, key) => {
