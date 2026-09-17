@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, clearApiCache } from './api.js';
-import { isInsideTelegram, getInitData } from './telegram.js';
+import { isInsideTelegram, getInitData, environmentInfo, diagnoseMissingInitData } from './telegram.js';
 import { Loading, ErrorState, Empty } from './ui.jsx';
 import { IconPhone } from './icons.jsx';
 import ClientApp from './client/ClientApp.jsx';
@@ -30,6 +30,9 @@ export default function App() {
   // Открыли не из Telegram и подменной initData для разработки нет —
   // дальше идти некуда, но сказать об этом надо по-человечески.
   if (!isInsideTelegram() && !getInitData() && import.meta.env.VITE_MOCK !== '1') {
+    const info = environmentInfo();
+    const reason = diagnoseMissingInitData(info);
+
     return (
       <div className="app">
         <main className="app__body">
@@ -38,10 +41,25 @@ export default function App() {
             title="Откройте через Telegram"
             text={
               'Это мини-приложение работает внутри Telegram.\n\n' +
-              'Найдите бота тренера и нажмите кнопку «Открыть приложение» ' +
+              'Откройте бота тренера и нажмите кнопку «Открыть приложение» ' +
               'или отправьте ему команду /app.'
             }
           />
+
+          {/* Техническая справка: без неё непонятно, открыли страницу
+              обычной ссылкой или Telegram действительно не дал подпись */}
+          <details className="small muted" style={{ maxWidth: 420, margin: '0 auto' }}>
+            <summary style={{ cursor: 'pointer', textAlign: 'center' }}>Подробности</summary>
+            <div style={{ marginTop: 10, lineHeight: 1.7 }}>
+              {reason && <div style={{ marginBottom: 10 }}>{reason}</div>}
+              <div>Скрипт Telegram: {info.sdkLoaded ? 'загружен' : 'не загружен'}</div>
+              <div>Платформа: {info.platform}</div>
+              <div>Версия: {info.version}</div>
+              <div>Длина подписи: {info.initDataLength}</div>
+              <div>Данные пользователя: {info.hasUser ? 'есть' : 'нет'}</div>
+              <div>Метка запуска в адресе: {info.hasTgFragment ? 'есть' : 'нет'}</div>
+            </div>
+          </details>
         </main>
       </div>
     );

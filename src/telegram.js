@@ -89,3 +89,49 @@ export function closeApp() {
   const app = tg();
   try { if (app) app.close(); } catch (_) {}
 }
+
+/**
+ * Срез того, что видно про среду запуска. Нужен для экрана «откройте через
+ * Telegram»: без него непонятно, то ли приложение открыли обычной ссылкой,
+ * то ли SDK не загрузился, то ли Telegram не передал подпись.
+ */
+export function environmentInfo() {
+  const app = tg();
+
+  const info = {
+    sdkLoaded: !!app,
+    platform: app && app.platform ? app.platform : '—',
+    version: app && app.version ? app.version : '—',
+    initDataLength: app && app.initData ? app.initData.length : 0,
+    hasUser: !!(app && app.initDataUnsafe && app.initDataUnsafe.user),
+    userId: (app && app.initDataUnsafe && app.initDataUnsafe.user && app.initDataUnsafe.user.id) || null,
+  };
+
+  // Telegram кладёт подпись во фрагмент адреса при запуске мини-приложения.
+  // Если его нет вовсе — страницу открыли обычной ссылкой, а не из бота.
+  try {
+    info.hasTgFragment = typeof window !== 'undefined' &&
+      window.location.hash.indexOf('tgWebAppData') !== -1;
+  } catch (_) {
+    info.hasTgFragment = false;
+  }
+
+  return info;
+}
+
+/** Короткий вывод: почему подписи нет */
+export function diagnoseMissingInitData(info) {
+  if (!info.sdkLoaded) {
+    return 'Скрипт Telegram не загрузился. Вероятно, страница открыта в обычном браузере ' +
+      'или у telegram.org нет доступа.';
+  }
+  if (!info.hasTgFragment) {
+    return 'Страница открыта по прямой ссылке, а не из бота. Подпись Telegram передаёт ' +
+      'только при запуске через кнопку мини-приложения.';
+  }
+  if (!info.initDataLength) {
+    return 'Telegram запустил приложение, но не передал подпись. Обычно помогает ' +
+      'полностью закрыть приложение и открыть заново из бота.';
+  }
+  return '';
+}
