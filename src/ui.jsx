@@ -1,5 +1,6 @@
 import React from 'react';
 import { IconAlert, IconKey, IconEmpty, IconDelta, IconRefresh, IconSearch } from './icons.jsx';
+import { environmentInfo } from './telegram.js';
 
 /**
  * Состояние загрузки. Скелетоны повторяют форму будущего содержимого,
@@ -43,7 +44,28 @@ export function ErrorState({ error, onRetry }) {
           </button>
         </div>
       )}
+
+      {/* При отказе в доступе важно понять, что именно не доехало:
+          по-разному ломается на телефоне и в настольном клиенте */}
+      {isAuth && <EnvDetails />}
     </div>
+  );
+}
+
+function EnvDetails() {
+  const info = environmentInfo();
+
+  return (
+    <details className="small muted" style={{ maxWidth: 420, margin: '18px auto 0' }}>
+      <summary style={{ cursor: 'pointer', textAlign: 'center' }}>Подробности</summary>
+      <div style={{ marginTop: 10, lineHeight: 1.7, textAlign: 'left' }}>
+        <div>Подпись в адресе: {info.fromHash ? 'есть' : 'нет'}</div>
+        <div>Длина подписи: {info.initDataLength}</div>
+        <div>Скрипт Telegram: {info.sdkLoaded ? 'загружен' : 'не загружен'}</div>
+        <div>Платформа: {info.platform}</div>
+        <div>Версия: {info.version}</div>
+      </div>
+    </details>
   );
 }
 

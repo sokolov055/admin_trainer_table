@@ -5,12 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
     <meta name="color-scheme" content="light dark" />
     <title>Личный кабинет</title>
-    <!-- SDK Telegram: управление окном, вибрация, события темы.
-         Загружается асинхронно и НЕ обязателен: подпись и тему приложение
-         читает само из адреса страницы. Домен telegram.org бывает
-         недоступен у провайдера, и блокирующий тег в этом случае просто
-         задерживал бы загрузку ради необязательного скрипта. -->
-    <script async src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- SDK Telegram.
+         На телефоне подпись приезжает во фрагменте адреса, и SDK не нужен.
+         А вот в настольном клиенте фрагмент бывает пустым, и подпись живёт
+         только внутри SDK — без него вход невозможен.
+         Поэтому: сначала пробуем официальный адрес (там всегда свежая
+         версия), а если telegram.org недоступен у провайдера — подхватываем
+         копию, лежащую рядом с приложением. -->
+    <script
+      src="https://telegram.org/js/telegram-web-app.js"
+      onerror="this.onerror=null;var s=document.createElement('script');s.src='telegram-web-app.js';document.head.appendChild(s);"
+    ></script>
   </head>
   <body>
     <div id="root"></div>
