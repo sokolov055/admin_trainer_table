@@ -1,6 +1,6 @@
 {
   "_комментарий": "Адрес API. Меняется без пересборки: npm run switch-api <адрес>",
-  "apiUrl": "https://script.google.com/macros/s/AKfycbz3d-RoSRTbOzYr5WHEsQEipWiSaikghsVnYFLT32U-l_dbt41dduiHVeK20kgJjtsO2w/exec",
-  "fallbackUrl": "",
-  "label": "Apps Script"
+  "apiUrl": "https://194-58-102-135.nip.io",
+  "fallbackUrl": "https://script.google.com/macros/s/AKfycbz3d-RoSRTbOzYr5WHEsQEipWiSaikghsVnYFLT32U-l_dbt41dduiHVeK20kgJjtsO2w/exec",
+  "label": "194-58-102-135.nip.io"
 }
