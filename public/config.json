@@ -1,0 +1,6 @@
+{
+  "_комментарий": "Адрес API. Меняется без пересборки: npm run switch-api <адрес>",
+  "apiUrl": "https://script.google.com/macros/s/AKfycbz3d-RoSRTbOzYr5WHEsQEipWiSaikghsVnYFLT32U-l_dbt41dduiHVeK20kgJjtsO2w/exec",
+  "fallbackUrl": "",
+  "label": "Apps Script"
+}

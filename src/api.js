@@ -31,8 +31,7 @@
  */
 
 import { getInitData } from './telegram.js';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { loadApiConfig, currentApiUrl, fallbackApiUrl } from './apiConfig.js';
 
 /** Сколько данные из localStorage считаются пригодными для показа.
  *  Не «свежими» — именно пригодными: их всё равно тут же обновляют. */
@@ -191,29 +190,33 @@ export async function apiBatch(requests) {
 }
 
 async function request(action, params) {
-  if (!API_URL && import.meta.env.VITE_MOCK !== '1') {
-    throw new ApiError(
-      'Не задан адрес API. При сборке нужен VITE_API_URL — см. webapp/.env.example',
-      0
-    );
-  }
-
   if (import.meta.env.VITE_MOCK === '1') {
     const { mockApi } = await import('./mock.js');
     return mockApi(action, params);
   }
 
+  // Адрес приезжает из config.json рядом с приложением: так переезд между
+  // бэкендами не требует пересборки
+  await loadApiConfig();
+
+  const url = currentApiUrl();
+  if (!url) {
+    throw new ApiError('Не задан адрес API — проверьте config.json рядом с приложением.', 0);
+  }
+
   const payload = { action, initData: getInitData(), ...params };
 
-  let body;
-  try {
-    body = await postJson(payload);
-  } catch (postErr) {
-    try {
-      body = await getJson(payload);
-    } catch (getErr) {
-      throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
-    }
+  let body = await tryEndpoint(url, payload);
+
+  // Запасной адрес нужен на время переезда: новый сервер не отозвался —
+  // молча уходим на старый, вместо того чтобы показывать клиенту ошибку
+  if (body === null) {
+    const spare = fallbackApiUrl();
+    if (spare && spare !== url) body = await tryEndpoint(spare, payload);
+  }
+
+  if (body === null) {
+    throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
   }
 
   if (!body || body.ok !== true) {
@@ -226,8 +229,21 @@ async function request(action, params) {
   return body.data;
 }
 
-async function postJson(payload) {
-  const resp = await fetch(API_URL, {
+/** Один адрес: сначала POST, при сбое — GET. null, если не отозвался вовсе */
+async function tryEndpoint(url, payload) {
+  try {
+    return await postJson(url, payload);
+  } catch (_) {
+    try {
+      return await getJson(url, payload);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+async function postJson(url, payload) {
+  const resp = await fetch(url, {
     method: 'POST',
     // text/plain — единственный способ обойтись без preflight (см. шапку)
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -237,7 +253,7 @@ async function postJson(payload) {
   return resp.json();
 }
 
-async function getJson(payload) {
+async function getJson(url, payload) {
   const qs = Object.keys(payload)
     .filter((k) => payload[k] !== undefined && payload[k] !== null)
     .map((k) => {
@@ -246,6 +262,6 @@ async function getJson(payload) {
     })
     .join('&');
 
-  const resp = await fetch(API_URL + '?' + qs, { method: 'GET', redirect: 'follow' });
+  const resp = await fetch(url + '?' + qs, { method: 'GET', redirect: 'follow' });
   return resp.json();
 }
