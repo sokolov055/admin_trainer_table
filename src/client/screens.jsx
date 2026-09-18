@@ -48,7 +48,7 @@ export function Overview({ clientRow }) {
           { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
           {
             label: 'Последняя тренировка',
-            value: data.lastTrainingDate ? relativeDays(data.lastTrainingDate) : 'не было',
+            value: data.lastTrainingDate ? relativeDays(data.lastTrainingDate) : 'нет данных',
           },
         ]}
       />
@@ -81,7 +81,7 @@ export function Overview({ clientRow }) {
             {data.lastTrainingDate && (
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>
             )}
-            {data.startDate && <Row label="Занимается с">{formatDate(data.startDate)}</Row>}
+            {clientRow && data.startDate && <Row label="Занимается с">{formatDate(data.startDate)}</Row>}
           </Rows>
         </Panel>
       </Section>
