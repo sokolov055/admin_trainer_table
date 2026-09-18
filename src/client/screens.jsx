@@ -5,7 +5,7 @@ import { LineChart } from '../charts.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta, SignOut,
-  formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
+  formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert } from '../icons.jsx';
 
@@ -45,11 +45,19 @@ export function Overview({ clientRow }) {
               : 'Баланс исчерпан'
         }
         facts={[
-          { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
+          // Ближайшее занятие стоит первым фактом намеренно: чаще всего
+          // приложение открывают именно с этим вопросом, и ответ не должен
+          // требовать прокрутки.
           {
-            label: 'Последняя тренировка',
-            value: data.lastTrainingDate ? relativeDays(data.lastTrainingDate) : 'нет данных',
+            label: 'Следующая тренировка',
+            // «Не назначена» и «расписание недоступно» — разные новости.
+            // Первая значит «занятий впереди нет, напишите тренеру»,
+            // вторая — «мы просто не знаем»; путать их нельзя.
+            value: data.nextTrainingDate
+              ? formatWhen(data.nextTrainingDate)
+              : data.scheduleKnown === false ? 'нет данных' : 'не назначена',
           },
+          { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
         ]}
       />
 
@@ -77,6 +85,13 @@ export function Overview({ clientRow }) {
             </Row>
             <Row label="Последний замер">
               <StatusBadge value={data.lastMeasureStatus} fallback="не было" />
+            </Row>
+            <Row label="Следующая тренировка">
+              {data.nextTrainingDate
+                ? formatDate(data.nextTrainingDate) + ', ' + formatTime(data.nextTrainingDate)
+                : data.scheduleKnown === false
+                  ? 'расписание временно недоступно'
+                  : 'не назначена'}
             </Row>
             {data.lastTrainingDate && (
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>

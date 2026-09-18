@@ -658,6 +658,49 @@ export function formatDate(iso, withYear = true) {
   });
 }
 
+/** «10:00» — время занятия; дата приходит без пояса, это часы тренера */
+export function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+
+  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Винительный падеж — «во вторник», а не «вторник». Список вместо правил:
+// семь слов, зато без грамматических сюрпризов у «среды» и «вторника».
+const WEEKDAY_AT = [
+  'в воскресенье', 'в понедельник', 'во вторник', 'в среду',
+  'в четверг', 'в пятницу', 'в субботу',
+];
+
+/**
+ * Когда занятие: «сегодня, 10:00», «завтра, 10:00», «в пятницу, 10:00»,
+ * дальше недели — «26 сентября, 10:00».
+ *
+ * Считаем разницу в КАЛЕНДАРНЫХ днях, а не в сутках: занятие сегодня в
+ * 18:00 — это «сегодня», хотя до него меньше суток, и «завтра», если
+ * делить разницу в миллисекундах на 24 часа. Именно так ошибается
+ * relativeDays, поэтому здесь отдельный расчёт.
+ */
+export function formatWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const days = Math.round((startOfDay(d) - startOfDay(new Date())) / 86400000);
+
+  const time = formatTime(iso);
+
+  if (days === 0) return 'сегодня, ' + time;
+  if (days === 1) return 'завтра, ' + time;
+  if (days === 2) return 'послезавтра, ' + time;
+  if (days > 2 && days < 7) return WEEKDAY_AT[d.getDay()] + ', ' + time;
+
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + time;
+}
+
 export function daysSince(iso) {
   if (!iso) return null;
   const d = new Date(iso);
