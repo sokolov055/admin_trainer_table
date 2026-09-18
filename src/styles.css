@@ -815,15 +815,18 @@ button { font-family: inherit; }
   .story__close:hover { color: #f2f0ea; }
 }
 
-/* Текст стоит в нижней трети, а не по центру: большой палец держит телефон
-   снизу, и середина экрана — ровно то место, которое им и закрывают. */
+/* Кадр занимает всю ширину колонки и стоит по центру высоты.
+   Прижатый к низу блок оставлял на телефоне пустую верхнюю половину, а
+   картинка в 34ch не доходила до правого края — вместе это читалось как
+   съехавшая вёрстка. Меру строки держат сами абзацы, а не кадр целиком:
+   картинке узкая колонка ни к чему, а тексту она нужна. */
 .story__frame {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  max-width: 34ch;
+  justify-content: center;
+  width: 100%;
   animation: story-frame-in var(--dur) var(--ease-out) both;
 }
 
@@ -853,7 +856,7 @@ button { font-family: inherit; }
 .story-art {
   width: 100%;
   height: auto;
-  max-height: min(200px, 22vh);
+  max-height: min(230px, 26vh);
   display: block;
 }
 
@@ -863,12 +866,17 @@ button { font-family: inherit; }
 .story { --tint: var(--accent-solid); }
 
 .story__date {
+  max-width: 34ch;
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
   color: rgba(242, 240, 234, 0.6);
 }
 
 .story__heading {
+  /* Шире меры абзаца: заголовок крупнее, и в 20ch он ломался на две
+     строки там, где спокойно вставал в полторы. Перенос всё равно
+     выбирает text-wrap: balance. */
+  max-width: 24ch;
   margin: 0 0 var(--space-3);
   font-size: var(--text-xl);
   font-weight: 680;
@@ -878,6 +886,7 @@ button { font-family: inherit; }
 }
 
 .story__body {
+  max-width: 34ch;
   margin: 0;
   font-size: var(--text-md);
   line-height: 1.45;
