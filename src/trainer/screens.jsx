@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useData } from '../useData.js';
+import { apiMutate } from '../api.js';
 import {
-  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
+  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
   DataTable, Delta, formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
 } from '../ui.jsx';
+import { getThemeMode, setThemeMode } from '../telegram.js';
 import {
   IconUsers, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart,
 } from '../icons.jsx';
@@ -16,6 +18,26 @@ export function Clients({ onOpenClient }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, []);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
+  const [refresh, setRefresh] = useState({ busy: false, error: null, done: null });
+
+  // Пересчёт по календарю — та же галочка «Обновить», что в таблице. Раньше
+  // ради неё надо было открыть таблицу на компьютере, и данные в приложении
+  // жили своей жизнью, пока тренер до неё не дойдёт.
+  //
+  // Ответ идёт десятки секунд: скрипт читает календарь и переписывает лист.
+  // Поэтому кнопка блокируется на время работы — второе нажатие не ускорит
+  // пересчёт, а только заставит ждать ещё и очереди на стороне таблицы.
+  const runRefresh = async () => {
+    setRefresh({ busy: true, error: null, done: null });
+
+    try {
+      const res = await apiMutate('calendar.refresh', {});
+      setRefresh({ busy: false, error: null, done: res });
+      reload();
+    } catch (err) {
+      setRefresh({ busy: false, error: err, done: null });
+    }
+  };
 
   if (loading) return <Loading rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -60,7 +82,19 @@ export function Clients({ onOpenClient }) {
         ]}
       />
 
-      <Section>
+      <Section
+        note={refreshNote(refresh)}
+        action={
+          <button
+            className="button button--ghost"
+            onClick={runRefresh}
+            disabled={refresh.busy}
+          >
+            <IconRefresh size={16} />
+            {refresh.busy ? 'Обновляю…' : 'Обновить'}
+          </button>
+        }
+      >
         <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
         <Chips items={filters} value={filter} onChange={setFilter} />
 
@@ -69,8 +103,14 @@ export function Clients({ onOpenClient }) {
         )}
 
         {filtered.map((c) => {
+          // «Нет данных» и «давно не приходил» — разные вещи, и лечатся
+          // по-разному: первое чинит пересчёт календаря, второе — звонок
+          // клиенту. Раньше оба показывались одним словом «пропал», которое
+          // вдобавок путалось с листом «Пропащие» — а туда клиент попадает
+          // только вручную и означает это совсем другое.
           const days = daysSince(c.lastTrainingDate);
-          const isStale = days === null || days > s.staleDays;
+          const noData = days === null;
+          const isStale = !noData && days > s.staleDays;
 
           return (
             <button className="item" key={c.row} onClick={() => onOpenClient(c)}>
@@ -94,7 +134,12 @@ export function Clients({ onOpenClient }) {
                 <span>
                   {c.lastTrainingDate ? relativeDays(c.lastTrainingDate) : 'тренировок не было'}
                 </span>
-                {isStale && <Badge kind="warn">пропал</Badge>}
+                {noData && <Badge>нет данных</Badge>}
+                {isStale && (
+                  <Badge kind="warn">
+                    не был {days} {plural(days, 'день', 'дня', 'дней')}
+                  </Badge>
+                )}
                 {!c.chatId && <Badge>без Telegram</Badge>}
                 {!c.hasLink && <Badge>без таблицы</Badge>}
               </div>
@@ -104,6 +149,27 @@ export function Clients({ onOpenClient }) {
       </Section>
     </>
   );
+}
+
+/**
+ * Подпись у кнопки обновления.
+ *
+ * Пока ничего не нажимали — говорим, что именно произойдёт: «обновить» само
+ * по себе не объясняет, откуда возьмутся данные. После пересчёта показываем
+ * итог цифрами: тренер видит, что работа действительно была сделана, а не
+ * просто мигнула кнопка.
+ */
+function refreshNote(state) {
+  if (state.busy) return 'Читаю календарь — это занимает до минуты';
+  if (state.error) return 'Не получилось: ' + (state.error.message || 'таблица не ответила');
+
+  if (state.done) {
+    const d = state.done;
+    const tail = d.mirrorUpdated === false ? ' · данные подтянутся в ближайшие минуты' : '';
+    return `Обновлено: ${d.trainings} ${plural(d.trainings, 'тренировка', 'тренировки', 'тренировок')} у ${d.clients} ${plural(d.clients, 'клиента', 'клиентов', 'клиентов')}${tail}`;
+  }
+
+  return 'Пересчитать тренировки и долг по календарю';
 }
 
 /* ==================================================================
@@ -266,9 +332,11 @@ export function Lost() {
 
   const unsettled = data.clients.filter((c) => c.balance !== 0);
 
+  // Заголовок не повторяет название подраздела, оно уже в шапке —
+  // здесь полезно другое: сколько их и сколько долгов осталось.
   return (
     <Section
-      title={'Ушедшие · ' + data.clients.length}
+      title={`${data.clients.length} ${plural(data.clients.length, 'человек', 'человека', 'человек')}`}
       note={unsettled.length ? `${unsettled.length} с незакрытым балансом` : 'все балансы закрыты'}
     >
       {data.clients.map((c) => (
@@ -401,5 +469,51 @@ function SheetView({ name, onBack }) {
         </Section>
       )}
     </>
+  );
+}
+
+/* ==================================================================
+ * Настройки
+ * ================================================================== */
+
+const THEME_ITEMS = [
+  { value: 'auto', label: 'Авто' },
+  { value: 'light', label: 'Светлая' },
+  { value: 'dark', label: 'Тёмная' },
+];
+
+const THEME_HINTS = {
+  auto: 'Как в Telegram: приложение переключается вместе с мессенджером, а вне его — вместе с системой.',
+  light: 'Всегда светлая, даже если Telegram в тёмной теме.',
+  dark: 'Всегда тёмная, даже если Telegram в светлой теме.',
+};
+
+/**
+ * Настройки приложения.
+ *
+ * Пока здесь одна вещь — тема. Раздел всё равно нужен: тренер открывает
+ * приложение и в зале при верхнем свете, и вечером дома, а тема Telegram
+ * к этому отношения не имеет.
+ */
+export function Settings() {
+  // Читаем один раз при первом рендере: значение уже применено к странице
+  // в telegram.js, и спрашивать хранилище на каждый рендер незачем.
+  const [mode, setMode] = useState(getThemeMode);
+
+  return (
+    <Section title="Внешний вид">
+      <Panel pad>
+        <div className="setting">
+          <div className="setting__label">Тема</div>
+          <Segmented
+            items={THEME_ITEMS}
+            value={mode}
+            label="Тема оформления"
+            onChange={(next) => setMode(setThemeMode(next))}
+          />
+          <div className="setting__note">{THEME_HINTS[mode]}</div>
+        </div>
+      </Panel>
+    </Section>
   );
 }

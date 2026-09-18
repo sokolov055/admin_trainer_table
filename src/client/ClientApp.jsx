@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Overview, Measurements, Plan, Progress, Nutrition } from './screens.jsx';
+import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { haptic } from '../telegram.js';
-import { IconHome, IconPlan, IconProgress, IconRuler, IconNutrition } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition } from '../icons.jsx';
 
 /**
  * Панель клиента.
@@ -14,9 +14,11 @@ import { IconHome, IconPlan, IconProgress, IconRuler, IconNutrition } from '../i
 
 const TABS = [
   { id: 'overview', label: 'Обзор', Icon: IconHome, Screen: Overview },
-  { id: 'plan', label: 'План', Icon: IconPlan, Screen: Plan },
+  { id: 'plan', label: 'Тренировки', Icon: IconPlan, Screen: Plan },
+  // Прогресс и замеры — один экран: это один и тот же разговор, от
+  // «что изменилось» к «какие были цифры», и разводить его по двум
+  // вкладкам значило заставлять человека складывать их в голове.
   { id: 'progress', label: 'Прогресс', Icon: IconProgress, Screen: Progress },
-  { id: 'measurements', label: 'Замеры', Icon: IconRuler, Screen: Measurements },
   { id: 'nutrition', label: 'Питание', Icon: IconNutrition, Screen: Nutrition },
 ];
 

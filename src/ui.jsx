@@ -1,5 +1,5 @@
-import React from 'react';
-import { IconAlert, IconKey, IconEmpty, IconDelta, IconRefresh, IconSearch } from './icons.jsx';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconRefresh, IconSearch } from './icons.jsx';
 import { environmentInfo } from './telegram.js';
 
 /**
@@ -199,9 +199,9 @@ export function Delta({ value, suffix = '', digits }) {
  * Управление
  * ========================================================================== */
 
-export function Chips({ items, value, onChange }) {
+export function Chips({ items, value, onChange, variant }) {
   return (
-    <div className="chips" role="tablist">
+    <div className={'chips' + (variant ? ' chips--' + variant : '')} role="tablist">
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const label = typeof item === 'string' ? item : item.label;
@@ -219,6 +219,321 @@ export function Chips({ items, value, onChange }) {
       })}
     </div>
   );
+}
+
+/**
+ * Выбор одного значения из нескольких — внешне тот же ряд, что и фильтры,
+ * но это не вкладки: здесь не переключают вид, а меняют настройку. Поэтому
+ * роль другая (radiogroup), и с клавиатуры он ведёт себя как переключатель.
+ */
+export function Segmented({ items, value, onChange, label, disabled }) {
+  return (
+    <div className="chips chips--flush" role="radiogroup" aria-label={label}>
+      {items.map((item) => {
+        const key = typeof item === 'string' ? item : item.value;
+        const text = typeof item === 'string' ? item : item.label;
+        return (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={key === value}
+            className={'chip' + (key === value ? ' chip--active' : '')}
+            onClick={() => onChange(key)}
+            disabled={disabled}
+          >
+            {text}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Выбор одного значения из длинного списка.
+ *
+ * Тот же переключатель, что Segmented, но поставленный столбиком. Разница
+ * не в оформлении, а в длине подписей: «Средняя: 3–5 тренировок в неделю»
+ * в ряд не помещается, и ряд начинает прокручиваться вбок — половина
+ * вариантов уезжает за край, и человек выбирает из того, что увидел.
+ * В столбик видно всё сразу, а строка во всю ширину — заведомо крупная
+ * цель для пальца.
+ *
+ * Выпадающий список решал бы ту же задачу, но прячет варианты за лишним
+ * нажатием и открывает системное колесо поверх экрана. Здесь вариантов
+ * три-пять, прятать нечего.
+ */
+export function Options({ items, value, onChange, label, disabled }) {
+  return (
+    <div className="options" role="radiogroup" aria-label={label}>
+      {items.map((item) => {
+        const key = typeof item === 'string' ? item : item.value;
+        const text = typeof item === 'string' ? item : item.label;
+        const active = key === value;
+
+        return (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            className={'option' + (active ? ' option--active' : '')}
+            onClick={() => onChange(key)}
+            disabled={disabled}
+          >
+            <span className="option__mark">{active && <IconCheck size={12} />}</span>
+            <span className="option__label">{text}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Поле ввода с подписью и местом под ошибку.
+ *
+ * type="text" при inputMode, а не type="number": числовая клавиатура нужна,
+ * а вот поведение числового поля — нет. В нём «76,9» в части браузеров
+ * превращается в пустую строку, колесо мыши незаметно меняет значение, а
+ * стрелки-стрелочки на телефоне только сужают поле. Запятую разбираем сами
+ * — ровно так же, как это делает сервер.
+ *
+ * Ошибка живёт под полем, а не в общем списке сверху: чинить надо здесь,
+ * и читать про это надо здесь же.
+ */
+export function Field({
+  label, hint, value, onChange, error, disabled,
+  inputMode = 'numeric', placeholder, inputRef,
+}) {
+  return (
+    <label className={'field' + (error ? ' field--bad' : '')}>
+      <span className="field__label">{label}</span>
+      <input
+        ref={inputRef}
+        className="field__input"
+        type="text"
+        inputMode={inputMode}
+        autoComplete="off"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        aria-invalid={error ? 'true' : undefined}
+      />
+      {error
+        ? <span className="field__error">{error}</span>
+        : hint && <span className="field__hint">{hint}</span>}
+    </label>
+  );
+}
+
+/**
+ * Короткое сообщение о том, чем кончилось действие.
+ *
+ * Тон красит всю плашку целиком — заливка, рамка и текст одного семейства,
+ * — потому что цвет должен сообщить исход раньше, чем прочитан текст.
+ */
+export function Note({ tone = 'info', icon, children }) {
+  const IconComponent = icon || (tone === 'critical' ? IconAlert : tone === 'good' ? IconCheck : IconAlert);
+
+  return (
+    <div className={'note note--' + tone}>
+      <span className="note__icon"><IconComponent size={18} /></span>
+      <div className="note__text">{children}</div>
+    </div>
+  );
+}
+
+/* ==========================================================================
+ * Выдвижное меню
+ * ========================================================================== */
+
+/** Совпадает с длительностью перехода в styles.css: панель должна уехать
+ *  до того, как её размонтируют, иначе закрытие происходит рывком */
+const DRAWER_DUR = 260;
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Боковая панель поверх экрана.
+ *
+ * Здесь собрана вся механика, которую легко недоделать и на которой меню
+ * сразу начинает ощущаться дешёвым: фокус уходит внутрь и возвращается на
+ * кнопку, Tab не выпадает наружу, страница под меню не прокручивается,
+ * закрыть можно мимо, с клавиатуры и смахиванием.
+ *
+ * Открывается меню кнопкой, а не свайпом от края: в Android с жестовой
+ * навигацией свайп от края — системное «назад», и приложение проиграло бы
+ * этот спор. Смахивание для закрытия начинается внутри панели и ничему не
+ * мешает.
+ */
+export function Drawer({ open, onClose, label, children }) {
+  const panelRef = useRef(null);
+  const dragRef = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(false);
+  const [drag, setDrag] = useState(0);
+
+  // Монтаж и размонтаж разведены с анимацией: панель живёт в DOM на время
+  // обратного перехода.
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      return undefined;
+    }
+    setShown(false);
+    const timer = setTimeout(() => setMounted(false), DRAWER_DUR);
+    return () => clearTimeout(timer);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!mounted || !open) return;
+
+    // Панель уже в DOM, но ещё в закрытом положении. Чтобы переход проиграл,
+    // браузер должен это положение посчитать — отсюда обращение к offsetWidth:
+    // оно заставляет пересчитать стили до того, как появится класс открытия.
+    // Через requestAnimationFrame это же место работает не везде: в вебвью
+    // без композитора кадры могут не выдаваться вовсе, и меню замирает
+    // за краем экрана.
+    const panel = panelRef.current;
+    if (panel) void panel.offsetWidth;
+    setShown(true);
+  }, [mounted, open]);
+
+  useEffect(() => {
+    if (!mounted) return undefined;
+
+    const returnTo = document.activeElement;
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (e.key === 'Tab') keepFocusInside(e, panelRef.current);
+    };
+
+    document.addEventListener('keydown', onKey);
+
+    // Фокус переносим на саму панель, а не на первый пункт: подсвеченный
+    // пункт читался бы как уже выбранный. Tab отсюда уходит внутрь меню.
+    const panel = panelRef.current;
+    if (panel) {
+      try { panel.focus({ preventScroll: true }); } catch (_) {}
+    }
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      body.style.overflow = prevOverflow;
+      // Фокус возвращается туда, откуда меню открыли, иначе следующий Tab
+      // начнёт обход страницы с начала.
+      if (returnTo && returnTo.focus) {
+        try { returnTo.focus({ preventScroll: true }); } catch (_) {}
+      }
+    };
+  }, [mounted]);
+
+  if (!mounted) return null;
+
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    dragRef.current = { x: t.clientX, y: t.clientY, at: Date.now(), dx: 0, axis: null };
+  };
+
+  const onTouchMove = (e) => {
+    const st = dragRef.current;
+    if (!st) return;
+
+    const t = e.touches[0];
+    const dx = t.clientX - st.x;
+    const dy = t.clientY - st.y;
+
+    // Направление определяем один раз: иначе список внутри меню начинает
+    // дёргаться вбок при обычной вертикальной прокрутке.
+    if (!st.axis) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      st.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (st.axis !== 'x') return;
+
+    st.dx = Math.max(0, dx);
+    setDrag(st.dx);
+  };
+
+  const onTouchEnd = () => {
+    const st = dragRef.current;
+    dragRef.current = null;
+    setDrag(0);
+    if (!st || st.axis !== 'x') return;
+
+    // Быстрый короткий бросок закрывает так же, как медленный длинный:
+    // палец говорит о намерении не только расстоянием. Но совсем короткое
+    // движение остаётся промахом при нажатии, а не жестом.
+    const speed = st.dx / Math.max(1, Date.now() - st.at);
+    const width = panelRef.current ? panelRef.current.offsetWidth : 320;
+    if (st.dx > width * 0.3 || (st.dx > 32 && speed > 0.5)) closeRef.current();
+  };
+
+  return (
+    <div className={'drawer' + (shown ? ' drawer--in' : '')}>
+      <div className="drawer__scrim" onClick={() => closeRef.current()} />
+      <div
+        className="drawer__panel"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        tabIndex={-1}
+        style={drag ? { transform: 'translateX(' + drag + 'px)', transition: 'none' } : undefined}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function keepFocusInside(e, panel) {
+  if (!panel) return;
+
+  const nodes = Array.prototype.slice.call(panel.querySelectorAll(FOCUSABLE));
+  if (nodes.length === 0) {
+    e.preventDefault();
+    panel.focus();
+    return;
+  }
+
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  const active = document.activeElement;
+  const outside = !panel.contains(active);
+
+  // Shift+Tab с самой панели увёл бы фокус на страницу за меню
+  if (e.shiftKey && active === panel) {
+    e.preventDefault();
+    last.focus();
+    return;
+  }
+
+  if (e.shiftKey && (active === first || outside)) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (active === last || outside)) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 export function Search({ value, onChange, placeholder = 'Поиск' }) {
@@ -311,10 +626,19 @@ export function daysSince(iso) {
 export function relativeDays(iso) {
   const days = daysSince(iso);
   if (days === null) return '—';
-  if (days <= 0) return 'сегодня';
+
+  // Дата в будущем — не «сегодня». Раньше отрицательная разница сваливалась
+  // в ту же ветку, и запланированная тренировка выглядела как проведённая
+  // сегодня — ошибка, которую на экране не отличить от правды.
+  if (days < 0) {
+    const ahead = -days;
+    if (ahead === 1) return 'завтра';
+    return 'через ' + ahead + ' ' + plural(ahead, 'день', 'дня', 'дней');
+  }
+
+  if (days === 0) return 'сегодня';
   if (days === 1) return 'вчера';
-  if (days < 5) return days + ' дня назад';
-  return days + ' дней назад';
+  return days + ' ' + plural(days, 'день', 'дня', 'дней') + ' назад';
 }
 
 export function plural(n, one, few, many) {

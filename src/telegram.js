@@ -109,6 +109,45 @@ export function initTelegramUi() {
   try { app.onEvent('themeChanged', () => applyTheme()); } catch (_) {}
 }
 
+/* ==========================================================================
+ * Тема
+ * ========================================================================== */
+
+const THEME_KEY = 'app_theme_v1';
+
+/** 'auto' — как в Telegram; 'light'/'dark' — ручной выбор человека */
+export const THEME_MODES = ['auto', 'light', 'dark'];
+
+/** Переменные, которые проставляет Telegram. Держим списком: их нужно уметь
+ *  не только выставить, но и убрать при ручном выборе темы. */
+const TG_VARS = [
+  '--tg-bg', '--tg-text', '--tg-hint', '--tg-link', '--tg-button',
+  '--tg-button-text', '--tg-secondary-bg', '--tg-section-bg', '--tg-header-bg',
+];
+
+/**
+ * Выбранный режим темы.
+ *
+ * localStorage в некоторых вебвью (приватный режим, запрет на хранилище)
+ * бросает исключение на самом обращении к свойству, поэтому и чтение, и
+ * запись обёрнуты: не смогли вспомнить выбор — работаем как «Авто».
+ */
+export function getThemeMode() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (THEME_MODES.indexOf(saved) !== -1) return saved;
+  } catch (_) {}
+  return 'auto';
+}
+
+/** Сохраняем выбор и сразу применяем: тема не должна ждать перезапуска */
+export function setThemeMode(mode) {
+  const next = THEME_MODES.indexOf(mode) !== -1 ? mode : 'auto';
+  try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+  applyTheme();
+  return next;
+}
+
 /**
  * Переносим тему Telegram в CSS-переменные.
  *
@@ -119,14 +158,24 @@ export function initTelegramUi() {
 function applyTheme() {
   if (typeof document === 'undefined') return;
 
+  const root = document.documentElement;
+  const mode = getThemeMode();
+
+  // Ручной выбор перебивает Telegram целиком, вместе с его цветами.
+  // Оставить их нельзя: --bg собран как var(--tg-bg, своё), и «Светлая»
+  // в тёмном клиенте осталась бы с тёмным фоном мессенджера.
+  if (mode !== 'auto') {
+    TG_VARS.forEach((name) => root.style.removeProperty(name));
+    root.setAttribute('data-theme', mode);
+    return;
+  }
+
   const app = tg();
   let params = (app && app.themeParams) || null;
 
   if (!params && launchParams.tgWebAppThemeParams) {
     try { params = JSON.parse(launchParams.tgWebAppThemeParams); } catch (_) { params = null; }
   }
-
-  const root = document.documentElement;
 
   if (params) {
     const map = {
@@ -150,7 +199,11 @@ function applyTheme() {
     || (params && isDarkColor(params.bg_color) ? 'dark' : null)
     || null;
 
+  // Telegram ничего не сказал о схеме — снимаем атрибут, а не оставляем
+  // прошлый: в «Авто» решать должна система (prefers-color-scheme), и без
+  // этого возврат из «Тёмной» в «Авто» не сработал бы.
   if (scheme) root.setAttribute('data-theme', scheme === 'dark' ? 'dark' : 'light');
+  else root.removeAttribute('data-theme');
 }
 
 /** Светлый или тёмный фон прислал Telegram — по яркости цвета */

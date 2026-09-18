@@ -65,7 +65,174 @@ function financeMetric(label, unit, values) {
   return { label, unit, norm: '', planYear: '', values: v };
 }
 
+/* ==========================================================================
+ * Питание
+ *
+ * Справочники и формула здесь повторяют серверные намеренно: mock.js — это
+ * и есть подменный сервер, и раз он отвечает на nutrition.save, отвечать он
+ * обязан тем же, чем ответил бы настоящий (server/src/lib/nutrition.js и
+ * src/150_OpsApi.js). Копия шкалы во фронте была бы ошибкой; копия в
+ * заглушке сервера — её работа.
+ * ========================================================================== */
+
+const NUTRITION_OPTIONS = {
+  sexes: [
+    { value: 'm', label: 'Мужской' },
+    { value: 'f', label: 'Женский' },
+  ],
+  activity: [
+    { value: 'sedentary', label: 'Сидячий: работа за столом, тренировок нет', factor: 1.2 },
+    { value: 'light', label: 'Лёгкая: 1–3 тренировки в неделю', factor: 1.375 },
+    { value: 'moderate', label: 'Средняя: 3–5 тренировок в неделю', factor: 1.55 },
+    { value: 'high', label: 'Высокая: 6–7 тренировок в неделю', factor: 1.725 },
+    { value: 'very_high', label: 'Очень высокая: 2 тренировки в день или тяжёлая работа', factor: 1.9 },
+  ],
+  goal: [
+    { value: 'lose', label: 'Похудение' },
+    { value: 'keep', label: 'Поддержание формы' },
+    { value: 'gain', label: 'Набор мышечной массы' },
+  ],
+  limits: {
+    age: { min: 14, max: 100 },
+    weight: { min: 30, max: 250 },
+    height: { min: 120, max: 230 },
+  },
+};
+
+const GOAL_MATH = {
+  lose: { factor: 0.80, protein: 2.2, fat: 0.8 },
+  keep: { factor: 1.00, protein: 1.8, fat: 1.0 },
+  gain: { factor: 1.15, protein: 2.0, fat: 1.0 },
+};
+
+/** Анкета демо-клиента. null — ещё не заполнена, и экран открывается
+ *  пустым: обе стороны сценария должны быть видны без перезагрузки. */
+let nutrition = null;
+
+function mockFail(message) {
+  const err = new Error(message);
+  err.code = 400;
+  throw err;
+}
+
+function mockNumber(raw, title) {
+  const s = String(raw === undefined || raw === null ? '' : raw).replace(',', '.').trim();
+  if (!s) mockFail(title + ': не заполнено');
+
+  const n = Number(s);
+  if (!Number.isFinite(n) || n <= 0) mockFail(title + ': нужно число больше нуля');
+  return n;
+}
+
+function mockParseSurvey(params) {
+  const L = NUTRITION_OPTIONS.limits;
+
+  const age = Math.round(mockNumber(params.age, 'Возраст'));
+  if (age < L.age.min || age > L.age.max) {
+    mockFail('Возраст должен быть от ' + L.age.min + ' до ' + L.age.max + ' лет');
+  }
+
+  const height = mockNumber(params.height, 'Рост');
+  if (height > 1.2 && height < 2.3) {
+    mockFail('Рост укажите в сантиметрах, а не в метрах — например 175');
+  }
+  if (height < L.height.min || height > L.height.max) {
+    mockFail('Рост должен быть от ' + L.height.min + ' до ' + L.height.max + ' см');
+  }
+
+  const weight = mockNumber(params.weight, 'Вес');
+  if (weight < L.weight.min || weight > L.weight.max) {
+    mockFail('Вес должен быть от ' + L.weight.min + ' до ' + L.weight.max + ' кг');
+  }
+
+  const raw = String(params.sex || '').toLowerCase();
+  const sex = raw === 'm' ? 'm' : raw === 'f' ? 'f' : null;
+  if (!sex) mockFail('Не выбран пол: формула основного обмена без него не считается');
+
+  const activity = String(params.activity || '');
+  if (!NUTRITION_OPTIONS.activity.some((a) => a.value === activity)) {
+    mockFail('Не выбран уровень активности');
+  }
+
+  const goal = String(params.goal || '');
+  if (!GOAL_MATH[goal]) mockFail('Не выбрана цель');
+
+  return {
+    age,
+    weight: Math.round(weight * 10) / 10,
+    height: Math.round(height * 10) / 10,
+    sex,
+    activity,
+    goal,
+  };
+}
+
+/** Миффлин—Сан Жеор с теми же предохранителями, что в src/150_OpsApi.js */
+function mockCompute(s) {
+  const factor = NUTRITION_OPTIONS.activity.find((a) => a.value === s.activity).factor;
+  const goal = GOAL_MATH[s.goal];
+  const notes = [];
+  let adjusted = false;
+
+  const bmr = 10 * s.weight + 6.25 * s.height - 5 * s.age + (s.sex === 'm' ? 5 : -161);
+  const tdee = bmr * factor;
+  let target = tdee * goal.factor;
+
+  if (target < bmr) {
+    target = bmr;
+    adjusted = true;
+    notes.push('Норма поднята до уровня основного обмена: ниже него дефицит не назначают.');
+  }
+
+  let kcal = Math.round(target / 10) * 10;
+  let protein = Math.round(s.weight * goal.protein);
+  let fat = Math.round(s.weight * goal.fat);
+  let carbs = Math.round((kcal - protein * 4 - fat * 9) / 4);
+
+  if (carbs < 50) {
+    protein = Math.min(protein, Math.round(s.weight * 1.6));
+    fat = Math.min(fat, Math.round(s.weight * 0.8));
+    carbs = Math.round((kcal - protein * 4 - fat * 9) / 4);
+    adjusted = true;
+    notes.push('Белки и жиры снижены до нижней границы (1.6 и 0.8 г/кг): '
+      + 'при таком весе и такой цели на углеводы ничего не оставалось.');
+  }
+
+  if (carbs < 50) {
+    carbs = 50;
+    kcal = protein * 4 + fat * 9 + carbs * 4;
+    adjusted = true;
+    notes.push('Дефицит смягчён: норма поднята до ' + kcal
+      + ' ккал, чтобы осталось хотя бы 50 г углеводов.');
+  }
+
+  return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal, protein, fat, carbs, adjusted, notes };
+}
+
 const MOCK = {
+  // Пакет: те же обработчики, только за один «поход на сервер». Нужен
+  // здесь, чтобы демо-режим повторял боевой путь загрузки, а не шёл
+  // мимо него по запасной ветке.
+  'batch': (params) => {
+    const list = typeof params.requests === 'string'
+      ? JSON.parse(params.requests)
+      : (params.requests || []);
+
+    return {
+      results: list.map((req) => {
+        const handler = MOCK[req.action];
+        if (!handler) {
+          return { action: req.action, ok: false, code: 404, error: 'Нет демо-данных для ' + req.action };
+        }
+        return {
+          action: req.action,
+          ok: true,
+          data: handler({ ...(req.params || {}), __role: params.__role }),
+        };
+      }),
+    };
+  },
+
   'me': (params) => ({
     role: params.__role === 'trainer' ? 'trainer' : 'client',
     name: params.__role === 'trainer' ? 'Константин' : 'Анна Морозова',
@@ -127,11 +294,64 @@ const MOCK = {
   }),
 
   'client.nutrition': () => ({
-    configured: false,
-    targets: { 'Ккал': null, 'Белки': null, 'Жиры': null, 'Углеводы': null },
+    configured: !!nutrition,
+    survey: nutrition ? nutrition.survey : null,
+    targets: nutrition ? nutrition.targets : null,
+    filledAt: nutrition ? nutrition.filledAt : null,
+    daysSinceFilled: nutrition ? 0 : null,
+    isNew: !!nutrition,
+    options: NUTRITION_OPTIONS,
     meals: [],
-    note: 'В личной таблице нет листа «Питание».',
     sheetName: 'Питание',
+    note: nutrition ? '' : 'Анкета питания ещё не заполнена.',
+  }),
+
+  // Запись анкеты. Считаем по-настоящему, той же формулой, что и таблица:
+  // демо нужно, чтобы смотреть экран на живых числах, а заглушка с
+  // фиксированной нормой показывала бы одно и то же при любых ответах.
+  // Проверки тоже настоящие — иначе форму нечем проверить.
+  'nutrition.save': (params) => {
+    const survey = mockParseSurvey(params);
+    const calc = mockCompute(survey);
+    const name = params.clientRow ? 'Дмитрий Соколов' : 'Анна Морозова';
+
+    nutrition = {
+      survey: {
+        age: survey.age,
+        weight: survey.weight,
+        height: survey.height,
+        sex: survey.sex,
+        activity: survey.activity,
+        activityLabel: NUTRITION_OPTIONS.activity.find((a) => a.value === survey.activity).label,
+        goal: survey.goal,
+        goalLabel: NUTRITION_OPTIONS.goal.find((g) => g.value === survey.goal).label,
+      },
+      targets: { kcal: calc.kcal, protein: calc.protein, fat: calc.fat, carbs: calc.carbs },
+      filledAt: new Date().toISOString().slice(0, 19),
+    };
+
+    return {
+      row: params.clientRow || 3,
+      name,
+      clientName: name,
+      survey: nutrition.survey,
+      targets: nutrition.targets,
+      bmr: calc.bmr,
+      tdee: calc.tdee,
+      adjusted: calc.adjusted,
+      notes: calc.notes,
+      filledAt: nutrition.filledAt,
+      filledBy: params.clientRow ? 'trainer' : 'client',
+      columnsCreated: [],
+    };
+  },
+
+  // Пересчёт по календарю в демо ничего не считает, но отвечает той же
+  // формой и с той же задержкой: кнопка в демо должна вести себя как в бою,
+  // иначе проверять по ней нечего.
+  'calendar.refresh': () => ({
+    clients: 5, trainings: 34, revenue: 102000,
+    mirrorUpdated: true, ms: 12400, at: new Date().toISOString(),
   }),
 
   'trainer.clients': () => ({
@@ -263,7 +483,15 @@ export function mockApi(action, params) {
         reject(Object.assign(new Error('Нет демо-данных для ' + action), { code: 404 }));
         return;
       }
-      resolve(handler({ ...params, __role: role }));
+
+      // Отказ демо-сервера должен доехать до экрана отклонённым обещанием.
+      // Исключение, брошенное прямо из таймера, не поймает никто: оно
+      // уронит вкладку, а форма так и останется ждать ответа.
+      try {
+        resolve(handler({ ...params, __role: role }));
+      } catch (err) {
+        reject(err);
+      }
     }, 180);
   });
 }

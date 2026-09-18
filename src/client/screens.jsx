@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
+import { apiBatch, apiMutate } from '../api.js';
 import { LineChart } from '../charts.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
-  Chips, Delta, formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
+  Chips, Segmented, Options, Field, Note, Delta,
+  formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert } from '../icons.jsx';
 
@@ -99,124 +101,6 @@ export function Overview({ clientRow }) {
 }
 
 /* ==================================================================
- * Показатели
- * ================================================================== */
-
-export function Measurements({ clientRow }) {
-  const { loading, data, error, reload } = useData(
-    'client.measurements', clientRow ? { clientRow } : {}, [clientRow]
-  );
-  const [field, setField] = useState('Вес');
-
-  if (loading) return <Loading rows={2} />;
-  if (error) return <ErrorState error={error} onRetry={reload} />;
-
-  const series = data.series || [];
-  const hasData = series.some((s) => s.rows && s.rows.length > 0);
-
-  if (!hasData) {
-    return (
-      <Empty
-        icon={IconRuler}
-        title="Замеров пока нет"
-        text={data.note || 'Когда тренер внесёт первый замер, здесь появится динамика по каждому обхвату.'}
-      />
-    );
-  }
-
-  // Одна метрика за раз. Вес и обхваты живут в разных диапазонах: на общей
-  // оси линия веса прижмётся к низу, а двух шкал на графике быть не должно.
-  const available = (data.fields || []).filter((f) =>
-    series.some((s) => (s.rows || []).some((r) => r[f] !== null && r[f] !== undefined))
-  );
-
-  const activeField = available.includes(field) ? field : available[0];
-  const unit = activeField === 'Вес' ? ' кг' : ' см';
-
-  const chartSeries = series.map((s) => ({
-    label: s.label || 'Замеры',
-    points: (s.rows || [])
-      .filter((r) => r[activeField] !== null && r[activeField] !== undefined)
-      .map((r) => ({ x: r.date, y: r[activeField] })),
-  }));
-
-  const first = chartSeries[0] && chartSeries[0].points;
-  const delta = first && first.length > 1
-    ? Math.round((first[first.length - 1].y - first[0].y) * 10) / 10
-    : null;
-
-  return (
-    <>
-      <Chips items={available} value={activeField} onChange={setField} />
-
-      <Lead
-        label={activeField}
-        value={first && first.length ? formatNumber(first[first.length - 1].y) + unit : '—'}
-        hint={
-          first && first.length
-            ? 'замер от ' + formatDate(first[first.length - 1].x)
-            : undefined
-        }
-        facts={
-          delta !== null
-            ? [
-                { label: 'От первого замера', value: <Delta value={delta} suffix={unit} /> },
-                { label: 'Всего замеров', value: formatNumber(first.length) },
-              ]
-            : undefined
-        }
-      />
-
-      <Section title="Динамика" note={'по датам замеров,' + unit}>
-        <Panel pad>
-          <LineChart series={chartSeries} unit={unit} />
-        </Panel>
-      </Section>
-
-      {series.map((s, i) => (
-        <Section key={i} title={s.label ? 'Замеры: ' + s.label : 'Все замеры'}>
-          <Panel pad>
-            <MeasureTable rows={s.rows} fields={data.fields} />
-          </Panel>
-        </Section>
-      ))}
-    </>
-  );
-}
-
-function MeasureTable({ rows, fields }) {
-  if (!rows || rows.length === 0) return <Empty text="Нет записей" />;
-
-  const used = fields.filter((f) => rows.some((r) => r[f] !== null && r[f] !== undefined));
-  const recent = rows.slice().reverse();
-
-  return (
-    <div className="table-wrap">
-      <table className="data">
-        <thead>
-          <tr>
-            <th className="sticky">Дата</th>
-            {used.map((f) => <th key={f} className="num">{f}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {recent.map((r, i) => (
-            <tr key={i}>
-              <td className="sticky nowrap">{formatDate(r.date)}</td>
-              {used.map((f) => (
-                <td key={f} className="num">
-                  {r[f] === null || r[f] === undefined ? '—' : formatNumber(r[f])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/* ==================================================================
  * Тренировочный план
  * ================================================================== */
 
@@ -285,68 +169,184 @@ export function Plan({ clientRow }) {
 }
 
 /* ==================================================================
- * Дашборд прогресса
+ * Прогресс и замеры
  * ================================================================== */
 
+/**
+ * Прогресс и замеры — один экран и один поход на сервер.
+ *
+ * Данные лежат в двух действиях: client.progress считает дельты и рост
+ * рабочих весов, client.measurements отдаёт сами замеры и канонический
+ * список показателей. Спрашивать их по очереди нельзя: у Apps Script
+ * платит время сам факт обращения, и два запроса — это две паузы подряд,
+ * а не вдвое больше данных. Поэтому оба действия уезжают одним пакетом.
+ *
+ * Отказ одного действия не роняет экран: пакет отвечает по каждому
+ * отдельно, и того, что доехало, хватает на большую часть страницы.
+ */
+function useProgressBundle(clientRow) {
+  const [state, setState] = useState({ loading: true, data: null, error: null });
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    const params = clientRow ? { clientRow } : {};
+
+    setState({ loading: true, data: null, error: null });
+
+    apiBatch([
+      { action: 'client.progress', params },
+      { action: 'client.measurements', params },
+    ])
+      .then((res) => {
+        if (!alive) return;
+
+        const progress = res['client.progress'];
+        const measurements = res['client.measurements'];
+        const okProgress = progress && progress.ok;
+        const okMeasurements = measurements && measurements.ok;
+
+        // Показывать нечего только когда не удалось ничего
+        if (!okProgress && !okMeasurements) {
+          setState({
+            loading: false,
+            data: null,
+            error: (progress && progress.error)
+              || (measurements && measurements.error)
+              || new Error('Сервер не ответил.'),
+          });
+          return;
+        }
+
+        setState({
+          loading: false,
+          error: null,
+          data: {
+            progress: okProgress ? progress.data : null,
+            measurements: okMeasurements ? measurements.data : null,
+          },
+        });
+      })
+      .catch((error) => {
+        if (alive) setState({ loading: false, data: null, error });
+      });
+
+    return () => { alive = false; };
+  }, [clientRow, attempt]);
+
+  return { ...state, reload: () => setAttempt((n) => n + 1) };
+}
+
 export function Progress({ clientRow }) {
-  const { loading, data, error, reload } = useData(
-    'client.progress', clientRow ? { clientRow } : {}, [clientRow]
-  );
+  const { loading, data, error, reload } = useProgressBundle(clientRow);
+  const [field, setField] = useState('Вес');
 
   if (loading) return <Loading rows={3} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
-  const series = data.series || [];
-  const lifts = data.lifts || [];
+  const progress = data.progress;
+  const measurements = data.measurements;
 
-  const weightSeries = series
-    .map((s) => ({
-      label: s.label || 'Вес',
-      points: (s.rows || [])
-        .filter((r) => r['Вес'] !== null && r['Вес'] !== undefined)
-        .map((r) => ({ x: r.date, y: r['Вес'] })),
-    }))
-    .filter((s) => s.points.length > 0);
+  // Оба действия читают одни и те же листы «Показатели» и в одном
+  // порядке, поэтому дельты ложатся на замеры по позиции серии.
+  const measureSeries = (measurements && measurements.series) || [];
+  const progressSeries = (progress && progress.series) || [];
+  const base = measureSeries.length ? measureSeries : progressSeries;
 
+  const series = base.map((s, i) => ({
+    label: s.label || '',
+    rows: s.rows || [],
+    deltas: (progressSeries[i] && progressSeries[i].deltas) || s.deltas || {},
+  }));
+
+  const lifts = (progress && progress.lifts) || [];
   const grew = lifts.filter((l) => l.delta > 0);
-  const mainDelta = series[0] && series[0].deltas ? series[0].deltas['Вес'] : null;
+  const hasRows = series.some((s) => s.rows.length > 0);
 
-  if (weightSeries.length === 0 && lifts.length === 0) {
+  if (!hasRows && lifts.length === 0) {
     return (
       <Empty
         icon={IconProgress}
-        title="Данных для прогресса пока мало"
-        text="Нужны хотя бы два замера или заполненные рабочие веса в программе месяца."
+        title="Прогресс пока не из чего собрать"
+        text={
+          (measurements && measurements.note)
+          || 'Нужен хотя бы один замер или заполненные рабочие веса в программе месяца — '
+             + 'тогда здесь появятся динамика, изменения и таблица замеров.'
+        }
       />
     );
   }
 
+  // Одна метрика за раз. Вес и обхваты живут в разных диапазонах: на общей
+  // оси линия веса прижмётся к низу, а двух шкал на графике быть не должно.
+  const fields = measureFields(measurements, series);
+  const available = fields.filter((f) =>
+    series.some((s) => s.rows.some((r) => r[f] !== null && r[f] !== undefined))
+  );
+
+  const activeField = available.indexOf(field) !== -1 ? field : available[0];
+  const unit = activeField === 'Вес' ? ' кг' : ' см';
+
+  const chartSeries = series.map((s) => ({
+    label: s.label || 'Замеры',
+    points: s.rows
+      .filter((r) => r[activeField] !== null && r[activeField] !== undefined)
+      .map((r) => ({ x: r.date, y: r[activeField] })),
+  }));
+
+  // Ведущая серия — первая: у сольного клиента она единственная, у
+  // сплит-пары крупная цифра всё равно может быть только чья-то одна.
+  const points = (chartSeries[0] && chartSeries[0].points) || [];
+  const first = points.length ? points[0] : null;
+  const last = points.length ? points[points.length - 1] : null;
+  const change = points.length > 1 ? Math.round((last.y - first.y) * 10) / 10 : null;
+
+  const facts = [
+    change !== null ? { label: 'Изменение', value: <Delta value={change} suffix={unit} /> } : null,
+    lifts.length
+      ? { label: 'Веса выросли', value: grew.length + ' из ' + lifts.length }
+      : (points.length ? { label: 'Всего замеров', value: formatNumber(points.length) } : null),
+  ].filter(Boolean);
+
+  const hasDeltas = series.some((s) => Object.keys(s.deltas).length > 0);
+
   return (
     <>
-      {mainDelta && (
+      {available.length > 1 && <Chips items={available} value={activeField} onChange={setField} />}
+
+      {hasRows ? (
         <Lead
-          label="Вес"
-          tone="info"
-          value={formatNumber(mainDelta.last) + ' кг'}
-          hint={`было ${formatNumber(mainDelta.first)} кг с ${formatDate(mainDelta.firstDate, false)}`}
-          facts={[
-            { label: 'Изменение', value: <Delta value={mainDelta.delta} suffix=" кг" /> },
-            lifts.length
-              ? { label: 'Веса выросли', value: grew.length + ' из ' + lifts.length }
-              : null,
-          ]}
+          label={activeField}
+          value={last ? formatNumber(last.y) + unit : '—'}
+          hint={
+            change !== null
+              ? 'было ' + formatNumber(first.y) + unit + ' с ' + formatDate(first.x, false)
+              : last ? 'замер от ' + formatDate(last.x) : undefined
+          }
+          facts={facts.length ? facts : undefined}
+        />
+      ) : (
+        // Замеров нет, но программа месяца заполнена — вести экран нечем,
+        // кроме роста весов, и это честный ответ на «что изменилось».
+        <Lead
+          label="Рабочие веса"
+          value={grew.length + ' из ' + lifts.length}
+          hint="упражнений прибавили с прошлого месяца"
+          facts={progress && progress.currentMonth
+            ? [{ label: 'Месяц', value: progress.currentMonth }]
+            : undefined}
         />
       )}
 
-      {weightSeries.length > 0 && (
-        <Section title="Динамика веса" note="килограммы по датам замеров">
+      {hasRows && (
+        <Section title="Динамика" note={'по датам замеров,' + unit}>
           <Panel pad>
-            <LineChart series={weightSeries} unit=" кг" />
+            <LineChart series={chartSeries} unit={unit} />
           </Panel>
         </Section>
       )}
 
-      {series.some((s) => Object.keys(s.deltas || {}).length > 0) && (
+      {hasDeltas && (
         <Section title="Изменения по замерам" note="от первого к последнему">
           <Panel pad>
             {series.map((s, i) => (
@@ -372,9 +372,7 @@ export function Progress({ clientRow }) {
                             <td>{f}</td>
                             <td className="num">{formatNumber(d.first)}</td>
                             <td className="num">{formatNumber(d.last)}</td>
-                            <td className="num">
-                              <Delta value={d.delta} />
-                            </td>
+                            <td className="num"><Delta value={d.delta} /></td>
                           </tr>
                         );
                       })}
@@ -388,7 +386,10 @@ export function Progress({ clientRow }) {
       )}
 
       {lifts.length > 0 && (
-        <Section title="Рабочие веса" note={`${data.currentMonth} против прошлого месяца`}>
+        <Section
+          title="Рабочие веса"
+          note={(progress && progress.currentMonth ? progress.currentMonth : 'этот месяц') + ' против прошлого месяца'}
+        >
           <Panel pad>
             <div className="table-wrap">
               <table className="data">
@@ -415,73 +416,503 @@ export function Progress({ clientRow }) {
           </Panel>
         </Section>
       )}
+
+      {/* Сырые замеры — в самом низу: до них доходят, когда нужна не
+          картина, а конкретная цифра за конкретную дату */}
+      {hasRows
+        ? series.map((s, i) => (
+            <Section key={i} title={s.label ? 'Замеры: ' + s.label : 'Замеры'}>
+              <Panel pad>
+                <MeasureTable rows={s.rows} fields={fields} />
+              </Panel>
+            </Section>
+          ))
+        : (
+          <Section title="Замеры">
+            <Panel pad>
+              <Empty
+                icon={IconRuler}
+                text={(measurements && measurements.note)
+                  || 'Замеров пока нет. Появятся, как только тренер внесёт первый.'}
+              />
+            </Panel>
+          </Section>
+        )}
     </>
   );
 }
+
+/**
+ * Список показателей. Обычно приходит с сервера готовым — в нём и порядок,
+ * и метрики, которых у клиента ещё нет. Если ответ с замерами не доехал,
+ * собираем список из самих строк: ключи там в том же порядке.
+ */
+function measureFields(measurements, series) {
+  if (measurements && measurements.fields && measurements.fields.length) return measurements.fields;
+
+  const out = [];
+  series.forEach((s) => s.rows.forEach((r) => {
+    Object.keys(r).forEach((k) => {
+      if (k !== 'date' && out.indexOf(k) === -1) out.push(k);
+    });
+  }));
+
+  return out;
+}
+
+function MeasureTable({ rows, fields }) {
+  if (!rows || rows.length === 0) return <Empty text="Нет записей" />;
+
+  const used = fields.filter((f) => rows.some((r) => r[f] !== null && r[f] !== undefined));
+  const recent = rows.slice().reverse();
+
+  return (
+    <div className="table-wrap">
+      <table className="data">
+        <thead>
+          <tr>
+            <th className="sticky">Дата</th>
+            {used.map((f) => <th key={f} className="num">{f}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {recent.map((r, i) => (
+            <tr key={i}>
+              <td className="sticky nowrap">{formatDate(r.date)}</td>
+              {used.map((f) => (
+                <td key={f} className="num">
+                  {r[f] === null || r[f] === undefined ? '—' : formatNumber(r[f])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* Карточка клиента у тренера пока разводит «Прогресс» и «Замеры» по
+   разным пунктам. Псевдоним держит её сборку живой до тех пор, пока
+   пункты там не сведены в один; после этого его надо убрать. */
 
 /* ==================================================================
  * Питание
  * ================================================================== */
 
+
+/**
+ * Анкета питания и посчитанная по ней норма.
+ *
+ * Раздел до сих пор был витриной без данных, и дело не в вёрстке: норму
+ * некому было посчитать. Тренер не станет считать её вручную восемнадцати
+ * клиентам, а клиент не полезет в таблицу. Поэтому здесь клиент отвечает
+ * на шесть вопросов о себе, а считает и записывает таблица.
+ *
+ * Два состояния, и оба полноценные:
+ *
+ * — анкеты нет: сначала короткое объяснение, зачем это, и сразу форма.
+ *   Пустое состояние с одной кнопкой «заполнить» добавило бы лишнее
+ *   нажатие ровно там, где человек уже готов отвечать;
+ * — анкета есть: крупно норма (ради неё и приходят), под ней ответы, по
+ *   которым она получена, и дата. Без ответов рядом число нечем
+ *   проверить, а вес меняется каждый месяц.
+ *
+ * СЧИТАЕМ НЕ ЗДЕСЬ. Формула живёт в Apps Script (src/150_OpsApi.js) — там
+ * же, где строка клиента. Вторая её копия во фронте однажды разошлась бы
+ * с первой, причём молча. Отсюда же правило про справочники: уровни
+ * активности и цели приезжают ответом сервера, а не лежат в этом файле,
+ * потому что это часть той же шкалы, по которой идёт расчёт.
+ *
+ * Этот же экран тренер открывает в карточке клиента — тогда приезжает
+ * clientRow, и анкету можно заполнить за того, кто приложением не
+ * пользуется.
+ */
 export function Nutrition({ clientRow }) {
   const { loading, data, error, reload } = useData(
     'client.nutrition', clientRow ? { clientRow } : {}, [clientRow]
   );
 
-  if (loading) return <Loading rows={2} />;
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(null);
+
+  // Тренер переключается между клиентами в одной и той же карточке, и
+  // экран при этом не размонтируется. Без сброса «норма записана» осталось
+  // бы висеть над анкетой следующего клиента — сообщение о чужом действии
+  // на чужих цифрах.
+  useEffect(() => {
+    setSaved(null);
+    setEditing(false);
+  }, [clientRow]);
+
+  if (loading) return <Loading rows={3} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
+  const byTrainer = !!clientRow;
+  const configured = !!data.configured;
+  const options = data.options;
+  const survey = data.survey || null;
   const targets = data.targets || {};
-  const withValues = Object.keys(targets).filter((k) => targets[k]);
 
-  if (!data.configured) {
+  // Ответ без справочников — это либо очень старый кэш, либо развёртывание
+  // Apps Script, отставшее от кода. Рисовать форму нечем: список уровней
+  // активности придумывать здесь нельзя, он часть расчёта.
+  if (!options || !options.activity || !options.goal) {
     return (
       <Empty
         icon={IconNutrition}
-        title="Раздел готовится"
-        text={
-          'Здесь появятся нормы КБЖУ и рацион.\n\n' +
-          `Чтобы включить: добавьте лист «${data.sheetName}» в личную таблицу ` +
-          'или колонки Ккал, Белки, Жиры, Углеводы на лист «Клиенты».'
-        }
+        title="Анкета недоступна"
+        text={'Сервер не прислал варианты для формы.\n\nОбновите приложение или проверьте развёртывание Apps Script.'}
       />
     );
   }
 
-  const lead = withValues[0];
+  const showForm = editing || !configured;
+
+  const onSaved = (result) => {
+    setSaved(result);
+    setEditing(false);
+    // Перечитываем с сервера, а не правим показанное на месте: тренер
+    // вправе поправить норму в таблице руками, и экран обязан показывать
+    // её, а не то, что следует из формулы.
+    reload();
+  };
 
   return (
     <>
-      {lead && (
+      {configured && (
         <Lead
-          label={'Норма · ' + lead}
-          value={formatNumber(targets[lead])}
-          facts={withValues.slice(1).map((k) => ({ label: k, value: formatNumber(targets[k]) }))}
+          label="Суточная норма"
+          value={formatNumber(targets.kcal) + ' ккал'}
+          hint={survey && survey.goalLabel ? survey.goalLabel : undefined}
+          facts={[
+            { label: 'Белки', value: grams(targets.protein) },
+            { label: 'Жиры', value: grams(targets.fat) },
+            { label: 'Углеводы', value: grams(targets.carbs) },
+          ]}
         />
       )}
 
-      {data.meals && data.meals.length > 0 && (
-        <Section title="Рацион">
-          <Panel pad>
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    {Object.keys(data.meals[0]).map((h) => <th key={h}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.meals.map((meal, i) => (
-                    <tr key={i}>
-                      {Object.keys(data.meals[0]).map((h) => <td key={h}>{meal[h]}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      {saved && !editing && (
+        <Section>
+          <Note tone="good">
+            Норма посчитана и записана в таблицу
+            {saved.clientName ? ' — ' + saved.clientName : ''}.
+            {byTrainer ? '' : ' Тренер получил уведомление.'}
+          </Note>
+        </Section>
+      )}
+
+      {/* Поправки расчёта приезжают только в ответе на запись: по ним видно,
+          почему получилось не ровно то, что следует из цели. Промолчать о
+          них значило бы оставить человека с необъяснимым числом. */}
+      {saved && !editing && saved.notes && saved.notes.length > 0 && (
+        <Section>
+          <Note tone="info">
+            {saved.notes.map((text, i) => <div key={i}>{text}</div>)}
+          </Note>
+        </Section>
+      )}
+
+      {configured && !editing && survey && (
+        <Section title="Анкета" note="по этим ответам посчитана норма">
+          <Panel>
+            <Rows>
+              <Row label="Возраст">
+                {survey.age} {plural(survey.age, 'год', 'года', 'лет')}
+              </Row>
+              <Row label="Вес">{formatNumber(survey.weight)} кг</Row>
+              <Row label="Рост">{formatNumber(survey.height)} см</Row>
+              <Row label="Пол">{survey.sex === 'm' ? 'мужской' : 'женский'}</Row>
+              <Row label="Активность">{survey.activityLabel || survey.activity}</Row>
+              <Row label="Цель">{survey.goalLabel || survey.goal}</Row>
+              {data.filledAt && (
+                <Row label="Заполнено">
+                  {formatDate(data.filledAt)} · {relativeDays(data.filledAt)}
+                </Row>
+              )}
+            </Rows>
           </Panel>
+        </Section>
+      )}
+
+      {configured && !editing && (
+        <Section>
+          <Panel pad>
+            <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
+              Изменился вес или цель — заполните анкету заново, норма пересчитается.
+            </p>
+            <button className="button button--block" onClick={() => setEditing(true)}>
+              Заполнить заново
+            </button>
+          </Panel>
+        </Section>
+      )}
+
+      {!configured && !editing && (
+        <Section>
+          <Note tone="info" icon={IconNutrition}>
+            {byTrainer
+              ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и ляжет в таблицу так же, как если бы он сделал это сам.'
+              : 'Шесть ответов о себе — и вы увидите суточную норму калорий и БЖУ. Считает её таблица, тренер получит результат сразу.'}
+          </Note>
+        </Section>
+      )}
+
+      {showForm && (
+        <Section title={configured ? 'Заполнить заново' : 'Анкета'}>
+          <NutritionForm
+            options={options}
+            survey={survey}
+            clientRow={clientRow}
+            onSaved={onSaved}
+            onCancel={configured ? () => setEditing(false) : null}
+          />
         </Section>
       )}
     </>
   );
+}
+
+/** «169 г» — единица прижата к числу: иначе ряд фактов читается как
+ *  список голых чисел, и белки от углеводов отличает только подпись */
+function grams(value) {
+  return value === null || value === undefined ? '—' : formatNumber(value) + ' г';
+}
+
+/**
+ * Форма анкеты.
+ *
+ * Проверка здесь — вежливость, а не защита: сервер и Apps Script проверяют
+ * то же самое у себя, и окончательный отказ всегда их. Смысл местной
+ * проверки в том, чтобы про «рост 1,75» человек узнал сразу, а не через
+ * несколько секунд ожидания Apps Script, и чтобы мусор не уезжал в таблицу
+ * вовсе.
+ *
+ * Границы полей берём из ответа сервера (options.limits), а не пишем
+ * числами здесь: разойдись они — форма начнёт обещать то, чего сервер не
+ * примет. Границ в ответе нет — местная проверка их просто не делает, и
+ * последнее слово остаётся за сервером.
+ */
+function NutritionForm({ options, survey, clientRow, onSaved, onCancel }) {
+  const [form, setForm] = useState(() => ({
+    age: survey && survey.age ? String(survey.age) : '',
+    weight: survey && survey.weight ? String(survey.weight) : '',
+    height: survey && survey.height ? String(survey.height) : '',
+    sex: (survey && survey.sex) || '',
+    activity: (survey && survey.activity) || '',
+    goal: (survey && survey.goal) || '',
+  }));
+
+  const [errors, setErrors] = useState({});
+  const [attempted, setAttempted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+
+  const inputs = useRef({});
+  const limits = options.limits || {};
+
+  // До первой попытки отправить молчим: подчёркивать красным поле, в
+  // которое человек ещё не дописал, — значит ругаться на него за то, что
+  // он печатает. После неё, наоборот, пересчитываем на каждый знак: он
+  // уже знает про ошибку и сейчас её чинит.
+  const set = (field, value) => {
+    const next = { ...form, [field]: value };
+    setForm(next);
+    if (attempted) setErrors(validateSurvey(next, limits));
+    setFailure(null);
+  };
+
+  const submit = async () => {
+    const found = validateSurvey(form, limits);
+
+    setAttempted(true);
+    setErrors(found);
+    setFailure(null);
+
+    const bad = Object.keys(found);
+    if (bad.length) {
+      // Ошибка может оказаться выше края экрана — уводим к ней сами,
+      // иначе нажатие выглядит как «кнопка не работает»
+      const node = inputs.current[bad[0]];
+      if (node && node.focus) node.focus();
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await apiMutate('nutrition.save', {
+        ...(clientRow ? { clientRow } : {}),
+        age: form.age,
+        weight: form.weight,
+        height: form.height,
+        sex: form.sex,
+        activity: form.activity,
+        goal: form.goal,
+      });
+      onSaved(result);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel pad>
+      <div className="survey">
+        <div className="survey__group">
+          <div className="field-row">
+            <Field
+              label="Возраст, лет"
+              placeholder="34"
+              value={form.age}
+              onChange={(v) => set('age', v)}
+              error={errors.age}
+              disabled={busy}
+              inputRef={(el) => { inputs.current.age = el; }}
+            />
+            <Field
+              label="Вес, кг"
+              placeholder="76,9"
+              inputMode="decimal"
+              value={form.weight}
+              onChange={(v) => set('weight', v)}
+              error={errors.weight}
+              disabled={busy}
+              inputRef={(el) => { inputs.current.weight = el; }}
+            />
+            <Field
+              label="Рост, см"
+              placeholder="175"
+              value={form.height}
+              onChange={(v) => set('height', v)}
+              error={errors.height}
+              disabled={busy}
+              inputRef={(el) => { inputs.current.height = el; }}
+            />
+          </div>
+        </div>
+
+        <div className="survey__group">
+          <div className="survey__legend">
+            Пол
+            <span className="survey__legend-note">
+              без него основной обмен не считается
+            </span>
+          </div>
+          <Segmented
+            items={options.sexes || []}
+            value={form.sex}
+            onChange={(v) => set('sex', v)}
+            label="Пол"
+            disabled={busy}
+          />
+          {errors.sex && <span className="field__error">{errors.sex}</span>}
+        </div>
+
+        <div className="survey__group">
+          <div className="survey__legend">
+            Уровень активности
+            <span className="survey__legend-note">
+              считайте все тренировки за неделю, не только с тренером
+            </span>
+          </div>
+          <Options
+            items={options.activity}
+            value={form.activity}
+            onChange={(v) => set('activity', v)}
+            label="Уровень активности"
+            disabled={busy}
+          />
+          {errors.activity && <span className="field__error">{errors.activity}</span>}
+        </div>
+
+        <div className="survey__group">
+          <div className="survey__legend">Цель</div>
+          <Options
+            items={options.goal}
+            value={form.goal}
+            onChange={(v) => set('goal', v)}
+            label="Цель"
+            disabled={busy}
+          />
+          {errors.goal && <span className="field__error">{errors.goal}</span>}
+        </div>
+
+        {/* Отказ сервера показываем его же словами: он называет и поле, и
+            что с ним не так. Переписывать это здесь значило бы завести
+            второй словарь ошибок, который однажды отстанет от первого. */}
+        {failure && <Note tone="critical">{failure.message}</Note>}
+
+        <div className="survey__actions">
+          <button
+            className="button button--primary button--block"
+            onClick={submit}
+            disabled={busy}
+          >
+            {busy ? 'Считаем…' : 'Посчитать норму'}
+          </button>
+
+          {onCancel && (
+            <button className="button button--block" onClick={onCancel} disabled={busy}>
+              Отмена
+            </button>
+          )}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * Проверка анкеты до отправки.
+ *
+ * Повторяет серверную (server/src/lib/nutrition.js) по существу, но не
+ * дословно: под полем на телефоне помещается строка, а не предложение.
+ * Совпадать обязано то, ЧТО отклоняется, а не какими словами.
+ */
+function validateSurvey(form, limits) {
+  const found = {};
+
+  const age = parseField(form.age);
+  if (age === null) found.age = 'Укажите возраст';
+  else if (Number.isNaN(age) || age <= 0) found.age = 'Нужно число';
+  else if (outOfRange(age, limits.age)) found.age = range(limits.age, 'лет');
+
+  const weight = parseField(form.weight);
+  if (weight === null) found.weight = 'Укажите вес';
+  else if (Number.isNaN(weight) || weight <= 0) found.weight = 'Нужно число';
+  else if (outOfRange(weight, limits.weight)) found.weight = range(limits.weight, 'кг');
+
+  const height = parseField(form.height);
+  if (height === null) found.height = 'Укажите рост';
+  else if (Number.isNaN(height) || height <= 0) found.height = 'Нужно число';
+  // Самая частая опечатка формы: в телефоне привычнее «1,75». Молча
+  // умножать на сто нельзя — подмена однажды угадает неправильно, а
+  // перепроверять посчитанную норму никто не станет.
+  else if (height > 1.2 && height < 2.3) found.height = 'В сантиметрах: 175, а не 1,75';
+  else if (outOfRange(height, limits.height)) found.height = range(limits.height, 'см');
+
+  if (!form.sex) found.sex = 'Выберите пол';
+  if (!form.activity) found.activity = 'Выберите уровень активности';
+  if (!form.goal) found.goal = 'Выберите цель';
+
+  return found;
+}
+
+/** null — пусто, NaN — не число, иначе само число. Запятая как у сервера */
+function parseField(raw) {
+  const s = String(raw === undefined || raw === null ? '' : raw).replace(',', '.').trim();
+  if (!s) return null;
+  return Number(s);
+}
+
+function outOfRange(value, limit) {
+  if (!limit || limit.min === undefined || limit.max === undefined) return false;
+  return value < limit.min || value > limit.max;
+}
+
+function range(limit, unit) {
+  return 'От ' + limit.min + ' до ' + limit.max + ' ' + unit;
 }

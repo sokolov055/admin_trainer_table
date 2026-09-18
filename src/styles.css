@@ -45,6 +45,10 @@
   --grid: #e6e3da;
   --axis: #c6c2b6;
 
+  /* Затемнение под выдвижной панелью: тёплое, из той же основы, что и
+     нейтрали, — нейтрально-чёрная пелена на тёплом фоне выглядит грязной. */
+  --scrim: rgba(26, 24, 21, 0.42);
+
   /* --- данные ---
      Вторая серия — бирюзовая, а не оранжевая: тёплые тона отданы
      смысловым заливкам, и линия данных не должна с ними перекликаться. */
@@ -112,6 +116,10 @@
   --dur-press: 120ms;
   --dur-fast: 160ms;
   --dur: 220ms;
+  /* Выдвижная панель едет дольше остального: она проходит весь экран, и на
+     220 мс движение читается как рывок. Значение продублировано в ui.jsx —
+     там по нему считается момент размонтажа. */
+  --dur-panel: 260ms;
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -137,6 +145,8 @@
   --border-strong: rgba(255, 255, 255, 0.2);
   --grid: #302d33;
   --axis: #403c44;
+
+  --scrim: rgba(0, 0, 0, 0.58);
 
   --series-1: #3987e5;
   --series-2: #22a97a;
@@ -187,6 +197,8 @@
     --border-strong: rgba(255, 255, 255, 0.2);
     --grid: #302d33;
     --axis: #403c44;
+
+    --scrim: rgba(0, 0, 0, 0.58);
 
     --series-1: #3987e5;
     --series-2: #22a97a;
@@ -286,12 +298,56 @@ button { font-family: inherit; }
   margin: 0 auto;
 }
 
+/* Заголовок и кнопка меню стоят на одной строке: отдельный ряд только
+   ради гамбургера съел бы вертикаль, которой на телефоне и так мало. */
+.app__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.app__headline { min-width: 0; }
+
 .app__title {
   margin: 0;
   font-size: var(--text-xl);
   font-weight: 680;
   letter-spacing: -0.021em;
   line-height: 1.2;
+}
+
+/* Подразделы раздела — в шапке, рядом с его названием. В теле экрана
+   ниже живут фильтры, и два ряда кнопок подряд слились бы в один. */
+.app__subnav { margin-top: var(--space-3); }
+.app__subnav .chips { margin-bottom: 0; }
+
+/**
+ * Кнопка-иконка. Рисованная часть маленькая, область нажатия — нет:
+ * 44 пикселя это нижняя граница попадания пальцем, а не запас.
+ */
+.icon-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.icon-button:active { transform: scale(0.94); background: var(--surface-active); }
+
+@media (hover: hover) and (pointer: fine) {
+  .icon-button:hover { background: var(--surface-hover); color: var(--text); }
 }
 
 .app__subtitle {
@@ -359,6 +415,149 @@ button { font-family: inherit; }
   display: flex;
   height: 22px;
   align-items: center;
+}
+
+/* ==========================================================================
+   Боковое меню
+   Здесь редкое: логи, листы, настройки. Панель приезжает справа — с той же
+   стороны, где кнопка, которая её позвала, иначе движение не связывается
+   с нажатием.
+   ========================================================================== */
+
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  opacity: 0;
+  transition: opacity var(--dur-panel) var(--ease-out);
+}
+
+.drawer--in .drawer__scrim { opacity: 1; }
+
+.drawer__panel {
+  position: relative;
+  width: min(320px, 84vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-3)
+           calc(var(--space-4) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  /* Прокрутка не уходит на страницу под панелью */
+  overscroll-behavior: contain;
+  /* Вертикаль остаётся браузеру, горизонталь разбирает сама панель:
+     смахивание вбок закрывает меню */
+  touch-action: pan-y;
+  transform: translateX(100%);
+  transition: transform var(--dur-panel) var(--ease-out);
+  outline: none;
+}
+
+.drawer--in .drawer__panel { transform: translateX(0); }
+
+.menu__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding-left: var(--space-3);
+}
+
+.menu__title {
+  font-size: var(--text-md);
+  font-weight: 650;
+  letter-spacing: -0.014em;
+}
+
+.menu__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.menu__item:active { transform: scale(0.97); background: var(--surface-active); }
+
+@media (hover: hover) and (pointer: fine) {
+  .menu__item:hover { background: var(--surface-hover); }
+}
+
+/* Открытый раздел подсвечен: меню закрывается сразу после выбора, и, придя
+   сюда снова, человек должен увидеть, где он находится. */
+.menu__item--active {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.menu__icon {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.menu__item--active .menu__icon { color: inherit; }
+
+.menu__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.menu__label { font-weight: 600; letter-spacing: -0.008em; }
+
+.menu__note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.menu__item--active .menu__note { color: color-mix(in srgb, var(--accent) 70%, transparent); }
+
+/* ==========================================================================
+   Настройка
+   ========================================================================== */
+
+.setting__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: 550;
+  margin-bottom: var(--space-2);
+}
+
+.setting__note {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  max-width: 46ch;
 }
 
 /* ==========================================================================
@@ -704,6 +903,8 @@ button { font-family: inherit; }
 
 .chips::-webkit-scrollbar { display: none; }
 
+.chips--flush { margin-bottom: 0; }
+
 .chip {
   flex: 0 0 auto;
   border: 1px solid var(--border);
@@ -723,6 +924,12 @@ button { font-family: inherit; }
 
 .chip:active { transform: scale(0.96); }
 
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .chip:hover { border-color: var(--border-strong); }
 }
@@ -731,6 +938,36 @@ button { font-family: inherit; }
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
+}
+
+/**
+ * Подразделы раздела. Это не фильтр, а ответ на вопрос «где я», поэтому
+ * выглядят они иначе: приподнятая плашка в утопленной дорожке вместо
+ * заливки акцентом. Два ряда одинаковых синих кнопок на одном экране —
+ * подразделы сверху и фильтры ниже — спорили бы за одно и то же внимание.
+ */
+.chips--nav {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  max-width: 100%;
+}
+
+.chips--nav .chip {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+  padding: 6px 15px;
+}
+
+.chips--nav .chip--active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ==========================================================================
@@ -953,7 +1190,17 @@ th.sticky, td.sticky {
     to { opacity: 1; }
   }
 
-  .item:active, .button:active, .chip:active, .tabbar__item:active { transform: none; }
+  .item:active, .button:active, .chip:active, .tabbar__item:active,
+  .icon-button:active, .menu__item:active { transform: none; }
+
+  /* Панель не едет через весь экран, а проявляется на месте */
+  .drawer__panel {
+    transform: none;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .drawer--in .drawer__panel { transform: none; opacity: 1; }
 }
 
 /* ==========================================================================
@@ -1048,6 +1295,7 @@ code {
   margin-bottom: 5px;
 }
 
+.field__input,
 .pay-field__input {
   width: 100%;
   font-family: inherit;
@@ -1062,11 +1310,13 @@ code {
   transition: border-color var(--dur-fast) var(--ease-out);
 }
 
+.field__input:focus,
 .pay-field__input:focus {
   outline: none;
   border-color: var(--accent);
 }
 
+.field__input:disabled,
 .pay-field__input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -1116,4 +1366,185 @@ code {
   display: flex;
   gap: var(--space-2);
   margin-top: var(--space-3);
+}
+
+/* ==========================================================================
+   Формы
+   Полей ввода в приложении мало, и все они живут в одном словаре с кнопкой
+   и фильтром: одна высота, один радиус, одна рамка, один отклик на фокус.
+   ========================================================================== */
+
+.field { display: block; }
+
+.field__label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+/* Подсказка и ошибка занимают одно и то же место, поэтому поле не
+   подпрыгивает в момент, когда ошибка появляется или уходит */
+.field__hint,
+.field__error {
+  display: block;
+  margin-top: 5px;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.field__hint { color: var(--text-muted); }
+.field__error { color: var(--critical-text); }
+
+.field--bad .field__input { border-color: var(--critical); }
+
+.field--bad .field__input:focus { border-color: var(--critical); }
+
+/* Возраст, вес и рост — три коротких числа, и стоять им в столбик незачем:
+   в ряд они читаются как одна мысль «вот я», а форма становится короче на
+   два экрана прокрутки. */
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: start;
+}
+
+/* --- выбор одного из нескольких --- */
+
+.options {
+  display: grid;
+  gap: 6px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 13px;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.option:active { transform: scale(0.97); }
+
+@media (hover: hover) and (pointer: fine) {
+  .option:hover { border-color: var(--border-strong); }
+}
+
+.option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.option--active {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Кружок слева, а не галочка сама по себе: пустой кружок сообщает, что
+   выбор ещё не сделан, — галочка в этом положении просто отсутствует, и
+   строка выглядит как обычный текст. */
+.option__mark {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  border: 1.75px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+
+.option--active .option__mark {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.option__label { min-width: 0; }
+
+/* --- итог действия --- */
+
+.note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.note__icon { display: flex; flex-shrink: 0; margin-top: 1px; }
+.note__text { min-width: 0; }
+
+.note--good {
+  background: var(--good-fill);
+  border-color: var(--good-line);
+  color: var(--good-text);
+}
+
+.note--critical {
+  background: var(--critical-fill);
+  border-color: var(--critical-line);
+  color: var(--critical-text);
+}
+
+.note--info {
+  background: var(--info-fill);
+  border-color: var(--info-line);
+  color: var(--info-text);
+}
+
+/* ==========================================================================
+   Питание
+   ========================================================================== */
+
+/* Группы внутри анкеты. Между группами расстояния больше, чем внутри
+   группы: «возраст-вес-рост» — одна мысль, «пол» — следующая. */
+.survey {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.survey__group { display: grid; gap: var(--space-2); }
+
+.survey__legend {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.survey__legend-note {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.survey__actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
