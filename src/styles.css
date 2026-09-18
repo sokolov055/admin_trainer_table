@@ -693,8 +693,15 @@ button { font-family: inherit; }
 .stories__item--seen .stories__face { color: var(--text-muted); }
 .stories__item--seen .stories__label { color: var(--text-muted); }
 
+/* Подсветка при наведении кладётся ПОВЕРХ непрозрачной поверхности, а не
+   вместо неё: --surface-hover полупрозрачна, и одной ею кружок превращался
+   бы в сплошной диск — сквозь вырез светило бы кольцо. */
 @media (hover: hover) and (pointer: fine) {
-  .stories__item:hover .stories__face { background: var(--surface-hover); }
+  .stories__item:hover .stories__face {
+    background:
+      linear-gradient(var(--surface-hover), var(--surface-hover)),
+      var(--surface);
+  }
 }
 
 /* --- Полноэкранный просмотр ---
@@ -767,13 +774,32 @@ button { font-family: inherit; }
   to { transform: scaleX(1); }
 }
 
+/* Шапка темы: что это за подборка и выход. Подпись не меняется, пока
+   листаются кадры, — по ней видно, что это одна история, а не пять. */
+.story__top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.story__caption {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 560;
+  letter-spacing: -0.005em;
+  color: rgba(242, 240, 234, 0.72);
+}
+
 .story__close {
-  align-self: flex-end;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
-  margin: var(--space-2) calc(var(--space-2) * -1) 0 0;
+  margin-right: calc(var(--space-2) * -1);
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -793,6 +819,7 @@ button { font-family: inherit; }
    снизу, и середина экрана — ровно то место, которое им и закрывают. */
 .story__frame {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -805,16 +832,35 @@ button { font-family: inherit; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.story__icon {
+/* Картинка кадра. Панель под ней чуть светлее поверхности — ровно
+   настолько, чтобы рисунок читался как отдельный предмет на экране, а не
+   как линии, висящие в пустоте. */
+.story__art-box {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  /* Сжимается первой: на коротком экране текст важнее картинки, и уехать
+     под край он не должен ни при какой высоте окна. */
+  flex: 0 1 auto;
+  min-height: 0;
   margin-bottom: var(--space-4);
+  padding: var(--space-3);
   border-radius: var(--radius-lg);
-  background: rgba(242, 240, 234, 0.1);
+  background: rgba(242, 240, 234, 0.05);
+  border: 1px solid rgba(242, 240, 234, 0.08);
   color: #f2f0ea;
 }
+
+.story-art {
+  width: 100%;
+  height: auto;
+  max-height: min(200px, 22vh);
+  display: block;
+}
+
+/* Цвет картинки задаёт кадр — инлайном, из данных. Здесь только запасное
+   значение: объявить --tint на самой картинке нельзя, собственное свойство
+   перекрыло бы унаследованное, и все кадры стали бы одного цвета. */
+.story { --tint: var(--accent-solid); }
 
 .story__date {
   margin: 0 0 var(--space-2);
