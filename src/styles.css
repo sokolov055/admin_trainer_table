@@ -281,6 +281,13 @@ button { font-family: inherit; }
 
 #root { min-height: 100vh; }
 
+/* Высота окна в мобильных браузерах меняется вместе с адресной строкой, и
+   100vh там больше видимой области. dvh считает по-настоящему видимое;
+   строка ниже, а не вместо — старые вебвью его не знают. */
+@supports (height: 100dvh) {
+  #root { min-height: 100dvh; }
+}
+
 /* ==========================================================================
    Каркас
    ========================================================================== */
@@ -289,6 +296,10 @@ button { font-family: inherit; }
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  .app { min-height: 100dvh; }
 }
 
 .app__header {
@@ -358,7 +369,10 @@ button { font-family: inherit; }
 
 .app__body {
   flex: 1;
-  padding: var(--space-3) var(--space-4) 96px;
+  /* Снизу — высота панели вкладок и полоса «домой» под ней: панель растёт
+     на безопасную зону, и без этого последняя строка списка уезжала бы
+     под неё ровно на эту величину. */
+  padding: var(--space-3) var(--space-4) calc(96px + env(safe-area-inset-bottom));
   max-width: 860px;
   width: 100%;
   margin: 0 auto;
@@ -415,6 +429,40 @@ button { font-family: inherit; }
   display: flex;
   height: 22px;
   align-items: center;
+}
+
+/**
+ * Запуск с иконки на рабочем столе.
+ *
+ * Там нет ни адресной строки, ни шапки Telegram — приложение занимает
+ * весь экран, и часы с вырезом ложатся прямо на шапку. Отступ сверху
+ * добавляется ТОЛЬКО в этом режиме: внутри мессенджера мини-приложение
+ * и так начинается ниже его собственной шапки, и безусловный отступ
+ * оторвал бы заголовок от края там, где это не нужно.
+ *
+ * По бокам — то же самое в альбомной ориентации: вырез съедает край
+ * экрана, и без отступа под него уходит первый символ строки.
+ *
+ * Блок стоит ПОСЛЕ всех трёх правил, которые правит: медиазапрос не
+ * добавляет веса селектору, и объявленное выше перебилось бы обычным
+ * `padding` ниже по файлу.
+ */
+@media (display-mode: standalone) {
+  .app__header {
+    padding-top: calc(var(--space-5) + env(safe-area-inset-top));
+    padding-left: calc(var(--space-4) + env(safe-area-inset-left));
+    padding-right: calc(var(--space-4) + env(safe-area-inset-right));
+  }
+
+  .app__body {
+    padding-left: calc(var(--space-4) + env(safe-area-inset-left));
+    padding-right: calc(var(--space-4) + env(safe-area-inset-right));
+  }
+
+  .tabbar {
+    padding-left: calc(6px + env(safe-area-inset-left));
+    padding-right: calc(6px + env(safe-area-inset-right));
+  }
 }
 
 /* ==========================================================================
@@ -806,6 +854,9 @@ button { font-family: inherit; }
   align-items: center;
   justify-content: center;
   gap: 7px;
+  /* Тем же классом размечена ссылка на бота: она обязана выглядеть кнопкой,
+     а не подчёркнутым текстом */
+  text-decoration: none;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -1103,6 +1154,111 @@ th.sticky, td.sticky {
 }
 
 /* ==========================================================================
+   Вход вне Telegram
+   Экран видят в тот момент, когда ещё не уверены, что приложение вообще
+   работает. Поэтому здесь ровно один путь вперёд — одна крупная кнопка, —
+   и всё остальное отступает: узкая колонка по центру пустого экрана.
+   ========================================================================== */
+
+.login {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Безопасные зоны здесь безусловны: экран входа — единственное, что
+     нарисовано на весь экран, и в режиме с рабочего стола прижимается
+     и к часам сверху, и к полосе «домой» снизу. */
+  padding: calc(var(--space-6) + env(safe-area-inset-top))
+           calc(var(--space-4) + env(safe-area-inset-right))
+           calc(var(--space-6) + env(safe-area-inset-bottom))
+           calc(var(--space-4) + env(safe-area-inset-left));
+}
+
+.login__inner {
+  width: 100%;
+  max-width: 330px;
+  text-align: center;
+}
+
+.login__mark {
+  display: inline-flex;
+  color: var(--text-muted);
+  opacity: 0.75;
+  margin-bottom: var(--space-3);
+}
+
+.login__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xl);
+  font-weight: 680;
+  letter-spacing: -0.021em;
+  line-height: 1.2;
+}
+
+.login__text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+/**
+ * Код. Вводить его никуда не нужно — ссылка подставляет его сама, — но
+ * прочитать и сверить с тем, что в чате, нужно посимвольно. Отсюда
+ * разрядка и крупный кегль: буквы не должны слипаться в слово.
+ */
+.login__code {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--text-hero);
+  font-weight: 680;
+  letter-spacing: 0.18em;
+  /* Цифры одной ширины: ширина кода не должна зависеть от того, какие
+     знаки в него попали */
+  font-variant-numeric: tabular-nums;
+  /* Разрядка добавляет пробел и после последнего знака — компенсируем,
+     иначе строка выглядит сдвинутой влево */
+  text-indent: 0.18em;
+}
+
+.login__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.login__cta { margin-top: var(--space-5); }
+
+.login__wait {
+  margin-top: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Единственное движение на экране — и оно сообщает состояние: приложение
+   не зависло, оно ждёт ответа */
+.login__pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: login-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+@keyframes login-pulse {
+  0%, 100% { opacity: 0.28; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.login__details {
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+/* ==========================================================================
    Состояния
    ========================================================================== */
 
@@ -1192,6 +1348,15 @@ th.sticky, td.sticky {
 
   .item:active, .button:active, .chip:active, .tabbar__item:active,
   .icon-button:active, .menu__item:active { transform: none; }
+
+  /* Точка ожидания не пульсирует размером, но продолжает дышать яркостью:
+     без неё экран входа выглядел бы застывшим */
+  .login__pulse { animation-name: login-pulse-fade; }
+
+  @keyframes login-pulse-fade {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
 
   /* Панель не едет через весь экран, а проявляется на месте */
   .drawer__panel {

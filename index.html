@@ -5,6 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
     <meta name="color-scheme" content="light dark" />
     <title>Личный кабинет</title>
+
+    <!-- Приложение на рабочем столе.
+         Все пути здесь ОТНОСИТЕЛЬНЫЕ, без ведущей косой черты: страница
+         лежит в подпапке (/admin_trainer_table/), и «/manifest.webmanifest»
+         указывал бы в корень домена, где ничего нет. Внутри манифеста
+         пути тоже относительные — они считаются от него самого, то есть
+         от той же подпапки. Это совпадает с base: './' в vite.config.js. -->
+    <link rel="manifest" href="manifest.webmanifest" />
+
+    <!-- Без этой иконки iOS кладёт на рабочий стол уменьшенный снимок
+         страницы — то есть пустой экран загрузки -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" href="icon-192.png" />
+
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+
+    <!-- default, а не black-translucent: при «прозрачном» статус-баре iOS
+         рисует часы белым поверх содержимого, а фон приложения в светлой
+         теме светлый — время стало бы нечитаемым. При default система
+         подбирает фон полосы сама, под цвет ниже. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Fit Track" />
+
+    <!-- Цвет системных полос отдельно для светлой и тёмной схемы: одно
+         значение на обе означало бы светлую полоску над тёмным экраном -->
+    <meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#17161a" media="(prefers-color-scheme: dark)" />
     <!-- ПЕРВЫМ ДЕЛОМ сохраняем фрагмент адреса.
          Telegram передаёт в нём подпись (tgWebAppData), а SDK при запуске
          вычищает адрес через history.replaceState. Если наш код прочитает

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api, apiBatch, apiStale } from './api.js';
-import { isInsideTelegram, getInitData, environmentInfo, diagnoseMissingInitData } from './telegram.js';
-import { Loading, ErrorState, Empty } from './ui.jsx';
-import { IconPhone } from './icons.jsx';
+import { getInitData, environmentInfo, diagnoseMissingInitData } from './telegram.js';
+import { hasToken, onTokenChange } from './session.js';
+import { Loading, ErrorState } from './ui.jsx';
 import ClientApp from './client/ClientApp.jsx';
 import TrainerApp from './trainer/TrainerApp.jsx';
+import LoginScreen from './LoginScreen.jsx';
 
 /**
  * Корень приложения: спрашивает сервер «кто я» и по ответу показывает
@@ -23,9 +24,22 @@ import TrainerApp from './trainer/TrainerApp.jsx';
  *   запрашиваются ОДНИМ запросом вместо двух последовательных. Лишнее
  *   действие в пакете отвалится по правам, не выполняясь, — это дешевле,
  *   чем ещё один поход на сервер.
+ *
+ * Два способа попасть внутрь. Из Telegram — по подписи мессенджера, она
+ * приезжает при каждом запуске. С иконки на рабочем столе подписи нет, и
+ * работает ключ, выданный после подтверждения у бота (session.js). Ни то
+ * ни другое не даёт прав само по себе: роль всё равно определяет сервер.
  */
 export default function App() {
   const [state, setState] = useState({ loading: true, me: null, error: null });
+
+  // Подпись читается один раз: внутри Telegram она не меняется за запуск,
+  // а вот ключ пропадает в тот момент, когда сервер откажет по сроку, —
+  // за ним и следим.
+  const initData = getInitData();
+  const [signedIn, setSignedIn] = useState(hasToken);
+
+  useEffect(() => onTokenChange(() => setSignedIn(hasToken())), []);
 
   const load = () => {
     const cached = apiStale('me', {});
@@ -67,44 +81,22 @@ export default function App() {
       });
   };
 
-  useEffect(load, []);
+  const authorized = !!initData || signedIn;
 
-  // Открыли не из Telegram и подменной initData для разработки нет —
-  // дальше идти некуда, но сказать об этом надо по-человечески.
-  if (!isInsideTelegram() && !getInitData() && import.meta.env.VITE_MOCK !== '1') {
-    const info = environmentInfo();
-    const reason = diagnoseMissingInitData(info);
+  // Загружаемся, только когда есть чем представиться. Иначе первый же
+  // запрос вернул бы отказ, и человек увидел бы ошибку вместо входа.
+  useEffect(() => {
+    if (!authorized) {
+      setState({ loading: true, me: null, error: null });
+      return;
+    }
+    load();
+  }, [authorized]);
 
-    return (
-      <div className="app">
-        <main className="app__body">
-          <Empty
-            icon={IconPhone}
-            title="Откройте через Telegram"
-            text={
-              'Это мини-приложение работает внутри Telegram.\n\n' +
-              'Откройте бота тренера и нажмите кнопку «Открыть приложение» ' +
-              'или отправьте ему команду /app.'
-            }
-          />
-
-          {/* Техническая справка: без неё непонятно, открыли страницу
-              обычной ссылкой или Telegram действительно не дал подпись */}
-          <details className="small muted" style={{ maxWidth: 420, margin: '0 auto' }}>
-            <summary style={{ cursor: 'pointer', textAlign: 'center' }}>Подробности</summary>
-            <div style={{ marginTop: 10, lineHeight: 1.7 }}>
-              {reason && <div style={{ marginBottom: 10 }}>{reason}</div>}
-              <div>Параметры запуска: {info.hasLaunchParams ? 'получены' : 'нет'}</div>
-              <div>Подпись в адресе: {info.fromHash ? 'есть' : 'нет'}</div>
-              <div>Длина подписи: {info.initDataLength}</div>
-              <div>Платформа: {info.platform}</div>
-              <div>Версия: {info.version}</div>
-              <div>Скрипт Telegram: {info.sdkLoaded ? 'загружен' : 'не загружен (не обязателен)'}</div>
-            </div>
-          </details>
-        </main>
-      </div>
-    );
+  // Ни подписи, ни ключа — приложение открыли снаружи Telegram и на этом
+  // устройстве ещё не входили. Это обычное начало, а не тупик.
+  if (!authorized) {
+    return <LoginScreen details={<LaunchDetails />} />;
   }
 
   if (state.loading) {
@@ -132,4 +124,33 @@ export default function App() {
   if (me.role === 'trainer') return <TrainerApp me={me} />;
 
   return <ClientApp me={me} />;
+}
+
+/**
+ * Техническая справка под экраном входа.
+ *
+ * Показывается, только когда Telegram приложение всё-таки запустил, но
+ * подпись не доехала: тогда вход по коду сработает, а вот причину сбоя
+ * без этих строк не найти. При обычном запуске с рабочего стола показывать
+ * нечего — и справки нет, экран остаётся спокойным.
+ */
+function LaunchDetails() {
+  const info = environmentInfo();
+  if (!info.hasLaunchParams) return null;
+
+  const reason = diagnoseMissingInitData(info);
+
+  return (
+    <details className="small muted login__details">
+      <summary style={{ cursor: 'pointer', textAlign: 'center' }}>Подробности</summary>
+      <div style={{ marginTop: 10, lineHeight: 1.7, textAlign: 'left' }}>
+        {reason && <div style={{ marginBottom: 10 }}>{reason}</div>}
+        <div>Подпись в адресе: {info.fromHash ? 'есть' : 'нет'}</div>
+        <div>Длина подписи: {info.initDataLength}</div>
+        <div>Платформа: {info.platform}</div>
+        <div>Версия: {info.version}</div>
+        <div>Скрипт Telegram: {info.sdkLoaded ? 'загружен' : 'не загружен (не обязателен)'}</div>
+      </div>
+    </details>
+  );
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconRefresh, IconSearch } from './icons.jsx';
+import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefresh, IconSearch } from './icons.jsx';
 import { environmentInfo } from './telegram.js';
+import { hasToken, describeDevice } from './session.js';
+import { logout } from './api.js';
 
 /**
  * Состояние загрузки. Скелетоны повторяют форму будущего содержимого,
@@ -80,6 +82,47 @@ export function Empty({ icon, title, text, action }) {
       {text && <div className="state__text">{text}</div>}
       {action && <div className="state__action">{action}</div>}
     </div>
+  );
+}
+
+/**
+ * Выход из приложения.
+ *
+ * Появляется, ТОЛЬКО когда в приложение вошли с устройства, по коду.
+ * Внутри Telegram выходить не из чего: личность там подтверждает сам
+ * мессенджер при каждом запуске, и кнопка «Выйти» либо ничего не сделала
+ * бы, либо пообещала бы то, чего не умеет.
+ *
+ * Пути назад нет — после нажатия человек оказывается на экране входа, —
+ * поэтому кнопка обычная, не основная, и рядом сказано, что будет дальше.
+ */
+export function SignOut() {
+  const [busy, setBusy] = useState(false);
+
+  if (!hasToken()) return null;
+
+  const run = () => {
+    setBusy(true);
+    // Сбрасывать busy не нужно: сразу после выхода экран сменится целиком
+    logout();
+  };
+
+  return (
+    <Section title="Вход">
+      <Panel pad>
+        <div className="setting">
+          <div className="setting__label">{describeDevice()}</div>
+          <button className="button" onClick={run} disabled={busy}>
+            <IconExit size={16} />
+            {busy ? 'Выходим…' : 'Выйти'}
+          </button>
+          <div className="setting__note">
+            Приложение закроется на этом устройстве. Чтобы вернуться,
+            понадобится новое подтверждение в Telegram.
+          </div>
+        </div>
+      </Panel>
+    </Section>
   );
 }
 

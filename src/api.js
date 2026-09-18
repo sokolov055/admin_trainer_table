@@ -31,6 +31,7 @@
  */
 
 import { getInitData } from './telegram.js';
+import { getToken, clearToken } from './session.js';
 import { loadApiConfig, currentApiUrl, fallbackApiUrl } from './apiConfig.js';
 
 /** Сколько данные из localStorage считаются пригодными для показа.
@@ -189,6 +190,34 @@ export async function apiBatch(requests) {
   return out;
 }
 
+/**
+ * Запрос до входа: запросить код и спросить, подтвердили ли его.
+ *
+ * Мимо кэша и мимо склейки одинаковых запросов — оба приёма здесь вредны.
+ * Кэш вернул бы «ещё ждём» навсегда, а склейка — один и тот же ответ на
+ * два подряд идущих опроса.
+ */
+export function apiPublic(action, params = {}) {
+  return request(action, params);
+}
+
+/**
+ * Выход с этого устройства.
+ *
+ * Сервер гасит ключ у себя, мы — у себя. Если сервер недоступен, выходим
+ * всё равно: человек нажал «Выйти», и отказать ему из-за связи нельзя.
+ * Ключ на сервере доживёт свой срок сам, а данные с устройства уйдут
+ * сейчас — это то, ради чего кнопку и нажимают.
+ */
+export async function logout() {
+  try {
+    await request('auth.logout', {});
+  } catch (_) {}
+
+  clearApiCache();
+  clearToken();
+}
+
 async function request(action, params) {
   if (import.meta.env.VITE_MOCK === '1') {
     const { mockApi } = await import('./mock.js');
@@ -204,7 +233,16 @@ async function request(action, params) {
     throw new ApiError('Не задан адрес API — проверьте config.json рядом с приложением.', 0);
   }
 
-  const payload = { action, initData: getInitData(), ...params };
+  const initData = getInitData();
+
+  // Подпись Telegram главнее выданного ключа, и это не вкусовщина: сервер,
+  // получив ключ, проверяет ТОЛЬКО его (server/src/lib/auth.js). Отправь мы
+  // оба сразу — запуск из мессенджера пошёл бы по пути «вход с устройства»
+  // и однажды сломался бы на чужом или просроченном ключе, хотя рядом
+  // лежит свежая подпись. Поэтому ключ едет, лишь когда подписи нет.
+  const token = initData ? '' : getToken();
+
+  const payload = { action, initData, ...(token ? { token } : {}), ...params };
 
   let body = await tryEndpoint(url, payload);
 
@@ -220,6 +258,17 @@ async function request(action, params) {
   }
 
   if (!body || body.ok !== true) {
+    // 401 в ответ на ключ — это не поломка, а конец срока: ключ живёт
+    // 90 дней, и рано или поздно этот ответ придёт у всех. Выбрасываем
+    // ключ и чужие данные из кэша, а корень приложения по этому же
+    // событию вернёт человека на экран входа — вместо красного экрана
+    // «ошибка», из которого никуда не деться.
+    if (token && (body && body.code) === 401) {
+      // Кэш чистим целиком: в нём лежат данные того, кто только что вышел
+      clearApiCache();
+      clearToken();
+    }
+
     throw new ApiError(
       (body && body.error) || 'Неизвестная ошибка сервера',
       (body && body.code) || 500

@@ -3,7 +3,7 @@ import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
-  DataTable, Delta, formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
+  SignOut, DataTable, Delta, formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { getThemeMode, setThemeMode } from '../telegram.js';
 import {
@@ -501,19 +501,25 @@ export function Settings() {
   const [mode, setMode] = useState(getThemeMode);
 
   return (
-    <Section title="Внешний вид">
-      <Panel pad>
-        <div className="setting">
-          <div className="setting__label">Тема</div>
-          <Segmented
-            items={THEME_ITEMS}
-            value={mode}
-            label="Тема оформления"
-            onChange={(next) => setMode(setThemeMode(next))}
-          />
-          <div className="setting__note">{THEME_HINTS[mode]}</div>
-        </div>
-      </Panel>
-    </Section>
+    <>
+      <Section title="Внешний вид">
+        <Panel pad>
+          <div className="setting">
+            <div className="setting__label">Тема</div>
+            <Segmented
+              items={THEME_ITEMS}
+              value={mode}
+              label="Тема оформления"
+              onChange={(next) => setMode(setThemeMode(next))}
+            />
+            <div className="setting__note">{THEME_HINTS[mode]}</div>
+          </div>
+        </Panel>
+      </Section>
+
+      {/* Выход стоит последним и сам прячется внутри Telegram: там выходить
+          не из чего, см. SignOut */}
+      <SignOut />
+    </>
   );
 }

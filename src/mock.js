@@ -7,6 +7,11 @@
  * переход, а также чтобы показать приложение до того, как настроен бэкенд.
  *
  * Роль переключается параметром в адресе: ?mockRole=trainer
+ *
+ * Вход по коду здесь тоже настоящий — с экраном, кодом и ожиданием. Не
+ * хватает только человека с телефоном, поэтому демо-сервер подтверждает
+ * код сам через пару опросов. Пройти этот путь глазами важнее, чем
+ * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
 const daysAgo = (n) => {
@@ -209,6 +214,14 @@ function mockCompute(s) {
   return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal, protein, fat, carbs, adjusted, notes };
 }
 
+/**
+ * Сколько раз демо-сервер ответит «ещё ждём», прежде чем подтвердит вход.
+ * Двух хватает, чтобы увидеть ожидание, и мало, чтобы оно надоело.
+ */
+const DEMO_POLLS_BEFORE_CONFIRM = 2;
+
+let demoLogin = null;
+
 const MOCK = {
   // Пакет: те же обработчики, только за один «поход на сервер». Нужен
   // здесь, чтобы демо-режим повторял боевой путь загрузки, а не шёл
@@ -232,6 +245,41 @@ const MOCK = {
       }),
     };
   },
+
+  /* ---------- Вход ---------- */
+
+  'auth.request': (params) => {
+    demoLogin = { code: 'D3M0FT', polls: 0, device: params.device || '' };
+
+    return {
+      code: demoLogin.code,
+      link: 'https://t.me/demo_fit_bot?start=login_' + demoLogin.code,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      ttlSec: 15 * 60,
+    };
+  },
+
+  'auth.poll': (params) => {
+    // Кода нет вовсе — ровно то, что ответил бы сервер после перезапуска
+    // с сохранённым, но уже забытым им кодом
+    if (!demoLogin || demoLogin.code !== String(params.code || '').toUpperCase()) {
+      return { status: 'unknown', message: 'Код не найден, запросите вход заново.' };
+    }
+
+    demoLogin.polls += 1;
+    if (demoLogin.polls <= DEMO_POLLS_BEFORE_CONFIRM) return { status: 'pending' };
+
+    demoLogin = null;
+
+    return {
+      status: 'confirmed',
+      token: 'demo-token',
+      chatId: '11111',
+      expiresAt: new Date(Date.now() + 90 * 86400 * 1000).toISOString(),
+    };
+  },
+
+  'auth.logout': () => ({ ok: true, revoked: 1 }),
 
   'me': (params) => ({
     role: params.__role === 'trainer' ? 'trainer' : 'client',
