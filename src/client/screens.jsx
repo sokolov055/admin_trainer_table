@@ -53,9 +53,13 @@ export function Overview({ clientRow }) {
             // «Не назначена» и «расписание недоступно» — разные новости.
             // Первая значит «занятий впереди нет, напишите тренеру»,
             // вторая — «мы просто не знаем»; путать их нельзя.
+            //
+            // Сравниваем с true, а не с false: поля может не быть вовсе —
+            // например, API отвечает кодом, который про расписание ещё не
+            // знает. Отсутствие ответа — это «не знаем», а не «занятий нет».
             value: data.nextTrainingDate
               ? formatWhen(data.nextTrainingDate)
-              : data.scheduleKnown === false ? 'нет данных' : 'не назначена',
+              : data.scheduleKnown !== true ? 'нет данных' : 'не назначена',
           },
           { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
         ]}
@@ -89,7 +93,7 @@ export function Overview({ clientRow }) {
             <Row label="Следующая тренировка">
               {data.nextTrainingDate
                 ? formatDate(data.nextTrainingDate) + ', ' + formatTime(data.nextTrainingDate)
-                : data.scheduleKnown === false
+                : data.scheduleKnown !== true
                   ? 'расписание временно недоступно'
                   : 'не назначена'}
             </Row>
