@@ -609,6 +609,268 @@ button { font-family: inherit; }
 }
 
 /* ==========================================================================
+   Сторис об обновлениях
+   Ряд кружков над содержимым обзора и полноэкранный просмотр по касанию.
+   Единственное место в приложении, которое обращается к человеку само,
+   поэтому оно обязано быть тихим: ряд занимает одну строку, непросмотренные
+   выделены кольцом, просмотренные остаются на месте и гаснут.
+   ========================================================================== */
+
+/* Ряд выходит за поля экрана отрицательными отступами и возвращает их
+   внутренним padding: обрезанный кружок у края — единственное, что честно
+   сообщает, что там есть ещё. Полоса прокрутки для этого не нужна. */
+.stories {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0 calc(var(--space-4) * -1) var(--space-4);
+  padding: var(--space-1) var(--space-4) var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.stories::-webkit-scrollbar { display: none; }
+
+.stories__item {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 68px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.stories__item:active { transform: scale(0.97); }
+
+/* Кольцо — это и есть «непрочитано»: сплошной акцентный ободок вокруг
+   значка. Кольцо рисуем фоном под вырезом, а не рамкой: рамка съедала бы
+   внутренний размер, и значок в просмотренном кружке был бы крупнее. */
+.stories__ring {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--accent);
+  transition: background var(--dur) var(--ease-out);
+}
+
+.stories__face {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+  transition: color var(--dur) var(--ease-out);
+}
+
+.stories__label {
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  text-align: center;
+  letter-spacing: -0.005em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Просмотренное не исчезает и не прячется — к нему возвращаются. Но и
+   звать больше не должно: кольцо становится обычной линией, значок
+   теряет акцент. */
+.stories__item--seen .stories__ring { background: var(--border-strong); }
+.stories__item--seen .stories__face { color: var(--text-muted); }
+.stories__item--seen .stories__label { color: var(--text-muted); }
+
+@media (hover: hover) and (pointer: fine) {
+  .stories__item:hover .stories__face { background: var(--surface-hover); }
+}
+
+/* --- Полноэкранный просмотр ---
+   У просмотра своя поверхность, тёмная в обеих темах: кадр забирает экран
+   целиком, и светлый лист посреди ночного чтения слепит. Тон взят из той же
+   тёплой основы, что и остальные нейтрали, а не из чистого чёрного. */
+.story {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4)
+           calc(var(--space-5) + env(safe-area-inset-bottom));
+  background: #17161a;
+  color: #f2f0ea;
+  opacity: 0;
+  transform: scale(0.985);
+  transition: opacity var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+  /* Прокручивать внутри нечего, а вертикальным движением кадр закрывают —
+     значит жесты забираем себе целиком, иначе браузер уведёт его в панораму. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.story--in {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.story:focus { outline: none; }
+
+.story__bars {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.story__bar {
+  flex: 1;
+  height: 2.5px;
+  border-radius: 2px;
+  background: rgba(242, 240, 234, 0.25);
+  overflow: hidden;
+}
+
+.story__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #f2f0ea;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.story__fill--done { transform: scaleX(1); }
+
+/* Линейно и без смягчения: полоска показывает утекающее время, а время
+   не ускоряется к концу. Кривые — для движения, которое изображает
+   физику, здесь её нет. */
+.story__fill--run {
+  animation-name: story-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes story-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.story__close {
+  align-self: flex-end;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin: var(--space-2) calc(var(--space-2) * -1) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: rgba(242, 240, 234, 0.75);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
+}
+
+.story__close:active { transform: scale(0.97); }
+
+@media (hover: hover) and (pointer: fine) {
+  .story__close:hover { color: #f2f0ea; }
+}
+
+/* Текст стоит в нижней трети, а не по центру: большой палец держит телефон
+   снизу, и середина экрана — ровно то место, которое им и закрывают. */
+.story__frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-width: 34ch;
+  animation: story-frame-in var(--dur) var(--ease-out) both;
+}
+
+@keyframes story-frame-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.story__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: rgba(242, 240, 234, 0.1);
+  color: #f2f0ea;
+}
+
+.story__date {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: rgba(242, 240, 234, 0.6);
+}
+
+.story__heading {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
+  font-weight: 680;
+  line-height: 1.22;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+
+.story__body {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.45;
+  color: rgba(242, 240, 234, 0.82);
+}
+
+/* На широком экране кадр остаётся колонкой по центру, а не растягивается
+   во всю ширину: сторис придуманы под телефон, и на настольном Telegram
+   строка в полтора метра читалась бы уже не как сторис. Отступами, а не
+   обёрткой, — иначе полоски и крестик остались бы по краям окна. */
+@media (min-width: 620px) {
+  .story {
+    padding-left: calc((100% - 560px) / 2);
+    padding-right: calc((100% - 560px) / 2);
+  }
+}
+
+.story__hint {
+  flex: 0 0 auto;
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-xs);
+  text-align: center;
+  color: rgba(242, 240, 234, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story { transform: none; }
+  .story--in { transform: none; }
+  .story__frame { animation: story-frame-fade var(--dur-fast) var(--ease-out) both; }
+
+  @keyframes story-frame-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .stories__item:active, .story__close:active { transform: none; }
+}
+
+/* ==========================================================================
    Ведущий показатель
    Один крупный факт, ради которого экран открывают, и приглушённый ряд
    уточнений под ним. Четыре одинаковые плитки заставляли бы сравнивать

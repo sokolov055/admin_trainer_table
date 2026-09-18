@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Clients, Finance, Processes, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
+import { Stories } from '../stories.jsx';
 import { Chips, Drawer } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import {
@@ -124,6 +125,11 @@ export default function TrainerApp({ me }) {
       </header>
 
       <main className="app__body" key={view + ':' + pane}>
+        {/* Те же сторис и тем же составом, что видят клиенты: тренер
+            должен знать, о чём приложение сейчас им рассказывает, не
+            заходя в чужую роль и не выспрашивая. Место — список клиентов:
+            первый экран панели, ровно как обзор у клиента. */}
+        {view === 'clients' && clientPane === 'active' && <Stories />}
         {view === 'clients' && clientPane === 'active' && <Clients onOpenClient={setOpenClient} />}
         {view === 'clients' && clientPane === 'lost' && <Lost />}
         {view === 'dashboard' && dashPane === 'finance' && <Finance />}

@@ -20,6 +20,13 @@ const daysAgo = (n) => {
   return d.toISOString().slice(0, 19);
 };
 
+/** Ближайшее занятие — с временем: на экране оно показывается по часам */
+const daysAhead = (n, time) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10) + 'T' + time + ':00';
+};
+
 const MEASURE_ROWS = [
   { date: daysAgo(150), 'Вес': 82.4, 'Талия': 94, 'Грудь': 104, 'Бедро': 59, 'Рука': 34, 'Ягодицы': 101, 'Плечи': 118 },
   { date: daysAgo(120), 'Вес': 81.1, 'Талия': 92.5, 'Грудь': 104.5, 'Бедро': 59.5, 'Рука': 34.5, 'Ягодицы': 100.5, 'Плечи': 118.5 },
@@ -299,6 +306,8 @@ const MOCK = {
     trainingsLeft: 4,
     trainingsThisMonth: 6,
     lastTrainingDate: daysAgo(2),
+    nextTrainingDate: daysAhead(2, '10:00'),
+    scheduleKnown: true,
     startDate: daysAgo(400),
     birthDate: null,
     lastMeasureStatus: '✅ 13.09.2026',

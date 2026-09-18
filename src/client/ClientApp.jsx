@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
+import { Stories } from '../stories.jsx';
 import { haptic } from '../telegram.js';
 import { IconHome, IconPlan, IconProgress, IconNutrition } from '../icons.jsx';
 
@@ -38,6 +39,14 @@ export default function ClientApp({ me }) {
           экран собирается той же короткой лесенкой, что и при первой
           загрузке, а не подменяется рывком */}
       <main className="app__body" key={tab}>
+        {/* Новости об обновлениях — только на обзоре. Экран открывают
+            первым, и это единственная вкладка, куда заходят без
+            конкретного вопроса; на остальных человек уже занят делом.
+
+            Здесь, а не внутри Overview: тот же экран открывает тренер из
+            карточки клиента, и сторис оттуда читались бы как что-то,
+            относящееся к этому клиенту. */}
+        {tab === 'overview' && <Stories />}
         <Screen />
       </main>
 
