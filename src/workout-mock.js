@@ -9,6 +9,16 @@ export function workoutMock(action, params) {
   const sessions = JSON.parse(localStorage.getItem(key) || '[]');
   if (action === 'workout.list') return { owner: String(owner), sessions: sessions.map(s => ({ ...s, done: summary(s).done })).reverse() };
   const previous = sessions.find(s => s.id === (params.id || params.session?.id));
+
+  // Удаление: запись пропадает целиком, как и в таблице. Право тренера —
+  // проверяем и здесь, иначе демо показывало бы кнопку, которой в бою нет.
+  if (action === 'workout.delete') {
+    if (params.__role !== 'trainer') throw new Error('Удалять занятия может только тренер');
+    if (!previous) throw new Error('Занятие не найдено');
+    localStorage.setItem(key, JSON.stringify(sessions.filter(v => v.id !== previous.id)));
+    return { deleted: previous.id };
+  }
+
   if (action === 'workout.get') {
     if (!previous) throw new Error('Занятие не найдено');
     return { session: previous };

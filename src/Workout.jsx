@@ -28,6 +28,12 @@ export default function WorkoutJournal({ clientRow, launch, onClose }) {
   const [storageError, setStorageError] = useState(false);
   const [conflict, setConflict] = useState(null);
   const [confirm, setConfirm] = useState('');
+
+  // id занятия, которое сейчас подтверждают к удалению. Отдельным
+  // состоянием, а не флагом «показать диалог»: подтверждение обязано быть
+  // привязано к конкретной строке, иначе список перерисуется и человек
+  // подтвердит удаление не того занятия.
+  const [erase, setErase] = useState('');
   const [undo, setUndo] = useState(null);
   const [now, setNow] = useState(Date.now());
   const state = useRef(null), key = useRef(''), saving = useRef(false), mounted = useRef(true);
@@ -48,6 +54,22 @@ export default function WorkoutJournal({ clientRow, launch, onClose }) {
     if (mounted.current) setHistory(result.sessions);
     return result.sessions;
   };
+  // Удаление записи журнала. Доступно только тренеру — у клиента этой
+  // кнопки нет, и сервер откажет ему по роли.
+  //
+  // Отмена оставляет занятие в истории, и для несостоявшейся тренировки
+  // это правильно. Но пробные и ошибочные записи копятся там же, а убрать
+  // их можно было только руками в таблице.
+  const remove = async id => {
+    setBusy(true); setMessage('');
+    try {
+      await apiMutate('workout.delete', { ...params, id });
+      setErase('');
+      await list();
+    } catch (e) { setMessage(e.message); }
+    finally { setBusy(false); }
+  };
+
   const open = async id => {
     setBusy(true); setMessage('');
     try {
@@ -262,7 +284,20 @@ export default function WorkoutJournal({ clientRow, launch, onClose }) {
       <h2>Журнал тренировок</h2><p className="muted">Начните занятие из программы или соберите свободную тренировку.</p>
       <button className="button button--primary button--block" disabled={busy} onClick={() => store(freshRecord(fromPlan({ title: 'Свободная тренировка', exercises: [{ name: 'Первое упражнение', sets: 3 }] }, '')))}>Начать свободную тренировку</button>
       {!history.length && <p>Здесь появятся проведённые занятия и их результаты.</p>}
-      {history.map(s => <button className="workout__history" key={s.id} disabled={busy} onClick={() => open(s.id)}><strong>{s.title}</strong><span>{new Date(s.startedAt).toLocaleDateString('ru-RU')} · {labels[s.status]} · {s.done} подходов</span></button>)}
+      {history.map(s => <div className="workout__history-row" key={s.id}>
+        <button className="workout__history" disabled={busy} onClick={() => open(s.id)}><strong>{s.title}</strong><span>{new Date(s.startedAt).toLocaleDateString('ru-RU')} · {labels[s.status]} · {s.done} подходов</span></button>
+
+        {/* Кнопка удаления только у тренера: журнал — это его записи о
+            клиенте. Подтверждение обязательно и называет занятие: удаление
+            безвозвратно, а строки в списке похожи друг на друга. */}
+        {clientRow && (erase === s.id
+          ? <span className="workout__erase" role="alert">
+              <span className="small">Удалить «{s.title}» навсегда?</span>
+              <button className="button" disabled={busy} onClick={() => remove(s.id)}>Удалить</button>
+              <button className="button" onClick={() => setErase('')}>Отмена</button>
+            </span>
+          : <button className="button" disabled={busy} onClick={() => setErase(s.id)} aria-label={'Удалить занятие ' + s.title}>Удалить</button>)}
+      </div>)}
     </>}
   </div>;
 }

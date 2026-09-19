@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
-import { apiBatch, apiMutate } from '../api.js';
+import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
@@ -139,6 +139,28 @@ export function Plan({ clientRow }) {
   const params = { ...(clientRow ? { clientRow } : {}), ...(month ? { month } : {}) };
   const { loading, data, error, reload } = useData('client.plan', params, [clientRow, month]);
 
+  // Незакрытое занятие. Раньше о нём не было видно ничего: «К программе»
+  // выглядит как выход, а занятие продолжает идти, и человек узнавал об
+  // этом, только когда не мог начать следующее — оно молча открывало
+  // старое.
+  const [running, setRunning] = useState(null);
+
+  // Журнал живёт в таблице и отвечает секундами, поэтому экран его не
+  // ждёт: программа рисуется сразу, строка про занятие появляется, когда
+  // придёт ответ. Перечитываем после выхода из журнала — там занятие
+  // могли завершить или отменить.
+  useEffect(() => {
+    let alive = true;
+    apiPublic('workout.list', clientRow ? { clientRow } : {})
+      .then((r) => {
+        if (!alive) return;
+        const list = (r && r.sessions) || [];
+        setRunning(list.find((x) => x.status === 'active' || x.status === 'paused') || null);
+      })
+      .catch(() => { if (alive) setRunning(null); });
+    return () => { alive = false; };
+  }, [clientRow, workout]);
+
   if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} launch={workout.block ? workout : null} onClose={() => setWorkout(null)} />;
 
   if (loading || error) return <>
@@ -148,6 +170,26 @@ export function Plan({ clientRow }) {
 
   const months = data.available || [];
   const blocks = data.blocks || [];
+
+  // Пока занятие не закрыто, новое начать нельзя: журнал всё равно откроет
+  // текущее. Поэтому вместо «Начать тренировку» у блоков показывается одна
+  // строка про идущее занятие — обещать кнопкой то, чего она не сделает,
+  // хуже, чем её не показывать.
+  const runningLine = running && (
+    <Section>
+      <Panel pad>
+        <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
+          {running.status === 'active' ? 'Идёт занятие' : 'Занятие на паузе'}
+          {' «' + running.title + '»'}
+          {running.done ? ' · ' + running.done + ' ' + plural(running.done, 'подход', 'подхода', 'подходов') : ''}.
+          {' '}Новое можно начать, когда это завершено или отменено.
+        </p>
+        <button className="button button--primary button--block" onClick={() => setWorkout({})}>
+          Вернуться к занятию
+        </button>
+      </Panel>
+    </Section>
+  );
 
   // Скрытые месяцы приезжают только тренеру: клиент про них не знает и
   // знать не должен, иначе появится вопрос «а что там».
@@ -159,6 +201,11 @@ export function Plan({ clientRow }) {
   return (
     <>
       <button className="button button--block" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
+
+      {/* Сразу под входом в журнал: если занятие не закрыто, это первое,
+          что человек должен узнать на этом экране. */}
+      {runningLine}
+
       {months.length > 1 && (
         <Chips
           items={months.map((m) => ({
@@ -198,7 +245,7 @@ export function Plan({ clientRow }) {
           note={block.exercises.length + ' ' + plural(block.exercises.length, 'упражнение', 'упражнения', 'упражнений')}
         >
           <Panel>
-            <button className="button button--primary button--block" onClick={() => setWorkout({ block, month: data.month })}>Начать тренировку</button>
+            {!running && <button className="button button--primary button--block" onClick={() => setWorkout({ block, month: data.month })}>Начать тренировку</button>}
             {block.exercises.map((ex, j) => (
               <div className="exercise" key={j}>
                 <div style={{ minWidth: 0 }}>
