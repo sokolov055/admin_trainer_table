@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { haptic } from './telegram.js';
-import { ART } from './storyArt.jsx';
-import { IconRefresh, IconClose } from './icons.jsx';
+import { ART, COVERS } from './storyArt.jsx';
+import { IconClose } from './icons.jsx';
 
 /**
  * Версия, в которой вышли эти новости.
@@ -98,8 +98,12 @@ export const TOPICS = [
     // Номер живёт в подписи и берётся из version.js — того же места, что
     // показывает тренеру строка внизу бокового меню.
     id: 'release',
-    label: 'Обновление',
-    Icon: IconRefresh,
+
+    // Подпись на плитке — короткая: она стоит поверх картинки, и длинная
+    // строка превращает обложку в текстовый блок. Полное название с
+    // номером версии живёт в caption, над раскрытым кадром.
+    label: 'Что нового',
+    cover: 'release',
     caption: 'Что нового в версии ' + NEWS_VERSION,
     frames: [
       {
@@ -194,10 +198,10 @@ export function Stories() {
           у края — единственное, что честно сообщает, что там есть ещё. */}
       <div className="stories" role="group" aria-label="Истории приложения">
         {TOPICS.map((topic, i) => {
-          const Icon = topic.Icon;
+          const Cover = COVERS[topic.cover];
 
           // Тема прочитана, когда прочитаны все её кадры. Достаточно одного
-          // непрочитанного — кружок продолжает звать: человек закрыл её на
+          // непрочитанного — плитка продолжает звать: человек закрыл её на
           // середине, и вернуться ему есть зачем.
           const isSeen = topic.frames.every((f) => seen.indexOf(f.id) !== -1);
 
@@ -209,12 +213,15 @@ export function Stories() {
               onClick={() => { setAt({ topic: i, frame: 0 }); haptic(); }}
               aria-label={topic.caption + ', экранов: ' + topic.frames.length}
             >
-              <span className="stories__ring">
-                <span className="stories__face">
-                  <Icon size={24} />
-                </span>
+              <span className="stories__tile">
+                {Cover ? <Cover /> : null}
+
+                {/* Затемнение снизу — не украшение: подпись лежит поверх
+                    картинки, и без него белый текст на светлом участке
+                    обложки перестал бы читаться. */}
+                <span className="stories__shade" />
+                <span className="stories__label">{topic.label}</span>
               </span>
-              <span className="stories__label">{topic.label}</span>
             </button>
           );
         })}

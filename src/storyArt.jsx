@@ -371,6 +371,111 @@ export function ArtPace() {
   );
 }
 
+/* ==========================================================================
+ * Обложки кружков
+ *
+ * Кружок с тонким значком читался как кнопка настроек: такое не открывают.
+ * Обложка занимает всю плитку и говорит «здесь история», прежде чем человек
+ * успел прочитать подпись, — тем же приёмом, что и полка историй в банке
+ * или мессенджере.
+ *
+ * Рисуем, а не фотографируем. Фотография потребовала бы файла, веса и
+ * повода каждый раз, а рисунок наследует ту же палитру и ту же руку, что и
+ * остальное приложение.
+ *
+ * preserveAspectRatio="slice": обложка обрезается по краям, но никогда не
+ * оставляет пустого поля — плитка обязана быть залита целиком при любой
+ * ширине экрана.
+ * ========================================================================== */
+
+/**
+ * Обложка темы «Что нового».
+ *
+ * Композиция собрана так, чтобы нижняя треть осталась почти пустой: там
+ * лежит подпись, и картинка не должна с ней спорить. Главный предмет —
+ * карточка приложения — стоит выше и чуть повёрнут, от этого плитка
+ * перестаёт выглядеть плоской заливкой.
+ *
+ * Цвета ярче, чем в остальном интерфейсе, и это намеренно: полка историй
+ * стоит над спокойным экраном и обязана быть заметнее его. Внутри самой
+ * истории всё возвращается к обычной палитре.
+ */
+export function CoverRelease() {
+  return (
+    <svg
+      className="stories__art"
+      viewBox="0 0 200 200"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <linearGradient id="cover-release" x1="0" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor="#5b8cff" />
+          <stop offset="0.55" stopColor="#4a63e8" />
+          <stop offset="1" stopColor="#6a3fd0" />
+        </linearGradient>
+
+        <radialGradient id="cover-release-glow" cx="0.22" cy="0.16" r="0.75">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.4" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+
+        <linearGradient id="cover-release-screen" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#e8edff" />
+        </linearGradient>
+      </defs>
+
+      <rect width="200" height="200" fill="url(#cover-release)" />
+      <rect width="200" height="200" fill="url(#cover-release-glow)" />
+
+      {/* карточка приложения: то, про что вся история */}
+      <g transform="rotate(-9 124 92)">
+        <rect x="92" y="28" width="76" height="112" rx="18"
+          fill="#0f1836" fillOpacity="0.18" transform="translate(3 5)" />
+        <rect x="92" y="28" width="76" height="112" rx="18" fill="url(#cover-release-screen)" />
+
+        {/* содержимое экрана: крупная цифра и строки — узнаваемый обзор */}
+        <rect x="104" y="44" width="34" height="7" rx="3.5" fill="#4a63e8" fillOpacity="0.3" />
+        <rect x="104" y="58" width="52" height="13" rx="5" fill="#4a63e8" fillOpacity="0.85" />
+        <rect x="104" y="80" width="44" height="6" rx="3" fill="#0f1836" fillOpacity="0.14" />
+        <rect x="104" y="92" width="52" height="6" rx="3" fill="#0f1836" fillOpacity="0.14" />
+        <rect x="104" y="104" width="30" height="6" rx="3" fill="#0f1836" fillOpacity="0.14" />
+
+        {/* гантель — тот же знак, что на иконке приложения */}
+        <g stroke="#4a63e8" strokeWidth="2.6" strokeLinecap="round" opacity="0.9">
+          <path d="M106 124h18" />
+          <path d="M105 119.5v9M125 119.5v9" />
+        </g>
+      </g>
+
+      {/* вспышка: «появилось новое» */}
+      <path
+        d="M48 42c3 15.6 8.7 21.3 24.3 24.3C56.7 69.3 51 75 48 90.6 45 75 39.3 69.3 23.7 66.3 39.3 63.3 45 57.6 48 42Z"
+        fill="#ffffff"
+        fillOpacity="0.95"
+      />
+      <path
+        d="M34 108c1.5 8 4.4 10.9 12.4 12.4-8 1.5-10.9 4.4-12.4 12.4-1.5-8-4.4-10.9-12.4-12.4 8-1.5 10.9-4.4 12.4-12.4Z"
+        fill="#ffffff"
+        fillOpacity="0.6"
+      />
+
+      {/* россыпь: воздух вокруг предмета, а не узор */}
+      <g fill="#ffffff">
+        <circle cx="176" cy="46" r="3.4" fillOpacity="0.55" />
+        <circle cx="166" cy="168" r="4.6" fillOpacity="0.35" />
+        <circle cx="70" cy="150" r="2.8" fillOpacity="0.4" />
+      </g>
+    </svg>
+  );
+}
+
+export const COVERS = {
+  release: CoverRelease,
+};
+
 export const ART = {
   schedule: ArtSchedule,
   nutrition: ArtNutrition,
