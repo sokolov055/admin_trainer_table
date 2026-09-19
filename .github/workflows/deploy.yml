@@ -38,6 +38,16 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
+      # Хеш коммита вшивается в готовую страницу. Без него нельзя снаружи
+      # ответить, что именно сейчас лежит на Pages: имя файла сборки зависит
+      # от содержимого и о коммите ничего не говорит. По этой метке
+      # проверка расхождения в основном репозитории и видит, отстал ли
+      # фронтенд от main.
+      - name: Отметить сборку хешем коммита
+        run: |
+          sed -i "s|</head>|<meta name=\"build-sha\" content=\"${GITHUB_SHA:0:7}\"></head>|" dist/index.html
+          grep -o 'build-sha[^>]*' dist/index.html
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
