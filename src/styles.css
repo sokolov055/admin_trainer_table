@@ -647,7 +647,7 @@ button { font-family: inherit; }
   font: inherit;
   cursor: pointer;
   scroll-snap-align: start;
-  border-radius: 22px;
+  border-radius: 20px;
   transition: transform var(--dur-press) var(--ease-out);
 }
 
@@ -658,9 +658,13 @@ button { font-family: inherit; }
 .stories__tile {
   position: relative;
   display: block;
-  width: 104px;
-  height: 104px;
-  border-radius: 20px;
+  /* 92 — вдвое больше минимальной цели для пальца (44 pt в iOS, 48 dp в
+     Android), так что уменьшать было куда. Со 104 плитка перетягивала на
+     себя внимание с того, ради чего экран открывают, а меньше 88 подпись
+     перестаёт помещаться в две строки. */
+  width: 92px;
+  height: 92px;
+  border-radius: 18px;
   overflow: hidden;
   background: var(--surface-sunken);
   box-shadow: 0 0 0 2.5px var(--bg), 0 0 0 5px var(--accent);
@@ -685,9 +689,9 @@ button { font-family: inherit; }
    картинке, и читать её будут одним взглядом, а не построчно. */
 .stories__label {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 9px;
+  left: 9px;
+  right: 9px;
+  bottom: 8px;
   font-size: var(--text-sm);
   font-weight: 640;
   line-height: 1.18;
