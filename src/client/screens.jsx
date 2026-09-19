@@ -9,6 +9,7 @@ import {
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import WorkoutJournal from '../Workout.jsx';
 
 /* ==================================================================
  * Обзор
@@ -133,12 +134,17 @@ export function Overview({ clientRow }) {
  * ================================================================== */
 
 export function Plan({ clientRow }) {
+  const [workout, setWorkout] = useState(null);
   const [month, setMonth] = useState('');
   const params = { ...(clientRow ? { clientRow } : {}), ...(month ? { month } : {}) };
   const { loading, data, error, reload } = useData('client.plan', params, [clientRow, month]);
 
-  if (loading) return <Loading lead={false} rows={4} />;
-  if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} launch={workout.block ? workout : null} onClose={() => setWorkout(null)} />;
+
+  if (loading || error) return <>
+    <button className="button button--block" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
+    {loading ? <Loading lead={false} rows={4} /> : <ErrorState error={error} onRetry={reload} />}
+  </>;
 
   const months = data.available || [];
   const blocks = data.blocks || [];
@@ -152,6 +158,7 @@ export function Plan({ clientRow }) {
 
   return (
     <>
+      <button className="button button--block" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
       {months.length > 1 && (
         <Chips
           items={months.map((m) => ({
@@ -191,6 +198,7 @@ export function Plan({ clientRow }) {
           note={block.exercises.length + ' ' + plural(block.exercises.length, 'упражнение', 'упражнения', 'упражнений')}
         >
           <Panel>
+            <button className="button button--primary button--block" onClick={() => setWorkout({ block, month: data.month })}>Начать тренировку</button>
             {block.exercises.map((ex, j) => (
               <div className="exercise" key={j}>
                 <div style={{ minWidth: 0 }}>
@@ -214,7 +222,7 @@ export function Plan({ clientRow }) {
 
       {totalExercises > 0 && (
         <p className="small muted" style={{ marginTop: 22, textAlign: 'center' }}>
-          Рабочие веса заполняет тренер в таблице
+          Откройте тренировку, чтобы записывать подходы и рабочие веса
         </p>
       )}
     </>

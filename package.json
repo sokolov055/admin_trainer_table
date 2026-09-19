@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Telegram Mini App: личный кабинет клиента и панель тренера поверх Google Sheets",
   "scripts": {
+    "test:workout": "node --test scripts/test-workout.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "react-test-renderer": "^18.3.1",
     "vite": "^5.4.11"
   }
 }

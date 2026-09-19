@@ -32,6 +32,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run test:workout
+
       - run: npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}

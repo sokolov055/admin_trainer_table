@@ -1,0 +1,36 @@
+.workout { padding-bottom: var(--space-6); }
+.workout h2 { font-size: var(--text-xl); margin: 24px 0 8px; overflow-wrap: anywhere; }
+.workout h3 { font-size: var(--text-lg); margin: 0 0 8px; overflow-wrap: anywhere; }
+.workout p { line-height: 1.5; }
+.workout__header { padding: 8px 0 22px; }
+.workout__header p { color: var(--text-secondary); }
+.workout__metrics { display: flex; flex-wrap: wrap; gap: 24px; font-variant-numeric: tabular-nums; }
+.workout__metrics strong { display: block; font-size: var(--text-xl); margin-top: 4px; }
+.workout progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.workout__fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.workout__field { display: grid; gap: 8px; margin: 16px 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.workout input, .workout textarea, .workout select { font: inherit; font-size: 16px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 10px; min-height: 44px; min-width: 0; max-width: 100%; box-sizing: border-box; caret-color: var(--accent); }
+.workout textarea { resize: vertical; width: 100%; }
+.workout input:focus-visible, .workout textarea:focus-visible, .workout select:focus-visible, .workout summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.workout__exercise { border-top: 1px solid var(--border-strong); padding-top: 24px; margin-top: 24px; }
+.workout__toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 12px 0; }
+.workout__toolbar label { display: grid; gap: 4px; font-size: var(--text-sm); }
+.workout__toolbar input { width: 76px; }
+.workout summary { min-height: 44px; padding: 12px 0; cursor: pointer; color: var(--text-secondary); font-size: var(--text-sm); }
+.workout__set-row, .workout__set-head { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) 48px; align-items: center; gap: 8px; }
+.workout__set-head { color: var(--text-secondary); font-size: var(--text-sm); margin: 16px 0 8px; }
+.workout__set { padding: 8px 0; border-top: 1px solid var(--border); }
+.workout__set-row { font-variant-numeric: tabular-nums; }
+.workout__set-row input { width: 100%; text-align: center; }
+.workout__check { width: 48px; min-height: 48px; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--surface); }
+.workout__check[aria-pressed="true"] { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
+.workout__set--done .workout__set-row > span { color: var(--good-text); font-weight: 600; }
+.workout__rest { padding: 12px; background: var(--info-fill); color: var(--info-text); display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.workout__finish { margin: 24px 0; padding: 20px 0; border-top: 1px solid var(--border-strong); }
+.workout__error { background: var(--warning-fill); color: var(--warning-text); padding: 16px; margin: 16px 0; border-radius: var(--radius-sm); }
+.workout__history { width: 100%; display: grid; gap: 8px; text-align: left; background: transparent; color: var(--text); padding: 18px 0; border: 0; border-bottom: 1px solid var(--border); min-height: 64px; }
+.workout__history span { font-size: var(--text-sm); color: var(--text-secondary); }
+.workout .button { min-height: 44px; margin: 4px 4px 4px 0; white-space: normal; }
+.workout button:disabled { opacity: .5; cursor: default; }
+.workout button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) { .workout button:not(:disabled):hover { filter: brightness(.96); } }

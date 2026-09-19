@@ -14,6 +14,8 @@
  * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
+import { workoutMock } from './workout-mock.js';
+
 const daysAgo = (n) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -642,7 +644,7 @@ const MOCK = {
 
 export function mockApi(action, params) {
   const role = new URLSearchParams(window.location.search).get('mockRole') || 'client';
-  const handler = MOCK[action];
+  const handler = action.startsWith('workout.') ? p => workoutMock(action, p) : MOCK[action];
 
   return new Promise((resolve, reject) => {
     // Небольшая задержка — чтобы скелетоны и состояния загрузки были видны
@@ -659,6 +661,7 @@ export function mockApi(action, params) {
       try {
         resolve(handler({ ...params, __role: role }));
       } catch (err) {
+        if (action.startsWith('workout.')) err.code = err.code || 400;
         reject(err);
       }
     }, 180);
