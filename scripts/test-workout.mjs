@@ -9,7 +9,11 @@ import renderer, { act } from 'react-test-renderer';
 import { workoutMock } from '../src/workout-mock.js';
 
 const data = new Map();
-globalThis.crypto = webcrypto;
+// В Node 18 глобального crypto нет, с Node 19 он есть и только для чтения:
+// присваивание в строгом режиме модуля падает с TypeError, и тест валится
+// целиком ещё до первой проверки. Локально это не воспроизводится, если
+// стоит Node 18, а в CI стоит Node 20 — ровно так тест и сломался.
+if (!globalThis.crypto) globalThis.crypto = webcrypto;
 globalThis.localStorage = { getItem: k => data.get(k) || null, setItem: (k, v) => data.set(k, v), removeItem: k => data.delete(k) };
 globalThis.window = { addEventListener() {}, removeEventListener() {} };
 globalThis.document = { hidden: false };
