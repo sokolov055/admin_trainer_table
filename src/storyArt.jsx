@@ -371,53 +371,6 @@ export function ArtPace() {
   );
 }
 
-/**
- * Скрытый месяц: полоса вкладок таблицы, одна из них погашена.
- *
- * Рисуем именно вкладки, а не абстрактный «глаз»: скрывается настоящий
- * лист в настоящей таблице, и человек должен узнать то место, где это
- * происходит. Пунктир у погашенной говорит, что лист на месте, просто его
- * не показывают, — сплошная заливка читалась бы как удаление.
- */
-export function ArtHide() {
-  const tabs = [
-    { w: 74, label: null, hidden: false },
-    { w: 74, label: null, hidden: false },
-    { w: 74, label: null, hidden: true },
-    { w: 46, label: null, hidden: false },
-  ];
-
-  let x = 26;
-
-  return (
-    <Art label="Вкладки таблицы, одна скрыта">
-      {/* сама таблица */}
-      <rect x={26} y={20} width={268} height={86} rx={10} opacity={0.3} />
-      {[38, 56, 74].map((y, i) => (
-        <rect key={y} x={42} y={y} width={i === 1 ? 200 : 160} height={7} rx={3.5}
-          fill="currentColor" fillOpacity={0.12} stroke="none" />
-      ))}
-
-      {/* полоса вкладок */}
-      {tabs.map((tab, i) => {
-        const el = tab.hidden ? (
-          <g key={i}>
-            <rect x={x} y={120} width={tab.w} height={32} rx={8}
-              stroke="var(--tint)" strokeOpacity={0.75} strokeDasharray="5 4" />
-            <path d={'M' + (x + 20) + ' 136h' + (tab.w - 40)}
-              stroke="var(--tint)" strokeOpacity={0.75} />
-          </g>
-        ) : (
-          <rect key={i} x={x} y={120} width={tab.w} height={32} rx={8}
-            fill="currentColor" fillOpacity={0.14} stroke="none" />
-        );
-        x += tab.w + 10;
-        return el;
-      })}
-    </Art>
-  );
-}
-
 export const ART = {
   schedule: ArtSchedule,
   nutrition: ArtNutrition,
@@ -425,5 +378,4 @@ export const ART = {
   install: ArtInstall,
   guide: ArtGuide,
   pace: ArtPace,
-  hide: ArtHide,
 };
