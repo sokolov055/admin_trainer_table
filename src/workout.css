@@ -1,39 +1,352 @@
-.workout { padding-bottom: var(--space-6); }
-.workout h2 { font-size: var(--text-xl); margin: 24px 0 8px; overflow-wrap: anywhere; }
-.workout h3 { font-size: var(--text-lg); margin: 0 0 8px; overflow-wrap: anywhere; }
-.workout p { line-height: 1.5; }
-.workout__header { padding: 8px 0 22px; }
-.workout__header p { color: var(--text-secondary); }
-.workout__metrics { display: flex; flex-wrap: wrap; gap: 24px; font-variant-numeric: tabular-nums; }
-.workout__metrics strong { display: block; font-size: var(--text-xl); margin-top: 4px; }
-.workout progress { width: 100%; height: 6px; accent-color: var(--accent); }
-.workout__fields { border: 0; padding: 0; margin: 0; min-width: 0; }
-.workout__field { display: grid; gap: 8px; margin: 16px 0; font-size: var(--text-sm); color: var(--text-secondary); }
-.workout input, .workout textarea, .workout select { font: inherit; font-size: 16px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 10px; min-height: 44px; min-width: 0; max-width: 100%; box-sizing: border-box; caret-color: var(--accent); }
+/**
+ * ==========================================================================
+ * Экран занятия
+ *
+ * Здесь человек стоит в зале с телефоном в одной руке, между подходами,
+ * и ему нужно ровно три вещи: сколько идёт, сколько сделано и куда вписать
+ * вес. Всё остальное — фон.
+ *
+ * Экран собран тем же словарём, что и остальное приложение: поверхность,
+ * рамка, скругление и отступы берутся из тех же переменных, что у Panel и
+ * Section. Своя вёрстка здесь нужна только там, где нужна таблица подходов;
+ * там, где приложение уже умеет показывать «главный факт и уточнения»,
+ * повторяем его приёмы, а не изобретаем вторые.
+ * ==========================================================================
+ */
+
+.workout {
+  padding-bottom: var(--space-6);
+}
+
+.workout h2 {
+  font-size: var(--text-xl);
+  font-weight: 680;
+  letter-spacing: -0.021em;
+  margin: var(--space-5) 0 var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.workout h3 {
+  font-size: var(--text-md);
+  font-weight: 640;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.workout p { line-height: 1.45; }
+
+/* --- Шапка занятия ---
+   Липкая, и это не украшение: между подходами человек прокручивает список
+   упражнений, а время и счётчик нужны ему постоянно. Уехавший вверх таймер
+   заставляет возвращаться наверх после каждого подхода. */
+.workout__header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 calc(var(--space-4) * -1) var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.workout__header h2 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+
+.workout__header p {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* Время — ведущий факт экрана, как «Оплачено вперёд» на обзоре: один
+   крупный показатель и приглушённые уточнения рядом. Моноширинные цифры
+   обязательны — иначе строка дёргается на каждой секунде. */
+.workout__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.workout__metrics strong {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--text-xl);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+/* Полоса выполненного — своя, а не браузерная: системный progress выглядит
+   по-разному в каждом движке и ни в одной теме не совпадает с палитрой. */
+.workout__bar {
+  height: 4px;
+  margin-top: var(--space-3);
+  border-radius: 2px;
+  background: var(--surface-active);
+  overflow: hidden;
+}
+
+.workout__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--dur) var(--ease-out);
+}
+
+.workout__status {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* --- Поля и упражнения --- */
+
+.workout__fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.workout__field {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* 16px, а не токен: меньший кегль заставляет iOS увеличивать страницу при
+   фокусе, и человек между подходами возит экран пальцами обратно. */
+.workout input,
+.workout textarea,
+.workout select {
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  min-height: 44px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  caret-color: var(--accent);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.workout input:focus,
+.workout textarea:focus,
+.workout select:focus { border-color: var(--border-strong); }
+
 .workout textarea { resize: vertical; width: 100%; }
-.workout input:focus-visible, .workout textarea:focus-visible, .workout select:focus-visible, .workout summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.workout__exercise { border-top: 1px solid var(--border-strong); padding-top: 24px; margin-top: 24px; }
-.workout__toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 12px 0; }
-.workout__toolbar label { display: grid; gap: 4px; font-size: var(--text-sm); }
+
+.workout input:focus-visible,
+.workout textarea:focus-visible,
+.workout select:focus-visible,
+.workout summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Упражнение — карточка, как Panel в остальном приложении. Раньше это была
+   линейка сверху: на длинном списке подходы соседних упражнений сливались
+   в одну ленту, и место, куда смотреть, приходилось искать. */
+.workout__exercise {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.workout__exercise > h3 { margin-bottom: var(--space-1); }
+
+.workout__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.workout__toolbar label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
 .workout__toolbar input { width: 76px; }
-.workout summary { min-height: 44px; padding: 12px 0; cursor: pointer; color: var(--text-secondary); font-size: var(--text-sm); }
-.workout__set-row, .workout__set-head { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) 48px; align-items: center; gap: 8px; }
-.workout__set-head { color: var(--text-secondary); font-size: var(--text-sm); margin: 16px 0 8px; }
-.workout__set { padding: 8px 0; border-top: 1px solid var(--border); }
-.workout__set-row { font-variant-numeric: tabular-nums; }
+
+.workout summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* Под каждым подходом стоит своя строка настроек, и в упражнении их
+   столько же, сколько подходов. Читают её редко, а место она занимает у
+   цифр, ради которых экран и открыт: оставляем цель для пальца прежней,
+   но убираем вес — это тихая возможность, а не пункт списка. */
+.workout__set-options summary {
+  min-height: 36px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.workout__set--done .workout__set-options summary { color: var(--good-text); opacity: 0.75; }
+
+/* --- Подходы --- */
+
+.workout__set-row,
+.workout__set-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.workout__set-head {
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.workout__set {
+  padding: var(--space-1) var(--space-2);
+  margin: 0 calc(var(--space-2) * -1);
+  border-radius: var(--radius-sm);
+  border-top: 1px solid var(--border);
+}
+
+.workout__set:first-of-type { border-top: 0; }
+
+.workout__set-row {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 .workout__set-row input { width: 100%; text-align: center; }
-.workout__check { width: 48px; min-height: 48px; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--surface); }
-.workout__check[aria-pressed="true"] { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
-.workout__set--done .workout__set-row > span { color: var(--good-text); font-weight: 600; }
-.workout__rest { padding: 12px; background: var(--info-fill); color: var(--info-text); display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
-.workout__finish { margin: 24px 0; padding: 20px 0; border-top: 1px solid var(--border-strong); }
-.workout__error { background: var(--warning-fill); color: var(--warning-text); padding: 16px; margin: 16px 0; border-radius: var(--radius-sm); }
-.workout__history { width: 100%; display: grid; gap: 8px; text-align: left; background: transparent; color: var(--text); padding: 18px 0; border: 0; border-bottom: 1px solid var(--border); min-height: 64px; }
+
+/* Выполненный подход подсвечивается целиком, а не одной галочкой: на
+   ходу человек считает взглядом, сколько строк «позеленело», и отдельный
+   значок в углу для этого слишком мелкая цель. */
+.workout__set--done {
+  background: var(--good-fill);
+  border-top-color: transparent;
+}
+
+.workout__set--done .workout__set-row > span { color: var(--good-text); font-weight: 640; }
+.workout__set--done input { background: transparent; border-color: var(--good-line); }
+
+.workout__check {
+  width: 48px;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--surface);
+  transition: background-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-press) var(--ease-out);
+}
+
+.workout__check:active { transform: scale(0.94); }
+
+.workout__check[aria-pressed="true"] {
+  background: var(--good-text);
+  color: var(--surface);
+  border-color: var(--good-text);
+}
+
+/* --- Отдых, конец занятия, история --- */
+
+.workout__rest {
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--info-fill);
+  border: 1px solid var(--info-line);
+  color: var(--info-text);
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.workout__finish {
+  margin: var(--space-5) 0;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.workout__finish h3 { margin-bottom: var(--space-1); }
+
+.workout__error {
+  background: var(--warning-fill);
+  border: 1px solid var(--warning-line);
+  color: var(--warning-text);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+  border-radius: var(--radius);
+}
+
+.workout__history {
+  width: 100%;
+  display: grid;
+  gap: var(--space-2);
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  padding: var(--space-4) 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  min-height: 64px;
+}
+
+.workout__history strong { font-weight: 640; }
 .workout__history span { font-size: var(--text-sm); color: var(--text-secondary); }
-.workout .button { min-height: 44px; margin: 4px 4px 4px 0; white-space: normal; }
+
+.workout .button {
+  min-height: 44px;
+  margin: var(--space-1) var(--space-1) var(--space-1) 0;
+  white-space: normal;
+}
+
 .workout button:disabled { opacity: .5; cursor: default; }
-.workout button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (hover: hover) { .workout button:not(:disabled):hover { filter: brightness(.96); } }
+
+.workout button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .workout button:not(:disabled):hover { filter: brightness(.96); }
+}
 
 /* Строка истории: само занятие и, у тренера, удаление рядом. Кнопка
    удаления вынесена из кнопки занятия, а не вложена в неё: кнопка внутри
@@ -62,3 +375,8 @@
 }
 
 .workout__erase .small { flex: 1; min-width: 12ch; }
+
+@media (prefers-reduced-motion: reduce) {
+  .workout__check:active { transform: none; }
+  .workout__bar span { transition: none; }
+}

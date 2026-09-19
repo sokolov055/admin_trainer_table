@@ -223,8 +223,20 @@ export default function WorkoutJournal({ clientRow, launch, onClose }) {
       <header className="workout__header">
         <h2>{s.title}</h2><p>{s.month || 'Свободная тренировка'} · {labels[s.status]}</p>
         <div className="workout__metrics"><span>Время <strong>{clock(elapsed)}</strong></span><span>Подходы <strong>{stats.done} / {stats.total}</strong></span></div>
-        <p className="small" role="status">{busy ? 'Сохраняем…' : record.dirty ? 'Есть несохранённые изменения' : 'Сохранено в облаке'}</p>
-        <progress max={stats.total || 1} value={stats.done} aria-label="Выполненные подходы" />
+        {/* Полоса своя, а не браузерный progress: системный выглядит
+            по-разному в каждом движке и ни в одной теме не совпадает с
+            палитрой приложения. Значение дублируется для чтения вслух. */}
+        <div
+          className="workout__bar"
+          role="progressbar"
+          aria-label="Выполненные подходы"
+          aria-valuemin={0}
+          aria-valuemax={stats.total || 1}
+          aria-valuenow={stats.done}
+        >
+          <span style={{ width: Math.round((stats.done / (stats.total || 1)) * 100) + '%' }} />
+        </div>
+        <p className="workout__status" role="status">{busy ? 'Сохраняем…' : record.dirty ? 'Есть несохранённые изменения' : 'Сохранено в облаке'}</p>
       </header>
       <fieldset disabled={!editable || !!conflict} className="workout__fields">
         <label className="workout__field">Название занятия<input value={s.title} maxLength={160} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
@@ -239,9 +251,9 @@ export default function WorkoutJournal({ clientRow, launch, onClose }) {
           <details><summary>Изменить упражнение</summary>
             <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ex => ({ ...ex, name: e.target.value }))} /></label>
             <div className="workout__toolbar">
-              <button className="button" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
-              <button className="button" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
-              <button className="button" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
+              <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
+              <button className="button button--ghost" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
+              <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
             </div>
           </details>
           <div className="workout__set-head" aria-hidden="true"><span>Подход</span><span>Вес, кг</span><span>Повторы</span><span>Готово</span></div>
