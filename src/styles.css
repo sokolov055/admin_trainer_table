@@ -122,6 +122,18 @@
   --dur-panel: 260ms;
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* --- поверхность историй ---
+     Тёмная в обеих темах, поэтому объявлена один раз и в тёмном блоке не
+     переопределяется. Кадр забирает экран целиком, и светлый лист посреди
+     вечернего чтения слепит — это не оттенок интерфейса, а его отсутствие.
+     Тон взят из той же тёплой основы, что и остальные нейтрали. */
+  --story-bg: #17161a;
+  --story-fg: #f2f0ea;
+
+  /* Затемнение под подписью на обложке: холоднее и глубже основы —
+     обложки яркие, и тёплая пелена на них выглядела бы грязью. */
+  --story-scrim: rgba(11, 12, 20, 0.72);
 }
 
 :root[data-theme='dark'] {
@@ -682,7 +694,12 @@ button { font-family: inherit; }
 .stories__shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(11, 12, 20, 0.72) 0%, rgba(11, 12, 20, 0.18) 46%, rgba(11, 12, 20, 0) 72%);
+  background: linear-gradient(
+    to top,
+    var(--story-scrim) 0%,
+    color-mix(in srgb, var(--story-scrim) 25%, transparent) 46%,
+    transparent 72%
+  );
 }
 
 /* Подпись прижата к низу и набрана плотно: это не заголовок, а этикетка на
@@ -696,7 +713,7 @@ button { font-family: inherit; }
   font-weight: 640;
   line-height: 1.18;
   letter-spacing: -0.012em;
-  color: #ffffff;
+  color: var(--story-fg);
   text-align: left;
   text-wrap: balance;
 
@@ -718,10 +735,11 @@ button { font-family: inherit; }
 }
 
 .stories__item--seen .stories__art { opacity: 0.55; }
-.stories__item--seen .stories__label { color: rgba(255, 255, 255, 0.82); }
+.stories__item--seen .stories__label { color: color-mix(in srgb, var(--story-fg) 82%, transparent); }
 
+/* Наведение возвращает прочитанной обложке полный цвет: на мыши это
+   единственный способ показать, что плитка живая и по ней можно нажать. */
 @media (hover: hover) and (pointer: fine) {
-  .stories__item:hover .stories__tile { transform: none; }
   .stories__item:hover .stories__art { opacity: 1; }
 }
 
@@ -737,8 +755,8 @@ button { font-family: inherit; }
   flex-direction: column;
   padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4)
            calc(var(--space-5) + env(safe-area-inset-bottom));
-  background: #17161a;
-  color: #f2f0ea;
+  background: var(--story-bg);
+  color: var(--story-fg);
   opacity: 0;
   transform: scale(0.985);
   transition: opacity var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
@@ -766,7 +784,7 @@ button { font-family: inherit; }
   flex: 1;
   height: 2.5px;
   border-radius: 2px;
-  background: rgba(242, 240, 234, 0.25);
+  background: color-mix(in srgb, var(--story-fg) 25%, transparent);
   overflow: hidden;
 }
 
@@ -774,7 +792,7 @@ button { font-family: inherit; }
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #f2f0ea;
+  background: var(--story-fg);
   transform: scaleX(0);
   transform-origin: left center;
 }
@@ -811,21 +829,23 @@ button { font-family: inherit; }
   font-size: var(--text-sm);
   font-weight: 560;
   letter-spacing: -0.005em;
-  color: rgba(242, 240, 234, 0.72);
+  color: color-mix(in srgb, var(--story-fg) 72%, transparent);
 }
 
 .story__close {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  /* 44 — минимальная цель для пальца (iOS). На 40 закрыть кадр с первого
+     раза получалось не всегда, а это единственный выход с экрана. */
+  width: 44px;
+  height: 44px;
   margin-right: calc(var(--space-2) * -1);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: none;
-  color: rgba(242, 240, 234, 0.75);
+  color: color-mix(in srgb, var(--story-fg) 75%, transparent);
   cursor: pointer;
   transition: color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
@@ -833,7 +853,7 @@ button { font-family: inherit; }
 .story__close:active { transform: scale(0.97); }
 
 @media (hover: hover) and (pointer: fine) {
-  .story__close:hover { color: #f2f0ea; }
+  .story__close:hover { color: var(--story-fg); }
 }
 
 /* Кадр занимает всю ширину колонки и стоит по центру высоты.
@@ -869,9 +889,9 @@ button { font-family: inherit; }
   margin-bottom: var(--space-4);
   padding: var(--space-3);
   border-radius: var(--radius-lg);
-  background: rgba(242, 240, 234, 0.05);
-  border: 1px solid rgba(242, 240, 234, 0.08);
-  color: #f2f0ea;
+  background: color-mix(in srgb, var(--story-fg) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--story-fg) 8%, transparent);
+  color: var(--story-fg);
 }
 
 .story-art {
@@ -890,7 +910,7 @@ button { font-family: inherit; }
   max-width: 34ch;
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
-  color: rgba(242, 240, 234, 0.6);
+  color: color-mix(in srgb, var(--story-fg) 60%, transparent);
 }
 
 .story__heading {
@@ -911,7 +931,7 @@ button { font-family: inherit; }
   margin: 0;
   font-size: var(--text-md);
   line-height: 1.45;
-  color: rgba(242, 240, 234, 0.82);
+  color: color-mix(in srgb, var(--story-fg) 82%, transparent);
 }
 
 /* На широком экране кадр остаётся колонкой по центру, а не растягивается
@@ -930,7 +950,9 @@ button { font-family: inherit; }
   margin: var(--space-5) 0 0;
   font-size: var(--text-xs);
   text-align: center;
-  color: rgba(242, 240, 234, 0.45);
+  /* 58 %, а не 45: на 45 % контраст к фону кадра был 4.2:1 при требуемых
+     4.5 для текста такого размера. Подсказка приглушённая, но читаемая. */
+  color: color-mix(in srgb, var(--story-fg) 58%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1208,6 +1230,12 @@ button { font-family: inherit; }
   background: var(--surface);
   color: var(--text);
   border-radius: var(--radius-sm);
+
+  /* 44 — минимальная цель для пальца (iOS; в Android 48 dp). Одних
+     отступов не хватало: при 13-м кегле кнопка выходила 38 px, и это
+     касалось всех кнопок приложения разом, а не одной. Высота задана
+     минимумом, а не жёстко: кнопке с двумя строками текста нужно расти. */
+  min-height: 44px;
   padding: 9px 14px;
   font-size: var(--text-sm);
   font-weight: 600;
@@ -1275,6 +1303,10 @@ button { font-family: inherit; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+
+  /* Та же минимальная цель для пальца, что и у кнопок: поле поиска
+     промахом мимо него и отличается от кнопки — по нему бьют не глядя. */
+  min-height: 44px;
   padding: 10px 12px 10px 38px;
   transition: border-color var(--dur-fast) var(--ease-out),
               background-color var(--dur-fast) var(--ease-out);
@@ -1318,6 +1350,22 @@ button { font-family: inherit; }
               background-color var(--dur-fast) var(--ease-out),
               color var(--dur-fast) var(--ease-out),
               border-color var(--dur-fast) var(--ease-out);
+}
+
+/* Область нажатия чипа доведена до 44 px, а вид оставлен прежним.
+   Растить сам чип нельзя: их в ряду пять-шесть, и ряд высотой в палец
+   съел бы экран, ради которого фильтры и нужны. Невидимая накладка решает
+   ровно то, что должно быть решено, — промах пальцем мимо цели. */
+.chip { position: relative; }
+
+.chip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
 }
 
 .chip:active { transform: scale(0.96); }

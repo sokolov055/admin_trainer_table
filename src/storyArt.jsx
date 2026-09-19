@@ -289,7 +289,7 @@ export function ArtInstall() {
       {/* наша иконка: та же гантель, что и на значке приложения */}
       <rect x={iconX} y={iconY} width={TILE} height={TILE} rx={9}
         fill="var(--tint)" stroke="none" />
-      <g stroke="#17161a" strokeWidth={2.2} strokeLinecap="round">
+      <g stroke="var(--story-bg)" strokeWidth={2.2} strokeLinecap="round">
         <path d={'M' + (iconX + 8) + ' ' + (iconY + 16) + 'h16'} />
         <path d={'M' + (iconX + 7) + ' ' + (iconY + 11) + 'v10'} />
         <path d={'M' + (iconX + 25) + ' ' + (iconY + 11) + 'v10'} />
@@ -351,7 +351,7 @@ export function ArtPace() {
             {row.active ? (
               <g>
                 <circle cx={52} cy={cy} r={10} fill="var(--tint)" stroke="none" />
-                <path d={'M47.5 ' + cy + 'l3.2 3.4 6-6.6'} stroke="#17161a" strokeWidth={2} />
+                <path d={'M47.5 ' + cy + 'l3.2 3.4 6-6.6'} stroke="var(--story-bg)" strokeWidth={2} />
               </g>
             ) : (
               <circle cx={52} cy={cy} r={10} opacity={0.35} />
