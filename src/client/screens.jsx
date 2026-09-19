@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
+import Ration from '../nutrition/Ration.jsx';
 import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
 import {
@@ -700,6 +701,7 @@ export function Nutrition({ clientRow }) {
 
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(null);
+  const [ration, setRation] = useState(false);
 
   // Тренер переключается между клиентами в одной и той же карточке, и
   // экран при этом не размонтируется. Без сброса «норма записана» осталось
@@ -708,6 +710,7 @@ export function Nutrition({ clientRow }) {
   useEffect(() => {
     setSaved(null);
     setEditing(false);
+    setRation(false);
   }, [clientRow]);
 
   if (loading) return <Loading rows={3} />;
@@ -738,6 +741,13 @@ export function Nutrition({ clientRow }) {
   }
 
   const showForm = editing || !configured;
+
+  // Экран рациона занимает всё место: это отдельная работа в три шага, и
+  // норма над ней превратилась бы в шапку, которую человек прокручивает
+  // мимо. Возврат — кнопкой «К норме» внутри самого экрана.
+  if (ration && configured) {
+    return <Ration targets={targets} onClose={() => setRation(false)} />;
+  }
 
   const onSaved = (result) => {
     setSaved(result);
@@ -794,6 +804,28 @@ export function Nutrition({ clientRow }) {
           clientRow={clientRow}
           onChanged={onSaved}
         />
+      )}
+
+      {/* Рацион показывается только самому клиенту. У тренера в карточке это
+          был бы ЕГО холодильник и его выбор блюд: продукты и «нравится»
+          хранятся на устройстве, и собрать отсюда рацион для клиента
+          невозможно — получилась бы кнопка, которая делает не то, что
+          обещает. */}
+      {configured && !editing && !byTrainer && (
+        <Section>
+          <Panel pad>
+            <h3 style={{ margin: '0 0 6px', fontSize: 'var(--text-md)', fontWeight: 640 }}>
+              Что приготовить из того, что дома
+            </h3>
+            <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
+              Отметьте продукты, которые есть, — приложение подберёт блюда,
+              соберёт из них день под вашу норму и покажет, что докупить.
+            </p>
+            <button className="button button--block button--primary" onClick={() => setRation(true)}>
+              Собрать рацион
+            </button>
+          </Panel>
+        </Section>
       )}
 
       {configured && !editing && survey && (

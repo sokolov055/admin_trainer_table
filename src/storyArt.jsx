@@ -558,6 +558,91 @@ export function ArtDraft() {
   );
 }
 
+/**
+ * Холодильник: продукты, часть из которых отмечена.
+ *
+ * Форма повторяет сам экран — ряды плиток с галочками, — потому что кадр
+ * рассказывает о действии, а не о еде. Нарисованная тарелка с котлетой
+ * выглядела бы аппетитнее и не объяснила бы, что надо сделать.
+ */
+export function ArtPantry() {
+  const rows = [
+    [{ w: 62, on: true }, { w: 78, on: false }, { w: 54, on: true }],
+    [{ w: 86, on: true }, { w: 58, on: true }, { w: 50, on: false }],
+    [{ w: 46, on: false }, { w: 92, on: true }, { w: 56, on: false }],
+  ];
+
+  return (
+    <Art label="Продукты, которые есть дома, отмечены галочками">
+      {rows.map((row, r) => {
+        let x = 34;
+        return (
+          <g key={r}>
+            {row.map((chip, i) => {
+              const y = 30 + r * 42;
+              const left = x;
+              x += chip.w + 12;
+              return (
+                <g key={i}>
+                  <rect
+                    x={left} y={y} width={chip.w} height={30} rx={15}
+                    fill={chip.on ? 'var(--tint)' : 'currentColor'}
+                    fillOpacity={chip.on ? 0.24 : 0.08}
+                    stroke={chip.on ? 'var(--tint)' : 'none'}
+                    strokeOpacity={0.75}
+                  />
+                  {chip.on && (
+                    <path
+                      d={'M' + (left + 11) + ' ' + (y + 15) + 'l4 4 8-9'}
+                      stroke="var(--tint)"
+                      strokeWidth={2}
+                    />
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+    </Art>
+  );
+}
+
+/**
+ * Колода: карточка блюда уходит вправо, следующая ждёт под ней.
+ *
+ * Наклон и вторая карточка позади — это и есть всё сообщение кадра: блюда
+ * листаются по одному, и за текущим есть ещё. Стрелки по краям названы
+ * словами в тексте кадра, поэтому здесь они только направление.
+ */
+export function ArtSwipe() {
+  return (
+    <Art label="Карточка блюда уходит вправо, следующая ждёт под ней">
+      <rect
+        x={96} y={44} width={120} height={104} rx={14}
+        fill="currentColor" fillOpacity={0.08} opacity={0.6}
+      />
+
+      <g transform="rotate(9 176 92)">
+        <rect
+          x={116} y={32} width={120} height={104} rx={14}
+          fill="var(--tint)" fillOpacity={0.2} stroke="var(--tint)" strokeOpacity={0.85}
+        />
+        <path d="M134 58h58" opacity={0.85} />
+        <path d="M134 74h84" opacity={0.5} />
+        <path d="M134 90h40" opacity={0.5} />
+        <circle cx={214} cy={112} r={11} fill="var(--tint)" stroke="none" />
+        <path d="M209 112l3.4 3.6 6.4-7" stroke="var(--story-bg)" strokeWidth={2} />
+      </g>
+
+      {/* Стрелки смотрят НАРУЖУ: они показывают, куда смахивать, а не куда
+          едет карточка. Направленные внутрь, они читались как сжатие. */}
+      <path d="M84 90h-26m9-8-9 8 9 8" opacity={0.45} />
+      <path d="M236 90h26m-9-8 9 8-9 8" opacity={0.75} stroke="var(--tint)" />
+    </Art>
+  );
+}
+
 export const ART = {
   schedule: ArtSchedule,
   nutrition: ArtNutrition,
@@ -567,4 +652,6 @@ export const ART = {
   pace: ArtPace,
   journal: ArtJournal,
   draft: ArtDraft,
+  pantry: ArtPantry,
+  swipe: ArtSwipe,
 };
