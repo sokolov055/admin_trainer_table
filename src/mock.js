@@ -112,10 +112,33 @@ const NUTRITION_OPTIONS = {
 };
 
 const GOAL_MATH = {
-  lose: { factor: 0.80, protein: 2.2, fat: 0.8 },
-  keep: { factor: 1.00, protein: 1.8, fat: 1.0 },
-  gain: { factor: 1.15, protein: 2.0, fat: 1.0 },
+  lose: { protein: 2.2, fat: 0.8 },
+  keep: { protein: 1.8, fat: 1.0 },
+  gain: { protein: 2.0, fat: 1.0 },
 };
+
+/** Шкала темпов — копия скриптовой (NUTRITION_PACE в src/150_OpsApi.js),
+ *  по той же причине, что и остальная математика заглушки. */
+const PACE_MATH = {
+  lose: [
+    { id: 'soft', factor: 0.90, label: 'Мягкий', note: '−10 %', hint: 'Дольше, но почти без голода' },
+    { id: 'even', factor: 0.85, label: 'Ровный', note: '−15 %', hint: 'Средний темп, его и советуют' },
+    { id: 'fast', factor: 0.80, label: 'Быстрый', note: '−20 %', hint: 'Заметный результат, тяжелее держать' },
+  ],
+  gain: [
+    { id: 'soft', factor: 1.07, label: 'Мягкий', note: '+7 %', hint: 'Медленнее, но почти без жира' },
+    { id: 'even', factor: 1.11, label: 'Ровный', note: '+11 %', hint: 'Средний темп, его и советуют' },
+    { id: 'fast', factor: 1.15, label: 'Быстрый', note: '+15 %', hint: 'Быстрее масса, но и жира больше' },
+  ],
+  keep: [
+    { id: 'even', factor: 1.00, label: 'Поддержание', note: '0 %', hint: 'Столько, сколько тратите' },
+  ],
+};
+
+function mockPace(goal, id) {
+  const list = PACE_MATH[goal] || PACE_MATH.keep;
+  return list.find((p) => p.id === id) || list.find((p) => p.id === 'even') || list[0];
+}
 
 /** Анкета демо-клиента. null — ещё не заполнена, и экран открывается
  *  пустым: обе стороны сценария должны быть видны без перезагрузки. */
@@ -174,6 +197,7 @@ function mockParseSurvey(params) {
     weight: Math.round(weight * 10) / 10,
     height: Math.round(height * 10) / 10,
     sex,
+    pace: mockPace(goal, params.pace).id,
     activity,
     goal,
   };
@@ -182,13 +206,35 @@ function mockParseSurvey(params) {
 /** Миффлин—Сан Жеор с теми же предохранителями, что в src/150_OpsApi.js */
 function mockCompute(s) {
   const factor = NUTRITION_OPTIONS.activity.find((a) => a.value === s.activity).factor;
+  const bmr = 10 * s.weight + 6.25 * s.height - 5 * s.age + (s.sex === 'm' ? 5 : -161);
+  const tdee = bmr * factor;
+
+  const list = PACE_MATH[s.goal] || PACE_MATH.keep;
+  const plans = list.map((pace) => mockPlan(s, pace, bmr, tdee));
+  const chosen = mockPace(s.goal, s.pace);
+  const picked = plans.find((p) => p.id === chosen.id) || plans[0];
+
+  return {
+    bmr: Math.round(bmr),
+    tdee: Math.round(tdee),
+    pace: picked.id,
+    paceLabel: picked.label,
+    kcal: picked.kcal,
+    protein: picked.protein,
+    fat: picked.fat,
+    carbs: picked.carbs,
+    adjusted: picked.adjusted,
+    notes: picked.notes,
+    plans,
+  };
+}
+
+function mockPlan(s, pace, bmr, tdee) {
   const goal = GOAL_MATH[s.goal];
   const notes = [];
   let adjusted = false;
 
-  const bmr = 10 * s.weight + 6.25 * s.height - 5 * s.age + (s.sex === 'm' ? 5 : -161);
-  const tdee = bmr * factor;
-  let target = tdee * goal.factor;
+  let target = tdee * pace.factor;
 
   if (target < bmr) {
     target = bmr;
@@ -218,7 +264,10 @@ function mockCompute(s) {
       + ' ккал, чтобы осталось хотя бы 50 г углеводов.');
   }
 
-  return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal, protein, fat, carbs, adjusted, notes };
+  return {
+    id: pace.id, label: pace.label, note: pace.note, hint: pace.hint,
+    kcal, protein, fat, carbs, adjusted, notes,
+  };
 }
 
 /**
@@ -357,6 +406,8 @@ const MOCK = {
     filledAt: nutrition ? nutrition.filledAt : null,
     daysSinceFilled: nutrition ? 0 : null,
     isNew: !!nutrition,
+    pace: nutrition ? nutrition.pace : null,
+    plans: nutrition ? nutrition.plans : [],
     options: NUTRITION_OPTIONS,
     meals: [],
     sheetName: 'Питание',
@@ -382,8 +433,12 @@ const MOCK = {
         activityLabel: NUTRITION_OPTIONS.activity.find((a) => a.value === survey.activity).label,
         goal: survey.goal,
         goalLabel: NUTRITION_OPTIONS.goal.find((g) => g.value === survey.goal).label,
+        pace: calc.pace,
+        paceLabel: calc.paceLabel,
       },
       targets: { kcal: calc.kcal, protein: calc.protein, fat: calc.fat, carbs: calc.carbs },
+      pace: calc.pace,
+      plans: calc.plans,
       filledAt: new Date().toISOString().slice(0, 19),
     };
 
@@ -393,6 +448,8 @@ const MOCK = {
       clientName: name,
       survey: nutrition.survey,
       targets: nutrition.targets,
+      pace: calc.pace,
+      plans: calc.plans,
       bmr: calc.bmr,
       tdee: calc.tdee,
       adjusted: calc.adjusted,
@@ -400,6 +457,35 @@ const MOCK = {
       filledAt: nutrition.filledAt,
       filledBy: params.clientRow ? 'trainer' : 'client',
       columnsCreated: [],
+    };
+  },
+
+  // Смена темпа. Анкету не трогаем — ровно как настоящая операция: она
+  // читает ответы из строки клиента, а здесь они лежат в nutrition.
+  'nutrition.pace': (params) => {
+    if (!nutrition) mockFail('Анкета питания ещё не заполнена');
+
+    const survey = { ...nutrition.survey, pace: mockPace(nutrition.survey.goal, params.pace).id };
+    const calc = mockCompute(survey);
+    const name = params.clientRow ? 'Дмитрий Соколов' : 'Анна Морозова';
+
+    nutrition.survey = { ...nutrition.survey, pace: calc.pace, paceLabel: calc.paceLabel };
+    nutrition.targets = { kcal: calc.kcal, protein: calc.protein, fat: calc.fat, carbs: calc.carbs };
+    nutrition.pace = calc.pace;
+    nutrition.plans = calc.plans;
+
+    return {
+      row: params.clientRow || 3,
+      name,
+      clientName: name,
+      survey: nutrition.survey,
+      targets: nutrition.targets,
+      pace: calc.pace,
+      plans: calc.plans,
+      bmr: calc.bmr,
+      tdee: calc.tdee,
+      adjusted: calc.adjusted,
+      notes: calc.notes,
     };
   },
 

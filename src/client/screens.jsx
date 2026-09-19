@@ -7,7 +7,8 @@ import {
   Chips, Segmented, Options, Field, Note, Delta, SignOut,
   formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert } from '../icons.jsx';
+import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck } from '../icons.jsx';
+import { haptic } from '../telegram.js';
 
 /* ==================================================================
  * Обзор
@@ -581,6 +582,11 @@ export function Nutrition({ clientRow }) {
   const survey = data.survey || null;
   const targets = data.targets || {};
 
+  // Варианты нормы считает таблица и присылает готовыми. Пусто — значит
+  // анкету заполнили до того, как появился выбор темпа: показываем норму
+  // без переключателя, ровно как раньше, и ничего не выдумываем.
+  const plans = Array.isArray(data.plans) ? data.plans : [];
+
   // Ответ без справочников — это либо очень старый кэш, либо развёртывание
   // Apps Script, отставшее от кода. Рисовать форму нечем: список уровней
   // активности придумывать здесь нельзя, он часть расчёта.
@@ -641,6 +647,18 @@ export function Nutrition({ clientRow }) {
         </Section>
       )}
 
+      {/* Выбор темпа — сразу под нормой: именно он её и определяет.
+          Одного варианта не показываем: у поддержания формы темпа нет, и
+          одинокая карточка притворялась бы выбором. */}
+      {configured && !editing && plans.length > 1 && (
+        <PaceChooser
+          plans={plans}
+          pace={data.pace}
+          clientRow={clientRow}
+          onChanged={onSaved}
+        />
+      )}
+
       {configured && !editing && survey && (
         <Section title="Анкета" note="по этим ответам посчитана норма">
           <Panel>
@@ -653,6 +671,7 @@ export function Nutrition({ clientRow }) {
               <Row label="Пол">{survey.sex === 'm' ? 'мужской' : 'женский'}</Row>
               <Row label="Активность">{survey.activityLabel || survey.activity}</Row>
               <Row label="Цель">{survey.goalLabel || survey.goal}</Row>
+              {survey.paceLabel && <Row label="Темп">{survey.paceLabel}</Row>}
               {data.filledAt && (
                 <Row label="Заполнено">
                   {formatDate(data.filledAt)} · {relativeDays(data.filledAt)}
@@ -698,6 +717,89 @@ export function Nutrition({ clientRow }) {
         </Section>
       )}
     </>
+  );
+}
+
+/**
+ * Выбор темпа: три варианта нормы.
+ *
+ * До этого цель сразу означала край шкалы — «Похудение» выдавало минус
+ * пятую часть расхода, самый жёсткий вариант из возможных. Человек видел
+ * одно число и не догадывался, что у него есть выбор; не выдержав, он
+ * бросал не темп, а питание целиком.
+ *
+ * Числа не считаем: они приезжают готовыми из таблицы, посчитанные тем же
+ * кодом, что и сама норма. Здесь только показ и отправка выбора.
+ *
+ * Выбор уходит сразу по нажатию, без кнопки «Сохранить»: вариантов три,
+ * выбор один, и подтверждать тут нечего. Пока запрос в пути, список
+ * заблокирован целиком — иначе нетерпеливый палец отправит два выбора
+ * подряд, и в таблицу ляжет тот, что ответил последним.
+ */
+function PaceChooser({ plans, pace, clientRow, onChanged }) {
+  const [busy, setBusy] = useState(null);
+  const [failure, setFailure] = useState(null);
+
+  const choose = async (id) => {
+    if (busy || id === pace) return;
+
+    setBusy(id);
+    setFailure(null);
+    haptic();
+
+    try {
+      const result = await apiMutate('nutrition.pace', {
+        ...(clientRow ? { clientRow } : {}),
+        pace: id,
+      });
+      onChanged(result);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Section title="Темп" note="насколько быстро идём к цели">
+      <div className="options" role="radiogroup" aria-label="Темп">
+        {plans.map((plan) => {
+          const active = plan.id === pace;
+
+          return (
+            <button
+              key={plan.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              className={'option option--pace' + (active ? ' option--active' : '')}
+              onClick={() => choose(plan.id)}
+              disabled={!!busy}
+            >
+              <span className="option__mark">{active && <IconCheck size={12} />}</span>
+              <span className="option__body">
+                <span className="option__top">
+                  <span>{plan.label}{plan.note ? ' · ' + plan.note : ''}</span>
+                  <span className="option__kcal">
+                    {busy === plan.id ? '…' : formatNumber(plan.kcal) + ' ккал'}
+                  </span>
+                </span>
+                <span className="option__hint">
+                  Б {plan.protein} · Ж {plan.fat} · У {plan.carbs} г
+                  {plan.hint ? ' — ' + plan.hint : ''}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {failure && (
+        <Note tone="critical" icon={IconAlert}>
+          {failure.message || 'Не получилось сменить темп'}
+        </Note>
+      )}
+    </Section>
   );
 }
 

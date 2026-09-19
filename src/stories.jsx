@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { haptic } from './telegram.js';
 import { ART } from './storyArt.jsx';
 import { IconRefresh, IconClose } from './icons.jsx';
+import { APP_VERSION } from './version.js';
 
 /**
  * ==========================================================================
@@ -71,11 +72,25 @@ const SEEN_KEY = 'stories_seen_v1';
  */
 export const TOPICS = [
   {
-    id: 'release-1-1',
+    // id темы без номера версии: тема одна и та же, меняется её состав.
+    // Номер живёт в подписи и берётся из version.js — того же места, что
+    // показывает тренеру строка внизу бокового меню.
+    id: 'release',
     label: 'Обновление',
     Icon: IconRefresh,
-    caption: 'Что нового в версии 1.1',
+    caption: 'Что нового в версии ' + APP_VERSION,
     frames: [
+      {
+        id: 'nutrition-pace',
+        date: '19 сентября',
+        art: 'pace',
+        tint: '#7fd97f',
+        heading: 'Питание: три варианта вместо одного',
+        body: 'Раньше цель сразу означала самый жёсткий темп: выбрал '
+          + 'похудение — получил предельный дефицит. Теперь у похудения и '
+          + 'набора три варианта, мягкий, ровный и быстрый, и видно, чем '
+          + 'они отличаются по калориям и БЖУ. Выбранный становится нормой.',
+      },
       {
         id: 'next-training',
         date: '19 сентября',

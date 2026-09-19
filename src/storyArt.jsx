@@ -326,10 +326,56 @@ export function ArtGuide() {
   );
 }
 
+/**
+ * Темп питания: три варианта нормы, выбран средний.
+ *
+ * Полоски разной длины — это калории: чем быстрее темп, тем короче.
+ * Отмечен средний, а не самый короткий, и в этом весь смысл кадра: раньше
+ * человек получал край шкалы, не зная, что у него есть выбор.
+ */
+export function ArtPace() {
+  const rows = [
+    { w: 196, active: false },
+    { w: 168, active: true },
+    { w: 140, active: false },
+  ];
+
+  return (
+    <Art label="Три варианта нормы, выбран средний">
+      {rows.map((row, i) => {
+        const y = 26 + i * 48;
+        const cy = y + 17;
+
+        return (
+          <g key={i}>
+            {row.active ? (
+              <g>
+                <circle cx={52} cy={cy} r={10} fill="var(--tint)" stroke="none" />
+                <path d={'M47.5 ' + cy + 'l3.2 3.4 6-6.6'} stroke="#17161a" strokeWidth={2} />
+              </g>
+            ) : (
+              <circle cx={52} cy={cy} r={10} opacity={0.35} />
+            )}
+
+            <rect
+              x={76} y={y} width={row.w} height={34} rx={11}
+              fill={row.active ? 'var(--tint)' : 'currentColor'}
+              fillOpacity={row.active ? 0.22 : 0.1}
+              stroke={row.active ? 'var(--tint)' : 'none'}
+              strokeOpacity={0.8}
+            />
+          </g>
+        );
+      })}
+    </Art>
+  );
+}
+
 export const ART = {
   schedule: ArtSchedule,
   nutrition: ArtNutrition,
   progress: ArtProgress,
   install: ArtInstall,
   guide: ArtGuide,
+  pace: ArtPace,
 };

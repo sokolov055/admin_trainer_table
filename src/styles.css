@@ -925,6 +925,15 @@ button { font-family: inherit; }
   .stories__item:active, .story__close:active { transform: none; }
 }
 
+/* Версия внизу бокового меню. Отодвинута от пунктов заметно сильнее, чем
+   пункты друг от друга: это не ещё один пункт, а подпись ко всему меню. */
+.menu__version {
+  margin: var(--space-5) 0 0;
+  padding: 0 var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 /* ==========================================================================
    Ведущий показатель
    Один крупный факт, ради которого экран открывают, и приглушённый ряд
@@ -1938,6 +1947,51 @@ code {
   border-color: var(--accent);
   color: var(--text);
 }
+
+/* Вариант темпа — тот же элемент выбора, но в две строки: кроме названия
+   в нём цифры, ради которых выбор и делается. Отдельного компонента не
+   заводим — у выбора в приложении должен быть один облик, иначе человек
+   не узнаёт знакомую механику. */
+.option--pace {
+  align-items: flex-start;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.option--pace .option__mark { margin-top: 1px; }
+
+.option__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.option__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Цифры в столбик сравнивают взглядом, а не читают — поэтому моноширинные
+   по цифрам: иначе «1920» и «2160» встают разной длины и сравниваются хуже. */
+.option__kcal {
+  flex: 0 0 auto;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.option__hint {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.option--active .option__hint { color: var(--text-secondary); }
 
 /* Кружок слева, а не галочка сама по себе: пустой кружок сообщает, что
    выбор ещё не сделан, — галочка в этом положении просто отсутствует, и

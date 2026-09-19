@@ -3,6 +3,7 @@ import { Clients, Finance, Processes, Lost, Logs, Sheets, Settings, ClientCard }
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
+import { APP_VERSION } from '../version.js';
 import { Chips, Drawer } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import {
@@ -185,6 +186,12 @@ export default function TrainerApp({ me }) {
             );
           })}
         </div>
+
+        {/* Версия — внизу меню, самой тихой строкой.
+            Она нужна не каждый день, а в один конкретный момент: когда
+            что-то не показывается и надо понять, та ли это сборка.
+            Поэтому место — последнее, а вид — приглушённый. */}
+        <p className="menu__version">Версия {APP_VERSION}</p>
       </Drawer>
     </div>
   );
