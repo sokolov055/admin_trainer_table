@@ -3,7 +3,7 @@ import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
-  SignOut, DataTable, Delta, formatNumber, formatMoney, formatDate, relativeDays, daysSince, plural,
+  SignOut, DataTable, Delta, formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { getThemeMode, setThemeMode } from '../telegram.js';
 import {
@@ -49,8 +49,13 @@ export function Clients({ onOpenClient }) {
     return c.balance < 0 || days === null || days > s.staleDays;
   });
 
+  // Клиенты с назначенным занятием впереди. Прошедшие сюда не попадают:
+  // сервер отдаёт дату, только пока занятие не кончилось.
+  const upcoming = data.clients.filter((c) => c.nextTrainingDate);
+
   const filters = [
     { value: 'all', label: `Все · ${data.clients.length}` },
+    { value: 'next', label: `Ближайшие · ${upcoming.length}` },
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
     { value: 'debt', label: `Долг · ${s.negativeBalance}` },
     { value: 'nomeasure', label: 'Без замера' },
@@ -59,11 +64,20 @@ export function Clients({ onOpenClient }) {
   const filtered = data.clients.filter((c) => {
     if (query && c.name.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
 
+    if (filter === 'next') return !!c.nextTrainingDate;
     if (filter === 'attention') return needsAttention.indexOf(c) !== -1;
     if (filter === 'debt') return c.balance < 0;
     if (filter === 'nomeasure') return String(c.lastMeasureStatus || '').indexOf('✅') !== 0;
     return true;
   });
+
+  // «Ближайшие» — единственный фильтр, который ещё и сортирует: список
+  // отвечает на вопрос «кто следующий», а на него нельзя ответить порядком
+  // строк в таблице. Даты в ISO сравниваются как строки — этого достаточно,
+  // они одного формата и одного пояса.
+  const shown = filter === 'next'
+    ? [...filtered].sort((a, b) => String(a.nextTrainingDate).localeCompare(String(b.nextTrainingDate)))
+    : filtered;
 
   return (
     <>
@@ -98,11 +112,11 @@ export function Clients({ onOpenClient }) {
         <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
         <Chips items={filters} value={filter} onChange={setFilter} />
 
-        {filtered.length === 0 && (
+        {shown.length === 0 && (
           <Empty icon={IconSearch} title="Никого не нашлось" text="Попробуйте другой фильтр или запрос." />
         )}
 
-        {filtered.map((c) => {
+        {shown.map((c) => {
           // «Нет данных» и «давно не приходил» — разные вещи, и лечатся
           // по-разному: первое чинит пересчёт календаря, второе — звонок
           // клиенту. Раньше оба показывались одним словом «пропал», которое
@@ -134,6 +148,11 @@ export function Clients({ onOpenClient }) {
                 <span>
                   {c.lastTrainingDate ? relativeDays(c.lastTrainingDate) : 'тренировок не было'}
                 </span>
+
+                {/* Когда следующая — не значок состояния, а обычный факт,
+                    поэтому обычной строкой. Значком он спорил бы за
+                    внимание с «не был N дней», а это разные новости. */}
+                {c.nextTrainingDate && <span>дальше {formatWhen(c.nextTrainingDate)}</span>}
                 {noData && <Badge>нет данных</Badge>}
                 {isStale && (
                   <Badge kind="warn">

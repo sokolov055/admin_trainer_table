@@ -476,6 +476,88 @@ export const COVERS = {
   release: CoverRelease,
 };
 
+/**
+ * Журнал: строки упражнений с отметками и рабочим весом.
+ *
+ * Рисуем именно то, что человек увидит на экране занятия — отмеченные
+ * подходы и цифры рядом. Абстрактная гантель сказала бы «тренировка», а
+ * кадр про другое: про то, что тренировка теперь записывается.
+ */
+export function ArtJournal() {
+  const rows = [
+    { done: true, w: 132 },
+    { done: true, w: 154 },
+    { done: false, w: 118 },
+  ];
+
+  return (
+    <Art label="Список упражнений с отмеченными подходами и весом">
+      {/* таймер занятия */}
+      <rect x={30} y={18} width={86} height={32} rx={11}
+        fill="var(--tint)" fillOpacity={0.16} stroke="var(--tint)" strokeOpacity={0.75} />
+      <text x={73} y={40} textAnchor="middle" fill="var(--tint)" stroke="none"
+        fontSize={16} fontWeight={640} letterSpacing="-0.01em">12:40</text>
+
+      {rows.map((row, i) => {
+        const y = 70 + i * 38;
+        return (
+          <g key={i}>
+            {/* отметка выполненного подхода */}
+            {row.done ? (
+              <g>
+                <rect x={30} y={y} width={26} height={26} rx={8} fill="var(--tint)" stroke="none" />
+                <path d={'M36 ' + (y + 13) + 'l4.6 4.8 9.4 -10'} stroke="#17161a" strokeWidth={2.2} />
+              </g>
+            ) : (
+              <rect x={30} y={y} width={26} height={26} rx={8} opacity={0.4} />
+            )}
+
+            <rect x={68} y={y + 4} width={row.w} height={8} rx={4}
+              fill="currentColor" fillOpacity={row.done ? 0.28 : 0.14} stroke="none" />
+            <rect x={68} y={y + 18} width={row.w - 60} height={6} rx={3}
+              fill="currentColor" fillOpacity={0.12} stroke="none" />
+
+            {/* рабочий вес — то, ради чего подход и отмечают */}
+            <text x={290} y={y + 18} textAnchor="end" fill="currentColor" stroke="none"
+              fontSize={15} fontWeight={640} opacity={row.done ? 0.95 : 0.35}>
+              {row.done ? (i === 0 ? '80' : '60') : '—'}
+            </text>
+          </g>
+        );
+      })}
+    </Art>
+  );
+}
+
+/**
+ * Пауза и сохранение: занятие остановлено, но ничего не потеряно.
+ *
+ * Два знака рядом — пауза и облако с галочкой — читаются как одно
+ * утверждение: «прервал, и записанное на месте». Порознь ни один из них
+ * этого не говорит.
+ */
+export function ArtDraft() {
+  return (
+    <Art label="Пауза и сохранённая запись">
+      <circle cx={112} cy={86} r={46} stroke="var(--tint)" strokeWidth={2.4} opacity={0.5} />
+      <g fill="var(--tint)" stroke="none">
+        <rect x={96} y={64} width={11} height={44} rx={4} />
+        <rect x={117} y={64} width={11} height={44} rx={4} />
+      </g>
+
+      {/* облако с галочкой: запись доехала */}
+      <path
+        d="M196 118c-12 0-20-8-20-18 0-9 6-16 15-17 3-11 13-19 25-19 14 0 26 10 28 24 10 1 18 9 18 19 0 11-9 19-21 19h-45Z"
+        fill="currentColor"
+        fillOpacity={0.14}
+        stroke="currentColor"
+        strokeOpacity={0.35}
+      />
+      <path d="M208 96l9 9 20-21" stroke="var(--tint)" strokeWidth={3.2} />
+    </Art>
+  );
+}
+
 export const ART = {
   schedule: ArtSchedule,
   nutrition: ArtNutrition,
@@ -483,4 +565,6 @@ export const ART = {
   install: ArtInstall,
   guide: ArtGuide,
   pace: ArtPace,
+  journal: ArtJournal,
+  draft: ArtDraft,
 };
