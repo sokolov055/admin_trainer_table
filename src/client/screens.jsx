@@ -143,12 +143,35 @@ export function Plan({ clientRow }) {
   const months = data.available || [];
   const blocks = data.blocks || [];
 
+  // Скрытые месяцы приезжают только тренеру: клиент про них не знает и
+  // знать не должен, иначе появится вопрос «а что там».
+  const hiddenMonths = data.hidden || [];
+  const isHidden = hiddenMonths.indexOf(data.month) !== -1;
+
   const totalExercises = blocks.reduce((s, b) => s + b.exercises.length, 0);
 
   return (
     <>
       {months.length > 1 && (
-        <Chips items={months.map((m) => ({ value: m, label: m }))} value={data.month} onChange={setMonth} />
+        <Chips
+          items={months.map((m) => ({
+            value: m,
+            // Пометка прямо в подписи, а не значком: тренер листает месяцы
+            // глазами, и «скрыт» должно читаться, не требуя расшифровки.
+            label: hiddenMonths.indexOf(m) !== -1 ? m + ' · скрыт' : m,
+          }))}
+          value={data.month}
+          onChange={setMonth}
+        />
+      )}
+
+      {data.canHide && data.month && (
+        <MonthVisibility
+          month={data.month}
+          hidden={isHidden}
+          clientRow={clientRow}
+          onChanged={reload}
+        />
       )}
 
       {blocks.length === 0 && (
@@ -195,6 +218,63 @@ export function Plan({ clientRow }) {
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * Скрыть месяц от клиента или вернуть его.
+ *
+ * Листы копятся годами: старые программы, месяцы без занятий, программа на
+ * отпуск. Удалять их жалко — в них история, — а клиенту показывать незачем.
+ * Раньше выбор был только такой: либо всё это у него в приложении, либо
+ * лист удалён насовсем.
+ *
+ * Кнопка прячет саму вкладку в таблице клиента, а не отметку где-то рядом.
+ * Поэтому и обратная сторона работает сама собой: скрыл вкладку руками в
+ * таблице — месяц пропал и в приложении. Одно состояние, одно место.
+ *
+ * Только у тренера: сервер не пустит клиента в это действие по роли, но и
+ * кнопки у него нет — решение, какие месяцы показывать, принимает не он.
+ */
+function MonthVisibility({ month, hidden, clientRow, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+
+  const toggle = async () => {
+    setBusy(true);
+    setFailure(null);
+    haptic();
+
+    try {
+      await apiMutate('plan.month.visibility', { clientRow, month, hidden: !hidden });
+      onChanged();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section>
+      <Panel pad>
+        <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
+          {hidden
+            ? `Лист «${month}» скрыт в таблице — клиент этот месяц не видит.`
+            : `Лист «${month}» виден клиенту. Скрытый останется в таблице со всем содержимым.`}
+        </p>
+
+        <button className="button button--block" onClick={toggle} disabled={busy}>
+          {busy ? 'Меняю…' : hidden ? 'Показать клиенту' : 'Скрыть от клиента'}
+        </button>
+
+        {failure && (
+          <Note tone="critical" icon={IconAlert}>
+            {failure.message || 'Не получилось изменить видимость листа'}
+          </Note>
+        )}
+      </Panel>
+    </Section>
   );
 }
 

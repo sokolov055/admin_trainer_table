@@ -38,6 +38,10 @@ const MEASURE_ROWS = [
 
 const FIELDS = ['Вес', 'Талия', 'Ягодицы', 'Грудь', 'Рука', 'Бедро', 'Плечи'];
 
+/** Какие месяцы тренер скрыл от клиента. Демо начинает с одного скрытого:
+ *  оба состояния кнопки должны быть видны без лишних нажатий. */
+let hiddenMonths = ['Июль 2026'];
+
 const PLAN_BLOCKS = [
   {
     title: 'Тренировка 1 — верх',
@@ -370,11 +374,33 @@ const MOCK = {
     fields: FIELDS,
   }),
 
-  'client.plan': (params) => ({
-    month: params.month || 'Сентябрь 2026',
-    available: MONTHS,
-    blocks: PLAN_BLOCKS,
-  }),
+  // Видимость месяцев живёт здесь же: демо должно показывать оба состояния
+  // кнопки, иначе проверить её нечем.
+  'client.plan': (params) => {
+    const trainer = !!params.clientRow;
+    const visible = MONTHS.filter((m) => trainer || hiddenMonths.indexOf(m) === -1);
+    const month = visible.indexOf(params.month) !== -1 ? params.month : visible[0] || '';
+
+    return {
+      month,
+      available: visible,
+      hidden: trainer ? hiddenMonths.slice() : [],
+      canHide: trainer,
+      blocks: month ? PLAN_BLOCKS : [],
+      note: month ? '' : 'В таблице клиента пока нет ни одного листа с программой.',
+    };
+  },
+
+  'plan.month.visibility': (params) => {
+    const month = String(params.month || '');
+    const want = params.hidden === true || String(params.hidden) === 'true';
+    const at = hiddenMonths.indexOf(month);
+
+    if (want && at === -1) hiddenMonths.push(month);
+    if (!want && at !== -1) hiddenMonths.splice(at, 1);
+
+    return { row: params.clientRow || 3, month, hidden: want };
+  },
 
   'client.progress': () => ({
     series: [{
