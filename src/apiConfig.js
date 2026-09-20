@@ -23,7 +23,7 @@ let resolved = null;
 let loading = null;
 
 /** Адрес из сборки — запасной вариант, если config.json недоступен */
-const BUILT_IN = import.meta.env.VITE_API_URL || '';
+const BUILT_IN = import.meta.env?.VITE_API_URL || '';
 
 export function currentApiUrl() {
   return resolved?.apiUrl || BUILT_IN;

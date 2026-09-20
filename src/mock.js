@@ -341,6 +341,24 @@ const MOCK = {
     };
   },
 
+  'auth.transfer.create': () => ({
+    ticket: 'demo-transfer-ticket',
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    ttlSec: 300,
+  }),
+
+  'auth.transfer.consume': () => ({
+    token: 'demo-token',
+    chatId: '11111',
+    expiresAt: new Date(Date.now() + 90 * 86400 * 1000).toISOString(),
+  }),
+
+  'auth.install.create': () => ({
+    ticket: 'demo-install-ticket',
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    ttlSec: 900,
+  }),
+
   'auth.logout': () => ({ ok: true, revoked: 1 }),
 
   'me': (params) => ({

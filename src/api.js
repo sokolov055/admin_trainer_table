@@ -202,6 +202,42 @@ export function apiPublic(action, params = {}) {
 }
 
 /**
+ * Чувствительные одноразовые действия выполняются только на основном
+ * Node-сервере и только POST-запросом. Билет нельзя повторять через GET:
+ * иначе секрет попадёт в адрес, историю браузера и журналы прокси.
+ */
+export async function apiPrimary(action, params = {}) {
+  if (import.meta.env.VITE_MOCK === '1') {
+    const { mockApi } = await import('./mock.js');
+    return mockApi(action, params);
+  }
+
+  await loadApiConfig();
+  const url = currentApiUrl();
+  if (!url) throw new ApiError('Не задан адрес API — проверьте config.json рядом с приложением.', 0);
+
+  const initData = getInitData();
+  const token = initData ? '' : getToken();
+  const payload = { action, initData, ...(token ? { token } : {}), ...params };
+
+  let body;
+  try {
+    body = await postJson(url, payload);
+  } catch (_) {
+    throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
+  }
+
+  if (!body || body.ok !== true) {
+    if (token && body && body.code === 401) {
+      clearApiCache();
+      clearToken();
+    }
+    throw new ApiError((body && body.error) || 'Неизвестная ошибка сервера', (body && body.code) || 500);
+  }
+  return body.data;
+}
+
+/**
  * Выход с этого устройства.
  *
  * Сервер гасит ключ у себя, мы — у себя. Если сервер недоступен, выходим

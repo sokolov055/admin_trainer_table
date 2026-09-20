@@ -1624,6 +1624,99 @@ th.sticky, td.sticky {
 
 .login__cta { margin-top: var(--space-5); }
 
+.login__steps {
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style-position: inside;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  text-align: left;
+}
+
+.login__alternative {
+  margin-top: var(--space-6);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  color: var(--text-secondary);
+}
+
+.login__alternative summary { cursor: pointer; min-height: 44px; padding: 11px 0; }
+.login__alternative-body { padding-top: var(--space-2); }
+.login__alternative-text { margin: 0; font-size: var(--text-sm); line-height: 1.55; }
+.login__inline-alert { margin-top: var(--space-3); color: var(--critical-text); }
+.login__recovery { margin-top: var(--space-3); }
+
+.login__mark--success { color: var(--good-text); opacity: 1; }
+
+.transfer-card {
+  margin: 0 var(--space-4) var(--space-5);
+  padding: var(--space-4);
+  display: flex;
+  gap: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.transfer-card__icon,
+.install-hint__icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.transfer-card__body { min-width: 0; flex: 1; }
+.transfer-card__title, .install-hint__title { margin: 0; font-size: var(--text-md); line-height: 1.3; }
+.transfer-card__text, .transfer-card__status, .transfer-card__error,
+.install-hint__text, .install-hint__error {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.transfer-card__error, .install-hint__error { color: var(--critical-text); }
+.transfer-card__button, .install-hint__action { margin-top: var(--space-3); min-height: 44px; }
+
+.install-hint {
+  position: fixed;
+  z-index: 80;
+  left: max(var(--space-3), env(safe-area-inset-left));
+  right: max(var(--space-3), env(safe-area-inset-right));
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  max-width: 440px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  display: flex;
+  gap: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 14px 42px rgba(20, 24, 21, 0.16);
+}
+.install-hint__body { min-width: 0; flex: 1; padding-right: 32px; }
+.install-hint__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login__pulse { animation: none; opacity: 0.7; }
+}
+
 .login__wait {
   margin-top: var(--space-4);
   display: inline-flex;

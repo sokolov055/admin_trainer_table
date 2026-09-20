@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { api, apiBatch, apiStale } from './api.js';
+import { api, apiBatch, apiStale, clearApiCache } from './api.js';
 import { getInitData, environmentInfo, diagnoseMissingInitData } from './telegram.js';
-import { hasToken, onTokenChange } from './session.js';
+import { clearToken, getToken, onTokenChange } from './session.js';
+import { readLoginTicket } from './auth-transfer.js';
 import { Loading, ErrorState } from './ui.jsx';
+import { InstallHint, TransferLoginScreen } from './AuthTransfer.jsx';
 import ClientApp from './client/ClientApp.jsx';
 import TrainerApp from './trainer/TrainerApp.jsx';
 import LoginScreen from './LoginScreen.jsx';
@@ -32,14 +34,16 @@ import LoginScreen from './LoginScreen.jsx';
  */
 export default function App() {
   const [state, setState] = useState({ loading: true, me: null, error: null });
+  const [loginTicket, setLoginTicket] = useState(readLoginTicket);
+  const [offerInstall, setOfferInstall] = useState({ active: false, installReady: true });
 
   // Подпись читается один раз: внутри Telegram она не меняется за запуск,
   // а вот ключ пропадает в тот момент, когда сервер откажет по сроку, —
   // за ним и следим.
   const initData = getInitData();
-  const [signedIn, setSignedIn] = useState(hasToken);
+  const [signedToken, setSignedToken] = useState(getToken);
 
-  useEffect(() => onTokenChange(() => setSignedIn(hasToken())), []);
+  useEffect(() => onTokenChange(setSignedToken), []);
 
   const load = () => {
     const cached = apiStale('me', {});
@@ -81,7 +85,7 @@ export default function App() {
       });
   };
 
-  const authorized = !!initData || signedIn;
+  const authorized = !!initData || !!signedToken;
 
   // Загружаемся, только когда есть чем представиться. Иначе первый же
   // запрос вернул бы отказ, и человек увидел бы ошибку вместо входа.
@@ -91,7 +95,29 @@ export default function App() {
       return;
     }
     load();
-  }, [authorized]);
+  }, [initData, signedToken]);
+
+  // Билет проверяем раньше сохранённой сессии. Ссылка могла быть создана
+  // для другого человека на общем устройстве; молча оставить прежний
+  // кабинет означало бы показать не того пользователя.
+  if (loginTicket) {
+    return (
+      <TransferLoginScreen
+        ticket={loginTicket}
+        details={<LaunchDetails />}
+        onAlternative={() => {
+          clearApiCache();
+          clearToken();
+          setLoginTicket('');
+        }}
+        onComplete={({ installReady }) => {
+          setState({ loading: true, me: null, error: null });
+          setOfferInstall({ active: true, installReady });
+          setLoginTicket('');
+        }}
+      />
+    );
+  }
 
   // Ни подписи, ни ключа — приложение открыли снаружи Telegram и на этом
   // устройстве ещё не входили. Это обычное начало, а не тупик.
@@ -121,9 +147,12 @@ export default function App() {
 
   const me = state.me;
 
-  if (me.role === 'trainer') return <TrainerApp me={me} />;
-
-  return <ClientApp me={me} />;
+  return (
+    <>
+      {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
+      <InstallHint active={offerInstall.active} installReady={offerInstall.installReady} />
+    </>
+  );
 }
 
 /**

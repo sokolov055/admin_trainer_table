@@ -3,6 +3,7 @@ import { Clients, Finance, Processes, Lost, Logs, Sheets, Settings, ClientCard }
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
+import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { APP_VERSION } from '../version.js';
 import { Chips, Drawer } from '../ui.jsx';
 import { haptic } from '../telegram.js';
@@ -130,6 +131,7 @@ export default function TrainerApp({ me }) {
             должен знать, о чём приложение сейчас им рассказывает, не
             заходя в чужую роль и не выспрашивая. Место — список клиентов:
             первый экран панели, ровно как обзор у клиента. */}
+        {view === 'clients' && clientPane === 'active' && <TelegramTransferCard />}
         {view === 'clients' && clientPane === 'active' && <Stories />}
         {view === 'clients' && clientPane === 'active' && <Clients onOpenClient={setOpenClient} />}
         {view === 'clients' && clientPane === 'lost' && <Lost />}
