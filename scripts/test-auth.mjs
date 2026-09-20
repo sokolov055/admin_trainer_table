@@ -5,6 +5,18 @@ import {
 } from '../src/auth-transfer.js';
 import { installGuidance, isIosDevice, isIosSafari, readInstallBridgeTicket } from '../src/install.js';
 import { resetClientAccess } from '../src/client-access.js';
+import { readInviteToken, removeInviteToken } from '../src/invites.js';
+
+test('invite token is read from query and removed without losing other parameters or hash', () => {
+  const location = {
+    href: 'https://example.test/app/?source=coach&invite=signed-token#section',
+  };
+  assert.equal(readInviteToken(location), 'signed-token');
+
+  let replaced = '';
+  removeInviteToken({ state: null, replaceState: (_s, _t, value) => { replaced = value; } }, location);
+  assert.equal(replaced, '/app/?source=coach#section');
+});
 
 test('transfer secret lives in fragment and is removed without changing query', () => {
   const location = {

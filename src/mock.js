@@ -74,6 +74,14 @@ const CLIENTS = [
   { row: 7, name: 'Игорь Лебедев', price: 3500, count: 8, balance: 14000, trainings: 7, revenue: 24500, payer: '', template: 'P02 — Сила', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 11.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(3), startDate: daysAgo(310), birthDate: null, chatId: '44444', clientKey: 'igor', hasLink: true },
 ];
 
+let trainerInvites = [
+  {
+    id: 'demo-reusable', kind: 'reusable', label: 'Ссылка для новых клиентов',
+    createdAt: new Date().toISOString(), expiresAt: daysAhead(60, '12:00'),
+    useCount: 2, active: true, url: window.location.origin + window.location.pathname + '?invite=demo-reusable-token',
+  },
+];
+
 const MONTH_COLUMNS = ['Май 2026', 'Июнь 2026', 'Июль 2026', 'Август 2026', 'Сентябрь 2026'];
 
 function financeMetric(label, unit, values) {
@@ -557,6 +565,30 @@ const MOCK = {
       staleDays: 14,
       currentMonth: 'Сентябрь 2026',
     },
+  }),
+
+  'trainer.invites': () => ({ invites: trainerInvites }),
+
+  'trainer.invite.create': (params) => {
+    const invite = {
+      id: 'demo-' + Date.now(), kind: params.kind === 'single' ? 'single' : 'reusable',
+      label: String(params.label || ''), createdAt: new Date().toISOString(),
+      expiresAt: daysAhead(params.kind === 'single' ? 7 : 90, '12:00'), useCount: 0, active: true,
+      url: window.location.origin + window.location.pathname + '?invite=demo-' + Date.now(),
+    };
+    trainerInvites = [invite, ...trainerInvites];
+    return invite;
+  },
+
+  'trainer.invite.revoke': (params) => {
+    trainerInvites = trainerInvites.filter((invite) => invite.id !== params.inviteId);
+    return { ok: true, id: params.inviteId };
+  },
+
+  'auth.invite.inspect': () => ({
+    active: true, kind: 'reusable', label: '', expiresAt: daysAhead(30, '12:00'),
+    telegramUrl: 'https://t.me/example_bot?start=join_demo',
+    methods: { telegram: true, email: false },
   }),
 
   'trainer.client.access.reset': (params) => ({

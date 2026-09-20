@@ -3,6 +3,8 @@ import { api, apiBatch, apiStale, clearApiCache } from './api.js';
 import { getInitData, environmentInfo, diagnoseMissingInitData } from './telegram.js';
 import { clearToken, getToken, onTokenChange } from './session.js';
 import { readLoginTicket } from './auth-transfer.js';
+import { readInviteToken, removeInviteToken } from './invites.js';
+import InviteRegistration from './InviteRegistration.jsx';
 import { Loading, ErrorState } from './ui.jsx';
 import { InstallHint, TransferLoginScreen } from './AuthTransfer.jsx';
 import ClientApp from './client/ClientApp.jsx';
@@ -35,6 +37,7 @@ import LoginScreen from './LoginScreen.jsx';
 export default function App() {
   const [state, setState] = useState({ loading: true, me: null, error: null });
   const [loginTicket, setLoginTicket] = useState(readLoginTicket);
+  const [inviteToken, setInviteToken] = useState(readInviteToken);
   const [offerInstall, setOfferInstall] = useState({ active: false, installReady: true });
 
   // Подпись читается один раз: внутри Telegram она не меняется за запуск,
@@ -96,6 +99,23 @@ export default function App() {
     }
     load();
   }, [initData, signedToken]);
+
+  // Приглашение важнее сохранённой сессии: ссылку могли открыть на общем
+  // устройстве, где уже был другой кабинет. Сначала явно регистрируем
+  // приглашённого человека, затем возвращаемся в обычный запуск.
+  if (inviteToken) {
+    return (
+      <InviteRegistration
+        token={inviteToken}
+        details={<LaunchDetails />}
+        onComplete={() => {
+          removeInviteToken();
+          setInviteToken('');
+          setState({ loading: true, me: null, error: null });
+        }}
+      />
+    );
+  }
 
   // Билет проверяем раньше сохранённой сессии. Ссылка могла быть создана
   // для другого человека на общем устройстве; молча оставить прежний

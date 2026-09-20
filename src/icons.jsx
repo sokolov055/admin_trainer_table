@@ -220,6 +220,34 @@ export const IconSend = (p) => (
   </Icon>
 );
 
+export const IconMail = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m4 7 8 6 8-6" />
+  </Icon>
+);
+
+export const IconLink = (p) => (
+  <Icon {...p}>
+    <path d="m9.5 14.5 5-5" />
+    <path d="M7.2 17.8 5.7 19.3a3.5 3.5 0 0 1-5-5l3.6-3.6a3.5 3.5 0 0 1 5 0" transform="translate(3 -2)" />
+    <path d="m16.8 6.2 1.5-1.5a3.5 3.5 0 0 1 5 5l-3.6 3.6a3.5 3.5 0 0 1-5 0" transform="translate(-3 2)" />
+  </Icon>
+);
+
+export const IconCopy = (p) => (
+  <Icon {...p}>
+    <rect x="8" y="8" width="11" height="11" rx="2" />
+    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+  </Icon>
+);
+
+export const IconTrash = (p) => (
+  <Icon {...p}>
+    <path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5" />
+  </Icon>
+);
+
 /**
  * Выход. Зеркало «Ушедших»: там человек уходит из списка, здесь — сам
  * закрывает кабинет. Развёрнут в другую сторону намеренно, чтобы две

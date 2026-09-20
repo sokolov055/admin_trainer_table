@@ -1659,6 +1659,64 @@ th.sticky, td.sticky {
 
 .login__mark--success { color: var(--good-text); opacity: 1; }
 
+/* Регистрация по приглашению остаётся тем же спокойным экраном входа,
+   но форме и пояснению нужен собственный вертикальный ритм. */
+.invite__inner { max-width: 360px; }
+.invite__body { margin-top: var(--space-5); }
+.invite__primary { min-height: 50px; }
+.invite__hint {
+  margin: var(--space-3) 0 var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+.invite__form { display: grid; gap: var(--space-4); text-align: left; }
+.invite__code-input {
+  text-align: center;
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+}
+.invite__error {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  color: var(--critical-text);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.invites-card { overflow: visible; }
+.invites-create { display: grid; gap: var(--space-3); min-width: 0; }
+.invites-create .field { min-width: 0; }
+.invites-create .field__input { min-width: 0; max-width: 100%; }
+.invites-create__hint {
+  margin: calc(-1 * var(--space-1)) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.invites-list { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.invite-row__copy { display: grid; gap: 3px; min-width: 0; }
+.invite-row__copy strong { font-size: var(--text-sm); overflow-wrap: anywhere; }
+.invite-row__copy span { color: var(--text-muted); font-size: var(--text-xs); }
+.invite-row__actions { display: flex; flex: 0 0 auto; gap: var(--space-2); }
+.invite-row__actions .button { min-height: 40px; padding: 7px 10px; }
+.invites-error { margin-top: var(--space-3); }
+
+@media (max-width: 520px) {
+  .invite-row { align-items: stretch; flex-direction: column; }
+  .invite-row__actions { width: 100%; }
+  .invite-row__actions .button:first-child { flex: 1; }
+}
+
 .transfer-card {
   margin: 0 var(--space-4) var(--space-5);
   padding: var(--space-4);
