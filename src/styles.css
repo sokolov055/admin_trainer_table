@@ -1264,6 +1264,16 @@ button { font-family: inherit; }
   color: var(--accent-text);
 }
 
+.button--critical {
+  background: var(--critical);
+  border-color: var(--critical);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .button--critical:hover { background: var(--critical); border-color: var(--critical); filter: brightness(1.06); }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .button--primary:hover { background: var(--accent); filter: brightness(1.07); }
 }
@@ -2017,6 +2027,70 @@ code {
 
 .pay-confirm__actions {
   display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Сброс входа раскрывается прямо в карточке клиента. Имя и текущая
+   привязка остаются перед глазами, а рискованное действие не прячется в
+   отдельном окне, которое легко подтвердить автоматически. */
+.access-reset__trigger {
+  margin-top: var(--space-3);
+  margin-left: -8px;
+}
+
+.access-reset,
+.access-reset__error,
+.access-reset__result {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+}
+
+.access-reset {
+  background: var(--critical-fill);
+  border: 1px solid var(--critical-line);
+  color: var(--critical-text);
+}
+
+.access-reset__error {
+  color: var(--critical-text);
+  background: var(--critical-fill);
+  border: 1px solid var(--critical-line);
+  font-size: var(--text-sm);
+}
+
+.access-reset__result {
+  color: var(--good-text);
+  background: var(--good-fill);
+  border: 1px solid var(--good-line);
+  font-size: var(--text-sm);
+}
+
+.access-reset__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  cursor: pointer;
+}
+
+.access-reset__option input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--critical);
+  flex: 0 0 auto;
+}
+
+.access-reset__option strong,
+.access-reset__option span span { display: block; }
+.access-reset__option span span { margin-top: 3px; font-size: var(--text-xs); line-height: 1.45; }
+.access-reset__option--disabled { opacity: 0.62; cursor: not-allowed; }
+
+.access-reset__actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
 }

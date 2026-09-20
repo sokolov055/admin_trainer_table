@@ -4,6 +4,7 @@ import {
   buildTransferUrl, consumeTransferTicket, readLoginTicket, removeLoginTicketFromUrl,
 } from '../src/auth-transfer.js';
 import { installGuidance, isIosDevice, isIosSafari, readInstallBridgeTicket } from '../src/install.js';
+import { resetClientAccess } from '../src/client-access.js';
 
 test('transfer secret lives in fragment and is removed without changing query', () => {
   const location = {
@@ -68,4 +69,36 @@ test('iOS guidance is limited to Safari and standalone install ticket is consume
   assert.equal(readInstallBridgeTicket({ document: doc, standalone: true, token: '' }), 'install-secret');
   assert.match(writes[0], /Max-Age=0/);
   assert.match(writes[0], /Path=\/app\//);
+});
+
+test('client access reset is primary-only and clears cached client data after success', async () => {
+  const calls = [];
+  let cleared = 0;
+  const result = await resetClientAccess(7, true, {
+    request: async (action, params) => {
+      calls.push({ action, params });
+      return { clientRow: 7, unlinked: true };
+    },
+    clearCache: () => { cleared += 1; },
+  });
+
+  assert.deepEqual(calls, [{
+    action: 'trainer.client.access.reset',
+    params: { clientRow: 7, unlinkTelegram: true },
+  }]);
+  assert.equal(cleared, 1);
+  assert.equal(result.unlinked, true);
+});
+
+test('failed client access reset keeps cached data and rejects invalid rows', async () => {
+  let cleared = 0;
+  await assert.rejects(
+    resetClientAccess(3, false, {
+      request: async () => { throw new Error('offline'); },
+      clearCache: () => { cleared += 1; },
+    }),
+    /offline/
+  );
+  assert.equal(cleared, 0);
+  await assert.rejects(resetClientAccess(0, false, { request: async () => ({}) }), /Не указан клиент/);
 });

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
+import { resetClientAccess } from '../client-access.js';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
   SignOut, DataTable, Delta, formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { getThemeMode, setThemeMode } from '../telegram.js';
 import {
-  IconUsers, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart,
+  IconUsers, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart, IconKey,
 } from '../icons.jsx';
 
 /* ==================================================================
@@ -196,6 +197,35 @@ function refreshNote(state) {
  * ================================================================== */
 
 export function ClientCard({ client }) {
+  const [access, setAccess] = useState({
+    confirming: false,
+    unlinkTelegram: false,
+    busy: false,
+    error: null,
+    done: null,
+    linked: !!client.chatId,
+  });
+
+  const resetAccess = async () => {
+    if (access.busy) return;
+    setAccess((s) => ({ ...s, busy: true, error: null, done: null }));
+
+    try {
+      const result = await resetClientAccess(client.row, access.unlinkTelegram);
+      setAccess((s) => ({
+        ...s,
+        busy: false,
+        confirming: false,
+        error: null,
+        done: result,
+        linked: s.unlinkTelegram ? false : s.linked,
+        unlinkTelegram: false,
+      }));
+    } catch (error) {
+      setAccess((s) => ({ ...s, busy: false, error, done: null }));
+    }
+  };
+
   return (
     <Panel pad className="enter">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px', alignItems: 'center' }}>
@@ -204,13 +234,75 @@ export function ClientCard({ client }) {
         </Badge>
         <Badge>{formatMoney(client.price)} за тренировку</Badge>
         {client.payer && <Badge>платит {client.payer}</Badge>}
-        {!client.chatId && <Badge kind="warn">нет Telegram</Badge>}
+        {!access.linked && <Badge kind="warn">нет Telegram</Badge>}
       </div>
 
       <div className="small muted" style={{ marginTop: 10 }}>
         {client.clientKey && <>Ключ <code>{client.clientKey}</code> · </>}
         строка {client.row}
       </div>
+
+      {access.done && (
+        <div className="access-reset__result" role="status">
+          Доступ сброшен. Все устройства выйдут при следующем запросе.
+          {access.done.unlinked && ' Telegram отвязан: клиенту нужно снова открыть персональную ссылку.'}
+        </div>
+      )}
+
+      {access.error && (
+        <div className="access-reset__error" role="alert">
+          Не получилось сбросить доступ: {access.error.message || 'сервер не ответил'}
+        </div>
+      )}
+
+      {!access.confirming && (
+        <button
+          className="button button--ghost access-reset__trigger"
+          onClick={() => setAccess((s) => ({ ...s, confirming: true, error: null, done: null }))}
+          disabled={access.busy || !access.linked}
+        >
+          <IconKey size={16} />
+          {access.linked ? 'Сбросить доступ' : 'Доступ уже сброшен'}
+        </button>
+      )}
+
+      {access.confirming && (
+        <div className="access-reset">
+          <div className="small">
+            Все открытые браузеры и ярлыки выйдут из кабинета. Тренировки,
+            замеры и оплаты останутся без изменений.
+          </div>
+
+          <label className={'access-reset__option' + (!client.clientKey ? ' access-reset__option--disabled' : '')}>
+            <input
+              type="checkbox"
+              checked={access.unlinkTelegram}
+              disabled={access.busy || !client.clientKey}
+              onChange={(event) => setAccess((s) => ({ ...s, unlinkTelegram: event.target.checked }))}
+            />
+            <span>
+              <strong>Отвязать Telegram</strong>
+              <span>
+                Клиент пройдёт самый первый вход заново по персональной ссылке.
+                {!client.clientKey && ' Сначала создайте ключ приглашения в таблице.'}
+              </span>
+            </span>
+          </label>
+
+          <div className="access-reset__actions">
+            <button className="button button--critical" onClick={resetAccess} disabled={access.busy}>
+              {access.busy ? 'Сбрасываю…' : 'Да, сбросить'}
+            </button>
+            <button
+              className="button button--ghost"
+              onClick={() => setAccess((s) => ({ ...s, confirming: false, unlinkTelegram: false, error: null }))}
+              disabled={access.busy}
+            >
+              Не надо
+            </button>
+          </div>
+        </div>
+      )}
     </Panel>
   );
 }

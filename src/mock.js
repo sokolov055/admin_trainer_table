@@ -559,6 +559,14 @@ const MOCK = {
     },
   }),
 
+  'trainer.client.access.reset': (params) => ({
+    clientRow: params.clientRow,
+    clientName: CLIENTS.find((client) => client.row === params.clientRow)?.name || 'Клиент',
+    revokedSessions: 2,
+    hadTelegram: true,
+    unlinked: params.unlinkTelegram === true,
+  }),
+
   'trainer.finance': () => ({
     sheet: 'BSC_Финансы',
     columns: [
