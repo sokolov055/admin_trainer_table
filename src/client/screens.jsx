@@ -345,14 +345,18 @@ function MonthVisibility({ month, hidden, clientRow, onChanged }) {
 /**
  * Прогресс и замеры — один экран и один поход на сервер.
  *
- * Данные лежат в двух действиях: client.progress считает дельты и рост
+ * Данные лежат в трёх действиях: client.progress считает дельты и рост
  * рабочих весов, client.measurements отдаёт сами замеры и канонический
- * список показателей. Спрашивать их по очереди нельзя: у Apps Script
- * платит время сам факт обращения, и два запроса — это две паузы подряд,
- * а не вдвое больше данных. Поэтому оба действия уезжают одним пакетом.
+ * список показателей, client.nutrition — анкету, из которой нужна одна
+ * цель: без неё изменение веса нечем оценить. Спрашивать их по очереди
+ * нельзя: у Apps Script платит время сам факт обращения, и три запроса —
+ * это три паузы подряд, а не втрое больше данных. Поэтому все действия
+ * уезжают одним пакетом.
  *
  * Отказ одного действия не роняет экран: пакет отвечает по каждому
  * отдельно, и того, что доехало, хватает на большую часть страницы.
+ * Незаполненная анкета — не отказ, а обычное состояние: экран тогда
+ * показывает изменения без окраски.
  */
 function useProgressBundle(clientRow) {
   const [state, setState] = useState({ loading: true, data: null, error: null });
@@ -367,12 +371,14 @@ function useProgressBundle(clientRow) {
     apiBatch([
       { action: 'client.progress', params },
       { action: 'client.measurements', params },
+      { action: 'client.nutrition', params },
     ])
       .then((res) => {
         if (!alive) return;
 
         const progress = res['client.progress'];
         const measurements = res['client.measurements'];
+        const nutrition = res['client.nutrition'];
         const okProgress = progress && progress.ok;
         const okMeasurements = measurements && measurements.ok;
 
@@ -394,6 +400,8 @@ function useProgressBundle(clientRow) {
           data: {
             progress: okProgress ? progress.data : null,
             measurements: okMeasurements ? measurements.data : null,
+            goal: (nutrition && nutrition.ok && nutrition.data
+              && nutrition.data.survey && nutrition.data.survey.goal) || null,
           },
         });
       })
@@ -416,6 +424,7 @@ export function Progress({ clientRow }) {
 
   const progress = data.progress;
   const measurements = data.measurements;
+  const goal = data.goal;
 
   // Оба действия читают одни и те же листы «Показатели» и в одном
   // порядке, поэтому дельты ложатся на замеры по позиции серии.
@@ -472,7 +481,12 @@ export function Progress({ clientRow }) {
   const change = points.length > 1 ? Math.round((last.y - first.y) * 10) / 10 : null;
 
   const facts = [
-    change !== null ? { label: 'Изменение', value: <Delta value={change} suffix={unit} /> } : null,
+    change !== null
+      ? {
+          label: 'Изменение',
+          value: <Delta value={change} suffix={unit} aim={measureAim(activeField, goal)} />,
+        }
+      : null,
     lifts.length
       ? { label: 'Веса выросли', value: grew.length + ' из ' + lifts.length }
       : (points.length ? { label: 'Всего замеров', value: formatNumber(points.length) } : null),
@@ -542,7 +556,7 @@ export function Progress({ clientRow }) {
                             <td>{f}</td>
                             <td className="num">{formatNumber(d.first)}</td>
                             <td className="num">{formatNumber(d.last)}</td>
-                            <td className="num"><Delta value={d.delta} /></td>
+                            <td className="num"><Delta value={d.delta} aim={measureAim(f, goal)} /></td>
                           </tr>
                         );
                       })}
@@ -610,6 +624,27 @@ export function Progress({ clientRow }) {
         )}
     </>
   );
+}
+
+/**
+ * Куда показателю полагается двигаться при выбранной цели.
+ *
+ * 1 — вверх, -1 — вниз, 0 — оценивать нечем. Ноль здесь не отговорка, а
+ * честный ответ: выросшая рука у человека на похудении — не провал, а
+ * подросшая талия на наборе массы — не то, за что стоит хвалить, и в обоих
+ * случаях приложению лучше промолчать, чем назначить цвет наугад.
+ *
+ * «Поддержание формы» не оценивается вовсе: там любое движение в пределах
+ * пары килограммов — колебание воды, а не результат.
+ */
+const MEASURE_AIM = {
+  lose: { 'Вес': -1, 'Талия': -1 },
+  gain: { 'Вес': 1, 'Грудь': 1, 'Рука': 1, 'Плечи': 1, 'Ягодицы': 1, 'Бедро': 1 },
+};
+
+function measureAim(field, goal) {
+  const table = goal ? MEASURE_AIM[goal] : null;
+  return (table && table[field]) || 0;
 }
 
 /**

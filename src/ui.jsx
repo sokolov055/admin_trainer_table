@@ -228,8 +228,24 @@ export function StatusBadge({ value, fallback = '—' }) {
   return <span className="small">{s}</span>;
 }
 
-export function Delta({ value, suffix = '', digits }) {
-  const cls = value > 0 ? 'delta--up' : value < 0 ? 'delta--down' : 'delta--flat';
+/**
+ * Изменение показателя: стрелка, число и цвет.
+ *
+ * `aim` — куда изменению полагается идти по цели человека: 1 — вверх,
+ * -1 — вниз, 0 — оценивать нечем. Зелёный и бордовый значат «по плану» и
+ * «против плана», а не «больше» и «меньше»: плюс 2,8 кг у человека на
+ * похудении — не достижение, и красить его в зелёный только потому, что
+ * число выросло, значит хвалить за то, чего он не хотел.
+ *
+ * При aim = 0 цвета нет вовсе: стрелка направление покажет, а оценку
+ * выдумывать не из чего — цель не выбрана или к ней этот обхват не привязан.
+ * По умолчанию aim = 1: рабочие веса растут в плюс при любой цели.
+ */
+export function Delta({ value, suffix = '', digits, aim = 1 }) {
+  const cls = !aim || value === 0
+    ? 'delta--flat'
+    : (value * aim > 0 ? 'delta--good' : 'delta--off');
+
   return (
     <span className={'delta ' + cls}>
       <IconDelta value={value} size={13} />

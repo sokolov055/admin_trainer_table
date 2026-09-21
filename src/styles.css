@@ -1406,11 +1406,20 @@ button { font-family: inherit; }
 
 /* --- фильтры --- */
 
+/* Ряд ездит только вбок. Раньше он ездил и вверх-вниз: невидимая накладка
+   в 44 px (см. .chip::after) выше самого чипа, и её края торчали за края
+   ряда — браузер считал это вертикальной прокруткой и утаскивал чипы вверх
+   вместо того, чтобы прокрутить страницу. Вертикальных отступов теперь
+   хватает, чтобы накладка помещалась целиком, а overflow-y: hidden держит
+   это правило при любом шрифте. Ряд без вертикальной прокрутки отдаёт
+   движение пальца вниз странице — как и ожидается. */
 .chips {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 2px 0 6px;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  padding: 6px 0;
   margin-bottom: var(--space-3);
   scrollbar-width: none;
 }
@@ -2054,8 +2063,11 @@ th.sticky, td.sticky {
   font-variant-numeric: tabular-nums;
 }
 
-.delta--up { color: var(--good-text); }
-.delta--down { color: var(--critical-text); }
+/* Цвет по цели, а не по знаку: --good значит «идёт куда надо», --off —
+   «идёт не туда». Бордовый, а не алый: набранный на похудении килограмм —
+   повод заметить, а не ошибка вроде долга или упавшего сохранения. */
+.delta--good { color: var(--good-text); }
+.delta--off { color: var(--critical-text); }
 .delta--flat { color: var(--text-muted); }
 
 .stack > * + * { margin-top: var(--space-2); }
