@@ -17,6 +17,7 @@ npm run test:auth
 npm run test:preview
 npm run test:calendar
 npm run test:offline
+npm run test:browser
 ```
 
 После успешной сборки сделай коммит и push в `main`. Workflow `.github/workflows/deploy.yml` автоматически публикует GitHub Pages:

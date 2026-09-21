@@ -12,6 +12,7 @@
     "test:preview": "node --test scripts/test-preview.mjs",
     "test:calendar": "node --test scripts/test-trainer-calendar.mjs",
     "test:offline": "node --test scripts/test-offline.mjs",
+    "test:browser": "node --test scripts/test-browser.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

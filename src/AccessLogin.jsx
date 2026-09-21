@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 
 import { enterByAccessLink, inspectAccessLink, removeAccessToken } from './access.js';
 import { prepareIosInstallBridge } from './install.js';
-import { IconAlert, IconCheck, IconKey, IconRefresh } from './icons.jsx';
+import { detectBrowser, androidBrowserUrl, copyCurrentLink } from './browser.js';
+import {
+  IconAlert, IconCheck, IconCopy, IconExternal, IconKey, IconRefresh, IconShare,
+} from './icons.jsx';
 
 /**
  * Первый экран клиента: вход по ссылке, которую прислал тренер.
@@ -14,6 +17,13 @@ import { IconAlert, IconCheck, IconKey, IconRefresh } from './icons.jsx';
  * Сам вход происходит по нажатию, а не при открытии страницы. Ссылку до
  * человека успевают открыть предпросмотр мессенджера и антивирус почты, и
  * автоматический вход расходовался бы на них (см. access.js).
+ *
+ * Перед всем этим — проверка, откуда ссылку открыли. Тренер шлёт её в
+ * Telegram, а Telegram открывает ссылки у себя внутри, и оттуда приложение
+ * на телефон не поставить: человек полистает кабинет, закроет мессенджер и
+ * больше приложение не найдёт. Поэтому во встроенном браузере вместо входа
+ * стоит указание, как выйти наружу. Вход при этом НЕ расходуется: ссылка
+ * останется целой для настоящего браузера.
  */
 
 const SUCCESS_PAUSE_MS = 550;
@@ -22,6 +32,8 @@ export default function AccessLogin({ token, onComplete, details }) {
   const [state, setState] = useState({ loading: true, link: null, error: null });
   const [status, setStatus] = useState('idle');
   const [problem, setProblem] = useState('');
+  const [anyway, setAnyway] = useState(false);
+  const [where] = useState(() => detectBrowser());
 
   const load = () => {
     setState({ loading: true, link: null, error: null });
@@ -59,6 +71,12 @@ export default function AccessLogin({ token, onComplete, details }) {
       setStatus('idle');
     }
   };
+
+  // Стена стоит ДО проверки ссылки, а не после: во встроенном браузере она
+  // должна появиться мгновенно, и ждать ради неё ответ сервера незачем.
+  if (where.deadEnd && !anyway) {
+    return <OpenOutside where={where} onAnyway={() => setAnyway(true)} details={details} />;
+  }
 
   if (state.loading) {
     return (
@@ -111,6 +129,82 @@ export default function AccessLogin({ token, onComplete, details }) {
         Пароль не нужен. После входа приложение можно поставить на домашний экран —
         подскажем, как только откроется кабинет.
       </p>
+      {details}
+    </AccessShell>
+  );
+}
+
+/**
+ * Выход из встроенного браузера.
+ *
+ * Что здесь можно, а чего нельзя, решает не желание, а система.
+ *
+ * Android отдаёт ссылку наружу сам: схема `intent://` не обрабатывается
+ * внутри WebView, и Android открывает её настоящим браузером. Поэтому тут
+ * работает кнопка.
+ *
+ * На iOS такой возможности НЕТ. Передать ссылку в Safari из WKWebView
+ * нельзя ничем: публичной схемы для этого не существует, и обойти это
+ * нечем. Значит, честный интерфейс — не кнопка, которая может не
+ * сработать, а понятные два шага, которые человек делает сам.
+ *
+ * Внизу — «всё равно войти здесь». Определение браузера живёт на разборе
+ * строки User-Agent и однажды ошибётся; ошибка не должна означать, что
+ * клиент не попадёт в кабинет и пойдёт звонить тренеру. Пусть лучше
+ * человек войдёт во встроенном браузере, чем не войдёт никуда.
+ */
+function OpenOutside({ where, onAnyway, details }) {
+  const [copied, setCopied] = useState(false);
+  const android = where.platform === 'android';
+  const intentUrl = android ? androidBrowserUrl(window.location.href) : '';
+
+  const copy = async () => {
+    const ok = await copyCurrentLink();
+    setCopied(ok);
+    if (!ok) window.prompt('Скопируйте ссылку вручную:', window.location.href);
+  };
+
+  return (
+    <AccessShell
+      icon={android ? <IconExternal size={26} /> : <IconShare size={26} />}
+      title={android ? 'Откройте в браузере' : 'Откройте в Safari'}
+      text={
+        android
+          ? 'Сейчас кабинет открыт внутри Telegram. Отсюда приложение не поставить на телефон — оно исчезнет, как только вы закроете мессенджер.'
+          : 'Сейчас кабинет открыт внутри Telegram. Поставить приложение на телефон можно только из Safari — это ограничение iPhone, обойти его нечем.'
+      }
+    >
+      {android ? (
+        <a className="button button--primary button--block invite__primary outside__jump" href={intentUrl}>
+          <IconExternal size={18} />
+          Открыть в браузере
+        </a>
+      ) : (
+        <ol className="outside__steps">
+          <li>
+            Нажмите <b>•••</b> в правом нижнем углу
+          </li>
+          <li>
+            Выберите <b>«Открыть в Safari»</b>
+          </li>
+        </ol>
+      )}
+
+      <button className="button button--block" onClick={copy}>
+        {copied ? <IconCheck size={17} /> : <IconCopy size={17} />}
+        {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
+      </button>
+
+      <p className="invite__hint">
+        {copied
+          ? 'Откройте ' + (android ? 'браузер' : 'Safari') + ' и вставьте ссылку в адресную строку.'
+          : 'Ссылка останется рабочей: вход отсюда не потрачен.'}
+      </p>
+
+      <button className="button button--ghost outside__anyway" onClick={onAnyway}>
+        Всё равно войти здесь
+      </button>
+
       {details}
     </AccessShell>
   );

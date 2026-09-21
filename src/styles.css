@@ -1759,6 +1759,35 @@ th.sticky, td.sticky {
   font-size: var(--text-xs);
   line-height: 1.55;
 }
+/* Выход из встроенного браузера мессенджера.
+   Шаги нумерованные и слева: человек сверяет их с тем, что видит в своей
+   панели, а по центру порядок действий читается хуже, чем список. */
+.outside__steps {
+  margin: 0 0 var(--space-4);
+  padding-left: 1.35em;
+  text-align: left;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.outside__steps li + li { margin-top: var(--space-2); }
+
+/* Главная кнопка и «скопировать» — разные по весу действия, и вплотную
+   они читаются как одна пара переключателей */
+.outside__jump { margin-bottom: var(--space-2); }
+.outside__steps b { color: var(--text); }
+
+/* «Всё равно войти здесь» — запасной путь на случай, когда браузер
+   определился неверно. Он должен быть, но не должен спорить за внимание
+   с тем, что мы советуем сделать: отсюда и приглушённый вид, и место
+   после подсказки, а не рядом с главной кнопкой. */
+.outside__anyway {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
 .invite__form { display: grid; gap: var(--space-4); text-align: left; }
 .invite__code-input {
   text-align: center;
