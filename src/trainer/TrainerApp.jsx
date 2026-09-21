@@ -31,7 +31,7 @@ import {
 
 const TABS = [
   { id: 'clients', label: 'Клиенты', Icon: IconUsers },
-  { id: 'dashboard', label: 'Dashboard', Icon: IconChart },
+  { id: 'dashboard', label: 'Сводка', Icon: IconChart },
 ];
 
 const MENU = [
@@ -50,7 +50,7 @@ const CLIENT_PANES = [
   { value: 'lost', label: 'Ушедшие' },
 ];
 
-/** Dashboard: две половины одного BSC — деньги и процессы за ними */
+/** Сводка: две половины одного BSC — деньги и процессы за ними */
 const DASH_PANES = [
   { value: 'finance', label: 'Финансы' },
   { value: 'processes', label: 'Процессы' },

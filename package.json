@@ -7,6 +7,7 @@
   "scripts": {
     "test:workout": "node --test scripts/test-workout.mjs",
     "test:ration": "node --test scripts/test-ration.mjs",
+    "test:ration-access": "node --test scripts/test-ration-access.mjs",
     "test:auth": "node --test scripts/test-auth.mjs",
     "test:preview": "node --test scripts/test-preview.mjs",
     "test:calendar": "node --test scripts/test-trainer-calendar.mjs",

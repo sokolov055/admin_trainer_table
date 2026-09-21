@@ -406,7 +406,11 @@ button { font-family: inherit; }
   gap: var(--space-3);
   width: 100%;
   padding: 10px max(var(--space-4), calc((100% - 828px) / 2));
-  background: var(--accent-wash);
+  /* Непрозрачный фон обязателен: полоса липкая, и под ней едет содержимое.
+     Один --accent-wash прозрачен — сквозь него просвечивал текст экрана, и
+     имя клиента накладывалось на цифры нормы. Оттенок тот же, но положен
+     поверх сплошного фона страницы. */
+  background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--bg);
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
   color: var(--text);
 }

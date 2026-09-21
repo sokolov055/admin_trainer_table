@@ -56,7 +56,7 @@ export default function InviteRegistration({ token, onComplete, details }) {
       {state.invite.methods.email && (
         <button className="button button--block" onClick={() => setEmailOpen(true)}>
           <IconMail size={17} />
-          Продолжить по email
+          Продолжить по почте
         </button>
       )}
       {!state.invite.methods.telegram && !state.invite.methods.email && (
@@ -110,7 +110,7 @@ function EmailRegistration({ token, onBack, onComplete }) {
   return (
     <InviteShell
       icon={<IconMail size={27} />}
-      title={request ? 'Введите код из письма' : 'Регистрация по email'}
+      title={request ? 'Введите код из письма' : 'Регистрация по почте'}
       text={request ? `Мы отправили шестизначный код на ${form.email}.` : 'Укажите имя и почту. Пароль придумывать не нужно.'}
     >
       <form className="invite__form" onSubmit={request ? confirm : send}>
@@ -121,7 +121,7 @@ function EmailRegistration({ token, onBack, onComplete }) {
               <input className="field__input" autoComplete="name" value={form.name} onChange={update('name')} required maxLength={120} />
             </label>
             <label className="field">
-              <span className="field__label">Email</span>
+              <span className="field__label">Почта</span>
               <input className="field__input" type="email" autoComplete="email" inputMode="email" value={form.email} onChange={update('email')} required maxLength={254} />
             </label>
           </>
