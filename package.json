@@ -8,6 +8,7 @@
     "test:workout": "node --test scripts/test-workout.mjs",
     "test:ration": "node --test scripts/test-ration.mjs",
     "test:auth": "node --test scripts/test-auth.mjs",
+    "test:preview": "node --test scripts/test-preview.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

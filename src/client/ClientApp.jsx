@@ -3,7 +3,7 @@ import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers } from '../icons.jsx';
 
 /**
  * Панель клиента.
@@ -24,13 +24,34 @@ const TABS = [
   { id: 'nutrition', label: 'Питание', Icon: IconNutrition, Screen: Nutrition },
 ];
 
-export default function ClientApp({ me }) {
+export default function ClientApp({ me, clientRow, preview }) {
   const [tab, setTab] = useState('overview');
   const current = TABS.find((t) => t.id === tab) || TABS[0];
   const Screen = current.Screen;
 
   return (
     <div className="app">
+      {preview && (
+        <aside className="client-preview" aria-label="Режим просмотра клиента">
+          <div className="client-preview__identity">
+            <span className="client-preview__icon"><IconUsers size={19} /></span>
+            <span>
+              <strong>Вы смотрите как клиент</strong>
+              <span className="client-preview__name">{me.name}</span>
+            </span>
+          </div>
+          <div className="client-preview__actions">
+            <button className="button button--ghost client-preview__change" onClick={preview.onChange}>
+              Сменить
+            </button>
+            <button className="button client-preview__exit" onClick={preview.onExit}>
+              <IconBack size={16} />
+              К тренеру
+            </button>
+          </div>
+        </aside>
+      )}
+
       <header className="app__header">
         <h1 className="app__title">{me.name}</h1>
         <p className="app__subtitle">{current.label}</p>
@@ -47,9 +68,9 @@ export default function ClientApp({ me }) {
             Здесь, а не внутри Overview: тот же экран открывает тренер из
             карточки клиента, и сторис оттуда читались бы как что-то,
             относящееся к этому клиенту. */}
-        {tab === 'overview' && <TelegramTransferCard />}
+        {tab === 'overview' && !preview && <TelegramTransferCard />}
         {tab === 'overview' && <Stories />}
-        <Screen />
+        <Screen clientRow={clientRow} />
       </main>
 
       <nav className="tabbar">

@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Clients, Finance, Processes, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
+import ClientApp from '../client/ClientApp.jsx';
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { Invites } from './Invites.jsx';
 import { APP_VERSION } from '../version.js';
-import { Chips, Drawer } from '../ui.jsx';
+import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../ui.jsx';
+import { useData } from '../useData.js';
 import { haptic } from '../telegram.js';
 import {
-  IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack,
+  IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch,
 } from '../icons.jsx';
 
 /**
@@ -32,6 +34,7 @@ const TABS = [
 ];
 
 const MENU = [
+  { id: 'client-preview', label: 'Клиентская версия', note: 'Проверить приложение глазами клиента', Icon: IconPhone },
   { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog },
   { id: 'sheets', label: 'Листы', note: 'Таблица как есть', Icon: IconSheet },
   { id: 'settings', label: 'Настройки', note: 'Тема приложения', Icon: IconSliders },
@@ -74,6 +77,20 @@ export default function TrainerApp({ me }) {
   const [dashPane, setDashPane] = useState('finance');
   const [menuOpen, setMenuOpen] = useState(false);
   const [openClient, setOpenClient] = useState(null);
+  const [previewClient, setPreviewClient] = useState(null);
+
+  if (previewClient) {
+    return (
+      <ClientApp
+        me={{ ...me, name: previewClient.name }}
+        clientRow={previewClient.row}
+        preview={{
+          onChange: () => { setPreviewClient(null); haptic(); },
+          onExit: () => { setPreviewClient(null); setView('clients'); haptic(); },
+        }}
+      />
+    );
+  }
 
   if (openClient) {
     return <ClientDetail client={openClient} onBack={() => setOpenClient(null)} />;
@@ -142,6 +159,7 @@ export default function TrainerApp({ me }) {
         {view === 'logs' && <Logs />}
         {view === 'sheets' && <Sheets />}
         {view === 'settings' && <Settings />}
+        {view === 'client-preview' && <ClientPreviewPicker onSelect={setPreviewClient} />}
       </main>
 
       <nav className="tabbar">
@@ -198,6 +216,43 @@ export default function TrainerApp({ me }) {
         <p className="menu__version">Версия {APP_VERSION}</p>
       </Drawer>
     </div>
+  );
+}
+
+function ClientPreviewPicker({ onSelect }) {
+  const { loading, data, error, reload } = useData('trainer.clients', {}, []);
+  const [query, setQuery] = useState('');
+
+  if (loading) return <Loading lead={false} rows={5} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+
+  const clients = (data.clients || []).filter((client) => (
+    !query || client.name.toLowerCase().includes(query.trim().toLowerCase())
+  ));
+
+  return (
+    <Section
+      title="Выберите клиента"
+      note="Откроется его настоящий интерфейс, но вы останетесь тренером"
+    >
+      <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
+      {clients.length === 0 && (
+        <Empty icon={IconSearch} title="Клиент не найден" text="Проверьте имя или очистите поиск." />
+      )}
+      {clients.map((client) => (
+        <button
+          className="item client-preview-picker__item"
+          key={client.row}
+          onClick={() => { onSelect(client); haptic(); }}
+        >
+          <span className="item__top">
+            <span className="item__name">{client.name}</span>
+            <IconPhone size={18} />
+          </span>
+          <span className="item__meta">Открыть клиентское приложение</span>
+        </button>
+      ))}
+    </Section>
   );
 }
 
