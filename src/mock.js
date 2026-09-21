@@ -405,7 +405,8 @@ const MOCK = {
   // Видимость месяцев живёт здесь же: демо должно показывать оба состояния
   // кнопки, иначе проверить её нечем.
   'client.plan': (params) => {
-    const trainer = !!params.clientRow;
+    const clientView = params.clientView === true || String(params.clientView).toLowerCase() === 'true';
+    const trainer = !!params.clientRow && !clientView;
     const visible = MONTHS.filter((m) => trainer || hiddenMonths.indexOf(m) === -1);
     const month = visible.indexOf(params.month) !== -1 ? params.month : visible[0] || '';
 

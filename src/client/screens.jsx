@@ -16,7 +16,7 @@ import WorkoutJournal from '../Workout.jsx';
  * Обзор
  * ================================================================== */
 
-export function Overview({ clientRow }) {
+export function Overview({ clientRow, clientView = false }) {
   const { loading, data, error, reload } = useData(
     'client.overview', clientRow ? { clientRow } : {}, [clientRow]
   );
@@ -103,7 +103,7 @@ export function Overview({ clientRow }) {
             {data.lastTrainingDate && (
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>
             )}
-            {clientRow && data.startDate && <Row label="Занимается с">{formatDate(data.startDate)}</Row>}
+            {clientRow && !clientView && data.startDate && <Row label="Занимается с">{formatDate(data.startDate)}</Row>}
           </Rows>
         </Panel>
       </Section>
@@ -134,11 +134,15 @@ export function Overview({ clientRow }) {
  * Тренировочный план
  * ================================================================== */
 
-export function Plan({ clientRow }) {
+export function Plan({ clientRow, clientView = false }) {
   const [workout, setWorkout] = useState(null);
   const [month, setMonth] = useState('');
-  const params = { ...(clientRow ? { clientRow } : {}), ...(month ? { month } : {}) };
-  const { loading, data, error, reload } = useData('client.plan', params, [clientRow, month]);
+  const params = {
+    ...(clientRow ? { clientRow } : {}),
+    ...(clientView ? { clientView: true } : {}),
+    ...(month ? { month } : {}),
+  };
+  const { loading, data, error, reload } = useData('client.plan', params, [clientRow, clientView, month]);
 
   // Незакрытое занятие. Раньше о нём не было видно ничего: «К программе»
   // выглядит как выход, а занятие продолжает идти, и человек узнавал об
@@ -162,7 +166,7 @@ export function Plan({ clientRow }) {
     return () => { alive = false; };
   }, [clientRow, workout]);
 
-  if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} launch={workout.block ? workout : null} onClose={() => setWorkout(null)} />;
+  if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block ? workout : null} onClose={() => setWorkout(null)} />;
 
   if (loading || error) return <>
     <button className="button button--block" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
@@ -694,7 +698,7 @@ function MeasureTable({ rows, fields }) {
  * clientRow, и анкету можно заполнить за того, кто приложением не
  * пользуется.
  */
-export function Nutrition({ clientRow }) {
+export function Nutrition({ clientRow, clientView = false }) {
   const { loading, data, error, reload } = useData(
     'client.nutrition', clientRow ? { clientRow } : {}, [clientRow]
   );
@@ -716,7 +720,9 @@ export function Nutrition({ clientRow }) {
   if (loading) return <Loading rows={3} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
-  const byTrainer = !!clientRow;
+  // clientRow выбирает данные, но не должен сам по себе менять интерфейс:
+  // в предпросмотре тренер работает с выбранным клиентом именно как клиент.
+  const byTrainer = !!clientRow && !clientView;
   const configured = !!data.configured;
   const options = data.options;
   const survey = data.survey || null;

@@ -30,7 +30,7 @@ const output = await build({
         if (args.path === 'screens') return {
           loader: 'jsx',
           contents: `import React from 'react';
-            const Screen = ({ clientRow }) => <div data-screen-row={String(clientRow ?? 'self')}>row:{clientRow ?? 'self'}</div>;
+            const Screen = ({ clientRow, clientView }) => <div data-screen-row={String(clientRow ?? 'self')} data-client-view={clientView ? 'yes' : 'no'}>row:{clientRow ?? 'self'}</div>;
             export const Overview = Screen; export const Plan = Screen;
             export const Progress = Screen; export const Nutrition = Screen;`,
         };
@@ -70,12 +70,14 @@ test('режим тренера передаёт выбранного клиен
   });
 
   assert.equal(text(tree.root.findByProps({ 'data-screen-row': '17' })), 'row:17');
+  assert.equal(tree.root.findByProps({ 'data-screen-row': '17' }).props['data-client-view'], 'yes');
   assert.equal(tree.root.findAll((node) => text(node) === 'transfer-card').length, 0);
 
   for (const label of ['Тренировки', 'Прогресс', 'Питание']) {
     const button = tree.root.findAllByType('button').find((node) => text(node) === label);
     await act(async () => button.props.onClick());
     assert.equal(text(tree.root.findByProps({ 'data-screen-row': '17' })), 'row:17');
+    assert.equal(tree.root.findByProps({ 'data-screen-row': '17' }).props['data-client-view'], 'yes');
   }
 
   await act(async () => tree.root.findAllByType('button').find((node) => text(node) === 'Сменить').props.onClick());
@@ -91,6 +93,7 @@ test('обычный клиент остаётся на собственных �
     tree = renderer.create(React.createElement(ClientApp, { me: { name: 'Клиент' } }));
   });
   assert.equal(text(tree.root.findByProps({ 'data-screen-row': 'self' })), 'row:self');
+  assert.equal(tree.root.findByProps({ 'data-screen-row': 'self' }).props['data-client-view'], 'no');
   assert.equal(tree.root.findAll((node) => text(node) === 'transfer-card').length > 0, true);
   tree.unmount();
 });

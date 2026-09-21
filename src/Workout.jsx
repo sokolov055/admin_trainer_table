@@ -19,7 +19,7 @@ async function storageKey(clientRow) {
   return 'workout_draft_v1:' + Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('') + ':' + (clientRow || 'self');
 }
 
-export default function WorkoutJournal({ clientRow, launch, onClose }) {
+export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose }) {
   const [record, setRecord] = useState(null);
   const [history, setHistory] = useState([]);
   const [ready, setReady] = useState(false);
@@ -302,7 +302,7 @@ export default function WorkoutJournal({ clientRow, launch, onClose }) {
         {/* Кнопка удаления только у тренера: журнал — это его записи о
             клиенте. Подтверждение обязательно и называет занятие: удаление
             безвозвратно, а строки в списке похожи друг на друга. */}
-        {clientRow && (erase === s.id
+        {clientRow && !clientView && (erase === s.id
           ? <span className="workout__erase" role="alert">
               <span className="small">Удалить «{s.title}» навсегда?</span>
               <button className="button" disabled={busy} onClick={() => remove(s.id)}>Удалить</button>

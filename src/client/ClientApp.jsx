@@ -8,10 +8,11 @@ import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers } 
 /**
  * Панель клиента.
  *
- * clientRow передаётся, только когда эти же экраны открывает тренер из
- * карточки клиента: тогда все запросы уходят с номером строки. У самого
- * клиента параметра нет, и сервер отдаёт исключительно его данные —
- * подставить чужой номер клиент не может, роутер это отклонит.
+ * clientRow передаётся, только когда эти же экраны открывает тренер для
+ * выбранного клиента: тогда все запросы уходят с номером строки. preview
+ * отдельно включает клиентскую видимость — выбранные данные остаются теми
+ * же, но тренерские детали не приезжают и не показываются. У самого клиента
+ * clientRow нет, и подставить чужой номер он не может: роутер это отклонит.
  */
 
 const TABS = [
@@ -70,7 +71,7 @@ export default function ClientApp({ me, clientRow, preview }) {
             относящееся к этому клиенту. */}
         {tab === 'overview' && !preview && <TelegramTransferCard />}
         {tab === 'overview' && <Stories />}
-        <Screen clientRow={clientRow} />
+        <Screen clientRow={clientRow} clientView={!!preview} />
       </main>
 
       <nav className="tabbar">
