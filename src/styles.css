@@ -2452,3 +2452,94 @@ code {
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
+
+/* ==========================================================================
+   Приглашение клиента в приложение
+   Ссылка — главный результат работы с новой карточкой, поэтому она подана
+   как готовый к отправке объект: сам адрес, кнопка отправки и рядом тихая
+   строка состояния. Всё остальное (перевыпуск, отзыв) — обычными кнопками.
+   ========================================================================== */
+
+.access-link {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.access-link--quiet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.access-link__invite { width: 100%; }
+
+.access-link__row {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken, var(--fill));
+}
+
+.access-link__url {
+  display: block;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.access-link__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.access-link__hint {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.access-link__hint--muted {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.access-link__note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--good-fill);
+  border: 1px solid var(--good-line);
+  color: var(--good-text);
+  font-size: var(--text-xs);
+}
+
+/* Заведение клиента: свёрнутая кнопка над списком и форма из одного поля */
+
+.add-client__open { margin-bottom: var(--space-3); }
+
+.add-client { margin-bottom: var(--space-3); text-align: left; }
+
+.add-client__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.add-client__hint {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}

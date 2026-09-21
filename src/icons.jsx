@@ -76,6 +76,15 @@ export const IconNutrition = (p) => (
 
 /* ---------- Навигация тренера ---------- */
 
+export const IconUserPlus = (p) => (
+  <Icon {...p}>
+    <circle cx="10" cy="8" r="3.5" />
+    <path d="M3.5 20c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" />
+    <path d="M18.5 7v6" />
+    <path d="M15.5 10h6" />
+  </Icon>
+);
+
 export const IconUsers = (p) => (
   <Icon {...p}>
     <circle cx="9" cy="8" r="3.5" />

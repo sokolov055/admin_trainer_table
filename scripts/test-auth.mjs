@@ -6,6 +6,7 @@ import {
 import { installGuidance, isIosDevice, isIosSafari, readInstallBridgeTicket } from '../src/install.js';
 import { resetClientAccess } from '../src/client-access.js';
 import { readInviteToken, removeInviteToken } from '../src/invites.js';
+import { enterByAccessLink, readAccessToken, removeAccessToken } from '../src/access.js';
 
 test('invite token is read from query and removed without losing other parameters or hash', () => {
   const location = {
@@ -113,4 +114,52 @@ test('failed client access reset keeps cached data and rejects invalid rows', as
   );
   assert.equal(cleared, 0);
   await assert.rejects(resetClientAccess(0, false, { request: async () => ({}) }), /Не указан клиент/);
+});
+
+test('access token is read from the address and cleaned up after login', () => {
+  const location = { href: 'https://example.test/app/?utm=letter&access=signed-access-token#plan' };
+  assert.equal(readAccessToken(location), 'signed-access-token');
+
+  let replaced = '';
+  removeAccessToken({ state: null, replaceState: (_s, _t, value) => { replaced = value; } }, location);
+  assert.equal(replaced, '/app/?utm=letter#plan');
+
+  // Ничего не меняем, если токена в адресе не было: лишний replaceState
+  // засоряет историю браузера.
+  let touched = false;
+  removeAccessToken(
+    { state: null, replaceState: () => { touched = true; } },
+    { href: 'https://example.test/app/' },
+  );
+  assert.equal(touched, false);
+});
+
+test('entering by link clears cached data before the new account token is stored', async () => {
+  const order = [];
+  const result = await enterByAccessLink('signed-access-token', {
+    request: async (action, params) => {
+      assert.equal(action, 'auth.access.enter');
+      assert.equal(params.token, 'signed-access-token');
+      assert.equal(params.device, 'iPhone, браузер');
+      return { token: 'client-session', name: 'Пётр Смирнов' };
+    },
+    clearCache: () => order.push('cache'),
+    storeToken: (token) => order.push('token:' + token),
+    device: 'iPhone, браузер',
+  });
+
+  assert.equal(result.name, 'Пётр Смирнов');
+  assert.deepEqual(order, ['cache', 'token:client-session'], 'чужие данные уходят до входа');
+});
+
+test('a login without a token is a failure, not a silent half-entry', async () => {
+  await assert.rejects(
+    enterByAccessLink('signed-access-token', {
+      request: async () => ({ ok: true }),
+      clearCache: () => { throw new Error('кэш чистить нечего'); },
+      storeToken: () => { throw new Error('ключа нет'); },
+      device: 'test',
+    }),
+    /ключ входа/,
+  );
 });

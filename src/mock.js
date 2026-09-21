@@ -74,6 +74,9 @@ const CLIENTS = [
   { row: 7, name: 'Игорь Лебедев', price: 3500, count: 8, balance: 14000, trainings: 7, revenue: 24500, payer: '', template: 'P02 — Сила', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 11.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(3), startDate: daysAgo(310), birthDate: null, chatId: '44444', clientKey: 'igor', hasLink: true },
 ];
 
+// Демо-ссылки входа: карточка → «Пригласить в приложение»
+let accessLinks = {};
+
 let trainerInvites = [
   {
     id: 'demo-reusable', kind: 'reusable', label: 'Ссылка для новых клиентов',
@@ -585,6 +588,45 @@ const MOCK = {
     trainerInvites = trainerInvites.filter((invite) => invite.id !== params.inviteId);
     return { ok: true, id: params.inviteId };
   },
+
+  'trainer.client.create': (params) => {
+    const row = Math.max(...CLIENTS.map((client) => client.row)) + 1;
+    const created = {
+      row, name: String(params.name || '').trim(), price: 0, count: 0, balance: 0,
+      trainings: 0, revenue: 0, payer: '', template: '', monthStatus: '',
+      lastMeasureStatus: '', monthSheetStatus: '', lastTrainingDate: null,
+      startDate: new Date().toISOString().slice(0, 10), birthDate: null,
+      chatId: '', clientKey: 'demo_' + row, hasLink: false,
+    };
+    CLIENTS.push(created);
+    return { row, name: created.name, clientKey: created.clientKey, created: true, mirrored: true };
+  },
+
+  'trainer.client.link': (params) => ({ link: accessLinks[params.clientRow] || null }),
+
+  'trainer.client.link.create': (params) => {
+    const token = 'demo-access-' + params.clientRow + '-' + Date.now();
+    accessLinks[params.clientRow] = {
+      id: token, clientRow: params.clientRow, createdAt: new Date().toISOString(),
+      expiresAt: daysAhead(30, '12:00'), useCount: 0, maxUses: 5, usesLeft: 5,
+      lastUsedAt: null, active: true, token,
+      url: window.location.origin + window.location.pathname + '?access=' + token,
+    };
+    return { link: accessLinks[params.clientRow] };
+  },
+
+  'trainer.client.link.revoke': (params) => {
+    delete accessLinks[params.clientRow];
+    return { revoked: 1 };
+  },
+
+  'auth.access.inspect': () => ({
+    active: true, name: 'Анна Морозова', expiresAt: daysAhead(30, '12:00'), usesLeft: 5,
+  }),
+
+  'auth.access.enter': () => ({
+    token: 'demo-session', name: 'Анна Морозова', expiresAt: daysAhead(90, '12:00'),
+  }),
 
   'auth.invite.inspect': () => ({
     active: true, kind: 'reusable', label: '', expiresAt: daysAhead(30, '12:00'),

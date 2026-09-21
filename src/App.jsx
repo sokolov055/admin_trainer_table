@@ -4,6 +4,8 @@ import { getInitData, environmentInfo, diagnoseMissingInitData } from './telegra
 import { clearToken, getToken, onTokenChange } from './session.js';
 import { readLoginTicket } from './auth-transfer.js';
 import { readInviteToken, removeInviteToken } from './invites.js';
+import { readAccessToken, removeAccessToken } from './access.js';
+import AccessLogin from './AccessLogin.jsx';
 import InviteRegistration from './InviteRegistration.jsx';
 import { Loading, ErrorState } from './ui.jsx';
 import { InstallHint, TransferLoginScreen } from './AuthTransfer.jsx';
@@ -38,6 +40,7 @@ export default function App() {
   const [state, setState] = useState({ loading: true, me: null, error: null });
   const [loginTicket, setLoginTicket] = useState(readLoginTicket);
   const [inviteToken, setInviteToken] = useState(readInviteToken);
+  const [accessToken, setAccessToken] = useState(readAccessToken);
   const [offerInstall, setOfferInstall] = useState({ active: false, installReady: true });
 
   // Подпись читается один раз: внутри Telegram она не меняется за запуск,
@@ -99,6 +102,25 @@ export default function App() {
     }
     load();
   }, [initData, signedToken]);
+
+  // Персональная ссылка от тренера — основной вход в приложение, и она
+  // важнее всего остального на этом устройстве. Её открывают и там, где
+  // уже был чужой кабинет: молча оставить прежний значило бы показать
+  // человеку не его данные.
+  if (accessToken) {
+    return (
+      <AccessLogin
+        token={accessToken}
+        details={<LaunchDetails />}
+        onComplete={() => {
+          removeAccessToken();
+          setAccessToken('');
+          setState({ loading: true, me: null, error: null });
+          setOfferInstall({ active: true, installReady: true });
+        }}
+      />
+    );
+  }
 
   // Приглашение важнее сохранённой сессии: ссылку могли открыть на общем
   // устройстве, где уже был другой кабинет. Сначала явно регистрируем

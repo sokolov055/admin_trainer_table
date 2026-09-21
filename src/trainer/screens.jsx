@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { resetClientAccess } from '../client-access.js';
+import { createClient } from '../access.js';
+import { ClientInviteLink } from './InviteLink.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
   SignOut, DataTable, Delta, formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { getThemeMode, setThemeMode } from '../telegram.js';
+import { getThemeMode, haptic, setThemeMode } from '../telegram.js';
 import {
-  IconUsers, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart, IconKey,
+  IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart, IconKey,
 } from '../icons.jsx';
 
 /* ==================================================================
@@ -18,6 +20,18 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, [refreshRevision]);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
+  const [pendingRow, setPendingRow] = useState(0);
+
+  // Заведённая карточка открывается сама, но только после того, как
+  // список перечитан: карточке нужны цифры из зеркала, а не одно имя из
+  // формы. Секунда ожидания честнее, чем полупустой экран.
+  useEffect(() => {
+    if (!pendingRow) return;
+    const created = (data && data.clients ? data.clients : []).find((c) => c.row === pendingRow);
+    if (!created) return;
+    setPendingRow(0);
+    onOpenClient(created);
+  }, [pendingRow, data]);
 
   if (loading) return <Loading rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -89,6 +103,17 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
           </button>
         }
       >
+        {/* Заведение клиента — первое действие тренера с новым человеком,
+            поэтому живёт над списком, а не в меню: искать его не должно
+            приходиться. Открывается по нажатию, чтобы форма не занимала
+            место в те дни, когда никого не заводят. */}
+        <AddClient
+          onCreated={(client) => {
+            setPendingRow(client.row);
+            reload();
+          }}
+        />
+
         <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
         <Chips items={filters} value={filter} onChange={setFilter} />
 
@@ -139,7 +164,10 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
                     не был {days} {plural(days, 'день', 'дня', 'дней')}
                   </Badge>
                 )}
-                {!c.chatId && <Badge>без Telegram</Badge>}
+                {/* Не приглашён — это задача тренера, а не свойство
+                    клиента: ни ссылки, ни Telegram у человека нет, и в
+                    кабинет он войти не может. */}
+                {!c.chatId && !c.invited && <Badge kind="warn">не приглашён</Badge>}
                 {!c.hasLink && <Badge>без таблицы</Badge>}
               </div>
             </button>
@@ -147,6 +175,99 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
         })}
       </Section>
     </>
+  );
+}
+
+/**
+ * Заведение клиента.
+ *
+ * Спрашиваем только ФИО. Цена, пакет и расписание появятся в таблице
+ * своим чередом, а сейчас нужно другое: чтобы у человека как можно
+ * быстрее был кабинет и ссылка в него. Всё остальное — потом.
+ *
+ * Строка создаётся в Google Таблице: она остаётся источником истины, и
+ * ключ клиента выдаёт она же. Поэтому кнопка думает несколько секунд —
+ * это поход в таблицу, а не задумчивость приложения.
+ */
+function AddClient({ onCreated }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    const value = name.trim();
+    if (!value || busy) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await createClient(value);
+      haptic('success');
+      setName('');
+      setOpen(false);
+      onCreated(created);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button className="button button--primary button--block add-client__open" onClick={() => { setOpen(true); haptic(); }}>
+        <IconUserPlus size={17} />
+        Добавить клиента
+      </button>
+    );
+  }
+
+  return (
+    <Panel pad className="add-client">
+      <form onSubmit={submit}>
+        <label className="field">
+          <span className="field__label">ФИО клиента</span>
+          <input
+            className="field__input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Иван Иванов"
+            autoComplete="off"
+            autoFocus
+            maxLength={120}
+            required
+          />
+        </label>
+
+        {error && (
+          <div className="access-reset__error" role="alert">
+            {error.message || 'Не получилось завести клиента'}
+          </div>
+        )}
+
+        <div className="add-client__actions">
+          <button className="button button--primary" disabled={busy || !name.trim()}>
+            {busy ? <IconRefresh size={16} /> : <IconUserPlus size={16} />}
+            {busy ? 'Завожу в таблице…' : 'Создать карточку'}
+          </button>
+          <button
+            className="button button--ghost"
+            type="button"
+            onClick={() => { setOpen(false); setError(null); }}
+            disabled={busy}
+          >
+            Отмена
+          </button>
+        </div>
+
+        <p className="add-client__hint">
+          Дальше в карточке будет кнопка «Пригласить в приложение» — она даст
+          ссылку, по которой клиент войдёт в свой кабинет.
+        </p>
+      </form>
+    </Panel>
   );
 }
 
@@ -213,7 +334,6 @@ export function ClientCard({ client }) {
         </Badge>
         <Badge>{formatMoney(client.price)} за тренировку</Badge>
         {client.payer && <Badge>платит {client.payer}</Badge>}
-        {!access.linked && <Badge kind="warn">нет Telegram</Badge>}
       </div>
 
       <div className="small muted" style={{ marginTop: 10 }}>
@@ -221,10 +341,15 @@ export function ClientCard({ client }) {
         строка {client.row}
       </div>
 
+      {/* Приглашение стоит выше сброса доступа намеренно: выдать вход —
+          повседневное действие, отобрать — редкое. */}
+      <ClientInviteLink client={client} />
+
       {access.done && (
         <div className="access-reset__result" role="status">
           Доступ сброшен. Все устройства выйдут при следующем запросе.
-          {access.done.unlinked && ' Telegram отвязан: клиенту нужно снова открыть персональную ссылку.'}
+          {access.done.revokedLinks > 0 && ' Ссылка входа отозвана — выдайте новую, когда понадобится.'}
+          {access.done.unlinked && ' Telegram отвязан.'}
         </div>
       )}
 
@@ -234,39 +359,47 @@ export function ClientCard({ client }) {
         </div>
       )}
 
+      {/* Кнопка доступна всегда: войти можно не только через Telegram, а
+          закрыть надо уметь любой вход — и ссылку, и открытые кабинеты. */}
       {!access.confirming && (
         <button
           className="button button--ghost access-reset__trigger"
           onClick={() => setAccess((s) => ({ ...s, confirming: true, error: null, done: null }))}
-          disabled={access.busy || !access.linked}
+          disabled={access.busy}
         >
           <IconKey size={16} />
-          {access.linked ? 'Сбросить доступ' : 'Доступ уже сброшен'}
+          Сбросить доступ
         </button>
       )}
 
       {access.confirming && (
         <div className="access-reset">
           <div className="small">
-            Все открытые браузеры и ярлыки выйдут из кабинета. Тренировки,
-            замеры и оплаты останутся без изменений.
+            Ссылка входа перестанет работать, все открытые браузеры и ярлыки
+            выйдут из кабинета. Тренировки, замеры и оплаты останутся без
+            изменений.
           </div>
 
-          <label className={'access-reset__option' + (!client.clientKey ? ' access-reset__option--disabled' : '')}>
-            <input
-              type="checkbox"
-              checked={access.unlinkTelegram}
-              disabled={access.busy || !client.clientKey}
-              onChange={(event) => setAccess((s) => ({ ...s, unlinkTelegram: event.target.checked }))}
-            />
-            <span>
-              <strong>Отвязать Telegram</strong>
+          {/* Отвязка нужна только тем, у кого Telegram вообще привязан:
+              остальные заходят по ссылке, и галочка им ничего не даёт. */}
+          {access.linked && (
+            <label className={'access-reset__option' + (!client.clientKey ? ' access-reset__option--disabled' : '')}>
+              <input
+                type="checkbox"
+                checked={access.unlinkTelegram}
+                disabled={access.busy || !client.clientKey}
+                onChange={(event) => setAccess((s) => ({ ...s, unlinkTelegram: event.target.checked }))}
+              />
               <span>
-                Клиент пройдёт самый первый вход заново по персональной ссылке.
-                {!client.clientKey && ' Сначала создайте ключ приглашения в таблице.'}
+                <strong>Отвязать Telegram</strong>
+                <span>
+                  Старый вход через бота перестанет работать. Дальше клиент
+                  заходит по ссылке, как все новые.
+                  {!client.clientKey && ' Сначала создайте ключ приглашения в таблице.'}
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
 
           <div className="access-reset__actions">
             <button className="button button--critical" onClick={resetAccess} disabled={access.busy}>
