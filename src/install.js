@@ -1,5 +1,6 @@
 import { apiPrimary } from './api.js';
 import { getToken, isStandalone } from './session.js';
+import { detectBrowser } from './browser.js';
 
 const DISMISSED_KEY = 'pwa_install_hint_v1';
 const INSTALL_COOKIE = 'fit_install_ticket';
@@ -29,18 +30,35 @@ export function onInstallPromptChange(listener) {
   return () => listeners.delete(listener);
 }
 
+/**
+ * Что показывать про установку — и показывать ли вообще.
+ *
+ * Раньше здесь было «iOS — значит рассказать про „Поделиться“». Это враньё
+ * ровно в тех случаях, когда помощь и нужна: во встроенном браузере
+ * Telegram и в Chrome для iPhone пункта «На экран „Домой“» нет, и человек,
+ * послушавшись, ищет в меню то, чего там не существует, а потом решает,
+ * что сломалось приложение.
+ *
+ * Поэтому решение принимает detectBrowser, и вариантов стало четыре:
+ *
+ * `prompt`     — браузер сам предложил установку (Android). Лучший случай:
+ *                одна кнопка, и дальше всё делает система.
+ * `ios`        — Safari на iPhone. Установка руками, три шага.
+ * `elsewhere`  — браузер, из которого установить нельзя. Единственный
+ *                честный совет здесь — сменить браузер.
+ * `null`       — уже установлено, подсказку закрыли, или это компьютер.
+ */
 export function installGuidance(options = {}) {
   const standalone = options.standalone !== undefined ? options.standalone : isStandalone();
   const dismissed = options.dismissed !== undefined ? options.dismissed : isInstallHintDismissed();
   const prompt = options.prompt !== undefined ? options.prompt : installPrompt;
-  const ua = options.userAgent !== undefined
-    ? options.userAgent
-    : (typeof navigator !== 'undefined' ? navigator.userAgent || '' : '');
+  const where = options.where || detectBrowser(options);
 
-  if (standalone || dismissed) return null;
+  if (standalone || where.kind === 'installed' || dismissed) return null;
   if (prompt) return 'prompt';
+  if (where.deadEnd) return 'elsewhere';
 
-  return isIosDevice(ua, options.maxTouchPoints) ? 'ios' : null;
+  return where.platform === 'ios' ? 'ios' : null;
 }
 
 export function isIosDevice(ua = '', maxTouchPoints) {

@@ -1788,6 +1788,23 @@ th.sticky, td.sticky {
   font-size: var(--text-sm);
 }
 
+.install-hint__steps {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.3em;
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  color: var(--text-secondary);
+}
+
+/* Значок «Поделиться» стоит прямо в строке, на месте слова: человек ищет
+   его глазами в панели браузера, и показать вернее, чем назвать. */
+.install-hint__steps svg {
+  vertical-align: -3px;
+  margin: 0 1px;
+}
+
+.install-hint__steps b { color: var(--text); }
+
 .invite__form { display: grid; gap: var(--space-4); text-align: left; }
 .invite__code-input {
   text-align: center;

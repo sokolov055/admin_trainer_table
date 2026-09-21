@@ -41,7 +41,7 @@ export default function App() {
   const [loginTicket, setLoginTicket] = useState(readLoginTicket);
   const [inviteToken, setInviteToken] = useState(readInviteToken);
   const [accessToken, setAccessToken] = useState(readAccessToken);
-  const [offerInstall, setOfferInstall] = useState({ active: false, installReady: true });
+  const [installReady, setInstallReady] = useState(true);
 
   // Подпись читается один раз: внутри Telegram она не меняется за запуск,
   // а вот ключ пропадает в тот момент, когда сервер откажет по сроку, —
@@ -116,7 +116,7 @@ export default function App() {
           removeAccessToken();
           setAccessToken('');
           setState({ loading: true, me: null, error: null });
-          setOfferInstall({ active: true, installReady: true });
+          setInstallReady(true);
         }}
       />
     );
@@ -152,9 +152,9 @@ export default function App() {
           clearToken();
           setLoginTicket('');
         }}
-        onComplete={({ installReady }) => {
+        onComplete={(result) => {
           setState({ loading: true, me: null, error: null });
-          setOfferInstall({ active: true, installReady });
+          setInstallReady(result.installReady);
           setLoginTicket('');
         }}
       />
@@ -192,7 +192,16 @@ export default function App() {
   return (
     <>
       {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
-      <InstallHint active={offerInstall.active} installReady={offerInstall.installReady} />
+      {/* Подсказка живёт не только сразу после входа. Ставят приложение
+          редко с первого раза: человек заходит посмотреть баланс, закрывает
+          вкладку и через неделю снова ищет ссылку в переписке. Поэтому она
+          показывается, пока её не закроют или пока приложение не окажется
+          установленным, — за этим следит installGuidance.
+
+          Внутри Telegram не показываем вовсе: там приложение открыто мини-
+          приложением, то есть намеренно, и советовать «смените браузер»
+          человеку, который ничего не выбирал, не за что. */}
+      <InstallHint active={!initData} installReady={installReady} />
     </>
   );
 }

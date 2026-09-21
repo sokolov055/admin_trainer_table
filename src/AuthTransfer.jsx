@@ -9,7 +9,7 @@ import {
 } from './install.js';
 import { isInsideTelegram, tg } from './telegram.js';
 import {
-  IconAlert, IconCheck, IconClose, IconPhone, IconRefresh, IconSend,
+  IconAlert, IconCheck, IconClose, IconExternal, IconPhone, IconRefresh, IconSend, IconShare,
 } from './icons.jsx';
 
 const SUCCESS_PAUSE_MS = 550;
@@ -201,14 +201,30 @@ export function InstallHint({ active, installReady = true }) {
       <button className="install-hint__close" onClick={close} aria-label="Закрыть подсказку">
         <IconClose size={18} />
       </button>
-      <div className="install-hint__icon"><IconCheck size={20} /></div>
+      <div className="install-hint__icon">
+        {kind === 'ios' ? <IconShare size={20} /> : kind === 'elsewhere' ? <IconExternal size={20} /> : <IconCheck size={20} />}
+      </div>
       <div className="install-hint__body">
-        <h2 className="install-hint__title" id="install-hint-title">Кабинет готов</h2>
+        <h2 className="install-hint__title" id="install-hint-title">
+          {kind === 'elsewhere' ? 'Чтобы приложение осталось' : 'Поставьте кабинет на телефон'}
+        </h2>
         <p className="install-hint__text">
-          {kind === 'ios'
-            ? 'В браузере нажмите «Поделиться», затем «На экран Домой».'
-            : 'Добавьте Fit Track на экран телефона, чтобы открывать кабинет одним нажатием.'}
+          {kind === 'elsewhere'
+            ? 'Этот браузер не умеет добавлять приложения на экран. Откройте кабинет по той же ссылке в Safari или Chrome — и повторите.'
+            : 'Иконка на экране открывает кабинет одним нажатием, без поиска ссылки в переписке.'}
         </p>
+
+        {/* Шаги, а не одна строка: человек выполняет их с телефоном в руке и
+            сверяет с тем, что видит. «Нажмите Поделиться, затем На экран
+            Домой» — это та же инструкция, свёрнутая до состояния, в котором
+            её уже нельзя выполнить не глядя. */}
+        {kind === 'ios' && (
+          <ol className="install-hint__steps">
+            <li>Нажмите <IconShare size={15} /> внизу экрана</li>
+            <li>Пролистайте список вниз</li>
+            <li>Выберите <b>«На экран „Домой“»</b></li>
+          </ol>
+        )}
         {kind === 'ios' && !bridgeReady && (
           <p className="install-hint__error" role="alert">{problem || 'Перед установкой нужно ещё раз подготовить безопасный вход.'}</p>
         )}
@@ -218,7 +234,7 @@ export function InstallHint({ active, installReady = true }) {
             {busy ? 'Открываем…' : 'Добавить на экран'}
           </button>
         )}
-        {kind === 'ios' && bridgeReady && (
+        {(kind === 'ios' || kind === 'elsewhere') && bridgeReady && (
           <button className="button install-hint__action" onClick={close}>Понятно</button>
         )}
         {kind === 'ios' && !bridgeReady && (

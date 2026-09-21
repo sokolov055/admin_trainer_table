@@ -84,6 +84,48 @@ test('iOS guidance is limited to Safari and standalone install ticket is consume
   assert.match(writes[0], /Path=\/app\//);
 });
 
+/**
+ * Совет про установку обязан зависеть от браузера, а не от системы.
+ *
+ * Прежняя версия отвечала «iOS — значит рассказать про „Поделиться“», и
+ * ошибалась ровно там, где подсказка нужнее всего: во встроенном браузере
+ * Telegram и в Chrome для iPhone пункта «На экран „Домой“» нет. Человек
+ * искал в меню то, чего там не бывает, и решал, что сломалось приложение.
+ */
+test('подсказка про установку не советует невозможного', () => {
+  const base = { standalone: false, dismissed: false, prompt: null };
+
+  const iosSafari = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1';
+  const iosTelegram = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148';
+  const iosChrome = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 CriOS/126.0 Mobile/15E148 Safari/604.1';
+  const androidChrome = 'Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36';
+  const androidWebview = 'Mozilla/5.0 (Linux; Android 13; SM-A536B Build/TP1A; wv) AppleWebKit/537.36 Version/4.0 Chrome/124.0 Mobile Safari/537.36';
+  const desktop = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36';
+
+  assert.equal(installGuidance({ ...base, userAgent: iosSafari }), 'ios',
+    'в Safari установка руками — и это единственное место на iPhone, где она есть');
+
+  assert.equal(installGuidance({ ...base, userAgent: iosTelegram, standalone: undefined }), 'elsewhere',
+    'во встроенном браузере Telegram советовать «Поделиться» бессмысленно');
+
+  assert.equal(installGuidance({ ...base, userAgent: iosChrome, standalone: undefined }), 'elsewhere',
+    'в Chrome для iPhone пункта «На экран „Домой“» нет');
+
+  assert.equal(installGuidance({ ...base, userAgent: androidChrome, prompt: {} }), 'prompt',
+    'когда браузер сам предложил установку, никакие инструкции не нужны');
+
+  assert.equal(installGuidance({ ...base, userAgent: androidWebview }), 'elsewhere');
+
+  assert.equal(installGuidance({ ...base, userAgent: desktop }), null,
+    'на компьютере ставить нечего');
+
+  assert.equal(installGuidance({ ...base, userAgent: iosSafari, standalone: true }), null,
+    'уже установлено');
+
+  assert.equal(installGuidance({ ...base, userAgent: iosSafari, dismissed: true }), null,
+    'подсказку закрыли — больше не навязываемся');
+});
+
 test('client access reset is primary-only and clears cached client data after success', async () => {
   const calls = [];
   let cleared = 0;
