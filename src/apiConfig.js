@@ -73,7 +73,12 @@ function fetchWithTimeout(url, ms) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
 
-  return fetch(url + '?t=' + Date.now(), {
+  // Без «?t=…» в адресе. Метка времени делала каждый запрос уникальным и
+  // тем самым прятала файл от сервис-воркера: в его кеше копилось бы по
+  // записи на запуск, и ни одна из них не пригодилась бы. Свежесть держит
+  // no-store и правило воркера «сначала сеть» — кеш здесь только на тот
+  // случай, когда сети нет совсем.
+  return fetch(url, {
     signal: controller.signal,
     cache: 'no-store',
   }).finally(() => clearTimeout(timer));
