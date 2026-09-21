@@ -5,7 +5,6 @@ import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
-import { Invites } from './Invites.jsx';
 import { APP_VERSION } from '../version.js';
 import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../ui.jsx';
 import { useData } from '../useData.js';
@@ -184,7 +183,14 @@ export default function TrainerApp({ me }) {
             заходя в чужую роль и не выспрашивая. Место — список клиентов:
             первый экран панели, ровно как обзор у клиента. */}
         {view === 'clients' && clientPane === 'active' && <TelegramTransferCard />}
-        {view === 'clients' && clientPane === 'active' && <Invites />}
+        {/* Приглашения по общей ссылке сняты с экрана: клиент теперь заводится
+            из своей карточки — тренер выдаёт ему персональную ссылку, и она
+            сразу открывает нужный кабинет. Общая ссылка требовала от клиента
+            регистрации и почты, то есть делала лишнюю работу ради того же
+            результата. Форма создания осталась в Invites.jsx и на сервере:
+            её место — регистрация ТРЕНЕРОВ, когда до неё дойдут руки.
+            Уже разосланные приглашения продолжают работать: страница, на
+            которую они ведут (InviteRegistration.jsx), никуда не делась. */}
         {view === 'clients' && clientPane === 'active' && <Stories />}
         {view === 'clients' && clientPane === 'active' && (
           <Clients
@@ -297,6 +303,17 @@ function ClientPreviewPicker({ onSelect }) {
   );
 }
 
+/**
+ * Карточка клиента.
+ *
+ * Вкладки карточки стоят в шапке и выглядят переключателем, а не рядом
+ * фишек, — намеренно. Раньше они лежали в теле экрана, и на вкладке
+ * «Тренировки» под ними вплотную вставали кнопка журнала и ряд месяцев:
+ * три ряда одинаковых пилюль подряд, из которых не прочитать, где ты
+ * находишься, где действие, а где фильтр. Навигация и содержимое экрана
+ * не должны быть одеты одинаково; месяцы остаются фишками в теле, потому
+ * что это и есть фильтр.
+ */
 function ClientDetail({ client, onBack }) {
   const [view, setView] = useState('overview');
   const current = CLIENT_VIEWS.find((v) => v.value === view) || CLIENT_VIEWS[0];
@@ -312,14 +329,14 @@ function ClientDetail({ client, onBack }) {
         </button>
         <h1 className="app__title">{client.name}</h1>
         <p className="app__subtitle">Карточка клиента · {current.label}</p>
+        <div className="app__subnav">
+          <Chips items={CLIENT_VIEWS} value={view} onChange={setView} variant="nav" />
+        </div>
       </header>
 
       <main className="app__body app__body--plain">
         <ClientCard client={client} />
-        <div style={{ marginTop: 14 }}>
-          <Chips items={CLIENT_VIEWS} value={view} onChange={setView} />
-        </div>
-        <div key={view}>
+        <div key={view} style={{ marginTop: 'var(--space-5)' }}>
           {isPayments
             ? <Payments client={client} />
             : <Screen clientRow={client.row} />}

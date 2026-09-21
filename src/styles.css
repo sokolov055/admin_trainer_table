@@ -1404,6 +1404,12 @@ button { font-family: inherit; }
   background: var(--surface);
 }
 
+/* Вход в журнал — действие, а следом за ним идёт ряд месяцев, то есть
+   фильтр. Вплотную друг к другу они читались как один блок кнопок, и
+   месяц можно было принять за продолжение журнала. Воздух между ними
+   стоит дешевле, чем подпись, объясняющая, что это разные вещи. */
+.plan__journal { margin-bottom: var(--space-4); }
+
 /* --- фильтры --- */
 
 /* Ряд ездит только вбок. Раньше он ездил и вверх-вниз: невидимая накладка
@@ -2487,6 +2493,37 @@ code {
 }
 
 .access-link__invite { width: 100%; }
+
+/* Строка, ради которой в блок возвращаются: отправить и понять, дошло ли.
+   Кнопка и состояние на одной строке, состояние прижато к правому краю и
+   при узком экране уходит под кнопку целой строкой, а не обрывком. */
+.access-link__lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.access-link__state {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.access-link__more { margin-top: var(--space-3); }
+
+.access-link__more > summary {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.access-link__more[open] > summary { margin-bottom: var(--space-3); }
 
 .access-link__row {
   padding: var(--space-3);

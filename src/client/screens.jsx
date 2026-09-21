@@ -169,7 +169,7 @@ export function Plan({ clientRow, clientView = false }) {
   if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block ? workout : null} onClose={() => setWorkout(null)} />;
 
   if (loading || error) return <>
-    <button className="button button--block" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
+    <button className="button button--block plan__journal" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
     {loading ? <Loading lead={false} rows={4} /> : <ErrorState error={error} onRetry={reload} />}
   </>;
 
@@ -205,7 +205,7 @@ export function Plan({ clientRow, clientView = false }) {
 
   return (
     <>
-      <button className="button button--block" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
+      <button className="button button--block plan__journal" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
 
       {/* Сразу под входом в журнал: если занятие не закрыто, это первое,
           что человек должен узнать на этом экране. */}

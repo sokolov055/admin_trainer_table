@@ -16,6 +16,14 @@ import { IconAlert, IconCheck, IconCopy, IconKey, IconRefresh, IconSend, IconTra
  * восстанавливает ту же самую по подписи. Поэтому тренер, потерявший
  * переписку, отправляет клиенту ровно то, что отправлял раньше, и старая
  * ссылка не перестаёт работать у того, кто её уже получил.
+ *
+ * Выданная ссылка свёрнута. Карточка открывается ради тренировок, оплат и
+ * замеров, а адрес на три строки, три кнопки и строка состояния стояли
+ * поверх всего этого при каждом заходе — при том что отправляют ссылку
+ * один раз. Снаружи остаётся то, ради чего сюда возвращаются: «Отправить»
+ * и короткая строка о том, дошло ли до человека. Сам адрес, перевыпуск и
+ * отзыв — под раскрытием: читать адрес глазами незачем, а перевыпускать и
+ * отзывать случайным касанием тем более.
  */
 
 export function ClientInviteLink({ client }) {
@@ -23,6 +31,7 @@ export function ClientInviteLink({ client }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const load = () => {
     setState((value) => ({ ...value, loading: true, error: null }));
@@ -51,6 +60,9 @@ export function ClientInviteLink({ client }) {
     const data = await createClientLink(client.row);
     setState({ loading: false, link: data.link, error: null });
     setConfirmRevoke(false);
+    // Только что выпущенную ссылку показываем развёрнутой: тренер сам её
+    // и запросил, и первое, что он захочет, — убедиться, что она есть.
+    setExpanded(true);
     haptic('success');
     await send(data.link);
   });
@@ -104,33 +116,45 @@ export function ClientInviteLink({ client }) {
 
       {link && (
         <>
-          <div className="access-link__row">
-            <code className="access-link__url">{link.url}</code>
-          </div>
-
-          <div className="access-link__actions">
+          <div className="access-link__lead">
             <button className="button button--primary" onClick={() => run(() => send(link))} disabled={busy}>
               {navigator.share ? <IconSend size={16} /> : <IconCopy size={16} />}
               {navigator.share ? 'Отправить' : 'Скопировать'}
             </button>
-            <button className="button" onClick={create} disabled={busy}>
-              <IconRefresh size={16} />
-              Новая ссылка
-            </button>
-            <button
-              className={'button' + (confirmRevoke ? ' button--critical' : '')}
-              onClick={() => (confirmRevoke ? revoke() : setConfirmRevoke(true))}
-              disabled={busy}
-            >
-              <IconTrash size={16} />
-              {confirmRevoke ? 'Подтвердить' : 'Отозвать'}
-            </button>
+            <span className="access-link__state">{describeUses(link)}</span>
           </div>
 
-          <p className="access-link__hint">
-            {describeUses(link)} · действует до {formatDate(link.expiresAt)}
-            {link.lastUsedAt ? ` · последний вход ${formatDate(link.lastUsedAt)}` : ''}
-          </p>
+          <details
+            className="access-link__more"
+            open={expanded}
+            onToggle={(event) => setExpanded(event.currentTarget.open)}
+          >
+            <summary>Ссылка и доступ</summary>
+
+            <div className="access-link__row">
+              <code className="access-link__url">{link.url}</code>
+            </div>
+
+            <div className="access-link__actions">
+              <button className="button" onClick={create} disabled={busy}>
+                <IconRefresh size={16} />
+                Новая ссылка
+              </button>
+              <button
+                className={'button' + (confirmRevoke ? ' button--critical' : '')}
+                onClick={() => (confirmRevoke ? revoke() : setConfirmRevoke(true))}
+                disabled={busy}
+              >
+                <IconTrash size={16} />
+                {confirmRevoke ? 'Подтвердить' : 'Отозвать'}
+              </button>
+            </div>
+
+            <p className="access-link__hint">
+              Действует до {formatDate(link.expiresAt)}
+              {link.lastUsedAt ? ` · последний вход ${formatDate(link.lastUsedAt)}` : ''}
+            </p>
+          </details>
         </>
       )}
 
