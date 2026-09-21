@@ -12,6 +12,7 @@ npm ci
 npm run build
 npm run test:workout
 npm run test:ration
+npm run test:calendar
 ```
 
 После успешной сборки сделай коммит и push в `main`. Workflow `.github/workflows/deploy.yml` автоматически публикует GitHub Pages:

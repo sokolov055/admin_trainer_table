@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useData } from '../useData.js';
-import { apiMutate } from '../api.js';
 import { resetClientAccess } from '../client-access.js';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
@@ -15,30 +14,10 @@ import {
  * Клиенты
  * ================================================================== */
 
-export function Clients({ onOpenClient }) {
-  const { loading, data, error, reload } = useData('trainer.clients', {}, []);
+export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
+  const { loading, data, error, reload } = useData('trainer.clients', {}, [refreshRevision]);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
-  const [refresh, setRefresh] = useState({ busy: false, error: null, done: null });
-
-  // Пересчёт по календарю — та же галочка «Обновить», что в таблице. Раньше
-  // ради неё надо было открыть таблицу на компьютере, и данные в приложении
-  // жили своей жизнью, пока тренер до неё не дойдёт.
-  //
-  // Ответ идёт десятки секунд: скрипт читает календарь и переписывает лист.
-  // Поэтому кнопка блокируется на время работы — второе нажатие не ускорит
-  // пересчёт, а только заставит ждать ещё и очереди на стороне таблицы.
-  const runRefresh = async () => {
-    setRefresh({ busy: true, error: null, done: null });
-
-    try {
-      const res = await apiMutate('calendar.refresh', {});
-      setRefresh({ busy: false, error: null, done: res });
-      reload();
-    } catch (err) {
-      setRefresh({ busy: false, error: err, done: null });
-    }
-  };
 
   if (loading) return <Loading rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -102,7 +81,7 @@ export function Clients({ onOpenClient }) {
         action={
           <button
             className="button button--ghost"
-            onClick={runRefresh}
+            onClick={onRefresh}
             disabled={refresh.busy}
           >
             <IconRefresh size={16} />

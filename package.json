@@ -9,6 +9,7 @@
     "test:ration": "node --test scripts/test-ration.mjs",
     "test:auth": "node --test scripts/test-auth.mjs",
     "test:preview": "node --test scripts/test-preview.mjs",
+    "test:calendar": "node --test scripts/test-trainer-calendar.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

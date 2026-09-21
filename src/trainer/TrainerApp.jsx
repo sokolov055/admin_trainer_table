@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clients, Finance, Processes, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
 import ClientApp from '../client/ClientApp.jsx';
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
@@ -9,6 +9,7 @@ import { Invites } from './Invites.jsx';
 import { APP_VERSION } from '../version.js';
 import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../ui.jsx';
 import { useData } from '../useData.js';
+import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch,
@@ -78,6 +79,39 @@ export default function TrainerApp({ me }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openClient, setOpenClient] = useState(null);
   const [previewClient, setPreviewClient] = useState(null);
+  const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });
+  const [calendarRevision, setCalendarRevision] = useState(0);
+  const calendarRequest = useRef(null);
+
+  // Календарь — источник баланса, тренировок и ближайших занятий. Запускаем
+  // его пересчёт сразу после входа тренера, но не ждём перед показом панели:
+  // список открывается из зеркала, а свежие числа тихо заменяют его позже.
+  // Та же функция обслуживает ручную кнопку, поэтому два одновременных
+  // запуска склеиваются ещё до серверной защиты от дублей.
+  const runCalendarRefresh = useCallback(() => {
+    if (calendarRequest.current) return calendarRequest.current;
+
+    setCalendarRefresh({ busy: true, error: null, done: null });
+
+    const request = apiMutate('calendar.refresh', {})
+      .then((result) => {
+        setCalendarRefresh({ busy: false, error: null, done: result });
+        setCalendarRevision((value) => value + 1);
+        return result;
+      })
+      .catch((error) => {
+        // Фоновая ошибка не закрывает панель: старые данные полезнее
+        // полноэкранного отказа, а рядом остаётся ручной повтор.
+        setCalendarRefresh({ busy: false, error, done: null });
+        return null;
+      })
+      .finally(() => { calendarRequest.current = null; });
+
+    calendarRequest.current = request;
+    return request;
+  }, []);
+
+  useEffect(() => { runCalendarRefresh(); }, [runCalendarRefresh]);
 
   if (previewClient) {
     return (
@@ -152,7 +186,14 @@ export default function TrainerApp({ me }) {
         {view === 'clients' && clientPane === 'active' && <TelegramTransferCard />}
         {view === 'clients' && clientPane === 'active' && <Invites />}
         {view === 'clients' && clientPane === 'active' && <Stories />}
-        {view === 'clients' && clientPane === 'active' && <Clients onOpenClient={setOpenClient} />}
+        {view === 'clients' && clientPane === 'active' && (
+          <Clients
+            onOpenClient={setOpenClient}
+            refresh={calendarRefresh}
+            onRefresh={runCalendarRefresh}
+            refreshRevision={calendarRevision}
+          />
+        )}
         {view === 'clients' && clientPane === 'lost' && <Lost />}
         {view === 'dashboard' && dashPane === 'finance' && <Finance />}
         {view === 'dashboard' && dashPane === 'processes' && <Processes />}

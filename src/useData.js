@@ -27,9 +27,14 @@ export function useData(action, params, deps = []) {
   const load = () => {
     const { data, stale, promise } = apiStale(action, params);
 
-    setState(data
+    setState((previous) => (data
       ? { data, loading: false, stale: true, error: null }
-      : { data: null, loading: true, stale: false, error: null });
+      // После записи общий API-кэш очищен намеренно. При фоновом перечитывании
+      // не заменяем уже показанный экран скелетоном: оставляем прежний снимок
+      // до свежего ответа и честно считаем его устаревшим.
+      : previous.data
+        ? { ...previous, loading: false, stale: true, error: null }
+        : { data: null, loading: true, stale: false, error: null }));
 
     promise
       .then((fresh) => setState({ data: fresh, loading: false, stale: false, error: null }))
