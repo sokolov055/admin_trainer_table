@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clients, Finance, Processes, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
+import { Clients, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
+import { Finance, Processes } from './Metrics.jsx';
+import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
@@ -10,9 +12,8 @@ import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../u
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
-import PushSetting from '../PushSetting.jsx';
 import {
-  IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch,
+  IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
 
 /**
@@ -35,10 +36,11 @@ const TABS = [
 ];
 
 const MENU = [
+  { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
   { id: 'client-preview', label: 'Клиентская версия', note: 'Проверить приложение глазами клиента', Icon: IconPhone },
   { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog },
   { id: 'sheets', label: 'Листы', note: 'Таблица как есть', Icon: IconSheet },
-  { id: 'settings', label: 'Настройки', note: 'Тема приложения', Icon: IconSliders },
+  { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
 
 const VIEWS = TABS.concat(MENU);
@@ -204,6 +206,7 @@ export default function TrainerApp({ me }) {
         {view === 'clients' && clientPane === 'lost' && <Lost />}
         {view === 'dashboard' && dashPane === 'finance' && <Finance />}
         {view === 'dashboard' && dashPane === 'processes' && <Processes />}
+        {view === 'expenses' && <Expenses />}
         {view === 'logs' && <Logs />}
         {view === 'sheets' && <Sheets />}
         {view === 'settings' && <Settings />}
@@ -234,13 +237,6 @@ export default function TrainerApp({ me }) {
           <button className="icon-button" onClick={() => { setMenuOpen(false); haptic(); }} aria-label="Закрыть меню">
             <IconClose size={20} />
           </button>
-        </div>
-
-        {/* Уведомления тренеру нужны не меньше, чем клиенту: отдых во
-            время занятия он ведёт сам, и пуш приходит тому, кто это
-            занятие открыл. */}
-        <div className="menu__push">
-          <PushSetting />
         </div>
 
         <div className="menu__list">

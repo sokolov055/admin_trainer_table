@@ -2814,3 +2814,99 @@ code {
   font-size: var(--text-xs);
   line-height: 1.55;
 }
+
+/* ==========================================================================
+   Показатели и расходы
+   ========================================================================== */
+
+/* Месяц со стрелками. Читается слева направо как «назад — где я — вперёд»,
+   поэтому подпись занимает всю середину и не ездит при смене названия. */
+.monthpick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.monthpick__label {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+
+/* Стрелка «вперёд» — та же, что «назад», развёрнутая: две отдельные иконки
+   ради одного поворота держать незачем. */
+.monthpick__next svg { transform: rotate(180deg); }
+
+.monthpick .icon-button[disabled] { opacity: 0.3; }
+
+/* Цифра и её изменение стоят в одной строке значения; дельта — после
+   числа, потому что сначала читают сколько, а потом куда. */
+.metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.metric__value { font-variant-numeric: tabular-nums; }
+
+.metrics__foot {
+  margin: var(--space-5) var(--space-1) 0;
+  line-height: 1.5;
+}
+
+/* --- расходы --- */
+
+.expense {
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.expense__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.expense__category {
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.expense__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.expense__amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Подтверждение удаления встаёт на место корзины и в строке, а не окном
+   поверх экрана: вопрос относится к одной трате, и место у него там же. */
+.expense__confirm {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.button--small {
+  padding: 6px 10px;
+  font-size: var(--text-sm);
+  min-height: 0;
+}
+
+.button.danger {
+  color: var(--critical-text);
+  border-color: var(--critical-line);
+  background: var(--critical-fill);
+}
+
+.small.danger { color: var(--critical-text); }

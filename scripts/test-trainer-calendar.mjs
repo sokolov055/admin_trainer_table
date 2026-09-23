@@ -19,6 +19,8 @@ const output = await build({
       const stub = (filter, path) => bundle.onResolve({ filter }, () => ({ path, namespace: 'calendar-test' }));
 
       stub(/^\.\/screens\.jsx$/, 'trainer-screens');
+      stub(/Metrics\.jsx$/, 'metrics');
+      stub(/Expenses\.jsx$/, 'expenses');
       stub(/client[\\/]ClientApp\.jsx$/, 'client-app');
       stub(/client[\\/]screens\.jsx$/, 'client-screens');
       stub(/Payments\.jsx$/, 'payments');
@@ -37,7 +39,7 @@ const output = await build({
           loader: 'jsx',
           contents: `import React from 'react';
             export const Clients = ({ refresh, onRefresh, refreshRevision }) => <div data-clients data-busy={refresh.busy ? 'yes' : 'no'} data-revision={String(refreshRevision)}><span>Список клиентов</span><button onClick={onRefresh}>Обновить вручную</button></div>;
-            export const Finance=()=>null; export const Processes=()=>null; export const Lost=()=>null;
+            export const Lost=()=>null;
             export const Logs=()=>null; export const Sheets=()=>null; export const Settings=()=>null; export const ClientCard=()=>null;`,
         };
         // apiPublic нужен не этой проверке, а настройке уведомлений,
@@ -58,8 +60,10 @@ const output = await build({
           contents: `import React from 'react'; const I=()=> <i />;
             export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
-            export const IconPhone=I; export const IconSearch=I;`,
+            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I;`,
         };
+        if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Processes=()=>null;` };
+        if (args.path === 'expenses') return { loader: 'jsx', contents: `export const Expenses=()=>null;` };
         if (args.path === 'client-screens') return { contents: `export const Overview=()=>null; export const Plan=()=>null; export const Progress=()=>null; export const Nutrition=()=>null;` };
         if (args.path === 'client-app') return { loader: 'jsx', contents: `export default function ClientApp(){ return null; }` };
         if (args.path === 'payments') return { loader: 'jsx', contents: `export const Payments=()=>null;` };

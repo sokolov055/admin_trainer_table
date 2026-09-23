@@ -6,10 +6,11 @@ import { createClient } from '../access.js';
 import { ClientInviteLink } from './InviteLink.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
-  SignOut, DataTable, Delta, Field, Note, formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
+  SignOut, DataTable, Field, Note, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { getThemeMode, haptic, setThemeMode } from '../telegram.js';
-import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart, IconKey, IconAlert, IconCheck } from '../icons.jsx';
+import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck } from '../icons.jsx';
+import PushSetting from '../PushSetting.jsx';
 
 /* ==================================================================
  * Клиенты
@@ -567,122 +568,6 @@ function ClientContacts({ clientRow }) {
   );
 }
 
-export function Finance() {
-  const { loading, data, error, reload } = useData('trainer.finance', {}, []);
-  const [showYears, setShowYears] = useState(false);
-
-  if (loading) return <Loading rows={4} />;
-  if (error) return <ErrorState error={error} onRetry={reload} />;
-
-  const all = data.columns || [];
-  const columns = all.filter((c) => showYears || !c.isYearTotal);
-
-  if (columns.length === 0) {
-    return <Empty icon={IconChart} title="Нет месяцев" text="В шапке листа BSC_Финансы не найдено ни одного месяца." />;
-  }
-
-  // Свежие месяцы первыми: до правого края широкой таблицы на телефоне
-  // ещё нужно долистать, а интересует обычно последний.
-  const ordered = columns.slice().reverse();
-  const latest = all.filter((c) => !c.isYearTotal).slice(-1)[0];
-
-  const metricBy = (label) => (data.metrics || []).find((m) => m.label === label);
-  const revenue = metricBy('Выручка');
-  const profit = metricBy('Прибыль');
-  const trainings = metricBy('Тренировок проведено');
-
-  return (
-    <>
-      {latest && revenue && (
-        <Lead
-          label={'Выручка · ' + latest.label}
-          tone="good"
-          value={revenue.values[latest.label] || '—'}
-          hint={revenue.unit ? 'в ' + revenue.unit : undefined}
-          facts={[
-            profit ? { label: 'Прибыль', value: profit.values[latest.label] || '—' } : null,
-            trainings ? { label: 'Тренировок', value: trainings.values[latest.label] || '—' } : null,
-          ]}
-        />
-      )}
-
-      <Section title={data.sheet} note="значения как в таблице">
-        <Chips
-          items={[
-            { value: 'months', label: 'Месяцы' },
-            { value: 'all', label: 'С итогами года' },
-          ]}
-          value={showYears ? 'all' : 'months'}
-          onChange={(v) => setShowYears(v === 'all')}
-        />
-
-        <Panel pad>
-          <MetricTable metrics={data.metrics} columns={ordered} />
-        </Panel>
-      </Section>
-    </>
-  );
-}
-
-/* ==================================================================
- * Процессы
- * ================================================================== */
-
-export function Processes() {
-  const { loading, data, error, reload } = useData('trainer.processes', {}, []);
-
-  if (loading) return <Loading rows={4} />;
-  if (error) return <ErrorState error={error} onRetry={reload} />;
-
-  const columns = (data.columns || []).filter((c) => !c.isYearTotal).slice().reverse();
-
-  if (columns.length === 0) {
-    return <Empty icon={IconChart} title="Нет снимков" text="В шапке листа BSC_Процессы не найдено ни одного месяца." />;
-  }
-
-  return (
-    <Section title={data.sheet} note="снимки по месяцам">
-      <Panel pad>
-        <MetricTable metrics={data.metrics} columns={columns} />
-      </Panel>
-    </Section>
-  );
-}
-
-function MetricTable({ metrics, columns }) {
-  if (!metrics || metrics.length === 0) return <Empty text="Нет метрик" />;
-
-  return (
-    <div className="table-wrap">
-      <table className="data">
-        <thead>
-          <tr>
-            <th className="sticky">Метрика</th>
-            {columns.map((c) => (
-              <th key={c.label} className="num">
-                {c.isYearTotal ? <strong>{c.label}</strong> : c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {metrics.map((m, i) => (
-            <tr key={i}>
-              <td className="sticky" style={{ fontWeight: 560 }}>
-                {m.label}
-                {m.unit && <span className="muted small">, {m.unit}</span>}
-              </td>
-              {columns.map((c) => (
-                <td key={c.label} className="num nowrap">{m.values[c.label] || '—'}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 /* ==================================================================
  * Ушедшие
  * ================================================================== */
@@ -858,9 +743,10 @@ const THEME_HINTS = {
 /**
  * Настройки приложения.
  *
- * Пока здесь одна вещь — тема. Раздел всё равно нужен: тренер открывает
- * приложение и в зале при верхнем свете, и вечером дома, а тема Telegram
- * к этому отношения не имеет.
+ * Тема и уведомления. Раньше уведомления висели отдельным блоком прямо в
+ * боковом меню, над списком разделов, — и это было не место: меню отвечает
+ * на вопрос «куда пойти», а не «как оно себя ведёт». Настройка, которую
+ * трогают один раз, стояла там, где каждый день ищут переход.
  */
 export function Settings() {
   // Читаем один раз при первом рендере: значение уже применено к странице
@@ -882,6 +768,13 @@ export function Settings() {
             <div className="setting__note">{THEME_HINTS[mode]}</div>
           </div>
         </Panel>
+      </Section>
+
+      {/* Уведомления тренеру нужны не меньше, чем клиенту: отдых во время
+          занятия он ведёт сам, и пуш о его конце приходит тому, кто это
+          занятие открыл. */}
+      <Section title="Уведомления">
+        <PushSetting />
       </Section>
 
       {/* Выход стоит последним и сам прячется внутри Telegram: там выходить

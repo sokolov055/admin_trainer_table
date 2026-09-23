@@ -364,7 +364,7 @@ export function Options({ items, value, onChange, label, disabled }) {
  */
 export function Field({
   label, hint, value, onChange, onFocus, error, disabled,
-  inputMode = 'numeric', placeholder, inputRef,
+  inputMode = 'numeric', placeholder, inputRef, type = 'text', list,
 }) {
   return (
     <label className={'field' + (error ? ' field--bad' : '')}>
@@ -372,8 +372,13 @@ export function Field({
       <input
         ref={inputRef}
         className="field__input"
-        type="text"
-        inputMode={inputMode}
+        // Дата отдаётся браузеру: свой календарь на телефоне всегда хуже
+        // родного, а «вчера» и «первое число» набирают именно в нём.
+        type={type}
+        // Список подсказок к полю со свободным вводом: браузер покажет
+        // уже введённое, не занимая места на экране.
+        list={list}
+        inputMode={type === 'text' ? inputMode : undefined}
         autoComplete="off"
         value={value}
         placeholder={placeholder}
