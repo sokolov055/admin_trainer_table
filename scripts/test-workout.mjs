@@ -116,3 +116,40 @@ test('ответ старого экрана не затирает новый в
   assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].title, 'Правка после возвращения');
   await act(async () => tree.unmount()); tree = null;
 });
+
+/**
+ * Суперсет доезжает из плана до занятия.
+ *
+ * В таблице он обозначен не словом, а объединённой ячейкой «Подходы», и по
+ * дороге к экрану проходит через три руки: чтение листа, снимок программы и
+ * разметку упражнения. Потеряется в любой — человек в зале увидит два
+ * обычных упражнения и отдохнёт между ними, хотя не должен.
+ */
+test('суперсет из программы виден в занятии', async () => {
+  const superset = { title: 'Тренировка с суперсетом', exercises: [
+    { name: 'Подтягивания', sets: '3', reps: '10', weight: '', supersetGroup: 'superset-4-5' },
+    { name: 'Тяга блока', sets: '3', reps: '12', weight: '35', supersetGroup: 'superset-4-5' },
+    { name: 'Планка', sets: '3', reps: '60', weight: '' },
+  ] };
+
+  // Предыдущие тесты оставили черновик, а экран открывает незакрытое
+  // занятие вместо нового — иначе человек потерял бы начатое.
+  data.clear();
+
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: superset, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+
+    const marks = local.root.findAllByProps({ className: 'workout__superset' }).map(text);
+
+    assert.deepEqual(marks, [
+      'Суперсет · 1 из 2, без отдыха между упражнениями',
+      'Суперсет · 2 из 2, без отдыха между упражнениями',
+    ], 'подпись стоит у обоих упражнений группы и ни у кого больше');
+  } finally {
+    if (local) local.unmount();
+  }
+});

@@ -173,6 +173,16 @@
 
 .workout__exercise > h3 { margin-bottom: var(--space-1); }
 
+/* Суперсет — указание к действию, а не пометка о происхождении: следующее
+   упражнение делается сразу, без отдыха. Поэтому строка цветная и стоит
+   выше плана, который человек читает уже спокойнее. */
+.workout__superset {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .workout__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -294,6 +304,26 @@
   flex-wrap: wrap;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+/* Пока идёт отдых, таймер нужен там, куда человек и так смотрит, —
+   внизу, под большим пальцем, над панелью вкладок. Высота панели здесь
+   повторена числом: она фиксированная и задана в styles.css. */
+.workout__rest--float {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  z-index: 15;
+  width: min(860px, calc(100% - 2 * var(--space-4)));
+  margin: 0 auto;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Без панели вкладок — в режиме просмотра и на широком экране — полоса
+   садится на нижний край сама. */
+.app__body--plain .workout__rest--float {
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
 }
 
 .workout__finish {

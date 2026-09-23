@@ -5,6 +5,10 @@ export function fromPlan(block, month) {
     status: 'active', elapsedMs: 0, restUntil: 0, note: '',
     exercises: block.exercises.slice(0, 30).map(e => ({
       id: uid(), name: e.name, note: '',
+      // Суперсет приезжает из плана и должен дожить до занятия: человек
+      // смотрит в экран между подходами и должен видеть, что следующее
+      // упражнение делается сразу, а не после отдыха.
+      supersetGroup: e.supersetGroup || '',
       prescription: [e.sets && e.sets + ' × ' + e.reps, e.weight && e.weight + ' кг', e.rpe && 'RPE ' + e.rpe].filter(Boolean).join(' · '),
       sets: Array.from({ length: Math.min(20, Math.max(1, parseInt(e.sets) || 3)) }, () => ({
         ...blankSet(),

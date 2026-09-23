@@ -251,22 +251,18 @@ export function Plan({ clientRow, clientView = false }) {
         >
           <Panel>
             {!running && <button className="button button--primary button--block" onClick={() => setWorkout({ block, month: data.month })}>Начать тренировку</button>}
-            {block.exercises.map((ex, j) => (
-              <div className="exercise" key={j}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="exercise__name">{ex.name}</div>
-                  <div className="exercise__scheme">
-                    {[
-                      ex.sets && ex.sets + ' × ' + (ex.reps || '?'),
-                      ex.rpe && 'RPE ' + ex.rpe,
-                    ].filter(Boolean).join('   ·   ') || '—'}
+            {supersets(block.exercises).map((group, j) => (
+              group.superset
+                ? (
+                  <div className="superset" key={j}>
+                    <div className="superset__head">
+                      Суперсет{group.sets ? ' · ' + group.sets + ' ' + plural(Number(group.sets), 'круг', 'круга', 'кругов') : ''}
+                      <span className="superset__hint">подряд, без отдыха между упражнениями</span>
+                    </div>
+                    {group.items.map((ex, k) => <ExerciseRow ex={ex} inSuperset key={k} />)}
                   </div>
-                </div>
-                <div className="exercise__weight">
-                  <div className="exercise__weight-value">{ex.weight || '—'}</div>
-                  {ex.prevWeight && <div className="exercise__weight-prev">было {ex.prevWeight}</div>}
-                </div>
-              </div>
+                )
+                : <ExerciseRow ex={group.items[0]} key={j} />
             ))}
           </Panel>
         </Section>
@@ -278,6 +274,55 @@ export function Plan({ clientRow, clientView = false }) {
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * Упражнения подряд с одной группой — один суперсет.
+ *
+ * В таблице суперсет не подписан словом: тренер объединяет ячейку
+ * «Подходы» на несколько строк, и число подходов у них общее. Группу из
+ * одного упражнения суперсетом не считаем — объединение могло остаться от
+ * оформления, а «суперсет из одного» человека только собьёт.
+ */
+function supersets(exercises) {
+  const groups = [];
+
+  (exercises || []).forEach((ex) => {
+    const last = groups[groups.length - 1];
+    if (ex.supersetGroup && last && last.key === ex.supersetGroup) last.items.push(ex);
+    else groups.push({ key: ex.supersetGroup || null, items: [ex] });
+  });
+
+  return groups.map((g) => ({
+    ...g,
+    superset: !!g.key && g.items.length > 1,
+    sets: g.items[0].sets || '',
+  }));
+}
+
+/**
+ * Строка упражнения. Внутри суперсета число подходов не повторяем у
+ * каждого: оно общее и стоит в заголовке группы, а дважды написанное
+ * рядом читается как «у каждого свои».
+ */
+function ExerciseRow({ ex, inSuperset }) {
+  const scheme = [
+    inSuperset ? (ex.reps && ex.reps + ' повт.') : (ex.sets && ex.sets + ' × ' + (ex.reps || '?')),
+    ex.rpe && 'RPE ' + ex.rpe,
+  ].filter(Boolean).join('   ·   ');
+
+  return (
+    <div className="exercise" style={{ minWidth: 0 }}>
+      <div style={{ minWidth: 0 }}>
+        <div className="exercise__name">{ex.name}</div>
+        <div className="exercise__scheme">{scheme || '—'}</div>
+      </div>
+      <div className="exercise__weight">
+        <div className="exercise__weight-value">{ex.weight || '—'}</div>
+        {ex.prevWeight && <div className="exercise__weight-prev">было {ex.prevWeight}</div>}
+      </div>
+    </div>
   );
 }
 

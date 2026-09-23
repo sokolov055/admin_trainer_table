@@ -19,6 +19,23 @@ async function storageKey(clientRow) {
   return 'workout_draft_v1:' + Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('') + ':' + (clientRow || 'self');
 }
 
+/**
+ * Подпись про суперсет.
+ *
+ * Группа приезжает из плана, но упражнения в занятии можно менять
+ * местами и удалять, поэтому считаем по текущему списку: осталось одно —
+ * подписи нет, «суперсет из одного» только собьёт.
+ */
+function supersetMark(exercises, index) {
+  const group = exercises[index].supersetGroup;
+  if (!group) return '';
+
+  const same = exercises.filter(e => e.supersetGroup === group);
+  if (same.length < 2) return '';
+
+  return `Суперсет · ${same.indexOf(exercises[index]) + 1} из ${same.length}, без отдыха между упражнениями`;
+}
+
 export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose }) {
   const [record, setRecord] = useState(null);
   const [history, setHistory] = useState([]);
@@ -244,9 +261,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
           <label>Отдых <select aria-label="Таймер отдыха" value="" onChange={e => change(s => ({ ...s, restUntil: Date.now() + Number(e.target.value) * 1000 }))}><option value="">Запустить</option><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
         </div>}
-        {!!s.restUntil && <div className="workout__rest" role="status">{now < s.restUntil ? 'Отдых ' + clock(s.restUntil - now) : 'Отдых закончен — следующий подход'}<button className="button" onClick={() => change(s => ({ ...s, restUntil: 0 }))}>Сбросить</button></div>}
+        {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
+            подходами человек листает список упражнений вниз, и таймер,
+            оставшийся наверху, приходилось искать прокруткой. */}
+        {!!s.restUntil && <div className="workout__rest workout__rest--float" role="status">{now < s.restUntil ? 'Отдых ' + clock(s.restUntil - now) : 'Отдых закончен — следующий подход'}<button className="button" onClick={() => change(s => ({ ...s, restUntil: 0 }))}>Сбросить</button></div>}
         {s.exercises.map((ex, ei) => <section className="workout__exercise" key={ex.id}>
           <h3>{ei + 1}. {ex.name || 'Новое упражнение'}</h3>
+          {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {ex.prescription && <p className="small muted">План: {ex.prescription}</p>}
           <details><summary>Изменить упражнение</summary>
             <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ex => ({ ...ex, name: e.target.value }))} /></label>

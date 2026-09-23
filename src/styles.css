@@ -1647,6 +1647,38 @@ th.sticky, td.sticky {
   margin-top: 1px;
 }
 
+/* Суперсет — не украшение, а указание: эти упражнения делают подряд.
+   Поэтому группа читается как одно целое — общая рамка и общий заголовок
+   с числом кругов, — а число подходов у строк внутри не повторяется. */
+.superset {
+  border-left: 2px solid var(--accent);
+  background: var(--accent-wash);
+  border-bottom: 1px solid var(--border);
+}
+
+.superset:last-child { border-bottom: 0; }
+
+.superset .exercise { border-bottom: 1px dashed var(--border); }
+.superset .exercise:last-child { border-bottom: 0; }
+
+.superset__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-2);
+  align-items: baseline;
+  padding: var(--space-3) var(--space-4) 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  color: var(--accent);
+}
+
+.superset__hint {
+  font-weight: 400;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 /* ==========================================================================
    Вход вне Telegram
    Экран видят в тот момент, когда ещё не уверены, что приложение вообще
