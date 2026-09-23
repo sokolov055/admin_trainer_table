@@ -32,6 +32,8 @@ export function startOffline(options = {}) {
     nav.serviceWorker.register(url).catch(() => {});
   };
 
+  listenForUpdate(nav, options);
+
   // После загрузки страницы, а не во время: регистрация соревнуется за сеть
   // с бандлом и данными первого экрана, а выигрыш от неё — на СЛЕДУЮЩЕМ
   // запуске. Торопиться ей некуда.
@@ -42,4 +44,45 @@ export function startOffline(options = {}) {
   }
 
   return true;
+}
+
+/**
+ * «Приложение обновилось» — и перезагрузка, если человек только что вошёл.
+ *
+ * Воркер отдаёт оболочку из кеша, поэтому первый запуск после выкладки
+ * показывает прежнюю версию: новая встаёт со следующего. Обычно это
+ * незаметно, но у того, кто сам ждёт правку, выглядит так, будто её не
+ * выложили.
+ *
+ * Перезагружаемся только в первую минуту после открытия: там человек ещё
+ * смотрит на первый экран, и обновление для него — мигание. Дальше он уже
+ * что-то делает — ведёт тренировку, заполняет анкету, — и выдёргивать
+ * страницу из-под него ради свежей версии нельзя. Ему она достанется на
+ * следующем запуске, как и раньше.
+ */
+const RELOAD_WINDOW_MS = 60000;
+
+function listenForUpdate(nav, options) {
+  const reload = options.reload || (() => {
+    if (typeof location !== 'undefined' && location.reload) location.reload();
+  });
+  const since = options.openedFor || (() => (typeof performance !== 'undefined' ? performance.now() : 0));
+
+  if (!nav.serviceWorker.addEventListener) return;
+
+  let done = false;
+
+  nav.serviceWorker.addEventListener('message', (event) => {
+    if (done) return;
+    if (!event || !event.data || event.data.type !== 'shell-updated') return;
+    if (since() > RELOAD_WINDOW_MS) return;
+
+    done = true;
+    reload();
+  });
+
+  // Слушателя, поставленного через addEventListener, браузер держит на
+  // паузе, пока его не попросят начать: без этого сообщение воркера
+  // копится в очереди и не приходит никогда.
+  if (nav.serviceWorker.startMessages) nav.serviceWorker.startMessages();
 }

@@ -98,7 +98,7 @@ async function openShell() {
 
   if (cached) {
     // Обновление в фоне: ответ человеку уже ушёл, ждать сеть незачем
-    refresh(cache, INDEX_URL);
+    refreshShell(cache);
     return cached;
   }
 
@@ -149,6 +149,41 @@ async function networkFirst(href) {
     if (cached) return cached;
     return Response.error();
   }
+}
+
+/**
+ * Обновление оболочки в фоне — и слово странице, если оболочка сменилась.
+ *
+ * Без этого выложенная правка доезжала до человека молча и на следующий
+ * запуск: он открывал приложение, видел вчерашнюю версию и решал, что
+ * выкладки не было. Поэтому воркер не просто кладёт новую оболочку в кеш,
+ * а сравнивает её с прежней и говорит открытой странице, что версия
+ * сменилась. Перезагружаться или нет — решает страница: воркер не знает,
+ * идёт ли сейчас тренировка.
+ *
+ * Сравниваем содержимое целиком, а не заголовки: у GitHub Pages ни ETag,
+ * ни дата не обещают того, что нам нужно, а «файл изменился» — обещают.
+ */
+async function refreshShell(cache) {
+  let fresh;
+  try {
+    fresh = await fetch(INDEX_URL, { cache: 'no-store' });
+  } catch (_) {
+    return;
+  }
+
+  if (!fresh.ok) return;
+
+  const previous = await cache.match(INDEX_URL);
+  const before = previous ? await previous.text() : '';
+  const after = await fresh.clone().text();
+
+  await cache.put(INDEX_URL, fresh);
+
+  if (!before || before === after) return;
+
+  const pages = await self.clients.matchAll({ type: 'window' });
+  pages.forEach((page) => page.postMessage({ type: 'shell-updated' }));
 }
 
 /** Тихое обновление кеша. Ошибка сети здесь ничего не значит: показывать уже нечего */

@@ -32,6 +32,7 @@ function makeResponse(body, { ok = true } = {}) {
   return {
     body,
     ok,
+    async text() { return body; },
     clone() { return makeResponse(body, { ok }); },
   };
 }
@@ -70,6 +71,9 @@ function boot({ network = new Map(), cached = new Map(), extraCaches = [] } = {}
   let claimed = false;
   let skipped = false;
 
+  const posted = [];
+  const pages = [{ postMessage: (message) => posted.push(message) }];
+
   const sandbox = {
     console,
     setTimeout,
@@ -82,7 +86,10 @@ function boot({ network = new Map(), cached = new Map(), extraCaches = [] } = {}
       location: { origin: 'https://sokolov055.github.io' },
       registration: { scope: SCOPE },
       skipWaiting() { skipped = true; },
-      clients: { claim: async () => { claimed = true; } },
+      clients: {
+        claim: async () => { claimed = true; },
+        matchAll: async () => pages,
+      },
       addEventListener(type, fn) { listeners[type] = fn; },
     },
     caches: {
@@ -102,7 +109,15 @@ function boot({ network = new Map(), cached = new Map(), extraCaches = [] } = {}
   vm.createContext(sandbox);
   vm.runInContext(SOURCE, sandbox);
 
-  return { listeners, cache, deleted, asked, isClaimed: () => claimed, isSkipped: () => skipped };
+  return {
+    listeners, cache, deleted, asked, posted,
+    isClaimed: () => claimed, isSkipped: () => skipped,
+  };
+}
+
+/** Даёт фоновому обновлению доработать: ответ человеку уходит раньше него */
+async function settle() {
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
 }
 
 /** Дёргает событие fetch и возвращает ответ, либо null, если воркер не вмешался */
@@ -183,6 +198,54 @@ test('первый запуск без сети не притворяется р
 });
 
 /* ==========================================================================
+ * Выложенная правка
+ *
+ * Оболочка отдаётся из кеша, поэтому свежая версия по умолчанию доезжает
+ * до человека только на следующий запуск. Для того, кто ждёт свою правку,
+ * это выглядит как «не выложили», и воркер обязан сказать странице, что
+ * оболочка сменилась. Сказать — именно про смену: слово на каждый запуск
+ * означало бы перезагрузку на каждый запуск.
+ * ========================================================================== */
+
+test('о новой оболочке страница узнаёт', async () => {
+  const worker = boot({
+    cached: new Map([[INDEX, makeResponse('старая оболочка')]]),
+    network: new Map([[INDEX, makeResponse('новая оболочка')]]),
+  });
+
+  await handle(worker, makeRequest(SCOPE, { mode: 'navigate' }));
+  await settle();
+
+  // Сравниваем текстом: объект родился внутри песочницы, и его прототип
+  // не тот же самый, что здесь, — deepEqual на это ругается.
+  assert.equal(JSON.stringify(worker.posted), JSON.stringify([{ type: 'shell-updated' }]));
+  assert.equal(worker.cache.store.get(INDEX).body, 'новая оболочка', 'новая легла в кеш');
+});
+
+test('о прежней оболочке страницу не беспокоят', async () => {
+  const worker = boot({
+    cached: new Map([[INDEX, makeResponse('оболочка')]]),
+    network: new Map([[INDEX, makeResponse('оболочка')]]),
+  });
+
+  await handle(worker, makeRequest(SCOPE, { mode: 'navigate' }));
+  await settle();
+
+  assert.deepEqual(worker.posted, [], 'выкладки не было — перезагружать нечего');
+});
+
+test('обрыв связи при проверке обновления ничего не ломает', async () => {
+  const worker = boot({ cached: new Map([[INDEX, makeResponse('оболочка')]]) });
+
+  const answer = await handle(worker, makeRequest(SCOPE, { mode: 'navigate' }));
+  await settle();
+
+  assert.equal(answer.body, 'оболочка', 'приложение открылось');
+  assert.deepEqual(worker.posted, []);
+  assert.equal(worker.cache.store.get(INDEX).body, 'оболочка', 'кеш цел');
+});
+
+/* ==========================================================================
  * Статика и настройки
  * ========================================================================== */
 
@@ -236,4 +299,90 @@ test('установка не ждёт закрытия старых вклад�
   const worker = boot();
   worker.listeners.install({ waitUntil: () => {} });
   assert.ok(worker.isSkipped());
+});
+
+/* ==========================================================================
+ * Сторона страницы
+ *
+ * Воркер только сообщает, что оболочка сменилась. Решает страница, и
+ * решение у неё одно важное: не выдёргивать себя из-под человека. Момент
+ * «только что открыл» — это мигание; момент «ведёт тренировку» — потерянный
+ * подход и непонятно что с ним случилось.
+ * ========================================================================== */
+
+const { startOffline } = await import('../src/offline.js');
+
+/** Поддельный navigator: собирает слушателей и говорит, просили ли очередь */
+function makeNavigator() {
+  const handlers = {};
+  let started = false;
+
+  return {
+    started: () => started,
+    send: (data) => (handlers.message || (() => {}))({ data }),
+    serviceWorker: {
+      register: async () => ({}),
+      addEventListener(type, fn) { handlers[type] = fn; },
+      startMessages() { started = true; },
+    },
+  };
+}
+
+test('сразу после запуска страница берёт новую версию', () => {
+  const nav = makeNavigator();
+  let reloaded = 0;
+
+  startOffline({
+    enabled: true, navigator: nav, baseURI: SCOPE,
+    openedFor: () => 1500, reload: () => { reloaded += 1; },
+  });
+
+  assert.ok(nav.started(), 'очередь сообщений включена, иначе слово воркера не придёт');
+  nav.send({ type: 'shell-updated' });
+
+  assert.equal(reloaded, 1);
+});
+
+test('во время работы страница себя не перезагружает', () => {
+  const nav = makeNavigator();
+  let reloaded = 0;
+
+  startOffline({
+    enabled: true, navigator: nav, baseURI: SCOPE,
+    openedFor: () => 20 * 60 * 1000, reload: () => { reloaded += 1; },
+  });
+
+  nav.send({ type: 'shell-updated' });
+
+  assert.equal(reloaded, 0, 'человек что-то делает — версия подождёт до следующего запуска');
+});
+
+test('перезагрузка случается один раз', () => {
+  const nav = makeNavigator();
+  let reloaded = 0;
+
+  startOffline({
+    enabled: true, navigator: nav, baseURI: SCOPE,
+    openedFor: () => 0, reload: () => { reloaded += 1; },
+  });
+
+  nav.send({ type: 'shell-updated' });
+  nav.send({ type: 'shell-updated' });
+
+  assert.equal(reloaded, 1);
+});
+
+test('чужое сообщение страницу не трогает', () => {
+  const nav = makeNavigator();
+  let reloaded = 0;
+
+  startOffline({
+    enabled: true, navigator: nav, baseURI: SCOPE,
+    openedFor: () => 0, reload: () => { reloaded += 1; },
+  });
+
+  nav.send({ type: 'что-то ещё' });
+  nav.send(null);
+
+  assert.equal(reloaded, 0);
 });
