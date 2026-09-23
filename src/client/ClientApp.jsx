@@ -3,7 +3,9 @@ import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu } from '../icons.jsx';
+import { Drawer, SignOut } from '../ui.jsx';
+import Profile from './Profile.jsx';
 
 /**
  * Панель клиента.
@@ -27,6 +29,11 @@ const TABS = [
 
 export default function ClientApp({ me, clientRow, preview }) {
   const [tab, setTab] = useState('overview');
+
+  // Боковое меню появилось ради «Моих данных»: вкладок внизу четыре, и
+  // пятая — про себя, а не про тренировки — сломала бы их ряд. Заодно
+  // сюда переехал выход: это конец разговора, а не раздел.
+  const [menu, setMenu] = useState(false);
   const current = TABS.find((t) => t.id === tab) || TABS[0];
   const Screen = current.Screen;
 
@@ -53,10 +60,31 @@ export default function ClientApp({ me, clientRow, preview }) {
         </aside>
       )}
 
-      <header className="app__header">
-        <h1 className="app__title">{me.name}</h1>
-        <p className="app__subtitle">{current.label}</p>
+      <header className="app__header app__header--menu">
+        <div>
+          <h1 className="app__title">{me.name}</h1>
+          <p className="app__subtitle">{current.label}</p>
+        </div>
+
+        <button className="app__menu" aria-label="Меню" onClick={() => setMenu(true)}>
+          <IconMenu size={22} />
+        </button>
       </header>
+
+      <Drawer open={menu} onClose={() => setMenu(false)} label="Меню">
+        <h2>Мои данные</h2>
+        <p className="small muted">
+          Тренеру это нужно, чтобы связаться с вами и точнее считать норму питания.
+          Заполнять всё сразу не обязательно.
+        </p>
+
+        <Profile clientRow={clientRow} />
+
+        {/* Выход у клиента живёт здесь: экрана настроек у него нет.
+            Когда этот же кабинет открывает тренер из карточки клиента,
+            выхода быть не должно — он вышел бы из своего. */}
+        {!clientRow && <SignOut />}
+      </Drawer>
 
       {/* key на контейнере перезапускает появление при смене вкладки:
           экран собирается той же короткой лесенкой, что и при первой

@@ -29,6 +29,11 @@ const daysAhead = (n, time) => {
   return d.toISOString().slice(0, 10) + 'T' + time + ':00';
 };
 
+/** Профиль демо-клиента: пустой, чтобы экран показывал именно заполнение */
+const demoProfile = {
+  birthAt: '', sex: '', height: '', phone: '', email: '', telegram: '', telegramUrl: '',
+};
+
 const MEASURE_ROWS = [
   { date: daysAgo(150), 'Вес': 82.4, 'Талия': 94, 'Грудь': 104, 'Бедро': 59, 'Рука': 34, 'Ягодицы': 101, 'Плечи': 118 },
   { date: daysAgo(120), 'Вес': 81.1, 'Талия': 92.5, 'Грудь': 104.5, 'Бедро': 59.5, 'Рука': 34.5, 'Ягодицы': 100.5, 'Плечи': 118.5 },
@@ -408,6 +413,42 @@ const MOCK = {
     series: [{ label: '', sheetName: 'Показатели', rows: MEASURE_ROWS }],
     fields: FIELDS,
   }),
+
+  // Профиль клиента. Живёт в памяти демо: показать экран без настоящего
+  // сервера иначе нечем, а сохранение должно быть видно сразу.
+  'profile.get': () => ({
+    clientRow: 3,
+    name: 'Анна Морозова',
+    profile: { ...demoProfile },
+    age: demoProfile.birthAt ? new Date().getFullYear() - Number(demoProfile.birthAt.slice(0, 4)) : null,
+    canEdit: true,
+  }),
+
+  'profile.save': (params) => {
+    ['birthAt', 'sex', 'height', 'phone', 'email'].forEach((field) => {
+      if (params[field] !== undefined) demoProfile[field] = String(params[field] || '').trim();
+    });
+
+    if (params.telegram !== undefined) {
+      const name = String(params.telegram || '').trim().replace(/^https?:\/\//i, '')
+        .replace(/^t\.me\//i, '').replace(/^@/, '').split(/[/?#]/)[0];
+
+      if (name && !/^[a-zA-Z0-9_]{4,32}$/.test(name)) {
+        throw new Error('Имя пользователя в Telegram — латиница, цифры и подчёркивание.');
+      }
+
+      demoProfile.telegram = name;
+      demoProfile.telegramUrl = name ? 'https://t.me/' + name : '';
+    }
+
+    if (demoProfile.height && Number(demoProfile.height) < 100) {
+      throw new Error('Рост: ожидали от 100 до 250 см.');
+    }
+
+    return MOCK['profile.get']();
+  },
+
+  'profile.telegram.link': () => ({ url: 'https://t.me/demo_fit_bot?start=tg_demo' }),
 
   // Замер из приложения. Демо-сервер ведёт себя как настоящий: пустое поле
   // значит «не мерил», замер за тот же день заменяет прежний, а не

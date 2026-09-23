@@ -5,7 +5,7 @@ import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
-  Chips, Segmented, Options, Field, Note, Delta, SignOut,
+  Chips, Segmented, Options, Field, Note, Delta,
   formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck } from '../icons.jsx';
@@ -120,13 +120,9 @@ export function Overview({ clientRow, clientView = false }) {
         </Section>
       )}
 
-      {/* Выход у клиента живёт здесь: экрана настроек у него нет, а «Обзор» —
-          единственный раздел про него самого, а не про тренировки. Стоит в
-          самом низу: это конец разговора, а не начало.
-          Когда этот же экран открывает тренер из карточки клиента
-          (clientRow задан), выхода быть не должно — он вышел бы из своего
-          кабинета, нажав кнопку внутри чужого. */}
-      {!clientRow && <SignOut />}
+      {/* Выход переехал в боковое меню, к «Моим данным»: он про себя, а
+          не про тренировки, и на обзоре стоял только потому, что меню не
+          было. */}
     </>
   );
 }

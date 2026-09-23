@@ -379,6 +379,28 @@ button { font-family: inherit; }
   font-size: var(--text-sm);
 }
 
+.app__header--menu {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.app__menu {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.app__menu:active { transform: scale(0.94); }
+
 .app__body {
   flex: 1;
   /* Снизу — высота панели вкладок и полоса «домой» под ней: панель растёт

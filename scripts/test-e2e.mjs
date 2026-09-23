@@ -199,6 +199,35 @@ test('замер записывается, а пустая форма объяс
   await assert.doesNotReject(page.getByText(/Замер за .* записан/).waitFor({ timeout: 20000 }));
 });
 
+/**
+ * Профиль в боковом меню. Заполняют его между делом, поэтому проверяем
+ * не «форма есть», а то, что незаполненное не мешает сохранить, а мусор
+ * объясняет себя.
+ */
+test('профиль сохраняется и объясняет опечатку', async () => {
+  await page.getByRole('button', { name: 'Меню' }).click();
+  await page.getByRole('heading', { name: 'Мои данные' }).waitFor({ timeout: 10000 });
+
+  await page.getByRole('textbox', { name: 'Рост, см' }).fill('17');
+  await page.getByRole('button', { name: 'Сохранить' }).click();
+
+  await assert.doesNotReject(
+    page.getByText(/от 100 до 250/).waitFor({ timeout: 10000 }),
+    'опечатку в росте не записываем молча',
+  );
+
+  await page.getByRole('textbox', { name: 'Рост, см' }).fill('168');
+  await page.getByRole('textbox', { name: 'Имя пользователя' }).fill('@anna_fit');
+  await page.getByRole('button', { name: 'Сохранить' }).click();
+
+  await assert.doesNotReject(page.getByText('Сохранено.').waitFor({ timeout: 10000 }));
+
+  // Тренеру нужна не строка, а ссылка, по которой открывается переписка
+  await assert.doesNotReject(
+    page.getByRole('link', { name: 'Открыть переписку' }).waitFor({ timeout: 5000 }),
+  );
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });
