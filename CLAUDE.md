@@ -10,17 +10,15 @@
 ```bash
 npm ci
 npm run build
-npm run test:workout
-npm run test:plan
-npm run test:ration
-npm run test:ration-access
-npm run test:auth
-npm run test:preview
-npm run test:calendar
-npm run test:offline
-npm run test:browser
+npm test
 npm run test:e2e
 ```
+
+`npm test` — все проверки, кроме браузерной; её же гоняет сборка. Отдельные
+наборы (`test:workout`, `test:plan`, `test:ration`, `test:ration-access`,
+`test:auth`, `test:preview`, `test:calendar`, `test:offline`, `test:browser`)
+остались для быстрой отладки, но перед push запускай `npm test` целиком:
+выбирать наборы глазами уже приводило к сломанной сборке.
 
 `test:e2e` — настоящий браузер по демо-сборке: вход, программа, суперсет,
 проведение тренировки, запись замера, чистая консоль. Требует Playwright и
