@@ -138,11 +138,118 @@ export default function LoginScreen({ details }) {
               {status === 'waiting' && login
                 ? <Waiting login={login} />
                 : <CodeStart status={status} problem={problem} onStart={requestCode} />}
+
+              <TrainerLogin />
             </div>
           </details>
           {details}
         </div>
       </main>
+    </div>
+  );
+}
+
+/**
+ * Вход тренера по почте.
+ *
+ * Спрятан под «другим способом» намеренно: клиенту он не нужен и только
+ * мешал бы — его дорога одна, персональная ссылка. А тренер заходит с
+ * любого устройства и не должен для этого искать бота: до сих пор
+ * потерянный вход означал поход в Telegram, и случалось это почти
+ * ежедневно.
+ *
+ * Пароля нет: доказательством служит доступ к почтовому ящику. Придумывать
+ * и восстанавливать нечего, а восстанавливать пароль пришлось бы всё равно
+ * по почте.
+ */
+function TrainerLogin() {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
+
+  const ask = async () => {
+    setBusy(true);
+    setProblem('');
+    try {
+      await apiPublic('auth.trainer.request', { email });
+      setSent(true);
+    } catch (error) {
+      setProblem(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const enter = async () => {
+    setBusy(true);
+    setProblem('');
+    try {
+      const res = await apiPublic('auth.trainer.confirm', { email, code, device: describeDevice() });
+      setToken(res.token);
+    } catch (error) {
+      setProblem(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button className="button button--ghost login__trainer-toggle" onClick={() => setOpen(true)}>
+        Я тренер — войти по почте
+      </button>
+    );
+  }
+
+  return (
+    <div className="login__trainer">
+      <label className="field">
+        <span className="field__label">Почта</span>
+        <input
+          className="field__input"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={busy || sent}
+        />
+      </label>
+
+      {sent && (
+        <label className="field">
+          <span className="field__label">Код из письма</span>
+          <input
+            className="field__input"
+            inputMode="text"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            disabled={busy}
+          />
+          <span className="field__hint">Код живёт 15 минут. Письмо приходит за несколько секунд.</span>
+        </label>
+      )}
+
+      {problem && <p className="login__problem">{problem}</p>}
+
+      <button
+        className="button button--primary button--block"
+        onClick={sent ? enter : ask}
+        disabled={busy || (sent ? code.length < 6 : !email)}
+      >
+        {busy ? 'Минуту…' : sent ? 'Войти' : 'Прислать код'}
+      </button>
+
+      {sent && (
+        <button className="button button--ghost" onClick={() => { setSent(false); setCode(''); setProblem(''); }} disabled={busy}>
+          Другой адрес
+        </button>
+      )}
     </div>
   );
 }

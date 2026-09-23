@@ -1694,6 +1694,26 @@ th.sticky, td.sticky {
   color: var(--text-muted);
 }
 
+.login__trainer {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+.login__trainer-toggle {
+  margin-top: var(--space-4);
+  width: 100%;
+}
+
+.login__problem {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--critical-text, #b3261e);
+}
+
 /* ==========================================================================
    Вход вне Telegram
    Экран видят в тот момент, когда ещё не уверены, что приложение вообще
