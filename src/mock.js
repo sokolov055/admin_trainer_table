@@ -59,7 +59,11 @@ const PLAN_BLOCKS = [
     exercises: [
       { name: 'Присед со штангой', weight: '95', prevWeight: '90', sets: '5', reps: '5', rpe: '8' },
       { name: 'Румынская тяга', weight: '85', prevWeight: '80', sets: '4', reps: '10', rpe: '7' },
-      { name: 'Выпады с гантелями', weight: '20', prevWeight: '20', sets: '3', reps: '12', rpe: '8' },
+      // Суперсет: в таблице это объединённая ячейка «Подходы», здесь —
+      // общая группа. Демо должно показывать и его, иначе увидеть эту
+      // часть экрана можно только на живом клиенте.
+      { name: 'Выпады с гантелями', weight: '20', prevWeight: '20', sets: '3', reps: '12', rpe: '8', supersetGroup: 'superset-9-10' },
+      { name: 'Подъём на носки', weight: '40', prevWeight: '40', sets: '3', reps: '15', rpe: '7', supersetGroup: 'superset-9-10' },
     ],
   },
 ];
@@ -404,6 +408,28 @@ const MOCK = {
     series: [{ label: '', sheetName: 'Показатели', rows: MEASURE_ROWS }],
     fields: FIELDS,
   }),
+
+  // Замер из приложения. Демо-сервер ведёт себя как настоящий: пустое поле
+  // значит «не мерил», замер за тот же день заменяет прежний, а не
+  // добавляет вторую точку на график.
+  'measure.create': (params) => {
+    const values = {};
+    FIELDS.forEach((field) => {
+      const raw = params.values && params.values[field];
+      const text = String(raw === undefined || raw === null ? '' : raw).trim().replace(',', '.');
+      if (text) values[field] = Math.round(Number(text) * 10) / 10;
+    });
+
+    if (!Object.keys(values).length) throw new Error('Введите хотя бы один показатель.');
+
+    const date = String(params.date || '').trim() || new Date().toISOString().slice(0, 10);
+    const existing = MEASURE_ROWS.find((r) => String(r.date).slice(0, 10) === date);
+
+    if (existing) Object.assign(existing, values);
+    else MEASURE_ROWS.push({ date, ...values });
+
+    return { sheetName: 'Показатели', date, values, replaced: !!existing };
+  },
 
   // Видимость месяцев живёт здесь же: демо должно показывать оба состояния
   // кнопки, иначе проверить её нечем.

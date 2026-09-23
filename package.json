@@ -7,6 +7,7 @@
   "scripts": {
     "test:workout": "node --test scripts/test-workout.mjs",
     "test:plan": "node --test scripts/test-plan.mjs",
+    "test:e2e": "node --test scripts/test-e2e.mjs",
     "test:ration": "node --test scripts/test-ration.mjs",
     "test:ration-access": "node --test scripts/test-ration-access.mjs",
     "test:auth": "node --test scripts/test-auth.mjs",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "esbuild": "^0.21.5",
+    "playwright": "^1.63.0",
     "react-test-renderer": "^18.3.1",
     "vite": "^5.4.11"
   }

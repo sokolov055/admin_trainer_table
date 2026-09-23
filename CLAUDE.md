@@ -19,7 +19,13 @@ npm run test:preview
 npm run test:calendar
 npm run test:offline
 npm run test:browser
+npm run test:e2e
 ```
+
+`test:e2e` — настоящий браузер по демо-сборке: вход, программа, суперсет,
+проведение тренировки, запись замера, чистая консоль. Требует Playwright и
+Chromium (`npx playwright install chromium` после `npm ci`). Живых данных не
+трогает: всё идёт по моку, поэтому проходить путь до конца можно смело.
 
 После успешной сборки сделай коммит и push в `main`. Workflow `.github/workflows/deploy.yml` автоматически публикует GitHub Pages:
 
