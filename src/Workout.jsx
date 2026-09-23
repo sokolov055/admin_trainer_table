@@ -252,6 +252,24 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return () => { clearInterval(timer); off.forEach(fn => fn()); };
   }, [ready]);
 
+  /**
+   * Запуск отдыха.
+   *
+   * Сохраняем НЕМЕДЛЕННО, не дожидаясь обычной задержки в полторы
+   * секунды. Причина простая и обнаружилась на живом телефоне: отдых
+   * начинается ровно тогда, когда человек убирает телефон в карман, —
+   * страница засыпает, отложенное сохранение не срабатывает, и сервер
+   * узнаёт время окончания только когда приложение снова открыли. Пуш
+   * приходил с опозданием в минуту, а то и позже.
+   */
+  const startRest = (seconds) => {
+    const length = seconds || (state.current && state.current.session.restSeconds);
+    if (!length) return;
+
+    change(v => ({ ...v, restUntil: Date.now() + length * 1000 }));
+    save();
+  };
+
   const updateExercise = (index, fn) => change(s => ({ ...s, exercises: s.exercises.map((e, i) => i === index ? fn(e) : e) }));
   const updateSet = (ei, si, fn) => updateExercise(ei, e => ({ ...e, sets: e.sets.map((s, i) => i === si ? fn(s) : s) }));
   const close = () => { if (state.current?.dirty) save(); onClose(); };
@@ -310,7 +328,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               дальше он стартует сам после каждого отмеченного подхода.
               Раньше за ним приходилось возвращаться в шапку экрана
               после каждого подхода — то есть листать вверх весь список. */}
-          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 0)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds, restUntil: seconds ? Date.now() + seconds * 1000 : 0 })); }}><option value="0">Вручную</option><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
+          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 0)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds })); if (seconds) startRest(seconds); else change(v => ({ ...v, restUntil: 0 })); }}><option value="0">Вручную</option><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
         </div>}
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
@@ -350,7 +368,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
                 // Отдых начинается там, где человек нажал, а не там, где
                 // стоит переключатель: подход отмечен — время пошло.
-                if (starting) change(v => (v.restSeconds ? { ...v, restUntil: Date.now() + v.restSeconds * 1000 } : v));
+                if (starting) startRest();
               }}><IconCheck size={20} /></button>
             </div>
             <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
