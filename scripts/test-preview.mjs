@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
@@ -24,7 +25,11 @@ const output = await build({
       bundle.onResolve({ filter: /stories\.jsx$/ }, () => ({ path: 'stories', namespace: 'preview-test' }));
       bundle.onResolve({ filter: /AuthTransfer\.jsx$/ }, () => ({ path: 'transfer', namespace: 'preview-test' }));
       bundle.onResolve({ filter: /telegram\.js$/ }, () => ({ path: 'telegram', namespace: 'preview-test' }));
-      bundle.onResolve({ filter: /icons\.jsx$/ }, () => ({ path: 'icons', namespace: 'preview-test' }));
+      // Иконки больше не подменяем: через боковое меню подтягивается
+      // настоящий ui.jsx, а он импортирует их десятками. Держать здесь
+      // список, который надо пополнять при каждой новой иконке, — способ
+      // ломать эту проверку правками, к ней не относящимися.
+      // Модуль чистый, без побочных действий, грузить его безопасно.
       bundle.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
       bundle.onLoad({ filter: /.*/, namespace: 'preview-test' }, (args) => {
         if (args.path === 'screens') return {
@@ -36,7 +41,19 @@ const output = await build({
         };
         if (args.path === 'stories') return { loader: 'jsx', contents: `import React from 'react'; export const Stories=()=> <div>stories</div>;` };
         if (args.path === 'transfer') return { loader: 'jsx', contents: `import React from 'react'; export const TelegramTransferCard=()=> <div>transfer-card</div>;` };
-        if (args.path === 'telegram') return { contents: `export const haptic=()=>{};` };
+        // Заглушка собирается из имён настоящего модуля, а не из списка
+        // руками: ui.jsx импортирует оттуда то одно, то другое, и список
+        // ломал бы эту проверку правками, к ней не относящимися.
+        if (args.path === 'telegram') {
+          const source = readFileSync(new URL('../src/telegram.js', import.meta.url), 'utf8');
+          const names = [...source.matchAll(/^export (?:function|const) (\w+)/gm)].map((m) => m[1]);
+
+          return {
+            contents: names
+              .map((name) => `export const ${name} = () => ({});`)
+              .join(String.fromCharCode(10)),
+          };
+        }
         return {
           loader: 'jsx',
           contents: `import React from 'react'; const I=()=> <i />;
