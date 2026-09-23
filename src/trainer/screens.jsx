@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
+import { apiPublic } from '../api.js';
 import { resetClientAccess } from '../client-access.js';
 import { createClient } from '../access.js';
 import { ClientInviteLink } from './InviteLink.jsx';
@@ -341,6 +342,8 @@ export function ClientCard({ client }) {
         строка {client.row}
       </div>
 
+      <ClientContacts clientRow={client.row} />
+
       {/* Приглашение стоит выше сброса доступа намеренно: выдать вход —
           повседневное действие, отобрать — редкое. */}
       <ClientInviteLink client={client} />
@@ -422,6 +425,51 @@ export function ClientCard({ client }) {
 /* ==================================================================
  * Финансы
  * ================================================================== */
+
+/**
+ * Контакты клиента из его профиля.
+ *
+ * Профиль заполняет сам клиент, и заполняет он его ради этой минуты:
+ * тренеру нужно позвонить или написать. Поэтому здесь не форма, а
+ * готовые ссылки — нажал и попал в разговор.
+ *
+ * Пусто — так и говорим: тренер должен понимать, что это не поломка, а
+ * «клиент ещё не заполнил».
+ */
+function ClientContacts({ clientRow }) {
+  const [state, setState] = useState({ loading: true, profile: null, age: null });
+
+  useEffect(() => {
+    let alive = true;
+
+    apiPublic('profile.get', { clientRow })
+      .then((r) => { if (alive) setState({ loading: false, profile: r.profile, age: r.age }); })
+      .catch(() => { if (alive) setState({ loading: false, profile: null, age: null }); });
+
+    return () => { alive = false; };
+  }, [clientRow]);
+
+  if (state.loading) return null;
+
+  const p = state.profile || {};
+
+  return (
+    <div className="client-contacts">
+      {(p.phone || p.telegramUrl || p.email) ? (
+        <>
+          {p.phone && <a className="button button--ghost" href={'tel:' + p.phone}>{p.phone}</a>}
+          {p.telegramUrl && (
+            <a className="button button--ghost" href={p.telegramUrl} target="_blank" rel="noreferrer">Telegram</a>
+          )}
+          {p.email && <a className="button button--ghost" href={'mailto:' + p.email}>{p.email}</a>}
+          {state.age ? <span className="small muted">{state.age} лет</span> : null}
+        </>
+      ) : (
+        <span className="small muted">Контактов нет — клиент заполняет их у себя, в «Моих данных».</span>
+      )}
+    </div>
+  );
+}
 
 export function Finance() {
   const { loading, data, error, reload } = useData('trainer.finance', {}, []);

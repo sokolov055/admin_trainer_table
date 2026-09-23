@@ -363,7 +363,7 @@ export function Options({ items, value, onChange, label, disabled }) {
  * и читать про это надо здесь же.
  */
 export function Field({
-  label, hint, value, onChange, error, disabled,
+  label, hint, value, onChange, onFocus, error, disabled,
   inputMode = 'numeric', placeholder, inputRef,
 }) {
   return (
@@ -378,6 +378,7 @@ export function Field({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
         disabled={disabled}
         aria-invalid={error ? 'true' : undefined}
       />

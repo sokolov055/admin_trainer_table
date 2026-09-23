@@ -155,6 +155,11 @@ export function Plan({ clientRow, clientView = false }) {
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Очередь и выполненные. Наверху всегда та тренировка, которую делать
+  // следующей: проведённые уезжают во вторую вкладку и не отодвигают её
+  // вниз — к середине месяца их больше, чем оставшихся.
+  const [planTab, setPlanTab] = useState('queue');
+
   // Журнал живёт в таблице и отвечает секундами, поэтому экран его не
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
   // придёт ответ. Перечитываем после выхода из журнала — там занятие
@@ -207,6 +212,11 @@ export function Plan({ clientRow, clientView = false }) {
   const isHidden = hiddenMonths.indexOf(data.month) !== -1;
 
   const totalExercises = blocks.reduce((s, b) => s + b.exercises.length, 0);
+
+  // Проведённой считается тренировка, у которой есть завершённое занятие
+  // этого месяца. Порядок внутри вкладок — тот же, что в программе.
+  const doneBlocks = blocks.filter((b) => blockSessions(sessions, b.title, data.month).length > 0);
+  const queueBlocks = blocks.filter((b) => !blockSessions(sessions, b.title, data.month).length);
 
   return (
     <>
@@ -293,7 +303,26 @@ export function Plan({ clientRow, clientView = false }) {
         />
       )}
 
-      {blocks.map((block, i) => {
+      {blocks.length > 0 && doneBlocks.length > 0 && (
+        <Chips
+          items={[
+            { value: 'queue', label: 'Очередь · ' + queueBlocks.length },
+            { value: 'done', label: 'Выполненные · ' + doneBlocks.length },
+          ]}
+          value={planTab}
+          onChange={setPlanTab}
+        />
+      )}
+
+      {planTab === 'queue' && queueBlocks.length === 0 && doneBlocks.length > 0 && (
+        <Empty
+          icon={IconPlan}
+          title="Все тренировки месяца проведены"
+          text="Программа пройдена целиком. Выполненные — на соседней вкладке."
+        />
+      )}
+
+      {(planTab === 'done' ? doneBlocks : queueBlocks).map((block, i) => {
         const past = blockSessions(sessions, block.title, data.month);
 
         return (

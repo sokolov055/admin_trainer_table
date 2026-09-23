@@ -234,3 +234,50 @@ test('отмеченный подход запускает отдых, если 
 
   assert.equal(rest().length, 1, 'отдых пошёл сам, без похода в шапку');
 });
+
+/**
+ * Завершённое занятие не должно перехватывать запуск следующего.
+ *
+ * Черновик остаётся в хранилище, если экран закрыли, не нажав «К
+ * журналу». Человек жал «Начать тренировку» у второй тренировки, а
+ * открывалась первая — уже проведённая, с чужими весами внутри.
+ */
+test('после завершённой тренировки запускается новая, а не открывается прежняя', async () => {
+  data.clear();
+  await mount();
+
+  // Проводим занятие до конца и уходим с экрана, не нажимая «К журналу»
+  const set = tree.root.findAll(n => n.type === 'input'
+    && typeof n.props['aria-label'] === 'string'
+    && n.props['aria-label'].includes('подход 1, повторы'))[0];
+
+  await act(async () => { await set.props.onChange({ target: { value: '10' } }); await delay(); });
+
+  const check = tree.root.findAll(n => n.type === 'button'
+    && typeof n.props['aria-label'] === 'string'
+    && n.props['aria-label'].includes('подход 1: выполнен'))[0];
+
+  await act(async () => { await check.props.onClick(); await delay(); });
+
+  await click('Завершить тренировку');
+  await click('Подтвердить');
+
+  assert.ok(JSON.parse(data.get([...data.keys()].find(k => k.startsWith('workout_draft'))) || '{}').session,
+    'черновик завершённого занятия остался на устройстве');
+
+  // Человек возвращается к программе и жмёт «Начать» у другого блока
+  const second = { title: 'Тренировка 2 — низ', exercises: [{ name: 'Присед', sets: 2, reps: '5', weight: '80' }] };
+
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: second, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+
+    const title = local.root.findAllByType('input').find(n => n.props.value === 'Тренировка 2 — низ');
+    assert.ok(title, 'открылась именно та тренировка, которую запускали');
+  } finally {
+    if (local) local.unmount();
+  }
+});

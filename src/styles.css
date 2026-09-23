@@ -1654,6 +1654,14 @@ th.sticky, td.sticky {
   font-variant-numeric: tabular-nums;
 }
 
+.client-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
 .plan__tools {
   display: flex;
   flex-wrap: wrap;

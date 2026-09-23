@@ -114,6 +114,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         // проведённую тренировку. Несохранённый черновик всё равно
         // побеждает — его негде взять заново.
         const wanted = launch && launch.sessionId;
+        const starting = !!(launch && launch.block);
+
+        // Черновик ЗАВЕРШЁННОГО занятия — это след, а не работа. Он
+        // остаётся в хранилище, если экран закрыли, не нажав «К журналу»,
+        // и до сих пор перехватывал запуск следующей тренировки: человек
+        // жал «Начать» у второй, а открывалась первая, уже проведённая и
+        // с чужими весами внутри.
+        const finished = draft && draft.session
+          && ['completed', 'cancelled'].includes(draft.session.status);
+
+        if (draft && finished && starting && !draft.dirty) draft = null;
+
         if (draft && !draft.dirty) await open(wanted || draft.session.id);
         if (!draft) {
           const active = sessions.find(s => ['active', 'paused'].includes(s.status));

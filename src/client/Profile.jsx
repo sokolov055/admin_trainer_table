@@ -52,7 +52,11 @@ export default function Profile({ clientRow }) {
     setBusy(true);
     setFailure(null);
     try {
-      const result = await apiMutate('profile.save', { ...params, ...form });
+      // Оставленный «+7» — это пустое поле, а не номер: человек коснулся
+      // и передумал. Отправлять его значит получить отказ на ровном месте.
+      const phone = /^\+?7?$/.test(String(form.phone).trim()) ? '' : form.phone;
+
+      const result = await apiMutate('profile.save', { ...params, ...form, phone });
       setForm({ ...EMPTY, ...(result.profile || {}) });
       setState((s) => ({ ...s, age: result.age }));
       setSaved(true);
@@ -118,7 +122,19 @@ export default function Profile({ clientRow }) {
         <div className="survey__group">
           <div className="field-row">
             <Field label="Рост, см" placeholder="175" inputMode="decimal" value={form.height} onChange={(v) => set('height', v)} disabled={busy} />
-            <Field label="Телефон" placeholder="+7 900 000-00-00" inputMode="tel" value={form.phone} onChange={(v) => set('phone', v)} disabled={busy} />
+
+            {/* «+7» подставляется при первом касании поля, а не заранее:
+                заранее поставленный плюс означал бы, что профиль без
+                телефона не сохранить — сервер ждёт десять цифр. */}
+            <Field
+              label="Телефон"
+              placeholder="+7 900 000-00-00"
+              inputMode="tel"
+              value={form.phone}
+              onFocus={() => { if (!form.phone) set('phone', '+7'); }}
+              onChange={(v) => set('phone', v)}
+              disabled={busy}
+            />
           </div>
         </div>
 

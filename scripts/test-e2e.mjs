@@ -171,6 +171,10 @@ test('тренировку можно провести, и блок станов
   // ничего не закрывает.
   await page.getByRole('button', { name: 'К программе' }).click({ timeout: 20000 });
 
+  // Проведённая тренировка уезжает во вторую вкладку: наверху очереди
+  // должна оставаться та, которую делать следующей.
+  await page.getByRole('tab', { name: /^Выполненные/ }).click({ timeout: 20000 });
+
   const done = section('Тренировка 1 — верх').locator('.plan__done');
   await done.waitFor({ timeout: 20000 });
   await assert.doesNotReject(done.getByText('Тренировка проведена').waitFor({ timeout: 5000 }));
@@ -184,6 +188,20 @@ test('тренировку можно провести, и блок станов
  * форма должна объяснять, чего от человека ждут, а не молчать погасшей
  * кнопкой.
  */
+/**
+ * Наверху очереди — следующая невыполненная. К середине месяца
+ * проведённых больше, чем оставшихся, и они отодвигали бы её вниз.
+ */
+test('проведённая тренировка уходит из очереди', async () => {
+  await page.getByRole('button', { name: 'К программе' }).click({ timeout: 20000 });
+  await page.getByRole('tab', { name: /^Очередь/ }).click({ timeout: 20000 });
+
+  const titles = await page.locator('.section__title').allInnerTexts();
+
+  assert.equal(titles.includes('Тренировка 1 — верх'), false, 'проведённой в очереди нет');
+  assert.equal(titles[0], 'Тренировка 2 — низ', 'наверху следующая невыполненная');
+});
+
 test('замер записывается, а пустая форма объясняет отказ', async () => {
   await openTab('Прогресс');
   await page.getByRole('button', { name: 'Записать замер' }).click({ timeout: 20000 });
