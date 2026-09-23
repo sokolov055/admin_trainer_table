@@ -167,3 +167,57 @@ function withTimeout(promise, ms) {
     );
   });
 }
+
+/* ==========================================================================
+ * Уведомления
+ *
+ * Пуш приходит и когда приложение закрыто — в этом весь смысл: телефон
+ * лежит в кармане, а отдых между подходами кончился.
+ *
+ * Показать уведомление ОБЯЗАТЕЛЬНО: браузеры не дают получить пуш и
+ * промолчать, и за молчание отбирают разрешение. Поэтому даже на пустое
+ * или испорченное содержимое показываем что-то осмысленное.
+ * ========================================================================== */
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (_) { data = {}; }
+
+  const title = data.title || 'Fit Track';
+
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+
+    // Одинаковый тег заменяет прежнее уведомление, а не кладёт рядом:
+    // три напоминания об отдыхе подряд — это не три дела, а одно.
+    tag: data.tag || 'fit',
+    renotify: true,
+    data: { url: data.url || '' },
+  }));
+});
+
+/**
+ * Нажатие открывает приложение, а не новую вкладку: у человека оно уже
+ * запущено в половине случаев, и вторая копия только запутает.
+ */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const target = new URL(event.notification.data?.url || '', self.registration.scope).href;
+
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+    for (const client of clients) {
+      if (client.url.startsWith(self.registration.scope)) {
+        await client.focus();
+        if ('navigate' in client && event.notification.data?.url) await client.navigate(target);
+        return;
+      }
+    }
+
+    await self.clients.openWindow(target);
+  })());
+});
