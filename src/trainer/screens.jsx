@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
-import { apiPublic } from '../api.js';
+import { apiPublic, apiMutate } from '../api.js';
 import { resetClientAccess } from '../client-access.js';
 import { createClient } from '../access.js';
 import { ClientInviteLink } from './InviteLink.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
-  SignOut, DataTable, Delta, formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
+  SignOut, DataTable, Delta, Field, Note, formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { getThemeMode, haptic, setThemeMode } from '../telegram.js';
-import {
-  IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart, IconKey,
-} from '../icons.jsx';
+import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconChart, IconKey, IconAlert, IconCheck } from '../icons.jsx';
 
 /* ==================================================================
  * Клиенты
@@ -344,6 +342,8 @@ export function ClientCard({ client }) {
 
       <ClientContacts clientRow={client.row} />
 
+      <ClientEdit client={client} />
+
       {/* Приглашение стоит выше сброса доступа намеренно: выдать вход —
           повседневное действие, отобрать — редкое. */}
       <ClientInviteLink client={client} />
@@ -425,6 +425,102 @@ export function ClientCard({ client }) {
 /* ==================================================================
  * Финансы
  * ================================================================== */
+
+/**
+ * Правка карточки: имя, цена, размер пакета, плательщик, архив.
+ *
+ * Последнее, ради чего тренер открывал таблицу с телефона. Форма
+ * свёрнута: открывают её редко, а карточку читают постоянно, и
+ * развёрнутый набор полей отодвинул бы вниз всё, ради чего заходят.
+ *
+ * Отправляем только изменённое. Это не экономия запроса: на той стороне
+ * отсутствующее поле значит «не трогай», и форма, где поправили одну
+ * цену, не должна обнулить остальное.
+ */
+function ClientEdit({ client }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  const initial = {
+    name: client.name || '',
+    price: client.price === null || client.price === undefined ? '' : String(client.price),
+    packageCount: client.packageCount === null || client.packageCount === undefined ? '' : String(client.packageCount),
+    payer: client.payer || '',
+  };
+
+  const [form, setForm] = useState(initial);
+
+  const set = (field, value) => {
+    setForm((f) => ({ ...f, [field]: value }));
+    setFailure(null);
+    setSaved(false);
+  };
+
+  const save = async () => {
+    const changes = {};
+    Object.keys(initial).forEach((field) => {
+      if (String(form[field]).trim() !== String(initial[field]).trim()) changes[field] = form[field];
+    });
+
+    if (!Object.keys(changes).length) {
+      setFailure(new Error('Ничего не изменилось.'));
+      return;
+    }
+
+    setBusy(true);
+    setFailure(null);
+    try {
+      await apiMutate('trainer.client.update', { clientRow: client.row, ...changes });
+      setSaved(true);
+    } catch (error) {
+      setFailure(error);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <div className="client-edit__toggle">
+        <button className="button button--ghost" onClick={() => setOpen(true)}>Изменить карточку</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="client-edit">
+      <Field label="ФИО" inputMode="text" value={form.name} onChange={(v) => set('name', v)} disabled={busy} />
+
+      <div className="field-row">
+        <Field label="Цена за тренировку" inputMode="numeric" value={form.price} onChange={(v) => set('price', v)} disabled={busy} />
+        <Field label="Размер пакета" inputMode="numeric" value={form.packageCount} onChange={(v) => set('packageCount', v)} disabled={busy} />
+      </div>
+
+      <Field
+        label="Плательщик"
+        hint="Если за клиента платит другой человек — впишите его ФИО"
+        inputMode="text"
+        value={form.payer}
+        onChange={(v) => set('payer', v)}
+        disabled={busy}
+      />
+
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
+      {saved && !failure && <Note tone="good" icon={IconCheck}>Сохранено. Изменения появятся в карточке через несколько секунд.</Note>}
+
+      <div className="client-edit__actions">
+        <button className="button button--primary" onClick={save} disabled={busy}>
+          {busy ? 'Сохраняю…' : 'Сохранить'}
+        </button>
+        <button className="button" onClick={() => { setOpen(false); setForm(initial); setFailure(null); }} disabled={busy}>
+          Отмена
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Контакты клиента из его профиля.
