@@ -235,6 +235,13 @@ export default function TrainerApp({ me }) {
           </button>
         </div>
 
+        {/* Уведомления тренеру нужны не меньше, чем клиенту: отдых во
+            время занятия он ведёт сам, и пуш приходит тому, кто это
+            занятие открыл. */}
+        <div className="menu__push">
+          <PushSetting />
+        </div>
+
         <div className="menu__list">
           {MENU.map((m) => {
             const Icon = m.Icon;

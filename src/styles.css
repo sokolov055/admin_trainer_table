@@ -1654,6 +1654,12 @@ th.sticky, td.sticky {
   font-variant-numeric: tabular-nums;
 }
 
+.menu__push {
+  padding: 0 var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-3);
+}
+
 .client-edit {
   display: grid;
   gap: var(--space-3);
