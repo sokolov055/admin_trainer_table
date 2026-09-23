@@ -11,6 +11,7 @@
 npm ci
 npm run build
 npm run test:workout
+npm run test:plan
 npm run test:ration
 npm run test:ration-access
 npm run test:auth

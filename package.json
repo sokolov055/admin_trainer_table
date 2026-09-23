@@ -6,6 +6,7 @@
   "description": "Telegram Mini App: личный кабинет клиента и панель тренера поверх Google Sheets",
   "scripts": {
     "test:workout": "node --test scripts/test-workout.mjs",
+    "test:plan": "node --test scripts/test-plan.mjs",
     "test:ration": "node --test scripts/test-ration.mjs",
     "test:ration-access": "node --test scripts/test-ration-access.mjs",
     "test:auth": "node --test scripts/test-auth.mjs",

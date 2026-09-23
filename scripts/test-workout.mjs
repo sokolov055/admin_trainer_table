@@ -16,7 +16,15 @@ const data = new Map();
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 globalThis.localStorage = { getItem: k => data.get(k) || null, setItem: (k, v) => data.set(k, v), removeItem: k => data.delete(k) };
 globalThis.window = { addEventListener() {}, removeEventListener() {} };
-globalThis.document = { hidden: false };
+// document умеет подписку: экран занятия перечитывает чужие правки при
+// возврате к приложению, и проверить это можно только настоящим событием.
+const docListeners = new Map();
+globalThis.document = {
+  hidden: false,
+  addEventListener(event, fn) { docListeners.set(event, [...(docListeners.get(event) || []), fn]); },
+  removeEventListener(event, fn) { docListeners.set(event, (docListeners.get(event) || []).filter(x => x !== fn)); },
+};
+const wake = async () => { for (const fn of docListeners.get('visibilitychange') || []) await fn(); };
 let offline = false;
 let holdSave = null;
 globalThis.__workoutApi = async (action, params) => {
@@ -152,4 +160,36 @@ test('суперсет из программы виден в занятии', as
   } finally {
     if (local) local.unmount();
   }
+});
+
+/**
+ * Занятие одно на двоих: клиент отмечает подходы, тренер смотрит в то же
+ * занятие со своего телефона. Телефон при этом лежит в кармане, а в
+ * свёрнутой вкладке опрос не идёт — поэтому возврат к приложению обязан
+ * перечитывать чужую версию сам, а не ждать очередного тика таймера.
+ */
+test('чужие правки занятия подхватываются при возврате к приложению', async () => {
+  data.clear();
+  await mount();
+  await click('Сохранить сейчас');
+
+  const key = 'workout_demo_server:3';
+  const stored = JSON.parse(data.get(key));
+  const session = stored[stored.length - 1];
+
+  // Так это выглядит со стороны тренера: он вписал рабочий вес и сохранил.
+  session.exercises[0].sets[0].weight = '99';
+  session.revision += 1;
+  session.updatedAt = new Date(Date.now() + 1000).toISOString();
+  data.set(key, JSON.stringify(stored));
+
+  const weightInput = () => tree.root.findAll(n => n.type === 'input'
+    && typeof n.props['aria-label'] === 'string'
+    && n.props['aria-label'].includes('подход 1, вес в кг'))[0];
+
+  assert.equal(weightInput().props.value, '40', 'до возврата на экране свой снимок');
+
+  await act(async () => { await wake(); await delay(); });
+
+  assert.equal(weightInput().props.value, '99', 'после возврата — то, что записал второй');
 });

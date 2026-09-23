@@ -11,6 +11,7 @@ import {
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import WorkoutJournal from '../Workout.jsx';
+import { supersets, blockSessions } from '../plan-model.js';
 
 /* ==================================================================
  * Обзор
@@ -148,7 +149,9 @@ export function Plan({ clientRow, clientView = false }) {
   // выглядит как выход, а занятие продолжает идти, и человек узнавал об
   // этом, только когда не мог начать следующее — оно молча открывало
   // старое.
-  const [running, setRunning] = useState(null);
+  // Журнал занятий: из него берутся и незакрытое занятие, и отметка
+  // «тренировка проведена» у блоков программы.
+  const [sessions, setSessions] = useState([]);
 
   // Журнал живёт в таблице и отвечает секундами, поэтому экран его не
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
@@ -159,14 +162,13 @@ export function Plan({ clientRow, clientView = false }) {
     apiPublic('workout.list', clientRow ? { clientRow } : {})
       .then((r) => {
         if (!alive) return;
-        const list = (r && r.sessions) || [];
-        setRunning(list.find((x) => x.status === 'active' || x.status === 'paused') || null);
+        setSessions((r && r.sessions) || []);
       })
-      .catch(() => { if (alive) setRunning(null); });
+      .catch(() => { if (alive) setSessions([]); });
     return () => { alive = false; };
   }, [clientRow, workout]);
 
-  if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block ? workout : null} onClose={() => setWorkout(null)} />;
+  if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => setWorkout(null)} />;
 
   if (loading || error) return <>
     <button className="button button--block plan__journal" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
@@ -175,6 +177,7 @@ export function Plan({ clientRow, clientView = false }) {
 
   const months = data.available || [];
   const blocks = data.blocks || [];
+  const running = sessions.find((x) => x.status === 'active' || x.status === 'paused') || null;
 
   // Пока занятие не закрыто, новое начать нельзя: журнал всё равно откроет
   // текущее. Поэтому вместо «Начать тренировку» у блоков показывается одна
@@ -243,13 +246,33 @@ export function Plan({ clientRow, clientView = false }) {
         />
       )}
 
-      {blocks.map((block, i) => (
+      {blocks.map((block, i) => {
+        const past = blockSessions(sessions, block.title, data.month);
+
+        return (
         <Section
           key={i}
           title={block.title}
           note={block.exercises.length + ' ' + plural(block.exercises.length, 'упражнение', 'упражнения', 'упражнений')}
         >
           <Panel>
+            {/* Веса живут в журнале, а не в программе: лист месяца — это
+                план, и занятие его не переписывает. Поэтому здесь не
+                «сколько ты поднял», а «эту тренировку ты уже провёл» и
+                прямая дорога к тому, с чем провёл. */}
+            {past.length > 0 && (
+              <div className="plan__done">
+                <div>
+                  <strong>Тренировка проведена</strong>
+                  <span>
+                    {formatDate(past[0].updatedAt)}
+                    {past[0].done ? ' · ' + past[0].done + ' ' + plural(past[0].done, 'подход', 'подхода', 'подходов') : ''}
+                    {past.length > 1 ? ' · всего занятий: ' + past.length : ''}
+                  </span>
+                </div>
+                <button className="button" onClick={() => setWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>
+              </div>
+            )}
             {!running && <button className="button button--primary button--block" onClick={() => setWorkout({ block, month: data.month })}>Начать тренировку</button>}
             {supersets(block.exercises).map((group, j) => (
               group.superset
@@ -266,7 +289,8 @@ export function Plan({ clientRow, clientView = false }) {
             ))}
           </Panel>
         </Section>
-      ))}
+        );
+      })}
 
       {totalExercises > 0 && (
         <p className="small muted" style={{ marginTop: 22, textAlign: 'center' }}>
@@ -278,33 +302,18 @@ export function Plan({ clientRow, clientView = false }) {
 }
 
 /**
- * Упражнения подряд с одной группой — один суперсет.
+ * Строка упражнения: название, подходы и повторы. Веса здесь нет
+ * намеренно.
  *
- * В таблице суперсет не подписан словом: тренер объединяет ячейку
- * «Подходы» на несколько строк, и число подходов у них общее. Группу из
- * одного упражнения суперсетом не считаем — объединение могло остаться от
- * оформления, а «суперсет из одного» человека только собьёт.
- */
-function supersets(exercises) {
-  const groups = [];
-
-  (exercises || []).forEach((ex) => {
-    const last = groups[groups.length - 1];
-    if (ex.supersetGroup && last && last.key === ex.supersetGroup) last.items.push(ex);
-    else groups.push({ key: ex.supersetGroup || null, items: [ex] });
-  });
-
-  return groups.map((g) => ({
-    ...g,
-    superset: !!g.key && g.items.length > 1,
-    sets: g.items[0].sets || '',
-  }));
-}
-
-/**
- * Строка упражнения. Внутри суперсета число подходов не повторяем у
- * каждого: оно общее и стоит в заголовке группы, а дважды написанное
- * рядом читается как «у каждого свои».
+ * В листе месяца «Вес» — это план тренера, и занятие его не переписывает:
+ * лист остаётся шаблоном. Показанное рядом с упражнением число выглядело
+ * как «твой рабочий вес» и жило своей жизнью — человек поднял больше, а в
+ * программе всё то же самое. Настоящие веса лежат в журнале, и путь к ним
+ * один: отметка «тренировка проведена» над списком.
+ *
+ * Внутри суперсета число подходов не повторяем у каждого: оно общее и
+ * стоит в заголовке группы, а дважды написанное рядом читается как
+ * «у каждого свои».
  */
 function ExerciseRow({ ex, inSuperset }) {
   const scheme = [
@@ -317,10 +326,6 @@ function ExerciseRow({ ex, inSuperset }) {
       <div style={{ minWidth: 0 }}>
         <div className="exercise__name">{ex.name}</div>
         <div className="exercise__scheme">{scheme || '—'}</div>
-      </div>
-      <div className="exercise__weight">
-        <div className="exercise__weight-value">{ex.weight || '—'}</div>
-        {ex.prevWeight && <div className="exercise__weight-prev">было {ex.prevWeight}</div>}
       </div>
     </div>
   );
@@ -464,6 +469,11 @@ export function Progress({ clientRow }) {
   const { loading, data, error, reload } = useProgressBundle(clientRow);
   const [field, setField] = useState('Вес');
 
+  // Форма нового замера. Открыта или нет — состояние экрана, а не данных:
+  // после записи закрывается сама и просит перечитать замеры.
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(null);
+
   if (loading) return <Loading rows={3} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
@@ -487,17 +497,55 @@ export function Progress({ clientRow }) {
   const grew = lifts.filter((l) => l.delta > 0);
   const hasRows = series.some((s) => s.rows.length > 0);
 
+  // Замер вносят с телефона сразу после весов, поэтому вход в форму стоит
+  // первым на экране, а не под таблицами: до низа в этот момент не листают.
+  const addMeasure = adding
+    ? (
+      <Section title="Новый замер">
+        <MeasureForm
+          fields={measureFields(measurements, series)}
+          series={series.map((x, i) => ({
+            label: x.label,
+            sheetName: (measurements && measurements.series && measurements.series[i]
+              && measurements.series[i].sheetName) || '',
+          }))}
+          clientRow={clientRow}
+          onSaved={(result) => { setAdding(false); setAdded(result); reload(); }}
+          onCancel={() => setAdding(false)}
+        />
+      </Section>
+    )
+    : (
+      <Section>
+        <Panel pad>
+          {added && (
+            <Note tone="good" icon={IconRuler}>
+              {added.replaced
+                ? 'Замер за ' + formatDate(added.date) + ' обновлён.'
+                : 'Замер за ' + formatDate(added.date) + ' записан.'}
+            </Note>
+          )}
+          <button className="button button--primary button--block" onClick={() => { setAdded(null); setAdding(true); }}>
+            Записать замер
+          </button>
+        </Panel>
+      </Section>
+    );
+
   if (!hasRows && lifts.length === 0) {
     return (
-      <Empty
-        icon={IconProgress}
-        title="Прогресс пока не из чего собрать"
-        text={
-          (measurements && measurements.note)
-          || 'Нужен хотя бы один замер или заполненные рабочие веса в программе месяца — '
-             + 'тогда здесь появятся динамика, изменения и таблица замеров.'
-        }
-      />
+      <>
+        {addMeasure}
+        <Empty
+          icon={IconProgress}
+          title="Прогресс пока не из чего собрать"
+          text={
+            (measurements && measurements.note)
+            || 'Запишите первый замер — и здесь появятся динамика, изменения и таблица замеров. '
+               + 'Рабочие веса подтянутся из программы месяца.'
+          }
+        />
+      </>
     );
   }
 
@@ -541,6 +589,8 @@ export function Progress({ clientRow }) {
 
   return (
     <>
+      {addMeasure}
+
       {available.length > 1 && <Chips items={available} value={activeField} onChange={setField} />}
 
       {hasRows ? (
@@ -668,6 +718,149 @@ export function Progress({ clientRow }) {
           </Section>
         )}
     </>
+  );
+}
+
+/**
+ * Форма замера.
+ *
+ * Раньше лист «Показатели» заполнял только тренер, а приложение его
+ * показывало: человек вставал на весы дома, запоминал число и ждал
+ * встречи. Половина замеров так и не доезжала.
+ *
+ * Пустое поле здесь значит «не мерил», а не ноль, и таких полей будет
+ * большинство: обхваты снимают раз в месяц, а на весы встают чаще.
+ * Поэтому ничего не обязательно, кроме одного любого значения.
+ *
+ * Пределы вменяемости («вес 7 кг» — это 70) проверяет сервер: они уже
+ * живут в двух местах, и третья копия здесь однажды разошлась бы с
+ * обеими. Отказ приходит текстом, который можно показать как есть.
+ */
+function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
+  // Локальный день, а не UTC: в Москве после трёх ночи toISOString отдал
+  // бы вчерашнее число, и замер лёг бы не в тот день.
+  const today = (() => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  })();
+
+  const [date, setDate] = useState(today);
+
+  // Лист выбирается только у сплит-пары: там серий две, а строка клиента
+  // на двоих одна, и понять, кто сейчас на весах, может только человек.
+  const named = series.filter((x) => x.sheetName);
+  const [sheetName, setSheetName] = useState(named.length === 1 ? named[0].sheetName : '');
+
+  const [values, setValues] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+
+  const list = (fields && fields.length ? fields : ['Вес']);
+  const filled = list.filter((f) => String(values[f] || '').trim());
+
+  const set = (name, value) => {
+    setValues((prev) => ({ ...prev, [name]: value }));
+    setFailure(null);
+  };
+
+  const submit = async () => {
+    if (!filled.length) {
+      setFailure(new Error('Введите хотя бы один показатель.'));
+      return;
+    }
+
+    if (named.length > 1 && !sheetName) {
+      setFailure(new Error('Выберите, чей это замер.'));
+      return;
+    }
+
+    setBusy(true);
+    setFailure(null);
+    try {
+      const payload = {};
+      filled.forEach((f) => { payload[f] = String(values[f]).trim(); });
+
+      const result = await apiMutate('measure.create', {
+        ...(clientRow ? { clientRow } : {}),
+        ...(sheetName ? { sheetName } : {}),
+        date,
+        values: payload,
+      });
+
+      onSaved(result);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel pad>
+      <div className="survey">
+        {named.length > 1 && (
+          <div className="survey__group">
+            <div className="survey__legend">Чей замер</div>
+            <Segmented
+              items={named.map((x) => ({ value: x.sheetName, label: x.label || x.sheetName }))}
+              value={sheetName}
+              onChange={setSheetName}
+              label="Чей замер"
+              disabled={busy}
+            />
+          </div>
+        )}
+
+        <div className="survey__group">
+          <label className="field">
+            <span className="field__label">Дата замера</span>
+            <input
+              className="field__input"
+              type="date"
+              value={date}
+              max={today}
+              onChange={(e) => setDate(e.target.value)}
+              disabled={busy}
+            />
+            <span className="field__hint">по умолчанию сегодня; задним числом можно, вперёд нельзя</span>
+          </label>
+        </div>
+
+        <div className="survey__group">
+          <div className="survey__legend">
+            Показатели
+            <span className="survey__legend-note">
+              заполните то, что мерили, — остальное останется как было
+            </span>
+          </div>
+          <div className="field-row">
+            {list.map((f) => (
+              <Field
+                key={f}
+                label={f + (f === 'Вес' ? ', кг' : ', см')}
+                inputMode="decimal"
+                value={values[f] || ''}
+                onChange={(v) => set(f, v)}
+                disabled={busy}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {failure && (
+        <Note tone="critical" icon={IconAlert}>
+          {failure.message || 'Не получилось записать замер'}
+        </Note>
+      )}
+
+      <div className="survey__actions">
+        <button className="button button--primary" onClick={submit} disabled={busy || !filled.length}>
+          {busy ? 'Записываю…' : 'Записать'}
+        </button>
+        <button className="button" onClick={onCancel} disabled={busy}>Отмена</button>
+      </div>
+    </Panel>
   );
 }
 

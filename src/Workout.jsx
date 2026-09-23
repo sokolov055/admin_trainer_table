@@ -109,11 +109,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       try {
         const sessions = await list();
         if (!alive) return;
-        if (draft && !draft.dirty) await open(draft.session.id);
+        // Занятие, которое попросили открыть с экрана программы («Посмотреть
+        // веса»). Оно важнее незакрытого: человек нажал на конкретную
+        // проведённую тренировку. Несохранённый черновик всё равно
+        // побеждает — его негде взять заново.
+        const wanted = launch && launch.sessionId;
+        if (draft && !draft.dirty) await open(wanted || draft.session.id);
         if (!draft) {
           const active = sessions.find(s => ['active', 'paused'].includes(s.status));
-          if (active) await open(active.id);
-          else if (launch) store(freshRecord(fromPlan(launch.block, launch.month)));
+          if (wanted) await open(wanted);
+          else if (active) await open(active.id);
+          else if (launch && launch.block) store(freshRecord(fromPlan(launch.block, launch.month)));
         }
       } catch (e) {
         if (alive) {
@@ -191,9 +197,25 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return () => { clearInterval(interval); window.removeEventListener('online', online); window.removeEventListener('beforeunload', unload); };
   }, []);
 
+  /**
+   * Чужие изменения того же занятия.
+   *
+   * Занятие одно на двоих: клиент отмечает подходы, тренер смотрит в него
+   * со своего телефона и правит вес. Поэтому экран не только пишет, но и
+   * перечитывает — и делает это не только по таймеру.
+   *
+   * Возврат к приложению — главный момент: телефон убирают в карман между
+   * подходами, и в свёрнутой вкладке опрос не идёт. Без этого тренер,
+   * открыв приложение, до двадцати секунд смотрел на устаревшие цифры и
+   * не мог понять, синхронизируется вообще что-нибудь или нет.
+   *
+   * Свой несохранённый черновик всегда важнее чужой версии: его негде
+   * взять заново, а чужая доедет следующим чтением.
+   */
   useEffect(() => {
     if (!ready) return;
-    const timer = setInterval(async () => {
+
+    const refresh = async () => {
       const r = state.current;
       if (!r || r.dirty || saving.current || conflictRef.current || document.hidden) return;
       try {
@@ -201,8 +223,21 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         if (!mounted.current || state.current?.dirty || state.current?.session.id !== r.session.id) return;
         if (result.session.revision !== r.revision) store({ session: result.session, revision: result.session.revision, dirty: false, tick: Date.now() });
       } catch (_) { /* Сбой чтения не должен мешать записи локального подхода. */ }
-    }, 20000);
-    return () => clearInterval(timer);
+    };
+
+    const timer = setInterval(refresh, 20000);
+    const listen = (target, event) => {
+      if (target && target.addEventListener) target.addEventListener(event, refresh);
+      return () => { if (target && target.removeEventListener) target.removeEventListener(event, refresh); };
+    };
+
+    const off = [
+      listen(document, 'visibilitychange'),
+      listen(window, 'focus'),
+      listen(window, 'online'),
+    ];
+
+    return () => { clearInterval(timer); off.forEach(fn => fn()); };
   }, [ready]);
 
   const updateExercise = (index, fn) => change(s => ({ ...s, exercises: s.exercises.map((e, i) => i === index ? fn(e) : e) }));

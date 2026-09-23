@@ -1632,20 +1632,35 @@ th.sticky, td.sticky {
   font-variant-numeric: tabular-nums;
 }
 
-.exercise__weight {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  flex: 0 0 auto;
+/* Проведённая тренировка. Зелёным — потому что это про сделанное, тем же
+   цветом, что и выполненный подход в занятии. Кнопка рядом, а не ниже:
+   отметка без дороги к весам — просто похвала. */
+.plan__done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--good-fill);
+  border-bottom: 1px solid var(--border);
+  color: var(--good-text);
 }
 
-.exercise__weight-value { font-weight: 650; font-size: var(--text-md); }
+.plan__done strong {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 640;
+  letter-spacing: -0.006em;
+}
 
-.exercise__weight-prev {
+.plan__done span {
   font-size: var(--text-xs);
   color: var(--text-muted);
-  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
 }
+
+.plan__done .button { flex: 0 0 auto; }
 
 /* Суперсет — не украшение, а указание: эти упражнения делают подряд.
    Поэтому группа читается как одно целое — общая рамка и общий заголовок
