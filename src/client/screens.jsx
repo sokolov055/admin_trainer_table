@@ -822,7 +822,11 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
               onChange={(e) => setDate(e.target.value)}
               disabled={busy}
             />
-            <span className="field__hint">по умолчанию сегодня; задним числом можно, вперёд нельзя</span>
+            <span className="field__hint">
+              {date === today
+                ? 'Сегодня. Если взвешивались раньше — поставьте тот день.'
+                : 'Замер за прошедший день. Запишется этой датой.'}
+            </span>
           </label>
         </div>
 
@@ -830,7 +834,8 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
           <div className="survey__legend">
             Показатели
             <span className="survey__legend-note">
-              заполните то, что мерили, — остальное останется как было
+              достаточно одного — например, только веса. Пустые поля не записываются
+              и прежние значения в этой строке не трогают
             </span>
           </div>
           <div className="field-row">
@@ -855,7 +860,9 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
       )}
 
       <div className="survey__actions">
-        <button className="button button--primary" onClick={submit} disabled={busy || !filled.length}>
+        {/* Кнопка не гаснет на незаполненной форме: погасшая кнопка не
+            объясняет, чего от человека ждут, а отказ объясняет. */}
+        <button className="button button--primary" onClick={submit} disabled={busy}>
           {busy ? 'Записываю…' : 'Записать'}
         </button>
         <button className="button" onClick={onCancel} disabled={busy}>Отмена</button>
