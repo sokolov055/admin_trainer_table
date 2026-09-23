@@ -414,6 +414,24 @@ const MOCK = {
     fields: FIELDS,
   }),
 
+  // Правка программы. Демо держит её в памяти: показать редактор без
+  // настоящего сервера иначе нечем, а результат должен быть виден сразу.
+  'plan.save': (params) => {
+    const blocks = (params.blocks || [])
+      .map((b) => ({
+        title: b.title,
+        exercises: (b.exercises || []).filter((e) => String(e.name || '').trim()),
+      }))
+      .filter((b) => b.exercises.length);
+
+    PLAN_BLOCKS.length = 0;
+    PLAN_BLOCKS.push(...blocks);
+
+    return { month: params.month, blocks };
+  },
+
+  'plan.month.create': (params) => ({ month: params.month, blocks: [] }),
+
   // Профиль клиента. Живёт в памяти демо: показать экран без настоящего
   // сервера иначе нечем, а сохранение должно быть видно сразу.
   'profile.get': () => ({

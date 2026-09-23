@@ -12,6 +12,7 @@ import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck 
 import { haptic } from '../telegram.js';
 import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions } from '../plan-model.js';
+import PlanEditor from '../trainer/PlanEditor.jsx';
 
 /* ==================================================================
  * Обзор
@@ -149,6 +150,11 @@ export function Plan({ clientRow, clientView = false }) {
   // «тренировка проведена» у блоков программы.
   const [sessions, setSessions] = useState([]);
 
+  // Правка программы доступна только тренеру и только из карточки
+  // клиента: в режиме «смотрю как клиент» кнопок быть не должно.
+  const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
+
   // Журнал живёт в таблице и отвечает секундами, поэтому экран его не
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
   // придёт ответ. Перечитываем после выхода из журнала — там занятие
@@ -209,6 +215,51 @@ export function Plan({ clientRow, clientView = false }) {
       {/* Сразу под входом в журнал: если занятие не закрыто, это первое,
           что человек должен узнать на этом экране. */}
       {runningLine}
+
+      {data.canHide && (editing
+        ? (
+          <Section title={'Правлю: ' + data.month}>
+            <PlanEditor
+              clientRow={clientRow}
+              month={data.month}
+              blocks={blocks}
+              onSaved={() => { setEditing(false); reload(); }}
+              onCancel={() => setEditing(false)}
+            />
+          </Section>
+        )
+        : (
+          <Section>
+            <Panel pad>
+              <div className="plan__tools">
+                {data.month && (
+                  <button className="button" onClick={() => setEditing(true)}>Изменить программу</button>
+                )}
+                <button className="button" disabled={creating} onClick={async () => {
+                  const month = window.prompt('Название месяца, как он называется в таблице:', nextMonthLabel());
+                  if (!month) return;
+
+                  setCreating(true);
+                  try {
+                    // Копируем с текущего: с этого программа начинается
+                    // почти всегда — меняются веса и пара упражнений.
+                    await apiMutate('plan.month.create', {
+                      clientRow, month, ...(data.month ? { copyFrom: data.month } : {}),
+                    });
+                    setMonth(month);
+                    reload();
+                  } catch (error) {
+                    window.alert(error.message);
+                  } finally {
+                    setCreating(false);
+                  }
+                }}>
+                  {creating ? 'Создаю…' : 'Новый месяц'}
+                </button>
+              </div>
+            </Panel>
+          </Section>
+        ))}
 
       {months.length > 1 && (
         <Chips
@@ -295,6 +346,17 @@ export function Plan({ clientRow, clientView = false }) {
       )}
     </>
   );
+}
+
+/** «Октябрь 2026» — как месяц называется в таблице */
+function nextMonthLabel() {
+  const names = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  return names[next.getMonth()] + ' ' + next.getFullYear();
 }
 
 /**
