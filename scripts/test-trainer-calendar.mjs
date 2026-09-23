@@ -40,7 +40,13 @@ const output = await build({
             export const Finance=()=>null; export const Processes=()=>null; export const Lost=()=>null;
             export const Logs=()=>null; export const Sheets=()=>null; export const Settings=()=>null; export const ClientCard=()=>null;`,
         };
-        if (args.path === 'api') return { contents: `export const apiMutate=(action, params)=>globalThis.__calendarRefreshHarness.apiMutate(action, params);` };
+        // apiPublic нужен не этой проверке, а настройке уведомлений,
+        // которая приехала в меню тренера. Заглушка отдаёт пустоту: пуши
+        // здесь не проверяются, но и ломать сборку они не должны.
+        if (args.path === 'api') return {
+          contents: 'export const apiMutate=(action, params)=>globalThis.__calendarRefreshHarness.apiMutate(action, params);'
+            + ' export const apiPublic=async()=>({});',
+        };
         if (args.path === 'ui') return {
           loader: 'jsx',
           contents: `import React from 'react';
