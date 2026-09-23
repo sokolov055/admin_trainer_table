@@ -151,6 +151,12 @@ test('тренировку можно провести, и блок станов
   await first.getByRole('textbox').nth(1).fill('8');
   await first.locator('.workout__check').click();
 
+  // Прошлый вес — подсказка рядом с планом: по ней в зале решают,
+  // добавлять ли сегодня.
+  await assert.doesNotReject(
+    page.locator('.workout__exercise').first().getByText('было 70').waitFor({ timeout: 5000 }),
+  );
+
   // Таймер отдыха должен быть виден на любом упражнении, а не только в шапке
   await page.getByLabel('Таймер отдыха').selectOption('60');
   const rest = page.locator('.workout__rest--float');

@@ -294,16 +294,31 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <label className="workout__field">Название занятия<input value={s.title} maxLength={160} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
         {editable && <div className="workout__toolbar">
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
-          <label>Отдых <select aria-label="Таймер отдыха" value="" onChange={e => change(s => ({ ...s, restUntil: Date.now() + Number(e.target.value) * 1000 }))}><option value="">Запустить</option><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
+          {/* Длительность не только запускает отдых, но и запоминается:
+              дальше он стартует сам после каждого отмеченного подхода.
+              Раньше за ним приходилось возвращаться в шапку экрана
+              после каждого подхода — то есть листать вверх весь список. */}
+          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 0)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds, restUntil: seconds ? Date.now() + seconds * 1000 : 0 })); }}><option value="0">Вручную</option><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
         </div>}
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
             оставшийся наверху, приходилось искать прокруткой. */}
-        {!!s.restUntil && <div className="workout__rest workout__rest--float" role="status">{now < s.restUntil ? 'Отдых ' + clock(s.restUntil - now) : 'Отдых закончен — следующий подход'}<button className="button" onClick={() => change(s => ({ ...s, restUntil: 0 }))}>Сбросить</button></div>}
+        {!!s.restUntil && <div className="workout__rest workout__rest--float" role="status">
+          <span>{now < s.restUntil ? 'Отдых ' + clock(s.restUntil - now) : 'Отдых закончен — следующий подход'}</span>
+          <span className="workout__rest-actions">
+            <button className="button" onClick={() => change(v => ({ ...v, restUntil: Math.max(now, v.restUntil) + 30000 }))}>+30 с</button>
+            <button className="button" onClick={() => change(v => ({ ...v, restUntil: 0 }))}>Сбросить</button>
+          </span>
+        </div>}
         {s.exercises.map((ex, ei) => <section className="workout__exercise" key={ex.id}>
           <h3>{ei + 1}. {ex.name || 'Новое упражнение'}</h3>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
-          {ex.prescription && <p className="small muted">План: {ex.prescription}</p>}
+          {(ex.prescription || ex.prevWeight) && (
+            <p className="small muted">
+              {ex.prescription ? 'План: ' + ex.prescription : ''}
+              {ex.prevWeight && <span className="workout__prev">было {ex.prevWeight}</span>}
+            </p>
+          )}
           <details><summary>Изменить упражнение</summary>
             <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ex => ({ ...ex, name: e.target.value }))} /></label>
             <div className="workout__toolbar">
@@ -319,7 +334,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               <input aria-label={`${ex.name}, подход ${si + 1}, повторы`} inputMode="numeric" value={set.reps} maxLength={6} onChange={e => updateSet(ei, si, s => ({ ...s, reps: e.target.value }))} />
               <button className="workout__check" aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
                 if (set.state !== 'done' && (!/^\d+$/.test(set.reps) || Number(set.reps) < 1)) { setMessage('Введите число повторов перед отметкой подхода.'); return; }
+                const starting = set.state !== 'done';
                 updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
+                // Отдых начинается там, где человек нажал, а не там, где
+                // стоит переключатель: подход отмечен — время пошло.
+                if (starting) change(v => (v.restSeconds ? { ...v, restUntil: Date.now() + v.restSeconds * 1000 } : v));
               }}><IconCheck size={20} /></button>
             </div>
             <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
@@ -335,7 +354,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <label className="workout__field">Заметка к упражнению<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} /></label>
         </section>)}
         {undo && <button className="button" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Отменить последнее удаление</button>}
-        <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>
+        <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>
       {editable && <div className="workout__finish">

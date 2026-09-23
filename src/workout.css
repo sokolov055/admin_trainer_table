@@ -173,6 +173,21 @@
 
 .workout__exercise > h3 { margin-bottom: var(--space-1); }
 
+/* Прошлый вес — подсказка рядом с планом, а не второй план: человек в
+   зале решает по ней, добавлять ли сегодня. */
+.workout__prev {
+  margin-left: var(--space-2);
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.workout__rest-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
 /* Суперсет — указание к действию, а не пометка о происхождении: следующее
    упражнение делается сразу, без отдыха. Поэтому строка цветная и стоит
    выше плана, который человек читает уже спокойнее. */

@@ -2,9 +2,15 @@ export const uid = () => crypto.randomUUID();
 export const blankSet = () => ({ weight: '', reps: '', rpe: '', state: 'pending', kind: 'work' });
 export function fromPlan(block, month) {
   return { id: uid(), title: block.title, sourceBlock: block.title, month,
-    status: 'active', elapsedMs: 0, restUntil: 0, note: '',
+    // restSeconds — сколько отдыхать после отмеченного подхода. Ноль
+    // значит «не запускать сам»: пока человек не выбрал длительность,
+    // таймер ведёт себя как раньше.
+    status: 'active', elapsedMs: 0, restUntil: 0, restSeconds: 0, note: '',
     exercises: block.exercises.slice(0, 30).map(e => ({
       id: uid(), name: e.name, note: '',
+      // Вес прошлого месяца — подсказка, а не план: человек в зале решает
+      // по ней, добавлять ли сегодня.
+      prevWeight: String(e.prevWeight || '').trim(),
       // Суперсет приезжает из плана и должен дожить до занятия: человек
       // смотрит в экран между подходами и должен видеть, что следующее
       // упражнение делается сразу, а не после отдыха.

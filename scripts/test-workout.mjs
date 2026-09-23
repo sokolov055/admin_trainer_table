@@ -49,7 +49,9 @@ const delay = () => new Promise(resolve => setTimeout(resolve, 30));
 const text = node => typeof node === 'string' ? node : (node.children || []).map(text).join('');
 const button = label => tree.root.findAllByType('button').find(b => text(b) === label);
 async function click(label) { const b = button(label); assert.ok(b, label); assert.ok(!b.props.disabled, 'Кнопка доступна: ' + label); await act(async () => { await b.props.onClick(); await delay(); }); }
-async function mount(launch = true) { await act(async () => { tree = renderer.create(React.createElement(Workout, { launch: launch ? { block, month: 'Сентябрь 2026' } : null, onClose() {} })); await delay(); }); }
+// Прошлый экран размонтируем: у занятия свой секундный таймер, и
+// оставленный в живых экземпляр не даёт процессу тестов завершиться.
+async function mount(launch = true) { if (tree) tree.unmount(); await act(async () => { tree = renderer.create(React.createElement(Workout, { launch: launch ? { block, month: 'Сентябрь 2026' } : null, onClose() {} })); await delay(); }); }
 after(() => { if (tree) tree.unmount(); });
 
 test('интерфейс: запись подхода, пауза, продолжение, завершение и история', async () => {
@@ -192,4 +194,43 @@ test('чужие правки занятия подхватываются при
   await act(async () => { await wake(); await delay(); });
 
   assert.equal(weightInput().props.value, '99', 'после возврата — то, что записал второй');
+});
+
+/**
+ * Отдых начинается там, где человек нажал.
+ *
+ * Раньше запустить его можно было только из шапки занятия, и после
+ * каждого подхода приходилось листать список вверх. Выбранная длительность
+ * запоминается в занятии, и дальше отметка подхода запускает отдых сама.
+ */
+test('отмеченный подход запускает отдых, если длительность выбрана', async () => {
+  data.clear();
+  await mount();
+
+  const rest = () => tree.root.findAll(n => n.props && n.props.className === 'workout__rest workout__rest--float');
+  assert.equal(rest().length, 0, 'до выбора длительности полосы нет');
+
+  const select = tree.root.findAll(n => n.type === 'select' && n.props['aria-label'] === 'Таймер отдыха')[0];
+  await act(async () => { await select.props.onChange({ target: { value: '90' } }); await delay(); });
+
+  await act(async () => {
+    const stop = tree.root.findAll(n => n.type === 'button' && /Сбросить/.test(text(n)))[0];
+    await stop.props.onClick();
+    await delay();
+  });
+  assert.equal(rest().length, 0, 'сбросили — полосы снова нет');
+
+  const set = tree.root.findAll(n => n.type === 'input'
+    && typeof n.props['aria-label'] === 'string'
+    && n.props['aria-label'].includes('подход 1, повторы'))[0];
+
+  await act(async () => { await set.props.onChange({ target: { value: '10' } }); await delay(); });
+
+  const check = tree.root.findAll(n => n.type === 'button'
+    && typeof n.props['aria-label'] === 'string'
+    && n.props['aria-label'].includes('подход 1: выполнен'))[0];
+
+  await act(async () => { await check.props.onClick(); await delay(); });
+
+  assert.equal(rest().length, 1, 'отдых пошёл сам, без похода в шапку');
 });
