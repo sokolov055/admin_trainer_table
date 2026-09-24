@@ -389,3 +389,217 @@ function findNearest(geom, x) {
 
   return { x: best.x, date: new Date(best.t).toISOString(), items };
 }
+
+/* ==========================================================================
+ * Столбики по периодам — как на бирже
+ * ========================================================================== */
+
+/**
+ * Один показатель по месяцам, кварталам или годам.
+ *
+ * Цвет — как на биржевом графике: зелёный столбик — стало лучше, чем в
+ * прошлом периоде, красный — хуже. «Лучше» решает `aim`: у расходов рост
+ * плохой, и красить его зелёным значило бы врать. Первый столбик сравнить
+ * не с чем — он нейтральный.
+ *
+ * Красный с зелёным путают люди с дальтонизмом (проверка палитры даёт
+ * ΔE 4 при норме 8), поэтому цвет не единственный признак. Ухудшение ещё
+ * и рисуется иначе — «пустым» столбиком с контуром, как свеча падения;
+ * подсказка над графиком пишет изменение стрелкой и словами, а весь ряд
+ * можно открыть таблицей.
+ *
+ * Идущий период (`partial`) приглушён и подписан: без этого текущий
+ * квартал выглядел бы провалом, хотя он просто не кончился.
+ */
+
+const BAR_PAD = { top: 16, right: 8, bottom: 24, left: 46 };
+const BAR_HEIGHT = 180;
+
+export function BarChart({ points, aim = 1, format, highlight, label }) {
+  const wrapRef = useRef(null);
+  const [width, setWidth] = useState(320);
+  const [active, setActive] = useState(null);
+  const [showTable, setShowTable] = useState(false);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return undefined;
+
+    const measure = () => setWidth(Math.max(el.clientWidth, 240));
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Смена показателя или разбивки сбрасывает выбранный столбик на
+  // подсвеченный период: подсказка не должна висеть над чужим числом.
+  useEffect(() => { setActive(null); }, [points, highlight]);
+
+  const list = points || [];
+  const known = list.filter((p) => p.value !== null && p.value !== undefined);
+
+  if (known.length === 0) {
+    return <div className="muted small bars__empty" ref={wrapRef}>Пока нет данных для графика.</div>;
+  }
+
+  const values = list.map((p) => (p.value === null || p.value === undefined ? 0 : p.value));
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const span = max - min || 1;
+
+  const plotW = width - BAR_PAD.left - BAR_PAD.right;
+  const plotH = BAR_HEIGHT - BAR_PAD.top - BAR_PAD.bottom;
+  const slot = plotW / list.length;
+  const gap = 2;
+  const barW = Math.max(2, Math.min(28, slot - gap));
+
+  const y = (v) => BAR_PAD.top + ((max - v) / span) * plotH;
+  const zero = y(0);
+
+  const bars = list.map((p, i) => {
+    const prev = i > 0 ? list[i - 1].value : null;
+    const has = p.value !== null && p.value !== undefined;
+    const delta = has && prev !== null && prev !== undefined ? p.value - prev : null;
+
+    // Лучше или хуже: направление изменения, развёрнутое для «меньше — лучше».
+    // Там, где сторона не определена (aim 0), — просто рост и падение.
+    let trend = 'flat';
+    if (delta) trend = (aim < 0 ? -delta : delta) > 0 ? 'up' : 'down';
+
+    const x = BAR_PAD.left + slot * i + (slot - barW) / 2;
+    const top = has ? Math.min(y(p.value), zero) : zero;
+    const h = has ? Math.max(Math.abs(y(p.value) - zero), p.value ? 2 : 0) : 0;
+
+    return { ...p, i, x, top, h, delta, trend, has, negative: has && p.value < 0 };
+  });
+
+  const current = active !== null && bars[active]
+    ? bars[active]
+    : bars.find((b) => b.key === highlight) || bars[bars.length - 1];
+
+  const ticks = [max, (max + min) / 2, min].filter((v, i, all) => all.indexOf(v) === i);
+
+  const pick = (i) => setActive((prev) => (prev === i ? null : i));
+
+  return (
+    <div className="bars" ref={wrapRef}>
+      <div className="bars__readout" aria-live="polite">
+        <span className="bars__period">{current.label}{current.partial ? ' · ещё идёт, данные неполные' : ''}</span>
+        <span className="bars__value">{current.has ? format(current.value) : '—'}</span>
+        {current.delta !== null && current.delta !== 0 && (
+          <span className={'bars__delta bars__delta--' + current.trend}>
+            {current.delta > 0 ? '↑ ' : '↓ '}{format(Math.abs(current.delta))} к прошлому периоду
+          </span>
+        )}
+      </div>
+
+      {showTable ? (
+        <table className="bars__table">
+          <thead>
+            <tr><th>Период</th><th>{label}</th><th>Изменение</th></tr>
+          </thead>
+          <tbody>
+            {bars.map((b) => (
+              <tr key={b.key}>
+                <td>{b.label}{b.partial ? ' (идёт)' : ''}</td>
+                <td>{b.has ? format(b.value) : '—'}</td>
+                <td>{b.delta ? (b.delta > 0 ? '↑ ' : '↓ ') + format(Math.abs(b.delta)) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <svg
+          width={width}
+          height={BAR_HEIGHT}
+          className="bars__svg"
+          role="img"
+          aria-label={label + ' по периодам'}
+        >
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={BAR_PAD.left} x2={width - BAR_PAD.right} y1={y(t)} y2={y(t)} className="bars__grid" />
+              <text x={BAR_PAD.left - 6} y={y(t) + 4} textAnchor="end" className="bars__tick">{shortNumber(t)}</text>
+            </g>
+          ))}
+
+          <line x1={BAR_PAD.left} x2={width - BAR_PAD.right} y1={zero} y2={zero} className="bars__zero" />
+
+          {bars.map((b) => (
+            <path
+              key={b.key}
+              d={barPath(b.x, b.top, barW, b.h, b.negative)}
+              className={
+                'bars__bar bars__bar--' + b.trend
+                + (b.partial ? ' bars__bar--partial' : '')
+                + (current.key === b.key ? ' bars__bar--current' : '')
+              }
+            />
+          ))}
+
+          {/* Подписи оси — первый, последний и выбранный период: подпись
+              под каждым столбиком на телефоне слиплась бы в кашу */}
+          {bars.filter((b, i) => i === 0 || i === bars.length - 1 || b.key === current.key).map((b) => (
+            <text
+              key={'l' + b.key}
+              x={Math.min(Math.max(b.x + barW / 2, BAR_PAD.left + 16), width - BAR_PAD.right - 16)}
+              y={BAR_HEIGHT - 6}
+              textAnchor="middle"
+              className={'bars__axis' + (b.key === current.key ? ' bars__axis--current' : '')}
+            >
+              {b.short || b.label}
+            </text>
+          ))}
+
+          {/* Цель для пальца — вся колонка, а не столбик: тонкий столбик
+              за три года пальцем не поймать */}
+          {bars.map((b) => (
+            <rect
+              key={'hit' + b.key}
+              x={BAR_PAD.left + slot * b.i}
+              y={0}
+              width={slot}
+              height={BAR_HEIGHT}
+              fill="transparent"
+              onClick={() => pick(b.i)}
+              style={{ cursor: 'pointer' }}
+            />
+          ))}
+        </svg>
+      )}
+
+      <button className="bars__toggle" type="button" onClick={() => setShowTable((v) => !v)}>
+        {showTable ? 'Показать графиком' : 'Показать таблицей'}
+      </button>
+    </div>
+  );
+}
+
+/** Столбик со скруглённым концом данных и прямым основанием у нуля */
+function barPath(x, top, w, h, negative) {
+  if (h <= 0) return '';
+  const r = Math.min(4, w / 2, h);
+  if (negative) {
+    const bottom = top + h;
+    return `M${x},${top} H${x + w} V${bottom - r} Q${x + w},${bottom} ${x + w - r},${bottom}`
+      + ` H${x + r} Q${x},${bottom} ${x},${bottom - r} Z`;
+  }
+  const base = top + h;
+  return `M${x},${base} V${top + r} Q${x},${top} ${x + r},${top}`
+    + ` H${x + w - r} Q${x + w},${top} ${x + w},${top + r} V${base} Z`;
+}
+
+/** Подпись оси коротко: 216 тыс, 1,2 млн */
+function shortNumber(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return formatNumber(v / 1e6, 1) + ' млн';
+  if (a >= 1e3) return formatNumber(Math.round(v / 1e3), 0) + ' тыс';
+  return formatNumber(v, a < 10 && a % 1 ? 1 : 0);
+}

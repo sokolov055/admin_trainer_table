@@ -2945,3 +2945,108 @@ code {
 }
 
 .field__input[type='date']::-webkit-date-and-time-value { text-align: left; }
+
+/* ==========================================================================
+ * График сводки: столбики по периодам
+ * ========================================================================== */
+
+.chart-card { margin-bottom: var(--space-5); }
+
+.chart-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.chart-card__title { margin: 0; font-size: var(--text-md); font-weight: 650; }
+
+.bars { position: relative; }
+
+.bars__readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-2);
+  margin-bottom: var(--space-2);
+  min-height: 44px;
+}
+
+.bars__period { width: 100%; color: var(--text-muted); font-size: var(--text-sm); }
+.bars__value { font-size: var(--text-lg); font-weight: 650; font-variant-numeric: tabular-nums; }
+.bars__delta { font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.bars__delta--up { color: var(--good-text); }
+.bars__delta--down { color: var(--critical-text); }
+.bars__delta--flat { color: var(--text-muted); }
+
+.bars__svg { display: block; touch-action: pan-y; }
+.bars__grid { stroke: var(--grid); stroke-width: 1; }
+.bars__zero { stroke: var(--border-strong); stroke-width: 1; }
+.bars__tick, .bars__axis { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.bars__axis--current { fill: var(--text); font-weight: 600; }
+
+/* Рост — сплошной столбик, падение — «пустой» с контуром, как свеча:
+   так их различают и те, кто не видит разницы красного и зелёного. */
+.bars__bar { opacity: 0.8; transition: opacity var(--dur) var(--ease-out); }
+.bars__bar--up { fill: var(--good); }
+.bars__bar--down { fill: var(--critical-fill); stroke: var(--critical); stroke-width: 1.5; }
+.bars__bar--flat { fill: var(--text-muted); opacity: 0.5; }
+.bars__bar--current { opacity: 1; }
+
+/* Идущий период — пунктиром и прозрачнее: месяц не кончился, и его
+   «падение» к прошлому — не провал, а неполные данные. */
+.bars__bar--partial { fill-opacity: 0.35; stroke-dasharray: 3 2; stroke-width: 1.5; }
+.bars__bar--partial.bars__bar--up { stroke: var(--good); }
+.bars__bar--partial.bars__bar--flat { stroke: var(--text-muted); }
+
+.bars__toggle {
+  margin-top: var(--space-1);
+  padding: 8px 0;
+  min-height: 36px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.bars__table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.bars__table th, .bars__table td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--border); }
+.bars__table th:first-child, .bars__table td:first-child { text-align: left; }
+.bars__table th { color: var(--text-muted); font-weight: 500; }
+.bars__empty { padding: 18px 0; }
+
+/* Строка показателя, по которой можно нажать: она переключает график.
+   Выбранная помечена полосой слева — цвет фона один не читался бы. */
+.rows__item--pick {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.rows__item--pick:active { background: var(--surface-active); }
+
+.rows__item--picked { background: var(--accent-wash); }
+.rows__item--picked::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.lead--pick { cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bars__bar { transition: none; }
+}

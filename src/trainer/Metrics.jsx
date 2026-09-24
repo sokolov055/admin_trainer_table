@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import {
-  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Delta, Segmented,
+  Lead, Section, Panel, Rows, Loading, ErrorState, Delta, Segmented,
   formatNumber, formatMoney,
 } from '../ui.jsx';
+import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
 import { IconBack } from '../icons.jsx';
 
@@ -92,6 +93,9 @@ let remembered = null;
 /** Для проверок: каждый экран в них открывается как в первый раз */
 export function resetPeriod() {
   remembered = null;
+  chosen.finance = 'profit';
+  chosen.process = 'trainings';
+  grainRemembered = 'month';
 }
 
 function usePeriod() {
@@ -193,38 +197,108 @@ function PeriodBar({ state, update }) {
 }
 
 /* ==================================================================
- * Строка показателя
+ * Показатели и график
  * ================================================================== */
 
 /**
- * Одна цифра и её изменение.
+ * Что умеет каждая цифра сводки: как её писать, в какую сторону хорошо и
+ * можно ли её показать на графике.
  *
  * `aim` — в какую сторону хорошо: у расходов и у молчащих клиентов рост
- * плохой, и красить его зелёным значило бы врать. Ноль вместо `aim` —
- * «сторона не определена»; такие есть: число оплат само по себе ни хорошо,
- * ни плохо.
+ * плохой, и красить его зелёным значило бы врать. Ноль — «сторона не
+ * определена»: число оплат само по себе ни хорошо, ни плохо.
+ *
+ * `chart: false` — цифры «на сегодня», а не за период: остаток предоплат,
+ * число клиентов в работе. У них нет истории по месяцам, и график из
+ * одинаковых столбиков только сбивал бы с толку.
+ */
+const FINANCE = {
+  profit: { label: 'Прибыль', unit: '₽' },
+  revenue: { label: 'Выручка', unit: '₽' },
+  expenses: { label: 'Расходы', unit: '₽', aim: -1 },
+  trainings: { label: 'Тренировок проведено' },
+  perTraining: { label: 'Выручка на тренировку', unit: '₽', note: 'занятий не было' },
+  perClient: { label: 'Выручка на клиента', unit: '₽', note: 'занятий не было' },
+  topShare: { label: 'Доля пяти крупнейших', unit: '%', aim: -1, note: 'занятий не было' },
+  cash: { label: 'Касса', unit: '₽', aim: 0 },
+  payments: { label: 'Оплат принято', aim: 0 },
+  averageCheck: { label: 'Средняя оплата', unit: '₽', note: 'оплат не было' },
+  bank: { label: 'Оплачено вперёд', unit: '₽', aim: 0, chart: false },
+  bankCover: { label: 'Отработать это займёт', unit: 'мес.', digits: 1, aim: 0, chart: false, note: 'выручки не было' },
+};
+
+const PROCESS = {
+  trainings: { label: 'Тренировок проведено' },
+  perClient: { label: 'Тренировок на клиента', digits: 1, note: 'занятий не было' },
+  activeClients: { label: 'Клиентов в работе', chart: false },
+  measuredClients: { label: 'Сняты замеры' },
+  measuredShare: { label: 'Доля с замером', unit: '%' },
+  withPlan: { label: 'Есть программа', chart: false },
+  planShare: { label: 'Доля с программой', unit: '%', chart: false },
+  silentClients: { label: 'Не приходили месяц', aim: -1, chart: false },
+};
+
+/** Выбранная для графика цифра — своя у финансов и у процессов */
+const chosen = { finance: 'profit', process: 'trainings' };
+
+function useChosen(group) {
+  const [key, setKey] = useState(chosen[group]);
+  const choose = (next) => {
+    chosen[group] = next;
+    setKey(next);
+    haptic();
+  };
+  return [key, choose];
+}
+
+/**
+ * Одна цифра и её изменение. Если у цифры есть история, строка —
+ * кнопка: нажатие переводит на неё график наверху.
  *
  * Прочерк на месте цифры не молчит, а объясняется подписью: «оплат не
  * было» читается иначе, чем просто пустое место, за которым человек
  * подозревает поломку.
  */
-function Metric({ label, value, before, unit, aim = 1, digits, note }) {
+function Metric({ id, spec, now, before, picked, onPick, label }) {
+  const value = now[id];
+  const was = before ? before[id] : null;
   const known = value !== null && value !== undefined;
-  const comparable = known && before !== null && before !== undefined && before !== value;
+  const comparable = spec.chart !== false && known && was !== null && was !== undefined && was !== value;
+
+  const body = (
+    <>
+      <span className="rows__label">{label || spec.label}</span>
+      <span className="rows__value">
+        {known ? (
+          <span className="metric">
+            <span className="metric__value">{format(value, spec.unit, spec.digits)}</span>
+            {comparable && (
+              <Delta
+                value={value - was}
+                suffix={spec.unit === '%' ? '%' : ''}
+                digits={spec.digits}
+                aim={spec.aim === undefined ? 1 : spec.aim}
+              />
+            )}
+          </span>
+        ) : (
+          <span className="muted small">{spec.note || '—'}</span>
+        )}
+      </span>
+    </>
+  );
+
+  if (spec.chart === false || !onPick) return <div className="rows__item">{body}</div>;
 
   return (
-    <Row label={label}>
-      {known ? (
-        <span className="metric">
-          <span className="metric__value">{format(value, unit, digits)}</span>
-          {comparable && (
-            <Delta value={value - before} suffix={unit === '%' ? '%' : ''} digits={digits} aim={aim} />
-          )}
-        </span>
-      ) : (
-        <span className="muted small">{note || '—'}</span>
-      )}
-    </Row>
+    <button
+      type="button"
+      className={'rows__item rows__item--pick' + (picked ? ' rows__item--picked' : '')}
+      aria-pressed={picked}
+      onClick={() => onPick(id)}
+    >
+      {body}
+    </button>
   );
 }
 
@@ -236,6 +310,7 @@ function Metric({ label, value, before, unit, aim = 1, digits, note }) {
 function format(value, unit, digits) {
   if (unit === '₽') return formatMoney(value);
   if (unit === '%') return formatNumber(value, digits) + '%';
+  if (unit === 'мес.') return formatNumber(value, digits) + ' мес.';
   return formatNumber(value, digits);
 }
 
@@ -244,34 +319,121 @@ function signed(value, period) {
   return (value > 0 ? '+' : '−') + formatMoney(Math.abs(value)) + ' ' + period.short;
 }
 
+const GRAINS = [
+  { value: 'month', label: 'Месяц' },
+  { value: 'quarter', label: 'Квартал' },
+  { value: 'year', label: 'Год' },
+];
+
+let grainRemembered = 'month';
+
+const SHORT_MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+/** Подпись столбика: полная — над графиком, короткая — под осью */
+function pointLabels(point, by) {
+  if (by === 'month') {
+    const [y, m] = point.key.split('-').map(Number);
+    return { label: monthLabel(point.key), short: SHORT_MONTHS[m - 1] + ' ' + String(y).slice(2) };
+  }
+  if (by === 'quarter') {
+    const [y, q] = point.key.split('-Q');
+    return { label: point.label, short: ['I', 'II', 'III', 'IV'][Number(q) - 1] + ' ' + y.slice(2) };
+  }
+  return { label: point.label, short: point.label };
+}
+
+/** Какой столбик подсветить: тот, что соответствует открытому периоду сводки */
+function highlightFor(state, by) {
+  const month = state.period === 'year' ? `${state.year}-12` : state.month;
+  const [y, m] = month.split('-').map(Number);
+  if (by === 'year') return String(y);
+  if (by === 'quarter') return `${y}-Q${Math.ceil(m / 3)}`;
+  return state.period === 'year' ? null : month;
+}
+
+/**
+ * График выбранной цифры по периодам.
+ *
+ * Разбивка — месяц, квартал или год — своя у графика и не зависит от
+ * того, какой период открыт в сводке: смотреть «сентябрь» и видеть рядом
+ * всю историю по кварталам — обычное желание.
+ */
+function MetricChart({ group, id, spec, state }) {
+  const [by, setBy] = useState(grainRemembered);
+  const { loading, data, error, reload } = useData('trainer.metrics.series', { by }, [by]);
+
+  const changeBy = (next) => {
+    grainRemembered = next;
+    setBy(next);
+    haptic();
+  };
+
+  let chart;
+  if (loading) chart = <Loading rows={2} />;
+  else if (error) chart = <ErrorState error={error} onRetry={reload} />;
+  else {
+    const points = (data.points || []).map((p) => ({
+      key: p.key,
+      ...pointLabels(p, data.by),
+      value: p[group] ? p[group][id] : null,
+      partial: p.partial,
+    }));
+
+    chart = (
+      <BarChart
+        points={points}
+        aim={spec.aim === undefined ? 1 : spec.aim}
+        format={(v) => format(v, spec.unit, spec.digits)}
+        highlight={highlightFor(state, data.by)}
+        label={spec.label}
+      />
+    );
+  }
+
+  return (
+    <Panel pad className="chart-card">
+      <div className="chart-card__head">
+        <h2 className="chart-card__title">{spec.label}</h2>
+      </div>
+      <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />
+      <div style={{ marginTop: 'var(--space-3)' }}>{chart}</div>
+    </Panel>
+  );
+}
+
 /* ==================================================================
  * Финансы
  * ================================================================== */
 
 export function Finance() {
   const [state, update] = usePeriod();
+  const [picked, pick] = useChosen('finance');
   const { loading, data, error, reload } = useMetrics(state);
 
-  const bar = <PeriodBar state={state} update={update} />;
+  const top = (
+    <>
+      <PeriodBar state={state} update={update} />
+      <MetricChart group="finance" id={picked} spec={FINANCE[picked]} state={state} />
+    </>
+  );
 
-  if (loading) return <>{bar}<Loading rows={4} /></>;
-  if (error) return <>{bar}<ErrorState error={error} onRetry={reload} /></>;
+  if (loading) return <>{top}<Loading rows={4} /></>;
+  if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
 
   const now = data.finance.now;
   const before = data.finance.before;
   const period = describe(data);
+  const row = (id, label) => (
+    <Metric id={id} spec={FINANCE[id]} now={now} before={before} picked={picked === id} onPick={pick} label={label} />
+  );
 
   return (
     <>
-      {bar}
+      {top}
 
-      {/* Крупно — прибыль, а не выручка. Выручку тренер и так помнит, а
-          прибыль до сих пор нигде не считалась: расходов не было ни в
-          базе, ни в таблице, и в месячных архивах её ставили руками.
-
-          Выручка — отработанное, та же цифра, что на экране клиентов.
-          Касса стоит отдельно и в прибыль не входит: это деньги, которые
-          ещё предстоит отработать. */}
+      {/* Крупно — прибыль, а не выручка. Выручка — отработанное, та же
+          цифра, что на экране клиентов. Касса стоит отдельно и в прибыль
+          не входит: это деньги, которые ещё предстоит отработать. */}
       <Lead
         label={'Прибыль · ' + period.label}
         tone={now.profit >= 0 ? 'good' : 'critical'}
@@ -286,10 +448,10 @@ export function Finance() {
       <Section title="Деньги" note={'рядом — изменение к ' + period.against}>
         <Panel>
           <Rows>
-            <Metric label="Выручка" unit="₽" value={now.revenue} before={before.revenue} />
-            <Metric label="Расходы" unit="₽" value={now.expenses} before={before.expenses} aim={-1} />
-            <Metric label="Прибыль" unit="₽" value={now.profit} before={before.profit} />
-            <Metric label="Тренировок проведено" value={now.trainings} before={before.trainings} />
+            {row('revenue')}
+            {row('expenses')}
+            {row('profit')}
+            {row('trainings')}
           </Rows>
         </Panel>
       </Section>
@@ -297,56 +459,32 @@ export function Finance() {
       <Section title="Сколько приносит работа">
         <Panel>
           <Rows>
-            <Metric
-              label="Выручка на тренировку"
-              unit="₽"
-              value={now.perTraining}
-              before={before.perTraining}
-              note="занятий не было"
-            />
-            <Metric
-              label="Выручка на клиента"
-              unit="₽"
-              value={now.perClient}
-              before={before.perClient}
-              note="занятий не было"
-            />
+            {row('perTraining')}
+            {row('perClient')}
+            {row('topShare')}
           </Rows>
         </Panel>
       </Section>
 
-      <Section
-        title="Деньги вперёд"
-        note="предоплаты — ещё не заработок, а обязательство отработать"
-      >
+      <Section title="Касса" note="деньги, которые пришли за период">
         <Panel>
           <Rows>
-            <Metric label={data.year ? 'Касса за год' : 'Касса за месяц'} unit="₽" value={now.cash} before={before.cash} aim={0} />
-            <Metric label="Оплат принято" value={now.payments} before={before.payments} aim={0} />
-            <Metric
-              label="Средняя оплата"
-              unit="₽"
-              value={now.averageCheck}
-              before={before.averageCheck}
-              note="оплат не было"
-            />
-            <Metric label="В банке" unit="₽" value={now.bank} before={before.bank} aim={0} />
-            <Metric
-              label="Хватит месяцев"
-              value={now.bankCover}
-              before={before.bankCover}
-              digits={2}
-              aim={0}
-              note="выручки не было — не с чем сравнивать"
-            />
-            <Metric
-              label="Доля пяти крупнейших"
-              unit="%"
-              value={now.topShare}
-              before={before.topShare}
-              aim={-1}
-              note="оплат не было"
-            />
+            {row('cash', data.year ? 'Касса за год' : 'Касса за месяц')}
+            {row('payments')}
+            {row('averageCheck')}
+          </Rows>
+        </Panel>
+      </Section>
+
+      {/* Раньше здесь стояли «В банке» и «Хватит месяцев», и что они
+          значат, было не понять. Это одна мысль в двух числах: сколько
+          клиенты заплатили вперёд и ещё не отходили — то есть сколько
+          тренер им должен, — и на сколько месяцев работы этого хватит. */}
+      <Section title="Долг перед клиентами" note="на сегодня: оплачено вперёд, но ещё не отработано">
+        <Panel>
+          <Rows>
+            {row('bank')}
+            {row('bankCover')}
           </Rows>
         </Panel>
       </Section>
@@ -354,9 +492,9 @@ export function Finance() {
       <p className="small muted metrics__foot">
         Выручка — проведённые тренировки по цене клиента, как на экране
         клиентов. Прибыль — выручка минус расходы, и больше ничего: налоги и
-        личные траты сюда не входят. Касса — оплаты, принятые в этом месяце:
-        это ещё не заработок, а тренировки, которые предстоит провести. В
-        банке — всё, что клиенты оплатили вперёд и ещё не отходили.
+        личные траты сюда не входят. Касса — оплаты, принятые за период:
+        это ещё не заработок, а тренировки, которые предстоит провести.
+        Нажмите на любую строку — график наверху покажет её историю.
       </p>
     </>
   );
@@ -368,20 +506,29 @@ export function Finance() {
 
 export function Processes() {
   const [state, update] = usePeriod();
+  const [picked, pick] = useChosen('process');
   const { loading, data, error, reload } = useMetrics(state);
 
-  const bar = <PeriodBar state={state} update={update} />;
+  const top = (
+    <>
+      <PeriodBar state={state} update={update} />
+      <MetricChart group="process" id={picked} spec={PROCESS[picked]} state={state} />
+    </>
+  );
 
-  if (loading) return <>{bar}<Loading rows={4} /></>;
-  if (error) return <>{bar}<ErrorState error={error} onRetry={reload} /></>;
+  if (loading) return <>{top}<Loading rows={4} /></>;
+  if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
 
   const now = data.process.now;
   const before = data.process.before;
   const period = describe(data);
+  const row = (id) => (
+    <Metric id={id} spec={PROCESS[id]} now={now} before={before} picked={picked === id} onPick={pick} />
+  );
 
   return (
     <>
-      {bar}
+      {top}
 
       <Lead
         label={'Тренировок · ' + period.label}
@@ -400,15 +547,9 @@ export function Processes() {
       <Section title="Работа" note={'рядом — изменение к ' + period.against}>
         <Panel>
           <Rows>
-            <Metric label="Клиентов в работе" value={now.activeClients} before={before.activeClients} />
-            <Metric label="Тренировок проведено" value={now.trainings} before={before.trainings} />
-            <Metric
-              label="Тренировок на клиента"
-              value={now.perClient}
-              before={before.perClient}
-              digits={1}
-              note="занятий не было"
-            />
+            {row('activeClients')}
+            {row('trainings')}
+            {row('perClient')}
           </Rows>
         </Panel>
       </Section>
@@ -419,10 +560,10 @@ export function Processes() {
       <Section title="Ведение">
         <Panel>
           <Rows>
-            <Metric label="Сняты замеры" value={now.measuredClients} before={before.measuredClients} />
-            <Metric label="Доля с замером" unit="%" value={now.measuredShare} before={before.measuredShare} />
-            <Metric label="Есть программа" value={now.withPlan} before={before.withPlan} />
-            <Metric label="Доля с программой" unit="%" value={now.planShare} before={before.planShare} />
+            {row('measuredClients')}
+            {row('measuredShare')}
+            {row('withPlan')}
+            {row('planShare')}
           </Rows>
         </Panel>
       </Section>
@@ -430,12 +571,7 @@ export function Processes() {
       <Section title="Кому позвонить" note="месяц без занятий — это ещё не уход, но уже повод">
         <Panel>
           <Rows>
-            <Metric
-              label="Не приходили месяц"
-              value={now.silentClients}
-              before={before.silentClients}
-              aim={-1}
-            />
+            {row('silentClients')}
           </Rows>
         </Panel>
       </Section>

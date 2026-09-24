@@ -304,6 +304,120 @@ const DEMO_POLLS_BEFORE_CONFIRM = 2;
 
 let demoLogin = null;
 
+
+/* ==========================================================================
+ * Сводка тренера: показатели и ряд для графика
+ *
+ * Выручка по месяцам — с сезоном: летом проседает, к осени растёт. Так на
+ * демо видно и зелёные, и красные столбики, а не одну ровную лестницу.
+ * ========================================================================== */
+
+const DEMO_REVENUE = [
+  ['2025-06', 180000], ['2025-07', 150000], ['2025-08', 165000], ['2025-09', 240000],
+  ['2025-10', 262000], ['2025-11', 255000], ['2025-12', 230000], ['2026-01', 210000],
+  ['2026-02', 268000], ['2026-03', 301000], ['2026-04', 290000], ['2026-05', 312000],
+  ['2026-06', 276000], ['2026-07', 245000], ['2026-08', 340250], ['2026-09', 216850],
+];
+
+function demoFinance(months) {
+  const revenue = months.reduce((sum, m) => sum + (DEMO_REVENUE.find((r) => r[0] === m) || [0, 0])[1], 0);
+  const expenses = 62000 * months.length;
+  const trainings = Math.round(revenue / 2437);
+  const cash = Math.round(revenue * 0.9);
+  const payments = Math.max(1, Math.round(cash / 26000));
+  return {
+    revenue,
+    expenses,
+    profit: revenue - expenses,
+    cash,
+    payments,
+    trainings,
+    activeClients: 15,
+    bank: 281800,
+    averageCheck: Math.round(cash / payments),
+    perTraining: trainings ? Math.round(revenue / trainings) : null,
+    perClient: Math.round(revenue / 15),
+    topShare: 58.3,
+    bankCover: revenue ? Math.round((281800 / (revenue / months.length)) * 100) / 100 : null,
+  };
+}
+
+function demoProcess(months) {
+  const trainings = demoFinance(months).trainings;
+  return {
+    activeClients: 23,
+    measuredClients: 9 * months.length,
+    measuredShare: 39,
+    trainings,
+    perClient: Math.round((trainings / 15) * 10) / 10,
+    withPlan: 18,
+    planShare: 78,
+    silentClients: 4,
+  };
+}
+
+function demoPrevMonth(month) {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 2, 1));
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+}
+
+function demoMetrics(params) {
+  const last = DEMO_REVENUE[DEMO_REVENUE.length - 1][0];
+
+  if (params.year) {
+    const year = Number(params.year);
+    const through = year === Number(last.slice(0, 4)) ? Number(last.slice(5)) : 12;
+    const months = (y) => Array.from({ length: through }, (_, i) => y + '-' + String(i + 1).padStart(2, '0'));
+    return {
+      year,
+      previousYear: year - 1,
+      throughMonth: through,
+      finance: { now: demoFinance(months(year)), before: demoFinance(months(year - 1)) },
+      process: { now: demoProcess(months(year)), before: demoProcess(months(year - 1)) },
+    };
+  }
+
+  const month = params.month || last;
+  const before = params.compare === 'year'
+    ? (Number(month.slice(0, 4)) - 1) + month.slice(4)
+    : demoPrevMonth(month);
+
+  return {
+    month,
+    compare: params.compare === 'year' ? 'year' : 'month',
+    previousMonth: before,
+    finance: { now: demoFinance([month]), before: demoFinance([before]) },
+    process: { now: demoProcess([month]), before: demoProcess([before]) },
+  };
+}
+
+function demoSeries(params) {
+  const by = ['month', 'quarter', 'year'].includes(params.by) ? params.by : 'month';
+  const last = DEMO_REVENUE[DEMO_REVENUE.length - 1][0];
+  const buckets = new Map();
+
+  DEMO_REVENUE.forEach(([month]) => {
+    const [y, m] = month.split('-').map(Number);
+    const key = by === 'year' ? String(y) : by === 'quarter' ? y + '-Q' + Math.ceil(m / 3) : month;
+    if (!buckets.has(key)) buckets.set(key, { key, y, m, months: [] });
+    buckets.get(key).months.push(month);
+  });
+
+  return {
+    by,
+    points: [...buckets.values()].map((b) => ({
+      key: b.key,
+      label: by === 'year' ? String(b.y)
+        : by === 'quarter' ? ['I', 'II', 'III', 'IV'][Math.ceil(b.m / 3) - 1] + ' кв. ' + b.y
+          : b.key,
+      partial: b.months.includes(last),
+      finance: demoFinance(b.months),
+      process: demoProcess(b.months),
+    })),
+  };
+}
+
 const MOCK = {
   // Пакет: те же обработчики, только за один «поход на сервер». Нужен
   // здесь, чтобы демо-режим повторял боевой путь загрузки, а не шёл
@@ -727,6 +841,9 @@ const MOCK = {
     hadTelegram: true,
     unlinked: params.unlinkTelegram === true,
   }),
+
+  'trainer.metrics': (params) => demoMetrics(params),
+  'trainer.metrics.series': (params) => demoSeries(params),
 
   'trainer.finance': () => ({
     sheet: 'BSC_Финансы',

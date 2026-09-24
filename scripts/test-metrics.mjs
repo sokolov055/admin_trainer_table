@@ -151,10 +151,23 @@ function metrics({ month = '2026-09', now = {}, before = {}, process: proc = {},
 function draw(Screen, answer, { onMutate } = {}) {
   resetPeriod();
   const asked = [];
+  const charted = [];
   const sent = [];
 
   globalThis.__metrics = {
     useData(action, params) {
+      // График просит свой ряд отдельным запросом. В сводке его не
+      // считаем: проверки смотрят, какой ПЕРИОД спросили у сервера.
+      if (action === 'trainer.metrics.series') {
+        charted.push(params);
+        const series = answer(action, params);
+        return {
+          loading: false,
+          data: series && series.points ? series : { by: params.by, points: [] },
+          error: null,
+          reload() {},
+        };
+      }
       asked.push({ action, params });
       return { loading: false, data: answer(action, params), error: null, reload() {} };
     },
@@ -167,7 +180,7 @@ function draw(Screen, answer, { onMutate } = {}) {
   let tree;
   act(() => { tree = renderer.create(React.createElement(Screen)); });
 
-  return { tree, asked, sent };
+  return { tree, asked, sent, charted };
 }
 
 /* ==========================================================================
@@ -472,4 +485,119 @@ test('в расходе цифровая клавиатура только у с
   assert.equal(modes['Сумма, ₽'], 'decimal');
   assert.equal(modes['Статья'], 'text');
   assert.equal(modes['Заметка'], 'text');
+});
+
+/* ==========================================================================
+ * График сводки
+ * ========================================================================== */
+
+/** Ряд для графика: выручка по трём месяцам — рост, потом падение */
+function series(by = 'month') {
+  const point = (key, revenue, extra = {}) => ({
+    key,
+    label: key,
+    partial: false,
+    finance: { profit: revenue - 62000, revenue, expenses: 62000, cash: 0, trainings: 0 },
+    process: { trainings: 10, perClient: 1 },
+    ...extra,
+  });
+
+  return {
+    by,
+    points: [
+      point('2026-07', 200000),
+      point('2026-08', 340000),
+      point('2026-09', 216850, { partial: true }),
+    ],
+  };
+}
+
+const answerWithSeries = (action, params) => (action === 'trainer.metrics.series'
+  ? series(params.by)
+  : metrics({ now: { revenue: 216850, profit: 154850 }, before: { revenue: 340000, profit: 278000 } }));
+
+const barsOf = (tree) => tree.root.findAll(
+  (node) => node.type === 'path' && String(node.props.className || '').includes('bars__bar'),
+  { deep: true },
+);
+
+test('график показывает прибыль, пока не выбрали другое', () => {
+  const { tree } = draw(Finance, answerWithSeries);
+
+  const title = tree.root.find((node) => node.props.className === 'chart-card__title');
+  assert.equal(textOf(title.props.children), 'Прибыль');
+});
+
+/**
+ * Как на бирже: зелёный — стало лучше, красный — хуже. Первый столбик
+ * сравнить не с чем. Падение рисуется ещё и «пустым» — это отдельный
+ * класс, а не только цвет.
+ */
+test('рост зелёный, падение красное, первый столбик нейтральный', () => {
+  const { tree } = draw(Finance, answerWithSeries);
+  const kinds = barsOf(tree).map((bar) => bar.props.className.match(/bars__bar--(up|down|flat)/)[1]);
+
+  assert.deepEqual(kinds, ['flat', 'up', 'down']);
+});
+
+test('нажатие на строку переводит на неё график', () => {
+  const { tree } = draw(Finance, answerWithSeries);
+
+  const revenue = tree.root.findAll(
+    (node) => node.type === 'button' && textOf(node.props.children).startsWith('Выручка'),
+    { deep: true },
+  )[0];
+  act(() => { revenue.props.onClick(); });
+
+  const title = tree.root.find((node) => node.props.className === 'chart-card__title');
+  assert.equal(textOf(title.props.children), 'Выручка');
+});
+
+/** У расходов рост — плохо: столбик роста расходов красный */
+test('у расходов рост красный', () => {
+  const answer = (action, params) => {
+    if (action !== 'trainer.metrics.series') return metrics();
+    const data = series(params.by);
+    data.points[1].finance.expenses = 90000;
+    return data;
+  };
+  const { tree } = draw(Finance, answer);
+
+  const expenses = tree.root.findAll(
+    (node) => node.type === 'button' && textOf(node.props.children).startsWith('Расходы'),
+    { deep: true },
+  )[0];
+  act(() => { expenses.props.onClick(); });
+
+  const kinds = barsOf(tree).map((bar) => bar.props.className.match(/bars__bar--(up|down|flat)/)[1]);
+  assert.equal(kinds[1], 'down', '62 000 → 90 000 — это хуже');
+});
+
+test('разбивка графика по кварталам уходит на сервер', () => {
+  const { tree, charted } = draw(Finance, answerWithSeries);
+
+  press(tree, 'Квартал');
+
+  assert.equal(charted[charted.length - 1].by, 'quarter');
+});
+
+/**
+ * «Оплачено вперёд» — цифра на сегодня, истории у неё нет: строка не
+ * кнопка, иначе график из одинаковых столбиков сбил бы с толку.
+ */
+test('цифры «на сегодня» на график не переключают', () => {
+  const { tree } = draw(Finance, answerWithSeries);
+
+  const clickable = tree.root.findAll(
+    (node) => node.type === 'button' && textOf(node.props.children).startsWith('Оплачено вперёд'),
+    { deep: true },
+  );
+  assert.equal(clickable.length, 0);
+  assert.match(screenText(tree), /Долг перед клиентами/);
+  assert.doesNotMatch(screenText(tree), /В банке|Хватит месяцев/);
+});
+
+test('идущий период подписан, чтобы не читаться провалом', () => {
+  const { tree } = draw(Finance, answerWithSeries);
+  assert.match(screenText(tree), /ещё идёт, данные неполные/);
 });
