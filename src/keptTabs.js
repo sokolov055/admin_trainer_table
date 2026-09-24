@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { scrollToClamped } from './scroll.js';
 
 /**
  * Разделы нижнего меню живут, пока приложение открыто.
@@ -37,7 +38,7 @@ export function useKeptTabs(view, tabIds, { keepScroll = true } = {}) {
     // (keepScroll: false — экран листает только часть себя, и страница
     // должна стоять, где стоит)
     if (keepScroll && typeof window !== 'undefined' && window.scrollTo) {
-      window.scrollTo(0, scrolls.current[view] || 0);
+      scrollToClamped(scrolls.current[view] || 0);
     }
   }, [view]);
 

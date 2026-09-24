@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { haptic } from './telegram.js';
+import { scrollToClamped } from './scroll.js';
 
 /**
  * Два жеста, которых ждут от приложения на телефоне: потянуть вниз —
@@ -949,7 +950,7 @@ export function Gestures() {
           requestAnimationFrame(() => {
             // Когда листается только область под баром, страница стоит —
             // прокрутку не трогаем
-            if (!done.region) window.scrollTo(0, done.snapshot ? done.snapshot.scrollY : 0);
+            if (!done.region) scrollToClamped(done.snapshot ? done.snapshot.scrollY : 0);
             stopLive();
             requestAnimationFrame(() => whenDrawn(() => { settleEntered(); afterPaint(() => dropScene()); }));
           });
@@ -1008,7 +1009,7 @@ export function Gestures() {
         // где человек был, ставим страницу на место — всё под сценой — и
         // только потом убираем сцену.
         requestAnimationFrame(() => {
-          if (restoreTo !== null) window.scrollTo(0, restoreTo);
+          if (restoreTo !== null) scrollToClamped(restoreTo);
           stopLive();
           requestAnimationFrame(() => whenDrawn(() => { settleEntered(); afterPaint(() => dropScene()); }));
         });

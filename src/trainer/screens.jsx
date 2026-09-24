@@ -704,16 +704,27 @@ export function Logs() {
           : result.indexOf('⚠️') === 0 ? 'warn'
           : result.indexOf('✅') === 0 ? 'good' : undefined;
 
+        // Плашка не переносится, и длинный текст ошибки раздвигал экран
+        // вбок. В плашке — короткий статус, подробности — строкой ниже.
+        const text = result.replace(/^[✅❌⚠️]+\s*/, '');
+        const long = text.length > 24;
+        const label = !text ? 'без статуса'
+          : !long ? text
+          : kind === 'bad' ? 'Ошибка' : kind === 'warn' ? 'Внимание' : kind === 'good' ? 'Готово' : 'Подробнее ниже';
+
         return (
           <div className="item item--static" key={i}>
             <div className="item__top">
               <span className="item__name">{e.action}</span>
-              <Badge kind={kind}>{result.replace(/^[✅❌⚠️]+\s*/, '') || 'без статуса'}</Badge>
+              <Badge kind={kind}>{label}</Badge>
             </div>
             <div className="item__meta">
               <span>{e.at}</span>
               {e.client && <span>{e.client}</span>}
             </div>
+            {long && (
+              <div className={'small log__result' + (kind === 'bad' ? ' log__result--bad' : '')}>{text}</div>
+            )}
             {e.details && (
               <div className="small muted" style={{ marginTop: 5 }}>{e.details}</div>
             )}
