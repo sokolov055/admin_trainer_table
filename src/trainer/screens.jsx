@@ -54,9 +54,13 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   // сервер отдаёт дату, только пока занятие не кончилось.
   const upcoming = data.clients.filter((c) => c.nextTrainingDate);
 
+  // Сплиты — пары, которые тренируются вместе по одной программе
+  const splits = data.clients.filter((c) => c.members && c.members.length > 1);
+
   const filters = [
     { value: 'next', label: `Ближайшие · ${upcoming.length}` },
     { value: 'all', label: `Все · ${data.clients.length}` },
+    { value: 'splits', label: `Сплиты · ${splits.length}` },
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
     { value: 'debt', label: `Долг · ${s.negativeBalance}` },
     { value: 'nomeasure', label: 'Без замера' },
@@ -66,6 +70,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
     if (query && c.name.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
 
     if (filter === 'next') return !!c.nextTrainingDate;
+    if (filter === 'splits') return splits.indexOf(c) !== -1;
     if (filter === 'attention') return needsAttention.indexOf(c) !== -1;
     if (filter === 'debt') return c.balance < 0;
     if (filter === 'nomeasure') return String(c.lastMeasureStatus || '').indexOf('✅') !== 0;
@@ -104,6 +109,10 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
 
         <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
         <Chips items={filters} value={filter} onChange={setFilter} />
+
+        {filter === 'splits' && (
+          <AddSplit onCreated={(client) => { setPendingRow(client.row); reload(); }} />
+        )}
 
         {shown.length === 0 && (
           <Empty icon={IconSearch} title="Никого не нашлось" text="Попробуйте другой фильтр или запрос." />
@@ -321,6 +330,151 @@ function AddClient({ onCreated }) {
 }
 
 /* ==================================================================
+ * Сплиты: двое по одной программе, один баланс
+ * ================================================================== */
+
+/**
+ * Новый сплит — клиент на двоих. Имя собирается из участников через «+»:
+ * по нему календарь узнаёт занятия пары, как и раньше.
+ */
+function AddSplit({ onCreated }) {
+  const [open, setOpen] = useState(false);
+  const [names, setNames] = useState(['', '']);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const members = names.map((n) => n.trim()).filter(Boolean);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (members.length < 2 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await createClient(members.join(' + '));
+      await apiMutate('trainer.split.save', { clientRow: created.row, members });
+      haptic('success');
+      setNames(['', '']);
+      setOpen(false);
+      onCreated(created);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button className="button button--block" style={{ marginBottom: 12 }} onClick={() => setOpen(true)}>
+        <IconUserPlus size={16} />
+        Новый сплит
+      </button>
+    );
+  }
+
+  return (
+    <Panel pad>
+      <form className="split-form" onSubmit={submit}>
+        <p className="small muted" style={{ margin: 0 }}>
+          Одна программа и один баланс на двоих. У каждого упражнения — кто его делает и с каким весом.
+        </p>
+        {names.map((n, i) => (
+          <Field
+            key={i}
+            label={'Участник ' + (i + 1)}
+            value={n}
+            placeholder={i === 0 ? 'Соня' : 'Юля'}
+            onChange={(v) => setNames((prev) => prev.map((x, k) => (k === i ? v : x)))}
+          />
+        ))}
+        {names.length < 4 && (
+          <button type="button" className="button button--ghost" onClick={() => setNames((p) => [...p, ''])}>Добавить участника</button>
+        )}
+        {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
+        <div className="library__actions">
+          <button className="button button--primary" disabled={busy || members.length < 2}>
+            {busy ? 'Завожу…' : 'Создать сплит'}
+          </button>
+          <button type="button" className="button" disabled={busy} onClick={() => { setOpen(false); setError(null); }}>Отмена</button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/**
+ * Состав пары в карточке. У обычного клиента — «Сделать сплитом»:
+ * пару, записанную одним человеком, можно разделить на участников.
+ */
+function ClientSplit({ client }) {
+  const initial = client.members && client.members.length > 1 ? client.members : [];
+  const [saved, setSaved] = useState(initial);
+  const [draft, setDraft] = useState(initial.length ? initial : null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const save = async (members) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await apiMutate('trainer.split.save', { clientRow: client.row, members });
+      setSaved(result.members);
+      setDraft(result.members.length ? result.members : null);
+      haptic('success');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!draft) {
+    return (
+      <button className="button button--ghost access-reset__trigger" onClick={() => setDraft(['', ''])}>
+        <IconUsers size={16} />
+        Сделать сплитом
+      </button>
+    );
+  }
+
+  const clean = draft.map((n) => n.trim()).filter(Boolean);
+  const changed = clean.join('|') !== saved.join('|');
+
+  return (
+    <div className="client-split">
+      <strong className="small">Сплит</strong>
+      <p className="small muted" style={{ margin: '2px 0 8px' }}>
+        Имена — как у серий замеров. Переименование переносит веса и замеры участника.
+      </p>
+      {draft.map((n, i) => (
+        <input
+          key={i}
+          className="field__input"
+          aria-label={'Участник ' + (i + 1)}
+          value={n}
+          maxLength={60}
+          disabled={busy}
+          onChange={(e) => setDraft((prev) => prev.map((x, k) => (k === i ? e.target.value : x)))}
+        />
+      ))}
+      <div className="library__actions">
+        {changed && (
+          <button className="button button--primary" disabled={busy || clean.length < 2} onClick={() => save(clean)}>
+            {busy ? 'Сохраняю…' : 'Сохранить состав'}
+          </button>
+        )}
+        {draft.length < 4 && <button className="button button--ghost" disabled={busy} onClick={() => setDraft((p) => [...p, ''])}>Ещё участник</button>}
+        {saved.length > 0
+          ? <button className="button button--ghost" disabled={busy} onClick={() => save([])}>Не сплит</button>
+          : <button className="button button--ghost" disabled={busy} onClick={() => setDraft(null)}>Отмена</button>}
+      </div>
+      {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
+    </div>
+  );
+}
+
+/* ==================================================================
  * Семья: плательщик и те, за кого он платит
  * ================================================================== */
 
@@ -462,6 +616,8 @@ export function ClientCard({ client }) {
       <ClientInviteLink client={client} />
 
       {client.family && <ClientFamily client={client} />}
+
+      <ClientSplit client={client} />
 
       {access.done && (
         <div className="access-reset__result" role="status">

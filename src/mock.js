@@ -77,7 +77,7 @@ const MONTHS = ['Сентябрь 2026', 'Август 2026', 'Июль 2026', '
 
 const CLIENTS = [
   { row: 3, name: 'Анна Морозова', price: 3000, count: 10, balance: 12000, trainings: 6, revenue: 18000, payer: '', template: 'P01 — Набор массы', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 13.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(2), nextTrainingDate: daysAhead(2, '10:00'), startDate: daysAgo(400), birthDate: null, chatId: '11111', clientKey: 'anna', hasLink: true },
-  { row: 4, name: 'Евгений и Екатерина', price: 4000, count: 8, balance: -4000, trainings: 4, revenue: 16000, payer: '', template: 'P03 — Сплит', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: 'Евгений: ✅ 08.09.2026  |  Екатерина: ❌ 20.07.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(5), nextTrainingDate: daysAhead(5, '19:00'), startDate: daysAgo(220), birthDate: null, chatId: '22222', clientKey: 'evgeny', hasLink: true },
+  { row: 4, name: 'Евгений и Екатерина', price: 4000, count: 8, balance: -4000, trainings: 4, revenue: 16000, payer: '', template: 'P03 — Сплит', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: 'Евгений: ✅ 08.09.2026  |  Екатерина: ❌ 20.07.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(5), nextTrainingDate: daysAhead(5, '19:00'), startDate: daysAgo(220), birthDate: null, chatId: '22222', clientKey: 'evgeny', hasLink: true, members: ['Евгений', 'Екатерина'] },
   { row: 5, name: 'Дмитрий Соколов', price: 2500, count: 12, balance: 7500, trainings: 9, revenue: 22500, payer: '', template: 'REPEAT_LAST_MONTH', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '❌ 02.08.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(1), nextTrainingDate: daysAhead(1, '08:30'), startDate: daysAgo(700), birthDate: null, chatId: '33333', clientKey: 'dmitry', hasLink: true },
   { row: 6, name: 'Мария Волкова', price: 3000, count: 10, balance: 0, trainings: 0, revenue: 0, payer: '', template: '', monthStatus: '', lastMeasureStatus: '', monthSheetStatus: '❌ нет "Сентябрь 2026"', lastTrainingDate: daysAgo(38), startDate: daysAgo(120), birthDate: null, chatId: '', clientKey: 'maria', hasLink: false },
   { row: 7, name: 'Игорь Лебедев', price: 3500, count: 8, balance: 14000, trainings: 7, revenue: 24500, payer: '', template: 'P02 — Сила', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 11.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(3), startDate: daysAgo(310), birthDate: null, chatId: '44444', clientKey: 'igor', hasLink: true },
@@ -609,6 +609,8 @@ const MOCK = {
     hasPersonalSheet: true,
   }),
 
+  'trainer.split.save': (params) => ({ row: params.clientRow, name: '', members: params.members || [] }),
+
   // Семья в демо: у Анны — брат, за которого она платит
   'family.list': () => ({ members: [{ row: 5, name: 'Дмитрий Соколов', payer: false }] }),
   'trainer.client.family': (params) => ({
@@ -710,7 +712,18 @@ const MOCK = {
       available: visible,
       hidden: trainer ? hiddenMonths.slice() : [],
       canHide: trainer,
-      blocks: month ? PLAN_BLOCKS : [],
+      // Сплит в демо — «Евгений и Екатерина» (строка 4)
+      members: Number(params.clientRow) === 4 ? ['Евгений', 'Екатерина'] : [],
+      blocks: month
+        ? (Number(params.clientRow) === 4
+          ? PLAN_BLOCKS.map((b) => ({ ...b, exercises: b.exercises.map((e, i) => ({
+            ...e,
+            performers: i === 1 ? ['Екатерина'] : [],
+            splitWeights: i === 1 ? { Екатерина: '20' } : { Евгений: '60', Екатерина: '30' },
+            splitPrev: {},
+          })) }))
+          : PLAN_BLOCKS)
+        : [],
       note: month ? '' : 'В таблице клиента пока нет ни одного листа с программой.',
     };
   },

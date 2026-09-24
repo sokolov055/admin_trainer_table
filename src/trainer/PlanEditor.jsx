@@ -24,7 +24,11 @@ import BlockOrder from './BlockOrder.jsx';
  * этого сразу следующее, без отдыха».
  */
 
-const blank = () => ({ name: '', weight: '', prevWeight: '', sets: '', reps: '', rpe: '', supersetGroup: '' });
+const blank = () => ({
+  name: '', weight: '', prevWeight: '', sets: '', reps: '', rpe: '', supersetGroup: '',
+  // Сплит: кто делает (пусто — все) и вес каждого
+  performers: [], splitWeights: {}, splitPrev: {},
+});
 
 /**
  * Тот же редактор правит и шаблоны из библиотеки: у шаблона те же блоки.
@@ -32,9 +36,13 @@ const blank = () => ({ name: '', weight: '', prevWeight: '', sets: '', reps: '',
  * шаблон одной тренировки, добавлять и убирать тренировки в нём нельзя;
  * submitLabel — подпись кнопки сохранения.
  */
+// members — участники сплита: у упражнения появляются исполнители и вес
+// каждого вместо одного общего веса
 export default function PlanEditor({
   clientRow, month, blocks, onSaved, onCancel, onSubmit, single = false, submitLabel = 'Сохранить программу',
+  members = [],
 }) {
+  const split = members.length > 1;
   // Подсказки названий из библиотеки: общие и свои упражнения. Набрать
   // «жим» и выбрать из списка быстрее, чем печатать целиком, а названия
   // одинаковые во всех программах — по ним строится «было» у клиента.
@@ -64,6 +72,26 @@ export default function PlanEditor({
     if (field === 'sets' && group) {
       list.forEach((e) => { if (e.supersetGroup === group) e.sets = value; });
     }
+    return next;
+  });
+
+  /**
+   * Кто делает упражнение. Пустой список значит «все»: так и хранится,
+   * чтобы новое упражнение не требовало отмечать каждого. Снять можно
+   * всех, кроме последнего: упражнение без исполнителя — это удаление.
+   */
+  const togglePerformer = (bi, ei, name) => change((next) => {
+    const ex = next[bi].exercises[ei];
+    const active = ex.performers && ex.performers.length ? ex.performers : members;
+    const on = active.includes(name) ? active.filter((n) => n !== name) : members.filter((m) => m === name || active.includes(m));
+    if (!on.length) return next;
+    ex.performers = on.length === members.length ? [] : on;
+    return next;
+  });
+
+  const setSplitWeight = (bi, ei, name, value) => change((next) => {
+    const ex = next[bi].exercises[ei];
+    ex.splitWeights = { ...(ex.splitWeights || {}), [name]: value };
     return next;
   });
 
@@ -227,17 +255,50 @@ export default function PlanEditor({
                   onChange={(e) => setExercise(bi, ei, 'name', e.target.value)}
                 />
 
-                <div className="plan-edit__numbers plan-edit__labels" aria-hidden="true">
-                  <span>{exercise.supersetGroup ? 'Круги' : 'Подходы'}</span><span>Повторы</span><span>Вес</span><span>RPE</span>
+                <div className={'plan-edit__numbers plan-edit__labels' + (split ? ' plan-edit__numbers--split' : '')} aria-hidden="true">
+                  <span>{exercise.supersetGroup ? 'Круги' : 'Подходы'}</span><span>Повторы</span>{!split && <span>Вес</span>}<span>RPE</span>
                 </div>
-                <div className="plan-edit__numbers">
+                <div className={'plan-edit__numbers' + (split ? ' plan-edit__numbers--split' : '')}>
                   <input className="field__input" placeholder="Подх." inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
                   <input className="field__input" placeholder="Повт." inputMode="text" value={exercise.reps} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
-                  <input className="field__input" placeholder="Вес" inputMode="decimal" value={exercise.weight} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />
+                  {!split && <input className="field__input" placeholder="Вес" inputMode="decimal" value={exercise.weight} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
                   <input className="field__input" placeholder="RPE" inputMode="decimal" value={exercise.rpe} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'rpe', e.target.value)} />
                 </div>
 
-                {exercise.prevWeight && <span className="plan-edit__prev">было {exercise.prevWeight}</span>}
+                {!split && exercise.prevWeight && <span className="plan-edit__prev">было {exercise.prevWeight}</span>}
+
+                {/* Сплит: кто делает и с каким весом — строкой на человека.
+                    Кнопка с именем — «делает»; снятому вес не нужен. */}
+                {split && (
+                  <div className="plan-edit__split">
+                    {members.map((m) => {
+                      const doing = !exercise.performers || !exercise.performers.length || exercise.performers.includes(m);
+                      const prev = exercise.splitPrev && exercise.splitPrev[m];
+                      return (
+                        <div className="plan-edit__person" key={m}>
+                          <button
+                            type="button"
+                            className={'chip' + (doing ? ' chip--active' : '')}
+                            aria-pressed={doing}
+                            disabled={busy}
+                            onClick={() => togglePerformer(bi, ei, m)}
+                          >{m}</button>
+                          <input
+                            className="field__input"
+                            aria-label={'Вес: ' + m}
+                            placeholder={doing ? 'Вес' : 'не делает'}
+                            inputMode="decimal"
+                            value={(exercise.splitWeights && exercise.splitWeights[m]) || ''}
+                            maxLength={24}
+                            disabled={busy || !doing}
+                            onChange={(e) => setSplitWeight(bi, ei, m, e.target.value)}
+                          />
+                          {prev && doing && <span className="plan-edit__prev">было {prev}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="plan-edit__actions">
                   <button className="icon-button plan-edit__icon" aria-label="Выше" title="Выше" disabled={busy || ei === 0} onClick={() => move(bi, ei, -1)}>

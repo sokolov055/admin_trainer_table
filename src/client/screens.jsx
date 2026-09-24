@@ -385,6 +385,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
               clientRow={clientRow}
               month={data.month}
               blocks={blocks}
+              members={data.members || []}
               onSaved={() => { setEditing(false); reload(); }}
               onCancel={() => setEditing(false)}
             />
@@ -524,10 +525,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                       Суперсет{group.sets ? ' · ' + group.sets + ' ' + plural(Number(group.sets), 'круг', 'круга', 'кругов') : ''}
                       <span className="superset__hint">подряд, без отдыха между упражнениями</span>
                     </div>
-                    {group.items.map((ex, k) => <ExerciseRow ex={ex} inSuperset key={k} />)}
+                    {group.items.map((ex, k) => <ExerciseRow ex={ex} inSuperset members={data.members} key={k} />)}
                   </div>
                 )
-                : <ExerciseRow ex={group.items[0]} key={j} />
+                : <ExerciseRow ex={group.items[0]} members={data.members} key={j} />
             ))}
           </Panel>
         </Section>
@@ -568,17 +569,30 @@ function nextMonthLabel() {
  * стоит в заголовке группы, а дважды написанное рядом читается как
  * «у каждого свои».
  */
-function ExerciseRow({ ex, inSuperset }) {
+function ExerciseRow({ ex, inSuperset, members = [] }) {
   const scheme = [
     inSuperset ? (ex.reps && ex.reps + ' повт.') : (ex.sets && ex.sets + ' × ' + (ex.reps || '?')),
     ex.rpe && 'RPE ' + ex.rpe,
   ].filter(Boolean).join('   ·   ');
+
+  // Сплит: кто делает и с каким весом. Упражнение не для всех — помечено
+  // именем, чтобы в зале не пришлось вспоминать, чьё оно.
+  const split = members && members.length > 1;
+  const doers = split ? (ex.performers && ex.performers.length ? ex.performers : members) : [];
+  const weights = doers
+    .map((m) => (ex.splitWeights && ex.splitWeights[m] ? m + ' ' + ex.splitWeights[m] + ' кг' : ''))
+    .filter(Boolean)
+    .join('   ·   ');
 
   return (
     <div className="exercise" style={{ minWidth: 0 }}>
       <div style={{ minWidth: 0 }}>
         <div className="exercise__name">{ex.name}</div>
         <div className="exercise__scheme">{scheme || '—'}</div>
+        {split && doers.length < members.length && (
+          <div className="exercise__who">только {doers.join(' и ')}</div>
+        )}
+        {split && weights && <div className="exercise__scheme">{weights}</div>}
       </div>
     </div>
   );
