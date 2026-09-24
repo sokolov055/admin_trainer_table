@@ -609,6 +609,13 @@ const MOCK = {
     hasPersonalSheet: true,
   }),
 
+  // Семья в демо: у Анны — брат, за которого она платит
+  'family.list': () => ({ members: [{ row: 5, name: 'Дмитрий Соколов', payer: false }] }),
+  'trainer.client.family': (params) => ({
+    row: params.clientRow,
+    family: { enabled: !!params.enabled, members: [{ name: 'Дмитрий Соколов', payer: false, enabled: true }] },
+  }),
+
   'client.measurements': () => ({
     series: [{ label: '', sheetName: 'Показатели', rows: MEASURE_ROWS }],
     fields: FIELDS,

@@ -298,7 +298,11 @@ async function request(action, params) {
 
   // Запасной адрес нужен на время переезда: новый сервер не отозвался —
   // молча уходим на старый, вместо того чтобы показывать клиенту ошибку
-  if (body === null) {
+  //
+  // Кроме данных члена семьи: Apps Script про семью не знает, familyRow
+  // пропустил бы мимо и отдал спросившему его собственные замеры — под
+  // именем родственника. Лучше честное «сервер не отвечает».
+  if (body === null && !JSON.stringify(params).includes('"familyRow"')) {
     const spare = fallbackApiUrl();
     if (spare && spare !== url) body = await tryEndpoint(spare, payload);
   }

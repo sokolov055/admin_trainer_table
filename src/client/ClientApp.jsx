@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
@@ -13,6 +13,8 @@ import { APP_VERSION } from '../version.js';
 import Profile from './Profile.jsx';
 import PushSetting from '../PushSetting.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
+import Family from './Family.jsx';
+import { apiPublic } from '../api.js';
 
 /**
  * Панель клиента.
@@ -51,10 +53,27 @@ const MENU = [
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
 
-const VIEWS = TABS.concat(MENU);
+// Семья — в меню, только если тренер открыл её этому человеку и в ней
+// есть кого показать. Пустой пункт «Семья» у одиночки только сбивал бы.
+const FAMILY = { id: 'family', label: 'Семья', note: 'Тренировки и прогресс близких', Icon: IconUsers };
 
 export default function ClientApp({ me, clientRow, preview }) {
   const [view, setView] = useState('overview');
+
+  // Семья — только в своём кабинете: тренеру в карточке клиента и в
+  // предпросмотре она не нужна, у него есть сами карточки.
+  // Не ждём и не показываем ошибок: нет ответа — нет и пункта в меню.
+  const [familyMembers, setFamilyMembers] = useState([]);
+  useEffect(() => {
+    if (clientRow) return undefined;
+    let alive = true;
+    apiPublic('family.list', {})
+      .then((r) => { if (alive) setFamilyMembers((r && r.members) || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [clientRow]);
+  const menu = familyMembers.length ? [FAMILY, ...MENU] : MENU;
+  const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
   // смахнуть вправо — вернуться на ту вкладку, где был человек
@@ -170,7 +189,7 @@ export default function ClientApp({ me, clientRow, preview }) {
         </div>
 
         <div className="menu__list">
-          {MENU.map((m) => {
+          {menu.map((m) => {
             const Icon = m.Icon;
             const active = m.id === view;
             return (
@@ -230,6 +249,8 @@ export default function ClientApp({ me, clientRow, preview }) {
             <Profile clientRow={clientRow} />
           </>
         )}
+
+        {view === 'family' && <Family members={familyMembers} />}
 
         {view === 'settings' && (
           <>

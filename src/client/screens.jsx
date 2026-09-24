@@ -226,7 +226,9 @@ export function Overview({ clientRow, clientView = false }) {
  * Тренировочный план
  * ================================================================== */
 
-export function Plan({ clientRow, clientView = false }) {
+// familyRow — программа члена семьи: только чтение, без журнала и без
+// «Начать тренировку». Записывать подходы за другого человека нельзя.
+export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [workout, setWorkout] = useState(null);
 
   // Переход вперёд снимает экран — его покажет жест «назад» под журналом
@@ -236,8 +238,9 @@ export function Plan({ clientRow, clientView = false }) {
     ...(clientRow ? { clientRow } : {}),
     ...(clientView ? { clientView: true } : {}),
     ...(month ? { month } : {}),
+    ...(familyRow ? { familyRow } : {}),
   };
-  const { loading, data, error, reload } = useData('client.plan', params, [clientRow, clientView, month]);
+  const { loading, data, error, reload } = useData('client.plan', params, [clientRow, clientView, month, familyRow]);
 
   // Незакрытое занятие. Раньше о нём не было видно ничего: «К программе»
   // выглядит как выход, а занятие продолжает идти, и человек узнавал об
@@ -268,19 +271,19 @@ export function Plan({ clientRow, clientView = false }) {
   // могли завершить или отменить.
   useEffect(() => {
     let alive = true;
-    apiPublic('workout.list', clientRow ? { clientRow } : {})
+    apiPublic('workout.list', familyRow ? { familyRow } : clientRow ? { clientRow } : {})
       .then((r) => {
         if (!alive) return;
         setSessions((r && r.sessions) || []);
       })
       .catch(() => { if (alive) setSessions([]); });
     return () => { alive = false; };
-  }, [clientRow, workout]);
+  }, [clientRow, workout, familyRow]);
 
   if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => setWorkout(null)} />;
 
   if (loading || error) return <>
-    <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>
+    {!familyRow && <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>}
     {loading ? <Loading lead={false} rows={4} /> : <ErrorState error={error} onRetry={reload} />}
   </>;
 
@@ -292,7 +295,7 @@ export function Plan({ clientRow, clientView = false }) {
   // текущее. Поэтому вместо «Начать тренировку» у блоков показывается одна
   // строка про идущее занятие — обещать кнопкой то, чего она не сделает,
   // хуже, чем её не показывать.
-  const runningLine = running && (
+  const runningLine = running && !familyRow && (
     <Section>
       <Panel pad>
         <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
@@ -322,7 +325,7 @@ export function Plan({ clientRow, clientView = false }) {
 
   return (
     <>
-      <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>
+      {!familyRow && <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>}
 
       {/* Сразу под входом в журнал: если занятие не закрыто, это первое,
           что человек должен узнать на этом экране. */}
@@ -483,10 +486,10 @@ export function Plan({ clientRow, clientView = false }) {
                     {past.length > 1 ? ' · всего занятий: ' + past.length : ''}
                   </span>
                 </div>
-                <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>
+                {!familyRow && <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>}
               </div>
             )}
-            {!running && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month })}>Начать тренировку</button>}
+            {!running && !familyRow && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month })}>Начать тренировку</button>}
             {supersets(block.exercises).map((group, j) => (
               group.superset
                 ? (
@@ -505,7 +508,7 @@ export function Plan({ clientRow, clientView = false }) {
         );
       })}
 
-      {totalExercises > 0 && (
+      {totalExercises > 0 && !familyRow && (
         <p className="small muted" style={{ marginTop: 22, textAlign: 'center' }}>
           Откройте тренировку, чтобы записывать подходы и рабочие веса
         </p>
@@ -632,20 +635,22 @@ function MonthVisibility({ month, hidden, clientRow, onChanged }) {
  * Незаполненная анкета — не отказ, а обычное состояние: экран тогда
  * показывает изменения без окраски.
  */
-function useProgressBundle(clientRow) {
+function useProgressBundle(clientRow, familyRow = null) {
   const [state, setState] = useState({ loading: true, data: null, error: null });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    const params = clientRow ? { clientRow } : {};
+    const params = familyRow ? { familyRow } : clientRow ? { clientRow } : {};
 
     setState({ loading: true, data: null, error: null });
 
+    // Питание члена семьи не показываем — и не спрашиваем: сервер его
+    // всё равно не отдаст, а цель без анкеты просто не окрасит изменения.
     apiBatch([
       { action: 'client.progress', params },
       { action: 'client.measurements', params },
-      { action: 'client.nutrition', params },
+      ...(familyRow ? [] : [{ action: 'client.nutrition', params }]),
     ])
       .then((res) => {
         if (!alive) return;
@@ -684,13 +689,14 @@ function useProgressBundle(clientRow) {
       });
 
     return () => { alive = false; };
-  }, [clientRow, attempt]);
+  }, [clientRow, familyRow, attempt]);
 
   return { ...state, reload: () => setAttempt((n) => n + 1) };
 }
 
-export function Progress({ clientRow }) {
-  const { loading, data, error, reload } = useProgressBundle(clientRow);
+// familyRow — показатели члена семьи: смотреть можно, записывать замер — нет
+export function Progress({ clientRow, familyRow = null }) {
+  const { loading, data, error, reload } = useProgressBundle(clientRow, familyRow);
   const [field, setField] = useState('Вес');
 
   // Форма нового замера. Открыта или нет — состояние экрана, а не данных:
@@ -723,7 +729,7 @@ export function Progress({ clientRow }) {
 
   // Замер вносят с телефона сразу после весов, поэтому вход в форму стоит
   // первым на экране, а не под таблицами: до низа в этот момент не листают.
-  const addMeasure = adding
+  const addMeasure = familyRow ? null : adding
     ? (
       <Section title="Новый замер">
         <MeasureForm
@@ -764,7 +770,9 @@ export function Progress({ clientRow }) {
           icon={IconProgress}
           title="Прогресс пока не из чего собрать"
           text={
-            (measurements && measurements.note)
+            familyRow
+              ? 'Замеров и рабочих весов пока нет.'
+              : (measurements && measurements.note)
             || 'Запишите первый замер — и здесь появятся динамика, изменения и таблица замеров. '
                + 'Рабочие веса подтянутся из программы месяца.'
           }

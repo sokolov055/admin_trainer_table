@@ -3718,3 +3718,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   align-items: center;
 }
 .profile__date::-webkit-date-and-time-value { text-align: left; min-height: 1.4em; }
+
+/* Семья: имя человека над его тренировками и прогрессом, галочка в карточке */
+.family__name { margin: 0 0 var(--space-3); font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.client-family { margin-top: var(--space-3); }

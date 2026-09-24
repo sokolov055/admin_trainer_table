@@ -321,6 +321,55 @@ function AddClient({ onCreated }) {
 }
 
 /* ==================================================================
+ * Семья: плательщик и те, за кого он платит
+ * ================================================================== */
+
+/**
+ * Участие в семье — галочка на каждого человека. Общий кошелёк ещё не
+ * согласие показывать свои замеры, поэтому по умолчанию выключено, и
+ * видят друг друга только те, кому тренер включил.
+ */
+function ClientFamily({ client }) {
+  const [family, setFamily] = useState(client.family);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const toggle = async (enabled) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await apiMutate('trainer.client.family', { clientRow: client.row, enabled });
+      setFamily(result.family);
+      haptic('success');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const others = family.members.map((m) => m.name + (m.enabled ? '' : ' (не включён)')).join(', ');
+
+  return (
+    <div className="client-family">
+      <label className="access-reset__option">
+        <input type="checkbox" checked={family.enabled} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+        <span>
+          <strong>Семья</strong>
+          <span>
+            {family.enabled
+              ? 'Включено: тренировки и показатели видны всем включённым в семье. Деньги и питание скрыты.'
+              : 'Включите, чтобы семья видела тренировки и показатели друг друга. Деньги и питание не показываются.'}
+            {' '}В семье: {others}.
+          </span>
+        </span>
+      </label>
+      {error && <div className="access-reset__error" role="alert">Не получилось: {error.message || 'сервер не ответил'}</div>}
+    </div>
+  );
+}
+
+/* ==================================================================
  * Шапка карточки клиента
  * ================================================================== */
 
@@ -411,6 +460,8 @@ export function ClientCard({ client }) {
       {/* Приглашение стоит выше сброса доступа намеренно: выдать вход —
           повседневное действие, отобрать — редкое. */}
       <ClientInviteLink client={client} />
+
+      {client.family && <ClientFamily client={client} />}
 
       {access.done && (
         <div className="access-reset__result" role="status">
