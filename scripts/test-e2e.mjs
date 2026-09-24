@@ -352,12 +352,12 @@ test('смахнуть вправо возвращает из «Моих дан�
   try {
     await phone.goto(origin + '/?access=' + 'A'.repeat(44));
     await phone.getByRole('button', { name: 'Войти в кабинет' }).click();
-    await phone.locator('.app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 10000 });
+    await phone.locator('#root .app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 10000 });
 
     // Назад: из экрана меню пальцем вправо — на вкладку, откуда пришли
     await phone.getByRole('button', { name: 'Меню' }).click();
     await phone.getByRole('button', { name: /Мои данные/ }).click();
-    await phone.locator('.app__subtitle', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 });
+    await phone.locator('#root .app__subtitle', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 });
     // Меню закрывается с анимацией — пока оно в DOM, жесты выключены
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
 
@@ -365,9 +365,38 @@ test('смахнуть вправо возвращает из «Моих дан�
     await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
 
     await assert.doesNotReject(
-      phone.locator('.app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 5000 }),
+      phone.locator('#root .app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 5000 }),
       'смахнули вправо — вернулись на обзор',
     );
+    // Пока едет сцена, на ней копии экранов — дожидаемся настоящего
+    await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
+
+    // Возвращённый экран встаёт без лесенки появления: снимок уже показал
+    // его целиком, и повторное проявление мигало
+    assert.equal(
+      await phone.evaluate(() => getComputedStyle(document.querySelector('#root .enter')).animationName),
+      'none',
+      'после жеста экран не проявляется заново',
+    );
+
+    // Вперёд: сразу после возврата жестом смахивание влево открывает тот
+    // экран, с которого вернулись, — и назад снова работает
+    await phone.waitForTimeout(700);
+    await swipe(phone, { x: 330, y: 420 }, { x: 60, y: 430 });
+    await assert.doesNotReject(
+      phone.locator('#root .app__subtitle', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 }),
+      'смахнули влево — снова «Мои данные»',
+    );
+    await phone.waitForTimeout(300);
+    await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
+    await phone.locator('#root .app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 5000 });
+
+    // Смена вкладки «вперёд» забывает: смахивание влево ничего не открывает
+    await phone.getByRole('button', { name: 'Прогресс', exact: true }).click();
+    await phone.getByRole('button', { name: 'Обзор', exact: true }).click();
+    await swipe(phone, { x: 330, y: 420 }, { x: 60, y: 430 });
+    await phone.waitForTimeout(600);
+    assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Обзор', 'после смены вкладки вперёд не ведёт');
 
     // Короткое движение без скорости «назад» не делает: экран пружиной
     // возвращается на место
@@ -376,7 +405,7 @@ test('смахнуть вправо возвращает из «Моих дан�
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
     await swipe(phone, { x: 60, y: 60 }, { x: 110, y: 62 }, { steps: 20, frameMs: 30 });
     await phone.waitForTimeout(700);
-    assert.equal(await phone.locator('.app__subtitle').textContent(), 'Настройки', 'короткий жест не уводит');
+    assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Настройки', 'короткий жест не уводит');
 
     // Потянуть вниз: индикатор докручивается до конца обновления и уходит
     await swipe(phone, { x: 195, y: 160 }, { x: 195, y: 520 }, { steps: 16 });

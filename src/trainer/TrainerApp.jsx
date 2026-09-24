@@ -12,7 +12,7 @@ import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../u
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
-import { useBackGesture, captureScreen } from '../gestures.jsx';
+import { useBackGesture, captureScreen, forgetForward } from '../gestures.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
@@ -90,9 +90,11 @@ export default function TrainerApp({ me }) {
 
   // Смахнуть вправо — назад. Порядок важен только при одновременном
   // открытии: карточка и просмотр глазами клиента перекрывают меню.
-  useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient);
-  useBackGesture(() => setOpenClient(null), !!openClient);
-  useBackGesture(() => setPreviewClient(null), !!previewClient);
+  // Третий аргумент — как открыть этот же экран снова: после возврата
+  // жестом смахивание влево возвращает вперёд.
+  useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient, () => setView(view));
+  useBackGesture(() => setOpenClient(null), !!openClient, () => setOpenClient(openClient));
+  useBackGesture(() => setPreviewClient(null), !!previewClient, () => setPreviewClient(previewClient));
   const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });
   const [calendarRevision, setCalendarRevision] = useState(0);
   const calendarRequest = useRef(null);
@@ -148,7 +150,7 @@ export default function TrainerApp({ me }) {
   const pane = view === 'clients' ? clientPane : view === 'dashboard' ? dashPane : '';
 
   const go = (id) => {
-    if (TABS.some((t) => t.id === id)) setLastTab(id);
+    if (TABS.some((t) => t.id === id)) { setLastTab(id); forgetForward(); }
     // Уход с вкладки в экран меню — снимок для жеста «назад»
     else if (!inMenu) captureScreen();
     setView(id);

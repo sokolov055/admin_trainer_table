@@ -3126,3 +3126,7 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .pull--spinning .pull__lift { animation: none; }
 }
+
+/* После жеста «назад/вперёд» экран встаёт без лесенки появления: снимок
+   уже показал его целиком, и повторное проявление читалось как мигание. */
+.gesture-landing .enter { animation: none; }
