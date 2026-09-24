@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { formatDate, formatNumber } from './ui.jsx';
+import { IconDelta } from './icons.jsx';
 
 /**
  * Линейный график на голом SVG.
@@ -495,7 +496,8 @@ export function BarChart({ points, aim = 1, format, highlight, label }) {
         <span className="bars__value">{current.has ? format(current.value) : '—'}</span>
         {current.delta !== null && current.delta !== 0 && (
           <span className={'bars__delta bars__delta--' + current.trend}>
-            {current.delta > 0 ? '↑ ' : '↓ '}{format(Math.abs(current.delta))} к прошлому периоду
+            <IconDelta value={current.delta} size={14} />
+            {format(Math.abs(current.delta))} к прошлому периоду
           </span>
         )}
       </div>
@@ -510,7 +512,7 @@ export function BarChart({ points, aim = 1, format, highlight, label }) {
               <tr key={b.key}>
                 <td>{b.label}{b.partial ? ' (идёт)' : ''}</td>
                 <td>{b.has ? format(b.value) : '—'}</td>
-                <td>{b.delta ? (b.delta > 0 ? '↑ ' : '↓ ') + format(Math.abs(b.delta)) : '—'}</td>
+                <td>{b.delta ? (b.delta > 0 ? '+' : '−') + format(Math.abs(b.delta)) : '—'}</td>
               </tr>
             ))}
           </tbody>
