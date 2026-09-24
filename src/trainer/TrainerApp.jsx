@@ -246,7 +246,7 @@ export default function TrainerApp({ me }) {
         {view === 'logs' && <Logs />}
         {view === 'sheets' && <Sheets />}
         {view === 'settings' && <Settings />}
-        {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen(); setPreviewClient(client); }} />}
+        {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
       </main>
 
       <TabBar tabs={TABS} active={view} onSelect={go} />

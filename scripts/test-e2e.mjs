@@ -447,6 +447,42 @@ test('смахнуть вправо возвращает из «Моих дан�
   }
 });
 
+/**
+ * Просмотр глазами клиента — та же лента, что у клиента, а слева от
+ * первого раздела — список клиентов тренера. Смахнули вправо с первого
+ * раздела — вернулись к списку.
+ */
+test('из просмотра глазами клиента смахивание вправо возвращает к списку клиентов', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Клиентская версия/ }).click();
+    await phone.getByText('Выберите клиента').waitFor({ timeout: 10000 });
+    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+
+    await phone.locator('#root .item').first().click();
+    await phone.getByText('Вы смотрите как клиент').waitFor({ timeout: 10000 });
+    await phone.waitForTimeout(500);
+
+    await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
+    await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 4000 });
+
+    await assert.doesNotReject(
+      phone.locator('#root').getByText('Выберите клиента').waitFor({ timeout: 5000 }),
+      'вернулись к списку клиентов',
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });

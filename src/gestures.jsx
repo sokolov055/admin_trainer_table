@@ -55,11 +55,20 @@ function snapshotOf(app) {
   };
 }
 
-export function captureScreen() {
+/**
+ * Снимки под именем — для «назад», который бывает не сразу после
+ * перехода. Из просмотра глазами клиента возвращаются к списку клиентов с
+ * первого раздела — а до этого человек мог походить по разделам, и
+ * обычный снимок давно бы протух.
+ */
+const namedSnapshots = new Map();
+
+export function captureScreen(name) {
   if (typeof document === 'undefined') return;
   const app = document.querySelector('#root .app');
   if (!app) return;
   pendingSnapshot = snapshotOf(app);
+  if (name) namedSnapshots.set(name, pendingSnapshot);
 }
 
 /**
@@ -69,19 +78,20 @@ export function captureScreen() {
  * карточки клиента) открывается позже родителя и перекрывает его. Функция
  * берётся из ref на момент жеста — меняться между кадрами ей можно.
  */
-export function useBackGesture(handler, enabled = true) {
+export function useBackGesture(handler, enabled = true, snapshotName = null) {
   const ref = useRef(handler);
   ref.current = handler;
 
   useEffect(() => {
     if (!enabled) return undefined;
 
-    const fresh = pendingSnapshot && Date.now() - pendingSnapshot.at < SNAPSHOT_FRESH_MS;
+    const named = snapshotName ? namedSnapshots.get(snapshotName) : null;
+    const fresh = !named && pendingSnapshot && Date.now() - pendingSnapshot.at < SNAPSHOT_FRESH_MS;
     const entry = {
       run: () => ref.current && ref.current(),
-      snapshot: fresh ? pendingSnapshot : null,
+      snapshot: named || (fresh ? pendingSnapshot : null),
     };
-    if (fresh) pendingSnapshot = null;
+    if (fresh || named) pendingSnapshot = null;
 
     backStack.push(entry);
     return () => {
@@ -286,6 +296,28 @@ function buildScene(direction, snapshot) {
 }
 
 /**
+ * Дождаться, пока настоящий экран дорисуется, — и только потом убирать
+ * снимок.
+ *
+ * Снимок уже показывает экран целиком. Если под ним настоящий экран ещё
+ * грузится (стоят заглушки), растворение снимка открывало заглушки на
+ * кадр-другой, а потом приходили данные — это и читалось как мигание.
+ * Держим снимок, пока заглушки не уйдут, но не дольше полутора секунд:
+ * если данные не приходят, честнее показать загрузку, чем старую копию.
+ */
+const DRAWN_WAIT_MS = 1500;
+
+function whenDrawn(done) {
+  const started = performance.now();
+  const check = () => {
+    const loading = document.querySelector('#root .app .skeleton');
+    if (!loading || performance.now() - started > DRAWN_WAIT_MS) done();
+    else requestAnimationFrame(check);
+  };
+  check();
+}
+
+/**
  * Возвращённый экран встаёт без анимации появления.
  *
  * Разделы экрана при монтировании собираются лесенкой из прозрачности. После
@@ -294,6 +326,11 @@ function buildScene(direction, snapshot) {
  */
 const LANDING_MS = 600;
 let landingTimer = 0;
+
+/** Блоки, которые уже на экране, больше не проявляются — ни сейчас, ни потом */
+function settleEntered() {
+  document.querySelectorAll('#root .enter').forEach((el) => { el.style.animation = 'none'; });
+}
 
 function landQuietly() {
   document.documentElement.classList.add('gesture-landing');
@@ -304,7 +341,7 @@ function landQuietly() {
     // «мигали» отдельные блоки через полсекунды после возврата. Поэтому
     // тем, кто уже на экране, анимацию выключаем насовсем, и только
     // потом снимаем класс. Появившиеся позже анимируются как обычно.
-    document.querySelectorAll('#root .enter').forEach((el) => { el.style.animation = 'none'; });
+    settleEntered();
     document.documentElement.classList.remove('gesture-landing');
   }, LANDING_MS);
 }
@@ -787,7 +824,7 @@ export function Gestures() {
           if (host) host.go(done.target.id);
           requestAnimationFrame(() => {
             window.scrollTo(0, done.snapshot ? done.snapshot.scrollY : 0);
-            requestAnimationFrame(() => dropScene(true));
+            requestAnimationFrame(() => whenDrawn(() => { settleEntered(); dropScene(true); }));
           });
         };
 
@@ -843,7 +880,7 @@ export function Gestures() {
         // верх списка вместо того места, откуда уходили.
         requestAnimationFrame(() => {
           if (restoreTo !== null) window.scrollTo(0, restoreTo);
-          requestAnimationFrame(() => dropScene(true));
+          requestAnimationFrame(() => whenDrawn(() => { settleEntered(); dropScene(true); }));
         });
       };
 

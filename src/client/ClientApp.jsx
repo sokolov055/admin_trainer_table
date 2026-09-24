@@ -59,6 +59,15 @@ export default function ClientApp({ me, clientRow, preview }) {
   const [lastTab, setLastTab] = useState('overview');
   useBackGesture(() => setView(lastTab), !TABS.some((t) => t.id === view));
 
+  // Просмотр глазами клиента: лента разделов клиента, а слева от первого —
+  // список клиентов тренера, откуда пришли. Смахивание вправо с первого
+  // раздела возвращает туда, и список выезжает слева, как при «назад».
+  useBackGesture(
+    () => preview && preview.onChange(),
+    !!preview && view === TABS[0].id,
+    'client-preview',
+  );
+
   // Листать разделы нижнего меню пальцем — пока открыт раздел, а не экран
   // поверх него. Функция перехода берётся на момент жеста.
   const goRef = useRef(null);
