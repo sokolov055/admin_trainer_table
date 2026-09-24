@@ -617,6 +617,53 @@ test('шаблон назначается клиенту, общий копир�
   }
 });
 
+/**
+ * Порядок тренировок в редакторе — перетаскиванием в свёрнутом списке:
+ * развёрнутая тренировка выше экрана, тащить её целиком нельзя.
+ */
+test('тренировки программы переставляются перетаскиванием', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const tab = await context.newPage();
+  tab.on('pageerror', (error) => consoleErrors.push(String(error)));
+  const visible = (sel) => tab.locator('#root main:not([hidden]) ' + sel);
+
+  try {
+    await tab.goto(origin + '/?mockRole=trainer');
+    await tab.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await tab.goto(origin + '/?mockRole=trainer');
+
+    await tab.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).first().click();
+    await tab.getByRole('button', { name: 'Изменить' }).click();
+    await tab.getByRole('button', { name: 'Порядок тренировок' }).click();
+
+    const rows = tab.locator('.block-order__row');
+    await rows.first().waitFor({ timeout: 5000 });
+    const a = await rows.nth(0).boundingBox();
+    const b = await rows.nth(1).boundingBox();
+    await tab.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await tab.mouse.down();
+    for (let i = 1; i <= 8; i += 1) {
+      await tab.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + ((b.y - a.y + 10) * i) / 8);
+    }
+    await tab.mouse.up();
+
+    await assert.doesNotReject(
+      tab.waitForFunction(() => {
+        const first = document.querySelector('.block-order__title');
+        return first && first.textContent === 'Тренировка 2 — низ';
+      }, null, { timeout: 5000 }),
+      'первой стала вторая тренировка',
+    );
+
+    await tab.getByRole('button', { name: 'Готово' }).click();
+    const firstTitle = await tab.locator('.plan-edit__title').first().inputValue();
+    assert.equal(firstTitle, 'Тренировка 2 — низ', 'порядок сохранился и в развёрнутом редакторе');
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });

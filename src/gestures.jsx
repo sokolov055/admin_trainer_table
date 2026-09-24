@@ -759,6 +759,9 @@ export function Gestures() {
 
     const onStart = (e) => {
       if (e.touches.length !== 1 || blocked()) { g = null; return; }
+      // Своё перетаскивание (порядок тренировок в редакторе) — жестам
+      // экрана тут делать нечего, ни листанию, ни «потянуть вниз»
+      if (e.target.closest && e.target.closest('[data-no-gestures]')) { g = null; return; }
 
       // Перехват на лету: берём текущее положение, а не цель пружины
       if (anim) { anim.stop(); anim = null; }

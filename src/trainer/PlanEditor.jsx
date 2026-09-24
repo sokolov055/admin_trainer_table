@@ -3,6 +3,7 @@ import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
 import { Note } from '../ui.jsx';
 import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash } from '../icons.jsx';
+import BlockOrder from './BlockOrder.jsx';
 
 /**
  * Редактор программы месяца.
@@ -10,8 +11,9 @@ import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash } from '
  * Последнее, ради чего тренер открывал таблицу на телефоне. Экран сделан
  * под эту ситуацию: он в зале, между клиентами, и ему нужно поменять вес
  * в двух строках или дописать упражнение — а не «составить программу».
- * Поэтому здесь нет ни конструктора, ни шаблонов, ни перетаскивания:
- * список, поля и кнопка «Сохранить».
+ * Поэтому здесь нет конструктора: список, поля и кнопка «Сохранить».
+ * Порядок тренировок меняют перетаскиванием в свёрнутом виде
+ * (BlockOrder.jsx) — развёрнутая тренировка выше экрана.
  *
  * Сохраняется месяц целиком, одним снимком. Так удаление становится
  * настоящим: дописывание поверх прежнего оставило бы убранное упражнение
@@ -45,6 +47,8 @@ export default function PlanEditor({
 
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
+
+  const [ordering, setOrdering] = useState(false);
 
   const change = (fn) => {
     setDraft((prev) => fn(prev.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e })) }))));
@@ -125,7 +129,32 @@ export default function PlanEditor({
         {names.map((name) => <option key={name} value={name} />)}
       </datalist>
 
-      {draft.map((block, bi) => (
+      {!single && draft.length > 1 && (
+        <div className="plan-edit__order-bar">
+          <button
+            className={'button' + (ordering ? ' button--primary' : '')}
+            disabled={busy}
+            onClick={() => setOrdering(!ordering)}
+          >
+            {ordering ? 'Готово' : 'Порядок тренировок'}
+          </button>
+          {ordering && <span className="small muted">Перетащите тренировку на новое место</span>}
+        </div>
+      )}
+
+      {ordering && (
+        <BlockOrder
+          blocks={draft}
+          disabled={busy}
+          onMove={(from, to) => change((next) => {
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            return next;
+          })}
+        />
+      )}
+
+      {!ordering && draft.map((block, bi) => (
         <div className="plan-edit__block" key={bi}>
           {/* Номер и название — одной строкой: по номеру тренировки видно
               издалека, когда листаешь длинную программу */}
@@ -214,7 +243,7 @@ export default function PlanEditor({
         </div>
       ))}
 
-      {!single && (
+      {!single && !ordering && (
         <button className="button button--block" disabled={busy} onClick={() => change((next) => {
           next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blank()] });
           return next;

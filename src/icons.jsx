@@ -286,6 +286,13 @@ export const IconArrowDown = (p) => (
   </Icon>
 );
 
+/** Ручка перетаскивания */
+export const IconGrip = (p) => (
+  <Icon {...p}>
+    <path d="M5 9h14M5 15h14" />
+  </Icon>
+);
+
 /** Суперсет: два упражнения сцеплены */
 export const IconLinkPair = (p) => (
   <Icon {...p}>
