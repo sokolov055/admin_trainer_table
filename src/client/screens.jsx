@@ -14,7 +14,7 @@ import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions, doneLine } from '../plan-model.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
-import { TemplateApply, SaveAsTemplate } from '../trainer/Library.jsx';
+import { TemplateApply, SaveAsTemplate, Media } from '../trainer/Library.jsx';
 
 /* ==================================================================
  * Обзор
@@ -580,6 +580,9 @@ function nextMonthLabel() {
 // me — участник пары, который смотрит: его вес первым и подписан «Вы»,
 // чужое упражнение приглушено
 function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
+  // Упражнение из базы открывается карточкой: видео, техника, мышцы
+  const [open, setOpen] = useState(false);
+  const card = ex.exercise;
   const scheme = [
     inSuperset ? (ex.reps && ex.reps + ' повт.') : (ex.sets && ex.sets + ' × ' + (ex.reps || '?')),
     ex.rpe && 'RPE ' + ex.rpe,
@@ -598,8 +601,15 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
 
   return (
     <div className={'exercise' + (split && me && !mine ? ' exercise--other' : '')} style={{ minWidth: 0 }}>
-      <div style={{ minWidth: 0 }}>
-        <div className="exercise__name">{ex.name}</div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        {card
+          ? (
+            <button type="button" className="exercise__name exercise__open" aria-expanded={open} onClick={() => { setOpen(!open); haptic(); }}>
+              {ex.name}
+              <span className="exercise__hint">{open ? 'свернуть' : 'техника'}</span>
+            </button>
+          )
+          : <div className="exercise__name">{ex.name}</div>}
         <div className="exercise__scheme">{scheme || '—'}</div>
         {split && doers.length < members.length && (
           <div className="exercise__who">
@@ -607,6 +617,17 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
           </div>
         )}
         {split && weights && <div className="exercise__scheme">{weights}</div>}
+        {card && open && (
+          <div className="exercise__card">
+            {(card.muscle || card.equipment) && (
+              <div className="exercise__scheme">{[card.muscle, card.equipment].filter(Boolean).join(' · ')}</div>
+            )}
+            <Media media={card.media} />
+            {card.notes
+              ? <p className="small" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{card.notes}</p>
+              : !card.media && <p className="small muted" style={{ marginBottom: 0 }}>Техника к этому упражнению пока не записана.</p>}
+          </div>
+        )}
       </div>
     </div>
   );

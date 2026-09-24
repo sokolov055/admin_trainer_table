@@ -1,3 +1,4 @@
+import ExercisePicker from './ExercisePicker.jsx';
 import React, { useState } from 'react';
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
@@ -28,6 +29,8 @@ const blank = () => ({
   name: '', weight: '', prevWeight: '', sets: '', reps: '', rpe: '', supersetGroup: '',
   // Сплит: кто делает (пусто — все) и вес каждого
   performers: [], splitWeights: {}, splitPrev: {},
+  // Ссылка на упражнение из базы: выбрано в подсказках или связано по названию
+  exerciseId: null,
 });
 
 /**
@@ -40,17 +43,17 @@ const blank = () => ({
 // каждого вместо одного общего веса
 export default function PlanEditor({
   clientRow, month, blocks, onSaved, onCancel, onSubmit, single = false, submitLabel = 'Сохранить программу',
-  members = [],
+  members = [], workoutTemplates = null, loadWorkout = null,
 }) {
   const split = members.length > 1;
   // Подсказки названий из библиотеки: общие и свои упражнения. Набрать
   // «жим» и выбрать из списка быстрее, чем печатать целиком, а названия
   // одинаковые во всех программах — по ним строится «было» у клиента.
   const library = useData('library.exercises', {}, []);
-  const names = library.data ? library.data.exercises.map((e) => e.name) : [];
-  const listId = 'exercise-names';
+  const [extra, setExtra] = useState([]);
+  const exercises = (library.data ? library.data.exercises : []).concat(extra);
   const [draft, setDraft] = useState(() => (blocks.length
-    ? blocks.map((b) => ({ title: b.title, exercises: b.exercises.map((e) => ({ ...blank(), ...e })) }))
+    ? blocks.map((b) => ({ title: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blank(), ...e })) }))
     : [{ title: 'Тренировка № 1', exercises: [blank()] }]));
 
   const [busy, setBusy] = useState(false);
@@ -153,6 +156,7 @@ export default function PlanEditor({
     try {
       const clean = draft.map((b) => ({
         title: b.title,
+        ...(b.sourceId ? { sourceId: b.sourceId } : {}),
         exercises: b.exercises.filter((e) => String(e.name || '').trim()),
       }));
 
@@ -176,10 +180,6 @@ export default function PlanEditor({
       <p className="small muted" style={{ marginTop: 0 }}>
         Пустые строки не сохраняются — упражнение без названия просто исчезнет.
       </p>
-
-      <datalist id={listId}>
-        {names.map((name) => <option key={name} value={name} />)}
-      </datalist>
 
       {!single && draft.length > 1 && (
         <div className="plan-edit__order-bar">
@@ -226,6 +226,11 @@ export default function PlanEditor({
         <div className="plan-edit__block" key={bi}>
           {/* Номер и название — одной строкой: по номеру тренировки видно
               издалека, когда листаешь длинную программу */}
+          {block.sourceId && workoutTemplates && (
+            <span className="plan-edit__source">
+              из шаблона «{(workoutTemplates.find((t) => t.id === block.sourceId) || {}).title || 'тренировки'}» · правка здесь — только в этой программе
+            </span>
+          )}
           <div className="plan-edit__block-head">
             {!single && <span className="plan-edit__block-num" aria-hidden="true">{bi + 1}</span>}
             <input
@@ -245,14 +250,17 @@ export default function PlanEditor({
 
             return (
               <div className={'plan-edit__row' + (exercise.supersetGroup ? ' plan-edit__row--superset' : '')} key={ei}>
-                <input
-                  className="field__input"
-                  placeholder="Упражнение"
-                  list={listId}
+                <ExercisePicker
                   value={exercise.name}
-                  maxLength={160}
+                  exerciseId={exercise.exerciseId}
+                  exercises={exercises}
                   disabled={busy}
-                  onChange={(e) => setExercise(bi, ei, 'name', e.target.value)}
+                  onPick={({ name, exerciseId }) => change((next) => {
+                    next[bi].exercises[ei].name = name;
+                    next[bi].exercises[ei].exerciseId = exerciseId;
+                    return next;
+                  })}
+                  onAdded={(saved) => setExtra((prev) => [...prev, saved])}
                 />
 
                 <div className={'plan-edit__numbers plan-edit__labels' + (split ? ' plan-edit__numbers--split' : '')} aria-hidden="true">
@@ -349,6 +357,33 @@ export default function PlanEditor({
           next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blank()] });
           return next;
         })}>Добавить тренировку</button>
+      )}
+
+      {/* Программа-шаблон: тренировка из шаблона тренировки — копией, которая
+          помнит, откуда взята (sourceId). Поправят шаблон тренировки —
+          приложение спросит, обновить ли её здесь. */}
+      {!single && !ordering && workoutTemplates && workoutTemplates.length > 0 && (
+        <div className="plan-edit__from-template">
+          <select
+            className="field__input"
+            aria-label="Тренировка из шаблона"
+            value=""
+            disabled={busy}
+            onChange={async (e) => {
+              const id = Number(e.target.value);
+              if (!id) return;
+              const block = await loadWorkout(id);
+              if (!block) return;
+              change((next) => {
+                next.push({ title: block.title, sourceId: id, exercises: block.exercises.map((x) => ({ ...blank(), ...x })) });
+                return next;
+              });
+            }}
+          >
+            <option value="">+ Тренировка из шаблона…</option>
+            {workoutTemplates.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+          </select>
+        </div>
       )}
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}

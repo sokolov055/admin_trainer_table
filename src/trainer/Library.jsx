@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
-import { apiMutate } from '../api.js';
+import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
@@ -357,6 +357,38 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
     ? template.blocks
     : [{ title: kind === 'workout' ? 'Тренировка' : 'Тренировка № 1', exercises: [] }];
 
+  // Программа собирается и из шаблонов тренировок — копиями со ссылкой
+  const workouts = useData('library.templates', { kind: 'workout' }, []);
+  const workoutList = kind === 'program' && workouts.data
+    ? workouts.data.templates.map((t) => ({ id: t.id, title: t.title }))
+    : null;
+
+  // Правка шаблона тренировки, стоящего в программах: спросить, обновить ли
+  // копии. Ответ ждёт сохранение — кнопка крутится, пока тренер решает.
+  const [ask, setAsk] = useState(null); // { programs, resolve }
+
+  const submit = async (clean) => {
+    let propagate = false;
+    if (kind === 'workout' && template) {
+      const usage = await apiPublic('library.template.usage', { id: template.id });
+      if (usage.programs.length) {
+        propagate = await new Promise((resolve) => setAsk({ programs: usage.programs, resolve }));
+        setAsk(null);
+      }
+    }
+    return apiMutate('library.template.save', {
+      id: template ? template.id : undefined,
+      kind,
+      title: title.trim(),
+      goal,
+      level,
+      description,
+      isPublic,
+      blocks: clean,
+      propagate,
+    });
+  };
+
   return (
     <>
       <Back onClick={onCancel}>Отмена</Back>
@@ -397,19 +429,30 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
           blocks={blocks}
           single={kind === 'workout'}
           submitLabel="Сохранить шаблон"
-          onSubmit={(clean) => apiMutate('library.template.save', {
-            id: template ? template.id : undefined,
-            kind,
-            title: title.trim(),
-            goal,
-            level,
-            description,
-            isPublic,
-            blocks: clean,
-          })}
+          workoutTemplates={workoutList}
+          loadWorkout={async (id) => {
+            const t = await apiPublic('library.template.get', { id });
+            return t && t.blocks && t.blocks[0];
+          }}
+          onSubmit={submit}
           onSaved={(saved) => { haptic('success'); onSaved(saved); }}
           onCancel={onCancel}
         />
+        {ask && (
+          <Panel pad>
+            <div className="library__form">
+              <strong>Эта тренировка стоит в программах</strong>
+              <p className="small" style={{ margin: 0 }}>
+                {ask.programs.map((p) => '«' + p.title + '»').join(', ')}. Обновить её там тоже?
+                Программы, уже выданные клиентам, не изменятся в любом случае.
+              </p>
+              <div className="library__actions">
+                <button className="button button--primary" onClick={() => ask.resolve(true)}>Обновить в программах</button>
+                <button className="button" onClick={() => ask.resolve(false)}>Только этот шаблон</button>
+              </div>
+            </div>
+          </Panel>
+        )}
       </Section>
     </>
   );
@@ -819,7 +862,7 @@ export function Animation({ id }) {
   );
 }
 
-function Media({ media }) {
+export function Media({ media }) {
   if (!media) return null;
   if (media.kind === 'animation') return <Animation id={media.url} />;
   if (media.kind === 'file') {
