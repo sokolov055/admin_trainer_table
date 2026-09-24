@@ -39,6 +39,42 @@ export function splitItems(recipe) {
 }
 
 /**
+ * Вес одной порции — в том виде, в каком продукты кладут на весы.
+ *
+ * Это сырой вес: крупы и макароны сухие, мясо и рыба сырые, так собран
+ * весь справочник. Варёная порция тяжелее на впитанную воду, и выдавать
+ * одно за другое нельзя — на упаковке крупы написано то же самое, и
+ * человек сравнивает именно с ним.
+ */
+export function portionWeight(recipe) {
+  const total = recipe.items.reduce((sum, item) => sum + item.grams, 0);
+  return Math.round(total / (recipe.portions || 1));
+}
+
+/**
+ * КБЖУ на сто граммов.
+ *
+ * Нужно для сравнения: «447 ккал» ничего не говорит о том, тяжёлое блюдо
+ * или лёгкое, пока не известно, сколько это граммов. На сто граммов —
+ * единственная величина, которой человек уже умеет пользоваться: она же
+ * написана на каждой упаковке.
+ */
+export function per100(recipe) {
+  const weight = portionWeight(recipe);
+  if (!weight) return null;
+
+  const share = 100 / weight;
+  const round = (value, digits) => Math.round(value * share * 10 ** digits) / 10 ** digits;
+
+  return {
+    kcal: Math.round(recipe.per.kcal * share),
+    protein: round(recipe.per.protein, 1),
+    fat: round(recipe.per.fat, 1),
+    carbs: round(recipe.per.carbs, 1),
+  };
+}
+
+/**
  * Блюда, отсортированные по тому, насколько они собираются из наличного.
  *
  * Сортировка идёт по ЧИСЛУ недостающих продуктов, а не по проценту

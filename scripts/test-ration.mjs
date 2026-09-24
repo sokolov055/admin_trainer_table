@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { RECIPES, FOOD, MAIN_GRAMS } from '../src/nutrition/recipes.js';
 import {
   rankRecipes, planVariants, shoppingList, dayTotals, splitItems, defaultPantry,
+  portionWeight, per100,
 } from '../src/nutrition/match.js';
 
 /**
@@ -218,4 +219,64 @@ test('холодильник начинается с того, что есть �
   const start = defaultPantry();
   assert.ok(start.includes('масло растительное'));
   for (const name of start) assert.ok(FOOD[name], 'нет в справочнике: ' + name);
+});
+
+/* ==========================================================================
+ * Порция и сто граммов
+ *
+ * «447 ккал» не говорит, тяжёлое блюдо или просто большое, пока не
+ * известен вес порции. На сто граммов — величина, которой человек уже
+ * умеет пользоваться: она написана на упаковке, и с ней он и сравнивает.
+ *
+ * Вес здесь сырой, как и весь справочник: крупы сухие, мясо сырое. Если
+ * пересчёт поедет, никто этого не увидит — цифра просто станет неверной.
+ * ========================================================================== */
+
+test('вес порции — это состав, делённый на число порций', () => {
+  for (const recipe of RECIPES) {
+    const total = recipe.items.reduce((sum, item) => sum + item.grams, 0);
+
+    assert.equal(portionWeight(recipe), Math.round(total / recipe.portions), recipe.name);
+    assert.ok(portionWeight(recipe) > 0, recipe.name + ': порция не может весить ноль');
+  }
+});
+
+test('КБЖУ на сто граммов пересчитывается из порции и её веса', () => {
+  for (const recipe of RECIPES) {
+    const weight = portionWeight(recipe);
+    const hundred = per100(recipe);
+
+    // Обратный ход: из ста граммов и веса порции должна получиться сама
+    // порция. Расхождение тут — это ошибка в пересчёте, а не округление.
+    const back = hundred.kcal * weight / 100;
+
+    assert.ok(
+      Math.abs(back - recipe.per.kcal) / recipe.per.kcal < 0.02,
+      recipe.name + ': на 100 г ' + hundred.kcal + ', обратно ' + Math.round(back)
+        + ', записано ' + recipe.per.kcal,
+    );
+
+    for (const key of ['protein', 'fat', 'carbs']) {
+      assert.ok(
+        Math.abs(hundred[key] * weight / 100 - recipe.per[key]) < 0.6,
+        recipe.name + ' · ' + key,
+      );
+    }
+  }
+});
+
+/**
+ * Домашняя еда — не сгущёнка и не масло: блюдо, у которого на сто граммов
+ * вышло за четыреста килокалорий, почти наверняка означает ошибку в весе
+ * продукта, а не действительно плотное блюдо.
+ */
+test('на сто граммов выходят человеческие числа', () => {
+  for (const recipe of RECIPES) {
+    const hundred = per100(recipe);
+
+    assert.ok(
+      hundred.kcal > 20 && hundred.kcal < 400,
+      recipe.name + ': ' + hundred.kcal + ' ккал на 100 г — проверьте вес продуктов',
+    );
+  }
 });

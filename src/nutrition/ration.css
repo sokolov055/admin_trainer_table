@@ -463,3 +463,18 @@
   .card--fly-right,
   .card--fly-left { opacity: 0; }
 }
+
+/* Порция и сто граммов — тихой строкой под крупными цифрами. Решение
+   принимают по калориям порции; сто граммов нужны, только когда блюдо с
+   чем-то сравнивают, и лезть вперёд им незачем. */
+.card__hundred {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: calc(var(--space-2) * -1) 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.card__portion { font-weight: 560; color: var(--text-secondary); }
+.card__raw { opacity: 0.75; }

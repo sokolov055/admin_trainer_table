@@ -5,6 +5,7 @@ import { haptic } from '../telegram.js';
 import { FOOD, MEALS } from './recipes.js';
 import {
   rankRecipes, planVariants, shoppingList, foodByGroup, defaultPantry, splitItems,
+  portionWeight, per100,
 } from './match.js';
 import './ration.css';
 
@@ -184,6 +185,30 @@ function Pantry({ pantry, onToggle, onNext }) {
  * ================================================================== */
 
 /**
+ * Порция и сто граммов.
+ *
+ * Вес сырой: крупы и макароны сухие, мясо и рыба сырые — так собран весь
+ * справочник, и так же написано на упаковке, с которой человек сравнивает.
+ * Умолчать об этом значит дать цифру, которая тихо расходится с весами.
+ */
+function Hundred({ recipe }) {
+  const weight = portionWeight(recipe);
+  const hundred = per100(recipe);
+  if (!weight || !hundred) return null;
+
+  return (
+    <p className="card__hundred">
+      <span className="card__portion">Порция ≈ {weight} г</span>
+      <span className="card__per100">
+        на 100 г: {hundred.kcal} ккал · Б {formatNumber(hundred.protein)}
+        {' · '}Ж {formatNumber(hundred.fat)} · У {formatNumber(hundred.carbs)}
+      </span>
+      <span className="card__raw">вес продуктов до готовки</span>
+    </p>
+  );
+}
+
+/**
  * Карточка блюда: то, что нужно для ответа «буду или не буду».
  *
  * Крупно калории — по ним человек и решает. Состав ниже, и в нём видно, чего
@@ -213,6 +238,12 @@ function Card({ entry, offset, style, handlers, flying }) {
         <span className="card__m">Ж&nbsp;{formatNumber(per.fat)}</span>
         <span className="card__m">У&nbsp;{formatNumber(per.carbs)}</span>
       </div>
+
+      {/* Крупные цифры — на порцию: по ним решают, есть или не есть. Ниже
+          её вес и те же цифры на сто граммов — величина, которой человек
+          уже умеет пользоваться, она написана на каждой упаковке. Без неё
+          «447 ккал» не говорит, тяжёлое блюдо или просто большое. */}
+      <Hundred recipe={recipe} />
 
       {missing.length === 0 ? (
         <p className="card__state card__state--ready">Готовится из того, что есть</p>
