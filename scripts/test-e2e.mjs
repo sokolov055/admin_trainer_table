@@ -263,6 +263,49 @@ test('клиенту правка программы не предлагаетс
   }
 });
 
+/**
+ * Вход по персональной ссылке — так клиенты попадают в кабинет.
+ *
+ * Здесь жили две поломки, которые видел только человек с телефоном.
+ * Во встроенном браузере Telegram вместо входа стояла стена «Откройте в
+ * Safari», и клиенты считали, что ссылка не грузится. А после входа
+ * кабинет висел скелетом до ручной перезагрузки: загрузку, запущенную
+ * сохранённым ключом, затирал сброс состояния на «Готово». Демо-сервер
+ * отвечает мгновенно, поэтому гонка воспроизводится здесь каждый раз.
+ *
+ * Отдельный контекст с агентом iPhone-Telegram: свой localStorage, чтобы
+ * не зависеть от входа по коду в первом сценарии.
+ */
+test('ссылка тренера из Telegram на iPhone открывает кабинет без перезагрузки', async () => {
+  const context = await browser.newContext({
+    viewport: VIEWPORT,
+    locale: 'ru-RU',
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+  });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+
+  try {
+    await phone.goto(origin + '/?access=' + 'A'.repeat(44));
+
+    await phone.getByRole('heading', { name: 'Анна Морозова' }).waitFor({ timeout: 10000 });
+    await assert.doesNotReject(
+      phone.getByText(/открыть в Safari/i).first().waitFor({ timeout: 5000 }),
+      'совет про Safari остаётся, но под входом',
+    );
+
+    await phone.getByRole('button', { name: 'Войти в кабинет' }).click();
+
+    await assert.doesNotReject(
+      phone.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 10000 }),
+      'кабинет открывается сам, без перезагрузки',
+    );
+    assert.equal(new URL(phone.url()).searchParams.has('access'), false, 'ключ ссылки убран из адреса');
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });

@@ -67,7 +67,36 @@
     <script src="telegram-web-app.js" defer></script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Заглушка до запуска приложения. React заменит её первым же кадром.
+         Без неё медленная сеть или браузер, который не смог выполнить
+         бандл, выглядели как белый лист — клиенты так и говорили: «ссылка
+         не грузится». Теперь видно, что идёт загрузка, а если через
+         двенадцать секунд приложение так и не запустилось, есть выход:
+         открыть ту же ссылку в Safari или в браузере. Всё здесь — только
+         встроенные стили и старый JS: бандла и CSS к этому моменту может
+         не быть вовсе. -->
+    <div id="root"><div id="boot" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;box-sizing:border-box;font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#8a8790;text-align:center"><div>Загружаем кабинет…</div><div id="boot-slow" hidden style="max-width:320px"><p style="margin:0 0 14px">Долго не открывается? Скопируйте ссылку и откройте её в Safari (на iPhone) или в Chrome.</p><button id="boot-copy" type="button" style="font:inherit;padding:12px 18px;border-radius:12px;border:1px solid #8a879066;background:transparent;color:inherit">Скопировать ссылку</button></div></div></div>
+    <script>
+      (function () {
+        setTimeout(function () {
+          var slow = document.getElementById('boot-slow');
+          if (!slow) return; // приложение уже нарисовалось
+          slow.hidden = false;
+          var btn = document.getElementById('boot-copy');
+          btn.onclick = function () {
+            var href = window.location.href;
+            var done = function () { btn.textContent = 'Ссылка скопирована'; };
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(href).then(done, function () { window.prompt('Скопируйте ссылку:', href); });
+                return;
+              }
+            } catch (e) {}
+            window.prompt('Скопируйте ссылку:', href);
+          };
+        }, 12000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

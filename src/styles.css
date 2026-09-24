@@ -1913,34 +1913,38 @@ th.sticky, td.sticky {
   font-size: var(--text-xs);
   line-height: 1.55;
 }
-/* Выход из встроенного браузера мессенджера.
-   Шаги нумерованные и слева: человек сверяет их с тем, что видит в своей
+/* Совет открыть ссылку в настоящем браузере. Стоит под входом и отделён
+   линией: это отдельный разговор — про иконку на экране, — а не второй
+   шаг входа, и спорить за внимание с главной кнопкой ему незачем. */
+.outside {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+.outside__lead {
+  margin: 0 0 var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+/* Шаги нумерованные и слева: человек сверяет их с тем, что видит в своей
    панели, а по центру порядок действий читается хуже, чем список. */
 .outside__steps {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--space-2);
   padding-left: 1.35em;
-  text-align: left;
   font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--text-secondary);
 }
 
-.outside__steps li + li { margin-top: var(--space-2); }
-
-/* Главная кнопка и «скопировать» — разные по весу действия, и вплотную
-   они читаются как одна пара переключателей */
-.outside__jump { margin-bottom: var(--space-2); }
+.outside__steps li + li { margin-top: var(--space-1); }
 .outside__steps b { color: var(--text); }
-
-/* «Всё равно войти здесь» — запасной путь на случай, когда браузер
-   определился неверно. Он должен быть, но не должен спорить за внимание
-   с тем, что мы советуем сделать: отсюда и приглушённый вид, и место
-   после подсказки, а не рядом с главной кнопкой. */
-.outside__anyway {
-  margin-top: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
+.outside .invite__hint { margin: 0; }
 
 .install-hint__steps {
   margin: var(--space-2) 0 0;

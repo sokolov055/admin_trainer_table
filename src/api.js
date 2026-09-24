@@ -206,6 +206,17 @@ export function apiPublic(action, params = {}) {
  * Node-сервере и только POST-запросом. Билет нельзя повторять через GET:
  * иначе секрет попадёт в адрес, историю браузера и журналы прокси.
  */
+/**
+ * Сколько ждать основной сервер на входе.
+ *
+ * Без предела запрос в плохой сети висел, сколько решит система, — на
+ * iPhone это минуты, — и человек смотрел на «Проверяем ссылку», не
+ * понимая, что делать. Действия здесь короткие: вход, проверка ссылки,
+ * билет для установки. Если за это время ответа нет, честнее сказать
+ * «сервер не отвечает» и дать повторить.
+ */
+const PRIMARY_TIMEOUT_MS = 20000;
+
 export async function apiPrimary(action, params = {}) {
   if (import.meta.env.VITE_MOCK === '1') {
     const { mockApi } = await import('./mock.js');
@@ -222,7 +233,7 @@ export async function apiPrimary(action, params = {}) {
 
   let body;
   try {
-    body = await postJson(url, payload);
+    body = await postJson(url, payload, PRIMARY_TIMEOUT_MS);
   } catch (_) {
     throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
   }
@@ -331,15 +342,25 @@ async function tryEndpoint(url, payload) {
   }
 }
 
-async function postJson(url, payload) {
-  const resp = await fetch(url, {
-    method: 'POST',
-    // text/plain — единственный способ обойтись без preflight (см. шапку)
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-    redirect: 'follow',
-  });
-  return resp.json();
+async function postJson(url, payload, timeoutMs) {
+  // Предел ставим только там, где его попросили: у Apps Script честный
+  // ответ бывает и через минуту, и обрывать его значило бы ломать рабочее.
+  const controller = timeoutMs && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      // text/plain — единственный способ обойтись без preflight (см. шапку)
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+    return await resp.json();
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function getJson(url, payload) {

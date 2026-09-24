@@ -113,9 +113,13 @@ export default function App() {
         token={accessToken}
         details={<LaunchDetails />}
         onComplete={() => {
+          // Состояние загрузки здесь НЕ сбрасываем. Ключ сохранён ещё в
+          // момент входа, и эффект выше уже запустил загрузку кабинета,
+          // пока на экране стояло «Готово». Сброс в «загружается» затирал
+          // её результат, а новой загрузки никто не запускал: кабинет
+          // висел скелетом до ручной перезагрузки страницы.
           removeAccessToken();
           setAccessToken('');
-          setState({ loading: true, me: null, error: null });
           setInstallReady(true);
         }}
       />
@@ -131,9 +135,9 @@ export default function App() {
         token={inviteToken}
         details={<LaunchDetails />}
         onComplete={() => {
+          // Загрузку не сбрасываем — см. вход по ссылке выше
           removeInviteToken();
           setInviteToken('');
-          setState({ loading: true, me: null, error: null });
         }}
       />
     );
@@ -153,7 +157,7 @@ export default function App() {
           setLoginTicket('');
         }}
         onComplete={(result) => {
-          setState({ loading: true, me: null, error: null });
+          // Загрузку не сбрасываем — см. вход по ссылке выше
           setInstallReady(result.installReady);
           setLoginTicket('');
         }}

@@ -4,7 +4,7 @@ import { enterByAccessLink, inspectAccessLink, removeAccessToken } from './acces
 import { prepareIosInstallBridge } from './install.js';
 import { detectBrowser, androidBrowserUrl, copyCurrentLink } from './browser.js';
 import {
-  IconAlert, IconCheck, IconCopy, IconExternal, IconKey, IconRefresh, IconShare,
+  IconAlert, IconCheck, IconCopy, IconExternal, IconKey, IconRefresh,
 } from './icons.jsx';
 
 /**
@@ -18,21 +18,26 @@ import {
  * человека успевают открыть предпросмотр мессенджера и антивирус почты, и
  * автоматический вход расходовался бы на них (см. access.js).
  *
- * Перед всем этим — проверка, откуда ссылку открыли. Тренер шлёт её в
- * Telegram, а Telegram открывает ссылки у себя внутри, и оттуда приложение
- * на телефон не поставить: человек полистает кабинет, закроет мессенджер и
- * больше приложение не найдёт. Поэтому во встроенном браузере вместо входа
- * стоит указание, как выйти наружу. Вход при этом НЕ расходуется: ссылка
- * останется целой для настоящего браузера.
+ * Откуда открыли ссылку, на вход НЕ влияет. Раньше во встроенном
+ * браузере Telegram, в Chrome и Яндексе на iPhone вместо входа стояла стена
+ * «Откройте в Safari» — ради иконки на экране. На деле клиенты читали её
+ * как «страница не работает»: кнопки входа не видно, а текст про Telegram
+ * показывался и тем, кто открыл ссылку в Chrome. Теперь войти можно
+ * откуда угодно, а совет про Safari стоит ниже кнопки — как способ
+ * поставить иконку, а не условие попасть в кабинет. Лишний вход не
+ * страшен: ссылка пускает пять раз.
  */
 
 const SUCCESS_PAUSE_MS = 550;
+
+/** Через сколько «Проверяем ссылку» перестаёт быть нормой и нужен совет */
+const SLOW_MS = 8000;
 
 export default function AccessLogin({ token, onComplete, details }) {
   const [state, setState] = useState({ loading: true, link: null, error: null });
   const [status, setStatus] = useState('idle');
   const [problem, setProblem] = useState('');
-  const [anyway, setAnyway] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [where] = useState(() => detectBrowser());
 
   const load = () => {
@@ -43,6 +48,15 @@ export default function AccessLogin({ token, onComplete, details }) {
   };
 
   useEffect(load, [token]);
+
+  // Проверка ссылки — один короткий запрос. Если он висит дольше
+  // нескольких секунд, дело не в сервере, а в сети или браузере, и
+  // человеку нужен выход, а не бесконечное «займёт несколько секунд».
+  useEffect(() => {
+    if (!state.loading) { setSlow(false); return undefined; }
+    const timer = setTimeout(() => setSlow(true), SLOW_MS);
+    return () => clearTimeout(timer);
+  }, [state.loading]);
 
   useEffect(() => {
     if (status !== 'success') return undefined;
@@ -72,19 +86,25 @@ export default function AccessLogin({ token, onComplete, details }) {
     }
   };
 
-  // Стена стоит ДО проверки ссылки, а не после: во встроенном браузере она
-  // должна появиться мгновенно, и ждать ради неё ответ сервера незачем.
-  if (where.deadEnd && !anyway) {
-    return <OpenOutside where={where} onAnyway={() => setAnyway(true)} details={details} />;
-  }
-
   if (state.loading) {
     return (
       <AccessShell
         icon={<IconRefresh size={26} />}
         title="Проверяем ссылку"
-        text="Это займёт несколько секунд."
-      />
+        text={slow
+          ? 'Что-то долго. Скорее всего, мешает связь или этот браузер.'
+          : 'Это займёт несколько секунд.'}
+      >
+        {slow && (
+          <>
+            <button className="button button--block" onClick={load}>
+              <IconRefresh size={16} />
+              Попробовать ещё раз
+            </button>
+            {where.deadEnd && <OpenOutside where={where} stuck />}
+          </>
+        )}
+      </AccessShell>
     );
   }
 
@@ -99,6 +119,7 @@ export default function AccessLogin({ token, onComplete, details }) {
           <IconRefresh size={16} />
           Проверить снова
         </button>
+        {where.deadEnd && <OpenOutside where={where} stuck />}
         {details}
       </AccessShell>
     );
@@ -129,34 +150,36 @@ export default function AccessLogin({ token, onComplete, details }) {
         Пароль не нужен. После входа приложение можно поставить на домашний экран —
         подскажем, как только откроется кабинет.
       </p>
+      {where.deadEnd && <OpenOutside where={where} />}
       {details}
     </AccessShell>
   );
 }
 
 /**
- * Выход из встроенного браузера.
+ * Совет открыть ссылку в настоящем браузере.
  *
- * Что здесь можно, а чего нельзя, решает не желание, а система.
+ * Не условие входа, а подсказка под ним: отсюда войти можно, но иконку на
+ * экран поставить нельзя (см. browser.js). А если страница здесь не
+ * грузится вовсе (`stuck`), тот же совет становится выходом из тупика.
+ *
+ * Что здесь можно, а чего нельзя, решает система.
  *
  * Android отдаёт ссылку наружу сам: схема `intent://` не обрабатывается
  * внутри WebView, и Android открывает её настоящим браузером. Поэтому тут
  * работает кнопка.
  *
- * На iOS такой возможности НЕТ. Передать ссылку в Safari из WKWebView
- * нельзя ничем: публичной схемы для этого не существует, и обойти это
- * нечем. Значит, честный интерфейс — не кнопка, которая может не
- * сработать, а понятные два шага, которые человек делает сам.
- *
- * Внизу — «всё равно войти здесь». Определение браузера живёт на разборе
- * строки User-Agent и однажды ошибётся; ошибка не должна означать, что
- * клиент не попадёт в кабинет и пойдёт звонить тренеру. Пусть лучше
- * человек войдёт во встроенном браузере, чем не войдёт никуда.
+ * На iOS такой возможности НЕТ: передать ссылку в Safari из WKWebView
+ * нечем. Во встроенном браузере Telegram есть пункт меню «Открыть в
+ * Safari» — его и называем. В Chrome и Яндексе такого пункта нет, там
+ * честнее всего скопировать ссылку.
  */
-function OpenOutside({ where, onAnyway, details }) {
+function OpenOutside({ where, stuck }) {
   const [copied, setCopied] = useState(false);
   const android = where.platform === 'android';
+  const telegram = where.kind === 'webview';
   const intentUrl = android ? androidBrowserUrl(window.location.href) : '';
+  const target = android ? 'браузере' : 'Safari';
 
   const copy = async () => {
     const ok = await copyCurrentLink();
@@ -164,49 +187,43 @@ function OpenOutside({ where, onAnyway, details }) {
     if (!ok) window.prompt('Скопируйте ссылку вручную:', window.location.href);
   };
 
+  const lead = stuck
+    ? `Откройте эту же ссылку в ${target} — там кабинет открывается надёжнее.`
+    : android
+      ? 'Чтобы поставить кабинет иконкой на экран, откройте ссылку в браузере: из Telegram это сделать нельзя.'
+      : telegram
+        ? 'Чтобы поставить кабинет иконкой на экран, откройте ссылку в Safari: из Telegram на iPhone это сделать нельзя.'
+        : 'Иконку на экран iPhone надёжнее всего ставить из Safari. Войти можно и здесь, а потом открыть ту же ссылку в Safari.';
+
   return (
-    <AccessShell
-      icon={android ? <IconExternal size={26} /> : <IconShare size={26} />}
-      title={android ? 'Откройте в браузере' : 'Откройте в Safari'}
-      text={
-        android
-          ? 'Сейчас кабинет открыт внутри Telegram. Отсюда приложение не поставить на телефон — оно исчезнет, как только вы закроете мессенджер.'
-          : 'Сейчас кабинет открыт внутри Telegram. Поставить приложение на телефон можно только из Safari — это ограничение iPhone, обойти его нечем.'
-      }
-    >
-      {android ? (
-        <a className="button button--primary button--block invite__primary outside__jump" href={intentUrl}>
-          <IconExternal size={18} />
+    <div className="outside">
+      <p className="outside__lead">{lead}</p>
+
+      {android && (
+        <a className="button button--block" href={intentUrl}>
+          <IconExternal size={17} />
           Открыть в браузере
         </a>
-      ) : (
+      )}
+
+      {!android && telegram && (
         <ol className="outside__steps">
-          <li>
-            Нажмите <b>•••</b> в правом нижнем углу
-          </li>
-          <li>
-            Выберите <b>«Открыть в Safari»</b>
-          </li>
+          <li>Откройте меню <b>•••</b></li>
+          <li>Выберите <b>«Открыть в Safari»</b></li>
         </ol>
       )}
 
-      <button className="button button--block" onClick={copy}>
+      <button className="button button--ghost button--block" onClick={copy}>
         {copied ? <IconCheck size={17} /> : <IconCopy size={17} />}
         {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
       </button>
 
-      <p className="invite__hint">
-        {copied
-          ? 'Откройте ' + (android ? 'браузер' : 'Safari') + ' и вставьте ссылку в адресную строку.'
-          : 'Ссылка останется рабочей: вход отсюда не потрачен.'}
-      </p>
-
-      <button className="button button--ghost outside__anyway" onClick={onAnyway}>
-        Всё равно войти здесь
-      </button>
-
-      {details}
-    </AccessShell>
+      {copied && (
+        <p className="invite__hint">
+          Откройте {android ? 'браузер' : 'Safari'} и вставьте ссылку в адресную строку.
+        </p>
+      )}
+    </div>
   );
 }
 
