@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import {
-  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Delta,
+  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Delta, Segmented,
   formatNumber, formatMoney,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
@@ -31,6 +31,18 @@ const MONTHS = [
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
 ];
 
+/** «к августу 2026»: после «к» месяц стоит в дательном падеже */
+const MONTHS_TO = [
+  'январю', 'февралю', 'марту', 'апрелю', 'маю', 'июню',
+  'июлю', 'августу', 'сентябрю', 'октябрю', 'ноябрю', 'декабрю',
+];
+
+function monthTo(month) {
+  const [year, m] = String(month || '').split('-').map(Number);
+  if (!year || !m || !MONTHS_TO[m - 1]) return String(month || '');
+  return MONTHS_TO[m - 1] + ' ' + year;
+}
+
 export function monthLabel(month) {
   const [year, m] = String(month || '').split('-').map(Number);
   if (!year || !m || !MONTHS[m - 1]) return String(month || '');
@@ -48,43 +60,134 @@ export function thisMonth(now = new Date()) {
 }
 
 /* ==================================================================
- * Месяц
+ * Период
  * ================================================================== */
 
 /**
- * Переключатель месяца.
+ * Что смотрим и с чем сравниваем.
  *
- * Стрелками, а не списком: месяцев бесконечно много, а ходят по ним почти
- * всегда на шаг назад — «а в прошлом сколько было». Вперёд за текущий
- * месяц не пускаем: там заведомо нули, и человек решит, что сломалось.
+ * Месяц сравнивают двумя способами. С прошлым месяцем — чтобы видеть, куда
+ * идёт дело прямо сейчас. С тем же месяцем год назад — потому что у зала
+ * есть сезон: сентябрь после лета всегда выглядит ростом к августу, и
+ * только сентябрь к сентябрю говорит, стало ли лучше на самом деле.
+ *
+ * Год сравнивается с прошлым годом, а текущий, ещё не кончившийся, — с
+ * теми же месяцами прошлого (это считает сервер, здесь только подпись).
+ *
+ * Выбор общий для «Финансов» и «Процессов» и переживает переход между
+ * ними: переключив на год, человек ждёт года и на соседней вкладке.
  */
-function MonthPicker({ month, onChange }) {
-  const limit = thisMonth();
-  const forward = shiftMonth(month, 1);
+const PERIODS = [
+  { value: 'month', label: 'Месяц' },
+  { value: 'year', label: 'Год' },
+];
 
-  const go = (step) => {
-    const next = shiftMonth(month, step);
-    if (next > limit) return;
-    onChange(next);
+const COMPARES = [
+  { value: 'month', label: 'К прошлому месяцу' },
+  { value: 'year', label: 'К году назад' },
+];
+
+let remembered = null;
+
+/** Для проверок: каждый экран в них открывается как в первый раз */
+export function resetPeriod() {
+  remembered = null;
+}
+
+function usePeriod() {
+  const [state, setState] = useState(() => remembered || {
+    period: 'month',
+    compare: 'month',
+    month: thisMonth(),
+    year: new Date().getFullYear(),
+  });
+
+  const update = (patch) => {
+    setState((prev) => {
+      const next = { ...prev, ...patch };
+      remembered = next;
+      return next;
+    });
     haptic();
   };
 
+  return [state, update];
+}
+
+function useMetrics(state) {
+  const params = state.period === 'year'
+    ? { year: state.year }
+    : { month: state.month, compare: state.compare };
+
+  return useData('trainer.metrics', params, [state.period, state.month, state.year, state.compare]);
+}
+
+/** Подписи периода и того, с чем сравниваем, — из ответа сервера */
+function describe(data) {
+  if (data.year) {
+    const partial = data.throughMonth && data.throughMonth < 12;
+    const range = partial ? ' (январь — ' + MONTHS[data.throughMonth - 1].toLowerCase() + ')' : '';
+    return {
+      label: String(data.year),
+      against: data.previousYear + ' году' + range,
+      short: 'к ' + data.previousYear + ' году',
+      same: 'сколько в ' + data.previousYear + ' году',
+    };
+  }
+
+  const past = monthTo(data.previousMonth);
+  return {
+    label: monthLabel(data.month),
+    against: past,
+    short: data.compare === 'year' ? 'к ' + past : 'к прошлому месяцу',
+    same: data.compare === 'year' ? 'сколько год назад' : 'сколько месяцем раньше',
+  };
+}
+
+/**
+ * Шапка периода: месяц или год, стрелки и способ сравнения.
+ *
+ * Стрелками, а не списком: ходят почти всегда на шаг назад — «а в прошлом
+ * сколько было». Вперёд за текущий период не пускаем: там заведомо нули,
+ * и человек решит, что сломалось.
+ */
+function PeriodBar({ state, update }) {
+  const yearNow = new Date().getFullYear();
+  const isYear = state.period === 'year';
+
+  const label = isYear ? String(state.year) : monthLabel(state.month);
+  const canForward = isYear ? state.year < yearNow : shiftMonth(state.month, 1) <= thisMonth();
+
+  const step = (dir) => {
+    if (dir > 0 && !canForward) return;
+    if (isYear) update({ year: state.year + dir });
+    else update({ month: shiftMonth(state.month, dir) });
+  };
+
   return (
-    <div className="monthpick">
-      <button className="icon-button" onClick={() => go(-1)} aria-label="Предыдущий месяц">
-        <IconBack size={18} />
-      </button>
+    <div className="period">
+      <Segmented items={PERIODS} value={state.period} onChange={(period) => update({ period })} label="Период" />
 
-      <span className="monthpick__label">{monthLabel(month)}</span>
+      <div className="monthpick">
+        <button className="icon-button" onClick={() => step(-1)} aria-label={isYear ? 'Предыдущий год' : 'Предыдущий месяц'}>
+          <IconBack size={18} />
+        </button>
 
-      <button
-        className="icon-button monthpick__next"
-        onClick={() => go(1)}
-        disabled={forward > limit}
-        aria-label="Следующий месяц"
-      >
-        <IconBack size={18} />
-      </button>
+        <span className="monthpick__label">{label}</span>
+
+        <button
+          className="icon-button monthpick__next"
+          onClick={() => step(1)}
+          disabled={!canForward}
+          aria-label={isYear ? 'Следующий год' : 'Следующий месяц'}
+        >
+          <IconBack size={18} />
+        </button>
+      </div>
+
+      {!isYear && (
+        <Segmented items={COMPARES} value={state.compare} onChange={(compare) => update({ compare })} label="Сравнить" />
+      )}
     </div>
   );
 }
@@ -136,9 +239,9 @@ function format(value, unit, digits) {
   return formatNumber(value, digits);
 }
 
-function signed(value) {
-  if (!value) return 'столько же, сколько месяцем раньше';
-  return (value > 0 ? '+' : '−') + formatMoney(Math.abs(value)) + ' к прошлому месяцу';
+function signed(value, period) {
+  if (!value) return 'столько же, ' + period.same;
+  return (value > 0 ? '+' : '−') + formatMoney(Math.abs(value)) + ' ' + period.short;
 }
 
 /* ==================================================================
@@ -146,19 +249,21 @@ function signed(value) {
  * ================================================================== */
 
 export function Finance() {
-  const [month, setMonth] = useState(thisMonth);
-  const { loading, data, error, reload } = useData('trainer.metrics', { month }, [month]);
+  const [state, update] = usePeriod();
+  const { loading, data, error, reload } = useMetrics(state);
 
-  if (loading) return <Loading rows={4} />;
-  if (error) return <ErrorState error={error} onRetry={reload} />;
+  const bar = <PeriodBar state={state} update={update} />;
+
+  if (loading) return <>{bar}<Loading rows={4} /></>;
+  if (error) return <>{bar}<ErrorState error={error} onRetry={reload} /></>;
 
   const now = data.finance.now;
   const before = data.finance.before;
-  const past = monthLabel(data.previousMonth).toLowerCase();
+  const period = describe(data);
 
   return (
     <>
-      <MonthPicker month={data.month} onChange={setMonth} />
+      {bar}
 
       {/* Крупно — прибыль, а не выручка. Выручку тренер и так помнит, а
           прибыль до сих пор нигде не считалась: расходов не было ни в
@@ -168,17 +273,17 @@ export function Finance() {
           Касса стоит отдельно и в прибыль не входит: это деньги, которые
           ещё предстоит отработать. */}
       <Lead
-        label={'Прибыль · ' + monthLabel(data.month)}
+        label={'Прибыль · ' + period.label}
         tone={now.profit >= 0 ? 'good' : 'critical'}
         value={formatMoney(now.profit)}
-        hint={signed(now.profit - before.profit)}
+        hint={signed(now.profit - before.profit, period)}
         facts={[
           { label: 'Выручка', value: formatMoney(now.revenue) },
           { label: 'Расходы', value: formatMoney(now.expenses) },
         ]}
       />
 
-      <Section title="Деньги" note={'рядом — изменение к ' + past}>
+      <Section title="Деньги" note={'рядом — изменение к ' + period.against}>
         <Panel>
           <Rows>
             <Metric label="Выручка" unit="₽" value={now.revenue} before={before.revenue} />
@@ -216,7 +321,7 @@ export function Finance() {
       >
         <Panel>
           <Rows>
-            <Metric label="Касса за месяц" unit="₽" value={now.cash} before={before.cash} aim={0} />
+            <Metric label={data.year ? 'Касса за год' : 'Касса за месяц'} unit="₽" value={now.cash} before={before.cash} aim={0} />
             <Metric label="Оплат принято" value={now.payments} before={before.payments} aim={0} />
             <Metric
               label="Средняя оплата"
@@ -262,27 +367,29 @@ export function Finance() {
  * ================================================================== */
 
 export function Processes() {
-  const [month, setMonth] = useState(thisMonth);
-  const { loading, data, error, reload } = useData('trainer.metrics', { month }, [month]);
+  const [state, update] = usePeriod();
+  const { loading, data, error, reload } = useMetrics(state);
 
-  if (loading) return <Loading rows={4} />;
-  if (error) return <ErrorState error={error} onRetry={reload} />;
+  const bar = <PeriodBar state={state} update={update} />;
+
+  if (loading) return <>{bar}<Loading rows={4} /></>;
+  if (error) return <>{bar}<ErrorState error={error} onRetry={reload} /></>;
 
   const now = data.process.now;
   const before = data.process.before;
-  const past = monthLabel(data.previousMonth).toLowerCase();
+  const period = describe(data);
 
   return (
     <>
-      <MonthPicker month={data.month} onChange={setMonth} />
+      {bar}
 
       <Lead
-        label={'Тренировок · ' + monthLabel(data.month)}
+        label={'Тренировок · ' + period.label}
         value={formatNumber(now.trainings, 0)}
         hint={
           now.perClient
             ? 'по ' + formatNumber(now.perClient, 1) + ' на клиента'
-            : 'занятий в этом месяце ещё не было'
+            : 'занятий за этот период ещё не было'
         }
         facts={[
           { label: 'Клиентов', value: formatNumber(now.activeClients, 0) },
@@ -290,7 +397,7 @@ export function Processes() {
         ]}
       />
 
-      <Section title="Работа" note={'рядом — изменение к ' + past}>
+      <Section title="Работа" note={'рядом — изменение к ' + period.against}>
         <Panel>
           <Rows>
             <Metric label="Клиентов в работе" value={now.activeClients} before={before.activeClients} />

@@ -2914,3 +2914,14 @@ code {
 }
 
 .warn__icon--critical { color: var(--critical-text); }
+
+/* Шапка периода сводки: месяц или год, стрелки, способ сравнения.
+   Переключатели по центру: это не фильтры списка, а выбор того, на что
+   смотрит весь экран. */
+.period {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.period .chips { justify-content: center; }

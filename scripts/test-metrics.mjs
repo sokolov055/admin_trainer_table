@@ -65,7 +65,7 @@ vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0]
   createRequire(import.meta.url), module, module.exports,
 );
 
-const { Finance, Processes, Expenses } = module.exports;
+const { Finance, Processes, Expenses, resetPeriod } = module.exports;
 
 /* ==========================================================================
  * Инструменты
@@ -149,6 +149,7 @@ function metrics({ month = '2026-09', now = {}, before = {}, process: proc = {},
  * какой месяц экран на самом деле спросил у сервера.
  */
 function draw(Screen, answer, { onMutate } = {}) {
+  resetPeriod();
   const asked = [];
   const sent = [];
 
@@ -262,6 +263,71 @@ test('дальше текущего месяца не уйти', () => {
   assert.equal(asked.length, before, 'запроса не случилось');
 });
 
+/**
+ * Сентябрь к августу врёт про сезон, поэтому месяц можно сравнить и с тем
+ * же месяцем год назад. Выбор уходит на сервер, подпись меняется вместе
+ * с ним.
+ */
+test('месяц сравнивается с тем же месяцем год назад', () => {
+  const { tree, asked } = draw(Finance, (action, params) => ({
+    ...metrics({ now: { profit: 100000 }, before: { profit: 80000 } }),
+    ...(params.compare === 'year' ? { compare: 'year', previousMonth: '2025-09' } : {}),
+  }));
+
+  press(tree, 'К году назад');
+
+  assert.equal(asked[asked.length - 1].params.compare, 'year');
+  const text = screenText(tree);
+  assert.match(text, /\+20 000 ₽ к сентябрю 2025/);
+  assert.match(text, /изменение к сентябрю 2025/);
+});
+
+/**
+ * Год сравнивается с прошлым, а текущий — с теми же месяцами прошлого:
+ * иначе каждый год до декабря выглядел бы падением.
+ */
+test('год сравнивается с прошлым, текущий — с теми же месяцами', () => {
+  const year = (data) => ({
+    year: 2026, previousYear: 2025, throughMonth: 9,
+    finance: { now: { ...data.finance.now, profit: 900000 }, before: { ...data.finance.before, profit: 700000 } },
+    process: data.process,
+  });
+
+  const { tree, asked } = draw(Finance, (action, params) => (params.year ? year(metrics()) : metrics()));
+
+  press(tree, 'Год');
+
+  assert.deepEqual(asked[asked.length - 1].params, { year: new Date().getFullYear() });
+
+  const text = screenText(tree);
+  assert.match(text, /Прибыль · 2026/);
+  assert.match(text, /\+200 000 ₽ к 2025 году/);
+  assert.match(text, /изменение к 2025 году \(январь — сентябрь\)/);
+  assert.match(text, /Касса за год/);
+  assert.doesNotMatch(text, /К году назад/, 'у года способ сравнения один');
+});
+
+test('выбранный период сохраняется при переходе на процессы', () => {
+  const answer = (action, params) => (params.year
+    ? { year: 2026, previousYear: 2025, throughMonth: 9, ...metrics() }
+    : metrics());
+
+  const first = draw(Finance, answer);
+  press(first.tree, 'Год');
+
+  // Второй экран открываем без сброса — как переход по вкладке
+  const asked = [];
+  globalThis.__metrics.useData = (action, params) => {
+    asked.push(params);
+    return { loading: false, data: answer(action, params), error: null, reload() {} };
+  };
+  let tree;
+  act(() => { tree = renderer.create(React.createElement(Processes)); });
+
+  assert.equal(asked[0].year, new Date().getFullYear());
+  assert.match(screenText(tree), /Тренировок · 2026/);
+});
+
 /* ==========================================================================
  * Процессы
  * ========================================================================== */
@@ -289,7 +355,7 @@ test('пустые процессы не врут про долю', () => {
   const text = screenText(tree);
 
   assert.ok(!/NaN|Infinity|undefined/.test(text), 'в тексте экрана: ' + text);
-  assert.match(text, /занятий в этом месяце ещё не было/);
+  assert.match(text, /занятий за этот период ещё не было/);
 });
 
 /* ==========================================================================
