@@ -265,7 +265,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // вниз — к середине месяца их больше, чем оставшихся.
   const [planTab, setPlanTab] = useState('queue');
 
-  // Журнал живёт в таблице и отвечает секундами, поэтому экран его не
+  // Журнал может ответить не сразу, поэтому экран его не
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
   // придёт ответ. Перечитываем после выхода из журнала — там занятие
   // могли завершить или отменить.
@@ -402,7 +402,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                   <button className="button" onClick={() => { setTemplateTool('save'); setSavedTemplate(false); }}>Сохранить как шаблон</button>
                 )}
                 <button className="button" disabled={creating} onClick={async () => {
-                  const month = window.prompt('Название месяца, как он называется в таблице:', nextMonthLabel());
+                  const month = window.prompt('Название месяца:', nextMonthLabel());
                   if (!month) return;
 
                   setCreating(true);
@@ -543,7 +543,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   );
 }
 
-/** «Октябрь 2026» — как месяц называется в таблице */
+/** «Октябрь 2026» — название следующего месяца */
 function nextMonthLabel() {
   const names = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
@@ -592,9 +592,8 @@ function ExerciseRow({ ex, inSuperset }) {
  * Раньше выбор был только такой: либо всё это у него в приложении, либо
  * лист удалён насовсем.
  *
- * Кнопка прячет саму вкладку в таблице клиента, а не отметку где-то рядом.
- * Поэтому и обратная сторона работает сама собой: скрыл вкладку руками в
- * таблице — месяц пропал и в приложении. Одно состояние, одно место.
+ * Скрытие — отметка на сервере: программы с 25 сентября в таблицах не
+ * живут, и вкладки там больше не прячутся.
  *
  * Только у тренера: сервер не пустит клиента в это действие по роли, но и
  * кнопки у него нет — решение, какие месяцы показывать, принимает не он.
@@ -623,8 +622,8 @@ function MonthVisibility({ month, hidden, clientRow, onChanged }) {
       <Panel pad>
         <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
           {hidden
-            ? `Лист «${month}» скрыт в таблице — клиент этот месяц не видит.`
-            : `Лист «${month}» виден клиенту. Скрытый останется в таблице со всем содержимым.`}
+            ? `Месяц «${month}» скрыт — клиент его не видит.`
+            : `Месяц «${month}» виден клиенту. Скрытый останется у вас со всем содержимым.`}
         </p>
 
         <button className="button button--block" onClick={toggle} disabled={busy}>

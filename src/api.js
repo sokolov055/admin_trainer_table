@@ -304,7 +304,11 @@ async function request(action, params) {
   // Кроме данных члена семьи: Apps Script про семью не знает, familyRow
   // пропустил бы мимо и отдал спросившему его собственные замеры — под
   // именем родственника. Лучше честное «сервер не отвечает».
-  if (body === null && !JSON.stringify(params).includes('"familyRow"')) {
+  //
+  // И кроме тренировок: программы и журнал с 25 сентября живут только на
+  // сервере, а Apps Script читал бы и писал их в таблицы — показал бы
+  // устаревшую копию или записал занятие туда, откуда его никто не прочтёт.
+  if (body === null && !JSON.stringify(params).includes('"familyRow"') && !trainingAction(action, params)) {
     const spare = fallbackApiUrl();
     if (spare && spare !== url) body = await tryEndpoint(spare, payload);
   }
@@ -429,4 +433,13 @@ function notifyMutated() {
   mutationListeners.forEach((fn) => {
     try { fn(); } catch (_) {}
   });
+}
+
+/** Программы, журнал, библиотека и семья — только основной сервер */
+const TRAINING_ACTION = /^(client\.plan|workout\.|plan\.|library\.|family\.)/;
+
+function trainingAction(action, params) {
+  if (TRAINING_ACTION.test(action)) return true;
+  const requests = params && Array.isArray(params.requests) ? params.requests : [];
+  return requests.some((r) => r && TRAINING_ACTION.test(String(r.action || '')));
 }
