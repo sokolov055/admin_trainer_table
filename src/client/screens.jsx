@@ -768,8 +768,6 @@ export function Progress({ clientRow }) {
     <>
       {addMeasure}
 
-      {available.length > 1 && <Chips items={available} value={activeField} onChange={setField} />}
-
       {hasRows ? (
         <Lead
           label={activeField}
@@ -792,6 +790,14 @@ export function Progress({ clientRow }) {
             ? [{ label: 'Месяц', value: progress.currentMonth }]
             : undefined}
         />
+      )}
+
+      {/* Выбор показателя — прямо над графиком, который он переключает:
+          сверху, над итогом, он читался как отдельный фильтр экрана */}
+      {available.length > 1 && (
+        <div className="progress__fields">
+          <Chips items={available} value={activeField} onChange={setField} />
+        </div>
       )}
 
       {hasRows && (

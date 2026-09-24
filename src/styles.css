@@ -3501,3 +3501,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   .client-card__more { animation: none; }
   .client-card__chevron { transition: none; }
 }
+
+/* Выбор показателя в «Прогрессе» — между итогом и графиком */
+.progress__fields { margin-top: var(--space-4); }
+.progress__fields .chips { margin-bottom: 0; }
