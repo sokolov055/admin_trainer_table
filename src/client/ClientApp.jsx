@@ -6,6 +6,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
+import { useViewMotion } from '../viewMotion.js';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders } from '../icons.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
@@ -91,6 +92,20 @@ export default function ClientApp({ me, clientRow, preview }) {
 
   // Разделы, где уже были, не пересобираются — прячутся (см. keptTabs.js)
   const tabs = useKeptTabs(view, TABS.map((t) => t.id));
+
+  // Переход по нажатию — въезд на 320 мс (viewMotion.js): разделы по
+  // порядку, экраны меню — «глубже», справа
+  useViewMotion(view, {
+    direction: (prev, next) => {
+      const order = TABS.map((t) => t.id);
+      const a = order.indexOf(prev);
+      const b = order.indexOf(next);
+      if (b < 0) return 1;
+      if (a < 0) return -1;
+      return b >= a ? 1 : -1;
+    },
+    target: () => document.querySelector('#root .app > main:not([hidden])'),
+  });
 
   const go = (id) => {
     tabs.leave();

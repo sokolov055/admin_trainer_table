@@ -549,6 +549,8 @@ test('шаблон назначается клиенту, общий копир�
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
   const tab = await context.newPage();
   tab.on('pageerror', (error) => consoleErrors.push(String(error)));
+  // Удаление спрашивает подтверждение — соглашаемся
+  tab.on('dialog', (dialog) => dialog.accept());
   const visible = (sel) => tab.locator('#root main:not([hidden]) ' + sel);
 
   try {
@@ -574,13 +576,42 @@ test('шаблон назначается клиенту, общий копир�
     await tab.getByRole('button', { name: 'Скопировать к себе' }).click();
     await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить' }).waitFor({ timeout: 5000 }), 'копия своя — её можно править');
 
-    // Упражнение: своя версия общего
+    // Тренировку из программы — отдельным шаблоном в «Тренировки»
+    await tab.getByRole('button', { name: 'В «Тренировки»' }).first().click();
+    await tab.getByText('В «Тренировках»').first().waitFor({ timeout: 5000 });
+    await tab.getByRole('button', { name: 'Назад' }).click();
+    await tab.getByRole('tab', { name: 'Тренировки', exact: true }).click();
+    await assert.doesNotReject(
+      visible('.item').filter({ hasText: 'Тренировка 1 — верх' }).first().waitFor({ timeout: 5000 }),
+      'тренировка из программы появилась в «Тренировках»',
+    );
+
+    // Удаление из списка: режим «Править»
+    await visible('.item').first().waitFor();
+    const before = await visible('.item').count();
+    await tab.getByRole('button', { name: 'Править' }).click();
+    await visible('.library__remove').first().click();
+    await tab.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .item').length === n - 1, before, { timeout: 5000 });
+    await tab.getByRole('button', { name: 'Готово' }).click();
+
+    // Упражнение: анимация, своя версия общего
     await tab.getByRole('tab', { name: 'Упражнения', exact: true }).click();
     await visible('.item').filter({ hasText: 'Планка' }).click();
-    await tab.getByText('Анимация техники появится позже').waitFor({ timeout: 5000 });
+    const frame = tab.locator('.library__anim img').first();
+    await frame.waitFor({ timeout: 5000 });
+    assert.ok(await frame.evaluate((img) => img.complete && img.naturalWidth > 0), 'кадр анимации загрузился');
     await tab.getByRole('button', { name: 'Сделать свою версию' }).click();
     await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
     await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
+    await assert.doesNotReject(tab.locator('.library__anim').waitFor({ timeout: 5000 }), 'у своей версии та же анимация');
+
+    // Общее убирается у себя и возвращается
+    await tab.getByRole('button', { name: 'Назад' }).click();
+    await tab.getByRole('button', { name: 'Править' }).click();
+    await visible('.library__row').filter({ hasText: 'Бёрпи' }).getByRole('button', { name: /Убрать/ }).click();
+    await tab.getByRole('button', { name: 'Убранные · 1' }).click();
+    await tab.getByRole('button', { name: 'Вернуть', exact: true }).click();
+    await assert.doesNotReject(tab.getByText('Все упражнения на месте').waitFor({ timeout: 5000 }), 'упражнение вернулось');
   } finally {
     await context.close();
   }

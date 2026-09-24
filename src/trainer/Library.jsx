@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
@@ -8,7 +8,7 @@ import { uploadVideo, mediaUrl, youtubeEmbed, monthName } from '../library.js';
 import {
   Section, Panel, Loading, ErrorState, Empty, Badge, Chips, Search, Segmented, Field, Note, plural,
 } from '../ui.jsx';
-import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck } from '../icons.jsx';
+import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash } from '../icons.jsx';
 
 /**
  * Библиотека тренера: шаблоны программ и тренировок, упражнения.
@@ -34,7 +34,39 @@ const SCOPES = [
   { value: 'public', label: 'Общие' },
 ];
 
-const GOALS = ['Похудение', 'Набор массы', 'Сила', 'Тонус', 'Выносливость', 'Здоровая спина', 'Реабилитация'];
+const GOALS = ['Похудение', 'Набор массы', 'Рельеф', 'Сила', 'Тонус', 'Выносливость', 'Здоровая спина', 'Реабилитация'];
+const OWN_GOAL = '__own';
+
+/**
+ * Цель — выбором из частых, а редкую можно вписать: «Своя» открывает поле.
+ * Одинаковые цели у шаблонов важны для фильтра в списке — поэтому сначала
+ * предлагаем готовые, а не пустое поле, где каждый напишет по-своему.
+ */
+function GoalPicker({ value, onChange }) {
+  const custom = !!value && !GOALS.includes(value);
+  const [own, setOwn] = useState(custom);
+  const items = [{ value: '', label: 'Без цели' }, ...GOALS.map((g) => ({ value: g, label: g })), { value: OWN_GOAL, label: 'Своя' }];
+
+  return (
+    <div>
+      <span className="field__label">Цель</span>
+      <Segmented
+        wrap
+        label="Цель"
+        items={items}
+        value={own ? OWN_GOAL : value}
+        onChange={(v) => {
+          if (v === OWN_GOAL) { setOwn(true); onChange(custom ? value : ''); return; }
+          setOwn(false);
+          onChange(v);
+        }}
+      />
+      {own && (
+        <Field label="Своя цель" inputMode="text" placeholder="Например, подготовка к забегу" value={value} onChange={onChange} />
+      )}
+    </div>
+  );
+}
 const LEVELS = [
   { value: '', label: 'Любой' },
   { value: 'Новичок', label: 'Новичок' },
@@ -57,8 +89,22 @@ function Templates({ kind }) {
   const [open, setOpen] = useState(null);       // id шаблона
   const [editing, setEditing] = useState(null); // шаблон или { new: true }
   const [assigning, setAssigning] = useState(null);
+  const [pruning, setPruning] = useState(false); // режим «Править список»
+  const [failure, setFailure] = useState(null);
 
   const list = useData('library.templates', { scope, kind }, [scope, kind]);
+
+  const remove = async (t) => {
+    if (!window.confirm(`Удалить шаблон «${t.title}»? Программ клиентов это не коснётся.`)) return;
+    setFailure(null);
+    try {
+      await apiMutate('library.template.delete', { id: t.id });
+      haptic('success');
+      list.reload();
+    } catch (err) {
+      setFailure(err);
+    }
+  };
 
   // Вложенные экраны закрываются смахиванием вправо, как всё остальное
   useBackGesture(() => setEditing(null), !!editing);
@@ -89,6 +135,7 @@ function Templates({ kind }) {
         onAssign={(t) => setAssigning(t)}
         onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
         onDeleted={() => { setOpen(null); list.reload(); }}
+        onSavedWorkout={() => list.reload()}
       />
     );
   }
@@ -102,13 +149,21 @@ function Templates({ kind }) {
 
   return (
     <>
-      <Segmented items={SCOPES} value={scope} onChange={(v) => { setScope(v); haptic(); }} label="Чьи шаблоны" />
+      <Segmented items={SCOPES} value={scope} onChange={(v) => { setScope(v); setPruning(false); haptic(); }} label="Чьи шаблоны" />
 
       {scope === 'mine' && (
-        <button className="button button--primary button--block" style={{ margin: 'var(--space-3) 0' }} onClick={() => setEditing({ new: true })}>
-          {kind === 'program' ? 'Новый шаблон программы' : 'Новый шаблон тренировки'}
-        </button>
+        <div className="library__bar">
+          <button className="button button--primary" disabled={pruning} onClick={() => setEditing({ new: true })}>
+            {kind === 'program' ? 'Новый шаблон программы' : 'Новый шаблон тренировки'}
+          </button>
+          {all.length > 0 && (
+            <button className="button" aria-pressed={pruning} onClick={() => { setPruning(!pruning); haptic(); }}>
+              {pruning ? 'Готово' : 'Править'}
+            </button>
+          )}
+        </div>
       )}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
 
       <Search value={q} onChange={setQ} placeholder="Поиск по названию и цели" />
       {goals.length > 1 && (
@@ -129,7 +184,13 @@ function Templates({ kind }) {
       )}
 
       {shown.map((t) => (
-        <button className="item" key={t.id} onClick={() => { setOpen(t.id); haptic(); }}>
+        <Row
+          key={t.id}
+          pruning={pruning && t.mine}
+          onOpen={() => { setOpen(t.id); haptic(); }}
+          onRemove={() => remove(t)}
+          removeLabel={`Удалить «${t.title}»`}
+        >
           <div className="item__top">
             <span className="item__name">{t.title}</span>
             {t.goal && <Badge>{t.goal}</Badge>}
@@ -143,9 +204,28 @@ function Templates({ kind }) {
             {!t.mine && <span>автор: {t.author}</span>}
             {t.mine && t.isPublic && <Badge kind="good">поделились</Badge>}
           </div>
-        </button>
+        </Row>
       ))}
     </>
+  );
+}
+
+/**
+ * Строка списка. В режиме правки она не открывается, а показывает кнопку
+ * удаления: так удаляют сразу несколько, не заходя в каждое.
+ */
+function Row({ pruning, onOpen, onRemove, removeLabel, removeText = 'Удалить', children }) {
+  if (!pruning) {
+    return <button className="item" onClick={onOpen}>{children}</button>;
+  }
+  return (
+    <div className="item library__row">
+      <div className="library__row-body">{children}</div>
+      <button className="button button--ghost danger library__remove" aria-label={removeLabel} onClick={onRemove}>
+        <IconTrash size={16} />
+        {removeText}
+      </button>
+    </div>
   );
 }
 
@@ -165,9 +245,9 @@ function exerciseLine(e) {
   return extra ? `${e.name} — ${extra}` : e.name;
 }
 
-function BlocksPreview({ blocks }) {
+function BlocksPreview({ blocks, action }) {
   return blocks.map((b, i) => (
-    <Section key={i} title={b.title}>
+    <Section key={i} title={b.title} action={action ? action(b, i) : null}>
       <Panel pad>
         <ol className="library__exercises">
           {b.exercises.map((e, j) => (
@@ -179,10 +259,11 @@ function BlocksPreview({ blocks }) {
   ));
 }
 
-function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted }) {
+function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSavedWorkout }) {
   const { loading, data, error, reload } = useData('library.template.get', { id }, [id]);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
+  const [savedBlocks, setSavedBlocks] = useState({}); // номер тренировки → сохранена
 
   if (loading) return <><Back onClick={onBack} /><Loading rows={3} /></>;
   if (error) return <><Back onClick={onBack} /><ErrorState error={error} onRetry={reload} /></>;
@@ -231,7 +312,36 @@ function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted }) {
         {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       </Panel>
 
-      <BlocksPreview blocks={t.blocks} />
+      {t.kind === 'program' && (
+        <p className="small muted library__hint">
+          Любую тренировку программы можно сохранить отдельным шаблоном — она появится в разделе «Тренировки».
+        </p>
+      )}
+
+      <BlocksPreview
+        blocks={t.blocks}
+        action={t.kind === 'program' ? (block, i) => (
+          savedBlocks[i]
+            ? <span className="library__saved"><IconCheck size={14} />В «Тренировках»</span>
+            : (
+              <button className="button button--ghost library__save-block" disabled={busy} onClick={() => act(async () => {
+                // Своя копия тренировки: из чужого общего шаблона тоже —
+                // править её можно будет только так
+                await apiMutate('library.template.save', {
+                  kind: 'workout',
+                  title: block.title || t.title,
+                  goal: t.goal || '',
+                  level: t.level || '',
+                  description: 'Из программы «' + t.title + '»',
+                  blocks: [block],
+                });
+                haptic('success');
+                setSavedBlocks((s) => ({ ...s, [i]: true }));
+                if (onSavedWorkout) onSavedWorkout();
+              })}>В «Тренировки»</button>
+            )
+        ) : null}
+      />
     </>
   );
 }
@@ -254,8 +364,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
       <Panel pad>
         <div className="library__form">
           <Field label="Название" inputMode="text" placeholder={kind === 'program' ? 'Похудение, 3 раза в неделю' : 'Верх тела'} value={title} onChange={setTitle} />
-          <Field label="Цель" inputMode="text" placeholder="Похудение" value={goal} onChange={setGoal} list="template-goals" />
-          <datalist id="template-goals">{GOALS.map((g) => <option key={g} value={g} />)}</datalist>
+          <GoalPicker value={goal} onChange={setGoal} />
 
           <div>
             <span className="field__label">Уровень</span>
@@ -489,8 +598,7 @@ export function SaveAsTemplate({ clientRow, month, onDone, onCancel }) {
           Программа «{month}» станет шаблоном: упражнения, подходы и повторы. Веса этого клиента в шаблон не попадут.
         </p>
         <Field label="Название шаблона" inputMode="text" placeholder="Похудение, 3 раза в неделю" value={title} onChange={setTitle} />
-        <Field label="Цель" inputMode="text" placeholder="Похудение" value={goal} onChange={setGoal} list="template-goals-save" />
-        <datalist id="template-goals-save">{GOALS.map((g) => <option key={g} value={g} />)}</datalist>
+        <GoalPicker value={goal} onChange={setGoal} />
         <label className="library__check">
           <input type="checkbox" checked={isPublic} onChange={(e) => setPublic(e.target.checked)} />
           <span>Поделиться с другими тренерами</span>
@@ -515,12 +623,35 @@ function Exercises() {
   const [muscle, setMuscle] = useState('');
   const [open, setOpen] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [pruning, setPruning] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [failure, setFailure] = useState(null);
 
   useBackGesture(() => setEditing(null), !!editing);
-  useBackGesture(() => setOpen(null), !editing && !!open);
+  useBackGesture(() => setShowHidden(false), !editing && showHidden);
+  useBackGesture(() => setOpen(null), !editing && !showHidden && !!open);
 
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
+
+  if (showHidden) {
+    return <HiddenExercises onBack={() => { setShowHidden(false); reload(); }} />;
+  }
+
+  const remove = async (e) => {
+    const question = e.common
+      ? `Убрать «${e.name}» из вашего списка? У других тренеров оно останется, а вернуть его можно в «Убранных».`
+      : `Удалить «${e.name}»? В программах клиентов оно останется.`;
+    if (!window.confirm(question)) return;
+    setFailure(null);
+    try {
+      await apiMutate('library.exercise.delete', { id: e.id });
+      haptic('success');
+      reload();
+    } catch (err) {
+      setFailure(err);
+    }
+  };
 
   const all = data.exercises;
   const current = open ? all.find((e) => e.id === open) : null;
@@ -543,6 +674,7 @@ function Exercises() {
         onBack={() => setOpen(null)}
         onEdit={() => setEditing(current)}
         onDeleted={() => { setOpen(null); reload(); }}
+        onRemove={() => remove(current).then(() => setOpen(null))}
       />
     );
   }
@@ -554,33 +686,142 @@ function Exercises() {
 
   return (
     <>
-      <button className="button button--primary button--block" style={{ marginBottom: 'var(--space-3)' }} onClick={() => setEditing({ new: true })}>
-        Своё упражнение
-      </button>
+      <div className="library__bar">
+        <button className="button button--primary" disabled={pruning} onClick={() => setEditing({ new: true })}>
+          Своё упражнение
+        </button>
+        <button className="button" aria-pressed={pruning} onClick={() => { setPruning(!pruning); haptic(); }}>
+          {pruning ? 'Готово' : 'Править'}
+        </button>
+      </div>
       <Search value={q} onChange={setQ} placeholder="Поиск упражнения" />
       <Chips items={muscles} value={muscle} onChange={setMuscle} />
 
-      <p className="small muted">{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
+      <div className="library__count">
+        <p className="small muted">{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
+        {data.hiddenCount > 0 && (
+          <button className="button button--ghost" onClick={() => { setShowHidden(true); setPruning(false); }}>
+            Убранные · {data.hiddenCount}
+          </button>
+        )}
+      </div>
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
 
       {shown.slice(0, 200).map((e) => (
-        <button className="item" key={e.id} onClick={() => { setOpen(e.id); haptic(); }}>
+        <Row
+          key={e.id}
+          pruning={pruning}
+          onOpen={() => { setOpen(e.id); haptic(); }}
+          onRemove={() => remove(e)}
+          removeLabel={(e.common ? 'Убрать «' : 'Удалить «') + e.name + '»'}
+          removeText={e.common ? 'Убрать' : 'Удалить'}
+        >
           <div className="item__top">
             <span className="item__name">{e.name}</span>
             {e.mine && <Badge kind="good">своё</Badge>}
           </div>
           <div className="item__meta">
             {[e.muscle, e.equipment].filter(Boolean).length > 0 && <span>{[e.muscle, e.equipment].filter(Boolean).join(' · ')}</span>}
-            {e.media && <Badge>видео</Badge>}
+            {e.media && <Badge>{e.media.kind === 'animation' ? 'анимация' : 'видео'}</Badge>}
           </div>
-        </button>
+        </Row>
       ))}
       {shown.length > 200 && <p className="small muted">Показаны первые 200 — уточните поиск.</p>}
     </>
   );
 }
 
+/** Убранные общие упражнения: вернуть по одному или все сразу */
+function HiddenExercises({ onBack }) {
+  const { loading, data, error, reload } = useData('library.exercises', { hidden: 1 }, []);
+  const [failure, setFailure] = useState(null);
+
+  const restore = async (ids) => {
+    setFailure(null);
+    try {
+      await apiMutate('library.exercise.restore', { ids });
+      haptic('success');
+      reload();
+    } catch (err) {
+      setFailure(err);
+    }
+  };
+
+  const list = data ? data.exercises : [];
+
+  return (
+    <>
+      <Back onClick={onBack} />
+      <Section
+        title="Убранные упражнения"
+        note="Общие упражнения, которые вы убрали из своего списка"
+        action={list.length > 1 ? <button className="button button--ghost" onClick={() => restore(list.map((e) => e.id))}>Вернуть все</button> : null}
+      >
+        {loading && <Loading lead={false} rows={3} />}
+        {error && <ErrorState error={error} onRetry={reload} />}
+        {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+        {!loading && !error && list.length === 0 && <Empty icon={IconCheck} title="Все упражнения на месте" />}
+        {list.map((e) => (
+          <div className="item library__row" key={e.id}>
+            <div className="library__row-body">
+              <div className="item__top"><span className="item__name">{e.name}</span></div>
+              {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
+            </div>
+            <button className="button button--ghost library__remove" onClick={() => restore([e.id])}>Вернуть</button>
+          </div>
+        ))}
+      </Section>
+    </>
+  );
+}
+
+const ANIM_ID = /^[\w-]+$/;
+
+function prefersStill() {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
+}
+
+/**
+ * Анимация техники из двух кадров — начало и конец движения.
+ *
+ * Кадры — из free-exercise-db (общественное достояние), лежат в самом
+ * приложении: public/anim/<id>/. Верхний кадр плавно проявляется поверх
+ * нижнего, поэтому посередине смены не бывает пустоты. Нажатие ставит на
+ * паузу; тем, кто просил систему меньше двигать, анимация сама не
+ * запускается — только по нажатию.
+ */
+export function Animation({ id }) {
+  const [frame, setFrame] = useState(0);
+  const [loaded, setLoaded] = useState(0);
+  const [playing, setPlaying] = useState(() => !prefersStill());
+
+  useEffect(() => {
+    if (!playing || loaded < 2) return undefined;
+    const timer = setInterval(() => setFrame((f) => 1 - f), 1100);
+    return () => clearInterval(timer);
+  }, [playing, loaded]);
+
+  if (!ANIM_ID.test(id || '')) return null;
+  const src = (n) => `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/${id}/${n}.jpg`;
+  const onLoad = () => setLoaded((n) => n + 1);
+
+  return (
+    <button
+      type="button"
+      className="library__anim"
+      aria-label={playing ? 'Остановить анимацию' : 'Показать движение'}
+      onClick={() => { setPlaying(!playing); haptic(); }}
+    >
+      <img src={src(0)} alt="Начало движения" onLoad={onLoad} draggable="false" />
+      <img src={src(1)} alt="Конец движения" onLoad={onLoad} draggable="false" data-off={frame === 0 ? '' : undefined} />
+      {!playing && <span className="library__anim-note">Нажмите — покажу движение</span>}
+    </button>
+  );
+}
+
 function Media({ media }) {
   if (!media) return null;
+  if (media.kind === 'animation') return <Animation id={media.url} />;
   if (media.kind === 'file') {
     return <video className="library__video" src={mediaUrl(media.url)} controls playsInline preload="metadata" />;
   }
@@ -599,7 +840,7 @@ function Media({ media }) {
   return <a className="button button--block" href={media.url} target="_blank" rel="noreferrer">Открыть видео</a>;
 }
 
-function ExerciseView({ exercise, onBack, onEdit, onDeleted }) {
+function ExerciseView({ exercise, onBack, onEdit, onDeleted, onRemove }) {
   const [failure, setFailure] = useState(null);
   const e = exercise;
 
@@ -618,7 +859,7 @@ function ExerciseView({ exercise, onBack, onEdit, onDeleted }) {
           ? <Media media={e.media} />
           : (
             <div className="library__placeholder">
-              {e.mine ? 'Видео нет — его можно приложить в «Изменить».' : 'Анимация техники появится позже.'}
+              {e.mine ? 'Видео нет — его можно приложить в «Изменить».' : 'Анимации для этого упражнения пока нет — приложите своё видео в своей версии.'}
             </div>
           )}
 
@@ -636,6 +877,9 @@ function ExerciseView({ exercise, onBack, onEdit, onDeleted }) {
                 setFailure(err);
               }
             }}>Удалить</button>
+          )}
+          {e.common && (
+            <button className="button button--ghost danger" onClick={onRemove}>Убрать у себя</button>
           )}
         </div>
         {!e.mine && (
@@ -661,6 +905,8 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
   const [failure, setFailure] = useState(null);
 
   const hasFile = exercise && exercise.mine && exercise.media && exercise.media.kind === 'file';
+  // Пустое поле ссылки не стирает загруженный файл и анимацию
+  const keepsMedia = hasFile || (exercise && exercise.media && exercise.media.kind === 'animation');
 
   const save = async () => {
     setBusy(true);
@@ -674,7 +920,7 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
         equipment,
         notes,
         // Ссылку не трогаем, если загружен файл и поле пустое
-        ...(link || !hasFile ? { link } : {}),
+        ...(link || !keepsMedia ? { link } : {}),
       });
 
       if (file) {

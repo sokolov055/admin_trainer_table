@@ -353,7 +353,26 @@ function refreshNote(state) {
  * Шапка карточки клиента
  * ================================================================== */
 
+const CARD_OPEN_KEY = 'client_card_open_v1';
+
+function readCardOpen() {
+  try { return localStorage.getItem(CARD_OPEN_KEY) === '1'; } catch (_) { return false; }
+}
+
+/**
+ * Шапка сворачивается: баланс и цена видны всегда, а ключ, контакты,
+ * правка и доступ — по кнопке. Нужны они редко, а место над «Оплачено
+ * вперёд» — самое дорогое на экране. Выбор тренера запоминается на
+ * устройстве и действует для всех карточек.
+ */
 export function ClientCard({ client }) {
+  const [expanded, setExpanded] = useState(readCardOpen);
+  const toggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    try { localStorage.setItem(CARD_OPEN_KEY, next ? '1' : '0'); } catch (_) { /* не запомнили — не беда */ }
+  };
+
   const [access, setAccess] = useState({
     confirming: false,
     unlinkTelegram: false,
@@ -391,8 +410,20 @@ export function ClientCard({ client }) {
         </Badge>
         <Badge>{formatMoney(client.price)} за тренировку</Badge>
         {client.payer && <Badge>платит {client.payer}</Badge>}
+        <button
+          type="button"
+          className="button button--ghost client-card__toggle"
+          aria-expanded={expanded}
+          aria-controls={'client-card-more-' + client.row}
+          onClick={toggle}
+        >
+          {expanded ? 'Свернуть' : 'Подробнее'}
+          <IconBack size={14} className="client-card__chevron" />
+        </button>
       </div>
 
+      {expanded && (
+      <div className="client-card__more" id={'client-card-more-' + client.row}>
       <div className="small muted" style={{ marginTop: 10 }}>
         {client.clientKey && <>Ключ <code>{client.clientKey}</code> · </>}
         строка {client.row}
@@ -475,6 +506,8 @@ export function ClientCard({ client }) {
             </button>
           </div>
         </div>
+      )}
+      </div>
       )}
     </Panel>
   );

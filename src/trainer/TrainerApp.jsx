@@ -15,6 +15,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
+import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
@@ -36,12 +37,28 @@ import Library, { LIBRARY_PANES } from './Library.jsx';
  * вид, что всё это одинаково срочно, и переполняли панель.
  */
 
+/** Разделы и экраны меню: разделы — по порядку, меню — «глубже», справа */
+function screenDirection(order) {
+  return (prev, next) => {
+    const deep = (v) => v === 'card' || v === 'preview';
+    if (deep(next)) return 1;
+    if (deep(prev)) return -1;
+    const a = order.indexOf(prev);
+    const b = order.indexOf(next);
+    if (b < 0) return 1;
+    if (a < 0) return -1;
+    return b >= a ? 1 : -1;
+  };
+}
+
+const visibleMain = () => document.querySelector('#root .app > main:not([hidden])');
+
 const TABS = [
   { id: 'clients', label: 'Клиенты', Icon: IconUsers },
-  { id: 'dashboard', label: 'Сводка', Icon: IconChart },
   // Библиотека: шаблоны программ и тренировок, упражнения. Отсюда
   // программы раскладываются клиентам за минуту (Library.jsx).
   { id: 'library', label: 'Шаблоны', Icon: IconPlan },
+  { id: 'dashboard', label: 'Сводка', Icon: IconChart },
 ];
 
 const MENU = [
@@ -121,6 +138,17 @@ export default function TrainerApp({ me }) {
     closeMenu: () => setMenuOpen(false),
     enabled: !inMenu && !openClient && !previewClient,
   });
+
+  // Переходы по нажатию — въезд на 320 мс (viewMotion.js)
+  const screen = previewClient ? 'preview' : openClient ? 'card' : view;
+  useViewMotion(screen, {
+    direction: screenDirection(TABS.map((t) => t.id)),
+    target: () => (screen === 'card' || screen === 'preview' ? document.querySelector('#root .app') : visibleMain()),
+  });
+  const paneTarget = () => { const m = visibleMain(); return m && m.firstElementChild; };
+  useViewMotion(clientPane, { direction: byOrder(CLIENT_PANES.map((p) => p.value)), target: paneTarget });
+  useViewMotion(dashPane, { direction: byOrder(DASH_PANES.map((p) => p.value)), target: paneTarget });
+  useViewMotion(libPane, { direction: byOrder(LIBRARY_PANES.map((p) => p.value)), target: paneTarget });
   const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });
   const [calendarRevision, setCalendarRevision] = useState(0);
   const calendarRequest = useRef(null);
@@ -423,6 +451,11 @@ function ClientDetail({ client, onBack }) {
 
   useBackGesture(onBack, view === ids[0], 'client-card');
 
+  useViewMotion(view, {
+    direction: byOrder(ids),
+    target: () => document.querySelector('.card-section:not([hidden])'),
+  });
+
   return (
     <div className="app">
       <header className="app__header">
@@ -432,13 +465,15 @@ function ClientDetail({ client, onBack }) {
         </button>
         <h1 className="app__title">{client.name}</h1>
         <p className="app__subtitle">Карточка клиента · {current.label}</p>
-        <div className="app__subnav">
-          <NavTabs ref={barRef} items={CLIENT_VIEWS} value={view} onChange={open} />
-        </div>
       </header>
 
       <main className="app__body app__body--plain">
+        {/* Сначала — кто это и сколько на балансе, потом разделы: бар
+            стоит прямо над тем, что он переключает */}
         <ClientCard client={client} />
+        <div className="app__subnav card-bar">
+          <NavTabs ref={barRef} items={CLIENT_VIEWS} value={view} onChange={open} />
+        </div>
         {CLIENT_VIEWS.map((v) => sections.shown(v.value) && (
           <div
             key={v.value}
@@ -446,7 +481,7 @@ function ClientDetail({ client, onBack }) {
             data-kept={sections.kept(v.value) ? '' : undefined}
             className="card-section"
             data-view={v.value}
-            style={{ marginTop: 'var(--space-5)' }}
+            style={{ marginTop: 'var(--space-4)' }}
           >
             {v.value === 'payments'
               ? <Payments client={client} />

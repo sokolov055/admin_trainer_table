@@ -1527,6 +1527,7 @@ button { font-family: inherit; }
 .chips::-webkit-scrollbar { display: none; }
 
 .chips--flush { margin-bottom: 0; }
+.chips--wrap { flex-wrap: wrap; overflow: visible; }
 
 .chip {
   flex: 0 0 auto;
@@ -3237,6 +3238,18 @@ code {
    момент изменения, и на кадр куски страницы оставались недорисованными. */
 .swipeback { will-change: transform; }
 
+/* Сосед в сцене жеста — копия страницы. Копия вставляется в документ
+   заново, и браузер запускал у неё анимации появления с нуля: блоки
+   «лесенки» были прозрачными, пока страница ехала, — вместо соседнего
+   раздела было пусто, и он возникал только в конце. Копия — неподвижная
+   картинка, анимаций в ней не бывает. */
+.swipeback *,
+.swipeback *::before,
+.swipeback *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
 /* Лента разделов: страницы лежат рядом, а не одна на другой — без тени.
    Своя подложка обязательна: в зазоре у крайнего раздела и между
    страницами иначе просвечивала настоящая страница, и экран двоился. */
@@ -3376,6 +3389,62 @@ html.live-region body { background: transparent; }
 
 video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
+/* Анимация техники: два кадра, верхний проявляется поверх нижнего.
+   Кадры на белом фоне — и подложка белая, в тёмной теме тоже: так
+   картинка выглядит карточкой, а не дырой в интерфейсе */
+.library__anim {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fff;
+  margin-bottom: var(--space-3);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.library__anim img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 320ms var(--ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.library__anim img[data-off] { opacity: 0; }
+
+.library__anim-note {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library__anim img { transition: none; }
+}
+
+.library__bar { display: flex; gap: var(--space-2); margin: var(--space-3) 0; }
+.library__bar .button--primary { flex: 1; }
+.library__count { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.library__row { display: flex; align-items: center; gap: var(--space-2); }
+.library__row-body { flex: 1; min-width: 0; }
+.library__remove { flex: 0 0 auto; gap: 6px; }
+.library__hint { margin: var(--space-3) 0 0; }
+.library__save-block { flex: 0 0 auto; font-size: var(--text-sm); }
+.library__saved { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); color: var(--good, var(--accent)); }
+
 .library__placeholder {
   display: grid;
   place-items: center;
@@ -3413,4 +3482,22 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   font-style: normal;
   font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+/* Сворачиваемая шапка карточки клиента */
+.client-card__toggle {
+  margin-left: auto;
+  min-height: 32px;
+  padding: 4px 8px;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.client-card__chevron { transform: rotate(-90deg); transition: transform 220ms var(--ease-out); }
+.client-card__toggle[aria-expanded="true"] .client-card__chevron { transform: rotate(90deg); }
+.client-card__more { animation: client-card-in 220ms var(--ease-out); }
+@keyframes client-card-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .client-card__more { animation: none; }
+  .client-card__chevron { transition: none; }
 }

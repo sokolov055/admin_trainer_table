@@ -426,17 +426,21 @@ function demoSeries(params) {
 const DEMO_MUSCLES = ['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Пресс', 'Всё тело', 'Кардио'];
 
 let demoExercises = [
-  ['Жим гантелей лёжа', 'Грудь', 'Гантели'],
-  ['Тяга верхнего блока к груди', 'Спина', 'Блок'],
-  ['Приседания со штангой', 'Ноги', 'Штанга'],
-  ['Ягодичный мост со штангой', 'Ягодицы', 'Штанга'],
-  ['Махи гантелями в стороны', 'Плечи', 'Гантели'],
-  ['Подъём гантелей на бицепс', 'Руки', 'Гантели'],
-  ['Планка', 'Пресс', 'Собственный вес'],
-  ['Румынская тяга', 'Ноги', 'Штанга'],
-].map(([name, muscle, equipment], i) => ({
-  id: i + 1, name, muscle, equipment, notes: '', media: null, mine: false, common: true,
+  ['Жим гантелей лёжа', 'Грудь', 'Гантели', 'Dumbbell_Bench_Press'],
+  ['Тяга верхнего блока к груди', 'Спина', 'Блок', 'Wide-Grip_Lat_Pulldown'],
+  ['Приседания со штангой', 'Ноги', 'Штанга', 'Barbell_Squat'],
+  ['Ягодичный мост со штангой', 'Ягодицы', 'Штанга', 'Barbell_Hip_Thrust'],
+  ['Махи гантелями в стороны', 'Плечи', 'Гантели', 'Side_Lateral_Raise'],
+  ['Подъём гантелей на бицепс', 'Руки', 'Гантели', 'Dumbbell_Bicep_Curl'],
+  ['Планка', 'Пресс', 'Собственный вес', 'Plank'],
+  ['Румынская тяга', 'Ноги', 'Штанга', 'Romanian_Deadlift'],
+  ['Бёрпи', 'Всё тело', 'Собственный вес', null],
+].map(([name, muscle, equipment, anim], i) => ({
+  id: i + 1, name, muscle, equipment, notes: '', mine: false, common: true,
+  media: anim ? { kind: 'animation', url: anim } : null,
 }));
+
+let demoHidden = new Set();
 
 const demoBlocks = [
   { title: 'Тренировка 1 — верх', exercises: [
@@ -924,20 +928,32 @@ const MOCK = {
     unlinked: params.unlinkTelegram === true,
   }),
 
-  'library.exercises': () => ({ exercises: demoExercises, muscles: DEMO_MUSCLES }),
+  'library.exercises': (params = {}) => ({
+    exercises: demoExercises.filter((e) => demoHidden.has(e.id) === !!params.hidden),
+    muscles: DEMO_MUSCLES,
+    hiddenCount: demoHidden.size,
+  }),
   'library.exercise.save': (params) => {
     const existing = demoExercises.find((e) => e.id === Number(params.id));
     if (existing && existing.mine) {
       Object.assign(existing, { name: params.name, muscle: params.muscle, equipment: params.equipment, notes: params.notes, media: params.link ? { kind: 'link', url: params.link } : existing.media });
       return existing;
     }
-    const mine = { id: ++demoExerciseSeq, name: params.name, muscle: params.muscle || '', equipment: params.equipment || '', notes: params.notes || '', media: params.link ? { kind: 'link', url: params.link } : null, mine: true, common: false };
+    const inherited = existing && existing.media && existing.media.kind === 'animation' ? existing.media : null;
+    const mine = { id: ++demoExerciseSeq, name: params.name, muscle: params.muscle || '', equipment: params.equipment || '', notes: params.notes || '', media: params.link ? { kind: 'link', url: params.link } : inherited, mine: true, common: false };
     demoExercises = [...demoExercises.filter((e) => !(existing && e.id === existing.id)), mine];
     return mine;
   },
   'library.exercise.delete': (params) => {
-    demoExercises = demoExercises.filter((e) => e.id !== Number(params.id));
+    const e = demoExercises.find((x) => x.id === Number(params.id));
+    if (e && e.common) { demoHidden.add(e.id); return { deleted: true, hidden: true }; }
+    demoExercises = demoExercises.filter((x) => x.id !== Number(params.id));
     return { deleted: true };
+  },
+  'library.exercise.restore': (params) => {
+    const ids = (params.ids || [params.id]).map(Number);
+    ids.forEach((id) => demoHidden.delete(id));
+    return { restored: ids.length };
   },
   'library.templates': (params) => demoTemplatesList(params),
   'library.template.get': (params) => demoTemplateCard(demoTemplate(params.id), true),

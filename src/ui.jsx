@@ -285,9 +285,9 @@ export function Chips({ items, value, onChange, variant }) {
  * но это не вкладки: здесь не переключают вид, а меняют настройку. Поэтому
  * роль другая (radiogroup), и с клавиатуры он ведёт себя как переключатель.
  */
-export function Segmented({ items, value, onChange, label, disabled }) {
+export function Segmented({ items, value, onChange, label, disabled, wrap }) {
   return (
-    <div className="chips chips--flush" role="radiogroup" aria-label={label}>
+    <div className={'chips chips--flush' + (wrap ? ' chips--wrap' : '')} role="radiogroup" aria-label={label}>
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const text = typeof item === 'string' ? item : item.label;
