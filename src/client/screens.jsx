@@ -285,6 +285,31 @@ export function Plan({ clientRow, clientView = false }) {
           что человек должен узнать на этом экране. */}
       {runningLine}
 
+      {months.length > 1 && (
+        <Chips
+          items={months.map((m) => ({
+            value: m,
+            // Пометка прямо в подписи, а не значком: тренер листает месяцы
+            // глазами, и «скрыт» должно читаться, не требуя расшифровки.
+            label: hiddenMonths.indexOf(m) !== -1 ? m + ' · скрыт' : m,
+          }))}
+          value={data.month}
+          onChange={setMonth}
+        />
+      )}
+
+      {data.canHide && data.month && (
+        <MonthVisibility
+          month={data.month}
+          hidden={isHidden}
+          clientRow={clientRow}
+          onChanged={reload}
+        />
+      )}
+
+      {/* Сначала — какой месяц и видит ли его клиент, потом — что с этим
+          месяцем делать: кнопки правки относятся к выбранному месяцу и
+          стоят под ним, а не над переключателем месяцев. */}
       {data.canHide && !editing && templateTool === 'apply' && (
         <Section title="Программа из шаблона">
           <TemplateApply
@@ -361,27 +386,6 @@ export function Plan({ clientRow, clientView = false }) {
           </Section>
         ))}
 
-      {months.length > 1 && (
-        <Chips
-          items={months.map((m) => ({
-            value: m,
-            // Пометка прямо в подписи, а не значком: тренер листает месяцы
-            // глазами, и «скрыт» должно читаться, не требуя расшифровки.
-            label: hiddenMonths.indexOf(m) !== -1 ? m + ' · скрыт' : m,
-          }))}
-          value={data.month}
-          onChange={setMonth}
-        />
-      )}
-
-      {data.canHide && data.month && (
-        <MonthVisibility
-          month={data.month}
-          hidden={isHidden}
-          clientRow={clientRow}
-          onChanged={reload}
-        />
-      )}
 
       {blocks.length === 0 && (
         <Empty
