@@ -273,6 +273,26 @@ export const IconCopy = (p) => (
   </Icon>
 );
 
+/** Переставить выше / ниже — в редакторе программы */
+export const IconArrowUp = (p) => (
+  <Icon {...p}>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </Icon>
+);
+
+export const IconArrowDown = (p) => (
+  <Icon {...p}>
+    <path d="M12 5v14M6 13l6 6 6-6" />
+  </Icon>
+);
+
+/** Суперсет: два упражнения сцеплены */
+export const IconLinkPair = (p) => (
+  <Icon {...p}>
+    <path d="M9.5 14.5l5-5M8 11l-2 2a3.5 3.5 0 0 0 5 5l2-2M16 13l2-2a3.5 3.5 0 0 0-5-5l-2 2" />
+  </Icon>
+);
+
 export const IconTrash = (p) => (
   <Icon {...p}>
     <path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5" />

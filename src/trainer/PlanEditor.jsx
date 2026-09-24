@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
-import { Panel, Note } from '../ui.jsx';
-import { IconAlert } from '../icons.jsx';
+import { Note } from '../ui.jsx';
+import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash } from '../icons.jsx';
 
 /**
  * Редактор программы месяца.
@@ -112,8 +112,11 @@ export default function PlanEditor({
     }
   };
 
+  // Без общей панели: карточка — у каждой тренировки, одна на уровень.
+  // Карточка в карточке (панель → тренировка → упражнение) и была тем,
+  // из-за чего тренировки сливались.
   return (
-    <Panel pad>
+    <div className="plan-edit">
       <p className="small muted" style={{ marginTop: 0 }}>
         Пустые строки не сохраняются — упражнение без названия просто исчезнет.
       </p>
@@ -124,13 +127,19 @@ export default function PlanEditor({
 
       {draft.map((block, bi) => (
         <div className="plan-edit__block" key={bi}>
-          <input
-            className="field__input plan-edit__title"
-            value={block.title}
-            maxLength={160}
-            disabled={busy}
-            onChange={(e) => change((next) => { next[bi].title = e.target.value; return next; })}
-          />
+          {/* Номер и название — одной строкой: по номеру тренировки видно
+              издалека, когда листаешь длинную программу */}
+          <div className="plan-edit__block-head">
+            {!single && <span className="plan-edit__block-num" aria-hidden="true">{bi + 1}</span>}
+            <input
+              aria-label={'Название тренировки ' + (bi + 1)}
+              className="field__input plan-edit__title"
+              value={block.title}
+              maxLength={160}
+              disabled={busy}
+              onChange={(e) => change((next) => { next[bi].title = e.target.value; return next; })}
+            />
+          </div>
 
           {block.exercises.map((exercise, ei) => {
             const paired = !!exercise.supersetGroup
@@ -149,6 +158,9 @@ export default function PlanEditor({
                   onChange={(e) => setExercise(bi, ei, 'name', e.target.value)}
                 />
 
+                <div className="plan-edit__numbers plan-edit__labels" aria-hidden="true">
+                  <span>Подходы</span><span>Повторы</span><span>Вес</span><span>RPE</span>
+                </div>
                 <div className="plan-edit__numbers">
                   <input className="field__input" placeholder="Подх." inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
                   <input className="field__input" placeholder="Повт." inputMode="text" value={exercise.reps} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
@@ -159,20 +171,28 @@ export default function PlanEditor({
                 {exercise.prevWeight && <span className="plan-edit__prev">было {exercise.prevWeight}</span>}
 
                 <div className="plan-edit__actions">
-                  <button className="button button--ghost" disabled={busy || ei === 0} onClick={() => move(bi, ei, -1)}>Выше</button>
-                  <button className="button button--ghost" disabled={busy || ei === block.exercises.length - 1} onClick={() => move(bi, ei, 1)}>Ниже</button>
+                  <button className="icon-button plan-edit__icon" aria-label="Выше" title="Выше" disabled={busy || ei === 0} onClick={() => move(bi, ei, -1)}>
+                    <IconArrowUp size={18} />
+                  </button>
+                  <button className="icon-button plan-edit__icon" aria-label="Ниже" title="Ниже" disabled={busy || ei === block.exercises.length - 1} onClick={() => move(bi, ei, 1)}>
+                    <IconArrowDown size={18} />
+                  </button>
                   <button
-                    className={'button' + (paired ? ' button--primary' : ' button--ghost')}
+                    className={'button button--ghost plan-edit__pair' + (paired ? ' plan-edit__pair--on' : '')}
+                    aria-pressed={paired}
                     disabled={busy || ei === block.exercises.length - 1}
                     onClick={() => toggleSuperset(bi, ei)}
                   >
-                    {paired ? 'В суперсете' : 'Вместе со следующим'}
+                    <IconLinkPair size={16} />
+                    {paired ? 'В суперсете' : 'Суперсет'}
                   </button>
-                  <button className="button button--ghost" disabled={busy} onClick={() => change((next) => {
+                  <button className="icon-button plan-edit__icon plan-edit__remove" aria-label="Убрать упражнение" title="Убрать" disabled={busy} onClick={() => change((next) => {
                     next[bi].exercises.splice(ei, 1);
                     if (!next[bi].exercises.length) next[bi].exercises.push(blank());
                     return next;
-                  })}>Убрать</button>
+                  })}>
+                    <IconTrash size={18} />
+                  </button>
                 </div>
               </div>
             );
@@ -209,6 +229,6 @@ export default function PlanEditor({
         </button>
         <button className="button" disabled={busy} onClick={onCancel}>Отмена</button>
       </div>
-    </Panel>
+    </div>
   );
 }
