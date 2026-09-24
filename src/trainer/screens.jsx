@@ -76,20 +76,10 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
 
   return (
     <>
-      <Lead
-        label={'Выручка · ' + s.currentMonth}
-        tone={s.profit >= 0 ? 'good' : 'critical'}
-        value={formatMoney(s.totalRevenue)}
-        hint={`${s.totalTrainings} ${plural(s.totalTrainings, 'тренировка', 'тренировки', 'тренировок')} у ${s.count} ${plural(s.count, 'клиента', 'клиентов', 'клиентов')}`}
-        facts={[
-          { label: 'Прибыль', value: formatMoney(s.profit, { compact: true }) },
-          { label: 'Касса', value: formatMoney(s.cash, { compact: true }) },
-          {
-            label: 'Требуют внимания',
-            value: needsAttention.length ? needsAttention.length + ' из ' + s.count : 'нет',
-          },
-        ]}
-      />
+      {/* День тренера, а не деньги: деньги живут в сводке, а сюда
+          заходят за людьми — кто сегодня, кто следующий, до кого не
+          дошли руки. */}
+      <TrainerDay summary={s} clients={data.clients} attention={needsAttention.length} />
 
       <Section
         note={refreshNote(refresh)}
@@ -149,7 +139,7 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
               </div>
               <div className="item__meta">
                 <span>
-                  {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')} · {formatMoney(c.revenue)}
+                  {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')} за месяц
                 </span>
                 <span>
                   {c.lastTrainingDate ? relativeDays(c.lastTrainingDate) : 'тренировок не было'}
@@ -176,6 +166,67 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
         })}
       </Section>
     </>
+  );
+}
+
+/**
+ * Сегодняшний день тренера.
+ *
+ * Крупно — сколько занятий сегодня, под ним — кто следующий. Рядом три
+ * числа про людей: сколько тренировок за месяц, кто требует внимания и
+ * кто ещё не приглашён в приложение.
+ *
+ * Занятия на сегодня считает сервер по календарю. Запасной путь через
+ * Apps Script их не знает — тогда крупной цифрой встаёт число клиентов,
+ * у которых ближайшее занятие сегодня: это то же самое, только без уже
+ * прошедших.
+ */
+function TrainerDay({ summary, clients, attention }) {
+  const day = summary.today;
+  const todayLabel = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+  const isToday = (iso) => {
+    const d = new Date(iso);
+    const n = new Date();
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+  };
+
+  const total = day ? day.total : clients.filter((c) => c.nextTrainingDate && isToday(c.nextTrainingDate)).length;
+
+  // Кто следующий: из календаря, а без него — ближайшая дата из списка
+  let next = day && day.next;
+  if (!next) {
+    const first = clients
+      .filter((c) => c.nextTrainingDate)
+      .sort((a, b) => String(a.nextTrainingDate).localeCompare(String(b.nextTrainingDate)))[0];
+    if (first) next = { name: first.name, at: first.nextTrainingDate };
+  }
+
+  const left = day ? day.total - day.done : null;
+
+  let hint;
+  if (next) hint = 'следующее — ' + next.name + ', ' + formatWhen(next.at);
+  else hint = 'впереди занятий не назначено';
+  if (day && day.total && left === 0) hint = 'все занятия на сегодня проведены · ' + hint;
+
+  const uninvited = clients.filter((c) => !c.chatId && !c.invited).length;
+
+  return (
+    <Lead
+      label={'Сегодня · ' + todayLabel}
+      value={total
+        ? total + ' ' + plural(total, 'занятие', 'занятия', 'занятий')
+        : 'Занятий нет'}
+      hint={hint}
+      facts={[
+        {
+          label: 'За месяц',
+          value: summary.totalTrainings + ' ' + plural(summary.totalTrainings, 'тренировка', 'тренировки', 'тренировок'),
+        },
+        { label: 'Требуют внимания', value: attention ? attention + ' из ' + summary.count : 'нет' },
+        { label: 'Не приглашены', value: uninvited || 'все' },
+      ]}
+    />
   );
 }
 
@@ -600,7 +651,7 @@ export function Lost() {
           </div>
           <div className="item__meta">
             <span>
-              {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')} · {formatMoney(c.revenue)}
+              {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')}
             </span>
             {c.balance !== 0 && (
               <Badge kind={c.balance < 0 ? 'bad' : 'warn'}>

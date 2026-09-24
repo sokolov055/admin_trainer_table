@@ -644,11 +644,12 @@ const MOCK = {
     clients: CLIENTS,
     summary: {
       count: CLIENTS.length,
-      cash: 96000,
-      totalRevenue: 81000,
       totalTrainings: 26,
-      profit: 81000 - 62000,
-      fixedCost: 62000,
+      today: {
+        total: 4,
+        done: 1,
+        next: { name: CLIENTS[0].name, at: new Date(Date.now() + 90 * 60000).toISOString() },
+      },
       negativeBalance: 1,
       staleClients: 1,
       staleDays: 14,
