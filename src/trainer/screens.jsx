@@ -82,7 +82,7 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
         value={formatMoney(s.totalRevenue)}
         hint={`${s.totalTrainings} ${plural(s.totalTrainings, 'тренировка', 'тренировки', 'тренировок')} у ${s.count} ${plural(s.count, 'клиента', 'клиентов', 'клиентов')}`}
         facts={[
-          { label: 'Прибыль после аренды', value: formatMoney(s.profit, { compact: true }) },
+          { label: 'Прибыль', value: formatMoney(s.profit, { compact: true }) },
           { label: 'Касса', value: formatMoney(s.cash, { compact: true }) },
           {
             label: 'Требуют внимания',

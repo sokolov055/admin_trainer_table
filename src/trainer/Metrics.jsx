@@ -162,7 +162,11 @@ export function Finance() {
 
       {/* Крупно — прибыль, а не выручка. Выручку тренер и так помнит, а
           прибыль до сих пор нигде не считалась: расходов не было ни в
-          базе, ни в таблице, и в месячных архивах её ставили руками. */}
+          базе, ни в таблице, и в месячных архивах её ставили руками.
+
+          Выручка — отработанное, та же цифра, что на экране клиентов.
+          Касса стоит отдельно и в прибыль не входит: это деньги, которые
+          ещё предстоит отработать. */}
       <Lead
         label={'Прибыль · ' + monthLabel(data.month)}
         tone={now.profit >= 0 ? 'good' : 'critical'}
@@ -180,7 +184,6 @@ export function Finance() {
             <Metric label="Выручка" unit="₽" value={now.revenue} before={before.revenue} />
             <Metric label="Расходы" unit="₽" value={now.expenses} before={before.expenses} aim={-1} />
             <Metric label="Прибыль" unit="₽" value={now.profit} before={before.profit} />
-            <Metric label="Оплат принято" value={now.payments} before={before.payments} aim={0} />
             <Metric label="Тренировок проведено" value={now.trainings} before={before.trainings} />
           </Rows>
         </Panel>
@@ -189,13 +192,6 @@ export function Finance() {
       <Section title="Сколько приносит работа">
         <Panel>
           <Rows>
-            <Metric
-              label="Средний чек"
-              unit="₽"
-              value={now.averageCheck}
-              before={before.averageCheck}
-              note="оплат не было"
-            />
             <Metric
               label="Выручка на тренировку"
               unit="₽"
@@ -220,6 +216,15 @@ export function Finance() {
       >
         <Panel>
           <Rows>
+            <Metric label="Касса за месяц" unit="₽" value={now.cash} before={before.cash} aim={0} />
+            <Metric label="Оплат принято" value={now.payments} before={before.payments} aim={0} />
+            <Metric
+              label="Средняя оплата"
+              unit="₽"
+              value={now.averageCheck}
+              before={before.averageCheck}
+              note="оплат не было"
+            />
             <Metric label="В банке" unit="₽" value={now.bank} before={before.bank} aim={0} />
             <Metric
               label="Хватит месяцев"
@@ -242,10 +247,11 @@ export function Finance() {
       </Section>
 
       <p className="small muted metrics__foot">
-        Выручка — оплаты, принятые в этом месяце. Прибыль — выручка минус
-        расходы, и больше ничего: налоги и личные траты сюда не входят.
-        Доля пяти крупнейших отвечает на вопрос, чем обернётся уход одного
-        из них.
+        Выручка — проведённые тренировки по цене клиента, как на экране
+        клиентов. Прибыль — выручка минус расходы, и больше ничего: налоги и
+        личные траты сюда не входят. Касса — оплаты, принятые в этом месяце:
+        это ещё не заработок, а тренировки, которые предстоит провести. В
+        банке — всё, что клиенты оплатили вперёд и ещё не отходили.
       </p>
     </>
   );
