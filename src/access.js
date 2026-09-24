@@ -65,21 +65,24 @@ export async function enterByAccessLink(token, deps = {}) {
  * Сторона тренера
  * ========================================================================== */
 
-export function fetchClientLink(clientRow, deps = {}) {
+// member — место участника сплита: у каждого из пары своя ссылка
+const withMember = (clientRow, member) => (member === undefined || member === null ? { clientRow } : { clientRow, member });
+
+export function fetchClientLink(clientRow, deps = {}, member) {
   const request = deps.request || apiPrimary;
-  return request('trainer.client.link', { clientRow });
+  return request('trainer.client.link', withMember(clientRow, member));
 }
 
-export async function createClientLink(clientRow, deps = {}) {
+export async function createClientLink(clientRow, deps = {}, member) {
   const request = deps.request || apiPrimary;
-  const result = await request('trainer.client.link.create', { clientRow });
+  const result = await request('trainer.client.link.create', withMember(clientRow, member));
   (deps.clearCache || clearApiCache)();
   return result;
 }
 
-export async function revokeClientLink(clientRow, deps = {}) {
+export async function revokeClientLink(clientRow, deps = {}, member) {
   const request = deps.request || apiPrimary;
-  const result = await request('trainer.client.link.revoke', { clientRow });
+  const result = await request('trainer.client.link.revoke', withMember(clientRow, member));
   (deps.clearCache || clearApiCache)();
   return result;
 }

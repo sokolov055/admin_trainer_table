@@ -26,7 +26,9 @@ import { IconAlert, IconCheck, IconCopy, IconKey, IconRefresh, IconSend, IconTra
  * отзывать случайным касанием тем более.
  */
 
-export function ClientInviteLink({ client }) {
+// member/memberName — ссылка для одного участника сплита: вход в кабинет
+// пары от его имени
+export function ClientInviteLink({ client, member, memberName, quiet = false }) {
   const [state, setState] = useState({ loading: true, link: null, error: null });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -35,12 +37,12 @@ export function ClientInviteLink({ client }) {
 
   const load = () => {
     setState((value) => ({ ...value, loading: true, error: null }));
-    fetchClientLink(client.row)
+    fetchClientLink(client.row, {}, member)
       .then((data) => setState({ loading: false, link: data.link, error: null }))
       .catch((error) => setState({ loading: false, link: null, error }));
   };
 
-  useEffect(load, [client.row]);
+  useEffect(load, [client.row, member]);
 
   const run = async (action) => {
     if (busy) return;
@@ -57,7 +59,7 @@ export function ClientInviteLink({ client }) {
   };
 
   const create = () => run(async () => {
-    const data = await createClientLink(client.row);
+    const data = await createClientLink(client.row, {}, member);
     setState({ loading: false, link: data.link, error: null });
     setConfirmRevoke(false);
     // Только что выпущенную ссылку показываем развёрнутой: тренер сам её
@@ -68,7 +70,7 @@ export function ClientInviteLink({ client }) {
   });
 
   const revoke = () => run(async () => {
-    await revokeClientLink(client.row);
+    await revokeClientLink(client.row, {}, member);
     setState({ loading: false, link: null, error: null });
     setConfirmRevoke(false);
     setNote('Ссылка отозвана. Уже открытые кабинеты остались — их закрывает «Сбросить доступ».');
@@ -76,7 +78,7 @@ export function ClientInviteLink({ client }) {
   });
 
   const send = async (link) => {
-    const result = await shareAccessLink(link.url, client.name);
+    const result = await shareAccessLink(link.url, memberName || client.name);
     if (result === 'cancelled') return;
     setNote(result === 'shared' ? 'Отправлено' : 'Ссылка скопирована — вставьте её в любой мессенджер');
     haptic('success');
@@ -105,12 +107,14 @@ export function ClientInviteLink({ client }) {
         <>
           <button className="button button--primary access-link__invite" onClick={create} disabled={busy}>
             {busy ? <IconRefresh size={16} /> : <IconKey size={16} />}
-            {busy ? 'Готовим ссылку…' : 'Пригласить в приложение'}
+            {busy ? 'Готовим ссылку…' : memberName ? 'Пригласить: ' + memberName : 'Пригласить в приложение'}
           </button>
-          <p className="access-link__hint">
-            Появится ссылка: отправьте её клиенту любым способом. Он откроет её
-            в браузере и сразу попадёт в свой кабинет — без Telegram и пароля.
-          </p>
+          {!quiet && (
+            <p className="access-link__hint">
+              Появится ссылка: отправьте её клиенту любым способом. Он откроет её
+              в браузере и сразу попадёт в свой кабинет — без Telegram и пароля.
+            </p>
+          )}
         </>
       )}
 
@@ -119,7 +123,7 @@ export function ClientInviteLink({ client }) {
           <div className="access-link__lead">
             <button className="button button--primary" onClick={() => run(() => send(link))} disabled={busy}>
               {navigator.share ? <IconSend size={16} /> : <IconCopy size={16} />}
-              {navigator.share ? 'Отправить' : 'Скопировать'}
+              {navigator.share ? 'Отправить' : 'Скопировать'}{memberName ? ': ' + memberName : ''}
             </button>
             <span className="access-link__state">{describeUses(link)}</span>
           </div>
@@ -165,7 +169,7 @@ export function ClientInviteLink({ client }) {
         </div>
       )}
 
-      {!link && client.chatId && (
+      {!link && client.chatId && !quiet && (
         <p className="access-link__hint access-link__hint--muted">
           <IconAlert size={14} />
           Клиент уже заходит через Telegram. Ссылка нужна, чтобы он перешёл

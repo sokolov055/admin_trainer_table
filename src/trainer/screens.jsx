@@ -613,7 +613,10 @@ export function ClientCard({ client }) {
 
       {/* Приглашение стоит выше сброса доступа намеренно: выдать вход —
           повседневное действие, отобрать — редкое. */}
-      <ClientInviteLink client={client} />
+      {/* У сплита ссылка у каждого: свой кабинет, свои веса и замеры */}
+      {client.members && client.members.length > 1
+        ? client.members.map((m, i) => <ClientInviteLink key={m} client={client} member={i} memberName={m} quiet={i > 0} />)
+        : <ClientInviteLink client={client} />}
 
       {client.family && <ClientFamily client={client} />}
 

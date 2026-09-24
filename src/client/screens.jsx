@@ -533,10 +533,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                       Суперсет{group.sets ? ' · ' + group.sets + ' ' + plural(Number(group.sets), 'круг', 'круга', 'кругов') : ''}
                       <span className="superset__hint">подряд, без отдыха между упражнениями</span>
                     </div>
-                    {group.items.map((ex, k) => <ExerciseRow ex={ex} inSuperset members={data.members} key={k} />)}
+                    {group.items.map((ex, k) => <ExerciseRow ex={ex} inSuperset members={data.members} me={data.me} key={k} />)}
                   </div>
                 )
-                : <ExerciseRow ex={group.items[0]} members={data.members} key={j} />
+                : <ExerciseRow ex={group.items[0]} members={data.members} me={data.me} key={j} />
             ))}
           </Panel>
         </Section>
@@ -577,7 +577,9 @@ function nextMonthLabel() {
  * стоит в заголовке группы, а дважды написанное рядом читается как
  * «у каждого свои».
  */
-function ExerciseRow({ ex, inSuperset, members = [] }) {
+// me — участник пары, который смотрит: его вес первым и подписан «Вы»,
+// чужое упражнение приглушено
+function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
   const scheme = [
     inSuperset ? (ex.reps && ex.reps + ' повт.') : (ex.sets && ex.sets + ' × ' + (ex.reps || '?')),
     ex.rpe && 'RPE ' + ex.rpe,
@@ -587,18 +589,22 @@ function ExerciseRow({ ex, inSuperset, members = [] }) {
   // именем, чтобы в зале не пришлось вспоминать, чьё оно.
   const split = members && members.length > 1;
   const doers = split ? (ex.performers && ex.performers.length ? ex.performers : members) : [];
-  const weights = doers
-    .map((m) => (ex.splitWeights && ex.splitWeights[m] ? m + ' ' + ex.splitWeights[m] + ' кг' : ''))
+  const mine = !!me && doers.includes(me);
+  const ordered = me ? [...doers.filter((m) => m === me), ...doers.filter((m) => m !== me)] : doers;
+  const weights = ordered
+    .map((m) => (ex.splitWeights && ex.splitWeights[m] ? (m === me ? 'Вы' : m) + ' ' + ex.splitWeights[m] + ' кг' : ''))
     .filter(Boolean)
     .join('   ·   ');
 
   return (
-    <div className="exercise" style={{ minWidth: 0 }}>
+    <div className={'exercise' + (split && me && !mine ? ' exercise--other' : '')} style={{ minWidth: 0 }}>
       <div style={{ minWidth: 0 }}>
         <div className="exercise__name">{ex.name}</div>
         <div className="exercise__scheme">{scheme || '—'}</div>
         {split && doers.length < members.length && (
-          <div className="exercise__who">только {doers.join(' и ')}</div>
+          <div className="exercise__who">
+            {me ? (mine ? 'только вы' : 'делает ' + doers.join(' и ')) : 'только ' + doers.join(' и ')}
+          </div>
         )}
         {split && weights && <div className="exercise__scheme">{weights}</div>}
       </div>
