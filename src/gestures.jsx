@@ -123,9 +123,12 @@ export function rememberTab(id) {
   if (app) tabSnapshots.set(id, snapshotOf(app));
 }
 
-export function useTabGesture({ tabs, active, go, openMenu = null, closeMenu = null, enabled = true }) {
+export function useTabGesture({
+  tabs, active, go, openMenu = null, closeMenu = null, enabled = true,
+  region = null, neighbour = null, drag = null, release = null,
+}) {
   const ref = useRef(null);
-  ref.current = { tabs, active, go, openMenu, closeMenu };
+  ref.current = { tabs, active, go, openMenu, closeMenu, region, neighbour, drag, release };
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -312,20 +315,42 @@ function liveParts() {
   return [...app.children].filter((el) => !el.matches('.tabbar, .drawer'));
 }
 
-function goLive() {
-  document.documentElement.classList.add('live-moving');
+/**
+ * Что едет. Обычно — вся страница без нижнего меню. Но экран может
+ * листать только часть себя (карточка клиента: шапка, бар разделов и
+ * блок с балансом общие, меняется только то, что под баром) — тогда
+ * едет только эта область.
+ */
+let liveRegion = null;
+
+function moving() {
+  return liveRegion ? [liveRegion] : liveParts();
+}
+
+function goLive(region = null) {
+  liveRegion = region;
+  // Сплошной фон — только тому, что едет. Когда листается область под
+  // баром, остальная страница прозрачна, и сквозь неё виден сосед.
+  if (region) {
+    region.style.background = 'var(--bg)';
+    document.documentElement.classList.add('live-region');
+  } else {
+    document.documentElement.classList.add('live-moving');
+  }
 }
 
 function moveLive(x, fade = null) {
-  liveParts().forEach((el) => {
+  moving().forEach((el) => {
     el.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
     el.style.opacity = fade === null ? '' : String(fade);
   });
 }
 
 function stopLive() {
-  liveParts().forEach((el) => { el.style.transform = ''; el.style.opacity = ''; });
-  document.documentElement.classList.remove('live-moving');
+  moving().forEach((el) => { el.style.transform = ''; el.style.opacity = ''; });
+  if (liveRegion) liveRegion.style.background = '';
+  liveRegion = null;
+  document.documentElement.classList.remove('live-moving', 'live-region');
 }
 
 /**
@@ -395,23 +420,42 @@ function landQuietly() {
  * Лента разделов: нынешний и соседний лежат рядом и едут вместе, как
  * страницы, — без теней и притемнения, это не «глубже», а «рядом».
  */
-function buildPager(target, side, at) {
+function buildPager(target, side, at, host) {
   const app = document.querySelector('#root .app');
   if (!app) return null;
+
+  const region = host && host.region ? host.region() : null;
 
   const scene = document.createElement('div');
   scene.className = 'swipeback swipeback--pager swipeback--live';
   scene.setAttribute('aria-hidden', 'true');
 
+  // Листается только область под баром: сцена начинается там же, где она
+  const box = region ? region.getBoundingClientRect() : null;
+  if (box) scene.style.top = box.top + 'px';
+
   // Снимок нынешнего раздела — только в память, на экран он не идёт
-  const now = snapshotOf(app);
+  const now = region ? null : snapshotOf(app);
 
   let next = null;
   if (target) {
     next = document.createElement('div');
     next.className = 'swipeback__cur';
-    const snap = tabSnapshots.get(target.id);
-    if (snap) {
+    const snap = region ? null : tabSnapshots.get(target.id);
+    const live = region && host.neighbour ? host.neighbour(target.id) : null;
+    if (live) {
+      // Соседний раздел уже открывали — он лежит спрятанным и свежим,
+      // копируем его, а не старый снимок
+      const copy = live.cloneNode(true);
+      copy.hidden = false;
+      copy.style.marginTop = '0';
+      const wrap = document.createElement('div');
+      wrap.className = 'swipeback__region';
+      wrap.style.left = box.left + 'px';
+      wrap.style.width = box.width + 'px';
+      wrap.appendChild(copy);
+      next.appendChild(wrap);
+    } else if (snap) {
       next.appendChild(page(snap.node, snap.scrollY));
     } else {
       // Раздела ещё не видели — заготовка с его названием на месте шапки
@@ -432,9 +476,12 @@ function buildPager(target, side, at) {
   }
 
   document.body.appendChild(scene);
-  goLive();
+  goLive(region);
 
-  return { direction: 'tabs', scene, next, side, at, target, now, snapshot: target ? tabSnapshots.get(target.id) : null };
+  return {
+    direction: 'tabs', scene, next, side, at, target, now, region: !!region, host,
+    snapshot: target && !region ? tabSnapshots.get(target.id) : null,
+  };
 }
 
 /* ==========================================================================
@@ -626,8 +673,12 @@ export function Gestures() {
       moveLive(offset);
       if (scene.next) scene.next.style.transform = `translate3d(${offset + scene.side * width}px, 0, 0)`;
 
-      // Таблетка нижнего меню едет вслед за пальцем — видно, в какой
-      // раздел листаешь, ещё до того, как отпустил
+      // Таблетка едет вслед за пальцем — видно, в какой раздел листаешь,
+      // ещё до того, как отпустил. У экрана со своим баром — его таблетка.
+      if (scene.host && scene.host.drag) {
+        scene.host.drag(scene.at - offset / width);
+        return;
+      }
       const bar = document.querySelector('.tabbar');
       const pill = bar && bar.querySelector('.tabbar__pill');
       if (pill) {
@@ -657,7 +708,10 @@ export function Gestures() {
       slideX = 0;
       pagerX = 0;
       stopLive();
-      if (gone && gone.direction === 'tabs') releasePill();
+      if (gone && gone.direction === 'tabs') {
+        if (gone.host && gone.host.release) gone.host.release();
+        else releasePill();
+      }
       if (gone) gone.scene.remove();
     };
 
@@ -741,7 +795,7 @@ export function Gestures() {
             g.menuHost = host;
             g.mode = 'menu';
           } else {
-            scene = at === -1 ? null : buildPager(target, side, at);
+            scene = at === -1 ? null : buildPager(target, side, at, host);
             g.mode = scene ? 'pager' : null;
           }
         }
@@ -871,10 +925,12 @@ export function Gestures() {
           coverWith(done);
           landQuietly();
           // Уходящий раздел запоминаем таким, каким его оставили
-          if (host) tabSnapshots.set(host.active, done.now);
+          if (host && done.now) tabSnapshots.set(host.active, done.now);
           if (host) host.go(done.target.id);
           requestAnimationFrame(() => {
-            window.scrollTo(0, done.snapshot ? done.snapshot.scrollY : 0);
+            // Когда листается только область под баром, страница стоит —
+            // прокрутку не трогаем
+            if (!done.region) window.scrollTo(0, done.snapshot ? done.snapshot.scrollY : 0);
             stopLive();
             requestAnimationFrame(() => whenDrawn(() => { settleEntered(); afterPaint(() => dropScene()); }));
           });

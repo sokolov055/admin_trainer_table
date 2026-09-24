@@ -3303,7 +3303,8 @@ code {
 /* Фон задан и у html, и у body. Фон body рисуется ПОВЕРХ слоя с
    отрицательным z-index, и сосед под страницей был бы не виден. На время
    жеста его убираем — под ним фон html того же цвета. */
-html.live-moving body { background: transparent; }
+html.live-moving body,
+html.live-region body { background: transparent; }
 
 /* Спрятанный раздел (keptTabs.js) при повторном показе не собирается
    лесенкой заново: браузер перезапускает анимацию у всего, что выходит
@@ -3312,3 +3313,35 @@ html.live-moving body { background: transparent; }
 
 /* То же для разделов карточки клиента */
 .card-section[data-kept] .enter { animation: none; }
+
+/* Бар разделов с переезжающей таблеткой (NavTabs.jsx): вид — как у
+   навигационных чипов, но выбранный отмечен одной таблеткой, которая
+   едет к нажатому и за пальцем при листании. */
+.chips--sliding { position: relative; }
+
+.chips__pill {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: var(--pill-w, 0);
+  transform: translate3d(var(--pill-x, 0), 0, 0);
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-nav) var(--ease-ios), width var(--dur-nav) var(--ease-ios);
+  pointer-events: none;
+}
+
+.chips--sliding .chip { z-index: 1; }
+
+.chips--sliding .chip--active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Сосед в ленте, когда листается только область под баром: его копия
+   встаёт ровно на место области */
+.swipeback__region { position: absolute; top: 0; }

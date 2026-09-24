@@ -15,6 +15,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
+import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
@@ -370,10 +371,12 @@ function ClientDetail({ client, onBack }) {
   const ids = CLIENT_VIEWS.map((v) => v.value);
 
   // Разделы карточки — такая же лента, как нижнее меню: смахивание вбок
-  // листает их, посещённые не пересобираются (keptTabs.js). Назад к
-  // списку — смахиванием вправо с первого раздела, как из клиентского
-  // просмотра; с остальных вправо листается к предыдущему разделу.
-  const sections = useKeptTabs(view, ids);
+  // листает их, посещённые не пересобираются (keptTabs.js). Шапка, бар и
+  // блок с балансом общие для всех разделов и стоят на месте — едет только
+  // содержимое под баром, а по бару за пальцем переезжает таблетка.
+  // Назад к списку — смахиванием вправо с первого раздела.
+  const sections = useKeptTabs(view, ids, { keepScroll: false });
+  const barRef = useRef(null);
 
   const open = (id) => {
     if (id === view) return;
@@ -389,6 +392,10 @@ function ClientDetail({ client, onBack }) {
     tabs: CLIENT_VIEWS.map((v) => ({ id: 'card:' + v.value, label: v.label })),
     active: 'card:' + view,
     go: (id) => open(id.replace(/^card:/, '')),
+    region: () => document.querySelector('.card-section:not([hidden])'),
+    neighbour: (id) => document.querySelector(`.card-section[data-view="${id.replace(/^card:/, '')}"]`),
+    drag: (pos) => barRef.current && barRef.current.drag(pos),
+    release: () => barRef.current && barRef.current.release(),
   });
 
   useBackGesture(onBack, view === ids[0], 'client-card');
@@ -403,7 +410,7 @@ function ClientDetail({ client, onBack }) {
         <h1 className="app__title">{client.name}</h1>
         <p className="app__subtitle">Карточка клиента · {current.label}</p>
         <div className="app__subnav">
-          <Chips items={CLIENT_VIEWS} value={view} onChange={open} variant="nav" />
+          <NavTabs ref={barRef} items={CLIENT_VIEWS} value={view} onChange={open} />
         </div>
       </header>
 
@@ -415,6 +422,7 @@ function ClientDetail({ client, onBack }) {
             hidden={view !== v.value}
             data-kept={sections.kept(v.value) ? '' : undefined}
             className="card-section"
+            data-view={v.value}
             style={{ marginTop: 'var(--space-5)' }}
           >
             {v.value === 'payments'

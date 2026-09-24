@@ -17,7 +17,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
  *   leave()   — запомнить прокрутку раздела, с которого уходят; вызывать
  *               до смены раздела.
  */
-export function useKeptTabs(view, tabIds) {
+export function useKeptTabs(view, tabIds, { keepScroll = true } = {}) {
   const isTab = (id) => tabIds.includes(id);
 
   const [visited, setVisited] = useState(() => (isTab(view) ? [view] : []));
@@ -34,7 +34,11 @@ export function useKeptTabs(view, tabIds) {
     if (isTab(was)) setHiddenOnce((list) => (list.includes(was) ? list : [...list, was]));
 
     // До отрисовки: раздел встаёт сразу на своём месте, без прыжка
-    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, scrolls.current[view] || 0);
+    // (keepScroll: false — экран листает только часть себя, и страница
+    // должна стоять, где стоит)
+    if (keepScroll && typeof window !== 'undefined' && window.scrollTo) {
+      window.scrollTo(0, scrolls.current[view] || 0);
+    }
   }, [view]);
 
   return {
