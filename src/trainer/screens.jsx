@@ -18,7 +18,7 @@ import ThemeSetting from '../ThemeSetting.jsx';
  * Клиенты
  * ================================================================== */
 
-export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
+export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, [refreshRevision]);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
@@ -86,19 +86,10 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
           дошли руки. */}
       <TrainerDay summary={s} clients={data.clients} attention={needsAttention.length} />
 
-      <Section
-        note={refreshNote(refresh)}
-        action={
-          <button
-            className="button button--ghost"
-            onClick={onRefresh}
-            disabled={refresh.busy}
-          >
-            <IconRefresh size={16} />
-            {refresh.busy ? 'Обновляю…' : 'Обновить'}
-          </button>
-        }
-      >
+      {/* Календарь пересчитывается сам — при входе и когда страницу тянут
+          вниз, — и строка с кнопкой «Обновить» больше не нужна: список
+          сразу открывается из зеркала, свежие числа тихо заменяют его. */}
+      <Section>
         {/* Заведение клиента — первое действие тренера с новым человеком,
             поэтому живёт над списком, а не в меню: искать его не должно
             приходиться. Открывается по нажатию, чтобы форма не занимала
@@ -326,27 +317,6 @@ function AddClient({ onCreated }) {
       </form>
     </Panel>
   );
-}
-
-/**
- * Подпись у кнопки обновления.
- *
- * Пока ничего не нажимали — говорим, что именно произойдёт: «обновить» само
- * по себе не объясняет, откуда возьмутся данные. После пересчёта показываем
- * итог цифрами: тренер видит, что работа действительно была сделана, а не
- * просто мигнула кнопка.
- */
-function refreshNote(state) {
-  if (state.busy) return 'Читаю календарь — это занимает до минуты';
-  if (state.error) return 'Не получилось: ' + (state.error.message || 'таблица не ответила');
-
-  if (state.done) {
-    const d = state.done;
-    const tail = d.mirrorUpdated === false ? ' · данные подтянутся в ближайшие минуты' : '';
-    return `Обновлено: ${d.trainings} ${plural(d.trainings, 'тренировка', 'тренировки', 'тренировок')} у ${d.clients} ${plural(d.clients, 'клиента', 'клиентов', 'клиентов')}${tail}`;
-  }
-
-  return 'Пересчитать тренировки и долг по календарю';
 }
 
 /* ==================================================================

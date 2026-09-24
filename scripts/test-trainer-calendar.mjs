@@ -39,7 +39,7 @@ const output = await build({
         if (args.path === 'trainer-screens') return {
           loader: 'jsx',
           contents: `import React from 'react';
-            export const Clients = ({ refresh, onRefresh, refreshRevision }) => <div data-clients data-busy={refresh.busy ? 'yes' : 'no'} data-revision={String(refreshRevision)}><span>Список клиентов</span><button onClick={onRefresh}>Обновить вручную</button></div>;
+            export const Clients = ({ onRefresh, refreshRevision }) => <div data-clients data-revision={String(refreshRevision)}><span>Список клиентов</span><button onClick={onRefresh}>Потянуть вниз</button></div>;
             export const Lost=()=>null;
             export const Logs=()=>null; export const Sheets=()=>null; export const Settings=()=>null; export const ClientCard=()=>null;`,
         };
@@ -106,7 +106,6 @@ test('календарь обновляется в фоне при входе и
 
   const clients = () => tree.root.findByProps({ 'data-clients': true });
   assert.equal(calls, 1, 'автоматический запуск происходит один раз');
-  assert.equal(clients().props['data-busy'], 'yes');
   assert.equal(clients().props['data-revision'], '0');
   assert.equal(clients().findByType('span').children.join(''), 'Список клиентов', 'панель не заблокирована запросом');
 
@@ -114,14 +113,13 @@ test('календарь обновляется в фоне при входе и
     clients().findByType('button').props.onClick();
     clients().findByType('button').props.onClick();
   });
-  assert.equal(calls, 1, 'ручные нажатия присоединяются к уже идущему запросу');
+  assert.equal(calls, 1, 'повторный запуск (страницу потянули вниз) присоединяется к идущему запросу');
 
   await act(async () => {
     finish({ trainings: 12, clients: 4, mirrorUpdated: true });
     await Promise.resolve();
   });
 
-  assert.equal(clients().props['data-busy'], 'no');
   assert.equal(clients().props['data-revision'], '1', 'после пересчёта список перечитывается');
 
   tree.unmount();

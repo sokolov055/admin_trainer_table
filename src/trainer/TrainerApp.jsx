@@ -149,32 +149,25 @@ export default function TrainerApp({ me }) {
   useViewMotion(clientPane, { direction: byOrder(CLIENT_PANES.map((p) => p.value)), target: paneTarget });
   useViewMotion(dashPane, { direction: byOrder(DASH_PANES.map((p) => p.value)), target: paneTarget });
   useViewMotion(libPane, { direction: byOrder(LIBRARY_PANES.map((p) => p.value)), target: paneTarget });
-  const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });
   const [calendarRevision, setCalendarRevision] = useState(0);
   const calendarRequest = useRef(null);
 
   // Календарь — источник баланса, тренировок и ближайших занятий. Запускаем
   // его пересчёт сразу после входа тренера, но не ждём перед показом панели:
   // список открывается из зеркала, а свежие числа тихо заменяют его позже.
-  // Та же функция обслуживает ручную кнопку, поэтому два одновременных
-  // запуска склеиваются ещё до серверной защиты от дублей.
+  // Та же функция срабатывает, когда страницу тянут вниз, поэтому два
+  // одновременных запуска склеиваются ещё до серверной защиты от дублей.
   const runCalendarRefresh = useCallback(() => {
     if (calendarRequest.current) return calendarRequest.current;
 
-    setCalendarRefresh({ busy: true, error: null, done: null });
-
     const request = apiMutate('calendar.refresh', {})
       .then((result) => {
-        setCalendarRefresh({ busy: false, error: null, done: result });
         setCalendarRevision((value) => value + 1);
         return result;
       })
-      .catch((error) => {
-        // Фоновая ошибка не закрывает панель: старые данные полезнее
-        // полноэкранного отказа, а рядом остаётся ручной повтор.
-        setCalendarRefresh({ busy: false, error, done: null });
-        return null;
-      })
+      // Фоновая ошибка не закрывает панель: старые данные полезнее
+      // полноэкранного отказа, а повтор — потянуть страницу вниз
+      .catch(() => null)
       .finally(() => { calendarRequest.current = null; });
 
     calendarRequest.current = request;
@@ -282,7 +275,6 @@ export default function TrainerApp({ me }) {
             {clientPane === 'active' && (
               <Clients
                 onOpenClient={(client) => { captureScreen('client-card'); setOpenClient(client); }}
-                refresh={calendarRefresh}
                 onRefresh={runCalendarRefresh}
                 refreshRevision={calendarRevision}
               />
