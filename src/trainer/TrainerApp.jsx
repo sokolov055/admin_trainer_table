@@ -108,6 +108,7 @@ export default function TrainerApp({ me }) {
     go: (id) => goRef.current && goRef.current(id),
     // За последним разделом — боковое меню: смахнуть влево открывает его
     openMenu: () => { setMenuOpen(true); haptic(); },
+    closeMenu: () => setMenuOpen(false),
     enabled: !inMenu && !openClient && !previewClient,
   });
   const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });

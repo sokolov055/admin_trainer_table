@@ -68,6 +68,7 @@ export default function ClientApp({ me, clientRow, preview }) {
     go: (id) => goRef.current && goRef.current(id),
     // За последним разделом — боковое меню: смахнуть влево открывает его
     openMenu: () => { setMenuOpen(true); haptic(); },
+    closeMenu: () => setMenuOpen(false),
     enabled: TABS.some((t) => t.id === view),
   });
 

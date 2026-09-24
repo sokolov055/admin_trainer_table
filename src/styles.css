@@ -120,7 +120,15 @@
   /* Выдвижная панель едет дольше остального: она проходит весь экран, и на
      220 мс движение читается как рывок. Значение продублировано в ui.jsx —
      там по нему считается момент размонтажа. */
-  --dur-panel: 260ms;
+  --dur-panel: 340ms;
+
+  /* Навигация — боковое меню, нижнее меню, смена экрана — в характере
+     iOS: кривая выдвижных панелей (из Ionic, её же берёт Vaul). Стартует
+     так же быстро, как ease-out, но тормозит дольше и мягче, без
+     ощутимой остановки в конце. Поэтому и длительность чуть больше —
+     медленнее это не ощущается, ощущается плавнее. */
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-nav: 340ms;
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -494,7 +502,7 @@ button { font-family: inherit; }
   backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid var(--border);
   box-shadow: inset 0 1px 0 var(--tabbar-edge), 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
-  transition: transform 260ms var(--ease-out), opacity 200ms var(--ease-out);
+  transition: transform var(--dur-nav) var(--ease-ios), opacity 240ms var(--ease-ios);
 }
 
 /* Экран бокового меню: меню уезжает вниз за край и не ловит нажатия */
@@ -516,7 +524,7 @@ button { font-family: inherit; }
   border-radius: 22px;
   background: var(--accent-wash);
   transform: translate3d(calc(var(--tab-pos) * 100%), 0, 0);
-  transition: transform 280ms var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  transition: transform var(--dur-nav) var(--ease-ios), opacity var(--dur-fast) var(--ease-out);
   pointer-events: none;
 }
 
@@ -556,7 +564,7 @@ button { font-family: inherit; }
   display: flex;
   height: 22px;
   align-items: center;
-  transition: transform 280ms var(--ease-out);
+  transition: transform var(--dur-nav) var(--ease-ios);
 }
 
 /* Выбранная иконка чуть приподнимается — «эта вкладка сейчас сверху» */
@@ -634,7 +642,7 @@ button { font-family: inherit; }
   inset: 0;
   background: var(--scrim);
   opacity: 0;
-  transition: opacity var(--dur-panel) var(--ease-out);
+  transition: opacity var(--dur-panel) var(--ease-ios);
 }
 
 .drawer--in .drawer__scrim { opacity: 1; }
@@ -656,7 +664,7 @@ button { font-family: inherit; }
      смахивание вбок закрывает меню */
   touch-action: pan-y;
   transform: translateX(100%);
-  transition: transform var(--dur-panel) var(--ease-out);
+  transition: transform var(--dur-panel) var(--ease-ios);
   outline: none;
 }
 
@@ -2229,7 +2237,7 @@ th.sticky, td.sticky {
    ========================================================================== */
 
 .enter {
-  animation: enter-up 260ms var(--ease-out) both;
+  animation: enter-up 320ms var(--ease-ios) both;
 }
 
 .enter:nth-child(2) { animation-delay: 40ms; }
@@ -3223,4 +3231,17 @@ code {
   margin-bottom: var(--space-3);
   border-radius: var(--radius-lg);
   background: var(--surface-sunken);
+}
+
+/* Боковое меню тянут пальцем с последнего раздела: положение и затемнение
+   задаёт gestures.jsx, собственные переходы выключены. Когда класс снят,
+   меню доезжает своим переходом от места, где его отпустили. */
+.drawer-held .drawer__panel {
+  transform: translateX(var(--drawer-pull, 100%)) !important;
+  transition: none !important;
+}
+
+.drawer-held .drawer__scrim {
+  opacity: var(--drawer-fade, 0) !important;
+  transition: none !important;
 }

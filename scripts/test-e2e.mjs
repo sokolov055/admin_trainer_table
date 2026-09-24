@@ -403,10 +403,16 @@ test('смахнуть вправо возвращает из «Моих дан�
     await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
     assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Обзор', 'с первого раздела вправо некуда');
 
-    // С последнего раздела влево — открывается боковое меню
+    // С последнего раздела влево — боковое меню тянется за пальцем, а
+    // страница стоит на месте. Чуть потянули и медленно отпустили — меню
+    // уезжает обратно.
     await phone.getByRole('button', { name: 'Питание', exact: true }).click();
     await phone.locator('#root .app__subtitle', { hasText: 'Питание' }).waitFor({ timeout: 5000 });
     await phone.waitForTimeout(300);
+    await swipe(phone, { x: 330, y: 420 }, { x: 290, y: 422 }, { steps: 20, frameMs: 30 });
+    assert.equal(await phone.locator('.swipeback').count(), 0, 'страница не съезжает');
+    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+    assert.equal(await phone.getByRole('button', { name: 'Закрыть меню' }).count(), 0, 'короткий жест меню не оставляет');
     await swipe(phone, { x: 330, y: 420 }, { x: 150, y: 430 });
     await assert.doesNotReject(
       phone.getByRole('button', { name: 'Закрыть меню' }).waitFor({ timeout: 3000 }),

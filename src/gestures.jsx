@@ -113,9 +113,9 @@ export function rememberTab(id) {
   if (app) tabSnapshots.set(id, snapshotOf(app));
 }
 
-export function useTabGesture({ tabs, active, go, openMenu = null, enabled = true }) {
+export function useTabGesture({ tabs, active, go, openMenu = null, closeMenu = null, enabled = true }) {
   const ref = useRef(null);
-  ref.current = { tabs, active, go, openMenu };
+  ref.current = { tabs, active, go, openMenu, closeMenu };
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -161,7 +161,7 @@ export function rubberband(distance, dimension, constant = 0.55) {
  * response — как быстро доходит до цели, в секундах. Стартует с текущего
  * значения и текущей скорости: перехват на лету не даёт рывка.
  */
-function spring({ from, to, velocity = 0, damping = 1, response = 0.35, onFrame, onDone }) {
+function spring({ from, to, velocity = 0, damping = 1, response = 0.4, onFrame, onDone }) {
   const stiffness = Math.pow((2 * Math.PI) / response, 2);
   const friction = (4 * Math.PI * damping) / response;
 
@@ -368,7 +368,7 @@ const PULL_MAX = 140;       // дальше резина почти не пус�
 const BACK_COMMIT = 0.35;   // доля ширины, после которой «назад» без скорости
 const BACK_FLICK = 500;     // px/с — взмах, который решает сам по себе
 const PARALLAX = 0.3;       // насколько предыдущий экран сдвинут влево в начале
-const MENU_PULL = 44;       // px резинового хода с последнего раздела, чтобы открыть меню
+const DRAWER_COMMIT = 0.3;  // доля ширины меню, вытянутая пальцем, чтобы оно осталось открытым
 const MIN_SPIN_MS = 500;    // короче индикатор не крутится: иначе мелькнёт
 
 /**
@@ -417,6 +417,45 @@ const PLATES = [
   [4.5, 3, 10],
 ];
 const BAR_W = 48;
+
+/**
+ * Боковое меню под пальцем.
+ *
+ * Меню открывается по-настоящему в момент жеста, но его панель держит
+ * палец: пока класс `drawer-held` на корне, положение панели и затемнение
+ * задают переменные, а собственные переходы выключены. На отпускании класс
+ * снимаем — и меню само доезжает (или уезжает) своим переходом от того
+ * места, где его оставил палец, без рывка.
+ */
+let drawerPulled = 0;
+
+function drawerWidth() {
+  const panel = document.querySelector('.drawer__panel');
+  return (panel && panel.offsetWidth) || Math.min(320, window.innerWidth * 0.84);
+}
+
+function holdDrawer() {
+  drawerPulled = 0;
+  const root = document.documentElement;
+  root.style.setProperty('--drawer-pull', '100%');
+  root.style.setProperty('--drawer-fade', '0');
+  root.classList.add('drawer-held');
+}
+
+function drawDrawer(pulled, width) {
+  drawerPulled = pulled;
+  const root = document.documentElement;
+  root.style.setProperty('--drawer-pull', (width - pulled) + 'px');
+  root.style.setProperty('--drawer-fade', String(pulled / width));
+}
+
+function releaseDrawer() {
+  const root = document.documentElement;
+  root.classList.remove('drawer-held');
+  root.style.removeProperty('--drawer-pull');
+  root.style.removeProperty('--drawer-fade');
+  drawerPulled = 0;
+}
 
 export function Gestures() {
   const pullRef = useRef(null);
@@ -605,10 +644,19 @@ export function Gestures() {
           const at = host.tabs.findIndex((tab) => tab.id === host.active);
           const side = dx < 0 ? 1 : -1;
           const target = at === -1 ? null : host.tabs[at + side] || null;
-          scene = at === -1 ? null : buildPager(target, side, at);
-          // За последним разделом — боковое меню
-          if (scene && !target && side > 0 && host.openMenu) scene.menu = true;
-          g.mode = scene ? 'pager' : null;
+
+          if (at !== -1 && !target && side > 0 && host.openMenu) {
+            // За последним разделом — боковое меню. Страница стоит на
+            // месте, а меню открывается сразу и выезжает из-за правого
+            // края за пальцем.
+            holdDrawer();
+            host.openMenu();
+            g.menuHost = host;
+            g.mode = 'menu';
+          } else {
+            scene = at === -1 ? null : buildPager(target, side, at);
+            g.mode = scene ? 'pager' : null;
+          }
         }
 
         if (!g.mode) { g = null; return; }
@@ -623,6 +671,13 @@ export function Gestures() {
         const armed = y >= PULL_TRIGGER;
         if (armed && !g.armed) haptic('light');
         g.armed = armed;
+      } else if (g.mode === 'menu') {
+        const width = drawerWidth();
+        const pulled = Math.min(Math.max(-dx, 0), width);
+        drawDrawer(pulled, width);
+        const armed = pulled >= width * DRAWER_COMMIT;
+        if (armed && !g.armed) haptic('light');
+        g.armed = armed;
       } else if (g.mode === 'pager') {
         const width = window.innerWidth;
         // Только в сторону выбранного соседа; назад через ноль не пускаем
@@ -631,9 +686,7 @@ export function Gestures() {
         // Соседа нет (крайний раздел) — резина, а не пустота
         const offset = scene.target ? Math.max(-width, Math.min(width, raw)) : rubberband(raw, width * 0.5);
         drawPager(offset);
-        const armed = scene.menu
-          ? offset <= -MENU_PULL
-          : !!scene.target && Math.abs(offset) >= width * BACK_COMMIT;
+        const armed = !!scene.target && Math.abs(offset) >= width * BACK_COMMIT;
         if (armed && !g.armed) haptic('light');
         g.armed = armed;
       } else {
@@ -695,25 +748,24 @@ export function Gestures() {
         return;
       }
 
+      if (mode === 'menu') {
+        const width = drawerWidth();
+        const v = -velocity('x');
+        const pulled = drawerPulled;
+        const host = g.menuHost;
+        g = null;
+        const keep = v > BACK_FLICK || (pulled >= width * DRAWER_COMMIT && v > -200);
+        if (keep) haptic('light');
+        else if (host && host.closeMenu) host.closeMenu();
+        // Дальше меню ведёт свой переход — от того места, где его отпустили
+        releaseDrawer();
+        return;
+      }
+
       if (mode === 'pager') {
         const width = window.innerWidth;
         const side = scene ? scene.side : 1;
         const v = velocity('x') * -side;
-        // С последнего раздела влево — открыть боковое меню. Страница
-        // пружиной встаёт на место, меню выезжает справа — с той стороны,
-        // куда тянули.
-        if (scene && scene.menu) {
-          const open = pagerX <= -MENU_PULL || v > BACK_FLICK;
-          const host = tabHost ? tabHost.get() : null;
-          g = null;
-          if (open && host && host.openMenu) {
-            haptic('light');
-            host.openMenu();
-          }
-          anim = spring({ from: pagerX, to: 0, velocity: -v * side, response: 0.3, onFrame: drawPager, onDone: () => { anim = null; dropScene(); } });
-          return;
-        }
-
         const go = scene && scene.target
           && (v > BACK_FLICK || (Math.abs(pagerX) >= width * BACK_COMMIT && v > -200));
         g = null;
@@ -748,8 +800,8 @@ export function Gestures() {
         anim = spring({
           from: pagerX,
           to: -side * width,
-          velocity: -Math.max(v, 800) * side,
-          response: 0.3,
+          velocity: -Math.max(v, 0) * side,
+          response: 0.42,
           onFrame: drawPager,
           onDone: finish,
         });
@@ -804,8 +856,8 @@ export function Gestures() {
       anim = spring({
         from: slideX,
         to: width,
-        velocity: Math.max(v, 800),
-        response: 0.3,
+        velocity: Math.max(v, 0),
+        response: 0.42,
         onFrame: drawSlide,
         onDone: finish,
       });
