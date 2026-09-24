@@ -427,3 +427,10 @@
   .workout__check:active { transform: none; }
   .workout__bar span { transition: none; }
 }
+
+/* Сплит: у подхода имя («Екатерина · 2») — оно не помещается в узкую
+   колонку номера, поэтому стоит строкой над весом и повторами */
+.workout__set-row--who,
+.workout__set-head--who { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 48px; }
+.workout__set-row--who > span:first-child { grid-column: 1 / -1; font-weight: 600; color: var(--text); }
+.workout__set-head--who > span:first-child { display: none; }

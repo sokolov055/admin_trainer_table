@@ -499,7 +499,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 {!familyRow && <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>}
               </div>
             )}
-            {!running && !familyRow && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month })}>Начать тренировку</button>}
+            {!running && !familyRow && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month, members: data.members || [] })}>Начать тренировку</button>}
             {made && supersets(made).map((group, j) => (
               <div className={group.superset ? 'superset' : undefined} key={'m' + j}>
                 {group.superset && (
@@ -507,14 +507,22 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                     Суперсет · {group.items[0].sets.length} {plural(group.items[0].sets.length, 'круг', 'круга', 'кругов')}
                   </div>
                 )}
-                {group.items.map((ex, k) => (
-                  <div className="exercise" style={{ minWidth: 0 }} key={k}>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="exercise__name">{ex.name}</div>
-                      <div className="exercise__scheme">{doneLine(ex.sets)}</div>
+                {group.items.map((ex, k) => {
+                  // У пары — строкой на человека: «Евгений: 3 × 12 · 25 кг»
+                  const who = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))];
+                  return (
+                    <div className="exercise" style={{ minWidth: 0 }} key={k}>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="exercise__name">{ex.name}</div>
+                        {who.length
+                          ? who.map((w) => (
+                            <div className="exercise__scheme" key={w}>{w}: {doneLine(ex.sets.filter((x) => x.who === w))}</div>
+                          ))
+                          : <div className="exercise__scheme">{doneLine(ex.sets)}</div>}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))}
             {!made && supersets(block.exercises).map((group, j) => (

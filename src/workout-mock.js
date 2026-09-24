@@ -11,7 +11,7 @@ export function workoutMock(action, params) {
     // Как на сервере (doneSummary): у завершённого — только сделанное
     exercises: s.status === 'completed'
       ? s.exercises.map(e => ({ name: e.name, supersetGroup: e.supersetGroup || '',
-        sets: e.sets.filter(x => x.state === 'done' && x.kind !== 'warmup').map(x => ({ weight: x.weight || '', reps: x.reps || '' })) }))
+        sets: e.sets.filter(x => x.state === 'done' && x.kind !== 'warmup').map(x => ({ weight: x.weight || '', reps: x.reps || '', ...(x.who ? { who: x.who } : {}) })) }))
         .filter(e => e.sets.length)
       : undefined })).reverse() };
   const previous = sessions.find(s => s.id === (params.id || params.session?.id));

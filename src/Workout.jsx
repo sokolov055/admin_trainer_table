@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { apiPublic, apiMutate } from './api.js';
 import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
-import { blankSet, clock, fromPlan, summary, uid } from './workout-model.js';
+import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
 import { IconCheck } from './icons.jsx';
 import { useBackGesture } from './gestures.jsx';
 import './workout.css';
@@ -132,12 +132,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const active = sessions.find(s => ['active', 'paused'].includes(s.status));
           if (wanted) await open(wanted);
           else if (active) await open(active.id);
-          else if (launch && launch.block) store(freshRecord(fromPlan(launch.block, launch.month)));
+          else if (launch && launch.block) store(freshRecord(fromPlan(launch.block, launch.month, launch.members || [])));
         }
       } catch (e) {
         if (alive) {
           setMessage('Нет связи с журналом. ' + e.message);
-          if (!draft && launch) store(freshRecord(fromPlan(launch.block, launch.month)));
+          if (!draft && launch && launch.block) store(freshRecord(fromPlan(launch.block, launch.month, launch.members || [])));
         }
       } finally { if (alive) setReady(true); }
     })();
@@ -361,9 +361,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
             </div>
           </details>
-          <div className="workout__set-head" aria-hidden="true"><span>Подход</span><span>Вес, кг</span><span>Повторы</span><span>Готово</span></div>
+          <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} aria-hidden="true"><span>Подход</span><span>Вес, кг</span><span>Повторы</span><span>Готово</span></div>
           {ex.sets.map((set, si) => <div className={'workout__set ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si}>
-            <div className="workout__set-row"><span>{si + 1}{set.kind === 'warmup' ? ' · Р' : ''}</span>
+            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')}><span>{setLabel(ex.sets, si)}{set.kind === 'warmup' ? ' · Р' : ''}</span>
               <input aria-label={`${ex.name}, подход ${si + 1}, вес в кг`} inputMode="decimal" value={set.weight} maxLength={12} onChange={e => updateSet(ei, si, s => ({ ...s, weight: e.target.value }))} />
               <input aria-label={`${ex.name}, подход ${si + 1}, повторы`} inputMode="numeric" value={set.reps} maxLength={6} onChange={e => updateSet(ei, si, s => ({ ...s, reps: e.target.value }))} />
               <button className="workout__check" aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
@@ -384,7 +384,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               </div>
             </details>
           </div>)}
-          <button className="button button--block" disabled={ex.sets.length >= 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, { ...ex.sets[ex.sets.length - 1], state: 'pending' }] }))}>Добавить подход</button>
+          {/* У пары подход добавляется кругом — по одному каждому, кто
+              делает упражнение, с его последним весом */}
+          {(() => {
+            const who = [...new Set(ex.sets.map(x => x.who).filter(Boolean))];
+            const round = who.length
+              ? who.map(w => ({ ...[...ex.sets].reverse().find(x => x.who === w), state: 'pending' }))
+              : [{ ...ex.sets[ex.sets.length - 1], state: 'pending' }];
+            return (
+              <button className="button button--block" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
+                {who.length > 1 ? 'Добавить круг' : 'Добавить подход'}
+              </button>
+            );
+          })()}
           <label className="workout__field">Заметка к упражнению<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} /></label>
         </section>)}
         {undo && <button className="button" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Отменить последнее удаление</button>}

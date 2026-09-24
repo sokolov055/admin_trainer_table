@@ -281,3 +281,25 @@ test('после завершённой тренировки запускает�
     if (local) local.unmount();
   }
 });
+
+test('сплит: подходы кругами по людям, у каждого свой вес и «было»', async () => {
+  const { fromPlan, setLabel } = await import('../src/workout-model.js');
+  const members = ['Евгений', 'Екатерина'];
+  const s = fromPlan({ title: 'Ноги', exercises: [
+    { name: 'Румынская тяга', sets: '3', reps: '12', splitWeights: { Евгений: '30', Екатерина: '20' }, splitPrev: { Евгений: '27,5' } },
+    { name: 'Жим с высокой постановкой', sets: '4', reps: '12', performers: ['Екатерина'], splitWeights: { Екатерина: '40' } },
+  ] }, 'Июль 2026', members);
+
+  const [both, hers] = s.exercises;
+  assert.deepEqual(both.sets.map((x) => x.who), ['Евгений', 'Екатерина', 'Евгений', 'Екатерина', 'Евгений', 'Екатерина']);
+  assert.deepEqual(both.sets.slice(0, 2).map((x) => x.weight), ['30', '20']);
+  assert.equal(both.prevWeight, 'Евгений 27,5');
+  assert.equal(setLabel(both.sets, 3), 'Екатерина · 2');
+  assert.equal(hers.sets.length, 4);
+  assert.ok(hers.sets.every((x) => x.who === 'Екатерина' && x.weight === '40'));
+
+  const solo = fromPlan({ title: 'X', exercises: [{ name: 'Жим', sets: '2', reps: '8', weight: '50' }] }, '', []);
+  assert.equal(solo.exercises[0].sets.length, 2);
+  assert.equal(solo.exercises[0].sets[0].who, undefined);
+  assert.equal(setLabel(solo.exercises[0].sets, 1), '2');
+});
