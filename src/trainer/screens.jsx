@@ -9,7 +9,7 @@ import {
   SignOut, DataTable, Field, Note, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
-import { useBackGesture, usePullRefresh } from '../gestures.jsx';
+import { useBackGesture, usePullRefresh, captureScreen } from '../gestures.jsx';
 import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
@@ -739,7 +739,7 @@ export function Sheets() {
   return (
     <Section title={list.data.spreadsheetName} note="любой лист таблицы, как есть">
       {list.data.sheets.map((sh) => (
-        <button className="item" key={sh.name} onClick={() => setSelected(sh.name)}>
+        <button className="item" key={sh.name} onClick={() => { captureScreen(); setSelected(sh.name); }}>
           <div className="item__top">
             <span className="item__name">{sh.name}</span>
             <span className="muted small nowrap">

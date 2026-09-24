@@ -3,7 +3,7 @@ import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
-import { useBackGesture } from '../gestures.jsx';
+import { useBackGesture, captureScreen } from '../gestures.jsx';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders } from '../icons.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
@@ -67,6 +67,8 @@ export default function ClientApp({ me, clientRow, preview }) {
 
   const go = (id) => {
     if (TABS.some((t) => t.id === id)) setLastTab(id);
+    // Уход с вкладки в экран меню — снимок для жеста «назад»
+    else if (TABS.some((t) => t.id === view)) captureScreen();
     setView(id);
     setMenuOpen(false);
     haptic();

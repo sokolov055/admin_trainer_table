@@ -10,7 +10,7 @@ import {
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { useBackGesture } from '../gestures.jsx';
+import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions } from '../plan-model.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
@@ -184,6 +184,9 @@ export function Overview({ clientRow, clientView = false }) {
 
 export function Plan({ clientRow, clientView = false }) {
   const [workout, setWorkout] = useState(null);
+
+  // Переход вперёд снимает экран — его покажет жест «назад» под журналом
+  const openWorkout = (value) => { captureScreen(); setWorkout(value); };
   const [month, setMonth] = useState('');
   const params = {
     ...(clientRow ? { clientRow } : {}),
@@ -228,7 +231,7 @@ export function Plan({ clientRow, clientView = false }) {
   if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => setWorkout(null)} />;
 
   if (loading || error) return <>
-    <button className="button button--block plan__journal" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
+    <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>
     {loading ? <Loading lead={false} rows={4} /> : <ErrorState error={error} onRetry={reload} />}
   </>;
 
@@ -249,7 +252,7 @@ export function Plan({ clientRow, clientView = false }) {
           {running.done ? ' · ' + running.done + ' ' + plural(running.done, 'подход', 'подхода', 'подходов') : ''}.
           {' '}Новое можно начать, когда это завершено или отменено.
         </p>
-        <button className="button button--primary button--block" onClick={() => setWorkout({})}>
+        <button className="button button--primary button--block" onClick={() => openWorkout({})}>
           Вернуться к занятию
         </button>
       </Panel>
@@ -270,7 +273,7 @@ export function Plan({ clientRow, clientView = false }) {
 
   return (
     <>
-      <button className="button button--block plan__journal" onClick={() => setWorkout({})}>Текущее занятие и журнал тренировок</button>
+      <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>
 
       {/* Сразу под входом в журнал: если занятие не закрыто, это первое,
           что человек должен узнать на этом экране. */}
@@ -396,10 +399,10 @@ export function Plan({ clientRow, clientView = false }) {
                     {past.length > 1 ? ' · всего занятий: ' + past.length : ''}
                   </span>
                 </div>
-                <button className="button" onClick={() => setWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>
+                <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>
               </div>
             )}
-            {!running && <button className="button button--primary button--block" onClick={() => setWorkout({ block, month: data.month })}>Начать тренировку</button>}
+            {!running && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month })}>Начать тренировку</button>}
             {supersets(block.exercises).map((group, j) => (
               group.superset
                 ? (
@@ -1268,7 +1271,7 @@ export function Nutrition({ clientRow, clientView = false }) {
                 клиента, а не в таблице.
               </Note>
             ) : (
-              <button className="button button--block button--primary" onClick={() => setRation(true)}>
+              <button className="button button--block button--primary" onClick={() => { captureScreen(); setRation(true); }}>
                 Собрать рацион
               </button>
             )}

@@ -12,7 +12,7 @@ import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../u
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
-import { useBackGesture } from '../gestures.jsx';
+import { useBackGesture, captureScreen } from '../gestures.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
@@ -149,6 +149,8 @@ export default function TrainerApp({ me }) {
 
   const go = (id) => {
     if (TABS.some((t) => t.id === id)) setLastTab(id);
+    // Уход с вкладки в экран меню — снимок для жеста «назад»
+    else if (!inMenu) captureScreen();
     setView(id);
     setMenuOpen(false);
     haptic();
@@ -210,7 +212,7 @@ export default function TrainerApp({ me }) {
         {view === 'clients' && clientPane === 'active' && <Stories />}
         {view === 'clients' && clientPane === 'active' && (
           <Clients
-            onOpenClient={setOpenClient}
+            onOpenClient={(client) => { captureScreen(); setOpenClient(client); }}
             refresh={calendarRefresh}
             onRefresh={runCalendarRefresh}
             refreshRevision={calendarRevision}
@@ -223,7 +225,7 @@ export default function TrainerApp({ me }) {
         {view === 'logs' && <Logs />}
         {view === 'sheets' && <Sheets />}
         {view === 'settings' && <Settings />}
-        {view === 'client-preview' && <ClientPreviewPicker onSelect={setPreviewClient} />}
+        {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen(); setPreviewClient(client); }} />}
       </main>
 
       <nav className="tabbar">
