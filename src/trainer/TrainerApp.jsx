@@ -97,7 +97,6 @@ export default function TrainerApp({ me }) {
   // глазами клиента ведёт себя как само клиентское приложение: там
   // смахивание листает разделы, а выход — кнопкой «К тренеру».
   useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient);
-  useBackGesture(() => setOpenClient(null), !!openClient);
 
   // Листать «Клиенты» и «Сводку» пальцем — пока открыт раздел, а не
   // карточка или экран меню. Функция перехода объявлена ниже ранних
@@ -242,7 +241,7 @@ export default function TrainerApp({ me }) {
             {clientPane === 'active' && <Stories />}
             {clientPane === 'active' && (
               <Clients
-                onOpenClient={(client) => { captureScreen(); setOpenClient(client); }}
+                onOpenClient={(client) => { captureScreen('client-card'); setOpenClient(client); }}
                 refresh={calendarRefresh}
                 onRefresh={runCalendarRefresh}
                 refreshRevision={calendarRevision}
@@ -368,8 +367,31 @@ function ClientPreviewPicker({ onSelect }) {
 function ClientDetail({ client, onBack }) {
   const [view, setView] = useState('overview');
   const current = CLIENT_VIEWS.find((v) => v.value === view) || CLIENT_VIEWS[0];
-  const Screen = current.Screen;
-  const isPayments = current.value === 'payments';
+  const ids = CLIENT_VIEWS.map((v) => v.value);
+
+  // Разделы карточки — такая же лента, как нижнее меню: смахивание вбок
+  // листает их, посещённые не пересобираются (keptTabs.js). Назад к
+  // списку — смахиванием вправо с первого раздела, как из клиентского
+  // просмотра; с остальных вправо листается к предыдущему разделу.
+  const sections = useKeptTabs(view, ids);
+
+  const open = (id) => {
+    if (id === view) return;
+    sections.leave();
+    rememberTab('card:' + view);
+    setView(id);
+    haptic();
+  };
+
+  useTabGesture({
+    // Имена с приставкой: снимки разделов хранятся общим списком, а
+    // «Обзор» и «Прогресс» есть и у клиентского приложения
+    tabs: CLIENT_VIEWS.map((v) => ({ id: 'card:' + v.value, label: v.label })),
+    active: 'card:' + view,
+    go: (id) => open(id.replace(/^card:/, '')),
+  });
+
+  useBackGesture(onBack, view === ids[0], 'client-card');
 
   return (
     <div className="app">
@@ -381,17 +403,25 @@ function ClientDetail({ client, onBack }) {
         <h1 className="app__title">{client.name}</h1>
         <p className="app__subtitle">Карточка клиента · {current.label}</p>
         <div className="app__subnav">
-          <Chips items={CLIENT_VIEWS} value={view} onChange={setView} variant="nav" />
+          <Chips items={CLIENT_VIEWS} value={view} onChange={open} variant="nav" />
         </div>
       </header>
 
       <main className="app__body app__body--plain">
         <ClientCard client={client} />
-        <div key={view} style={{ marginTop: 'var(--space-5)' }}>
-          {isPayments
-            ? <Payments client={client} />
-            : <Screen clientRow={client.row} />}
-        </div>
+        {CLIENT_VIEWS.map((v) => sections.shown(v.value) && (
+          <div
+            key={v.value}
+            hidden={view !== v.value}
+            data-kept={sections.kept(v.value) ? '' : undefined}
+            className="card-section"
+            style={{ marginTop: 'var(--space-5)' }}
+          >
+            {v.value === 'payments'
+              ? <Payments client={client} />
+              : <v.Screen clientRow={client.row} />}
+          </div>
+        ))}
       </main>
     </div>
   );

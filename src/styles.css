@@ -3309,3 +3309,6 @@ html.live-moving body { background: transparent; }
    лесенкой заново: браузер перезапускает анимацию у всего, что выходит
    из display: none, и каждый переход по вкладкам мигал бы. */
 .app__body[data-kept] .enter { animation: none; }
+
+/* То же для разделов карточки клиента */
+.card-section[data-kept] .enter { animation: none; }

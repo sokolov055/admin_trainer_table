@@ -501,6 +501,45 @@ test('из просмотра глазами клиента смахивание
   }
 });
 
+/**
+ * Разделы карточки клиента листаются пальцем, как нижнее меню, а с
+ * первого раздела смахивание вправо возвращает к списку клиентов.
+ */
+test('разделы карточки клиента листаются смахиванием', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  const subtitle = () => phone.locator('#root .app__subtitle').first().textContent();
+  const settled = () => phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 4000 });
+
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+
+    await phone.locator('#root main:not([hidden]) .item').first().click({ timeout: 10000 });
+    await phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 10000 });
+    await phone.waitForTimeout(400);
+
+    await swipe(phone, { x: 330, y: 600 }, { x: 60, y: 610 });
+    await settled();
+    assert.equal(await subtitle(), 'Карточка клиента · Оплаты', 'влево — следующий раздел');
+
+    await swipe(phone, { x: 60, y: 600 }, { x: 330, y: 610 });
+    await settled();
+    assert.equal(await subtitle(), 'Карточка клиента · Обзор', 'вправо — предыдущий');
+
+    await swipe(phone, { x: 60, y: 600 }, { x: 330, y: 610 });
+    await settled();
+    await assert.doesNotReject(
+      phone.locator('#root .app__title', { hasText: 'Клиенты' }).waitFor({ timeout: 5000 }),
+      'с первого раздела — назад к списку',
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });
