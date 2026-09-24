@@ -540,6 +540,52 @@ test('разделы карточки клиента листаются смах
   }
 });
 
+/**
+ * Библиотека — ради скорости: шаблон программы назначается клиенту за
+ * пару нажатий. Чужой общий шаблон копируется к себе, общее упражнение —
+ * своей версией.
+ */
+test('шаблон назначается клиенту, общий копируется, упражнение — своей версией', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const tab = await context.newPage();
+  tab.on('pageerror', (error) => consoleErrors.push(String(error)));
+  const visible = (sel) => tab.locator('#root main:not([hidden]) ' + sel);
+
+  try {
+    await tab.goto(origin + '/?mockRole=trainer');
+    await tab.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await tab.goto(origin + '/?mockRole=trainer');
+
+    await tab.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await visible('.item', { hasText: 'Похудение, 3 раза в неделю' }).first().waitFor({ timeout: 10000 });
+    await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).click();
+
+    await tab.getByRole('button', { name: 'Назначить клиенту' }).click();
+    await visible('.item').first().click();
+    await tab.getByRole('button', { name: 'Назначить', exact: true }).click();
+    await assert.doesNotReject(tab.getByText('Назначено').waitFor({ timeout: 5000 }), 'шаблон назначен');
+
+    // Общий шаблон другого тренера — к себе
+    await tab.getByRole('button', { name: 'К шаблону' }).click();
+    await tab.getByRole('button', { name: 'Назад' }).click();
+    await tab.getByRole('radio', { name: 'Общие' }).click();
+    await visible('.item').filter({ hasText: 'Сила: база 5×5' }).click();
+    await tab.getByText('автор: Мария').waitFor({ timeout: 5000 });
+    await tab.getByRole('button', { name: 'Скопировать к себе' }).click();
+    await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить' }).waitFor({ timeout: 5000 }), 'копия своя — её можно править');
+
+    // Упражнение: своя версия общего
+    await tab.getByRole('tab', { name: 'Упражнения', exact: true }).click();
+    await visible('.item').filter({ hasText: 'Планка' }).click();
+    await tab.getByText('Анимация техники появится позже').waitFor({ timeout: 5000 });
+    await tab.getByRole('button', { name: 'Сделать свою версию' }).click();
+    await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });

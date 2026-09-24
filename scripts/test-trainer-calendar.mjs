@@ -24,6 +24,7 @@ const output = await build({
       stub(/client[\\/]ClientApp\.jsx$/, 'client-app');
       stub(/client[\\/]screens\.jsx$/, 'client-screens');
       stub(/Payments\.jsx$/, 'payments');
+      stub(/Library\.jsx$/, 'library');
       stub(/stories\.jsx$/, 'stories');
       stub(/AuthTransfer\.jsx$/, 'transfer');
       stub(/Invites\.jsx$/, 'invites');
@@ -60,8 +61,9 @@ const output = await build({
           contents: `import React from 'react'; const I=()=> <i />;
             export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
-            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I;`,
+            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I;`,
         };
+        if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Processes=()=>null;` };
         if (args.path === 'expenses') return { loader: 'jsx', contents: `export const Expenses=()=>null;` };
         if (args.path === 'client-screens') return { contents: `export const Overview=()=>null; export const Plan=()=>null; export const Progress=()=>null; export const Nutrition=()=>null;` };

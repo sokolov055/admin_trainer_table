@@ -418,6 +418,88 @@ function demoSeries(params) {
   };
 }
 
+
+/* ==========================================================================
+ * Библиотека тренера: упражнения и шаблоны (демо, в памяти)
+ * ========================================================================== */
+
+const DEMO_MUSCLES = ['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Пресс', 'Всё тело', 'Кардио'];
+
+let demoExercises = [
+  ['Жим гантелей лёжа', 'Грудь', 'Гантели'],
+  ['Тяга верхнего блока к груди', 'Спина', 'Блок'],
+  ['Приседания со штангой', 'Ноги', 'Штанга'],
+  ['Ягодичный мост со штангой', 'Ягодицы', 'Штанга'],
+  ['Махи гантелями в стороны', 'Плечи', 'Гантели'],
+  ['Подъём гантелей на бицепс', 'Руки', 'Гантели'],
+  ['Планка', 'Пресс', 'Собственный вес'],
+  ['Румынская тяга', 'Ноги', 'Штанга'],
+].map(([name, muscle, equipment], i) => ({
+  id: i + 1, name, muscle, equipment, notes: '', media: null, mine: false, common: true,
+}));
+
+const demoBlocks = [
+  { title: 'Тренировка 1 — верх', exercises: [
+    { name: 'Жим гантелей лёжа', sets: '3', reps: '12', weight: '', rpe: '', supersetGroup: '' },
+    { name: 'Тяга верхнего блока к груди', sets: '3', reps: '12', weight: '', rpe: '', supersetGroup: '' },
+  ] },
+  { title: 'Тренировка 2 — низ', exercises: [
+    { name: 'Приседания со штангой', sets: '4', reps: '10', weight: '', rpe: '', supersetGroup: '' },
+    { name: 'Ягодичный мост со штангой', sets: '4', reps: '12', weight: '', rpe: '', supersetGroup: '' },
+  ] },
+];
+
+let demoTemplates = [
+  { id: 1, kind: 'program', title: 'Похудение, 3 раза в неделю', goal: 'Похудение', level: 'Новичок', description: 'Круговой формат, отдых 60 секунд.', isPublic: false, mine: true, author: 'Константин', blocks: demoBlocks, uses: 0 },
+  { id: 2, kind: 'program', title: 'Сила: база 5×5', goal: 'Сила', level: 'Средний', description: '', isPublic: true, mine: false, author: 'Мария', blocks: demoBlocks, uses: 4 },
+  { id: 3, kind: 'workout', title: 'Ноги и ягодицы', goal: 'Тонус', level: '', description: '', isPublic: false, mine: true, author: 'Константин', blocks: [demoBlocks[1]], uses: 0 },
+];
+
+let demoTemplateSeq = 10;
+let demoExerciseSeq = 100;
+
+function demoTemplateCard(t, withBlocks) {
+  const exercises = t.blocks.reduce((s, b) => s + b.exercises.length, 0);
+  const card = { ...t, workouts: t.blocks.length, exercises };
+  if (!withBlocks) delete card.blocks;
+  return card;
+}
+
+function demoTemplatesList(params) {
+  const scope = params.scope === 'public' ? 'public' : 'mine';
+  const list = demoTemplates
+    .filter((t) => (scope === 'public' ? !t.mine && t.isPublic : t.mine))
+    .filter((t) => !params.kind || t.kind === params.kind)
+    .map((t) => demoTemplateCard(t, false));
+  return { scope, templates: list, goals: [...new Set(list.map((t) => t.goal).filter(Boolean))] };
+}
+
+function demoTemplate(id) {
+  const t = demoTemplates.find((x) => x.id === Number(id));
+  if (!t) throw Object.assign(new Error('Шаблон не найден.'), { code: 404 });
+  return t;
+}
+
+function demoTemplateSave(params) {
+  const fields = {
+    kind: params.kind || 'program',
+    title: params.title || 'Без названия',
+    goal: params.goal || '',
+    level: params.level || '',
+    description: params.description || '',
+    isPublic: !!params.isPublic,
+    blocks: params.blocks || [],
+  };
+  if (params.id) {
+    const t = demoTemplate(params.id);
+    Object.assign(t, fields);
+    return demoTemplateCard(t, true);
+  }
+  const t = { id: ++demoTemplateSeq, mine: true, author: 'Константин', uses: 0, ...fields };
+  demoTemplates = [t, ...demoTemplates];
+  return demoTemplateCard(t, true);
+}
+
 const MOCK = {
   // Пакет: те же обработчики, только за один «поход на сервер». Нужен
   // здесь, чтобы демо-режим повторял боевой путь загрузки, а не шёл
@@ -841,6 +923,35 @@ const MOCK = {
     hadTelegram: true,
     unlinked: params.unlinkTelegram === true,
   }),
+
+  'library.exercises': () => ({ exercises: demoExercises, muscles: DEMO_MUSCLES }),
+  'library.exercise.save': (params) => {
+    const existing = demoExercises.find((e) => e.id === Number(params.id));
+    if (existing && existing.mine) {
+      Object.assign(existing, { name: params.name, muscle: params.muscle, equipment: params.equipment, notes: params.notes, media: params.link ? { kind: 'link', url: params.link } : existing.media });
+      return existing;
+    }
+    const mine = { id: ++demoExerciseSeq, name: params.name, muscle: params.muscle || '', equipment: params.equipment || '', notes: params.notes || '', media: params.link ? { kind: 'link', url: params.link } : null, mine: true, common: false };
+    demoExercises = [...demoExercises.filter((e) => !(existing && e.id === existing.id)), mine];
+    return mine;
+  },
+  'library.exercise.delete': (params) => {
+    demoExercises = demoExercises.filter((e) => e.id !== Number(params.id));
+    return { deleted: true };
+  },
+  'library.templates': (params) => demoTemplatesList(params),
+  'library.template.get': (params) => demoTemplateCard(demoTemplate(params.id), true),
+  'library.template.save': (params) => demoTemplateSave(params),
+  'library.template.delete': (params) => {
+    demoTemplates = demoTemplates.filter((t) => t.id !== Number(params.id));
+    return { deleted: true };
+  },
+  'library.template.copy': (params) => {
+    const source = demoTemplate(params.id);
+    return demoTemplateSave({ ...source, id: undefined, isPublic: false });
+  },
+  'library.template.fromClient': (params) => demoTemplateSave({ kind: params.kind || 'program', title: params.title, goal: params.goal, isPublic: params.isPublic, blocks: demoBlocks }),
+  'plan.fromTemplate': (params) => ({ month: params.month, blocks: demoTemplate(params.templateId).blocks }),
 
   'trainer.metrics': (params) => demoMetrics(params),
   'trainer.metrics.series': (params) => demoSeries(params),

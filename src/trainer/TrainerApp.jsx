@@ -18,7 +18,9 @@ import { useKeptTabs } from '../keptTabs.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
+  IconPlan,
 } from '../icons.jsx';
+import Library, { LIBRARY_PANES } from './Library.jsx';
 
 /**
  * Панель тренера.
@@ -37,6 +39,9 @@ import {
 const TABS = [
   { id: 'clients', label: 'Клиенты', Icon: IconUsers },
   { id: 'dashboard', label: 'Сводка', Icon: IconChart },
+  // Библиотека: шаблоны программ и тренировок, упражнения. Отсюда
+  // программы раскладываются клиентам за минуту (Library.jsx).
+  { id: 'library', label: 'Шаблоны', Icon: IconPlan },
 ];
 
 const MENU = [
@@ -82,6 +87,7 @@ export default function TrainerApp({ me }) {
   const [view, setView] = useState('clients');
   const [clientPane, setClientPane] = useState('active');
   const [dashPane, setDashPane] = useState('finance');
+  const [libPane, setLibPane] = useState('program');
   const [menuOpen, setMenuOpen] = useState(false);
   const [openClient, setOpenClient] = useState(null);
   const [previewClient, setPreviewClient] = useState(null);
@@ -218,6 +224,11 @@ export default function TrainerApp({ me }) {
             <Chips items={DASH_PANES} value={dashPane} onChange={switchPane(setDashPane)} variant="nav" />
           </div>
         )}
+        {view === 'library' && (
+          <div className="app__subnav">
+            <Chips items={LIBRARY_PANES} value={libPane} onChange={switchPane(setLibPane)} variant="nav" />
+          </div>
+        )}
       </header>
 
       {/* «Клиенты» и «Сводка» — свои страницы, и посещённая не
@@ -262,6 +273,18 @@ export default function TrainerApp({ me }) {
           <div key={dashPane}>
             {dashPane === 'finance' && <Finance />}
             {dashPane === 'processes' && <Processes />}
+          </div>
+        </main>
+      )}
+
+      {tabs.shown('library') && (
+        <main
+          className="app__body"
+          hidden={view !== 'library'}
+          data-kept={tabs.kept('library') ? '' : undefined}
+        >
+          <div key={libPane}>
+            <Library pane={libPane} />
           </div>
         </main>
       )}

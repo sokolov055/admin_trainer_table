@@ -14,6 +14,7 @@ import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions } from '../plan-model.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
+import { TemplateApply, SaveAsTemplate } from '../trainer/Library.jsx';
 
 /* ==================================================================
  * Обзор
@@ -208,6 +209,11 @@ export function Plan({ clientRow, clientView = false }) {
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Шаблоны: взять готовую программу из библиотеки или сохранить эту как
+  // шаблон. Только тренер, как и правка.
+  const [templateTool, setTemplateTool] = useState(null); // 'apply' | 'save'
+  const [savedTemplate, setSavedTemplate] = useState(false);
+
   // Очередь и выполненные. Наверху всегда та тренировка, которую делать
   // следующей: проведённые уезжают во вторую вкладку и не отодвигают её
   // вниз — к середине месяца их больше, чем оставшихся.
@@ -279,7 +285,29 @@ export function Plan({ clientRow, clientView = false }) {
           что человек должен узнать на этом экране. */}
       {runningLine}
 
-      {data.canHide && (editing
+      {data.canHide && !editing && templateTool === 'apply' && (
+        <Section title="Программа из шаблона">
+          <TemplateApply
+            clientRow={clientRow}
+            month={data.month}
+            onApplied={(m) => { setTemplateTool(null); setMonth(m); reload(); }}
+            onCancel={() => setTemplateTool(null)}
+          />
+        </Section>
+      )}
+
+      {data.canHide && !editing && templateTool === 'save' && (
+        <Section title="Сохранить как шаблон">
+          <SaveAsTemplate
+            clientRow={clientRow}
+            month={data.month}
+            onDone={() => { setTemplateTool(null); setSavedTemplate(true); }}
+            onCancel={() => setTemplateTool(null)}
+          />
+        </Section>
+      )}
+
+      {data.canHide && !templateTool && (editing
         ? (
           <Section title={'Правлю: ' + data.month}>
             <PlanEditor
@@ -297,6 +325,10 @@ export function Plan({ clientRow, clientView = false }) {
               <div className="plan__tools">
                 {data.month && (
                   <button className="button" onClick={() => setEditing(true)}>Изменить программу</button>
+                )}
+                <button className="button" onClick={() => { setTemplateTool('apply'); setSavedTemplate(false); }}>Из шаблона</button>
+                {data.month && blocks.length > 0 && (
+                  <button className="button" onClick={() => { setTemplateTool('save'); setSavedTemplate(false); }}>Сохранить как шаблон</button>
                 )}
                 <button className="button" disabled={creating} onClick={async () => {
                   const month = window.prompt('Название месяца, как он называется в таблице:', nextMonthLabel());
@@ -320,6 +352,11 @@ export function Plan({ clientRow, clientView = false }) {
                   {creating ? 'Создаю…' : 'Новый месяц'}
                 </button>
               </div>
+              {savedTemplate && (
+                <p className="small muted" style={{ marginBottom: 0 }}>
+                  Шаблон сохранён — он в разделе «Шаблоны» нижнего меню.
+                </p>
+              )}
             </Panel>
           </Section>
         ))}

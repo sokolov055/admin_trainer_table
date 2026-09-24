@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiMutate } from '../api.js';
+import { useData } from '../useData.js';
 import { Panel, Note } from '../ui.jsx';
 import { IconAlert } from '../icons.jsx';
 
@@ -23,7 +24,21 @@ import { IconAlert } from '../icons.jsx';
 
 const blank = () => ({ name: '', weight: '', prevWeight: '', sets: '', reps: '', rpe: '', supersetGroup: '' });
 
-export default function PlanEditor({ clientRow, month, blocks, onSaved, onCancel }) {
+/**
+ * Тот же редактор правит и шаблоны из библиотеки: у шаблона те же блоки.
+ * onSubmit(blocks) — куда сохранять вместо программы клиента; single —
+ * шаблон одной тренировки, добавлять и убирать тренировки в нём нельзя;
+ * submitLabel — подпись кнопки сохранения.
+ */
+export default function PlanEditor({
+  clientRow, month, blocks, onSaved, onCancel, onSubmit, single = false, submitLabel = 'Сохранить программу',
+}) {
+  // Подсказки названий из библиотеки: общие и свои упражнения. Набрать
+  // «жим» и выбрать из списка быстрее, чем печатать целиком, а названия
+  // одинаковые во всех программах — по ним строится «было» у клиента.
+  const library = useData('library.exercises', {}, []);
+  const names = library.data ? library.data.exercises.map((e) => e.name) : [];
+  const listId = 'exercise-names';
   const [draft, setDraft] = useState(() => (blocks.length
     ? blocks.map((b) => ({ title: b.title, exercises: b.exercises.map((e) => ({ ...blank(), ...e })) }))
     : [{ title: 'Тренировка № 1', exercises: [blank()] }]));
@@ -80,14 +95,14 @@ export default function PlanEditor({ clientRow, month, blocks, onSaved, onCancel
     setBusy(true);
     setFailure(null);
     try {
-      const result = await apiMutate('plan.save', {
-        clientRow,
-        month,
-        blocks: draft.map((b) => ({
-          title: b.title,
-          exercises: b.exercises.filter((e) => String(e.name || '').trim()),
-        })),
-      });
+      const clean = draft.map((b) => ({
+        title: b.title,
+        exercises: b.exercises.filter((e) => String(e.name || '').trim()),
+      }));
+
+      const result = onSubmit
+        ? await onSubmit(clean)
+        : await apiMutate('plan.save', { clientRow, month, blocks: clean });
 
       onSaved(result);
     } catch (error) {
@@ -102,6 +117,10 @@ export default function PlanEditor({ clientRow, month, blocks, onSaved, onCancel
       <p className="small muted" style={{ marginTop: 0 }}>
         Пустые строки не сохраняются — упражнение без названия просто исчезнет.
       </p>
+
+      <datalist id={listId}>
+        {names.map((name) => <option key={name} value={name} />)}
+      </datalist>
 
       {draft.map((block, bi) => (
         <div className="plan-edit__block" key={bi}>
@@ -123,6 +142,7 @@ export default function PlanEditor({ clientRow, month, blocks, onSaved, onCancel
                 <input
                   className="field__input"
                   placeholder="Упражнение"
+                  list={listId}
                   value={exercise.name}
                   maxLength={160}
                   disabled={busy}
@@ -164,24 +184,28 @@ export default function PlanEditor({ clientRow, month, blocks, onSaved, onCancel
               return next;
             })}>Добавить упражнение</button>
 
-            <button className="button button--ghost" disabled={busy || draft.length === 1} onClick={() => change((next) => {
-              next.splice(bi, 1);
-              return next;
-            })}>Убрать тренировку</button>
+            {!single && (
+              <button className="button button--ghost" disabled={busy || draft.length === 1} onClick={() => change((next) => {
+                next.splice(bi, 1);
+                return next;
+              })}>Убрать тренировку</button>
+            )}
           </div>
         </div>
       ))}
 
-      <button className="button button--block" disabled={busy} onClick={() => change((next) => {
-        next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blank()] });
-        return next;
-      })}>Добавить тренировку</button>
+      {!single && (
+        <button className="button button--block" disabled={busy} onClick={() => change((next) => {
+          next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blank()] });
+          return next;
+        })}>Добавить тренировку</button>
+      )}
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
 
       <div className="plan-edit__footer">
         <button className="button button--primary" disabled={busy} onClick={save}>
-          {busy ? 'Сохраняю…' : 'Сохранить программу'}
+          {busy ? 'Сохраняю…' : submitLabel}
         </button>
         <button className="button" disabled={busy} onClick={onCancel}>Отмена</button>
       </div>
