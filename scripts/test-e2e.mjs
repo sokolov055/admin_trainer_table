@@ -163,6 +163,12 @@ test('тренировку можно провести, и блок станов
   await rest.waitFor({ timeout: 5000 });
   assert.ok(await rest.isVisible(), 'полоса отдыха прижата к низу экрана');
 
+  // Упражнение меняют прямо в зале. Программа месяца от этого не
+  // меняется, но во «Выполненных» должно стоять сделанное, а не план.
+  const firstExercise = page.locator('.workout__exercise').first();
+  await firstExercise.getByText('Изменить упражнение').click();
+  await firstExercise.getByLabel('Название').fill('Жим на наклонной скамье');
+
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
   await page.getByRole('button', { name: 'Подтвердить' }).click();
 
@@ -178,6 +184,12 @@ test('тренировку можно провести, и блок станов
   const done = section('Тренировка 1 — верх').locator('.plan__done');
   await done.waitFor({ timeout: 20000 });
   await assert.doesNotReject(done.getByText('Тренировка проведена').waitFor({ timeout: 5000 }));
+
+  const block = section('Тренировка 1 — верх');
+  await assert.doesNotReject(block.getByText('Жим на наклонной скамье').waitFor({ timeout: 5000 }),
+    'во «Выполненных» — упражнение, сделанное на занятии');
+  assert.equal(await block.locator('.exercise__name', { hasText: /^Жим лёжа$/ }).count(), 0, 'а не из плана');
+  await assert.doesNotReject(block.getByText('1 × 8').waitFor({ timeout: 5000 }), 'и сколько сделано');
 
   await done.getByRole('button', { name: 'Посмотреть веса' }).click();
   await page.getByRole('heading', { name: 'Тренировка 1 — верх' }).first().waitFor({ timeout: 20000 });

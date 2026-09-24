@@ -12,7 +12,7 @@ import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck 
 import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
-import { supersets, blockSessions } from '../plan-model.js';
+import { supersets, blockSessions, doneLine } from '../plan-model.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
 import { TemplateApply, SaveAsTemplate } from '../trainer/Library.jsx';
 
@@ -465,11 +465,20 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {(planTab === 'done' ? doneBlocks : queueBlocks).map((block, i) => {
         const past = blockSessions(sessions, block.title, data.month);
 
+        // Во «Выполненных» — то, что сделано на последнем занятии, а не
+        // план: в зале упражнение могли заменить или добавить, а программа
+        // месяца от занятия не меняется. Старый ответ сервера (или Apps
+        // Script) состава не присылает — тогда, как раньше, план.
+        const made = planTab === 'done' && past[0] && Array.isArray(past[0].exercises) && past[0].exercises.length
+          ? past[0].exercises
+          : null;
+        const shownExercises = made || block.exercises;
+
         return (
         <Section
           key={i}
           title={block.title}
-          note={block.exercises.length + ' ' + plural(block.exercises.length, 'упражнение', 'упражнения', 'упражнений')}
+          note={shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
         >
           <Panel>
             {/* Веса живут в журнале, а не в программе: лист месяца — это
@@ -490,7 +499,24 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
               </div>
             )}
             {!running && !familyRow && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month })}>Начать тренировку</button>}
-            {supersets(block.exercises).map((group, j) => (
+            {made && supersets(made).map((group, j) => (
+              <div className={group.superset ? 'superset' : undefined} key={'m' + j}>
+                {group.superset && (
+                  <div className="superset__head">
+                    Суперсет · {group.items[0].sets.length} {plural(group.items[0].sets.length, 'круг', 'круга', 'кругов')}
+                  </div>
+                )}
+                {group.items.map((ex, k) => (
+                  <div className="exercise" style={{ minWidth: 0 }} key={k}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="exercise__name">{ex.name}</div>
+                      <div className="exercise__scheme">{doneLine(ex.sets)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {!made && supersets(block.exercises).map((group, j) => (
               group.superset
                 ? (
                   <div className="superset" key={j}>

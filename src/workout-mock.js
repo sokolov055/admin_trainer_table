@@ -7,7 +7,13 @@ export function workoutMock(action, params) {
   if (!owner) throw new Error('Укажите клиента');
   const key = 'workout_demo_server:' + owner;
   const sessions = JSON.parse(localStorage.getItem(key) || '[]');
-  if (action === 'workout.list') return { owner: String(owner), sessions: sessions.map(s => ({ ...s, done: summary(s).done })).reverse() };
+  if (action === 'workout.list') return { owner: String(owner), sessions: sessions.map(s => ({ ...s, done: summary(s).done,
+    // Как на сервере (doneSummary): у завершённого — только сделанное
+    exercises: s.status === 'completed'
+      ? s.exercises.map(e => ({ name: e.name, supersetGroup: e.supersetGroup || '',
+        sets: e.sets.filter(x => x.state === 'done' && x.kind !== 'warmup').map(x => ({ weight: x.weight || '', reps: x.reps || '' })) }))
+        .filter(e => e.sets.length)
+      : undefined })).reverse() };
   const previous = sessions.find(s => s.id === (params.id || params.session?.id));
 
   // Удаление: запись пропадает целиком, как и в таблице. Право тренера —

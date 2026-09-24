@@ -46,3 +46,21 @@ export function blockSessions(sessions, blockTitle, month) {
       && (!month || s.month === month))
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
+
+/**
+ * Сделанное на занятии — строкой, как в программе: «3 × 15 · 20 кг», а если
+ * подходы разные — каждый: «20 кг × 12, 22.5 кг × 10».
+ *
+ * Для вкладки «Выполненные»: упражнение, заменённое в зале, живёт только в
+ * журнале, и показывать там блок программы значило показывать не то, что
+ * человек делал.
+ */
+export function doneLine(sets) {
+  const list = sets || [];
+  if (!list.length) return '';
+  const same = list.every((x) => x.weight === list[0].weight && x.reps === list[0].reps);
+  if (same) {
+    return list.length + ' × ' + (list[0].reps || '?') + (list[0].weight ? ' · ' + list[0].weight + ' кг' : '');
+  }
+  return list.map((x) => (x.weight ? x.weight + ' кг × ' : '') + (x.reps || '?')).join(', ');
+}
