@@ -218,13 +218,14 @@ test('замер записывается, а пустая форма объяс
 });
 
 /**
- * Профиль в боковом меню. Заполняют его между делом, поэтому проверяем
+ * Профиль — пункт бокового меню, открывается отдельным экраном. Заполняют его между делом, поэтому проверяем
  * не «форма есть», а то, что незаполненное не мешает сохранить, а мусор
  * объясняет себя.
  */
 test('профиль сохраняется и объясняет опечатку', async () => {
   await page.getByRole('button', { name: 'Меню' }).click();
-  await page.getByRole('heading', { name: 'Мои данные' }).waitFor({ timeout: 10000 });
+  await page.getByRole('button', { name: /Мои данные/ }).click();
+  await page.getByRole('textbox', { name: 'Рост, см' }).waitFor({ timeout: 10000 });
 
   await page.getByRole('textbox', { name: 'Рост, см' }).fill('17');
   await page.getByRole('button', { name: 'Сохранить' }).click();

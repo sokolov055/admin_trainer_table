@@ -379,28 +379,6 @@ button { font-family: inherit; }
   font-size: var(--text-sm);
 }
 
-.app__header--menu {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.app__menu {
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.app__menu:active { transform: scale(0.94); }
-
 .app__body {
   flex: 1;
   /* Снизу — высота панели вкладок и полоса «домой» под ней: панель растёт
@@ -2910,19 +2888,6 @@ code {
 }
 
 .small.danger { color: var(--critical-text); }
-
-/* Раздел бокового меню. Появляется той же короткой лесенкой, что и экран:
-   переключение разделов — это смена содержимого, а не подмена рывком. */
-.menu__pane {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-  animation: enter-up var(--dur) var(--ease-out) both;
-}
-
-.menu__pane > h2 { margin: 0; }
-.menu__pane > p { margin: calc(var(--space-3) * -1) 0 0; }
 
 /* Объяснение подставленных значений стоит над формой, а не под ней:
    прочитать его надо до того, как человек начнёт стирать чужие числа. */

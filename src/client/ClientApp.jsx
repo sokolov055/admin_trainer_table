@@ -3,8 +3,9 @@ import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu } from '../icons.jsx';
-import { Chips, Drawer, SignOut } from '../ui.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders } from '../icons.jsx';
+import { Drawer, Section, SignOut } from '../ui.jsx';
+import { APP_VERSION } from '../version.js';
 import Profile from './Profile.jsx';
 import PushSetting from '../PushSetting.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
@@ -30,27 +31,39 @@ const TABS = [
 ];
 
 /**
- * Разделы бокового меню.
+ * Пункты бокового меню — тем же списком, что у тренера: каждый открывает
+ * свой экран в основном окне.
  *
- * Анкета и настройки лежали одной простынёй, и выходило, что человек,
- * зашедший включить уведомления, сначала пролистывал свой рост и телефон.
- * Это разные разговоры: «кто я» и «как приложение себя ведёт».
+ * Раньше анкета рисовалась прямо в выезжающей панели, а над ней стоял
+ * переключатель «Профиль / Настройки». Панель уже экрана, форма в неё не
+ * помещалась и на телефоне наезжала на переключатель. Отдельный экран
+ * снимает это целиком: у формы вся ширина, а меню остаётся меню.
+ *
+ * «Кто я» и «как приложение себя ведёт» по-прежнему разные пункты:
+ * зашедший включить уведомления не должен листать свой рост и телефон.
  */
-const MENU_PANES = [
-  { value: 'profile', label: 'Профиль' },
-  { value: 'settings', label: 'Настройки' },
+const MENU = [
+  { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, Telegram', Icon: IconUsers },
+  { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
 
+const VIEWS = TABS.concat(MENU);
+
 export default function ClientApp({ me, clientRow, preview }) {
-  const [tab, setTab] = useState('overview');
+  const [view, setView] = useState('overview');
 
   // Боковое меню появилось ради «Моих данных»: вкладок внизу четыре, и
   // пятая — про себя, а не про тренировки — сломала бы их ряд. Заодно
   // сюда переехал выход: это конец разговора, а не раздел.
-  const [menu, setMenu] = useState(false);
-  const [pane, setPane] = useState('profile');
-  const current = TABS.find((t) => t.id === tab) || TABS[0];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const current = VIEWS.find((v) => v.id === view) || VIEWS[0];
   const Screen = current.Screen;
+
+  const go = (id) => {
+    setView(id);
+    setMenuOpen(false);
+    haptic();
+  };
 
   return (
     <div className="app">
@@ -75,51 +88,60 @@ export default function ClientApp({ me, clientRow, preview }) {
         </aside>
       )}
 
-      <header className="app__header app__header--menu">
-        <div>
-          <h1 className="app__title">{me.name}</h1>
-          <p className="app__subtitle">{current.label}</p>
+      <header className="app__header">
+        <div className="app__bar">
+          <div className="app__headline">
+            <h1 className="app__title">{me.name}</h1>
+            <p className="app__subtitle">{current.label}</p>
+          </div>
+          <button
+            className="icon-button"
+            onClick={() => { setMenuOpen(true); haptic(); }}
+            aria-label="Меню"
+            aria-expanded={menuOpen}
+            aria-haspopup="dialog"
+          >
+            <IconMenu size={22} />
+          </button>
         </div>
-
-        <button className="app__menu" aria-label="Меню" onClick={() => setMenu(true)}>
-          <IconMenu size={22} />
-        </button>
       </header>
 
-      <Drawer open={menu} onClose={() => setMenu(false)} label="Меню">
-        <Chips items={MENU_PANES} value={pane} onChange={(next) => { setPane(next); haptic(); }} />
+      <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} label="Меню">
+        <div className="menu__head">
+          <span className="menu__title">Ещё</span>
+          <button className="icon-button" onClick={() => { setMenuOpen(false); haptic(); }} aria-label="Закрыть меню">
+            <IconClose size={20} />
+          </button>
+        </div>
 
-        {pane === 'profile' && (
-          <div className="menu__pane" key="profile">
-            <h2>Мои данные</h2>
-            <p className="small muted">
-              Тренеру это нужно, чтобы связаться с вами и точнее считать норму питания.
-              Заполнять всё сразу не обязательно.
-            </p>
+        <div className="menu__list">
+          {MENU.map((m) => {
+            const Icon = m.Icon;
+            const active = m.id === view;
+            return (
+              <button
+                key={m.id}
+                className={'menu__item' + (active ? ' menu__item--active' : '')}
+                onClick={() => go(m.id)}
+                aria-current={active ? 'page' : undefined}
+              >
+                <span className="menu__icon"><Icon size={20} /></span>
+                <span className="menu__text">
+                  <span className="menu__label">{m.label}</span>
+                  <span className="menu__note">{m.note}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-            <Profile clientRow={clientRow} />
-          </div>
-        )}
-
-        {pane === 'settings' && (
-          <div className="menu__pane" key="settings">
-            <h2>Настройки</h2>
-
-            <PushSetting clientRow={clientRow} />
-            <ThemeSetting />
-
-            {/* Выход стоит последним: это конец разговора, а не раздел.
-                Когда этот же кабинет открывает тренер из карточки клиента,
-                выхода быть не должно — он вышел бы из своего. */}
-            {!clientRow && <SignOut />}
-          </div>
-        )}
+        <p className="menu__version">Версия {APP_VERSION}</p>
       </Drawer>
 
       {/* key на контейнере перезапускает появление при смене вкладки:
           экран собирается той же короткой лесенкой, что и при первой
           загрузке, а не подменяется рывком */}
-      <main className="app__body" key={tab}>
+      <main className="app__body" key={view}>
         {/* Новости об обновлениях — только на обзоре. Экран открывают
             первым, и это единственная вкладка, куда заходят без
             конкретного вопроса; на остальных человек уже занят делом.
@@ -127,20 +149,46 @@ export default function ClientApp({ me, clientRow, preview }) {
             Здесь, а не внутри Overview: тот же экран открывает тренер из
             карточки клиента, и сторис оттуда читались бы как что-то,
             относящееся к этому клиенту. */}
-        {tab === 'overview' && !preview && <TelegramTransferCard />}
-        {tab === 'overview' && <Stories />}
-        <Screen clientRow={clientRow} clientView={!!preview} />
+        {view === 'overview' && !preview && <TelegramTransferCard />}
+        {view === 'overview' && <Stories />}
+        {Screen && <Screen clientRow={clientRow} clientView={!!preview} />}
+
+        {view === 'profile' && (
+          <>
+            <p className="small muted">
+              Тренеру это нужно, чтобы связаться с вами и точнее считать норму питания.
+              Заполнять всё сразу не обязательно.
+            </p>
+            <Profile clientRow={clientRow} />
+          </>
+        )}
+
+        {view === 'settings' && (
+          <>
+            <Section title="Внешний вид">
+              <ThemeSetting />
+            </Section>
+            <Section title="Уведомления">
+              <PushSetting clientRow={clientRow} />
+            </Section>
+
+            {/* Выход стоит последним: это конец разговора, а не раздел.
+                Когда этот же кабинет открывает тренер из карточки клиента,
+                выхода быть не должно — он вышел бы из своего. */}
+            {!clientRow && <SignOut />}
+          </>
+        )}
       </main>
 
       <nav className="tabbar">
         {TABS.map((t) => {
           const Icon = t.Icon;
-          const active = t.id === tab;
+          const active = t.id === view;
           return (
             <button
               key={t.id}
               className={'tabbar__item' + (active ? ' tabbar__item--active' : '')}
-              onClick={() => { setTab(t.id); haptic(); }}
+              onClick={() => go(t.id)}
               aria-current={active ? 'page' : undefined}
             >
               <span className="tabbar__icon"><Icon size={21} /></span>
