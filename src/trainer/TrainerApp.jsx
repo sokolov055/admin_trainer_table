@@ -13,6 +13,7 @@ import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen, forgetForward } from '../gestures.jsx';
+import TabBar from '../TabBar.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
@@ -244,23 +245,7 @@ export default function TrainerApp({ me }) {
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen(); setPreviewClient(client); }} />}
       </main>
 
-      <nav className="tabbar">
-        {TABS.map((t) => {
-          const Icon = t.Icon;
-          const active = t.id === view;
-          return (
-            <button
-              key={t.id}
-              className={'tabbar__item' + (active ? ' tabbar__item--active' : '')}
-              onClick={() => go(t.id)}
-              aria-current={active ? 'page' : undefined}
-            >
-              <span className="tabbar__icon"><Icon size={21} /></span>
-              {t.label}
-            </button>
-          );
-        })}
-      </nav>
+      <TabBar tabs={TABS} active={view} onSelect={go} />
 
       <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} label="Меню">
         <div className="menu__head">

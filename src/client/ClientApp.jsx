@@ -4,6 +4,7 @@ import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen, forgetForward } from '../gestures.jsx';
+import TabBar from '../TabBar.jsx';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders } from '../icons.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
@@ -202,23 +203,7 @@ export default function ClientApp({ me, clientRow, preview }) {
         )}
       </main>
 
-      <nav className="tabbar">
-        {TABS.map((t) => {
-          const Icon = t.Icon;
-          const active = t.id === view;
-          return (
-            <button
-              key={t.id}
-              className={'tabbar__item' + (active ? ' tabbar__item--active' : '')}
-              onClick={() => go(t.id)}
-              aria-current={active ? 'page' : undefined}
-            >
-              <span className="tabbar__icon"><Icon size={21} /></span>
-              {t.label}
-            </button>
-          );
-        })}
-      </nav>
+      <TabBar tabs={TABS} active={view} onSelect={go} />
     </div>
   );
 }

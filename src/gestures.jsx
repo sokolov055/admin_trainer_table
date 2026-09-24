@@ -323,7 +323,7 @@ function landQuietly() {
  * Лента разделов: нынешний и соседний лежат рядом и едут вместе, как
  * страницы, — без теней и притемнения, это не «глубже», а «рядом».
  */
-function buildPager(target, side) {
+function buildPager(target, side, at) {
   const app = document.querySelector('#root .app');
   if (!app) return null;
 
@@ -364,7 +364,7 @@ function buildPager(target, side) {
   scene.appendChild(cur);
   document.body.appendChild(scene);
 
-  return { direction: 'tabs', scene, cur, next, side, target, now, snapshot: target ? tabSnapshots.get(target.id) : null };
+  return { direction: 'tabs', scene, cur, next, side, at, target, now, snapshot: target ? tabSnapshots.get(target.id) : null };
 }
 
 /* ==========================================================================
@@ -515,6 +515,24 @@ export function Gestures() {
 
       scene.cur.style.transform = `translate3d(${offset}px, 0, 0)`;
       if (scene.next) scene.next.style.transform = `translate3d(${offset + scene.side * width}px, 0, 0)`;
+
+      // Таблетка нижнего меню едет вслед за пальцем — видно, в какой
+      // раздел листаешь, ещё до того, как отпустил
+      const bar = document.querySelector('.tabbar');
+      const pill = bar && bar.querySelector('.tabbar__pill');
+      if (pill) {
+        bar.classList.add('tabbar--dragging');
+        pill.style.setProperty('--tab-pos', String(scene.at - offset / width));
+      }
+    };
+
+    /** Отдать таблетку обратно меню: дальше её положение ведёт React */
+    const releasePill = () => {
+      const bar = document.querySelector('.tabbar');
+      if (!bar) return;
+      bar.classList.remove('tabbar--dragging');
+      const pill = bar.querySelector('.tabbar__pill');
+      if (pill) pill.style.removeProperty('--tab-pos');
     };
 
     /**
@@ -527,6 +545,7 @@ export function Gestures() {
       scene = null;
       slideX = 0;
       pagerX = 0;
+      if (gone && gone.direction === 'tabs') releasePill();
       if (!gone) return;
       if (!fade) { gone.scene.remove(); return; }
       gone.scene.style.transition = 'opacity 150ms ease-out';
@@ -599,7 +618,7 @@ export function Gestures() {
           const at = host.tabs.findIndex((tab) => tab.id === host.active);
           const side = dx < 0 ? 1 : -1;
           const target = at === -1 ? null : host.tabs[at + side] || null;
-          scene = at === -1 ? null : buildPager(target, side);
+          scene = at === -1 ? null : buildPager(target, side, at);
           g.mode = scene ? 'pager' : null;
         }
 
@@ -807,16 +826,49 @@ export function Gestures() {
       });
     };
 
-    document.addEventListener('touchstart', onStart, { passive: true });
+    /**
+     * Элемент под пальцем может исчезнуть посреди жеста: React заменил
+     * экран (сменилась вкладка, пришли данные). События касания продолжают
+     * приходить ему, но от оторванного элемента до документа они уже не
+     * всплывают — и жест глох на полпути. Поэтому слушаем ещё и сам
+     * элемент, а берём оттуда только то, что до документа не дойдёт.
+     */
+    let held = null;
+    const detached = (fn) => (e) => { if (!e.currentTarget.isConnected) fn(e); };
+    const heldMove = detached(onMove);
+    const heldEnd = detached((e) => { onEnd(e); letGo(); });
+
+    const letGo = () => {
+      if (!held) return;
+      held.removeEventListener('touchmove', heldMove);
+      held.removeEventListener('touchend', heldEnd);
+      held.removeEventListener('touchcancel', heldEnd);
+      held = null;
+    };
+
+    const start = (e) => {
+      letGo();
+      held = e.target;
+      if (held && held.addEventListener) {
+        held.addEventListener('touchmove', heldMove, { passive: false });
+        held.addEventListener('touchend', heldEnd, { passive: true });
+        held.addEventListener('touchcancel', heldEnd, { passive: true });
+      }
+      onStart(e);
+    };
+    const end = (e) => { onEnd(e); letGo(); };
+
+    document.addEventListener('touchstart', start, { passive: true });
     document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onEnd, { passive: true });
-    document.addEventListener('touchcancel', onEnd, { passive: true });
+    document.addEventListener('touchend', end, { passive: true });
+    document.addEventListener('touchcancel', end, { passive: true });
 
     return () => {
-      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchstart', start);
       document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onEnd);
-      document.removeEventListener('touchcancel', onEnd);
+      document.removeEventListener('touchend', end);
+      document.removeEventListener('touchcancel', end);
+      letGo();
       if (anim) anim.stop();
       dropScene();
       drawPull(0);
