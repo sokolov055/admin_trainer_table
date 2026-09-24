@@ -60,18 +60,19 @@ const FAMILY = { id: 'family', label: 'Семья', note: 'Тренировки 
 export default function ClientApp({ me, clientRow, preview }) {
   const [view, setView] = useState('overview');
 
-  // Семья — только в своём кабинете: тренеру в карточке клиента и в
-  // предпросмотре она не нужна, у него есть сами карточки.
+  // Семья — в своём кабинете и в «смотрю как клиент» (тренер проверяет,
+  // что увидит клиент). В карточке клиента у тренера её нет: там сами
+  // карточки.
   // Не ждём и не показываем ошибок: нет ответа — нет и пункта в меню.
   const [familyMembers, setFamilyMembers] = useState([]);
   useEffect(() => {
-    if (clientRow) return undefined;
+    if (clientRow && !preview) return undefined;
     let alive = true;
-    apiPublic('family.list', {})
+    apiPublic('family.list', clientRow ? { clientRow } : {})
       .then((r) => { if (alive) setFamilyMembers((r && r.members) || []); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [clientRow]);
+  }, [clientRow, preview]);
   const menu = familyMembers.length ? [FAMILY, ...MENU] : MENU;
   const VIEWS = TABS.concat(menu);
 
@@ -250,7 +251,7 @@ export default function ClientApp({ me, clientRow, preview }) {
           </>
         )}
 
-        {view === 'family' && <Family members={familyMembers} />}
+        {view === 'family' && <Family members={familyMembers} preview={!!preview} />}
 
         {view === 'settings' && (
           <>

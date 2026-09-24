@@ -271,7 +271,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // могли завершить или отменить.
   useEffect(() => {
     let alive = true;
-    apiPublic('workout.list', familyRow ? { familyRow } : clientRow ? { clientRow } : {})
+    apiPublic('workout.list', { ...(clientRow ? { clientRow } : {}), ...(familyRow ? { familyRow } : {}) })
       .then((r) => {
         if (!alive) return;
         setSessions((r && r.sessions) || []);
@@ -667,7 +667,7 @@ function useProgressBundle(clientRow, familyRow = null) {
 
   useEffect(() => {
     let alive = true;
-    const params = familyRow ? { familyRow } : clientRow ? { clientRow } : {};
+    const params = { ...(clientRow ? { clientRow } : {}), ...(familyRow ? { familyRow } : {}) };
 
     setState({ loading: true, data: null, error: null });
 

@@ -14,7 +14,9 @@ import { useBackGesture } from '../gestures.jsx';
  * Кто попадает в список, решает тренер: участие включается каждому
  * отдельно, и видят друг друга только включённые.
  */
-export default function Family({ members }) {
+// preview — тренер смотрит глазами клиента: данные берутся его правами по
+// номеру строки, familyRow при этом оставляет экраны только для чтения.
+export default function Family({ members, preview = false }) {
   const [open, setOpen] = useState(null);
   const [tab, setTab] = useState('plan');
 
@@ -35,8 +37,8 @@ export default function Family({ members }) {
           onChange={setTab}
         />
         {tab === 'plan'
-          ? <Plan key={'p' + open.row} familyRow={open.row} />
-          : <Progress key={'g' + open.row} familyRow={open.row} />}
+          ? <Plan key={'p' + open.row} familyRow={open.row} {...(preview ? { clientRow: open.row, clientView: true } : {})} />
+          : <Progress key={'g' + open.row} familyRow={open.row} {...(preview ? { clientRow: open.row } : {})} />}
       </>
     );
   }
