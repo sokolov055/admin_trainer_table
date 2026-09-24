@@ -41,7 +41,9 @@
    заставляет возвращаться наверх после каждого подхода. */
 .workout__header {
   position: sticky;
-  top: 0;
+  /* Под строкой состояния: в приложении с иконки страница рисуется и под
+     часами, и прилипшая к самому верху шапка ушла бы под них */
+  top: env(safe-area-inset-top);
   z-index: 3;
   margin: 0 calc(var(--space-4) * -1) var(--space-4);
   padding: var(--space-3) var(--space-4) var(--space-3);

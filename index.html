@@ -22,11 +22,14 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
 
-    <!-- default, а не black-translucent: при «прозрачном» статус-баре iOS
-         рисует часы белым поверх содержимого, а фон приложения в светлой
-         теме светлый — время стало бы нечитаемым. При default система
-         подбирает фон полосы сама, под цвет ниже. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- black-translucent: приложение рисует и под строкой состояния, как
+         нативное, — боковое меню, затемнение и истории доходят до самого
+         верха. Раньше стояло default: там приложение начиналось ниже
+         полосы, и iPhone красил её сам, под верхний край страницы, — при
+         открытом меню серой полосой над белой панелью.
+         Плата известна и принята: часы iPhone в этом режиме всегда
+         белые, и в светлой теме на светлом фоне читаются плохо. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Fit Track" />
 
     <!-- Цвет системных полос отдельно для светлой и тёмной схемы: одно

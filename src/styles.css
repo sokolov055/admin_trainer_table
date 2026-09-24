@@ -269,6 +269,23 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* Подложка под строкой состояния. Приложение с иконки рисует и под
+   часами (black-translucent в index.html), и без подложки текст страницы
+   при прокрутке проезжал бы прямо под ними. Высота — ровно строка
+   состояния; вне приложения с иконки она нулевая. Боковое меню, его
+   затемнение и истории лежат выше и доходят до самого верха. */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--bg);
+  z-index: 25;
+  pointer-events: none;
+}
+
 /**
  * Браузерные поверхности, которые мы не рисовали, но которые всё равно
  * видны: выделение, каретка, полоса прокрутки, кольцо фокуса. По умолчанию
@@ -410,7 +427,8 @@ button { font-family: inherit; }
 .client-preview {
   position: sticky;
   top: 0;
-  z-index: 19;
+  /* Выше подложки строки состояния: полоса сама продолжается под часы */
+  z-index: 26;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -609,6 +627,11 @@ button { font-family: inherit; }
  * `padding` ниже по файлу.
  */
 @media (display-mode: standalone) {
+  /* Полоса «Вы смотрите как клиент» — первая на экране: она и уходит под
+     часы, а шапка под ней отступа на строку состояния уже не делает */
+  .client-preview { padding-top: calc(10px + env(safe-area-inset-top)); }
+  .client-preview + .app__header { padding-top: var(--space-5); }
+
   .app__header {
     padding-top: calc(var(--space-5) + env(safe-area-inset-top));
     padding-left: calc(var(--space-4) + env(safe-area-inset-left));
