@@ -235,7 +235,9 @@ export async function apiPrimary(action, params = {}) {
   try {
     body = await postJson(url, payload, PRIMARY_TIMEOUT_MS);
   } catch (_) {
-    throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
+    // Частая причина — VPN: через него сервер нередко недоступен, а
+    // приложение из кеша при этом открывается и выглядит сломанным.
+    throw new ApiError('Сервер не отвечает. Если включён VPN — выключите его; иначе проверьте связь и попробуйте ещё раз.', 0);
   }
 
   if (!body || body.ok !== true) {
