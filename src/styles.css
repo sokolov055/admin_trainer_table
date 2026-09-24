@@ -82,6 +82,7 @@
   /* --- глубина: смещение + мягкое размытие. Свечение без смещения —
          это декорация, а не тень. --- */
   --shadow-sm: 0 1px 2px rgba(26, 24, 21, 0.05), 0 1px 1px rgba(26, 24, 21, 0.03);
+  --pill-drop: rgba(26, 24, 21, 0.07);
   --shadow-md: 0 4px 12px rgba(26, 24, 21, 0.08), 0 1px 3px rgba(26, 24, 21, 0.05);
   --shadow-lg: 0 12px 32px rgba(26, 24, 21, 0.13), 0 3px 8px rgba(26, 24, 21, 0.07);
 
@@ -193,6 +194,7 @@
   --info-line: rgba(142, 192, 245, 0.22);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --pill-drop: rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 3px 8px rgba(0, 0, 0, 0.35);
 }
@@ -246,6 +248,7 @@
     --info-line: rgba(142, 192, 245, 0.22);
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --pill-drop: rgba(0, 0, 0, 0.4);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 3px 8px rgba(0, 0, 0, 0.35);
   }
@@ -1727,7 +1730,12 @@ table.data tr:last-child td { border-bottom: 0; }
 .panel--pad table.data th:first-child,
 .panel--pad table.data td:first-child { padding-left: 0; }
 
-td.num, th.num { text-align: right; padding-right: 0; }
+/* Числа — вправо, под своим заголовком. Слева у числовой колонки свой
+   отступ: иначе в узкой таблице соседние числа слипаются («106,536,5»). */
+td.num, th.num,
+table.data td.num, table.data th.num { text-align: right; padding-right: 0; padding-left: var(--space-3); }
+
+.progress__add { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); }
 
 th.sticky, td.sticky {
   position: sticky;
@@ -3306,17 +3314,10 @@ code {
 
 .rows__item--pick:active { background: var(--surface-active); }
 
+/* Выбранная строка — заливкой и весом подписи. Цветной полосы слева нет:
+   это украшение, а не состояние, и craft-floor его прямо запрещает. */
 .rows__item--picked { background: var(--accent-wash); }
-.rows__item--picked::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-}
+.rows__item--picked .rows__label { color: var(--text); font-weight: 600; }
 
 .lead--pick { cursor: pointer; }
 
@@ -3516,20 +3517,60 @@ html.live-region body { background: transparent; }
    едет к нажатому и за пальцем при листании. */
 .chips--sliding { position: relative; }
 
+/* Таблетка движется и меняет ширину только transform: края — полукруги
+   постоянной ширины, середина растягивается scaleX от ширины в 1px.
+   Анимировать width значило бы пересчитывать раскладку на каждом кадре.
+   Жест (NavTabs.drag) задаёт --pill-x/--pill-w поверх базовых значений. */
 .chips__pill {
+  --cap-n: 20;
+  --cap: calc(var(--cap-n) * 1px);
+  --x: var(--pill-x, var(--pill-x-base, 0px));
+  --w: var(--pill-w, var(--pill-w-base, 0));
   position: absolute;
   top: 3px;
   bottom: 3px;
   left: 0;
-  width: var(--pill-w, 0);
-  transform: translate3d(var(--pill-x, 0), 0, 0);
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--dur-nav) var(--ease-ios), width var(--dur-nav) var(--ease-ios);
+  width: 0;
+  transform: translate3d(var(--x), 0, 0);
+  /* Тень — одна на всю таблетку: у трёх частей по отдельности она
+     темнела бы на стыках. Цвет — из темы, как у --shadow-sm. */
+  filter: drop-shadow(0 1px 2px var(--pill-drop));
+  transition: transform var(--dur-nav) var(--ease-ios);
   pointer-events: none;
 }
+
+.chips__pill-cap,
+.chips__pill-mid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: transform var(--dur-nav) var(--ease-ios);
+}
+
+.chips__pill-cap { width: var(--cap); z-index: 1; }
+.chips__pill-cap--l { border-right: 0; border-radius: 999px 0 0 999px; }
+.chips__pill-cap--r {
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  transform: translate3d(calc(var(--w) * 1px - var(--cap)), 0, 0);
+}
+
+/* Середина заходит под края на пиксель: без нахлёста на стыке видна щель */
+.chips__pill-mid {
+  width: 1px;
+  border-left: 0;
+  border-right: 0;
+  transform-origin: 0 0;
+  transform: translate3d(calc(var(--cap) - 1px), 0, 0) scaleX(calc(var(--w) - 2 * var(--cap-n) + 2));
+}
+
+/* Под пальцем — без задержки: таблетка идёт ровно за жестом */
+.chips__pill--live,
+.chips__pill--live .chips__pill-cap,
+.chips__pill--live .chips__pill-mid { transition: none; }
 
 .chips--sliding .chip { z-index: 1; }
 

@@ -83,11 +83,11 @@ const NavTabs = forwardRef(function NavTabs({ items, value, onChange }, ref) {
       const to = measure(Math.ceil(pos)) || from;
       if (!from) return;
       const t = pos - Math.floor(pos);
-      pill.style.transition = 'none';
+      pill.classList.add('chips__pill--live');
       const x = from.x + (to.x - from.x) * t;
       const w = from.w + (to.w - from.w) * t;
-      pill.style.transform = `translate3d(${x}px, 0, 0)`;
-      pill.style.width = w + 'px';
+      pill.style.setProperty('--pill-x', x + 'px');
+      pill.style.setProperty('--pill-w', String(w));
       // Ряд едет за таблеткой, а не таблетка за край
       cancelAnimationFrame(scrollAnim.current);
       const left = scrollFor({ x, w });
@@ -96,20 +96,29 @@ const NavTabs = forwardRef(function NavTabs({ items, value, onChange }, ref) {
     release() {
       const pill = pillRef.current;
       if (!pill) return;
-      pill.style.transition = '';
-      pill.style.transform = '';
-      pill.style.width = '';
+      pill.classList.remove('chips__pill--live');
+      pill.style.removeProperty('--pill-x');
+      pill.style.removeProperty('--pill-w');
     },
   }), [items.length]);
 
   return (
     <div className="chips chips--nav chips--sliding" role="tablist" ref={rowRef}>
+      {/* Таблетка из трёх частей: края-полукруги и середина, которая
+          растягивается scaleX. Так ширина меняется одним transform —
+          без пересчёта раскладки на каждом кадре, и скругления при этом
+          не вытягиваются. --pill-w — число пикселей без единиц: его
+          делит scaleX. */}
       <span
         className="chips__pill"
         ref={pillRef}
         aria-hidden="true"
-        style={box ? { '--pill-x': box.x + 'px', '--pill-w': box.w + 'px' } : { opacity: 0 }}
-      />
+        style={box ? { '--pill-x-base': box.x + 'px', '--pill-w-base': String(box.w) } : { opacity: 0 }}
+      >
+        <span className="chips__pill-cap chips__pill-cap--l" />
+        <span className="chips__pill-mid" />
+        <span className="chips__pill-cap chips__pill-cap--r" />
+      </span>
       {items.map((item) => (
         <button
           key={item.value}

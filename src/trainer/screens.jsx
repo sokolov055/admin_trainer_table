@@ -923,7 +923,8 @@ export function Logs() {
         // вбок. В плашке — короткий статус, подробности — строкой ниже.
         const text = result.replace(/^[✅❌⚠️]+\s*/, '');
         const long = text.length > 24;
-        const label = !text ? 'без статуса'
+        const label = !text
+          ? (kind === 'bad' ? 'Ошибка' : kind === 'warn' ? 'Внимание' : kind === 'good' ? 'Готово' : 'без статуса')
           : !long ? text
           : kind === 'bad' ? 'Ошибка' : kind === 'warn' ? 'Внимание' : kind === 'good' ? 'Готово' : 'Подробнее ниже';
 

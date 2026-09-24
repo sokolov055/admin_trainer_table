@@ -66,7 +66,7 @@ export default function PushSetting({ clientRow }) {
   };
 
   return (
-    <div className="survey__group">
+    <div className="survey__group panel panel--pad">
       <div className="survey__legend">
         Напоминания
         <span className="survey__legend-note">

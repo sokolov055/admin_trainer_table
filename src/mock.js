@@ -611,6 +611,17 @@ const MOCK = {
 
   'trainer.split.save': (params) => ({ row: params.clientRow, name: '', members: params.members || [] }),
 
+  'expense.list': (params) => ({
+    month: params.month || new Date().toISOString().slice(0, 7),
+    expenses: [
+      { id: 1, spent_at: new Date().toISOString().slice(0, 10), category: 'Аренда зала', amount: 45000, note: '' },
+      { id: 2, spent_at: new Date().toISOString().slice(0, 10), category: 'Реклама', amount: 12000, note: 'Таргет, сентябрь' },
+      { id: 3, spent_at: new Date().toISOString().slice(0, 10), category: 'Инвентарь', amount: 5000, note: '' },
+    ],
+    total: 62000,
+    categories: ['Аренда зала', 'Реклама', 'Инвентарь'],
+  }),
+
   // Расписание в демо: занятия клиентов на этой неделе
   'trainer.schedule': () => ({
     events: CLIENTS.filter((c) => c.nextTrainingDate).map((c, i) => ({

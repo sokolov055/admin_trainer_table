@@ -820,20 +820,20 @@ export function Progress({ clientRow, familyRow = null }) {
       </Section>
     )
     : (
-      <Section>
-        <Panel pad>
-          {added && (
-            <Note tone="good" icon={IconRuler}>
-              {added.replaced
-                ? 'Замер за ' + formatDate(added.date) + ' обновлён.'
-                : 'Замер за ' + formatDate(added.date) + ' записан.'}
-            </Note>
-          )}
-          <button className="button button--primary button--block" onClick={() => { setAdded(null); setAdding(true); }}>
-            Записать замер
-          </button>
-        </Panel>
-      </Section>
+      // Кнопка без карточки вокруг: карточка ради одной кнопки — рамка без
+      // содержания, и она слипалась с итогом ниже
+      <div className="progress__add">
+        {added && (
+          <Note tone="good" icon={IconRuler}>
+            {added.replaced
+              ? 'Замер за ' + formatDate(added.date) + ' обновлён.'
+              : 'Замер за ' + formatDate(added.date) + ' записан.'}
+          </Note>
+        )}
+        <button className="button button--primary button--block" onClick={() => { setAdded(null); setAdding(true); }}>
+          Записать замер
+        </button>
+      </div>
     );
 
   if (!hasRows && lifts.length === 0) {

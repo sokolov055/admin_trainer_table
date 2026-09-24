@@ -203,7 +203,7 @@ export default function Profile({ clientRow }) {
         <button className="button button--primary" onClick={save} disabled={busy}>
           {busy ? 'Сохраняю…' : 'Сохранить'}
         </button>
-        <button className="button" onClick={load} disabled={busy}>Обновить</button>
+        <button className="button" onClick={load} disabled={busy}>Отменить правки</button>
       </div>
     </Panel>
   );
