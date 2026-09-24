@@ -12,7 +12,7 @@ import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../u
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
-import { useBackGesture, captureScreen, forgetForward } from '../gestures.jsx';
+import { useBackGesture, useTabGesture, rememberTab, captureScreen, forgetForward } from '../gestures.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
@@ -95,6 +95,17 @@ export default function TrainerApp({ me }) {
   useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient, () => setView(view));
   useBackGesture(() => setOpenClient(null), !!openClient, () => setOpenClient(openClient));
   useBackGesture(() => setPreviewClient(null), !!previewClient, () => setPreviewClient(previewClient));
+
+  // Листать «Клиенты» и «Сводку» пальцем — пока открыт раздел, а не
+  // карточка или экран меню. Функция перехода объявлена ниже ранних
+  // возвратов, поэтому берём её через ref на момент жеста.
+  const goRef = useRef(null);
+  useTabGesture({
+    tabs: TABS,
+    active: view,
+    go: (id) => goRef.current && goRef.current(id),
+    enabled: !inMenu && !openClient && !previewClient,
+  });
   const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });
   const [calendarRevision, setCalendarRevision] = useState(0);
   const calendarRequest = useRef(null);
@@ -150,6 +161,8 @@ export default function TrainerApp({ me }) {
   const pane = view === 'clients' ? clientPane : view === 'dashboard' ? dashPane : '';
 
   const go = (id) => {
+    // Раздел, с которого уходят, запоминаем — его покажет листание
+    if (!inMenu && id !== view) rememberTab(view);
     if (TABS.some((t) => t.id === id)) { setLastTab(id); forgetForward(); }
     // Уход с вкладки в экран меню — снимок для жеста «назад»
     else if (!inMenu) captureScreen();
@@ -157,6 +170,7 @@ export default function TrainerApp({ me }) {
     setMenuOpen(false);
     haptic();
   };
+  goRef.current = go;
 
   const switchPane = (setter) => (value) => {
     setter(value);

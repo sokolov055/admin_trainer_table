@@ -391,12 +391,22 @@ test('смахнуть вправо возвращает из «Моих дан�
     await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
     await phone.locator('#root .app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 5000 });
 
-    // Смена вкладки «вперёд» забывает: смахивание влево ничего не открывает
+    // Смена вкладки «вперёд» забывает — и смахивание влево листает
+    // разделы нижнего меню, а не открывает прежний экран
     await phone.getByRole('button', { name: 'Прогресс', exact: true }).click();
     await phone.getByRole('button', { name: 'Обзор', exact: true }).click();
     await swipe(phone, { x: 330, y: 420 }, { x: 60, y: 430 });
-    await phone.waitForTimeout(600);
-    assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Обзор', 'после смены вкладки вперёд не ведёт');
+    await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
+    assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Тренировки', 'влево — следующий раздел');
+
+    await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
+    await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
+    assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Обзор', 'вправо — предыдущий');
+
+    // Первый раздел — дальше вправо некуда: резина и возврат на место
+    await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
+    await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
+    assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Обзор', 'с первого раздела вправо некуда');
 
     // Короткое движение без скорости «назад» не делает: экран пружиной
     // возвращается на место

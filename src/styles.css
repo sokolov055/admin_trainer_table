@@ -3130,3 +3130,26 @@ code {
 /* После жеста «назад/вперёд» экран встаёт без лесенки появления: снимок
    уже показал его целиком, и повторное проявление читалось как мигание. */
 .gesture-landing .enter { animation: none; }
+
+/* Лента разделов: страницы лежат рядом, а не одна на другой — без тени */
+.swipeback--pager .swipeback__cur { box-shadow: none; }
+
+/* Раздел, где ещё не были: заготовка с названием вместо шапки и серые
+   карточки — сразу видно, куда листаешь, а настоящий встанет после жеста */
+.swipeback__blank {
+  padding: calc(env(safe-area-inset-top) + var(--space-5)) var(--space-4) 0;
+}
+
+.swipeback__blank-title {
+  font-size: var(--text-xl, 26px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: var(--space-2) 0 var(--space-5);
+}
+
+.swipeback__blank-card {
+  height: 96px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}

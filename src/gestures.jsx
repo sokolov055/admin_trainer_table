@@ -114,6 +114,36 @@ export function useBackGesture(handler, enabled = true, reopen = null) {
 }
 
 /**
+ * Разделы нижнего меню, между которыми листают жестом.
+ *
+ * Регистрирует оболочка (клиента или тренера), пока открыт один из
+ * разделов, а не экран поверх них. Снимки разделов копятся по мере
+ * хождения: при листании соседний раздел въезжает уже нарисованным — таким,
+ * каким его оставили. Где ещё не были, въезжает заготовка с названием, а
+ * настоящий раздел встаёт после жеста из кэша данных.
+ */
+let tabHost = null;
+const tabSnapshots = new Map();
+
+export function rememberTab(id) {
+  if (typeof document === 'undefined' || !id) return;
+  const app = document.querySelector('#root .app');
+  if (app) tabSnapshots.set(id, snapshotOf(app));
+}
+
+export function useTabGesture({ tabs, active, go, enabled = true }) {
+  const ref = useRef(null);
+  ref.current = { tabs, active, go };
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const host = { get: () => ref.current };
+    tabHost = host;
+    return () => { if (tabHost === host) tabHost = null; };
+  }, [enabled]);
+}
+
+/**
  * Подписка на «потянули вниз». Функция может вернуть обещание — индикатор
  * крутится, пока все обещания не закончатся.
  */
@@ -289,6 +319,54 @@ function landQuietly() {
   landingTimer = setTimeout(() => document.documentElement.classList.remove('gesture-landing'), LANDING_MS);
 }
 
+/**
+ * Лента разделов: нынешний и соседний лежат рядом и едут вместе, как
+ * страницы, — без теней и притемнения, это не «глубже», а «рядом».
+ */
+function buildPager(target, side) {
+  const app = document.querySelector('#root .app');
+  if (!app) return null;
+
+  const scene = document.createElement('div');
+  scene.className = 'swipeback swipeback--pager';
+  scene.setAttribute('aria-hidden', 'true');
+
+  const now = snapshotOf(app);
+  const cur = document.createElement('div');
+  cur.className = 'swipeback__cur';
+  cur.appendChild(page(now.node, now.scrollY));
+
+  let next = null;
+  if (target) {
+    next = document.createElement('div');
+    next.className = 'swipeback__cur';
+    const snap = tabSnapshots.get(target.id);
+    if (snap) {
+      next.appendChild(page(snap.node, snap.scrollY));
+    } else {
+      // Раздела ещё не видели — заготовка с его названием на месте шапки
+      const blank = document.createElement('div');
+      blank.className = 'swipeback__blank';
+      const title = document.createElement('div');
+      title.className = 'swipeback__blank-title';
+      title.textContent = target.label;
+      blank.appendChild(title);
+      for (let i = 0; i < 3; i += 1) {
+        const bar = document.createElement('div');
+        bar.className = 'swipeback__blank-card';
+        blank.appendChild(bar);
+      }
+      next.appendChild(blank);
+    }
+    scene.appendChild(next);
+  }
+
+  scene.appendChild(cur);
+  document.body.appendChild(scene);
+
+  return { direction: 'tabs', scene, cur, next, side, target, now, snapshot: target ? tabSnapshots.get(target.id) : null };
+}
+
 /* ==========================================================================
  * Слой жестов
  * ========================================================================== */
@@ -360,6 +438,7 @@ export function Gestures() {
     let anim = null;            // текущая пружина
     let pullY = 0;              // видимый ход индикатора
     let slideX = 0;             // ход сцены «назад/вперёд»
+    let pagerX = 0;             // сдвиг ленты разделов, со знаком
     let scene = null;           // сцена «назад», пока жест идёт
     let refreshing = false;
 
@@ -421,6 +500,23 @@ export function Gestures() {
       scene.shade.style.opacity = String(0.14 * (back ? 1 - p : p));
     };
 
+    /** Лента разделов: нынешний сдвинут на offset, соседний — рядом с ним */
+    const drawPager = (offset) => {
+      pagerX = offset;
+      if (!scene) return;
+      const width = window.innerWidth;
+
+      if (reducedMotion()) {
+        const p = Math.min(Math.abs(offset) / width, 1);
+        scene.cur.style.opacity = String(1 - p);
+        if (scene.next) scene.next.style.opacity = String(p);
+        return;
+      }
+
+      scene.cur.style.transform = `translate3d(${offset}px, 0, 0)`;
+      if (scene.next) scene.next.style.transform = `translate3d(${offset + scene.side * width}px, 0, 0)`;
+    };
+
     /**
      * Убрать сцену. После состоявшегося жеста — растворением: под ней уже
      * стоит настоящий экран, и мгновенная смена копии на него, даже
@@ -430,6 +526,7 @@ export function Gestures() {
       const gone = scene;
       scene = null;
       slideX = 0;
+      pagerX = 0;
       if (!gone) return;
       if (!fade) { gone.scene.remove(); return; }
       gone.scene.style.transition = 'opacity 150ms ease-out';
@@ -454,8 +551,10 @@ export function Gestures() {
         atTop: (window.scrollY || document.documentElement.scrollTop) <= 0,
         canBack: backStack.length > 0 && free,
         canForward: !!forward && free,
+        canTabs: !!tabHost && free,
         startPull: pullY,
         startSlide: slideX,
+        startPager: pagerX,
         history: [{ x: t.clientX, y: t.clientY, t: performance.now() }],
         armed: false,
       };
@@ -481,7 +580,7 @@ export function Gestures() {
 
         if (scene) {
           // Перехватили сцену на лету — продолжаем её же
-          g.mode = 'slide';
+          g.mode = scene.direction === 'tabs' ? 'pager' : 'slide';
         } else if (g.atTop && !refreshing && dy > 0 && dy > Math.abs(dx)) {
           g.mode = 'pull';
           // Индикатор стартует с нуля в точке выбора, а не прыгает на
@@ -494,6 +593,14 @@ export function Gestures() {
         } else if (g.canForward && dx < 0 && sideways) {
           scene = buildScene('forward', forward.snapshot);
           g.mode = scene ? 'slide' : null;
+        } else if (g.canTabs && sideways) {
+          // Листание разделов: влево — следующий, вправо — предыдущий
+          const host = tabHost.get();
+          const at = host.tabs.findIndex((tab) => tab.id === host.active);
+          const side = dx < 0 ? 1 : -1;
+          const target = at === -1 ? null : host.tabs[at + side] || null;
+          scene = at === -1 ? null : buildPager(target, side);
+          g.mode = scene ? 'pager' : null;
         }
 
         if (!g.mode) { g = null; return; }
@@ -506,6 +613,17 @@ export function Gestures() {
         const y = rubberband(Math.max(0, raw), PULL_MAX);
         drawPull(y);
         const armed = y >= PULL_TRIGGER;
+        if (armed && !g.armed) haptic('light');
+        g.armed = armed;
+      } else if (g.mode === 'pager') {
+        const width = window.innerWidth;
+        // Только в сторону выбранного соседа; назад через ноль не пускаем
+        let raw = g.startPager + dx;
+        raw = scene.side > 0 ? Math.min(raw, 0) : Math.max(raw, 0);
+        // Соседа нет (крайний раздел) — резина, а не пустота
+        const offset = scene.target ? Math.max(-width, Math.min(width, raw)) : rubberband(raw, width * 0.5);
+        drawPager(offset);
+        const armed = !!scene.target && Math.abs(offset) >= width * BACK_COMMIT;
         if (armed && !g.armed) haptic('light');
         g.armed = armed;
       } else {
@@ -563,6 +681,52 @@ export function Gestures() {
               onDone: () => { anim = null; refreshing = false; drawPull(0); },
             });
           }, wait);
+        });
+        return;
+      }
+
+      if (mode === 'pager') {
+        const width = window.innerWidth;
+        const side = scene ? scene.side : 1;
+        const v = velocity('x') * -side;
+        const go = scene && scene.target
+          && (v > BACK_FLICK || (Math.abs(pagerX) >= width * BACK_COMMIT && v > -200));
+        g = null;
+
+        if (!go) {
+          anim = spring({ from: pagerX, to: 0, velocity: -v * side, onFrame: drawPager, onDone: () => { anim = null; dropScene(); } });
+          return;
+        }
+
+        haptic('light');
+        const host = tabHost ? tabHost.get() : null;
+        const done = scene;
+
+        const finish = () => {
+          anim = null;
+          landQuietly();
+          // Уходящий раздел запоминаем таким, каким его оставили
+          if (host) tabSnapshots.set(host.active, done.now);
+          if (host) host.go(done.target.id);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, done.snapshot ? done.snapshot.scrollY : 0);
+            requestAnimationFrame(() => dropScene(true));
+          });
+        };
+
+        if (reducedMotion()) {
+          drawPager(-side * width);
+          finish();
+          return;
+        }
+
+        anim = spring({
+          from: pagerX,
+          to: -side * width,
+          velocity: -Math.max(v, 800) * side,
+          response: 0.3,
+          onFrame: drawPager,
+          onDone: finish,
         });
         return;
       }
