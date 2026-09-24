@@ -327,10 +327,20 @@ function buildScene(direction, snapshot) {
  * время жеста получают сплошной фон, чтобы сосед не просвечивал сквозь
  * их прозрачные места.
  */
+/**
+ * Плашка «Вы смотрите как клиент» при листании разделов стоит на месте,
+ * как нижнее меню: она общая для всех разделов. Раньше она ехала вместе со
+ * страницей, а у соседа была её копия — копия лежит под подложкой строки
+ * состояния, и верх плашки под часами на время жеста пропадал.
+ * При «назад» (к выбору клиента) плашка уходит вместе с экраном.
+ */
+let keepChrome = false;
+
 function liveParts() {
   const app = document.querySelector('#root .app');
   if (!app) return [];
-  return [...app.children].filter((el) => !el.matches('.tabbar, .drawer'));
+  const still = keepChrome ? '.tabbar, .drawer, .client-preview' : '.tabbar, .drawer';
+  return [...app.children].filter((el) => !el.matches(still));
 }
 
 /**
@@ -368,6 +378,7 @@ function stopLive() {
   moving().forEach((el) => { el.style.transform = ''; el.style.opacity = ''; });
   if (liveRegion) liveRegion.style.background = '';
   liveRegion = null;
+  keepChrome = false;
   document.documentElement.classList.remove('live-moving', 'live-region');
 }
 
@@ -472,7 +483,10 @@ function buildPager(target, side, at, host) {
       wrap.appendChild(copy);
       next.appendChild(wrap);
     } else if (snap) {
-      next.appendChild(page(snap.node, snap.scrollY));
+      const copy = page(snap.node, snap.scrollY);
+      // Настоящая плашка стоит поверх — в копии она только держит место
+      copy.querySelectorAll('.client-preview').forEach((el) => { el.style.visibility = 'hidden'; });
+      next.appendChild(copy);
     } else {
       // Раздела ещё не видели — заготовка с его названием на месте шапки
       const blank = document.createElement('div');
@@ -492,6 +506,7 @@ function buildPager(target, side, at, host) {
   }
 
   document.body.appendChild(scene);
+  keepChrome = !region;
   goLive(region);
 
   return {
