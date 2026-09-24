@@ -280,3 +280,28 @@ test('на сто граммов выходят человеческие чис�
     );
   }
 });
+
+test('своё: сникерс вычитается из нормы, и день собирается под остаток', async () => {
+  const m = await import('../src/nutrition/match.js');
+  const snickers = { name: 'Сникерс', kcal: 507, protein: 9.3, fat: 27.6, carbs: 55.5, piece: 50 };
+  const eaten = m.extraTotals([{ product: snickers, grams: 50 }]);
+  assert.deepEqual(eaten, { kcal: 254, protein: 4.7, fat: 13.8, carbs: 27.8 });
+
+  const target = { kcal: 2000, protein: 120, fat: 70, carbs: 220 };
+  const rest = m.remainingTarget(target, eaten);
+  assert.equal(rest.kcal, 1746);
+  assert.equal(m.remainingTarget(target, { kcal: 2500, protein: 200, fat: 0, carbs: 0 }).kcal, 0, 'ниже нуля не уходит');
+
+  const all = m.planVariants(RECIPES.map((r) => r.id), target);
+  const lighter = m.planVariants(RECIPES.map((r) => r.id), rest);
+  assert.ok(lighter[0].totals.kcal < all[0].totals.kcal, 'блюда подобраны легче');
+  assert.equal(m.addTotals(lighter[0].totals, eaten).kcal, lighter[0].totals.kcal + 254);
+});
+
+test('своё: продукт с упаковки проверяется', async () => {
+  const { cleanProduct } = await import('../src/nutrition/match.js');
+  assert.deepEqual(cleanProduct({ name: 'Сникерс', kcal: '507', protein: '9,3' }).errors, []);
+  assert.ok(cleanProduct({ name: '', kcal: '507' }).errors.length);
+  assert.ok(cleanProduct({ name: 'X', kcal: '' }).errors.length);
+  assert.ok(cleanProduct({ name: 'X', kcal: 'много' }).errors.length);
+});

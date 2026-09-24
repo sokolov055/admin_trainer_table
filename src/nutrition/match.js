@@ -349,3 +349,81 @@ export function foodByGroup() {
 export function defaultPantry() {
   return STAPLES.filter((name) => FOOD[name]);
 }
+
+/* ==================================================================
+ * Своё: продукт, которого нет в наборе блюд
+ * ================================================================== */
+
+/**
+ * Сникерс, кофе с сиропом, бутерброд на работе — то, что человек съел или
+ * собирается съесть помимо подобранного дня. КБЖУ он переписывает с
+ * упаковки: там оно всегда на 100 г, поэтому и храним на 100 г. Вес
+ * штуки — по желанию: «1 батончик» удобнее, чем «50 г».
+ *
+ * Своих справочников с цифрами «по памяти» нет намеренно: неверное КБЖУ
+ * хуже отсутствующего, а упаковка точнее любой таблицы.
+ */
+
+/** КБЖУ съеденного количества граммов продукта (цифры на 100 г) */
+export function extraOf(product, grams) {
+  const k = (Number(grams) || 0) / 100;
+  const at = (key) => Math.round((Number(product[key]) || 0) * k * 10) / 10;
+  return { kcal: Math.round((Number(product.kcal) || 0) * k), protein: at('protein'), fat: at('fat'), carbs: at('carbs') };
+}
+
+/** Всё своё за день одной суммой */
+export function extraTotals(extras) {
+  const sum = { kcal: 0, protein: 0, fat: 0, carbs: 0 };
+  for (const item of extras || []) {
+    const part = extraOf(item.product, item.grams);
+    for (const key of Object.keys(sum)) sum[key] += part[key];
+  }
+  for (const key of Object.keys(sum)) sum[key] = Math.round(sum[key] * 10) / 10;
+  sum.kcal = Math.round(sum.kcal);
+  return sum;
+}
+
+/**
+ * Что остаётся на подобранные блюда, когда своё уже съедено (или
+ * запланировано). День пересобирается под этот остаток: съел сникерс —
+ * обед и ужин станут легче, а не норма перевалит на двести калорий.
+ * Ниже нуля не уходим: перебор своим — отдельная новость, а не
+ * отрицательная норма для перебора блюд.
+ */
+export function remainingTarget(target, eaten) {
+  const left = (key) => Math.max(0, Math.round(((target[key] || 0) - (eaten[key] || 0)) * 10) / 10);
+  return { kcal: Math.max(0, Math.round((target.kcal || 0) - (eaten.kcal || 0))), protein: left('protein'), fat: left('fat'), carbs: left('carbs') };
+}
+
+/** Сложить итоги дня: блюда плюс своё */
+export function addTotals(a, b) {
+  const out = {};
+  for (const key of ['kcal', 'protein', 'fat', 'carbs']) out[key] = Math.round(((a[key] || 0) + (b[key] || 0)) * 10) / 10;
+  out.kcal = Math.round(out.kcal);
+  return out;
+}
+
+/** Проверить продукт с упаковки: название и калории обязательны, остальное — числа или пусто */
+export function cleanProduct(raw) {
+  const num = (v, max) => {
+    const n = Number(String(v ?? '').replace(',', '.').trim());
+    return String(v ?? '').trim() === '' ? 0 : (Number.isFinite(n) && n >= 0 && n <= max ? Math.round(n * 10) / 10 : NaN);
+  };
+  const name = String(raw.name || '').trim().slice(0, 60);
+  const product = {
+    id: raw.id || 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name,
+    kcal: num(raw.kcal, 950),
+    protein: num(raw.protein, 100),
+    fat: num(raw.fat, 100),
+    carbs: num(raw.carbs, 100),
+    piece: num(raw.piece, 2000),
+  };
+  const errors = [];
+  if (!name) errors.push('Назовите продукт');
+  if (!product.kcal) errors.push('Калории на 100 г — с упаковки');
+  for (const [key, label] of [['kcal', 'Калории'], ['protein', 'Белки'], ['fat', 'Жиры'], ['carbs', 'Углеводы'], ['piece', 'Вес штуки']]) {
+    if (Number.isNaN(product[key])) errors.push(label + ': не число или слишком много');
+  }
+  return { product, errors };
+}

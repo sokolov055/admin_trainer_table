@@ -478,3 +478,31 @@
 
 .card__portion { font-weight: 560; color: var(--text-secondary); }
 .card__raw { opacity: 0.75; }
+
+/* Своё сегодня: продукты с упаковки поверх подобранного дня */
+.extras__list { display: grid; }
+.extras__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 12px var(--space-4); border-bottom: 1px solid var(--border); }
+.extras__row:last-child { border-bottom: 0; }
+.extras__name { font-weight: 600; overflow-wrap: anywhere; }
+.extras__meta { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.extras__add { margin-top: var(--space-2); }
+.extras__form { display: grid; gap: var(--space-3); }
+.extras__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.extras__grid .field__label { white-space: nowrap; }
+.extras__grid input, .extras__amount input { text-align: center; font-variant-numeric: tabular-nums; }
+.extras__amount { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: end; }
+.extras__unit { display: flex; gap: 6px; padding-bottom: 4px; }
+.extras__matches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.extras__matches > .small { width: 100%; }
+.extras__saved { display: inline-flex; align-items: center; gap: 2px; }
+/* Сердечко — избранное. Контур в покое, залитое — в избранном */
+.extras__like {
+  border: 0; background: none; color: var(--text-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 36px; min-height: 36px; border-radius: 999px;
+}
+.extras__like--on { color: var(--critical, #e0565b); }
+.extras__like--on svg path { fill: currentColor; }
+.extras__like:active { transform: scale(0.9); }
+.extras__picked-actions { display: flex; align-items: center; gap: 4px; }
+.extras__picked { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }

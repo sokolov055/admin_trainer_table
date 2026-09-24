@@ -5,8 +5,9 @@ import { haptic } from '../telegram.js';
 import { FOOD, MEALS } from './recipes.js';
 import {
   rankRecipes, planVariants, shoppingList, foodByGroup, defaultPantry, splitItems,
-  portionWeight, per100,
+  portionWeight, per100, extraTotals, remainingTarget, addTotals,
 } from './match.js';
+import Extras from './Extras.jsx';
 import './ration.css';
 
 /**
@@ -452,12 +453,15 @@ function Bar({ label, value, goal, unit }) {
   );
 }
 
-function Day({ variants, index, targets, pantry, onOther, onRestart, onPantry }) {
-  const plan = variants[index % variants.length];
+function Day({ variants, index, targets, pantry, eaten, extras, onOther, onRestart, onPantry }) {
+  // Своё может закрыть норму целиком — тогда блюд не остаётся, и это не ошибка
+  const plan = variants.length ? variants[index % variants.length] : { dishes: [], totals: { kcal: 0, protein: 0, fat: 0, carbs: 0 } };
   const list = useMemo(() => shoppingList(plan.dishes, pantry), [plan, pantry]);
   const groups = useMemo(foodByGroup, []);
 
-  const shortfall = plan.diff.kcal;
+  // Итог дня — блюда плюс своё; с нормой сравнивается всё вместе
+  const totals = addTotals(plan.totals, eaten);
+  const shortfall = totals.kcal - Math.round(targets.kcal);
   const badly = targets.kcal > 0 && Math.abs(shortfall) / targets.kcal > OFF_TARGET;
 
   const rows = (items) => {
@@ -476,14 +480,21 @@ function Day({ variants, index, targets, pantry, onOther, onRestart, onPantry })
       <Section>
         <Panel pad>
           <div className="day__lead">
-            <span className="day__kcal">{formatNumber(plan.totals.kcal)}</span>
+            <span className="day__kcal">{formatNumber(totals.kcal)}</span>
             <span className="day__unit">ккал за день</span>
           </div>
-          <Bar label="Белки" value={plan.totals.protein} goal={targets.protein} unit=" г" />
-          <Bar label="Жиры" value={plan.totals.fat} goal={targets.fat} unit=" г" />
-          <Bar label="Углеводы" value={plan.totals.carbs} goal={targets.carbs} unit=" г" />
+          {eaten.kcal > 0 && (
+            <p className="small muted" style={{ margin: '0 0 var(--space-2)' }}>
+              из них своё — {formatNumber(eaten.kcal)} ккал, блюда подобраны под остаток
+            </p>
+          )}
+          <Bar label="Белки" value={totals.protein} goal={targets.protein} unit=" г" />
+          <Bar label="Жиры" value={totals.fat} goal={targets.fat} unit=" г" />
+          <Bar label="Углеводы" value={totals.carbs} goal={targets.carbs} unit=" г" />
         </Panel>
       </Section>
+
+      {extras}
 
       {badly && (
         <Section>
@@ -491,12 +502,22 @@ function Day({ variants, index, targets, pantry, onOther, onRestart, onPantry })
             {shortfall < 0
               ? 'До нормы не хватает ' + Math.abs(shortfall) + ' ккал. Отметьте ещё '
                 + 'блюд — чем больше выбор, тем точнее собирается день.'
-              : 'День выходит на ' + shortfall + ' ккал больше нормы. Посмотрите '
-                + 'другие варианты или отметьте блюда полегче.'}
+              : eaten.kcal > 0 && eaten.kcal >= targets.kcal * 0.6
+                ? 'Своё почти закрывает норму, и день выходит на ' + shortfall + ' ккал больше. '
+                  + 'Это не страшно разово — завтра просто вернитесь к подобранному дню.'
+                : 'День выходит на ' + shortfall + ' ккал больше нормы. Посмотрите '
+                  + 'другие варианты или отметьте блюда полегче.'}
           </Note>
         </Section>
       )}
 
+      {plan.dishes.length === 0 && (
+        <Section>
+          <Note tone="info">Своё уже закрыло норму на сегодня — подбирать блюда не под что.</Note>
+        </Section>
+      )}
+
+      {plan.dishes.length > 0 && (
       <Section title="Что есть сегодня" note={'вариант ' + (index % variants.length + 1) + ' из ' + variants.length}>
         <Panel>
           <div className="day__dishes">
@@ -523,6 +544,7 @@ function Day({ variants, index, targets, pantry, onOther, onRestart, onPantry })
           </div>
         </Panel>
       </Section>
+      )}
 
       <Section>
         <div className="ration__actions">
@@ -607,14 +629,34 @@ export default function Ration({ targets, onClose }) {
   const [variant, setVariant] = useState(0);
   const [step, setStep] = useState(() => ((saved.liked || []).length >= 2 ? 'day' : 'pantry'));
 
-  useEffect(() => { save({ pantry, liked, seen }); }, [pantry, liked, seen]);
+  // Своё — на сегодня: завтра начинается с чистого дня. Недавние продукты
+  // — на устройстве, на случай без сети; основная база общая, на сервере.
+  const today = new Date().toISOString().slice(0, 10);
+  const [extras, setExtras] = useState(() => (saved.extras && saved.extras.date === today ? saved.extras.items : []));
+  const [products, setProducts] = useState(() => saved.products || []);
+
+  useEffect(() => {
+    save({ pantry, liked, seen, extras: { date: today, items: extras }, products });
+  }, [pantry, liked, seen, extras, products]);
+
+  const eaten = useMemo(() => extraTotals(extras), [extras]);
+  const rest = useMemo(() => remainingTarget(targets, eaten), [targets, eaten]);
+
+  const addExtra = ({ product, grams, pieces }) => {
+    setExtras((list) => [...list, { id: 'e' + Date.now().toString(36), product, grams, pieces }]);
+    setProducts((list) => [product, ...list.filter((p) => p.id !== product.id && p.name.toLowerCase() !== product.name.toLowerCase())].slice(0, 40));
+    setVariant(0);
+  };
+  const removeExtra = (id) => { setExtras((list) => list.filter((e) => e.id !== id)); setVariant(0); };
+
 
   const deck = useMemo(
     () => rankRecipes(pantry).filter((entry) => !seen.includes(entry.recipe.id)),
     [pantry, seen]
   );
 
-  const variants = useMemo(() => planVariants(liked, targets), [liked, targets]);
+  // Блюда подбираются под то, что осталось от нормы после своего
+  const variants = useMemo(() => planVariants(liked, rest), [liked, rest]);
 
   const toggle = (name) => setPantry((list) => (
     list.includes(name) ? list.filter((n) => n !== name) : [...list, name]
@@ -642,7 +684,7 @@ export default function Ration({ targets, onClose }) {
 
   // День собрать не из чего — такое бывает, если отмечены только завтраки.
   // Возвращаем человека к колоде вместо пустого экрана с объяснением.
-  const dayReady = step === 'day' && variants.length > 0;
+  const dayReady = step === 'day' && (variants.length > 0 || extras.length > 0);
 
   return (
     <div className="ration">
@@ -698,6 +740,10 @@ export default function Ration({ targets, onClose }) {
           index={variant}
           targets={targets}
           pantry={pantry}
+          eaten={eaten}
+          extras={(
+            <Extras extras={extras} products={products} onAdd={addExtra} onRemove={removeExtra} />
+          )}
           onOther={() => setVariant((n) => n + 1)}
           onRestart={restart}
           onPantry={() => setStep('pantry')}

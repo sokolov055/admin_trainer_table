@@ -611,6 +611,18 @@ const MOCK = {
 
   'trainer.split.save': (params) => ({ row: params.clientRow, name: '', members: params.members || [] }),
 
+  'food.search': (params) => {
+    const all = [
+      { id: 1, name: 'Сникерс', kcal: 507, protein: 9.3, fat: 27.6, carbs: 55.5, piece: 50, uses: 12 },
+      { id: 2, name: 'Капучино 300 мл', kcal: 45, protein: 2.4, fat: 2.1, carbs: 3.9, piece: 300, uses: 7 },
+    ];
+    const q = String(params.q || '').toLowerCase();
+    return { foods: all.filter((f) => !q || f.name.toLowerCase().includes(q)) };
+  },
+  'food.add': (params) => ({ food: { id: 99, name: params.name, kcal: Number(params.kcal) || 0, protein: Number(params.protein) || 0, fat: Number(params.fat) || 0, carbs: Number(params.carbs) || 0, piece: Number(params.piece) || 0, uses: 0 }, existed: false }),
+  'food.use': () => ({ ok: true }),
+  'food.like': (params) => ({ id: params.id, liked: !!params.liked }),
+
   'expense.list': (params) => ({
     month: params.month || new Date().toISOString().slice(0, 7),
     expenses: [
