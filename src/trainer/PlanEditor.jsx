@@ -56,9 +56,24 @@ export default function PlanEditor({
   };
 
   const setExercise = (bi, ei, field, value) => change((next) => {
-    next[bi].exercises[ei][field] = value;
+    const list = next[bi].exercises;
+    list[ei][field] = value;
+    // Суперсет делают кругами: число подходов у всех упражнений группы
+    // одно. Вписал у любого — встало у всех.
+    const group = list[ei].supersetGroup;
+    if (field === 'sets' && group) {
+      list.forEach((e) => { if (e.supersetGroup === group) e.sets = value; });
+    }
     return next;
   });
+
+  /** Подходы группы — одним числом: первое заполненное в ней */
+  const syncSets = (list, group) => {
+    if (!group) return;
+    const members = list.filter((e) => e.supersetGroup === group);
+    const sets = (members.find((e) => String(e.sets || '').trim()) || {}).sets || '';
+    members.forEach((e) => { e.sets = sets; });
+  };
 
   /**
    * Пометка «вместе со следующим» живёт на паре, а не на упражнении:
@@ -70,16 +85,25 @@ export default function PlanEditor({
     const mine = list[ei].supersetGroup;
 
     if (mine && list[ei + 1] && list[ei + 1].supersetGroup === mine) {
-      list[ei].supersetGroup = '';
-      list[ei + 1].supersetGroup = '';
+      // Разрезаем группу по этой границе: у каждой половины из двух и
+      // больше упражнений своя группа, одиночка — без группы
+      const left = [];
+      const right = [];
+      list.forEach((e, k) => { if (e.supersetGroup === mine) (k <= ei ? left : right).push(e); });
+      if (left.length < 2) left.forEach((e) => { e.supersetGroup = ''; });
+      const fresh = 'g' + Date.now() + '-' + ei;
+      right.forEach((e) => { e.supersetGroup = right.length < 2 ? '' : fresh; });
       return next;
     }
 
     if (!list[ei + 1]) return next;
 
-    const group = 'g' + Date.now() + '-' + ei;
+    // Третье к паре — в ту же группу, а не новой парой поверх старой
+    const group = mine || 'g' + Date.now() + '-' + ei;
+    const joined = list[ei + 1].supersetGroup;
     list[ei].supersetGroup = group;
-    list[ei + 1].supersetGroup = group;
+    list.forEach((e, k) => { if (k === ei + 1 || (joined && e.supersetGroup === joined)) e.supersetGroup = group; });
+    syncSets(list, group);
     return next;
   });
 
@@ -138,7 +162,7 @@ export default function PlanEditor({
           >
             {ordering ? 'Готово' : 'Порядок тренировок'}
           </button>
-          {ordering && <span className="small muted">Перетащите тренировку на новое место</span>}
+          {ordering && <span className="small muted">Перетащите на новое место. Долгое нажатие — копировать или удалить</span>}
         </div>
       )}
 
@@ -149,6 +173,22 @@ export default function PlanEditor({
           onMove={(from, to) => change((next) => {
             const [moved] = next.splice(from, 1);
             next.splice(to, 0, moved);
+            return next;
+          })}
+          onCopy={(i) => change((next) => {
+            const copy = {
+              ...next[i],
+              title: next[i].title + ' (копия)',
+              // Суперсеты копии — свои группы, чтобы не склеиться с оригиналом
+              exercises: next[i].exercises.map((e) => ({
+                ...e, supersetGroup: e.supersetGroup ? e.supersetGroup + '-c' + Date.now() : '',
+              })),
+            };
+            next.splice(i + 1, 0, copy);
+            return next;
+          })}
+          onRemove={(i) => change((next) => {
+            if (next.length > 1) next.splice(i, 1);
             return next;
           })}
         />
@@ -188,7 +228,7 @@ export default function PlanEditor({
                 />
 
                 <div className="plan-edit__numbers plan-edit__labels" aria-hidden="true">
-                  <span>Подходы</span><span>Повторы</span><span>Вес</span><span>RPE</span>
+                  <span>{exercise.supersetGroup ? 'Круги' : 'Подходы'}</span><span>Повторы</span><span>Вес</span><span>RPE</span>
                 </div>
                 <div className="plan-edit__numbers">
                   <input className="field__input" placeholder="Подх." inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />

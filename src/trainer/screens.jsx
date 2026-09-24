@@ -20,7 +20,8 @@ import ThemeSetting from '../ThemeSetting.jsx';
 
 export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, [refreshRevision]);
-  const [filter, setFilter] = useState('all');
+  // Сначала — ближайшие: заходят сюда чаще всего за тем, кто сегодня
+  const [filter, setFilter] = useState('next');
   const [query, setQuery] = useState('');
   const [pendingRow, setPendingRow] = useState(0);
 
@@ -54,8 +55,8 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   const upcoming = data.clients.filter((c) => c.nextTrainingDate);
 
   const filters = [
-    { value: 'all', label: `Все · ${data.clients.length}` },
     { value: 'next', label: `Ближайшие · ${upcoming.length}` },
+    { value: 'all', label: `Все · ${data.clients.length}` },
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
     { value: 'debt', label: `Долг · ${s.negativeBalance}` },
     { value: 'nomeasure', label: 'Без замера' },

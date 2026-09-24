@@ -160,7 +160,7 @@ export default function TrainerApp({ me }) {
   const runCalendarRefresh = useCallback(() => {
     if (calendarRequest.current) return calendarRequest.current;
 
-    const request = apiMutate('calendar.refresh', {})
+    const request = apiMutate('calendar.refresh', {}, { quiet: true })
       .then((result) => {
         setCalendarRevision((value) => value + 1);
         return result;

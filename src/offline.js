@@ -62,11 +62,23 @@ export function startOffline(options = {}) {
  */
 const RELOAD_WINDOW_MS = 60000;
 
+// Человек уже что-то делает — касался экрана, листал, печатал. Тогда
+// перезагрузка — это мигание посреди прокрутки, и её не будет даже в
+// первую минуту.
+let touched = false;
+if (typeof window !== 'undefined' && window.addEventListener) {
+  const mark = () => { touched = true; };
+  ['touchstart', 'pointerdown', 'scroll', 'keydown'].forEach((type) => {
+    window.addEventListener(type, mark, { once: true, passive: true, capture: true });
+  });
+}
+
 function listenForUpdate(nav, options) {
   const reload = options.reload || (() => {
     if (typeof location !== 'undefined' && location.reload) location.reload();
   });
   const since = options.openedFor || (() => (typeof performance !== 'undefined' ? performance.now() : 0));
+  const busy = options.interacted || (() => touched);
 
   if (!nav.serviceWorker.addEventListener) return;
 
@@ -75,7 +87,7 @@ function listenForUpdate(nav, options) {
   nav.serviceWorker.addEventListener('message', (event) => {
     if (done) return;
     if (!event || !event.data || event.data.type !== 'shell-updated') return;
-    if (since() > RELOAD_WINDOW_MS) return;
+    if (since() > RELOAD_WINDOW_MS || busy()) return;
 
     done = true;
     reload();

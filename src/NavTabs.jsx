@@ -24,14 +24,48 @@ const NavTabs = forwardRef(function NavTabs({ items, value, onChange }, ref) {
 
   const index = Math.max(0, items.findIndex((item) => item.value === value));
 
-  useLayoutEffect(() => {
-    setBox(measure(index));
+  /**
+   * Ряд шире экрана прокручивается так, чтобы таблетка была видна. Раньше
+   * это делал scrollIntoView браузера — с задержкой: таблетка уезжала за
+   * край, а ряд догонял её через полсекунды. Теперь ряд едет вместе с ней:
+   * при нажатии — той же кривой и за то же время, при листании пальцем —
+   * в каждом кадре.
+   */
+  const scrollAnim = useRef(0);
+  const scrollFor = (box) => {
+    const row = rowRef.current;
+    if (!row || !box) return null;
+    const max = row.scrollWidth - row.clientWidth;
+    if (max <= 0) return null;
+    const pad = 28;
+    let left = row.scrollLeft;
+    if (box.x - pad < left) left = box.x - pad;
+    else if (box.x + box.w + pad > left + row.clientWidth) left = box.x + box.w + pad - row.clientWidth;
+    return Math.max(0, Math.min(max, left));
+  };
 
-    // Выбранная кнопка должна быть видна, даже если ряд прокручен
-    const el = buttons()[index];
-    if (el && el.scrollIntoView) {
-      try { el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }); } catch (_) {}
-    }
+  const glide = (target) => {
+    const row = rowRef.current;
+    cancelAnimationFrame(scrollAnim.current);
+    if (!row || target === null || Math.abs(target - row.scrollLeft) < 1) return;
+    const from = row.scrollLeft;
+    const t0 = performance.now();
+    const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const dur = reduce ? 0 : 340;
+    const step = (now) => {
+      const p = dur ? Math.min(1, (now - t0) / dur) : 1;
+      // Та же мягкая остановка, что у таблетки (--ease-ios)
+      const e = 1 - Math.pow(1 - p, 4);
+      row.scrollLeft = from + (target - from) * e;
+      if (p < 1) scrollAnim.current = requestAnimationFrame(step);
+    };
+    scrollAnim.current = requestAnimationFrame(step);
+  };
+
+  useLayoutEffect(() => {
+    const next = measure(index);
+    setBox(next);
+    glide(scrollFor(next));
   }, [index, items.length]);
 
   useLayoutEffect(() => {
@@ -50,8 +84,14 @@ const NavTabs = forwardRef(function NavTabs({ items, value, onChange }, ref) {
       if (!from) return;
       const t = pos - Math.floor(pos);
       pill.style.transition = 'none';
-      pill.style.transform = `translate3d(${from.x + (to.x - from.x) * t}px, 0, 0)`;
-      pill.style.width = (from.w + (to.w - from.w) * t) + 'px';
+      const x = from.x + (to.x - from.x) * t;
+      const w = from.w + (to.w - from.w) * t;
+      pill.style.transform = `translate3d(${x}px, 0, 0)`;
+      pill.style.width = w + 'px';
+      // Ряд едет за таблеткой, а не таблетка за край
+      cancelAnimationFrame(scrollAnim.current);
+      const left = scrollFor({ x, w });
+      if (left !== null && rowRef.current) rowRef.current.scrollLeft = left;
     },
     release() {
       const pill = pillRef.current;

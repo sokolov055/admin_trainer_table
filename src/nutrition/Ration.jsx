@@ -225,6 +225,9 @@ function Card({ entry, offset, style, handlers, flying }) {
     <article
       className={'card' + (flying ? ' card--fly-' + flying : '')}
       style={{ ...style, zIndex: 10 - offset }}
+      // Карточку смахивают сами — листание разделов и «потянуть вниз»
+      // тут перехватывать нельзя
+      data-no-gestures
       {...handlers}
     >
       <div className="card__top">

@@ -392,7 +392,7 @@ async function getJson(url, payload) {
  *    послать ещё раз, а платёж — нельзя: неизвестно, дошёл ли он.
  *    Решение о повторе принимает человек, видя сообщение об ошибке.
  */
-export async function apiMutate(action, params = {}) {
+export async function apiMutate(action, params = {}, { quiet = false } = {}) {
   const data = await request(action, params);
 
   memory.clear();
@@ -405,7 +405,9 @@ export async function apiMutate(action, params = {}) {
   // Разделы нижнего меню не пересобираются при переходах (keptTabs.js), и
   // спрятанный раздел показал бы цифры до записи. Говорим всем открытым
   // экранам перечитать данные — они сделают это тихо, не пряча старое.
-  notifyMutated();
+  // quiet — фоновая запись (пересчёт календаря при входе): будить все
+  // экраны разом незачем, каждый перечитается при открытии или «потянуть».
+  if (!quiet) notifyMutated();
 
   return data;
 }

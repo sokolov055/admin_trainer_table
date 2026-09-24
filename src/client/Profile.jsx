@@ -42,6 +42,29 @@ export default function Profile({ clientRow }) {
 
   useEffect(load, [clientRow]);
 
+  // Ссылку на бота — заранее. iPhone не открывает ссылку, полученную уже
+  // после нажатия (ожидание ответа сервера разрывает связь с касанием), и
+  // кнопка молчала. Готовая ссылка открывается сразу, как обычная.
+  const [tgUrl, setTgUrl] = useState('');
+  useEffect(() => {
+    let alive = true;
+    apiPublic('profile.telegram.link', params)
+      .then((r) => { if (alive && r && r.url) setTgUrl(r.url); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [clientRow]);
+
+  // Вернулись из бота — перечитываем анкету: имя уже записал бот
+  const [awaitingBot, setAwaitingBot] = useState(false);
+  useEffect(() => {
+    if (!awaitingBot) return undefined;
+    const back = () => {
+      if (document.visibilityState === 'visible') { setAwaitingBot(false); load(); }
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, [awaitingBot]);
+
   const set = (field, value) => {
     setForm((f) => ({ ...f, [field]: value }));
     setFailure(null);
@@ -76,8 +99,11 @@ export default function Profile({ clientRow }) {
     setBusy(true);
     setFailure(null);
     try {
-      const { url } = await apiMutate('profile.telegram.link', params);
-      window.open(url, '_blank', 'noopener');
+      const { url } = await apiPublic('profile.telegram.link', params);
+      // Переход в том же окне: открытие нового после ожидания iPhone
+      // блокирует, а t.me всё равно уводит в приложение Telegram
+      setAwaitingBot(true);
+      window.location.href = url;
       setSaved(false);
     } catch (error) {
       setFailure(error);
@@ -93,19 +119,22 @@ export default function Profile({ clientRow }) {
     <Panel pad>
       <div className="survey">
         <div className="survey__group">
-          <label className="field">
-            <span className="field__label">Дата рождения</span>
-            <input
-              className="field__input"
-              type="date"
-              value={form.birthAt}
-              onChange={(e) => set('birthAt', e.target.value)}
-              disabled={busy}
-            />
-            <span className="field__hint">
-              {state.age ? `Сейчас ${state.age} — возраст считается сам` : 'По ней считается возраст для нормы питания'}
-            </span>
-          </label>
+          <div className="field-row profile__row">
+            <label className="field">
+              <span className="field__label">Дата рождения</span>
+              <input
+                className="field__input profile__date"
+                type="date"
+                value={form.birthAt}
+                onChange={(e) => set('birthAt', e.target.value)}
+                disabled={busy}
+              />
+            </label>
+            <Field label="Рост, см" placeholder="175" inputMode="decimal" value={form.height} onChange={(v) => set('height', v)} disabled={busy} />
+          </div>
+          <span className="field__hint">
+            {state.age ? `Сейчас ${state.age} — возраст считается сам` : 'По дате рождения считается возраст для нормы питания'}
+          </span>
         </div>
 
         <div className="survey__group">
@@ -120,9 +149,7 @@ export default function Profile({ clientRow }) {
         </div>
 
         <div className="survey__group">
-          <div className="field-row">
-            <Field label="Рост, см" placeholder="175" inputMode="decimal" value={form.height} onChange={(v) => set('height', v)} disabled={busy} />
-
+          <div>
             {/* «+7» подставляется при первом касании поля, а не заранее:
                 заранее поставленный плюс означал бы, что профиль без
                 телефона не сохранить — сервер ждёт десять цифр. */}
@@ -151,15 +178,20 @@ export default function Profile({ clientRow }) {
           <Field label="Имя пользователя" placeholder="@anna_fit" inputMode="text" value={form.telegram} onChange={(v) => set('telegram', v)} disabled={busy} />
 
           <div className="survey__actions">
-            <button className="button" onClick={fillFromTelegram} disabled={busy}>Заполнить из Telegram</button>
+            {tgUrl ? (
+              <a className="button" href={tgUrl} onClick={() => setAwaitingBot(true)}>Заполнить из Telegram</a>
+            ) : (
+              <button className="button" onClick={fillFromTelegram} disabled={busy}>Заполнить из Telegram</button>
+            )}
             {form.telegramUrl && (
               <a className="button button--ghost" href={form.telegramUrl} target="_blank" rel="noreferrer">Открыть переписку</a>
             )}
           </div>
 
           <p className="small muted">
-            Нажмите «Заполнить из Telegram», затем в открывшемся чате — «Старт»,
-            и возвращайтесь: имя подставится само.
+            Нажмите «Заполнить из Telegram», в чате с ботом — «Старт». Бот
+            подставит имя сам и пришлёт его отдельным сообщением — если поле
+            осталось пустым, скопируйте его оттуда.
           </p>
         </div>
       </div>

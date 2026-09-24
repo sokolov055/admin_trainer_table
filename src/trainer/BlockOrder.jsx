@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { haptic } from '../telegram.js';
 import { plural } from '../ui.jsx';
-import { IconGrip } from '../icons.jsx';
+import { IconGrip, IconCopy, IconTrash } from '../icons.jsx';
 
 /**
  * Порядок тренировок в программе — перетаскиванием.
@@ -14,8 +14,16 @@ import { IconGrip } from '../icons.jsx';
  * Строки одной высоты (название в одну строку) — по шагу между ними
  * считается, куда встанет тренировка. С клавиатуры — стрелки вверх и
  * вниз на выбранной строке.
+ *
+ * Долгое нажатие без движения — действия с тренировкой: скопировать
+ * (копия встаёт следом) или удалить.
  */
-export default function BlockOrder({ blocks, onMove, disabled }) {
+const HOLD_MS = 450;
+const HOLD_SLOP = 6;
+
+export default function BlockOrder({ blocks, onMove, onCopy, onRemove, disabled }) {
+  const [menu, setMenu] = useState(null);
+  const holdTimer = useRef(null);
   const listRef = useRef(null);
   const drag = useRef(null);
   const settle = useRef(false);
@@ -34,19 +42,38 @@ export default function BlockOrder({ blocks, onMove, disabled }) {
 
   const start = (e, index) => {
     if (disabled || drag.current || (e.button !== undefined && e.button !== 0)) return;
+    // Открыты действия — касание их закрывает, а не начинает перетаскивание
+    if (menu !== null) { setMenu(null); return; }
     const rows = [...listRef.current.children];
     const step = rows.length > 1
       ? rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top
       : e.currentTarget.offsetHeight;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { from: index, to: index, y0: e.clientY, step, rows, id: e.pointerId };
-    setDragging(index);
-    haptic('light');
+    drag.current = { from: index, to: index, y0: e.clientY, step, rows, id: e.pointerId, moved: false };
+    setMenu(null);
+
+    // Держат, не двигая, — это не перетаскивание, а вызов действий
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      const d = drag.current;
+      if (!d || d.moved) return;
+      drag.current = null;
+      setDragging(null);
+      setMenu(index);
+      haptic('medium');
+    }, HOLD_MS);
   };
 
   const move = (e) => {
     const d = drag.current;
     if (!d || e.pointerId !== d.id) return;
+    if (!d.moved) {
+      if (Math.abs(e.clientY - d.y0) < HOLD_SLOP) return;
+      d.moved = true;
+      clearTimeout(holdTimer.current);
+      setDragging(d.from);
+      haptic('light');
+    }
     const last = d.rows.length - 1;
     // Дальше крайних мест строка не уезжает
     const dy = Math.max(-d.from * d.step, Math.min((last - d.from) * d.step, e.clientY - d.y0));
@@ -68,10 +95,12 @@ export default function BlockOrder({ blocks, onMove, disabled }) {
   };
 
   const end = (e) => {
+    clearTimeout(holdTimer.current);
     const d = drag.current;
     if (!d || e.pointerId !== d.id) return;
     drag.current = null;
     setDragging(null);
+    if (!d.moved) return;
 
     if (d.to === d.from) {
       // Никуда не переставили — строка плавно возвращается
@@ -119,6 +148,26 @@ export default function BlockOrder({ blocks, onMove, disabled }) {
               <span className="block-order__meta">{count} {plural(count, 'упражнение', 'упражнения', 'упражнений')}</span>
             </span>
             <IconGrip size={20} className="block-order__grip" />
+            {menu === i && (
+              <div className="block-order__menu" onPointerDown={(e) => e.stopPropagation()}>
+                <button className="button" onClick={() => { setMenu(null); onCopy(i); haptic('success'); }}>
+                  <IconCopy size={16} />
+                  Копировать
+                </button>
+                <button
+                  className="button button--ghost danger"
+                  disabled={blocks.length === 1}
+                  onClick={() => {
+                    setMenu(null);
+                    if (window.confirm(`Удалить «${block.title || 'тренировку'}»?`)) onRemove(i);
+                  }}
+                >
+                  <IconTrash size={16} />
+                  Удалить
+                </button>
+                <button className="button button--ghost" onClick={() => setMenu(null)}>Отмена</button>
+              </div>
+            )}
           </li>
         );
       })}

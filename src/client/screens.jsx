@@ -30,7 +30,36 @@ import { TemplateApply, SaveAsTemplate } from '../trainer/Library.jsx';
  * Молчим, пока занятий больше чем на неделю: предупреждение, висящее
  * всегда, перестаёт быть предупреждением.
  */
-function PackageEnding({ state }) {
+function PackageEnding({ state, payer, trainer }) {
+  // Платит другой человек: свой баланс у клиента нулевой, и «занятия
+  // закончились» было бы неправдой. Говорим, сколько лежит у плательщика и
+  // на сколько тренировок этого хватит — всегда, не только под конец.
+  if (payer) {
+    const left = payer.trainingsLeft;
+    const low = state && state.known && (state.soon || state.out);
+    return (
+      <Section>
+        <Panel pad>
+          <div className="warn">
+            <span className={'warn__icon' + (state && state.out ? ' warn__icon--critical' : '')}>
+              <IconAlert size={18} />
+            </span>
+            <div className="small">
+              <strong>Платит {payer.name}.</strong>{' '}
+              На остатке {formatMoney(payer.balance)}
+              {left !== null && left !== undefined
+                ? left > 0
+                  ? ` — в запасе ${left} ${plural(left, 'тренировка', 'тренировки', 'тренировок')}.`
+                  : ' — оплаченных тренировок не осталось.'
+                : '.'}
+              {low && (trainer ? ' Напомните плательщику об оплате.' : ' Пора пополнить.')}
+            </div>
+          </div>
+        </Panel>
+      </Section>
+    );
+  }
+
   if (!state || !state.known || (!state.soon && !state.out)) return null;
 
   return (
@@ -44,7 +73,9 @@ function PackageEnding({ state }) {
             {state.out ? (
               <>
                 <strong>Оплаченные занятия закончились.</strong>{' '}
-                Следующее пройдёт в долг — напишите тренеру об оплате.
+                {trainer
+                  ? 'Следующее пройдёт в долг — напомните клиенту об оплате.'
+                  : 'Следующее пройдёт в долг — напишите тренеру об оплате.'}
               </>
             ) : (
               <>
@@ -53,7 +84,9 @@ function PackageEnding({ state }) {
                     ? 'Осталось одно оплаченное занятие.'
                     : 'Осталось ' + state.left + ' ' + plural(state.left, 'занятие', 'занятия', 'занятий') + '.'}
                 </strong>{' '}
-                Это примерно на неделю — продлите пакет, чтобы не прерываться.
+                {trainer
+                  ? 'Это примерно на неделю — самое время напомнить о продлении.'
+                  : 'Это примерно на неделю — продлите пакет, чтобы не прерываться.'}
               </>
             )}
           </div>
@@ -119,7 +152,7 @@ export function Overview({ clientRow, clientView = false }) {
           единственная новость, требующая действия СЕГОДНЯ: «осталось 2»
           человек читает как «ещё есть» и узнаёт о конце в тот день, когда
           пришёл заниматься. */}
-      <PackageEnding state={data.packageEnding} />
+      <PackageEnding state={data.packageEnding} payer={data.payer} trainer={!!clientRow && !clientView} />
 
       {sinceTraining !== null && sinceTraining > 14 && (
         <Section>
