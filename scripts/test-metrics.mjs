@@ -456,3 +456,20 @@ test('другой месяц спрашивается у сервера', () =>
 
   assert.notEqual(asked[asked.length - 1].params.month, asked[0].params.month);
 });
+
+/**
+ * Цифровая клавиатура — только у суммы. Общее поле по умолчанию цифровое,
+ * и статья с заметкой открывали на телефоне цифры вместо букв.
+ */
+test('в расходе цифровая клавиатура только у суммы', () => {
+  const { tree } = draw(Expenses, () => ({ month: '2026-09', total: 0, count: 0, items: [], categories: [] }));
+
+  const modes = Object.fromEntries(
+    tree.root.findAll((node) => node.type === 'input', { deep: true })
+      .map((input) => [textOf(input.parent.props.children).trim(), input.props.inputMode]),
+  );
+
+  assert.equal(modes['Сумма, ₽'], 'decimal');
+  assert.equal(modes['Статья'], 'text');
+  assert.equal(modes['Заметка'], 'text');
+});

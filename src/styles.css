@@ -2925,3 +2925,23 @@ code {
 }
 
 .period .chips { justify-content: center; }
+
+/* Форма расхода: поля с воздухом между ними — иначе подпись следующего
+   поля липнет к предыдущему и читается как его подсказка. */
+.expense-form {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+/* Поле даты на iPhone: у родного выбора даты своя минимальная ширина и
+   текст по центру, и поле вылезало за край карточки. */
+.field__input[type='date'] {
+  min-width: 0;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+
+.field__input[type='date']::-webkit-date-and-time-value { text-align: left; }

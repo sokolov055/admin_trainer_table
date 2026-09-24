@@ -117,45 +117,50 @@ function AddExpense({ month, categories, onAdded }) {
   return (
     <Section title="Вписать расход">
       <Panel pad>
-        <Field
-          label="Статья"
-          placeholder="Аренда зала"
-          value={category}
-          onChange={(value) => { setCategory(value); setSaved(false); }}
-          disabled={busy}
-          list="expense-categories"
-        />
+        <div className="expense-form">
+          <Field
+            label="Статья"
+            placeholder="Аренда зала"
+            // Поле по умолчанию цифровое (Field), а статья — слова
+            inputMode="text"
+            value={category}
+            onChange={(value) => { setCategory(value); setSaved(false); }}
+            disabled={busy}
+            list="expense-categories"
+          />
 
-        {/* Подсказки браузера, а не свой список: так они работают и
-            клавиатурой, и на телефоне, и ничего не занимают на экране */}
-        <datalist id="expense-categories">
-          {categories.map((name) => <option key={name} value={name} />)}
-        </datalist>
+          {/* Подсказки браузера, а не свой список: так они работают и
+              клавиатурой, и на телефоне, и ничего не занимают на экране */}
+          <datalist id="expense-categories">
+            {categories.map((name) => <option key={name} value={name} />)}
+          </datalist>
 
-        <Field
-          label="Сумма, ₽"
-          placeholder="12 000"
-          inputMode="decimal"
-          value={amount}
-          onChange={(value) => { setAmount(value); setSaved(false); }}
-          disabled={busy}
-        />
+          <Field
+            label="Сумма, ₽"
+            placeholder="12 000"
+            inputMode="decimal"
+            value={amount}
+            onChange={(value) => { setAmount(value); setSaved(false); }}
+            disabled={busy}
+          />
 
-        <Field
-          label="Когда"
-          type="date"
-          value={spentAt}
-          onChange={setSpentAt}
-          disabled={busy}
-        />
+          <Field
+            label="Когда"
+            type="date"
+            value={spentAt}
+            onChange={setSpentAt}
+            disabled={busy}
+          />
 
-        <Field
-          label="Заметка"
-          placeholder="не обязательно"
-          value={note}
-          onChange={setNote}
-          disabled={busy}
-        />
+          <Field
+            label="Заметка"
+            placeholder="не обязательно"
+            inputMode="text"
+            value={note}
+            onChange={setNote}
+            disabled={busy}
+          />
+        </div>
 
         {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
         {saved && !failure && <Note tone="good" icon={IconCheck}>Записано.</Note>}
