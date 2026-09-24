@@ -306,6 +306,93 @@ test('ссылка тренера из Telegram на iPhone открывает �
   }
 });
 
+/**
+ * Жесты пальцем: смахнуть вправо — назад, потянуть вниз — обновить.
+ *
+ * Палец ведём настоящими событиями касания по кадрам, а не вызовом
+ * функции: проверить надо ровно то, что делает человек, — с выбором
+ * направления после первых пикселей и с решением на отпускании.
+ */
+async function swipe(page, from, to, { steps = 12, frameMs = 16 } = {}) {
+  await page.evaluate(async ({ from, to, steps, frameMs }) => {
+    const target = document.elementFromPoint(from.x, from.y) || document.body;
+    const touch = (x, y) => new Touch({ identifier: 1, target, clientX: x, clientY: y });
+    const fire = (type, x, y) => {
+      const t = touch(x, y);
+      target.dispatchEvent(new TouchEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        touches: type === 'touchend' ? [] : [t],
+        targetTouches: type === 'touchend' ? [] : [t],
+        changedTouches: [t],
+      }));
+    };
+    const wait = () => new Promise((r) => setTimeout(r, frameMs));
+
+    fire('touchstart', from.x, from.y);
+    for (let i = 1; i <= steps; i += 1) {
+      await wait();
+      fire('touchmove', from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+    }
+    await wait();
+    fire('touchend', to.x, to.y);
+  }, { from, to, steps, frameMs });
+}
+
+test('смахнуть вправо возвращает из «Моих данных», вниз — обновляет', async () => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    locale: 'ru-RU',
+    hasTouch: true,
+    isMobile: true,
+  });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+
+  try {
+    await phone.goto(origin + '/?access=' + 'A'.repeat(44));
+    await phone.getByRole('button', { name: 'Войти в кабинет' }).click();
+    await phone.locator('.app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 10000 });
+
+    // Назад: из экрана меню пальцем вправо — на вкладку, откуда пришли
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Мои данные/ }).click();
+    await phone.locator('.app__subtitle', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 });
+    // Меню закрывается с анимацией — пока оно в DOM, жесты выключены
+    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+
+    // Прямо по полям анкеты: над полем, где не печатают, «назад» работает
+    await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
+
+    await assert.doesNotReject(
+      phone.locator('.app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 5000 }),
+      'смахнули вправо — вернулись на обзор',
+    );
+
+    // Короткое движение без скорости «назад» не делает: экран пружиной
+    // возвращается на место
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Настройки/ }).click();
+    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+    await swipe(phone, { x: 60, y: 60 }, { x: 110, y: 62 }, { steps: 20, frameMs: 30 });
+    await phone.waitForTimeout(700);
+    assert.equal(await phone.locator('.app__subtitle').textContent(), 'Настройки', 'короткий жест не уводит');
+
+    // Потянуть вниз: индикатор докручивается до конца обновления и уходит
+    await swipe(phone, { x: 195, y: 160 }, { x: 195, y: 520 }, { steps: 16 });
+    await assert.doesNotReject(
+      phone.locator('.pull--spinning').waitFor({ timeout: 3000 }),
+      'потянули за порог — пошло обновление',
+    );
+    await assert.doesNotReject(
+      phone.waitForFunction(() => !document.querySelector('.pull--spinning'), null, { timeout: 8000 }),
+      'обновилось — индикатор ушёл',
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });

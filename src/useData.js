@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiStale } from './api.js';
+import { onPullRefresh } from './gestures.jsx';
 
 /**
  * Загрузка данных экрана.
@@ -36,7 +37,7 @@ export function useData(action, params, deps = []) {
         ? { ...previous, loading: false, stale: true, error: null }
         : { data: null, loading: true, stale: false, error: null }));
 
-    promise
+    return promise
       .then((fresh) => setState({ data: fresh, loading: false, stale: false, error: null }))
       .catch((error) => {
         setState((prev) => (prev.data
@@ -46,7 +47,11 @@ export function useData(action, params, deps = []) {
       });
   };
 
-  useEffect(load, deps);
+  useEffect(() => { load(); }, deps);
+
+  // «Потянули вниз» перечитывает всё, что сейчас на экране. Обещание
+  // возвращаем, чтобы индикатор крутился ровно до свежего ответа.
+  useEffect(() => onPullRefresh(() => load()), deps);
 
   return { ...state, reload: load };
 }

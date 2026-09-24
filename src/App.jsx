@@ -12,6 +12,7 @@ import { InstallHint, TransferLoginScreen } from './AuthTransfer.jsx';
 import ClientApp from './client/ClientApp.jsx';
 import TrainerApp from './trainer/TrainerApp.jsx';
 import LoginScreen from './LoginScreen.jsx';
+import { Gestures } from './gestures.jsx';
 
 /**
  * Корень приложения: спрашивает сервер «кто я» и по ответу показывает
@@ -196,6 +197,7 @@ export default function App() {
   return (
     <>
       {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
+      <Gestures />
       {/* Подсказка живёт не только сразу после входа. Ставят приложение
           редко с первого раза: человек заходит посмотреть баланс, закрывает
           вкладку и через неделю снова ищет ссылку в переписке. Поэтому она

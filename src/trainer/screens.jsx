@@ -9,6 +9,7 @@ import {
   SignOut, DataTable, Field, Note, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
+import { useBackGesture, usePullRefresh } from '../gestures.jsx';
 import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
@@ -22,6 +23,10 @@ export function Clients({ onOpenClient, refresh, onRefresh, refreshRevision }) {
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [pendingRow, setPendingRow] = useState(0);
+
+  // Потянуть вниз на списке — ещё и перечитать календарь. Индикатор его не
+  // ждёт: пересчёт идёт до минуты, а ход его и так виден строкой над списком.
+  usePullRefresh(() => { onRefresh(); });
 
   // Заведённая карточка открывается сама, но только после того, как
   // список перечитан: карточке нужны цифры из зеркала, а не одно имя из
@@ -723,6 +728,8 @@ export function Logs() {
 export function Sheets() {
   const list = useData('trainer.sheets', {}, []);
   const [selected, setSelected] = useState(null);
+
+  useBackGesture(() => setSelected(null), !!selected);
 
   if (list.loading) return <Loading lead={false} rows={5} />;
   if (list.error) return <ErrorState error={list.error} onRetry={list.reload} />;

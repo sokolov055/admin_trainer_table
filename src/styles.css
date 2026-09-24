@@ -3050,3 +3050,97 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .bars__bar { transition: none; }
 }
+
+/* ==========================================================================
+ * Жесты: потянуть — обновить, смахнуть — назад
+ * ========================================================================== */
+
+/* Индикатор обновления выезжает поверх экрана, а не тянет экран за собой:
+   панель вкладок закреплена у нижнего края, и при сдвиге родителя она
+   уехала бы вместе с ним. Положение и масштаб пишет gestures.jsx каждым
+   кадром — здесь только вид. */
+.pull {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 50%;
+  z-index: 60;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md, 0 6px 18px rgba(0, 0, 0, 0.14));
+  color: var(--text-muted);
+  opacity: 0;
+  transform: translate3d(-50%, -48px, 0);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.pull__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.pull__ring circle {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: calc(100 - var(--pull-progress, 0) * 100);
+}
+
+.pull__icon { display: grid; place-items: center; }
+
+/* Порог пройден: стрелка окрашивается — «отпускай, обновлю» */
+.pull--armed { color: var(--accent); }
+
+/* Идёт обновление: кольцо неполное и вращается, стрелка стоит */
+.pull--spinning .pull__ring { animation: pull-spin 0.8s linear infinite; }
+.pull--spinning .pull__ring circle { stroke-dashoffset: 30; }
+.pull--spinning { color: var(--accent); }
+
+@keyframes pull-spin {
+  from { transform: rotate(-90deg); }
+  to { transform: rotate(270deg); }
+}
+
+/* Стрелка «назад» у левого края растёт вместе с жестом и заливается
+   цветом на пороге — видно, что отпускание уже вернёт назад. */
+.backhint {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  z-index: 60;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md, 0 6px 18px rgba(0, 0, 0, 0.14));
+  color: var(--text-muted);
+  opacity: 0;
+  transform: translate3d(-36px, -50%, 0);
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: background var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.backhint--armed {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pull--spinning .pull__ring { animation-duration: 2.4s; }
+  .backhint { transition: none; }
+}

@@ -3,6 +3,7 @@ import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
+import { useBackGesture } from '../gestures.jsx';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders } from '../icons.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
@@ -52,6 +53,11 @@ const VIEWS = TABS.concat(MENU);
 export default function ClientApp({ me, clientRow, preview }) {
   const [view, setView] = useState('overview');
 
+  // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
+  // смахнуть вправо — вернуться на ту вкладку, где был человек
+  const [lastTab, setLastTab] = useState('overview');
+  useBackGesture(() => setView(lastTab), !TABS.some((t) => t.id === view));
+
   // Боковое меню появилось ради «Моих данных»: вкладок внизу четыре, и
   // пятая — про себя, а не про тренировки — сломала бы их ряд. Заодно
   // сюда переехал выход: это конец разговора, а не раздел.
@@ -60,6 +66,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   const Screen = current.Screen;
 
   const go = (id) => {
+    if (TABS.some((t) => t.id === id)) setLastTab(id);
     setView(id);
     setMenuOpen(false);
     haptic();

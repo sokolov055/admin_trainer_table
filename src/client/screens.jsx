@@ -10,6 +10,7 @@ import {
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import { useBackGesture } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions } from '../plan-model.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
@@ -1122,6 +1123,9 @@ export function Nutrition({ clientRow, clientView = false }) {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(null);
   const [ration, setRation] = useState(false);
+
+  // Рацион — экран поверх питания: смахнуть вправо возвращает к норме
+  useBackGesture(() => setRation(false), ration);
 
   // Тренер переключается между клиентами в одной и той же карточке, и
   // экран при этом не размонтируется. Без сброса «норма записана» осталось

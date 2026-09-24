@@ -37,7 +37,7 @@ const output = await build({ entryPoints: ['src/Workout.jsx'], bundle: true, wri
   format: 'cjs', platform: 'node', external: ['react'], define: { 'import.meta.env.VITE_MOCK': '"1"' },
   plugins: [{ name: 'test-api', setup(b) {
     b.onResolve({ filter: /\/(api|telegram|session)\.js$/ }, args => ({ path: args.path, namespace: 'test' }));
-    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const getInitData=()=>""; export const getToken=()=>"demo";' }));
+    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const getInitData=()=>""; export const getToken=()=>"demo"; export const haptic=()=>{};' }));
     b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
   } }] });
 const module = { exports: {} };

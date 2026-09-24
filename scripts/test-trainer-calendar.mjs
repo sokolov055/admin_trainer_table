@@ -60,7 +60,7 @@ const output = await build({
           contents: `import React from 'react'; const I=()=> <i />;
             export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
-            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I;`,
+            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I;`,
         };
         if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Processes=()=>null;` };
         if (args.path === 'expenses') return { loader: 'jsx', contents: `export const Expenses=()=>null;` };

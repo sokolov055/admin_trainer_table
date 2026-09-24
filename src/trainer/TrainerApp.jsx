@@ -12,6 +12,7 @@ import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../u
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
+import { useBackGesture } from '../gestures.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
@@ -81,6 +82,17 @@ export default function TrainerApp({ me }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openClient, setOpenClient] = useState(null);
   const [previewClient, setPreviewClient] = useState(null);
+
+  // Вкладка, с которой ушли в боковое меню: «назад» из расходов или логов
+  // возвращает туда, откуда пришли, а не на первую вкладку.
+  const [lastTab, setLastTab] = useState('clients');
+  const inMenu = !TABS.some((t) => t.id === view);
+
+  // Смахнуть вправо — назад. Порядок важен только при одновременном
+  // открытии: карточка и просмотр глазами клиента перекрывают меню.
+  useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient);
+  useBackGesture(() => setOpenClient(null), !!openClient);
+  useBackGesture(() => setPreviewClient(null), !!previewClient);
   const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });
   const [calendarRevision, setCalendarRevision] = useState(0);
   const calendarRequest = useRef(null);
@@ -136,6 +148,7 @@ export default function TrainerApp({ me }) {
   const pane = view === 'clients' ? clientPane : view === 'dashboard' ? dashPane : '';
 
   const go = (id) => {
+    if (TABS.some((t) => t.id === id)) setLastTab(id);
     setView(id);
     setMenuOpen(false);
     haptic();

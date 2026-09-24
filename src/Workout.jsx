@@ -4,6 +4,7 @@ import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
 import { blankSet, clock, fromPlan, summary, uid } from './workout-model.js';
 import { IconCheck } from './icons.jsx';
+import { useBackGesture } from './gestures.jsx';
 import './workout.css';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
@@ -273,6 +274,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const updateExercise = (index, fn) => change(s => ({ ...s, exercises: s.exercises.map((e, i) => i === index ? fn(e) : e) }));
   const updateSet = (ei, si, fn) => updateExercise(ei, e => ({ ...e, sets: e.sets.map((s, i) => i === si ? fn(s) : s) }));
   const close = () => { if (state.current?.dirty) save(); onClose(); };
+
+  // Смахнуть вправо — то же, что «Назад»: с сохранением незаписанного
+  useBackGesture(close);
   const exportDraft = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(state.current, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'тренировка.json'; a.click(); URL.revokeObjectURL(url);
