@@ -402,5 +402,23 @@ export async function apiMutate(action, params = {}) {
       .forEach((k) => localStorage.removeItem(k));
   } catch (_) {}
 
+  // Разделы нижнего меню не пересобираются при переходах (keptTabs.js), и
+  // спрятанный раздел показал бы цифры до записи. Говорим всем открытым
+  // экранам перечитать данные — они сделают это тихо, не пряча старое.
+  notifyMutated();
+
   return data;
+}
+
+const mutationListeners = new Set();
+
+export function onMutated(fn) {
+  mutationListeners.add(fn);
+  return () => mutationListeners.delete(fn);
+}
+
+function notifyMutated() {
+  mutationListeners.forEach((fn) => {
+    try { fn(); } catch (_) {}
+  });
 }

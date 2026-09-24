@@ -93,8 +93,14 @@ test('режим тренера передаёт выбранного клиен
   for (const label of ['Тренировки', 'Прогресс', 'Питание']) {
     const button = tree.root.findAllByType('button').find((node) => text(node) === label);
     await act(async () => button.props.onClick());
-    assert.equal(text(tree.root.findByProps({ 'data-screen-row': '17' })), 'row:17');
-    assert.equal(tree.root.findByProps({ 'data-screen-row': '17' }).props['data-client-view'], 'yes');
+    // Посещённые разделы остаются в разметке спрятанными (keptTabs.js) —
+    // проверяем каждый: все получают выбранного клиента
+    const screens = tree.root.findAllByProps({ 'data-screen-row': '17' });
+    assert.ok(screens.length >= 1);
+    screens.forEach((screen) => {
+      assert.equal(text(screen), 'row:17');
+      assert.equal(screen.props['data-client-view'], 'yes');
+    });
   }
 
   await act(async () => tree.root.findAllByType('button').find((node) => text(node) === 'Сменить').props.onClick());

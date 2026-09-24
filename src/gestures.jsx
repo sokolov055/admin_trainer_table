@@ -343,7 +343,10 @@ const DRAWN_WAIT_MS = 1500;
 function whenDrawn(done) {
   const started = performance.now();
   const check = () => {
-    const loading = document.querySelector('#root .app .skeleton');
+    // Заглушки только видимых экранов: спрятанные разделы (keptTabs.js)
+    // могут грузиться в фоне, и ждать их незачем
+    const loading = [...document.querySelectorAll('#root .app .skeleton')]
+      .some((el) => el.offsetParent !== null);
     if (!loading || performance.now() - started > DRAWN_WAIT_MS) done();
     else requestAnimationFrame(check);
   };

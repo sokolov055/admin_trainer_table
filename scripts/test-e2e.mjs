@@ -196,7 +196,8 @@ test('проведённая тренировка уходит из очеред
   await page.getByRole('button', { name: 'К программе' }).click({ timeout: 20000 });
   await page.getByRole('tab', { name: /^Очередь/ }).click({ timeout: 20000 });
 
-  const titles = await page.locator('.section__title').allInnerTexts();
+  // Только видимый раздел: посещённые остаются в разметке спрятанными
+  const titles = await page.locator('#root main:not([hidden]) .section__title').allInnerTexts();
 
   assert.equal(titles.includes('Тренировка 1 — верх'), false, 'проведённой в очереди нет');
   assert.equal(titles[0], 'Тренировка 2 — низ', 'наверху следующая невыполненная');
@@ -398,6 +399,23 @@ test('смахнуть вправо возвращает из «Моих дан�
     await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
     assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Обзор', 'вправо — предыдущий');
 
+    // Раздел, где уже были, не пересобирается: тот же экран и то же
+    // место прокрутки — переход без задержки загрузки
+    await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    const scrolled = await phone.evaluate(() => {
+      window.__kept = document.querySelector('#root main:not([hidden])');
+      window.scrollTo(0, 300);
+      return Math.round(window.scrollY);
+    });
+    assert.ok(scrolled > 0, 'раздел длинный — есть что прокрутить');
+    await phone.getByRole('button', { name: 'Прогресс', exact: true }).click();
+    await phone.evaluate(() => window.scrollTo(0, 0));
+    await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    assert.equal(await phone.evaluate(() => document.querySelector('#root main:not([hidden])') === window.__kept), true, 'тот же экран, не собран заново');
+    assert.equal(await phone.evaluate(() => Math.round(window.scrollY)), scrolled, 'прокрутка на своём месте');
+    await phone.getByRole('button', { name: 'Обзор', exact: true }).click();
+    await phone.evaluate(() => window.scrollTo(0, 0));
+
     // Первый раздел — дальше вправо некуда: резина и возврат на место
     await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
     await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
@@ -467,7 +485,7 @@ test('из просмотра глазами клиента смахивание
     await phone.getByText('Выберите клиента').waitFor({ timeout: 10000 });
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
 
-    await phone.locator('#root .item').first().click();
+    await phone.locator('#root main:not([hidden]) .item').first().click();
     await phone.getByText('Вы смотрите как клиент').waitFor({ timeout: 10000 });
     await phone.waitForTimeout(500);
 

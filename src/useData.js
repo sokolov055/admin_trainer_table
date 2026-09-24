@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiStale } from './api.js';
+import { apiStale, onMutated } from './api.js';
 import { onPullRefresh } from './gestures.jsx';
 
 /**
@@ -52,6 +52,10 @@ export function useData(action, params, deps = []) {
   // «Потянули вниз» перечитывает всё, что сейчас на экране. Обещание
   // возвращаем, чтобы индикатор крутился ровно до свежего ответа.
   useEffect(() => onPullRefresh(() => load()), deps);
+
+  // После записи данных — перечитать тихо: спрятанный раздел иначе
+  // показал бы цифры до записи, пока его не пересоберут
+  useEffect(() => onMutated(() => { load(); }), deps);
 
   return { ...state, reload: load };
 }

@@ -5,6 +5,7 @@ import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
+import { useKeptTabs } from '../keptTabs.js';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders } from '../icons.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
@@ -86,9 +87,13 @@ export default function ClientApp({ me, clientRow, preview }) {
   // сюда переехал выход: это конец разговора, а не раздел.
   const [menuOpen, setMenuOpen] = useState(false);
   const current = VIEWS.find((v) => v.id === view) || VIEWS[0];
-  const Screen = current.Screen;
+  const onTab = TABS.some((t) => t.id === view);
+
+  // Разделы, где уже были, не пересобираются — прячутся (см. keptTabs.js)
+  const tabs = useKeptTabs(view, TABS.map((t) => t.id));
 
   const go = (id) => {
+    tabs.leave();
     // Раздел, с которого уходят, запоминаем — его покажет листание
     if (TABS.some((t) => t.id === view) && id !== view) rememberTab(view);
     if (TABS.some((t) => t.id === id)) setLastTab(id);
@@ -176,18 +181,31 @@ export default function ClientApp({ me, clientRow, preview }) {
       {/* key на контейнере перезапускает появление при смене вкладки:
           экран собирается той же короткой лесенкой, что и при первой
           загрузке, а не подменяется рывком */}
+      {/* Каждый раздел — своя страница, и посещённые не пересобираются:
+          спрятанный раздел ждёт с данными и прокруткой, переход мгновенный.
+          key на странице меню перезапускает появление при её смене. */}
+      {TABS.map((t) => tabs.shown(t.id) && (
+        <main
+          key={t.id}
+          className="app__body"
+          hidden={view !== t.id}
+          data-kept={tabs.kept(t.id) ? '' : undefined}
+        >
+          {/* Новости об обновлениях — только на обзоре. Экран открывают
+              первым, и это единственная вкладка, куда заходят без
+              конкретного вопроса; на остальных человек уже занят делом.
+
+              Здесь, а не внутри Overview: тот же экран открывает тренер из
+              карточки клиента, и сторис оттуда читались бы как что-то,
+              относящееся к этому клиенту. */}
+          {t.id === 'overview' && !preview && <TelegramTransferCard />}
+          {t.id === 'overview' && <Stories />}
+          <t.Screen clientRow={clientRow} clientView={!!preview} />
+        </main>
+      ))}
+
+      {!onTab && (
       <main className="app__body" key={view}>
-        {/* Новости об обновлениях — только на обзоре. Экран открывают
-            первым, и это единственная вкладка, куда заходят без
-            конкретного вопроса; на остальных человек уже занят делом.
-
-            Здесь, а не внутри Overview: тот же экран открывает тренер из
-            карточки клиента, и сторис оттуда читались бы как что-то,
-            относящееся к этому клиенту. */}
-        {view === 'overview' && !preview && <TelegramTransferCard />}
-        {view === 'overview' && <Stories />}
-        {Screen && <Screen clientRow={clientRow} clientView={!!preview} />}
-
         {view === 'profile' && (
           <>
             <p className="small muted">
@@ -214,6 +232,7 @@ export default function ClientApp({ me, clientRow, preview }) {
           </>
         )}
       </main>
+      )}
 
       <TabBar tabs={TABS} active={view} onSelect={go} />
     </div>

@@ -14,6 +14,7 @@ import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
+import { useKeptTabs } from '../keptTabs.js';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
 } from '../icons.jsx';
@@ -101,6 +102,9 @@ export default function TrainerApp({ me }) {
   // Листать «Клиенты» и «Сводку» пальцем — пока открыт раздел, а не
   // карточка или экран меню. Функция перехода объявлена ниже ранних
   // возвратов, поэтому берём её через ref на момент жеста.
+  // Разделы, где уже были, не пересобираются — прячутся (см. keptTabs.js)
+  const tabs = useKeptTabs(view, TABS.map((t) => t.id));
+
   const goRef = useRef(null);
   useTabGesture({
     tabs: TABS,
@@ -163,9 +167,9 @@ export default function TrainerApp({ me }) {
   }
 
   const current = VIEWS.find((v) => v.id === view) || VIEWS[0];
-  const pane = view === 'clients' ? clientPane : view === 'dashboard' ? dashPane : '';
 
   const go = (id) => {
+    tabs.leave();
     // Раздел, с которого уходят, запоминаем — его покажет листание
     if (!inMenu && id !== view) rememberTab(view);
     if (TABS.some((t) => t.id === id)) setLastTab(id);
@@ -216,38 +220,61 @@ export default function TrainerApp({ me }) {
         )}
       </header>
 
-      <main className="app__body" key={view + ':' + pane}>
-        {/* Те же сторис и тем же составом, что видят клиенты: тренер
-            должен знать, о чём приложение сейчас им рассказывает, не
-            заходя в чужую роль и не выспрашивая. Место — список клиентов:
-            первый экран панели, ровно как обзор у клиента. */}
-        {view === 'clients' && clientPane === 'active' && <TelegramTransferCard />}
-        {/* Приглашения по общей ссылке сняты с экрана: клиент теперь заводится
-            из своей карточки — тренер выдаёт ему персональную ссылку, и она
-            сразу открывает нужный кабинет. Общая ссылка требовала от клиента
-            регистрации и почты, то есть делала лишнюю работу ради того же
-            результата. Форма создания осталась в Invites.jsx и на сервере:
-            её место — регистрация ТРЕНЕРОВ, когда до неё дойдут руки.
-            Уже разосланные приглашения продолжают работать: страница, на
-            которую они ведут (InviteRegistration.jsx), никуда не делась. */}
-        {view === 'clients' && clientPane === 'active' && <Stories />}
-        {view === 'clients' && clientPane === 'active' && (
-          <Clients
-            onOpenClient={(client) => { captureScreen(); setOpenClient(client); }}
-            refresh={calendarRefresh}
-            onRefresh={runCalendarRefresh}
-            refreshRevision={calendarRevision}
-          />
-        )}
-        {view === 'clients' && clientPane === 'lost' && <Lost />}
-        {view === 'dashboard' && dashPane === 'finance' && <Finance />}
-        {view === 'dashboard' && dashPane === 'processes' && <Processes />}
+      {/* «Клиенты» и «Сводка» — свои страницы, и посещённая не
+          пересобирается: спрятанная ждёт с данными и прокруткой, переход
+          мгновенный. Внутри раздела подразделы по-прежнему сменяются. */}
+      {tabs.shown('clients') && (
+        <main
+          className="app__body"
+          hidden={view !== 'clients'}
+          data-kept={tabs.kept('clients') ? '' : undefined}
+        >
+          <div key={clientPane}>
+            {/* Те же сторис и тем же составом, что видят клиенты: тренер
+                должен знать, о чём приложение сейчас им рассказывает, не
+                заходя в чужую роль и не выспрашивая. Место — список клиентов:
+                первый экран панели, ровно как обзор у клиента. */}
+            {clientPane === 'active' && <TelegramTransferCard />}
+            {/* Приглашения по общей ссылке сняты с экрана: клиент теперь
+                заводится из своей карточки персональной ссылкой. Страница,
+                на которую ведут уже разосланные приглашения
+                (InviteRegistration.jsx), никуда не делась. */}
+            {clientPane === 'active' && <Stories />}
+            {clientPane === 'active' && (
+              <Clients
+                onOpenClient={(client) => { captureScreen(); setOpenClient(client); }}
+                refresh={calendarRefresh}
+                onRefresh={runCalendarRefresh}
+                refreshRevision={calendarRevision}
+              />
+            )}
+            {clientPane === 'lost' && <Lost />}
+          </div>
+        </main>
+      )}
+
+      {tabs.shown('dashboard') && (
+        <main
+          className="app__body"
+          hidden={view !== 'dashboard'}
+          data-kept={tabs.kept('dashboard') ? '' : undefined}
+        >
+          <div key={dashPane}>
+            {dashPane === 'finance' && <Finance />}
+            {dashPane === 'processes' && <Processes />}
+          </div>
+        </main>
+      )}
+
+      {inMenu && (
+      <main className="app__body" key={view}>
         {view === 'expenses' && <Expenses />}
         {view === 'logs' && <Logs />}
         {view === 'sheets' && <Sheets />}
         {view === 'settings' && <Settings />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
       </main>
+      )}
 
       <TabBar tabs={TABS} active={view} onSelect={go} />
 
