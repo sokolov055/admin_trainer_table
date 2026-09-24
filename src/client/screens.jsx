@@ -1274,6 +1274,7 @@ export function Nutrition({ clientRow, clientView = false }) {
           <NutritionForm
             options={options}
             survey={survey}
+            prefill={data.prefill}
             clientRow={clientRow}
             onSaved={onSaved}
             onCancel={configured ? () => setEditing(false) : null}
@@ -1367,6 +1368,13 @@ function PaceChooser({ plans, pace, clientRow, onChanged }) {
   );
 }
 
+/** Прежний ответ, иначе подсказка, иначе пусто — всё строкой для поля */
+function pick(saved, hint) {
+  if (saved !== null && saved !== undefined && saved !== '') return String(saved);
+  if (hint !== null && hint !== undefined && hint !== '') return String(hint);
+  return '';
+}
+
 /** «169 г» — единица прижата к числу: иначе ряд фактов читается как
  *  список голых чисел, и белки от углеводов отличает только подпись */
 function grams(value) {
@@ -1387,15 +1395,24 @@ function grams(value) {
  * примет. Границ в ответе нет — местная проверка их просто не делает, и
  * последнее слово остаётся за сервером.
  */
-function NutritionForm({ options, survey, clientRow, onSaved, onCancel }) {
+function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel }) {
+  // Прежние ответы важнее подсказок: если анкету уже заполняли, форма
+  // открывается ровно тем, что человек вписал сам. Подсказки — из
+  // профиля и последнего замера — подставляются только в пустые поля,
+  // чтобы не переспрашивать то, что приложение и так знает.
   const [form, setForm] = useState(() => ({
-    age: survey && survey.age ? String(survey.age) : '',
-    weight: survey && survey.weight ? String(survey.weight) : '',
-    height: survey && survey.height ? String(survey.height) : '',
-    sex: (survey && survey.sex) || '',
+    age: pick(survey && survey.age, prefill && prefill.age),
+    weight: pick(survey && survey.weight, prefill && prefill.weight),
+    height: pick(survey && survey.height, prefill && prefill.height),
+    sex: (survey && survey.sex) || (prefill && prefill.sex) || '',
     activity: (survey && survey.activity) || '',
     goal: (survey && survey.goal) || '',
   }));
+
+  // Чего нет ни там, ни там, остаётся пустым: выдумать возраст или вес
+  // нельзя, а подставленное наугад человек не перепроверит.
+  const filled = ['age', 'weight', 'height', 'sex']
+    .filter((field) => !(survey && survey[field]) && form[field] !== '');
 
   const [errors, setErrors] = useState({});
   const [attempted, setAttempted] = useState(false);
@@ -1454,6 +1471,17 @@ function NutritionForm({ options, survey, clientRow, onSaved, onCancel }) {
   return (
     <Panel pad>
       <div className="survey">
+        {/* Откуда взялись числа — человек должен понимать сразу. Молча
+            подставленный вес выглядит как чужой, и первое, что с ним
+            делают, — стирают и вписывают заново. */}
+        {filled.length > 0 && (
+          <p className="small muted survey__prefill">
+            {filled.includes('weight')
+              ? 'Заполнили за вас: из профиля и последнего замера. Проверьте и поправьте, если что-то изменилось.'
+              : 'Заполнили за вас из профиля. Проверьте и поправьте, если что-то изменилось.'}
+          </p>
+        )}
+
         <div className="survey__group">
           <div className="field-row">
             <Field
