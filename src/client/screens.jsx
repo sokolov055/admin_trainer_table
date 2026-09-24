@@ -122,8 +122,8 @@ export function Overview({ clientRow, clientView = false }) {
       {sinceTraining !== null && sinceTraining > 14 && (
         <Section>
           <Panel pad>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ color: 'var(--warning-text)', display: 'flex', flexShrink: 0, marginTop: 1 }}>
+            <div className="warn">
+              <span className="warn__icon">
                 <IconAlert size={18} />
               </span>
               <div className="small">
