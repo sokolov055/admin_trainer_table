@@ -611,6 +611,25 @@ const MOCK = {
 
   'trainer.split.save': (params) => ({ row: params.clientRow, name: '', members: params.members || [] }),
 
+  // Расписание в демо: занятия клиентов на этой неделе
+  'trainer.schedule': () => ({
+    events: CLIENTS.filter((c) => c.nextTrainingDate).map((c, i) => ({
+      id: 'demo-ev-' + i,
+      clientRow: c.row,
+      clientName: c.name,
+      title: c.name,
+      startsAt: c.nextTrainingDate,
+      endsAt: new Date(new Date(c.nextTrainingDate).getTime() + 3600000).toISOString(),
+      done: false,
+    })),
+    calendar: true,
+    serviceEmail: 'demo@example.iam.gserviceaccount.com',
+    feedUrl: 'https://example.invalid/ics/t-demo.ics',
+  }),
+  'trainer.schedule.save': () => ({ id: 'demo-ev-new' }),
+  'trainer.schedule.delete': (params) => ({ deleted: params.id }),
+  'client.schedule.feed': () => ({ url: 'https://example.invalid/ics/c-demo.ics' }),
+
   // Семья в демо: у Анны — брат, за которого она платит
   'family.list': () => ({ members: [{ row: 5, name: 'Дмитрий Соколов', payer: false }] }),
   'trainer.client.family': (params) => ({

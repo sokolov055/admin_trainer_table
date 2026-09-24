@@ -52,6 +52,14 @@ export const IconPlan = (p) => (
   </Icon>
 );
 
+export const IconCalendar = (p) => (
+  <Icon {...p}>
+    <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+    <path d="M3.5 9.5h17M8 2.5v4M16 2.5v4" />
+    <path d="M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2" />
+  </Icon>
+);
+
 export const IconProgress = (p) => (
   <Icon {...p}>
     <path d="M4 19h16" />

@@ -14,6 +14,7 @@ import Profile from './Profile.jsx';
 import PushSetting from '../PushSetting.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import Family from './Family.jsx';
+import { PhoneCalendar } from '../trainer/Schedule.jsx';
 import { apiPublic } from '../api.js';
 
 /**
@@ -262,6 +263,8 @@ export default function ClientApp({ me, clientRow, preview }) {
               <PushSetting clientRow={clientRow} />
             </Section>
 
+            <ScheduleFeed clientRow={clientRow} />
+
             {/* Выход стоит последним: это конец разговора, а не раздел.
                 Когда этот же кабинет открывает тренер из карточки клиента,
                 выхода быть не должно — он вышел бы из своего. */}
@@ -274,4 +277,22 @@ export default function ClientApp({ me, clientRow, preview }) {
       <TabBar tabs={TABS} active={view} onSelect={go} />
     </div>
   );
+}
+
+/**
+ * Свои тренировки в календаре телефона — подпиской по ссылке. Нет ключа
+ * или сервер не ответил — блока просто нет: это удобство, а не раздел.
+ */
+function ScheduleFeed({ clientRow }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    let alive = true;
+    apiPublic('client.schedule.feed', clientRow ? { clientRow } : {})
+      .then((r) => { if (alive && r && r.url) setUrl(r.url); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [clientRow]);
+
+  if (!url) return null;
+  return <PhoneCalendar url={url} text="Ваши тренировки — в календаре телефона: подпишитесь один раз, новые занятия появятся сами." />;
 }

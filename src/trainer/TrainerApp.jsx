@@ -19,9 +19,10 @@ import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
-  IconPlan,
+  IconPlan, IconCalendar,
 } from '../icons.jsx';
 import Library, { LIBRARY_PANES } from './Library.jsx';
+import Schedule from './Schedule.jsx';
 
 /**
  * Панель тренера.
@@ -55,6 +56,8 @@ const visibleMain = () => document.querySelector('#root .app > main:not([hidden]
 
 const TABS = [
   { id: 'clients', label: 'Клиенты', Icon: IconUsers },
+  // Расписание: занятия из Google Календаря, запись туда же (Schedule.jsx)
+  { id: 'schedule', label: 'Расписание', Icon: IconCalendar },
   // Библиотека: шаблоны программ и тренировок, упражнения. Отсюда
   // программы раскладываются клиентам за минуту (Library.jsx).
   { id: 'library', label: 'Шаблоны', Icon: IconPlan },
@@ -281,6 +284,16 @@ export default function TrainerApp({ me }) {
             )}
             {clientPane === 'lost' && <Lost />}
           </div>
+        </main>
+      )}
+
+      {tabs.shown('schedule') && (
+        <main
+          className="app__body"
+          hidden={view !== 'schedule'}
+          data-kept={tabs.kept('schedule') ? '' : undefined}
+        >
+          <Schedule />
         </main>
       )}
 
