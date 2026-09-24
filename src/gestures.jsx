@@ -191,7 +191,7 @@ export function rubberband(distance, dimension, constant = 0.55) {
  * response — как быстро доходит до цели, в секундах. Стартует с текущего
  * значения и текущей скорости: перехват на лету не даёт рывка.
  */
-function spring({ from, to, velocity = 0, damping = 1, response = 0.33, onFrame, onDone }) {
+function spring({ from, to, velocity = 0, damping = 1, response = 0.34, onFrame, onDone }) {
   const stiffness = Math.pow((2 * Math.PI) / response, 2);
   const friction = (4 * Math.PI * damping) / response;
 
@@ -507,10 +507,10 @@ const LOCK = 10;            // px до выбора направления
 const PULL_TRIGGER = 72;    // px видимого хода, после которых отпускание обновляет
 const PULL_REST = 56;       // где индикатор ждёт, пока идёт обновление
 const PULL_MAX = 140;       // дальше резина почти не пускает
-const BACK_COMMIT = 0.2;    // доля ширины, после которой «назад» и листание без скорости
-const BACK_FLICK = 300;     // px/с — взмах, который решает сам по себе
+const BACK_COMMIT = 0.14;    // доля ширины, после которой «назад» и листание без скорости
+const BACK_FLICK = 220;     // px/с — взмах, который решает сам по себе
 const PARALLAX = 0.3;       // насколько предыдущий экран сдвинут влево в начале
-const DRAWER_COMMIT = 0.2;  // доля ширины меню, вытянутая пальцем, чтобы оно осталось открытым
+const DRAWER_COMMIT = 0.14;  // доля ширины меню, вытянутая пальцем, чтобы оно осталось открытым
 const MIN_SPIN_MS = 500;    // короче индикатор не крутится: иначе мелькнёт
 
 /**
@@ -965,7 +965,7 @@ export function Gestures() {
           from: pagerX,
           to: -side * width,
           velocity: -Math.max(v, 0) * side,
-          response: 0.33,
+          response: 0.34,
           onFrame: drawPager,
           onDone: finish,
         });
@@ -1024,7 +1024,7 @@ export function Gestures() {
         from: slideX,
         to: width,
         velocity: Math.max(v, 0),
-        response: 0.33,
+        response: 0.34,
         onFrame: drawSlide,
         onDone: finish,
       });
