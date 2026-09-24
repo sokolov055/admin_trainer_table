@@ -31,28 +31,27 @@ import { TemplateApply, SaveAsTemplate } from '../trainer/Library.jsx';
  * всегда, перестаёт быть предупреждением.
  */
 function PackageEnding({ state, payer, trainer }) {
-  // Платит другой человек: свой баланс у клиента нулевой, и «занятия
-  // закончились» было бы неправдой. Говорим, сколько лежит у плательщика и
-  // на сколько тренировок этого хватит — всегда, не только под конец.
+  // Платит другой человек. Сколько у него лежит и на сколько тренировок
+  // хватит, говорит главный блок наверху; здесь — только когда пора
+  // пополнять. Постоянная жёлтая плашка при полном кошельке читалась как
+  // тревога там, где всё в порядке.
   if (payer) {
+    if (!state || !state.known || (!state.soon && !state.out)) return null;
     const left = payer.trainingsLeft;
-    const low = state && state.known && (state.soon || state.out);
     return (
       <Section>
         <Panel pad>
           <div className="warn">
-            <span className={'warn__icon' + (state && state.out ? ' warn__icon--critical' : '')}>
+            <span className={'warn__icon' + (state.out ? ' warn__icon--critical' : '')}>
               <IconAlert size={18} />
             </span>
             <div className="small">
-              <strong>Платит {payer.name}.</strong>{' '}
-              На остатке {formatMoney(payer.balance)}
-              {left !== null && left !== undefined
-                ? left > 0
-                  ? ` — в запасе ${left} ${plural(left, 'тренировка', 'тренировки', 'тренировок')}.`
-                  : ' — оплаченных тренировок не осталось.'
-                : '.'}
-              {low && (trainer ? ' Напомните плательщику об оплате.' : ' Пора пополнить.')}
+              <strong>
+                {state.out || !left
+                  ? 'Оплаченные тренировки закончились.'
+                  : 'Осталось ' + left + ' ' + plural(left, 'тренировка', 'тренировки', 'тренировок') + '.'}
+              </strong>{' '}
+              {trainer ? 'Напомните об оплате: платит ' + payer.name + '.' : 'Пора пополнить: платит ' + payer.name + '.'}
             </div>
           </div>
         </Panel>
@@ -108,7 +107,16 @@ export function Overview({ clientRow, clientView = false }) {
 
   // Главный вопрос клиента — «сколько у меня оплачено вперёд». Отвечаем
   // тренировками, а не рублями: в тренировках человек и думает.
-  const leadIsTrainings = data.trainingsLeft !== null && data.balance > 0;
+  //
+  // Если платит другой человек, свой баланс у клиента нулевой, и крупное
+  // «0 ₽ · Баланс исчерпан» было неправдой: тренировки оплачены, просто
+  // деньгами плательщика. Тогда и отвечаем его деньгами. Свой долг
+  // клиента важнее — его показываем как раньше.
+  const payer = data.payer && data.balance >= 0 ? data.payer : null;
+  const own = !payer;
+  const leadMoney = payer ? payer.balance : data.balance;
+  const leadLeft = payer ? payer.trainingsLeft : data.trainingsLeft;
+  const leadIsTrainings = leadLeft !== null && leadLeft !== undefined && leadMoney > 0;
 
   return (
     <>
@@ -116,16 +124,18 @@ export function Overview({ clientRow, clientView = false }) {
         label={leadIsTrainings ? 'Оплачено вперёд' : 'Баланс'}
         value={
           leadIsTrainings
-            ? data.trainingsLeft + ' ' + plural(data.trainingsLeft, 'тренировка', 'тренировки', 'тренировок')
-            : formatMoney(data.balance)
+            ? leadLeft + ' ' + plural(leadLeft, 'тренировка', 'тренировки', 'тренировок')
+            : formatMoney(leadMoney)
         }
-        tone={data.balance < 0 ? 'critical' : data.balance > 0 ? 'good' : undefined}
+        tone={leadMoney < 0 ? 'critical' : leadMoney > 0 ? 'good' : undefined}
         hint={
-          leadIsTrainings
-            ? formatMoney(data.balance) + ' на балансе'
-            : data.balance < 0
-              ? 'Нужно пополнить'
-              : 'Баланс исчерпан'
+          own
+            ? leadIsTrainings
+              ? formatMoney(data.balance) + ' на балансе'
+              : data.balance < 0
+                ? 'Нужно пополнить'
+                : 'Баланс исчерпан'
+            : 'Платит ' + payer.name + ' · ' + formatMoney(payer.balance) + ' на балансе'
         }
         facts={[
           // Ближайшее занятие стоит первым фактом намеренно: чаще всего

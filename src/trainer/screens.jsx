@@ -376,9 +376,13 @@ export function ClientCard({ client }) {
   return (
     <Panel pad className="enter">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px', alignItems: 'center' }}>
-        <Badge kind={client.balance < 0 ? 'bad' : client.balance > 0 ? 'good' : undefined}>
-          Баланс {formatMoney(client.balance)}
-        </Badge>
+        {/* За клиента платит другой человек — свой нулевой баланс ничего не
+            говорит, и «Баланс 0 ₽» только пугал. Долг показываем всегда. */}
+        {!(client.payer && client.balance === 0) && (
+          <Badge kind={client.balance < 0 ? 'bad' : client.balance > 0 ? 'good' : undefined}>
+            Баланс {formatMoney(client.balance)}
+          </Badge>
+        )}
         <Badge>{formatMoney(client.price)} за тренировку</Badge>
         {client.payer && <Badge>платит {client.payer}</Badge>}
         <button
