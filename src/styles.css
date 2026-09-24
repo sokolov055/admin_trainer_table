@@ -443,13 +443,25 @@ button { font-family: inherit; }
   gap: var(--space-3);
   width: 100%;
   padding: 10px max(var(--space-4), calc((100% - 828px) / 2));
-  /* Непрозрачный фон обязателен: полоса липкая, и под ней едет содержимое.
-     Один --accent-wash прозрачен — сквозь него просвечивал текст экрана, и
-     имя клиента накладывалось на цифры нормы. Оттенок тот же, но положен
-     поверх сплошного фона страницы. */
-  background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--bg);
+  /* Полупрозрачная, как панели iOS: содержимое под липкой полосой
+     угадывается, но размыто. Без размытия прозрачный фон не годится —
+     сквозь него читался текст экрана, и имя клиента накладывалось на
+     цифры нормы. */
+  background: linear-gradient(var(--accent-wash), var(--accent-wash)),
+    color-mix(in srgb, var(--bg) 62%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
   color: var(--text);
+}
+
+/* Кто просил систему меньше прозрачности — сплошной фон */
+@media (prefers-reduced-transparency: reduce) {
+  .client-preview {
+    background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 .client-preview__identity {
@@ -3304,10 +3316,14 @@ code {
 .swipeback--live { z-index: -1; }
 .swipeback--cover { z-index: 15; }
 
-.live-moving #root .app > :not(.tabbar):not(.drawer) {
+.live-moving #root .app > :not(.tabbar):not(.drawer):not(.client-preview) {
   background: var(--bg);
   will-change: transform;
 }
+
+/* У плашки «Вы смотрите как клиент» свой непрозрачный фон с оттенком —
+   сплошной фон выше стирал оттенок на время жеста */
+.live-moving #root .app > .client-preview { will-change: transform; }
 
 /* Тень по левому краю уходящей страницы при «назад» */
 .swipeback__edge {
