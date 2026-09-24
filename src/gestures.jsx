@@ -47,9 +47,26 @@ const refreshers = new Set();
 let pendingSnapshot = null;
 const SNAPSHOT_FRESH_MS = 1500;
 
+/**
+ * Копия только того, что видно: шапка, открытый раздел, панель вкладок.
+ *
+ * Спрятанные разделы (keptTabs.js) лежат в той же странице — список
+ * клиентов, графики сводки, шаблоны. Копировать их незачем, а стоили они
+ * большую часть времени: копия снималась в начале жеста, и на iPhone
+ * сосед появлялся с задержкой. Меню тоже не нужно — в копии его убирают.
+ */
 function snapshotOf(app) {
+  const node = app.cloneNode(false);
+  [...app.children].forEach((el) => {
+    if (el.hidden || el.matches('.drawer')) return;
+    const copy = el.cloneNode(true);
+    // Во время жеста у частей страницы стоит сдвиг — копии он не нужен
+    copy.style.transform = '';
+    copy.style.opacity = '';
+    node.appendChild(copy);
+  });
   return {
-    node: app.cloneNode(true),
+    node,
     scrollY: window.scrollY || document.documentElement.scrollTop || 0,
     at: Date.now(),
   };
@@ -434,8 +451,6 @@ function buildPager(target, side, at, host) {
   const box = region ? region.getBoundingClientRect() : null;
   if (box) scene.style.top = box.top + 'px';
 
-  // Снимок нынешнего раздела — только в память, на экран он не идёт
-  const now = region ? null : snapshotOf(app);
 
   let next = null;
   if (target) {
@@ -479,7 +494,7 @@ function buildPager(target, side, at, host) {
   goLive(region);
 
   return {
-    direction: 'tabs', scene, next, side, at, target, now, region: !!region, host,
+    direction: 'tabs', scene, next, side, at, target, region: !!region, host,
     snapshot: target && !region ? tabSnapshots.get(target.id) : null,
   };
 }
@@ -922,10 +937,14 @@ export function Gestures() {
 
         const finish = () => {
           anim = null;
+          // Уходящий раздел запоминаем таким, каким его оставили. Снимаем в
+          // конце, а не в начале жеста: копия стоит времени, и в начале она
+          // задерживала появление соседа. Сейчас страница уже за краем, а
+          // сосед на месте — короткая пауза здесь не видна.
+          const app = document.querySelector('#root .app');
+          if (host && app && !done.region) tabSnapshots.set(host.active, snapshotOf(app));
           coverWith(done);
           landQuietly();
-          // Уходящий раздел запоминаем таким, каким его оставили
-          if (host && done.now) tabSnapshots.set(host.active, done.now);
           if (host) host.go(done.target.id);
           requestAnimationFrame(() => {
             // Когда листается только область под баром, страница стоит —
