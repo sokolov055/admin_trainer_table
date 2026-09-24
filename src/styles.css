@@ -2910,3 +2910,16 @@ code {
 }
 
 .small.danger { color: var(--critical-text); }
+
+/* Раздел бокового меню. Появляется той же короткой лесенкой, что и экран:
+   переключение разделов — это смена содержимого, а не подмена рывком. */
+.menu__pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  animation: enter-up var(--dur) var(--ease-out) both;
+}
+
+.menu__pane > h2 { margin: 0; }
+.menu__pane > p { margin: calc(var(--space-3) * -1) 0 0; }

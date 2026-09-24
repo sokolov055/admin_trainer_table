@@ -4,8 +4,10 @@ import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu } from '../icons.jsx';
-import { Drawer, SignOut } from '../ui.jsx';
+import { Chips, Drawer, SignOut } from '../ui.jsx';
 import Profile from './Profile.jsx';
+import PushSetting from '../PushSetting.jsx';
+import ThemeSetting from '../ThemeSetting.jsx';
 
 /**
  * Панель клиента.
@@ -27,6 +29,18 @@ const TABS = [
   { id: 'nutrition', label: 'Питание', Icon: IconNutrition, Screen: Nutrition },
 ];
 
+/**
+ * Разделы бокового меню.
+ *
+ * Анкета и настройки лежали одной простынёй, и выходило, что человек,
+ * зашедший включить уведомления, сначала пролистывал свой рост и телефон.
+ * Это разные разговоры: «кто я» и «как приложение себя ведёт».
+ */
+const MENU_PANES = [
+  { value: 'profile', label: 'Профиль' },
+  { value: 'settings', label: 'Настройки' },
+];
+
 export default function ClientApp({ me, clientRow, preview }) {
   const [tab, setTab] = useState('overview');
 
@@ -34,6 +48,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   // пятая — про себя, а не про тренировки — сломала бы их ряд. Заодно
   // сюда переехал выход: это конец разговора, а не раздел.
   const [menu, setMenu] = useState(false);
+  const [pane, setPane] = useState('profile');
   const current = TABS.find((t) => t.id === tab) || TABS[0];
   const Screen = current.Screen;
 
@@ -72,18 +87,33 @@ export default function ClientApp({ me, clientRow, preview }) {
       </header>
 
       <Drawer open={menu} onClose={() => setMenu(false)} label="Меню">
-        <h2>Мои данные</h2>
-        <p className="small muted">
-          Тренеру это нужно, чтобы связаться с вами и точнее считать норму питания.
-          Заполнять всё сразу не обязательно.
-        </p>
+        <Chips items={MENU_PANES} value={pane} onChange={(next) => { setPane(next); haptic(); }} />
 
-        <Profile clientRow={clientRow} />
+        {pane === 'profile' && (
+          <div className="menu__pane" key="profile">
+            <h2>Мои данные</h2>
+            <p className="small muted">
+              Тренеру это нужно, чтобы связаться с вами и точнее считать норму питания.
+              Заполнять всё сразу не обязательно.
+            </p>
 
-        {/* Выход у клиента живёт здесь: экрана настроек у него нет.
-            Когда этот же кабинет открывает тренер из карточки клиента,
-            выхода быть не должно — он вышел бы из своего. */}
-        {!clientRow && <SignOut />}
+            <Profile clientRow={clientRow} />
+          </div>
+        )}
+
+        {pane === 'settings' && (
+          <div className="menu__pane" key="settings">
+            <h2>Настройки</h2>
+
+            <PushSetting clientRow={clientRow} />
+            <ThemeSetting />
+
+            {/* Выход стоит последним: это конец разговора, а не раздел.
+                Когда этот же кабинет открывает тренер из карточки клиента,
+                выхода быть не должно — он вышел бы из своего. */}
+            {!clientRow && <SignOut />}
+          </div>
+        )}
       </Drawer>
 
       {/* key на контейнере перезапускает появление при смене вкладки:

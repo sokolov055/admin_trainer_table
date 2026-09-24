@@ -29,9 +29,33 @@ export function installedAsApp() {
     || window.navigator.standalone === true;
 }
 
-export function pushState() {
-  if (!pushSupported()) return 'unsupported';
-  return Notification.permission;
+/**
+ * Включены ли уведомления на этом устройстве.
+ *
+ * Вопрос не к разрешению браузера, а к подписке. Разрешение, однажды
+ * выданное, обратно уже не забирается: после «выключить» оно так и
+ * остаётся `granted`. Кнопка, читавшая его, показывала «выключить» и
+ * после выключения — выглядело это как «ничего не произошло», а включить
+ * обратно становилось нечем.
+ *
+ * Спрашиваем `getRegistration`, а не `ready`: `ready` ждёт воркера
+ * вечно, а его может не быть вовсе — в разработке он не регистрируется, и
+ * настройка молча зависала бы на «проверяю».
+ */
+export async function pushStatus() {
+  if (!pushSupported()) return { supported: false, permission: 'unsupported', subscribed: false };
+
+  const permission = Notification.permission;
+  if (permission !== 'granted') return { supported: true, permission, subscribed: false };
+
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const subscription = registration && await registration.pushManager.getSubscription();
+
+    return { supported: true, permission, subscribed: !!subscription };
+  } catch (_) {
+    return { supported: true, permission, subscribed: false };
+  }
 }
 
 function toBytes(base64) {
@@ -71,6 +95,10 @@ export async function enablePush(clientRow) {
 
   const registration = await navigator.serviceWorker.ready;
 
+  // Здесь `ready` уместен: включение возможно только там, где воркер
+  // зарегистрирован, и подождать его установки — то, чего человек и ждёт,
+  // нажав кнопку.
+
   // Переиспользуем существующую подписку: повторный subscribe с теми же
   // ключами вернёт её же, а с другими — упадёт.
   const subscription = await registration.pushManager.getSubscription()
@@ -91,15 +119,17 @@ export async function enablePush(clientRow) {
 export async function disablePush() {
   if (!pushSupported()) return { ok: true };
 
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  const registration = await navigator.serviceWorker.getRegistration();
+  const subscription = registration && await registration.pushManager.getSubscription();
   if (!subscription) return { ok: true };
 
   try {
     await apiMutate('push.unsubscribe', { endpoint: subscription.endpoint });
   } catch (_) {
     // Сервер недоступен — отписываемся хотя бы на устройстве: человек
-    // нажал «выключить», и уведомления должны прекратиться.
+    // нажал «выключить», и уведомления должны прекратиться. Запись на
+    // сервере станет мёртвой, но он сам её уберёт при первой же отправке:
+    // служба доставки ответит на неё 410.
   }
 
   await subscription.unsubscribe();

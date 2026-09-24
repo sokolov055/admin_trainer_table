@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { apiPublic, apiMutate } from '../api.js';
-import PushSetting from '../PushSetting.jsx';
 import { Field, Segmented, Note, Loading, ErrorState, Panel } from '../ui.jsx';
 import { IconAlert, IconCheck } from '../icons.jsx';
 
@@ -164,8 +163,6 @@ export default function Profile({ clientRow }) {
           </p>
         </div>
       </div>
-
-      <PushSetting clientRow={clientRow} />
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
       {saved && !failure && <Note tone="good" icon={IconCheck}>Сохранено.</Note>}

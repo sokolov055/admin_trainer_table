@@ -5,12 +5,13 @@ import { resetClientAccess } from '../client-access.js';
 import { createClient } from '../access.js';
 import { ClientInviteLink } from './InviteLink.jsx';
 import {
-  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Segmented, Search,
+  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
   SignOut, DataTable, Field, Note, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { getThemeMode, haptic, setThemeMode } from '../telegram.js';
+import { haptic } from '../telegram.js';
 import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
+import ThemeSetting from '../ThemeSetting.jsx';
 
 /* ==================================================================
  * Клиенты
@@ -728,18 +729,6 @@ function SheetView({ name, onBack }) {
  * Настройки
  * ================================================================== */
 
-const THEME_ITEMS = [
-  { value: 'auto', label: 'Авто' },
-  { value: 'light', label: 'Светлая' },
-  { value: 'dark', label: 'Тёмная' },
-];
-
-const THEME_HINTS = {
-  auto: 'Как в Telegram: приложение переключается вместе с мессенджером, а вне его — вместе с системой.',
-  light: 'Всегда светлая, даже если Telegram в тёмной теме.',
-  dark: 'Всегда тёмная, даже если Telegram в светлой теме.',
-};
-
 /**
  * Настройки приложения.
  *
@@ -749,25 +738,10 @@ const THEME_HINTS = {
  * трогают один раз, стояла там, где каждый день ищут переход.
  */
 export function Settings() {
-  // Читаем один раз при первом рендере: значение уже применено к странице
-  // в telegram.js, и спрашивать хранилище на каждый рендер незачем.
-  const [mode, setMode] = useState(getThemeMode);
-
   return (
     <>
       <Section title="Внешний вид">
-        <Panel pad>
-          <div className="setting">
-            <div className="setting__label">Тема</div>
-            <Segmented
-              items={THEME_ITEMS}
-              value={mode}
-              label="Тема оформления"
-              onChange={(next) => setMode(setThemeMode(next))}
-            />
-            <div className="setting__note">{THEME_HINTS[mode]}</div>
-          </div>
-        </Panel>
+        <ThemeSetting />
       </Section>
 
       {/* Уведомления тренеру нужны не меньше, чем клиенту: отдых во время
