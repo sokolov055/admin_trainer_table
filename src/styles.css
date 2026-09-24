@@ -1307,11 +1307,17 @@ button { font-family: inherit; }
   color: var(--text-muted);
 }
 
+/* clip, а не только hidden: карточку с hidden Safari на iPhone умеет
+   прокрутить вбок сам — чтобы показать курсор в поле, если что-то внутри
+   оказалось шире карточки. Всё содержимое уезжало влево и так и
+   оставалось. Карточку с clip прокрутить нельзя ничем. hidden — для
+   браузеров, которые clip не знают. */
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  overflow: clip;
 }
 
 .panel--pad { padding: var(--space-4); }
@@ -3543,7 +3549,10 @@ html.live-region body { background: transparent; }
 
 .library__back { margin-bottom: var(--space-3); }
 .library__title { margin: 0 0 var(--space-2); font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.01em; }
-.library__form { display: grid; gap: var(--space-4); }
+/* Колонка — не шире карточки. Без этого сетка брала ширину самого
+   длинного ряда — групп мышц, которые не переносятся, — поле названия
+   становилось шире экрана, и длинное название уводило форму вбок. */
+.library__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 .library__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 .library__textarea { min-height: 96px; resize: vertical; font: inherit; line-height: 1.45; }
 
