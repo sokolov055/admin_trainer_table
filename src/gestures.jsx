@@ -171,7 +171,7 @@ export function rubberband(distance, dimension, constant = 0.55) {
  * response — как быстро доходит до цели, в секундах. Стартует с текущего
  * значения и текущей скорости: перехват на лету не даёт рывка.
  */
-function spring({ from, to, velocity = 0, damping = 1, response = 0.4, onFrame, onDone }) {
+function spring({ from, to, velocity = 0, damping = 1, response = 0.34, onFrame, onDone }) {
   const stiffness = Math.pow((2 * Math.PI) / response, 2);
   const friction = (4 * Math.PI * damping) / response;
 
@@ -262,37 +262,70 @@ function buildScene(direction, snapshot) {
   if (!app) return null;
 
   const scene = document.createElement('div');
-  scene.className = 'swipeback';
+  scene.className = 'swipeback swipeback--live';
   scene.setAttribute('aria-hidden', 'true');
 
-  const now = snapshotOf(app);
-  const underSnap = direction === 'back' ? snapshot : now;
-  const overSnap = direction === 'back' ? now : snapshot;
-
+  // Под настоящей страницей — снимок прежнего экрана
   const under = document.createElement('div');
   under.className = 'swipeback__prev';
-  if (underSnap) under.appendChild(page(underSnap.node, underSnap.scrollY));
+  if (snapshot) under.appendChild(page(snapshot.node, snapshot.scrollY));
 
-  const over = document.createElement('div');
-  over.className = 'swipeback__cur';
-  if (overSnap) over.appendChild(page(overSnap.node, overSnap.scrollY));
-
-  // Настоящая панель вкладок стоит поверх сцены. Если у экрана, который
-  // уходит или приходит, своей панели нет, а у другого есть, — копия
-  // панели едет вместе со своей страницей, иначе она мигнула бы в конце.
+  // Настоящая панель вкладок стоит поверх всего. Если у уходящего экрана
+  // своей панели нет, а у прежнего была, — копия панели едет вместе с
+  // прежней страницей, иначе она мигнула бы в конце.
   if (!app.querySelector('.tabbar:not(.tabbar--hidden)') && snapshot) {
     const bar = snapshot.node.querySelector('.tabbar:not(.tabbar--hidden)');
-    if (bar) (direction === 'back' ? under : over).appendChild(bar.cloneNode(true));
+    if (bar) under.appendChild(bar.cloneNode(true));
   }
 
   const shade = document.createElement('div');
   shade.className = 'swipeback__shade';
   under.appendChild(shade);
 
-  scene.append(under, over);
-  document.body.appendChild(scene);
+  // Тень по левому краю уходящей страницы — она лежит на прежней
+  const edge = document.createElement('div');
+  edge.className = 'swipeback__edge';
 
-  return { direction, scene, under, over, shade, now };
+  scene.append(under, edge);
+  document.body.appendChild(scene);
+  goLive();
+
+  return { direction, scene, under, shade, edge };
+}
+
+/**
+ * Едет настоящая страница, а не её копия.
+ *
+ * Копию нынешнего экрана Safari на iPhone рисует не сразу, а кусками, и
+ * первые кадры жеста сквозь недорисованную копию проступала настоящая
+ * страница — верх экрана «не съезжал сразу». Настоящая страница уже
+ * нарисована, ей задержке неоткуда взяться. Копия нужна только соседнему
+ * экрану, который выезжает из-за края, — там запоздалая дорисовка не видна.
+ *
+ * Сцена с соседом лежит ПОД страницей (z-index -1), а части страницы на
+ * время жеста получают сплошной фон, чтобы сосед не просвечивал сквозь
+ * их прозрачные места.
+ */
+function liveParts() {
+  const app = document.querySelector('#root .app');
+  if (!app) return [];
+  return [...app.children].filter((el) => !el.matches('.tabbar, .drawer'));
+}
+
+function goLive() {
+  document.documentElement.classList.add('live-moving');
+}
+
+function moveLive(x, fade = null) {
+  liveParts().forEach((el) => {
+    el.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
+    el.style.opacity = fade === null ? '' : String(fade);
+  });
+}
+
+function stopLive() {
+  liveParts().forEach((el) => { el.style.transform = ''; el.style.opacity = ''; });
+  document.documentElement.classList.remove('live-moving');
 }
 
 /**
@@ -327,6 +360,15 @@ function whenDrawn(done) {
 const LANDING_MS = 600;
 let landingTimer = 0;
 
+/**
+ * Два кадра отрисовки: первый — браузер раскладывает и рисует настоящий
+ * экран под сценой, второй — он уже на экране. Сцену снимаем после, иначе
+ * под ней может оказаться ещё не дорисованная страница.
+ */
+function afterPaint(done) {
+  requestAnimationFrame(() => requestAnimationFrame(done));
+}
+
 /** Блоки, которые уже на экране, больше не проявляются — ни сейчас, ни потом */
 function settleEntered() {
   document.querySelectorAll('#root .enter').forEach((el) => { el.style.animation = 'none'; });
@@ -355,13 +397,11 @@ function buildPager(target, side, at) {
   if (!app) return null;
 
   const scene = document.createElement('div');
-  scene.className = 'swipeback swipeback--pager';
+  scene.className = 'swipeback swipeback--pager swipeback--live';
   scene.setAttribute('aria-hidden', 'true');
 
+  // Снимок нынешнего раздела — только в память, на экран он не идёт
   const now = snapshotOf(app);
-  const cur = document.createElement('div');
-  cur.className = 'swipeback__cur';
-  cur.appendChild(page(now.node, now.scrollY));
 
   let next = null;
   if (target) {
@@ -388,10 +428,10 @@ function buildPager(target, side, at) {
     scene.appendChild(next);
   }
 
-  scene.appendChild(cur);
   document.body.appendChild(scene);
+  goLive();
 
-  return { direction: 'tabs', scene, cur, next, side, at, target, now, snapshot: target ? tabSnapshots.get(target.id) : null };
+  return { direction: 'tabs', scene, next, side, at, target, now, snapshot: target ? tabSnapshots.get(target.id) : null };
 }
 
 /* ==========================================================================
@@ -554,17 +594,18 @@ export function Gestures() {
       if (!scene) return;
       const width = window.innerWidth;
       const p = Math.min(Math.max(x / width, 0), 1);
-      const back = scene.direction === 'back';
 
       if (reducedMotion()) {
-        // Без езды: страницы сменяются растворением
-        scene.over.style.opacity = String(back ? 1 - p : p);
+        // Без езды: страница растворяется, под ней проступает прежняя
+        moveLive(0, 1 - p);
         return;
       }
 
-      scene.over.style.transform = `translate3d(${back ? x : width - x}px, 0, 0)`;
-      scene.under.style.transform = `translate3d(${-width * PARALLAX * (back ? 1 - p : p)}px, 0, 0)`;
-      scene.shade.style.opacity = String(0.14 * (back ? 1 - p : p));
+      moveLive(x);
+      scene.under.style.transform = `translate3d(${-width * PARALLAX * (1 - p)}px, 0, 0)`;
+      scene.shade.style.opacity = String(0.14 * (1 - p));
+      scene.edge.style.transform = `translate3d(${x - 24}px, 0, 0)`;
+      scene.edge.style.opacity = String(1 - p);
     };
 
     /** Лента разделов: нынешний сдвинут на offset, соседний — рядом с ним */
@@ -575,12 +616,11 @@ export function Gestures() {
 
       if (reducedMotion()) {
         const p = Math.min(Math.abs(offset) / width, 1);
-        scene.cur.style.opacity = String(1 - p);
-        if (scene.next) scene.next.style.opacity = String(p);
+        moveLive(0, 1 - p);
         return;
       }
 
-      scene.cur.style.transform = `translate3d(${offset}px, 0, 0)`;
+      moveLive(offset);
       if (scene.next) scene.next.style.transform = `translate3d(${offset + scene.side * width}px, 0, 0)`;
 
       // Таблетка нижнего меню едет вслед за пальцем — видно, в какой
@@ -603,21 +643,28 @@ export function Gestures() {
     };
 
     /**
-     * Убрать сцену. После состоявшегося жеста — растворением: под ней уже
-     * стоит настоящий экран, и мгновенная смена копии на него, даже
-     * одинаковых, иногда читалась как мигание.
+     * Убрать сцену — мгновенно. Раньше после жеста она растворялась, но на
+     * iPhone растворение большого слоя заставляет Safari перерисовать его,
+     * и на кадр куски страницы становились белыми — «моргание». Растворять
+     * и незачем: к этому моменту снимок и настоящий экран уже совпадают.
      */
-    const dropScene = (fade = false) => {
+    const dropScene = () => {
       const gone = scene;
       scene = null;
       slideX = 0;
       pagerX = 0;
+      stopLive();
       if (gone && gone.direction === 'tabs') releasePill();
-      if (!gone) return;
-      if (!fade) { gone.scene.remove(); return; }
-      gone.scene.style.transition = 'opacity 150ms ease-out';
-      gone.scene.style.opacity = '0';
-      setTimeout(() => gone.scene.remove(), 170);
+      if (gone) gone.scene.remove();
+    };
+
+    /**
+     * Жест состоялся: сцена со снимком того, куда пришли, встаёт поверх
+     * страницы. Под ней настоящая страница меняется, возвращается на место
+     * и дорисовывается, и только потом сцена уходит.
+     */
+    const coverWith = (done) => {
+      if (done) done.scene.classList.add('swipeback--cover');
     };
 
     /* ---------------- касания ---------------- */
@@ -818,13 +865,15 @@ export function Gestures() {
 
         const finish = () => {
           anim = null;
+          coverWith(done);
           landQuietly();
           // Уходящий раздел запоминаем таким, каким его оставили
           if (host) tabSnapshots.set(host.active, done.now);
           if (host) host.go(done.target.id);
           requestAnimationFrame(() => {
             window.scrollTo(0, done.snapshot ? done.snapshot.scrollY : 0);
-            requestAnimationFrame(() => whenDrawn(() => { settleEntered(); dropScene(true); }));
+            stopLive();
+            requestAnimationFrame(() => whenDrawn(() => { settleEntered(); afterPaint(() => dropScene()); }));
           });
         };
 
@@ -838,7 +887,7 @@ export function Gestures() {
           from: pagerX,
           to: -side * width,
           velocity: -Math.max(v, 0) * side,
-          response: 0.42,
+          response: 0.34,
           onFrame: drawPager,
           onDone: finish,
         });
@@ -871,16 +920,19 @@ export function Gestures() {
 
       // Экран доезжает тем же путём, каким его тянули, со скоростью пальца;
       // только потом меняется настоящий экран
+      const done = scene;
       const finish = () => {
         anim = null;
+        coverWith(done);
         landQuietly();
         change();
         // Новый экран рисуется в следующем кадре. Возвращаем прокрутку туда,
-        // где человек был, и только потом растворяем сцену — иначе мелькнёт
-        // верх списка вместо того места, откуда уходили.
+        // где человек был, ставим страницу на место — всё под сценой — и
+        // только потом убираем сцену.
         requestAnimationFrame(() => {
           if (restoreTo !== null) window.scrollTo(0, restoreTo);
-          requestAnimationFrame(() => whenDrawn(() => { settleEntered(); dropScene(true); }));
+          stopLive();
+          requestAnimationFrame(() => whenDrawn(() => { settleEntered(); afterPaint(() => dropScene()); }));
         });
       };
 
@@ -894,7 +946,7 @@ export function Gestures() {
         from: slideX,
         to: width,
         velocity: Math.max(v, 0),
-        response: 0.42,
+        response: 0.34,
         onFrame: drawSlide,
         onDone: finish,
       });

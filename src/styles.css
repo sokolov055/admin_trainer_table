@@ -120,15 +120,15 @@
   /* Выдвижная панель едет дольше остального: она проходит весь экран, и на
      220 мс движение читается как рывок. Значение продублировано в ui.jsx —
      там по нему считается момент размонтажа. */
-  --dur-panel: 340ms;
+  --dur-panel: 280ms;
 
   /* Навигация — боковое меню, нижнее меню, смена экрана — в характере
      iOS: кривая выдвижных панелей (из Ionic, её же берёт Vaul). Стартует
      так же быстро, как ease-out, но тормозит дольше и мягче, без
-     ощутимой остановки в конце. Поэтому и длительность чуть больше —
-     медленнее это не ощущается, ощущается плавнее. */
+     ощутимой остановки в конце. Длительности — как в Telegram: плавно,
+     но без растянутости. */
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-nav: 340ms;
+  --dur-nav: 280ms;
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -2237,7 +2237,7 @@ th.sticky, td.sticky {
    ========================================================================== */
 
 .enter {
-  animation: enter-up 320ms var(--ease-ios) both;
+  animation: enter-up 260ms var(--ease-ios) both;
 }
 
 .enter:nth-child(2) { animation-delay: 40ms; }
@@ -3210,6 +3210,10 @@ code {
 .gesture-landing .tabbar__icon,
 .gesture-landing .tabbar__item { transition: none; }
 
+/* Сцена сразу отдельным слоем: иначе Safari повышал бы её до слоя в
+   момент изменения, и на кадр куски страницы оставались недорисованными. */
+.swipeback { will-change: transform; }
+
 /* Лента разделов: страницы лежат рядом, а не одна на другой — без тени.
    Своя подложка обязательна: в зазоре у крайнего раздела и между
    страницами иначе просвечивала настоящая страница, и экран двоился. */
@@ -3248,3 +3252,32 @@ code {
   opacity: var(--drawer-fade, 0) !important;
   transition: none !important;
 }
+
+/* Жест с настоящей страницей: сосед — копия — лежит ПОД страницей, а
+   части страницы на время жеста получают сплошной фон, чтобы сосед не
+   просвечивал сквозь их прозрачные места. Когда жест состоялся, сцена со
+   снимком того, куда пришли, встаёт поверх — под ней страница меняется. */
+.swipeback--live { z-index: -1; }
+.swipeback--cover { z-index: 15; }
+
+.live-moving #root .app > :not(.tabbar):not(.drawer) {
+  background: var(--bg);
+  will-change: transform;
+}
+
+/* Тень по левому краю уходящей страницы при «назад» */
+.swipeback__edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 24px;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0));
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Фон задан и у html, и у body. Фон body рисуется ПОВЕРХ слоя с
+   отрицательным z-index, и сосед под страницей был бы не виден. На время
+   жеста его убираем — под ним фон html того же цвета. */
+html.live-moving body { background: transparent; }
