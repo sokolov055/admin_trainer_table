@@ -16,7 +16,7 @@ npm run test:e2e
 
 `npm test` — все проверки, кроме браузерной; её же гоняет сборка. Отдельные
 наборы (`test:workout`, `test:plan`, `test:ration`, `test:ration-access`,
-`test:auth`, `test:preview`, `test:calendar`, `test:metrics`, `test:push`, `test:offline`,
+`test:auth`, `test:preview`, `test:calendar`, `test:metrics`, `test:overview`, `test:push`, `test:offline`,
 `test:browser`)
 остались для быстрой отладки, но перед push запускай `npm test` целиком:
 выбирать наборы глазами уже приводило к сломанной сборке.

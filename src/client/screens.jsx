@@ -18,6 +18,49 @@ import PlanEditor from '../trainer/PlanEditor.jsx';
  * Обзор
  * ================================================================== */
 
+/**
+ * Пакет заканчивается.
+ *
+ * Плашка, а не строчка в фактах: факты читают глазами по диагонали, а это
+ * то, ради чего экран и открыли. Числом, а не «скоро»: человек решает,
+ * платить сегодня или после выходных, и «скоро» ему в этом не помогает.
+ *
+ * Молчим, пока занятий больше чем на неделю: предупреждение, висящее
+ * всегда, перестаёт быть предупреждением.
+ */
+function PackageEnding({ state }) {
+  if (!state || !state.known || (!state.soon && !state.out)) return null;
+
+  return (
+    <Section>
+      <Panel pad>
+        <div className="warn">
+          <span className={'warn__icon' + (state.out ? ' warn__icon--critical' : '')}>
+            <IconAlert size={18} />
+          </span>
+          <div className="small">
+            {state.out ? (
+              <>
+                <strong>Оплаченные занятия закончились.</strong>{' '}
+                Следующее пройдёт в долг — напишите тренеру об оплате.
+              </>
+            ) : (
+              <>
+                <strong>
+                  {state.left === 1
+                    ? 'Осталось одно оплаченное занятие.'
+                    : 'Осталось ' + state.left + ' ' + plural(state.left, 'занятие', 'занятия', 'занятий') + '.'}
+                </strong>{' '}
+                Это примерно на неделю — продлите пакет, чтобы не прерываться.
+              </>
+            )}
+          </div>
+        </div>
+      </Panel>
+    </Section>
+  );
+}
+
 export function Overview({ clientRow, clientView = false }) {
   const { loading, data, error, reload } = useData(
     'client.overview', clientRow ? { clientRow } : {}, [clientRow]
@@ -69,6 +112,12 @@ export function Overview({ clientRow, clientView = false }) {
           { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
         ]}
       />
+
+      {/* Конец пакета. Стоит сразу под главной цифрой, потому что это
+          единственная новость, требующая действия СЕГОДНЯ: «осталось 2»
+          человек читает как «ещё есть» и узнаёт о конце в тот день, когда
+          пришёл заниматься. */}
+      <PackageEnding state={data.packageEnding} />
 
       {sinceTraining !== null && sinceTraining > 14 && (
         <Section>

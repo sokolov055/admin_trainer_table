@@ -2927,3 +2927,21 @@ code {
 /* Объяснение подставленных значений стоит над формой, а не под ней:
    прочитать его надо до того, как человек начнёт стирать чужие числа. */
 .survey__prefill { margin: 0 0 var(--space-3); }
+
+/* Предупреждение внутри панели: значок слева, текст рядом. Раньше такие
+   плашки собирались инлайновыми стилями по месту и расходились между
+   собой на один-два пикселя. */
+.warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.warn__icon {
+  color: var(--warning-text);
+  display: flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.warn__icon--critical { color: var(--critical-text); }
