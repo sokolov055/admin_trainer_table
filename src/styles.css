@@ -120,7 +120,7 @@
   /* Выдвижная панель едет дольше остального: она проходит весь экран, и на
      220 мс движение читается как рывок. Значение продублировано в ui.jsx —
      там по нему считается момент размонтажа. */
-  --dur-panel: 320ms;
+  --dur-panel: 330ms;
 
   /* Навигация — боковое меню, нижнее меню, смена экрана — в характере
      iOS: кривая выдвижных панелей (из Ionic, её же берёт Vaul). Стартует
@@ -128,7 +128,7 @@
      ощутимой остановки в конце. Длительности — как в Telegram: плавно,
      но без растянутости. */
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-nav: 280ms;
+  --dur-nav: 330ms;
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -520,7 +520,7 @@ button { font-family: inherit; }
   backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid var(--border);
   box-shadow: inset 0 1px 0 var(--tabbar-edge), 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
-  transition: transform var(--dur-nav) var(--ease-ios), opacity 240ms var(--ease-ios);
+  transition: transform var(--dur-nav) var(--ease-ios), opacity var(--dur-nav) var(--ease-ios);
 }
 
 /* Экран бокового меню: меню уезжает вниз за край и не ловит нажатия */
@@ -2261,7 +2261,7 @@ th.sticky, td.sticky {
    ========================================================================== */
 
 .enter {
-  animation: enter-up 260ms var(--ease-ios) both;
+  animation: enter-up var(--dur-nav) var(--ease-ios) both;
 }
 
 .enter:nth-child(2) { animation-delay: 40ms; }
@@ -3413,7 +3413,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   width: 100%;
   height: 100%;
   object-fit: contain;
-  transition: opacity 320ms var(--ease-out);
+  transition: opacity var(--dur-nav) var(--ease-out);
   -webkit-user-select: none;
   user-select: none;
 }
@@ -3493,9 +3493,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
-.client-card__chevron { transform: rotate(-90deg); transition: transform 220ms var(--ease-out); }
+.client-card__chevron { transform: rotate(-90deg); transition: transform var(--dur-nav) var(--ease-ios); }
 .client-card__toggle[aria-expanded="true"] .client-card__chevron { transform: rotate(90deg); }
-.client-card__more { animation: client-card-in 220ms var(--ease-out); }
+.client-card__more { animation: client-card-in var(--dur-nav) var(--ease-ios); }
 @keyframes client-card-in { from { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) {
   .client-card__more { animation: none; }

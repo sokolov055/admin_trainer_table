@@ -417,7 +417,7 @@ export function Note({ tone = 'info', icon, children }) {
 
 /** Совпадает с длительностью перехода в styles.css: панель должна уехать
  *  до того, как её размонтируют, иначе закрытие происходит рывком */
-const DRAWER_DUR = 320;
+const DRAWER_DUR = 330;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 

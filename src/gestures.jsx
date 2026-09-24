@@ -191,7 +191,7 @@ export function rubberband(distance, dimension, constant = 0.55) {
  * response — как быстро доходит до цели, в секундах. Стартует с текущего
  * значения и текущей скорости: перехват на лету не даёт рывка.
  */
-function spring({ from, to, velocity = 0, damping = 1, response = 0.34, onFrame, onDone }) {
+function spring({ from, to, velocity = 0, damping = 1, response = 0.33, onFrame, onDone }) {
   const stiffness = Math.pow((2 * Math.PI) / response, 2);
   const friction = (4 * Math.PI * damping) / response;
 
@@ -965,7 +965,7 @@ export function Gestures() {
           from: pagerX,
           to: -side * width,
           velocity: -Math.max(v, 0) * side,
-          response: 0.34,
+          response: 0.33,
           onFrame: drawPager,
           onDone: finish,
         });
@@ -1024,7 +1024,7 @@ export function Gestures() {
         from: slideX,
         to: width,
         velocity: Math.max(v, 0),
-        response: 0.34,
+        response: 0.33,
         onFrame: drawSlide,
         onDone: finish,
       });
