@@ -47,20 +47,6 @@ const refreshers = new Set();
 let pendingSnapshot = null;
 const SNAPSHOT_FRESH_MS = 1500;
 
-/**
- * «Вперёд» — как в браузере: сразу после возврата жестом смахивание влево
- * снова открывает экран, с которого вернулись. Хранится, как открыть его
- * заново, и снимок — чтобы он выезжал справа уже нарисованным.
- *
- * Любой другой переход (вперёд кнопкой, смена вкладки) «вперёд» забывает:
- * иначе смахивание открывало бы экран, о котором человек уже не помнит.
- */
-let forward = null;
-
-export function forgetForward() {
-  forward = null;
-}
-
 function snapshotOf(app) {
   return {
     node: app.cloneNode(true),
@@ -74,7 +60,6 @@ export function captureScreen() {
   const app = document.querySelector('#root .app');
   if (!app) return;
   pendingSnapshot = snapshotOf(app);
-  forgetForward();
 }
 
 /**
@@ -83,15 +68,10 @@ export function captureScreen() {
  * Работает последний зарегистрированный: вложенный экран (журнал внутри
  * карточки клиента) открывается позже родителя и перекрывает его. Функция
  * берётся из ref на момент жеста — меняться между кадрами ей можно.
- *
- * `reopen` — как открыть этот же экран снова. Если он есть, после возврата
- * жестом можно смахнуть влево и вернуться вперёд.
  */
-export function useBackGesture(handler, enabled = true, reopen = null) {
+export function useBackGesture(handler, enabled = true) {
   const ref = useRef(handler);
   ref.current = handler;
-  const reopenRef = useRef(reopen);
-  reopenRef.current = reopen;
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -99,8 +79,6 @@ export function useBackGesture(handler, enabled = true, reopen = null) {
     const fresh = pendingSnapshot && Date.now() - pendingSnapshot.at < SNAPSHOT_FRESH_MS;
     const entry = {
       run: () => ref.current && ref.current(),
-      // Замыкание берём на момент жеста: в нём тот экран, что открыт сейчас
-      reopen: () => reopenRef.current,
       snapshot: fresh ? pendingSnapshot : null,
     };
     if (fresh) pendingSnapshot = null;
@@ -121,6 +99,10 @@ export function useBackGesture(handler, enabled = true, reopen = null) {
  * хождения: при листании соседний раздел въезжает уже нарисованным — таким,
  * каким его оставили. Где ещё не были, въезжает заготовка с названием, а
  * настоящий раздел встаёт после жеста из кэша данных.
+ *
+ * За последним разделом — боковое меню: лента одна. Смахивание влево с
+ * последнего раздела открывает меню (оно и так выезжает справа), а с
+ * экранов меню смахивание вправо возвращает на раздел — это «назад».
  */
 let tabHost = null;
 const tabSnapshots = new Map();
@@ -131,9 +113,9 @@ export function rememberTab(id) {
   if (app) tabSnapshots.set(id, snapshotOf(app));
 }
 
-export function useTabGesture({ tabs, active, go, enabled = true }) {
+export function useTabGesture({ tabs, active, go, openMenu = null, enabled = true }) {
   const ref = useRef(null);
-  ref.current = { tabs, active, go };
+  ref.current = { tabs, active, go, openMenu };
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -288,8 +270,8 @@ function buildScene(direction, snapshot) {
   // Настоящая панель вкладок стоит поверх сцены. Если у экрана, который
   // уходит или приходит, своей панели нет, а у другого есть, — копия
   // панели едет вместе со своей страницей, иначе она мигнула бы в конце.
-  if (!app.querySelector('.tabbar') && snapshot) {
-    const bar = snapshot.node.querySelector('.tabbar');
+  if (!app.querySelector('.tabbar:not(.tabbar--hidden)') && snapshot) {
+    const bar = snapshot.node.querySelector('.tabbar:not(.tabbar--hidden)');
     if (bar) (direction === 'back' ? under : over).appendChild(bar.cloneNode(true));
   }
 
@@ -316,7 +298,15 @@ let landingTimer = 0;
 function landQuietly() {
   document.documentElement.classList.add('gesture-landing');
   clearTimeout(landingTimer);
-  landingTimer = setTimeout(() => document.documentElement.classList.remove('gesture-landing'), LANDING_MS);
+  landingTimer = setTimeout(() => {
+    // Снять класс просто так нельзя: браузер увидит, что у элемента снова
+    // есть анимация, и проиграет её с нуля — на уже видимом экране. Так
+    // «мигали» отдельные блоки через полсекунды после возврата. Поэтому
+    // тем, кто уже на экране, анимацию выключаем насовсем, и только
+    // потом снимаем класс. Появившиеся позже анимируются как обычно.
+    document.querySelectorAll('#root .enter').forEach((el) => { el.style.animation = 'none'; });
+    document.documentElement.classList.remove('gesture-landing');
+  }, LANDING_MS);
 }
 
 /**
@@ -378,6 +368,7 @@ const PULL_MAX = 140;       // дальше резина почти не пус�
 const BACK_COMMIT = 0.35;   // доля ширины, после которой «назад» без скорости
 const BACK_FLICK = 500;     // px/с — взмах, который решает сам по себе
 const PARALLAX = 0.3;       // насколько предыдущий экран сдвинут влево в начале
+const MENU_PULL = 44;       // px резинового хода с последнего раздела, чтобы открыть меню
 const MIN_SPIN_MS = 500;    // короче индикатор не крутится: иначе мелькнёт
 
 /**
@@ -569,7 +560,6 @@ export function Gestures() {
         mode: null,
         atTop: (window.scrollY || document.documentElement.scrollTop) <= 0,
         canBack: backStack.length > 0 && free,
-        canForward: !!forward && free,
         canTabs: !!tabHost && free,
         startPull: pullY,
         startSlide: slideX,
@@ -609,9 +599,6 @@ export function Gestures() {
           const top = backStack[backStack.length - 1];
           scene = buildScene('back', top && top.snapshot);
           g.mode = scene ? 'slide' : null;
-        } else if (g.canForward && dx < 0 && sideways) {
-          scene = buildScene('forward', forward.snapshot);
-          g.mode = scene ? 'slide' : null;
         } else if (g.canTabs && sideways) {
           // Листание разделов: влево — следующий, вправо — предыдущий
           const host = tabHost.get();
@@ -619,6 +606,8 @@ export function Gestures() {
           const side = dx < 0 ? 1 : -1;
           const target = at === -1 ? null : host.tabs[at + side] || null;
           scene = at === -1 ? null : buildPager(target, side, at);
+          // За последним разделом — боковое меню
+          if (scene && !target && side > 0 && host.openMenu) scene.menu = true;
           g.mode = scene ? 'pager' : null;
         }
 
@@ -642,7 +631,9 @@ export function Gestures() {
         // Соседа нет (крайний раздел) — резина, а не пустота
         const offset = scene.target ? Math.max(-width, Math.min(width, raw)) : rubberband(raw, width * 0.5);
         drawPager(offset);
-        const armed = !!scene.target && Math.abs(offset) >= width * BACK_COMMIT;
+        const armed = scene.menu
+          ? offset <= -MENU_PULL
+          : !!scene.target && Math.abs(offset) >= width * BACK_COMMIT;
         if (armed && !g.armed) haptic('light');
         g.armed = armed;
       } else {
@@ -708,6 +699,21 @@ export function Gestures() {
         const width = window.innerWidth;
         const side = scene ? scene.side : 1;
         const v = velocity('x') * -side;
+        // С последнего раздела влево — открыть боковое меню. Страница
+        // пружиной встаёт на место, меню выезжает справа — с той стороны,
+        // куда тянули.
+        if (scene && scene.menu) {
+          const open = pagerX <= -MENU_PULL || v > BACK_FLICK;
+          const host = tabHost ? tabHost.get() : null;
+          g = null;
+          if (open && host && host.openMenu) {
+            haptic('light');
+            host.openMenu();
+          }
+          anim = spring({ from: pagerX, to: 0, velocity: -v * side, response: 0.3, onFrame: drawPager, onDone: () => { anim = null; dropScene(); } });
+          return;
+        }
+
         const go = scene && scene.target
           && (v > BACK_FLICK || (Math.abs(pagerX) >= width * BACK_COMMIT && v > -200));
         g = null;
@@ -770,30 +776,9 @@ export function Gestures() {
 
       haptic('light');
 
-      // Что сделать с настоящим экраном, когда сцена доедет
-      let change;
-      let restoreTo = null;
-
-      if (back) {
-        const top = backStack[backStack.length - 1];
-        const reopen = top ? top.reopen() : null;
-        const leaving = scene.now;
-        restoreTo = top && top.snapshot ? top.snapshot.scrollY : null;
-        change = () => {
-          if (top) top.run();
-          // Запоминаем, куда можно вернуться вперёд: как открыть и как
-          // выглядело. Экраны без `reopen` вперёд не пускают.
-          forward = reopen ? { run: reopen, snapshot: leaving } : null;
-        };
-      } else {
-        const next = forward;
-        restoreTo = next.snapshot ? next.snapshot.scrollY : null;
-        change = () => {
-          // Нынешний экран — снимок для следующего «назад» с того, куда идём
-          captureScreen();
-          next.run();
-        };
-      }
+      const top = backStack[backStack.length - 1];
+      const restoreTo = top && top.snapshot ? top.snapshot.scrollY : null;
+      const change = () => { if (top) top.run(); };
 
       // Экран доезжает тем же путём, каким его тянули, со скоростью пальца;
       // только потом меняется настоящий экран

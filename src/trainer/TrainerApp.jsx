@@ -12,7 +12,7 @@ import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../u
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
-import { useBackGesture, useTabGesture, rememberTab, captureScreen, forgetForward } from '../gestures.jsx';
+import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
@@ -91,11 +91,12 @@ export default function TrainerApp({ me }) {
 
   // Смахнуть вправо — назад. Порядок важен только при одновременном
   // открытии: карточка и просмотр глазами клиента перекрывают меню.
-  // Третий аргумент — как открыть этот же экран снова: после возврата
-  // жестом смахивание влево возвращает вперёд.
-  useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient, () => setView(view));
-  useBackGesture(() => setOpenClient(null), !!openClient, () => setOpenClient(openClient));
-  useBackGesture(() => setPreviewClient(null), !!previewClient, () => setPreviewClient(previewClient));
+  // Назад пальцем — только с экранов бокового меню (на раздел, откуда
+  // пришли) и из карточки клиента, открытой внутри раздела. Просмотр
+  // глазами клиента ведёт себя как само клиентское приложение: там
+  // смахивание листает разделы, а выход — кнопкой «К тренеру».
+  useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient);
+  useBackGesture(() => setOpenClient(null), !!openClient);
 
   // Листать «Клиенты» и «Сводку» пальцем — пока открыт раздел, а не
   // карточка или экран меню. Функция перехода объявлена ниже ранних
@@ -105,6 +106,8 @@ export default function TrainerApp({ me }) {
     tabs: TABS,
     active: view,
     go: (id) => goRef.current && goRef.current(id),
+    // За последним разделом — боковое меню: смахнуть влево открывает его
+    openMenu: () => { setMenuOpen(true); haptic(); },
     enabled: !inMenu && !openClient && !previewClient,
   });
   const [calendarRefresh, setCalendarRefresh] = useState({ busy: false, error: null, done: null });
@@ -164,7 +167,7 @@ export default function TrainerApp({ me }) {
   const go = (id) => {
     // Раздел, с которого уходят, запоминаем — его покажет листание
     if (!inMenu && id !== view) rememberTab(view);
-    if (TABS.some((t) => t.id === id)) { setLastTab(id); forgetForward(); }
+    if (TABS.some((t) => t.id === id)) setLastTab(id);
     // Уход с вкладки в экран меню — снимок для жеста «назад»
     else if (!inMenu) captureScreen();
     setView(id);

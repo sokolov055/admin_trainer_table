@@ -729,7 +729,7 @@ export function Sheets() {
   const list = useData('trainer.sheets', {}, []);
   const [selected, setSelected] = useState(null);
 
-  useBackGesture(() => setSelected(null), !!selected, () => setSelected(selected));
+  useBackGesture(() => setSelected(null), !!selected);
 
   if (list.loading) return <Loading lead={false} rows={5} />;
   if (list.error) return <ErrorState error={list.error} onRetry={list.reload} />;

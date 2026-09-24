@@ -494,6 +494,14 @@ button { font-family: inherit; }
   backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid var(--border);
   box-shadow: inset 0 1px 0 var(--tabbar-edge), 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
+  transition: transform 260ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
+/* Экран бокового меню: меню уезжает вниз за край и не ловит нажатия */
+.tabbar--hidden {
+  transform: translate3d(0, calc(100% + 32px), 0);
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Таблетка выбранного раздела — одна на всё меню. Переезжает к нажатой
@@ -570,6 +578,8 @@ button { font-family: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .tabbar { transition: opacity 200ms var(--ease-out); }
+  .tabbar--hidden { transform: none; }
   .tabbar__pill { transition: opacity var(--dur-fast) var(--ease-out); }
   .tabbar__icon { transition: none; }
 }
@@ -3183,6 +3193,14 @@ code {
 /* После жеста «назад/вперёд» экран встаёт без лесенки появления: снимок
    уже показал его целиком, и повторное проявление читалось как мигание. */
 .gesture-landing .enter { animation: none; }
+
+/* В тот же момент меню переключает выбранную вкладку. Снимок уже показал
+   её выбранной, и проявление таблетки и подъём иконки заново — лишнее
+   движение, которое читалось как мигание. */
+.gesture-landing .tabbar,
+.gesture-landing .tabbar__pill,
+.gesture-landing .tabbar__icon,
+.gesture-landing .tabbar__item { transition: none; }
 
 /* Лента разделов: страницы лежат рядом, а не одна на другой — без тени */
 .swipeback--pager .swipeback__cur { box-shadow: none; }

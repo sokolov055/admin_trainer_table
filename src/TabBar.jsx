@@ -20,11 +20,13 @@ export default function TabBar({ tabs, active, onSelect }) {
 
   return (
     <nav
-      className="tabbar"
+      // На экранах бокового меню («Расходы», «Мои данные») ни одна вкладка
+      // не выбрана, и меню висело бы пустой подставкой поверх списка. Там
+      // оно уезжает вниз, как в iOS, и возвращается с разделом.
+      className={'tabbar' + (onTab ? '' : ' tabbar--hidden')}
       style={{ '--tab-count': tabs.length, '--tab-pos': index }}
+      aria-hidden={onTab ? undefined : 'true'}
     >
-      {/* На экране меню («Расходы», «Мои данные») ни одна вкладка не
-          выбрана — таблетку прячем, а не оставляем на прошлой */}
       <span className={'tabbar__pill' + (onTab ? '' : ' tabbar__pill--off')} aria-hidden="true" />
 
       {tabs.map((t) => {
@@ -35,6 +37,7 @@ export default function TabBar({ tabs, active, onSelect }) {
             key={t.id}
             className={'tabbar__item' + (current ? ' tabbar__item--active' : '')}
             onClick={() => onSelect(t.id)}
+            tabIndex={onTab ? undefined : -1}
             aria-current={current ? 'page' : undefined}
           >
             <span className="tabbar__icon"><Icon size={21} /></span>

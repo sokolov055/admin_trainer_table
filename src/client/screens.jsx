@@ -1128,7 +1128,7 @@ export function Nutrition({ clientRow, clientView = false }) {
   const [ration, setRation] = useState(false);
 
   // Рацион — экран поверх питания: смахнуть вправо возвращает к норме
-  useBackGesture(() => setRation(false), ration, () => setRation(true));
+  useBackGesture(() => setRation(false), ration);
 
   // Тренер переключается между клиентами в одной и той же карточке, и
   // экран при этом не размонтируется. Без сброса «норма записана» осталось

@@ -378,23 +378,18 @@ test('смахнуть вправо возвращает из «Моих дан�
       'none',
       'после жеста экран не проявляется заново',
     );
-
-    // Вперёд: сразу после возврата жестом смахивание влево открывает тот
-    // экран, с которого вернулись, — и назад снова работает
-    await phone.waitForTimeout(700);
-    await swipe(phone, { x: 330, y: 420 }, { x: 60, y: 430 });
-    await assert.doesNotReject(
-      phone.locator('#root .app__subtitle', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 }),
-      'смахнули влево — снова «Мои данные»',
+    // И не проявляется позже: снятие класса «после жеста» раньше
+    // перезапускало анимацию на уже видимых блоках — они «мигали»
+    await phone.waitForTimeout(900);
+    assert.equal(
+      await phone.evaluate(() => getComputedStyle(document.querySelector('#root .enter')).animationName),
+      'none',
+      'через секунду блоки не проявляются заново',
     );
-    await phone.waitForTimeout(300);
-    await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
-    await phone.locator('#root .app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 5000 });
 
-    // Смена вкладки «вперёд» забывает — и смахивание влево листает
-    // разделы нижнего меню, а не открывает прежний экран
-    await phone.getByRole('button', { name: 'Прогресс', exact: true }).click();
-    await phone.getByRole('button', { name: 'Обзор', exact: true }).click();
+    // Лента одна: разделы нижнего меню, а за последним — боковое меню.
+    // Влево — следующий раздел; «вперёд» на прежний экран больше нет.
+    await phone.waitForTimeout(700);
     await swipe(phone, { x: 330, y: 420 }, { x: 60, y: 430 });
     await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
     assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Тренировки', 'влево — следующий раздел');
@@ -408,11 +403,25 @@ test('смахнуть вправо возвращает из «Моих дан�
     await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 3000 });
     assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Обзор', 'с первого раздела вправо некуда');
 
+    // С последнего раздела влево — открывается боковое меню
+    await phone.getByRole('button', { name: 'Питание', exact: true }).click();
+    await phone.locator('#root .app__subtitle', { hasText: 'Питание' }).waitFor({ timeout: 5000 });
+    await phone.waitForTimeout(300);
+    await swipe(phone, { x: 330, y: 420 }, { x: 150, y: 430 });
+    await assert.doesNotReject(
+      phone.getByRole('button', { name: 'Закрыть меню' }).waitFor({ timeout: 3000 }),
+      'за последним разделом — боковое меню',
+    );
+    await phone.getByRole('button', { name: 'Закрыть меню' }).click();
+    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+
     // Короткое движение без скорости «назад» не делает: экран пружиной
     // возвращается на место
     await phone.getByRole('button', { name: 'Меню' }).click();
     await phone.getByRole('button', { name: /Настройки/ }).click();
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+    // На экране бокового меню нижнее меню уезжает, а не висит пустым
+    assert.equal(await phone.locator('.tabbar').getAttribute('aria-hidden'), 'true', 'нижнее меню спрятано');
     await swipe(phone, { x: 60, y: 60 }, { x: 110, y: 62 }, { steps: 20, frameMs: 30 });
     await phone.waitForTimeout(700);
     assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Настройки', 'короткий жест не уводит');
