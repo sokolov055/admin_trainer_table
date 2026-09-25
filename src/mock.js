@@ -142,8 +142,8 @@ const NUTRITION_OPTIONS = {
   ],
   // Два вопроса (с 25.09.2026): чем занят день и тренировки в неделю
   lifestyles: [
-    { value: 'desk', label: 'Сидячая: работа за столом, на машине', factor: 1.2 },
-    { value: 'feet', label: 'На ногах: работа стоя, много хожу', factor: 1.35 },
+    { value: 'desk', label: 'Сидячий: работа за столом, на машине', factor: 1.2 },
+    { value: 'feet', label: 'Подвижный: работа стоя, много хожу пешком', factor: 1.35 },
     { value: 'labor', label: 'Физический труд: стройка, склад, доставка', factor: 1.5 },
   ],
   trainingStep: 0.05,

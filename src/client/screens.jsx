@@ -1542,8 +1542,8 @@ export function Nutrition({ clientRow, clientView = false }) {
               <Row label="Пол">{survey.sex === 'm' ? 'мужской' : 'женский'}</Row>
               {survey.lifestyle
                 ? <>
-                  <Row label="День">{(survey.lifestyleLabel || '').split(':')[0] || survey.lifestyle}</Row>
-                  <Row label="Тренировок">{survey.trainings} в неделю</Row>
+                  <Row label="Образ жизни">{((survey.lifestyleLabel || '').split(':')[0] || survey.lifestyle).toLowerCase()}</Row>
+                  <Row label="Тренировки">{survey.trainings} в неделю</Row>
                 </>
                 : <Row label="Активность">{survey.activityLabel || survey.activity}</Row>}
               <Row label="Цель">{survey.goalLabel || survey.goal}</Row>
@@ -1709,8 +1709,8 @@ function grams(value) {
  */
 /** Запасной список, если сервер старый и не прислал его */
 const LIFESTYLES = [
-  { value: 'desk', label: 'Сидячая: работа за столом, на машине', factor: 1.2 },
-  { value: 'feet', label: 'На ногах: работа стоя, много хожу', factor: 1.35 },
+  { value: 'desk', label: 'Сидячий: работа за столом, на машине', factor: 1.2 },
+  { value: 'feet', label: 'Подвижный: работа стоя, много хожу пешком', factor: 1.35 },
   { value: 'labor', label: 'Физический труд: стройка, склад, доставка', factor: 1.5 },
 ];
 
@@ -1872,14 +1872,14 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
 
         <div className="survey__group">
           <div className="survey__legend">
-            Чем занят день
+            Образ жизни
             <span className="survey__legend-note">без тренировок: работа, дорога, быт</span>
           </div>
           <Options
             items={options.lifestyles || LIFESTYLES}
             value={form.lifestyle}
             onChange={(v) => set('lifestyle', v)}
-            label="Чем занят день"
+            label="Образ жизни"
             disabled={busy}
           />
           {errors.lifestyle && <span className="field__error">{errors.lifestyle}</span>}
@@ -1965,7 +1965,7 @@ function validateSurvey(form, limits) {
   else if (outOfRange(height, limits.height)) found.height = range(limits.height, 'см');
 
   if (!form.sex) found.sex = 'Выберите пол';
-  if (!form.lifestyle) found.lifestyle = 'Выберите, чем занят день';
+  if (!form.lifestyle) found.lifestyle = 'Выберите образ жизни';
   if (form.trainings === '') found.trainings = 'Выберите, сколько тренировок в неделю';
   if (!form.goal) found.goal = 'Выберите цель';
 
