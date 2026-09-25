@@ -522,3 +522,6 @@
 /* Яйца штуками: граммы рядом, мельче — для тех, кто взвешивает */
 .amount__grams { color: var(--text-muted); font-size: var(--text-xs); margin-left: 4px; }
 .eggs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 var(--space-3); }
+
+/* Отправить список покупок в заметки или мессенджер */
+.shop__share { margin-top: var(--space-3); }

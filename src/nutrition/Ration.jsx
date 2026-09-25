@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, createContext, useContext } from 'react';
 import { Section, Panel, Note, Search, formatNumber, plural } from '../ui.jsx';
-import { IconCheck, IconClose, IconBack, IconNutrition } from '../icons.jsx';
+import { IconCheck, IconClose, IconBack, IconNutrition, IconShare } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { MEALS } from './recipes.js';
 import { CATALOG, setCatalog } from './catalog.js';
@@ -20,6 +20,63 @@ function Amount({ food, grams: g }) {
   const pieces = pieceLabel(food, g, size) || mlLabel(food, g);
   if (!pieces) return <>{grams(g)}</>;
   return <>{pieces} <span className="amount__grams">({grams(g)})</span></>;
+}
+
+/** Вес строкой для текста списка — так же, как на экране */
+function amountText(food, g, size) {
+  const shown = pieceLabel(food, g, size) || mlLabel(food, g);
+  return shown ? shown + ' (' + grams(g) + ')' : grams(g);
+}
+
+/**
+ * Список покупок — текстом для заметок или мессенджера: группы полки,
+ * «— продукт — сколько». Дома лежащее — отдельной строкой в конце, чтобы
+ * не забыть проверить, а не купить.
+ */
+export function shoppingText(groups, home, size) {
+  const lines = ['Список покупок', ''];
+  groups.forEach((g) => {
+    lines.push(g.title);
+    g.items.forEach((row) => lines.push('— ' + row.food + ' — ' + amountText(row.food, row.grams, size)));
+    lines.push('');
+  });
+  if (home.length) lines.push('Проверить, что хватит дома: ' + home.map((r) => r.food).join(', '));
+  return lines.join('\n').trim();
+}
+
+/**
+ * Отправить список: системное «Поделиться» (Заметки, Telegram, WhatsApp),
+ * а где его нет — скопировать, чтобы вставить в любой блокнот.
+ */
+function ShareList({ text }) {
+  const [note, setNote] = useState('');
+  const send = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Список покупок', text });
+        haptic('success');
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // закрыли меню — не ошибка
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setNote('Список скопирован — вставьте его в заметки или в чат');
+      haptic('success');
+    } catch (_) {
+      window.prompt('Скопируйте список:', text);
+    }
+  };
+  return (
+    <div className="shop__share">
+      <button type="button" className="button button--block" onClick={send}>
+        <IconShare size={16} />
+        Отправить список
+      </button>
+      {note && <p className="small muted" style={{ margin: '6px 0 0' }}>{note}</p>}
+    </div>
+  );
 }
 
 /** Какие яйца у человека дома: мелкие, средние, крупные */
@@ -654,6 +711,7 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
             </div>
           </Panel>
         )}
+        {list.buy.length > 0 && <ShareList text={shoppingText(rows(list.buy), list.athome, eggSize)} />}
       </Section>
 
       {/* Почему объём больше, чем съедается за день, — сказать обязательно:
