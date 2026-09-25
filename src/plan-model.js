@@ -64,3 +64,16 @@ export function doneLine(sets) {
   }
   return list.map((x) => (x.weight ? x.weight + ' кг × ' : '') + (x.reps || '?')).join(', ');
 }
+
+/**
+ * Подход суперсета без числа кругов: круги стоят у скобки, и «4 × 15» у
+ * каждого упражнения повторяло бы их. «15 повт. · 10 кг», а если подходы
+ * разные — каждый: «10 кг × 12, 12 кг × 10».
+ */
+export function roundLine(sets) {
+  const list = sets || [];
+  if (!list.length) return '';
+  const same = list.every((x) => x.weight === list[0].weight && x.reps === list[0].reps);
+  if (same) return (list[0].reps || '?') + ' повт.' + (list[0].weight ? ' · ' + list[0].weight + ' кг' : '');
+  return list.map((x) => (x.weight ? x.weight + ' кг × ' : '') + (x.reps || '?')).join(', ');
+}

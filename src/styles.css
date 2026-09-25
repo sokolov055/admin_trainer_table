@@ -3837,3 +3837,15 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .dish__edit-row input:nth-child(2) { text-align: center; font-variant-numeric: tabular-nums; }
 .card__tag { font-size: var(--text-xs); color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
 .recipe__steps { margin: var(--space-2) 0 0; padding-left: 1.3em; display: grid; gap: 6px; font-size: var(--text-sm); line-height: 1.45; }
+
+/* Суперсет — скобкой справа с числом кругов, как рисуют от руки */
+.superset__body { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.superset__items { min-width: 0; }
+.superset__bracket { display: flex; align-items: center; gap: 8px; padding: var(--space-3) var(--space-4) var(--space-3) 0; }
+.superset__line {
+  align-self: stretch; width: 10px; margin: 6px 0;
+  border: 2px solid var(--accent); border-left: 0; border-radius: 0 10px 10px 0;
+}
+.superset__count { display: grid; justify-items: center; line-height: 1.05; min-width: 40px; }
+.superset__count strong { font-size: var(--text-xl, 1.5rem); font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.superset__count span { font-size: var(--text-xs); color: var(--text-muted); }

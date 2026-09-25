@@ -14,7 +14,7 @@ import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck 
 import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
-import { supersets, blockSessions, doneLine } from '../plan-model.js';
+import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
 import { TemplateApply, SaveAsTemplate, Media } from '../trainer/Library.jsx';
 
@@ -504,41 +504,37 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
               </div>
             )}
             {!running && !familyRow && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month, members: data.members || [] })}>Начать тренировку</button>}
-            {made && supersets(made).map((group, j) => (
-              <div className={group.superset ? 'superset' : undefined} key={'m' + j}>
-                {group.superset && (
-                  <div className="superset__head">
-                    Суперсет · {group.items[0].sets.length} {plural(group.items[0].sets.length, 'круг', 'круга', 'кругов')}
-                  </div>
-                )}
-                {group.items.map((ex, k) => {
-                  // У пары — строкой на человека: «Евгений: 3 × 12 · 25 кг»
-                  const who = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))];
-                  return (
-                    <div className="exercise" style={{ minWidth: 0 }} key={k}>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="exercise__name">{ex.name}</div>
-                        {who.length
-                          ? who.map((w) => (
-                            <div className="exercise__scheme" key={w}>{w}: {doneLine(ex.sets.filter((x) => x.who === w))}</div>
-                          ))
-                          : <div className="exercise__scheme">{doneLine(ex.sets)}</div>}
-                      </div>
+            {made && supersets(made).map((group, j) => {
+              // У пары — строкой на человека: «Евгений: 3 × 12 · 25 кг». В
+              // суперсете круги стоят у скобки, у упражнения — без них.
+              const line = group.superset ? roundLine : doneLine;
+              const rows = group.items.map((ex, k) => {
+                const who = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))];
+                return (
+                  <div className="exercise" style={{ minWidth: 0 }} key={k}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="exercise__name">{ex.name}</div>
+                      {who.length
+                        ? who.map((w) => (
+                          <div className="exercise__scheme" key={w}>{w}: {line(ex.sets.filter((x) => x.who === w))}</div>
+                        ))
+                        : <div className="exercise__scheme">{line(ex.sets)}</div>}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  </div>
+                );
+              });
+              if (!group.superset) return <React.Fragment key={'m' + j}>{rows}</React.Fragment>;
+              // Круги — подходы упражнения; у пары их вдвое больше, делим на людей
+              const people = (ex) => new Set(ex.sets.map((x) => x.who || '')).size || 1;
+              const rounds = Math.max(...group.items.map((ex) => Math.round(ex.sets.length / people(ex))));
+              return <Superset rounds={rounds} key={'m' + j}>{rows}</Superset>;
+            })}
             {!made && supersets(block.exercises).map((group, j) => (
               group.superset
                 ? (
-                  <div className="superset" key={j}>
-                    <div className="superset__head">
-                      Суперсет{group.sets ? ' · ' + group.sets + ' ' + plural(Number(group.sets), 'круг', 'круга', 'кругов') : ''}
-                      <span className="superset__hint">подряд, без отдыха между упражнениями</span>
-                    </div>
+                  <Superset rounds={Number(group.sets) || 0} key={j}>
                     {group.items.map((ex, k) => <ExerciseRow ex={ex} inSuperset members={data.members} me={data.me} key={k} />)}
-                  </div>
+                  </Superset>
                 )
                 : <ExerciseRow ex={group.items[0]} members={data.members} me={data.me} key={j} />
             ))}
@@ -581,6 +577,35 @@ function nextMonthLabel() {
  * стоит в заголовке группы, а дважды написанное рядом читается как
  * «у каждого свои».
  */
+/**
+ * Суперсет — скобкой справа, у скобки крупно число кругов: так тренер
+ * рисует его от руки на листе, и так же читается с одного взгляда —
+ * «эти упражнения — подряд, столько-то раз».
+ */
+function Superset({ rounds, children }) {
+  const label = rounds ? rounds + ' ' + plural(rounds, 'круг', 'круга', 'кругов') : '';
+  return (
+    <div className="superset" role="group" aria-label={'Суперсет' + (label ? ', ' + label : '')}>
+      <div className="superset__head">
+        Суперсет
+        <span className="superset__hint">подряд, без отдыха между упражнениями</span>
+      </div>
+      <div className="superset__body">
+        <div className="superset__items">{children}</div>
+        {rounds > 0 && (
+          <div className="superset__bracket" aria-hidden="true">
+            <span className="superset__line" />
+            <span className="superset__count">
+              <strong>{rounds}</strong>
+              <span>{plural(rounds, 'круг', 'круга', 'кругов')}</span>
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // me — участник пары, который смотрит: его вес первым и подписан «Вы»,
 // чужое упражнение приглушено
 function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {

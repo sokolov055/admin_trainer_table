@@ -94,3 +94,10 @@ test('свободная тренировка ни к одному блоку н
 
   assert.deepEqual(blockSessions(free, 'Тренировка № 1', 'Сентябрь 2026'), []);
 });
+
+test('подход суперсета — без числа кругов: круги стоят у скобки', async () => {
+  const { roundLine } = await import('../src/plan-model.js');
+  assert.equal(roundLine([{ weight: '', reps: '15' }, { weight: '', reps: '15' }]), '15 повт.');
+  assert.equal(roundLine([{ weight: '10', reps: '12' }, { weight: '10', reps: '12' }]), '12 повт. · 10 кг');
+  assert.equal(roundLine([{ weight: '10', reps: '12' }, { weight: '12', reps: '10' }]), '10 кг × 12, 12 кг × 10');
+});
