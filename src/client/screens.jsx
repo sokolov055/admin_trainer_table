@@ -1694,10 +1694,8 @@ function PaceChooser({ plans, pace, clientRow, onChanged }) {
                     {busy === plan.id ? '…' : formatNumber(plan.kcal) + ' ккал'}
                   </span>
                 </span>
-                <span className="option__hint">
-                  Б {plan.protein} · Ж {plan.fat} · У {plan.carbs} г
-                  {plan.hint ? ' — ' + plan.hint : ''}
-                </span>
+                {plan.hint && <span className="option__hint">{plan.hint}</span>}
+                <span className="option__macros">Б {plan.protein} · Ж {plan.fat} · У {plan.carbs} г</span>
               </span>
             </button>
           );
@@ -1779,8 +1777,11 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
 
   // Чего нет ни там, ни там, остаётся пустым: выдумать возраст или вес
   // нельзя, а подставленное наугад человек не перепроверит.
-  const filled = ['age', 'weight', 'height', 'sex']
-    .filter((field) => !(survey && survey[field]) && form[field] !== '');
+  // Что подставлено из профиля и замера — при открытии, а не «что сейчас
+  // заполнено»: иначе пол, выбранный самим человеком, тоже объявлялся
+  // «заполненным за вас», а пустые поля рядом выглядели готовыми
+  const [filled] = useState(() => ['age', 'weight', 'height', 'sex']
+    .filter((field) => !(survey && survey[field]) && pick(null, prefill && prefill[field]) !== ''));
 
   const [errors, setErrors] = useState({});
   const [attempted, setAttempted] = useState(false);
@@ -1857,7 +1858,7 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
           <div className="field-row">
             <Field
               label="Возраст, лет"
-              placeholder="34"
+              placeholder="лет"
               value={form.age}
               onChange={(v) => set('age', v)}
               error={errors.age}
@@ -1866,7 +1867,7 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
             />
             <Field
               label="Вес, кг"
-              placeholder="76,9"
+              placeholder="кг"
               inputMode="decimal"
               value={form.weight}
               onChange={(v) => set('weight', v)}
@@ -1876,7 +1877,7 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
             />
             <Field
               label="Рост, см"
-              placeholder="175"
+              placeholder="см"
               value={form.height}
               onChange={(v) => set('height', v)}
               error={errors.height}

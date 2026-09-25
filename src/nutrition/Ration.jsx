@@ -570,7 +570,7 @@ function Bar({ label, value, goal, unit }) {
         </span>
       </div>
       <div className="day__bar-track">
-        <span style={{ width: Math.min(100, share * 100) + '%' }} />
+        <span style={{ transform: `scaleX(${Math.min(1, share)})` }} />
       </div>
     </div>
   );
@@ -648,20 +648,22 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
               const meal = MEALS.find((m) => m.id === dish.recipe.meal) || {};
               return (
                 <div key={dish.recipe.id} className="day__dish">
-                  <div className="day__dish-head">
-                    <span className="day__meal">{meal.title || dish.recipe.meal}</span>
-                    {dish.servings !== 1 && (
-                      <span className="day__servings">{servingLabel(dish.servings)}</span>
-                    )}
+                  {/* Приём пищи — колонкой слева: день читается сверху вниз
+                      по времени, а название блюда остаётся главным */}
+                  <span className="day__meal">{meal.title || dish.recipe.meal}</span>
+                  <div className="day__body">
+                    <h4 className="day__name">{dish.recipe.name}</h4>
+                    <p className="day__macros">
+                      <strong>{Math.round(dish.recipe.per.kcal * dish.servings)} ккал</strong>
+                      <span>
+                        Б {formatNumber(Math.round(dish.recipe.per.protein * dish.servings * 10) / 10)} ·
+                        {' '}Ж {formatNumber(Math.round(dish.recipe.per.fat * dish.servings * 10) / 10)} ·
+                        {' '}У {formatNumber(Math.round(dish.recipe.per.carbs * dish.servings * 10) / 10)}
+                      </span>
+                      {dish.servings !== 1 && <span className="day__servings">{servingLabel(dish.servings)}</span>}
+                    </p>
+                    <Recipe recipe={dish.recipe} />
                   </div>
-                  <h4 className="day__name">{dish.recipe.name}</h4>
-                  <p className="day__macros">
-                    {Math.round(dish.recipe.per.kcal * dish.servings)} ккал ·
-                    {' '}Б {formatNumber(Math.round(dish.recipe.per.protein * dish.servings * 10) / 10)} ·
-                    {' '}Ж {formatNumber(Math.round(dish.recipe.per.fat * dish.servings * 10) / 10)} ·
-                    {' '}У {formatNumber(Math.round(dish.recipe.per.carbs * dish.servings * 10) / 10)}
-                  </p>
-                  <Recipe recipe={dish.recipe} />
                 </div>
               );
             })}
@@ -671,12 +673,13 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
       )}
 
       <Section>
+        {/* Главное действие дня — другой вариант; остальное — шаг назад */}
         <div className="ration__actions">
           {variants.length > 1 && (
-            <button className="button" onClick={onOther}>Другой вариант</button>
+            <button className="button button--primary ration__main" onClick={onOther}>Другой вариант</button>
           )}
-          <button className="button" onClick={onRestart}>Выбрать блюда заново</button>
-          <button className="button" onClick={onPantry}>Изменить продукты</button>
+          <button className="button button--ghost" onClick={onRestart}>Выбрать блюда заново</button>
+          <button className="button button--ghost" onClick={onPantry}>Изменить продукты</button>
         </div>
       </Section>
 

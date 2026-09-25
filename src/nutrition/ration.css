@@ -373,7 +373,8 @@
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width var(--dur) var(--ease-out);
+  transform-origin: left center;
+  transition: transform var(--dur) var(--ease-out);
 }
 
 .day__dishes { display: grid; }
@@ -525,3 +526,18 @@
 
 /* Отправить список покупок в заметки или мессенджер */
 .shop__share { margin-top: var(--space-3); }
+
+/* ==========================================================================
+ * День: фокус (26.09.2026). Три приёма пищи были одинаковыми блоками с
+ * тремя одинаковыми синими ссылками — взгляд уходил на ссылки, а не на еду.
+ * ========================================================================== */
+.day__dish { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.day__meal { padding-top: 4px; font-size: var(--text-sm); font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-muted); }
+.day__name { margin: 0 0 4px; font-size: var(--text-lg); font-weight: 700; line-height: 1.25; text-wrap: balance; }
+.day__macros { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.day__macros strong { color: var(--text); font-weight: 700; font-size: var(--text-md); }
+.day__macros span { color: var(--text-muted); font-size: var(--text-sm); }
+.day__macros .day__servings { padding: 1px 8px; border-radius: 999px; background: var(--accent-wash); color: var(--accent); font-weight: 600; font-size: var(--text-xs); }
+/* «Как готовить» — спокойная ссылка, а не третий синий акцент в каждом блоке */
+.day__dish .recipe summary { color: var(--text-secondary); font-weight: 500; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+.ration__main { flex-basis: 100%; }

@@ -732,7 +732,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     {!s && ready && <>
       <h2>Журнал тренировок</h2><p className="muted">Начните занятие из программы или соберите свободную тренировку.</p>
       <button className="button button--primary button--block" disabled={busy} onClick={() => store(freshRecord(fromPlan({ title: 'Свободная тренировка', exercises: [{ name: 'Первое упражнение', sets: 3 }] }, '')))}>Начать свободную тренировку</button>
-      {!history.length && <p>Здесь появятся проведённые занятия и их результаты.</p>}
+      {!history.length && <p className="small muted">Здесь появятся проведённые занятия и их результаты.</p>}
       {history.map(s => <div className="workout__history-row" key={s.id}>
         <button className="workout__history" disabled={busy} onClick={() => open(s.id)}><strong>{s.title}</strong><span>{new Date(s.startedAt).toLocaleDateString('ru-RU')} · {labels[s.status]} · {s.done} подходов</span></button>
 
