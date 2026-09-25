@@ -3,7 +3,7 @@ import { apiPublic, apiMutate } from './api.js';
 import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders } from './icons.jsx';
 import { useBackGesture } from './gestures.jsx';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
@@ -56,6 +56,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // подтвердит удаление не того занятия.
   const [erase, setErase] = useState('');
   const [undo, setUndo] = useState(null);
+  // Настройки подхода открываются по номеру подхода — одна за раз, а не
+  // строкой «Настройки подхода» под каждым: их читают редко, а место они
+  // занимали у цифр, ради которых экран и открыт
+  const [openSet, setOpenSet] = useState('');
   // Разъединили или соединили суперсет — подходы перелетают на новые места
   const fieldsRef = useRef(null);
   const flip = useFlip(fieldsRef);
@@ -319,12 +323,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       if (l >= 1 && r >= 1) next.reps = String(Math.min(l, r));
       return next;
     });
-    return <div className={'workout__set ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si} data-flip={ex.id + ':' + si} data-flip-delay={si * 140}>
-            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')} style={{ '--cols': fields.length }}><span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span>
+    const key = ex.id + ':' + si;
+    const current = focus.ex === ex.id && focus.set === si;
+    return <div className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}>
+            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')} style={{ '--cols': fields.length }}>
+              {inRound
+                ? <span>{label}</span>
+                : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, подход ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
+                  <span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span><IconSliders size={12} aria-hidden="true" />
+                </button>}
               {fields.map(f => (
                 <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
               ))}
-              <button className="workout__check" aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
+              <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
                 const lack = set.state !== 'done' && missing(set, track);
                 if (lack) { setMessage(lack); return; }
                 const starting = set.state !== 'done';
@@ -357,16 +368,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             )}
             {/* В круге суперсета своих настроек у подхода нет — они общие,
                 «Настройки круга» под кругом */}
-            {!inRound && <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
+            {set.state === 'skipped' && !inRound && openSet !== key && <p className="workout__skipped">Пропущен — нажмите номер, чтобы вернуть</p>}
+            {!inRound && openSet === key && <div className="workout__set-options">
               {setExtras(ex, ei, si)}
               <div className="workout__toolbar">
                 <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
                 <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
                 {setTools(ex, ei, si)}
                 <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-                <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить подход</button>
+                <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить подход</button>
               </div>
-            </details>}
+            </div>}
           </div>;
   };
 
@@ -380,10 +392,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const track = trackOf(ex);
     const fields = [...settingsFields(track), ...track.metrics.map(m => metricField(m, track))];
     const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
-    return <div className={'workout__set workout__set--cardio ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si} data-flip={ex.id + ':' + si} data-flip-delay={si * 140}>
+    const key = ex.id + ':' + si;
+    const current = focus.ex === ex.id && focus.set === si;
+    return <div className={'workout__set workout__set--cardio' + (set.state === 'done' ? ' workout__set--done' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}>
       <div className="workout__cardio-head">
-        <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}{set.kind === 'warmup' ? ' · разминка' : ''}</span>
-        <button className="workout__check" aria-label={`${ex.name}, отрезок ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
+        {inRound
+          ? <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}</span>
+          : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, отрезок ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
+            <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}{set.kind === 'warmup' ? ' · разминка' : ''}</span><IconSliders size={12} aria-hidden="true" />
+          </button>}
+        <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, отрезок ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
           const lack = set.state !== 'done' && missing(set, track);
           if (lack) { setMessage(lack); return; }
           const starting = set.state !== 'done';
@@ -396,14 +414,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
         ))}
       </div>
-      {!inRound && <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки отрезка'}</summary>
+      {!inRound && openSet === key && <div className="workout__set-options">
         <div className="workout__toolbar">
           <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
           <label>RPE<input aria-label={`${ex.name}, отрезок ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
           <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-          <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить отрезок</button>
+          <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить отрезок</button>
         </div>
-      </details>}
+      </div>}
     </div>;
   };
 
@@ -518,7 +536,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         ? { ...e, sets: [...e.sets, { ...e.sets[e.sets.length - 1], state: 'pending' }] }
         : e)),
     }));
-    return <section className="workout__exercise workout__rounds" key={'g' + group} data-flip-enter="">
+    const currentHere = members.some(({ ex }) => ex.id === focus.ex);
+    return <section className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-flip-enter="">
       <div className="workout__rounds-head">
         <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
         <button className="button button--ghost" onClick={split}>Разъединить</button>
@@ -574,6 +593,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
 
   const s = record?.session;
+
+  // Куда смотреть: первое упражнение с неотмеченным подходом и этот
+  // подход. Оно обведено, подход подсвечен, его «готово» — залито; всё
+  // остальное тише. Иначе в зале глаза разбегаются по одинаковым строкам.
+  const focus = (() => {
+    const list = (s && s.exercises) || [];
+    for (let i = 0; i < list.length; i += 1) {
+      const si = list[i].sets.findIndex(x => x.state === 'pending');
+      if (si !== -1) return { ex: list[i].id, set: si };
+    }
+    return { ex: '', set: -1 };
+  })();
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
@@ -603,7 +634,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           aria-valuemax={stats.total || 1}
           aria-valuenow={stats.done}
         >
-          <span style={{ width: Math.round((stats.done / (stats.total || 1)) * 100) + '%' }} />
+          <span style={{ transform: `scaleX(${stats.done / (stats.total || 1)})` }} />
         </div>
         <p className="workout__status" role="status">{busy ? 'Сохраняем…' : record.dirty ? 'Есть несохранённые изменения' : 'Сохранено в облаке'}</p>
       </header>
@@ -634,12 +665,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           if (members.length > 1 && !members.some(m => m.ex.sets.some(x => x.who))) {
             return members[0].ei === ei ? <React.Fragment key={'g' + group}>{joinBefore(ei)}{supersetBlock(members)}</React.Fragment> : null;
           }
-          return <React.Fragment key={ex.id}>{joinBefore(ei)}<section className="workout__exercise" key={ex.id} data-flip-enter="">
-          <h3 data-flip={'name:' + ex.id}>{ei + 1}. {ex.name || 'Новое упражнение'}</h3>
+          const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
+          const finished = doneSets === ex.sets.length;
+          const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
+          return <React.Fragment key={ex.id}>{joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '')} key={ex.id} data-flip-enter="">
+          <div className="workout__ex-head">
+            <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {ex.name || 'Новое упражнение'}</h3>
+            <span className="workout__ex-count" aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{finished ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
+          </div>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
-          {(ex.prescription || ex.prevWeight) && (
-            <p className="small muted">
-              {ex.prescription ? 'План: ' + ex.prescription : ''}
+          {(main || ex.prevWeight) && (
+            <p className="workout__target">
+              {main && <strong>{main}</strong>}
+              {rest.map((r, i) => <span key={i}>{r}</span>)}
               {ex.prevWeight && <span className="workout__prev">было {ex.prevWeight}</span>}
             </p>
           )}
@@ -664,12 +702,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               ? who.map(w => ({ ...[...ex.sets].reverse().find(x => x.who === w), state: 'pending' }))
               : [{ ...ex.sets[ex.sets.length - 1], state: 'pending' }];
             return (
-              <button className="button button--block" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
+              <button className="button button--ghost button--block workout__add" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
                 {who.length > 1 ? 'Добавить круг' : trackOf(ex).kind === 'cardio' ? 'Добавить отрезок' : 'Добавить подход'}
               </button>
             );
           })()}
-          <label className="workout__field">Заметка к упражнению<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} /></label>
+          {/* Заметка — свёрнута, пока пустая: поле ввода на всю ширину в
+              каждом упражнении перетягивало взгляд с подходов */}
+          <details className="workout__note" {...(ex.note ? { open: true } : {})}>
+            <summary>{ex.note ? 'Заметка' : 'Добавить заметку'}</summary>
+            <textarea aria-label="Заметка к упражнению" value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} />
+          </details>
         </section></React.Fragment>;
         })}
         {undo && <button className="button" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Отменить последнее удаление</button>}

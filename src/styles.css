@@ -3875,3 +3875,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .schedule__cancelled .item__name { text-decoration: line-through; color: var(--text-muted); }
 .schedule-stats__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-2); }
 .schedule-stats__num { font-size: var(--text-xl, 24px); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* План упражнения: главные цифры («4 × 8») — цветом текста и весом, остальное тише */
+.exercise__main { color: var(--text); font-weight: 700; font-size: var(--text-md, 16px); font-variant-numeric: tabular-nums; }
+/* Отмены и переносы в карточке: число месяца — главное, разбивка мелко */
+.changes { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.changes__detail { font-size: var(--text-xs); font-weight: 400; color: var(--text-muted); }

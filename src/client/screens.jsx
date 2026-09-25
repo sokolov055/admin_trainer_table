@@ -250,7 +250,13 @@ function changeLine(counts, kind) {
   const detail = kind === 'cancel'
     ? ['клиент ' + t.cancelClient, 'тренер ' + t.cancelTrainer, t.cancelLate ? 'поздних ' + t.cancelLate : '', t.cancelCharged ? 'списано ' + t.cancelCharged : '']
     : ['клиент ' + t.moveClient, 'тренер ' + t.moveTrainer];
-  return part(counts.month) + ' в этом месяце · ' + all + ' всего (' + detail.filter(Boolean).join(', ') + ')';
+  // Число этого месяца — главное; разбивка за всё время — мелко под ним
+  return (
+    <span className="changes">
+      <strong>{part(counts.month)} в этом месяце</strong>
+      <span className="changes__detail">всего {all}: {detail.filter(Boolean).join(', ')}</span>
+    </span>
+  );
 }
 
 export function Plan({ clientRow, clientView = false, familyRow = null }) {
@@ -663,7 +669,13 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
             </button>
           )
           : <div className="exercise__name">{ex.name}</div>}
-        <div className="exercise__scheme">{scheme || '—'}</div>
+        {/* План — цифрами, которые ищут глазами: «4 × 8» заметно, RPE и
+            приёмы рядом тише */}
+        <div className="exercise__scheme">
+          {scheme ? scheme.split('   ·   ').map((part, i) => (i === 0
+            ? <span key={i}>{part.split(' · ').map((p, j) => (j === 0 ? <strong key={j} className="exercise__main">{p}</strong> : <span key={j}> · {p}</span>))}</span>
+            : <span key={i}>   ·   {part}</span>)) : '—'}
+        </div>
         {split && doers.length < members.length && (
           <div className="exercise__who">
             {me ? (mine ? 'только вы' : 'делает ' + doers.join(' и ')) : 'только ' + doers.join(' и ')}

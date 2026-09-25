@@ -158,7 +158,7 @@ test('суперсет из программы виден в занятии', as
     const heads = () => local.root.findAllByType('h3').map(text);
     const rounds = () => local.root.findAllByProps({ className: 'workout__round' }).map(r =>
       r.findAllByProps({ className: 'workout__round-name' }).map(n => text(n).split(' · ')[0]));
-    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3. Планка']);
+    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3 Планка']);
     assert.deepEqual(rounds(), [['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока']]);
     assert.equal(local.root.findAllByProps({ className: 'workout__round-title' }).map(text).join(), 'Круг 1,Круг 2,Круг 3');
     // Поля в круге без заголовков колонок — единицы стоят у названия
@@ -171,7 +171,8 @@ test('суперсет из программы виден в занятии', as
 
     // Настройки — одни на круг, а не у каждого упражнения
     const summaries = () => local.root.findAllByType('summary').map(text);
-    assert.equal(summaries().filter(t => t === 'Настройки подхода').length, 3, 'только у планки');
+    const setMenus = local.root.findAllByType('button').filter(b => /подход \d+: настройки$/.test(b.props['aria-label'] || ''));
+    assert.equal(setMenus.length, 3, 'настройки подхода — только у планки, в кругах их нет');
     assert.equal(summaries().filter(t => t === 'Настройки круга').length, 3);
     await press('Пропустить круг');
     assert.equal(summaries().filter(t => t === 'Круг пропущен · изменить').length, 1);
@@ -180,13 +181,13 @@ test('суперсет из программы виден в занятии', as
     // Разъединили — два отдельных упражнения, подходов у каждого столько,
     // сколько было кругов
     await press('Разъединить');
-    assert.deepEqual(heads(), ['1. Подтягивания', '2. Тяга блока', '3. Планка']);
-    assert.equal(local.root.findAllByProps({ className: 'workout__set ' }).length, 9);
+    assert.deepEqual(heads(), ['1 Подтягивания', '2 Тяга блока', '3 Планка']);
+    assert.equal(local.root.findAll(n => n.type === 'div' && String(n.props.className || '').split(' ')[0] === 'workout__set').length, 9);
     assert.equal(rounds().length, 0);
 
     // И обратно — кнопкой между карточками
     await press('Соединить в суперсет');
-    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3. Планка']);
+    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3 Планка']);
   } finally {
     if (local) local.unmount();
   }
@@ -352,7 +353,6 @@ test('кардио в занятии: режим, метрики, «+ метри
       'Беговая дорожка, отрезок 1, скорость, км/ч',
       'Беговая дорожка, отрезок 1, наклон, %',
       'Беговая дорожка, отрезок 1, расстояние, км',
-      'Беговая дорожка, отрезок 1, RPE',
     ]);
     const button = label => local.root.findAllByType('button').find(b => text(b) === label);
     assert.ok(button('Запустить интервалы'), 'таймер интервалов на месте');
