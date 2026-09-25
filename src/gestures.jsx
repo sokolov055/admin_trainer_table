@@ -1,3 +1,4 @@
+import { openSwipeRow, closeSwipeRow } from './swipe.js';
 import React, { useEffect, useRef } from 'react';
 import { haptic } from './telegram.js';
 import { scrollToClamped } from './scroll.js';
@@ -778,6 +779,15 @@ export function Gestures() {
       // Своё перетаскивание (порядок тренировок в редакторе) — жестам
       // экрана тут делать нечего, ни листанию, ни «потянуть вниз»
       if (e.target.closest && e.target.closest('[data-no-gestures]')) { g = null; return; }
+      // Открыта красная корзина строки (swipe.js): касание по ней — её
+      // дело (нажать «Удалить» или смахнуть вправо, закрыть), касание мимо
+      // — закрывает её. «Назад» и разделы — только следующим жестом
+      const openRow = openSwipeRow();
+      if (openRow) {
+        if (!openRow.contains(e.target)) closeSwipeRow();
+        g = null;
+        return;
+      }
 
       // Перехват на лету: берём текущее положение, а не цель пружины
       if (anim) { anim.stop(); anim = null; }

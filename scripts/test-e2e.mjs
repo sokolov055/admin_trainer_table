@@ -656,7 +656,7 @@ test('тренировки программы переставляются пе�
     await tab.getByRole('button', { name: 'Шаблоны', exact: true }).click();
     await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).first().click();
     await tab.getByRole('button', { name: 'Изменить' }).click();
-    await tab.getByRole('button', { name: 'Порядок тренировок' }).click();
+    await tab.getByRole('button', { name: 'Свернуть тренировки' }).click();
 
     const rows = tab.locator('.block-order__row');
     await rows.first().waitFor({ timeout: 5000 });
@@ -705,7 +705,7 @@ test('тренировки программы переставляются пе�
     assert.equal(await rows.count(), before + 2, 'скопированы обе');
     assert.equal(await tab.locator('.block-order__title').nth(1).textContent(), 'Тренировка 2 — низ (копия)', 'копия — сразу за своей');
 
-    await tab.getByRole('button', { name: 'Готово' }).click();
+    await tab.locator('.plan-edit__order-bar').getByRole('button', { name: 'Развернуть' }).click();
     const firstTitle = await tab.locator('.plan-edit__title').first().inputValue();
     assert.equal(firstTitle, 'Тренировка 2 — низ', 'порядок сохранился и в развёрнутом редакторе');
   } finally {

@@ -34,7 +34,7 @@ function reduced() {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
 }
 
-export default function BlockOrder({ blocks, onMove, onCopy, onRemove, disabled }) {
+export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, disabled }) {
   const [menu, setMenu] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [openRow, setOpenRow] = useState(null);
@@ -181,8 +181,10 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, disabled 
     }
 
     if (g.axis !== 'y') {
-      // Просто касание: открытая корзина закрывается
+      // Просто касание: открытая корзина закрывается, а если закрывать
+      // нечего — открывается сама тренировка
       if (openRow !== null) closeOpen();
+      else if (onOpen && !(e.target.closest && e.target.closest('.block-order__handle'))) onOpen(g.from);
       return;
     }
 

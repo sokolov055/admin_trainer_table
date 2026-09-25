@@ -1,11 +1,13 @@
 import ExercisePicker from './ExercisePicker.jsx';
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useTabLock } from '../gestures.jsx';
 import { apiMutate } from '../api.js';
 import { trackOf, cardioFrom } from '../exercise-track.js';
 import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
 import { useData } from '../useData.js';
 import { Note } from '../ui.jsx';
-import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash } from '../icons.jsx';
+import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash, IconPlus } from '../icons.jsx';
 import BlockOrder from './BlockOrder.jsx';
 
 /**
@@ -99,6 +101,27 @@ export default function PlanEditor({
   };
 
   const [ordering, setOrdering] = useState(false);
+  // Правка программы — не раздел: смахнуть влево в соседний раздел значило
+  // бы бросить несохранённое. Выход — «Сохранить» или «Отмена»
+  useTabLock(true);
+
+  // Из свёрнутого списка — к тренировке: развернуть и прокрутить к ней
+  const openBlock = (i) => {
+    setOrdering(false);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = document.querySelectorAll('.plan-edit__block')[i];
+      if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }));
+  };
+  const toggleOrdering = () => {
+    const next = !ordering;
+    setOrdering(next);
+    // Свернули — к началу списка, он короткий и должен быть виден целиком
+    if (next) requestAnimationFrame(() => {
+      const el = document.querySelector('.plan-edit__order-bar');
+      if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  };
   // Удалённое из порядка тренировок можно вернуть: подтверждения нет —
   // нажатие на корзину уже осознанное, а ошибку чинит «Вернуть»
   const [undo, setUndo] = useState(null); // { draft, text }
@@ -233,11 +256,11 @@ export default function PlanEditor({
           <button
             className={'button' + (ordering ? ' button--primary' : '')}
             disabled={busy}
-            onClick={() => setOrdering(!ordering)}
+            onClick={toggleOrdering}
           >
-            {ordering ? 'Готово' : 'Порядок тренировок'}
+            {ordering ? 'Развернуть' : 'Свернуть тренировки'}
           </button>
-          {ordering && <span className="small muted">Тащите за значок справа. Смахните влево — удалить. Долгое нажатие — копировать</span>}
+          {ordering && <span className="small muted">Нажмите тренировку — откроется она. Тащите за значок справа, смахните влево — удалить, держите — копировать</span>}
         </div>
       )}
 
@@ -245,6 +268,7 @@ export default function PlanEditor({
         <BlockOrder
           blocks={draft}
           disabled={busy}
+          onOpen={openBlock}
           onMove={(from, to) => change((next) => {
             const [moved] = next.splice(from, 1);
             next.splice(to, 0, moved);
@@ -314,7 +338,8 @@ export default function PlanEditor({
               && block.exercises[ei + 1].supersetGroup === exercise.supersetGroup;
 
             return (
-              <div className={'plan-edit__row' + (exercise.supersetGroup ? ' plan-edit__row--superset' : '')} key={ei}>
+              <React.Fragment key={ei}>
+              <div className={'plan-edit__row' + (exercise.supersetGroup ? ' plan-edit__row--superset' : '')}>
                 <ExercisePicker
                   value={exercise.name}
                   exerciseId={exercise.exerciseId}
@@ -403,15 +428,6 @@ export default function PlanEditor({
                   <button className="icon-button plan-edit__icon" aria-label="Ниже" title="Ниже" disabled={busy || ei === block.exercises.length - 1} onClick={() => move(bi, ei, 1)}>
                     <IconArrowDown size={18} />
                   </button>
-                  <button
-                    className={'button button--ghost plan-edit__pair' + (paired ? ' plan-edit__pair--on' : '')}
-                    aria-pressed={paired}
-                    disabled={busy || ei === block.exercises.length - 1}
-                    onClick={() => toggleSuperset(bi, ei)}
-                  >
-                    <IconLinkPair size={16} />
-                    {paired ? 'В суперсете' : 'Суперсет'}
-                  </button>
                   {/* Дропсет — в последнем подходе: в зале там уже будет
                       строка первого сброса */}
                   {(track.kind === 'strength' || track.kind === 'bodyweight') && (
@@ -432,6 +448,32 @@ export default function PlanEditor({
                   </button>
                 </div>
               </div>
+
+              {/* Между упражнениями: вставить ещё одно прямо здесь и
+                  соединить соседей в суперсет — там, где об этом думают,
+                  а не в конце тренировки */}
+              {ei < block.exercises.length - 1 && (
+                <div className={'plan-edit__between' + (paired ? ' plan-edit__between--paired' : '')}>
+                  <button type="button" className="plan-edit__between-btn" disabled={busy} onClick={() => change((next) => {
+                    next[bi].exercises.splice(ei + 1, 0, blank());
+                    return next;
+                  })}>
+                    <IconPlus size={16} />
+                    Упражнение
+                  </button>
+                  <button
+                    type="button"
+                    className={'plan-edit__between-btn' + (paired ? ' plan-edit__between-btn--on' : '')}
+                    aria-pressed={paired}
+                    disabled={busy}
+                    onClick={() => toggleSuperset(bi, ei)}
+                  >
+                    <IconLinkPair size={16} />
+                    {paired ? 'В суперсете — разъединить' : 'Суперсет'}
+                  </button>
+                </div>
+              )}
+              </React.Fragment>
             );
           })}
 
@@ -500,12 +542,26 @@ export default function PlanEditor({
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
 
-      <div className="plan-edit__footer">
-        <button className="button button--primary" disabled={busy} onClick={save}>
-          {busy ? 'Сохраняю…' : submitLabel}
-        </button>
-        <button className="button" disabled={busy} onClick={onCancel}>Отмена</button>
-      </div>
+      {/* Место под плавающей панелью: без него последнее упражнение
+          пряталось бы под ней */}
+      <div className="plan-edit__float-space" aria-hidden="true" />
+
+      {/* «Сохранить», «Свернуть» и «Отмена» — всегда под рукой, с любого
+          места программы. Панель — у края экрана, вне ленты: «липкое»
+          позиционирование ломается внутри сдвигаемых слоёв (листание
+          разделов), и кнопка оставалась внизу страницы */}
+      {typeof document !== 'undefined' && createPortal(
+        <div className="plan-edit__float" role="toolbar" aria-label="Правка программы">
+          <button className="button button--primary" disabled={busy} onClick={save}>
+            {busy ? 'Сохраняю…' : submitLabel}
+          </button>
+          {!single && draft.length > 1 && (
+            <button className="button" disabled={busy} onClick={toggleOrdering}>{ordering ? 'Развернуть' : 'Свернуть'}</button>
+          )}
+          <button className="button button--ghost" disabled={busy} onClick={onCancel}>Отмена</button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

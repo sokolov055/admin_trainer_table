@@ -22,6 +22,15 @@ const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
 const SNAP_MS = 240;
 
 let closeOpen = null;
+let openEl = null;
+
+/**
+ * Открыта ли где-то корзина. Жесты экрана (gestures.jsx) спрашивают: пока
+ * она открыта, смахивание вправо — не «назад», а «закрыть корзину»; любое
+ * касание мимо строки тоже её закрывает. Выход — следующим смахиванием.
+ */
+export function openSwipeRow() { return closeOpen ? openEl : null; }
+export function closeSwipeRow() { if (closeOpen) closeOpen(); }
 
 function reduced() {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
@@ -96,7 +105,7 @@ export function useSwipe({ width = 88, disabled = false } = {}) {
     const opened = !shut && (s.x < -width / 2 || (flick && dx < 0));
     place(opened ? -width : 0, true);
     open.current = opened;
-    if (opened) closeOpen = self.current; else if (closeOpen === self.current) closeOpen = null;
+    if (opened) { closeOpen = self.current; openEl = s.el; } else if (closeOpen === self.current) closeOpen = null;
     // Смахивание — не нажатие: кнопки под пальцем срабатывать не должны
     const stop = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
     s.el.addEventListener('click', stop, { capture: true, once: true });

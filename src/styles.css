@@ -4009,3 +4009,24 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Ручка перестановки: палец на ней не листает страницу, а тащит строку */
 .block-order__handle { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -8px -8px -8px 0; touch-action: none; cursor: grab; }
 .block-order__row { cursor: default; }
+
+/* Панель правки программы — закреплена у низа экрана (портал в body) */
+.plan-edit__float {
+  position: fixed; left: 50%; bottom: var(--float-bottom); z-index: 40;
+  width: min(calc(100% - 2 * var(--space-4)), 560px); transform: translateX(-50%);
+  display: flex; gap: var(--space-2); padding: var(--space-2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.45);
+}
+.plan-edit__float .button--primary { flex: 1; }
+.plan-edit__float-space { height: 88px; }
+
+/* Промежуток между упражнениями: «+ Упражнение» и «Суперсет» — тихие
+   кнопки-пилюли на линии-разделителе */
+.plan-edit__between { position: relative; display: flex; justify-content: center; gap: var(--space-2); padding: var(--space-2) 0; }
+.plan-edit__between::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--border); }
+.plan-edit__between--paired::before { border-top-style: dashed; border-top-color: var(--accent); }
+.plan-edit__between-btn { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.plan-edit__between-btn:active { transform: scale(0.96); }
+.plan-edit__between-btn--on { border-color: var(--accent); color: var(--accent); background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface); }
+.plan-edit__between + .plan-edit__row { border-top: 0; }
