@@ -1,5 +1,5 @@
 import ExercisePicker from './ExercisePicker.jsx';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiMutate } from '../api.js';
 import { trackOf, cardioFrom } from '../exercise-track.js';
 import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
@@ -99,6 +99,14 @@ export default function PlanEditor({
   };
 
   const [ordering, setOrdering] = useState(false);
+  // Удалённое из порядка тренировок можно вернуть: подтверждения нет —
+  // нажатие на корзину уже осознанное, а ошибку чинит «Вернуть»
+  const [undo, setUndo] = useState(null); // { draft, text }
+  useEffect(() => {
+    if (!undo) return undefined;
+    const t = setTimeout(() => setUndo(null), 8000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   const change = (fn) => {
     setDraft((prev) => fn(prev.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e })) }))));
@@ -229,7 +237,7 @@ export default function PlanEditor({
           >
             {ordering ? 'Готово' : 'Порядок тренировок'}
           </button>
-          {ordering && <span className="small muted">Перетащите на новое место. Долгое нажатие — копировать или удалить</span>}
+          {ordering && <span className="small muted">Перетащите на новое место. Смахните влево — удалить. Долгое нажатие — копировать</span>}
         </div>
       )}
 
@@ -242,23 +250,39 @@ export default function PlanEditor({
             next.splice(to, 0, moved);
             return next;
           })}
-          onCopy={(i) => change((next) => {
-            const copy = {
-              ...next[i],
-              title: next[i].title + ' (копия)',
-              // Суперсеты копии — свои группы, чтобы не склеиться с оригиналом
-              exercises: next[i].exercises.map((e) => ({
-                ...e, supersetGroup: e.supersetGroup ? e.supersetGroup + '-c' + Date.now() : '',
-              })),
-            };
-            next.splice(i + 1, 0, copy);
+          onCopy={(indices) => change((next) => {
+            // С конца: копия встаёт сразу за своей тренировкой, и номера
+            // ещё не скопированных от этого не сдвигаются
+            [...indices].sort((a, b) => b - a).forEach((i) => {
+              const copy = {
+                ...next[i],
+                title: next[i].title + ' (копия)',
+                // Суперсеты копии — свои группы, чтобы не склеиться с оригиналом
+                exercises: next[i].exercises.map((e) => ({
+                  ...e, supersetGroup: e.supersetGroup ? e.supersetGroup + '-c' + Date.now() + '-' + i : '',
+                })),
+              };
+              next.splice(i + 1, 0, copy);
+            });
             return next;
           })}
-          onRemove={(i) => change((next) => {
-            if (next.length > 1) next.splice(i, 1);
-            return next;
-          })}
+          onRemove={(indices) => {
+            if (draft.length - indices.length < 1) return;
+            const names = indices.map((i) => '«' + (draft[i].title || 'Без названия') + '»');
+            setUndo({
+              draft,
+              text: names.length === 1 ? 'Удалена ' + names[0] : 'Удалено тренировок: ' + names.length,
+            });
+            change((next) => next.filter((_, i) => !indices.includes(i)));
+          }}
         />
+      )}
+
+      {ordering && undo && (
+        <div className="block-order__undo" role="status">
+          <span>{undo.text}</span>
+          <button type="button" className="button button--ghost" onClick={() => { setDraft(undo.draft); setUndo(null); }}>Вернуть</button>
+        </div>
       )}
 
       {!ordering && draft.map((block, bi) => (

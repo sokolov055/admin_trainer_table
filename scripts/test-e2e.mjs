@@ -677,6 +677,32 @@ test('тренировки программы переставляются пе�
       'первой стала вторая тренировка',
     );
 
+    // Смахнуть влево — выезжает корзина; удаление без подтверждения, но с «Вернуть»
+    const before = await rows.count();
+    const r = await rows.nth(1).boundingBox();
+    await tab.mouse.move(r.x + r.width - 30, r.y + r.height / 2);
+    await tab.mouse.down();
+    for (let i = 1; i <= 6; i += 1) await tab.mouse.move(r.x + r.width - 30 - i * 25, r.y + r.height / 2 + 1);
+    await tab.mouse.up();
+    const trash = rows.nth(1).locator('.block-order__trash');
+    await tab.waitForFunction(() => {
+      const s = document.querySelectorAll('.block-order__swipe')[1];
+      return s && Number(getComputedStyle(s).opacity) > 0.9;
+    }, null, { timeout: 3000 });
+    await trash.click();
+    await tab.waitForFunction((n) => document.querySelectorAll('.block-order__row').length === n - 1, before, { timeout: 3000 });
+    await tab.getByRole('button', { name: 'Вернуть' }).click();
+    assert.equal(await rows.count(), before, 'удалённое вернулось');
+
+    // Выбрать две тренировки и скопировать разом
+    await tab.getByRole('button', { name: 'Выбрать', exact: true }).click();
+    await rows.nth(0).click();
+    await rows.nth(1).click();
+    await assert.doesNotReject(tab.getByText('Выбрано 2').waitFor({ timeout: 3000 }));
+    await tab.locator('.block-order__actions').getByRole('button', { name: 'Копировать' }).click();
+    assert.equal(await rows.count(), before + 2, 'скопированы обе');
+    assert.equal(await tab.locator('.block-order__title').nth(1).textContent(), 'Тренировка 2 — низ (копия)', 'копия — сразу за своей');
+
     await tab.getByRole('button', { name: 'Готово' }).click();
     const firstTitle = await tab.locator('.plan-edit__title').first().inputValue();
     assert.equal(firstTitle, 'Тренировка 2 — низ', 'порядок сохранился и в развёрнутом редакторе');
