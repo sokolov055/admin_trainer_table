@@ -140,6 +140,14 @@ const NUTRITION_OPTIONS = {
     { value: 'high', label: 'Высокая: 6–7 тренировок в неделю', factor: 1.725 },
     { value: 'very_high', label: 'Очень высокая: 2 тренировки в день или тяжёлая работа', factor: 1.9 },
   ],
+  // Два вопроса (с 25.09.2026): чем занят день и тренировки в неделю
+  lifestyles: [
+    { value: 'desk', label: 'Сидячая: работа за столом, на машине', factor: 1.2 },
+    { value: 'feet', label: 'На ногах: работа стоя, много хожу', factor: 1.35 },
+    { value: 'labor', label: 'Физический труд: стройка, склад, доставка', factor: 1.5 },
+  ],
+  trainingStep: 0.05,
+  trainingsMax: 14,
   goal: [
     { value: 'lose', label: 'Похудение' },
     { value: 'keep', label: 'Поддержание формы' },
@@ -226,9 +234,10 @@ function mockParseSurvey(params) {
   if (!sex) mockFail('Не выбран пол: формула основного обмена без него не считается');
 
   const activity = String(params.activity || '');
-  if (!NUTRITION_OPTIONS.activity.some((a) => a.value === activity)) {
-    mockFail('Не выбран уровень активности');
-  }
+  const lifestyle = String(params.lifestyle || '');
+  if (!NUTRITION_OPTIONS.lifestyles.some((l) => l.value === lifestyle)) mockFail('Не выбран образ жизни');
+  const trainings = Number(params.trainings);
+  if (!Number.isInteger(trainings) || trainings < 0 || trainings > 14) mockFail('Тренировок в неделю — от 0 до 14');
 
   const goal = String(params.goal || '');
   if (!GOAL_MATH[goal]) mockFail('Не выбрана цель');
@@ -239,14 +248,17 @@ function mockParseSurvey(params) {
     height: Math.round(height * 10) / 10,
     sex,
     pace: mockPace(goal, params.pace).id,
-    activity,
+    lifestyle,
+    trainings,
+    activity: NUTRITION_OPTIONS.activity.some((a) => a.value === activity) ? activity : 'light',
     goal,
   };
 }
 
 /** Миффлин—Сан Жеор с теми же предохранителями, что в src/150_OpsApi.js */
 function mockCompute(s) {
-  const factor = NUTRITION_OPTIONS.activity.find((a) => a.value === s.activity).factor;
+  const base = NUTRITION_OPTIONS.lifestyles.find((l) => l.value === s.lifestyle).factor;
+  const factor = Math.min(1.9, Math.round((base + s.trainings * 0.05) * 1000) / 1000);
   const bmr = 10 * s.weight + 6.25 * s.height - 5 * s.age + (s.sex === 'm' ? 5 : -161);
   const tdee = bmr * factor;
 
@@ -284,13 +296,15 @@ function mockPlan(s, pace, bmr, tdee) {
   }
 
   let kcal = Math.round(target / 10) * 10;
-  let protein = Math.round(s.weight * goal.protein);
-  let fat = Math.round(s.weight * goal.fat);
+  // Белок и жир — от веса при ИМТ 25, если вес выше
+  const ref = Math.round(Math.min(s.weight, 25 * (s.height / 100) ** 2) * 10) / 10;
+  let protein = Math.round(ref * goal.protein);
+  let fat = Math.round(ref * goal.fat);
   let carbs = Math.round((kcal - protein * 4 - fat * 9) / 4);
 
   if (carbs < 50) {
-    protein = Math.min(protein, Math.round(s.weight * 1.6));
-    fat = Math.min(fat, Math.round(s.weight * 0.8));
+    protein = Math.min(protein, Math.round(ref * 1.6));
+    fat = Math.min(fat, Math.round(ref * 0.8));
     carbs = Math.round((kcal - protein * 4 - fat * 9) / 4);
     adjusted = true;
     notes.push('Белки и жиры снижены до нижней границы (1.6 и 0.8 г/кг): '
@@ -875,6 +889,9 @@ const MOCK = {
         sex: survey.sex,
         activity: survey.activity,
         activityLabel: NUTRITION_OPTIONS.activity.find((a) => a.value === survey.activity).label,
+        lifestyle: survey.lifestyle,
+        lifestyleLabel: NUTRITION_OPTIONS.lifestyles.find((l) => l.value === survey.lifestyle).label,
+        trainings: survey.trainings,
         goal: survey.goal,
         goalLabel: NUTRITION_OPTIONS.goal.find((g) => g.value === survey.goal).label,
         pace: calc.pace,

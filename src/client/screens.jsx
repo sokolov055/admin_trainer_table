@@ -1540,7 +1540,12 @@ export function Nutrition({ clientRow, clientView = false }) {
               <Row label="Вес">{formatNumber(survey.weight)} кг</Row>
               <Row label="Рост">{formatNumber(survey.height)} см</Row>
               <Row label="Пол">{survey.sex === 'm' ? 'мужской' : 'женский'}</Row>
-              <Row label="Активность">{survey.activityLabel || survey.activity}</Row>
+              {survey.lifestyle
+                ? <>
+                  <Row label="День">{(survey.lifestyleLabel || '').split(':')[0] || survey.lifestyle}</Row>
+                  <Row label="Тренировок">{survey.trainings} в неделю</Row>
+                </>
+                : <Row label="Активность">{survey.activityLabel || survey.activity}</Row>}
               <Row label="Цель">{survey.goalLabel || survey.goal}</Row>
               {survey.paceLabel && <Row label="Темп">{survey.paceLabel}</Row>}
               {data.filledAt && (
@@ -1571,7 +1576,7 @@ export function Nutrition({ clientRow, clientView = false }) {
           <Note tone="info" icon={IconNutrition}>
             {byTrainer
               ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и ляжет в таблицу так же, как если бы он сделал это сам.'
-              : 'Шесть ответов о себе — и вы увидите суточную норму калорий и БЖУ. Считает её таблица, тренер получит результат сразу.'}
+              : 'Семь ответов о себе — и вы увидите суточную норму калорий и БЖУ. Тренер получит результат сразу.'}
           </Note>
         </Section>
       )}
@@ -1702,6 +1707,27 @@ function grams(value) {
  * примет. Границ в ответе нет — местная проверка их просто не делает, и
  * последнее слово остаётся за сервером.
  */
+/** Запасной список, если сервер старый и не прислал его */
+const LIFESTYLES = [
+  { value: 'desk', label: 'Сидячая: работа за столом, на машине', factor: 1.2 },
+  { value: 'feet', label: 'На ногах: работа стоя, много хожу', factor: 1.35 },
+  { value: 'labor', label: 'Физический труд: стройка, склад, доставка', factor: 1.5 },
+];
+
+/**
+ * Ключ прежней шкалы активности, ближайший по множителю. Нужен запасному
+ * адресу: Apps Script проверяет анкету по старой шкале. Сервер считает
+ * сам и этот ключ не использует.
+ */
+function legacyActivity(options, form) {
+  const base = ((options.lifestyles || LIFESTYLES).find((l) => l.value === form.lifestyle) || LIFESTYLES[0]).factor;
+  const factor = base + Number(form.trainings || 0) * (options.trainingStep || 0.05);
+  const levels = options.activity || [];
+  let best = levels[0];
+  levels.forEach((l) => { if (Math.abs(l.factor - factor) < Math.abs(best.factor - factor)) best = l; });
+  return best ? best.value : 'light';
+}
+
 function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel }) {
   // Прежние ответы важнее подсказок: если анкету уже заполняли, форма
   // открывается ровно тем, что человек вписал сам. Подсказки — из
@@ -1712,7 +1738,9 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
     weight: pick(survey && survey.weight, prefill && prefill.weight),
     height: pick(survey && survey.height, prefill && prefill.height),
     sex: (survey && survey.sex) || (prefill && prefill.sex) || '',
-    activity: (survey && survey.activity) || '',
+    // Активность — двумя вопросами: чем занят день и сколько тренировок
+    lifestyle: (survey && survey.lifestyle) || '',
+    trainings: survey && survey.trainings !== undefined && survey.trainings !== null ? String(survey.trainings) : '',
     goal: (survey && survey.goal) || '',
   }));
 
@@ -1764,7 +1792,10 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
         weight: form.weight,
         height: form.height,
         sex: form.sex,
-        activity: form.activity,
+        lifestyle: form.lifestyle,
+        trainings: Number(form.trainings),
+        // Ключ прежней шкалы — для запасного адреса (Apps Script) и листа
+        activity: legacyActivity(options, form),
         goal: form.goal,
       });
       onSaved(result);
@@ -1841,19 +1872,30 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
 
         <div className="survey__group">
           <div className="survey__legend">
-            Уровень активности
-            <span className="survey__legend-note">
-              считайте все тренировки за неделю, не только с тренером
-            </span>
+            Чем занят день
+            <span className="survey__legend-note">без тренировок: работа, дорога, быт</span>
           </div>
           <Options
-            items={options.activity}
-            value={form.activity}
-            onChange={(v) => set('activity', v)}
-            label="Уровень активности"
+            items={options.lifestyles || LIFESTYLES}
+            value={form.lifestyle}
+            onChange={(v) => set('lifestyle', v)}
+            label="Чем занят день"
             disabled={busy}
           />
-          {errors.activity && <span className="field__error">{errors.activity}</span>}
+          {errors.lifestyle && <span className="field__error">{errors.lifestyle}</span>}
+        </div>
+
+        <div className="survey__group">
+          <div className="survey__legend">
+            Тренировок в неделю
+            <span className="survey__legend-note">все: с тренером, сами, бассейн, бег</span>
+          </div>
+          <div className="chips survey__trainings" role="radiogroup" aria-label="Тренировок в неделю">
+            {['0', '1', '2', '3', '4', '5', '6', '7'].map((n) => (
+              <button key={n} type="button" role="radio" aria-checked={form.trainings === n} className={'chip' + (form.trainings === n ? ' chip--active' : '')} disabled={busy} onClick={() => set('trainings', n)}>{n}</button>
+            ))}
+          </div>
+          {errors.trainings && <span className="field__error">{errors.trainings}</span>}
         </div>
 
         <div className="survey__group">
@@ -1923,7 +1965,8 @@ function validateSurvey(form, limits) {
   else if (outOfRange(height, limits.height)) found.height = range(limits.height, 'см');
 
   if (!form.sex) found.sex = 'Выберите пол';
-  if (!form.activity) found.activity = 'Выберите уровень активности';
+  if (!form.lifestyle) found.lifestyle = 'Выберите, чем занят день';
+  if (form.trainings === '') found.trainings = 'Выберите, сколько тренировок в неделю';
   if (!form.goal) found.goal = 'Выберите цель';
 
   return found;
