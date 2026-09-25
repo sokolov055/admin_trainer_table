@@ -96,7 +96,9 @@ export function useSwipe({ width = 88, disabled = false } = {}) {
     g.current = null;
     if (!s || e.pointerId !== s.id) return;
     if (s.axis !== 'x') {
-      if (open.current) self.current();
+      // Касание по корзине — её дело: закрыть строку значило бы спрятать
+      // кнопку до того, как браузер пришлёт по ней «нажатие»
+      if (open.current && !(action.current && action.current.contains(e.target))) self.current();
       return;
     }
     const dx = e.clientX - s.x0;

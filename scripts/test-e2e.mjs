@@ -713,6 +713,47 @@ test('тренировки программы переставляются пе�
   }
 });
 
+/**
+ * Корзина после смахивания — настоящими касаниями, а не мышью. На телефоне
+ * «нажатие» по только что выдвинутой кнопке браузер не присылает, и
+ * удаление молчало, хотя мышью всё работало. Ловим именно это.
+ */
+test('смахнуть подход и нажать корзину пальцем — подход удаляется', async () => {
+  const context = await browser.newContext({ viewport: { width: 412, height: 915 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const c = await context.newPage();
+  c.on('pageerror', (error) => consoleErrors.push(String(error)));
+  const cdp = await context.newCDPSession(c);
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  try {
+    await c.goto(origin);
+    await c.getByText('Другой способ входа').tap();
+    await c.getByRole('button', { name: /Войти через код/ }).tap();
+    await c.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
+    await c.getByRole('button', { name: 'Тренировки', exact: true }).tap();
+    const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });
+    await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
+    const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
+    await rows.nth(1).waitFor({ timeout: 20000 });
+    await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await c.waitForTimeout(300);
+    const before = await rows.count();
+    const b = await rows.nth(1).boundingBox();
+    const x0 = b.x + b.width - 60;
+    const y = b.y + 10;
+    await touch('touchStart', x0, y);
+    for (let i = 1; i <= 10; i += 1) { await touch('touchMove', x0 - i * 18, y); await c.waitForTimeout(16); }
+    await touch('touchEnd', 0, 0);
+    await c.waitForTimeout(400);
+    const trash = await rows.nth(1).locator('.swipe__trash').boundingBox();
+    await touch('touchStart', trash.x + trash.width / 2, trash.y + trash.height / 2);
+    await c.waitForTimeout(60);
+    await touch('touchEnd', 0, 0);
+    await c.waitForFunction((n) => document.querySelectorAll('.workout__exercise')[1].querySelectorAll('.workout__set').length === n - 1, before, { timeout: 5000 });
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });

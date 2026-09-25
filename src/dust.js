@@ -1,18 +1,24 @@
 /**
- * Удаление «в пыль»: элемент рассыпается на крупинки, они разлетаются и
- * гаснут — как в «Мстителях», только за полсекунды.
+ * Удаление «в пыль» — как после щелчка Таноса: элемент рассыпается
+ * волной от левого края к правому, крупными хлопьями, и они уносятся
+ * вправо-вверх, растворяясь.
  *
- * Без картинок и холста: SVG-фильтр feTurbulence даёт мелкий шум, а
- * feDisplacementMap сдвигает по нему пиксели элемента — чем больше сдвиг,
- * тем мельче «пыль». Сдвиг растёт от 0 до DUST_SCALE, одновременно элемент
- * уплывает вверх-вправо и гаснет. Каждому удалению — свой фильтр, чтобы
- * два удаления подряд не делили одну анимацию.
+ * Без картинок и холста:
+ *   - SVG feTurbulence с низкой частотой даёт крупный шум — хлопья;
+ *   - feDisplacementMap сдвигает по нему пиксели элемента, и сдвиг растёт
+ *     кадрами — хлопья отрываются всё дальше;
+ *   - маска с мягким краем идёт слева направо — рассыпание не разом, а
+ *     волной, как у героев в кино;
+ *   - сам элемент уплывает вправо-вверх.
+ * Каждому удалению — свой фильтр, два подряд не делят одну анимацию.
  *
  * Возвращает обещание: удалить из данных — после того, как рассыпался.
  * С reduce motion — короткое угасание без движения.
  */
-const DURATION = 520;
-const DUST_SCALE = 70;
+const DURATION = 1400;
+const DUST_SCALE = 150;
+/** Ширина мягкого края волны, % ширины элемента */
+const EDGE = 35;
 let seq = 0;
 
 function reduced() {
@@ -26,18 +32,23 @@ function filterFor(id) {
   svg.setAttribute('height', '0');
   svg.setAttribute('aria-hidden', 'true');
   svg.style.position = 'absolute';
-  svg.innerHTML = `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%">`
-    + '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="' + (seq % 9) + '" result="n"/>'
+  svg.innerHTML = `<filter id="${id}" x="-30%" y="-60%" width="170%" height="220%">`
+    + '<feTurbulence type="fractalNoise" baseFrequency="0.22" numOctaves="1" seed="' + (seq % 9) + '" result="n"/>'
     + '<feDisplacementMap in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G"/>'
     + '</filter>';
   document.body.appendChild(svg);
   return { svg, map: svg.querySelector('feDisplacementMap') };
 }
 
+function mask(el, value) {
+  el.style.maskImage = value;
+  el.style.webkitMaskImage = value;
+}
+
 export function dust(el) {
   if (!el || typeof el.animate !== 'function') return Promise.resolve();
   if (reduced()) {
-    return el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, fill: 'forwards' }).finished.catch(() => {});
+    return el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' }).finished.catch(() => {});
   }
   seq += 1;
   const id = 'dust-' + seq;
@@ -45,13 +56,17 @@ export function dust(el) {
   el.style.filter = `url(#${id})`;
   el.style.pointerEvents = 'none';
 
-  // Сдвиг пикселей — кадрами: у атрибутов SVG-фильтра нет CSS-анимации
+  // Сдвиг пикселей и волна маски — кадрами: у атрибутов SVG-фильтра и у
+  // градиента маски нет плавной CSS-анимации
   const start = performance.now();
   let raf = 0;
   const step = (now) => {
     const t = Math.min(1, (now - start) / DURATION);
-    // Сначала медленно трескается, потом рассыпается быстро
+    // Сначала трещит, потом рвётся: сдвиг растёт с ускорением
     map.setAttribute('scale', String(DUST_SCALE * t * t));
+    // Волна: левее края — уже пыль (прозрачно), правее — ещё целое
+    const edge = -EDGE + t * (100 + 2 * EDGE);
+    mask(el, `linear-gradient(to right, transparent ${edge - EDGE}%, #000 ${edge + EDGE}%)`);
     if (t < 1) raf = requestAnimationFrame(step);
   };
   raf = requestAnimationFrame(step);
@@ -59,10 +74,10 @@ export function dust(el) {
   return el.animate(
     [
       { opacity: 1, transform: 'translate3d(0, 0, 0)' },
-      { opacity: 0.85, transform: 'translate3d(4px, -2px, 0)', offset: 0.4 },
-      { opacity: 0, transform: 'translate3d(18px, -14px, 0)' },
+      { opacity: 0.9, transform: 'translate3d(10px, -6px, 0)', offset: 0.45 },
+      { opacity: 0, transform: 'translate3d(46px, -34px, 0)' },
     ],
-    { duration: DURATION, easing: 'cubic-bezier(0.4, 0, 0.7, 0.2)', fill: 'forwards' },
+    { duration: DURATION, easing: 'cubic-bezier(0.45, 0, 0.8, 0.4)', fill: 'forwards' },
   ).finished.catch(() => {}).then(() => {
     cancelAnimationFrame(raf);
     // Сначала вызывающий убирает элемент из данных (его .then идёт сразу
@@ -72,6 +87,7 @@ export function dust(el) {
     requestAnimationFrame(() => {
       el.style.filter = '';
       el.style.pointerEvents = '';
+      mask(el, '');
       el.getAnimations().forEach((a) => a.cancel());
       svg.remove();
     });

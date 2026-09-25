@@ -201,11 +201,13 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
   };
 
   /** Удалить с уходом строки влево: строка гаснет и уезжает, потом исчезает */
+  const removing = useRef(false);
   const remove = (indices) => {
-    if (blocks.length - indices.length < 1) return;
+    if (removing.current || blocks.length - indices.length < 1) return;
+    removing.current = true;
     haptic('success');
     const rows = indices.map((i) => listRef.current && listRef.current.children[i]).filter(Boolean);
-    const done = () => { onRemove(indices); setSelected(new Set()); setSelecting(false); };
+    const done = () => { removing.current = false; onRemove(indices); setSelected(new Set()); setSelecting(false); };
     // В пыль: тренировка рассыпается и гаснет (dust.js)
     Promise.all(rows.map(dust)).then(done);
   };
@@ -284,6 +286,9 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
                   aria-label={`Удалить «${title}»`}
                   disabled={blocks.length === 1}
                   onPointerDown={(e) => e.stopPropagation()}
+                  /* На отпускание пальца: на iPhone «нажатие» по только что
+                     выдвинутой кнопке приходит не всегда */
+                  onPointerUp={(e) => { e.stopPropagation(); remove([i]); }}
                   onClick={(e) => { e.stopPropagation(); remove([i]); }}
                 >
                   <IconTrash size={22} />

@@ -393,7 +393,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
                 {setTools(ex, ei, si)}
                 <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-                <button className="button" disabled={ex.sets.length === 1} onClick={(e) => dust(e.currentTarget.closest('.workout__set')).then(removeSet)}>Удалить подход</button>
               </div>
             </div>}
           </SwipeRow>;
@@ -438,7 +437,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
           <label>RPE<input aria-label={`${ex.name}, отрезок ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
           <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-          <button className="button" disabled={ex.sets.length === 1} onClick={(e) => dust(e.currentTarget.closest('.workout__set')).then(removeSet)}>Удалить отрезок</button>
         </div>
       </div>}
     </SwipeRow>;
@@ -762,7 +760,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <div className="workout__toolbar">
               <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
               <button className="button button--ghost" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
-              <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={(e) => { const snapshot = s.exercises; dust(e.currentTarget.closest('.workout__exercise')).then(() => { setUndo(snapshot, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(x => x.id !== ex.id) })); }); }}>Убрать</button>
             </div>
           </details>
           {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}

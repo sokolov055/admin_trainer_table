@@ -15,6 +15,14 @@ import { IconTrash } from './icons.jsx';
 export default function SwipeRow({ className = '', children, onDelete, label, disabled = false, dustClosest = '', ...rest }) {
   const sw = useSwipe({ disabled });
   const root = useRef(null);
+  const firing = useRef(false);
+  const fire = (e) => {
+    e.stopPropagation();
+    if (firing.current) return;
+    firing.current = true;
+    const el = (dustClosest && root.current && root.current.closest(dustClosest)) || root.current;
+    dust(el).then(() => { onDelete(); sw.reset(); firing.current = false; });
+  };
   return (
     <div className={'swipe ' + className} ref={root} {...(disabled ? {} : sw.bind)} {...rest}>
       {!disabled && (
@@ -23,11 +31,12 @@ export default function SwipeRow({ className = '', children, onDelete, label, di
             type="button"
             className="swipe__trash"
             aria-label={label}
-            onClick={(e) => {
-              e.stopPropagation();
-              const el = (dustClosest && root.current && root.current.closest(dustClosest)) || root.current;
-              dust(el).then(() => { onDelete(); sw.reset(); });
-            }}
+            /* На отпускание пальца, а не на «нажатие»: на iPhone «нажатие» по
+               кнопке, которую только что выдвинули смахиванием, приходит не
+               всегда. onClick — для клавиатуры; дважды не сработает */
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={fire}
+            onClick={fire}
           >
             <IconTrash size={20} />
             <span>Удалить</span>
