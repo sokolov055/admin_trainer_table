@@ -10,7 +10,7 @@ import {
   Chips, Segmented, Options, Field, Note, Delta,
   formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck } from '../icons.jsx';
+import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
@@ -297,6 +297,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // следующей: проведённые уезжают во вторую вкладку и не отодвигают её
   // вниз — к середине месяца их больше, чем оставшихся.
   const [planTab, setPlanTab] = useState('queue');
+  // Тренировки свёрнуты: список из шести тренировок по шесть упражнений —
+  // это лента в несколько экранов, где нужная теряется. Свёрнутая
+  // показывает, что в ней, и сразу даёт начать; развернуть — по нажатию.
+  const [openBlocks, setOpenBlocks] = useState({});
 
   // Журнал может ответить не сразу, поэтому экран его не
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
@@ -507,6 +511,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           ? past[0].exercises
           : null;
         const shownExercises = made || block.exercises;
+        const blockKey = planTab + ':' + i + ':' + block.title;
+        const open = !!openBlocks[blockKey];
+        const names = shownExercises.map((ex) => ex.name).filter(Boolean);
+        const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
 
         return (
         <Section
@@ -533,7 +541,19 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
               </div>
             )}
             {!running && !familyRow && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month, members: data.members || [] })}>Начать тренировку</button>}
-            {made && supersets(made).map((group, j) => {
+            <button
+              type="button"
+              className="plan__toggle"
+              aria-expanded={open}
+              onClick={() => { setOpenBlocks((prev) => ({ ...prev, [blockKey]: !open })); haptic(); }}
+            >
+              <span className="plan__toggle-text">
+                <strong>{open ? 'Свернуть' : planTab === 'done' ? 'Что сделано' : 'Упражнения'}</strong>
+                {!open && preview && <span>{preview}</span>}
+              </span>
+              <IconChevron size={18} className={'plan__chevron' + (open ? ' plan__chevron--open' : '')} aria-hidden="true" />
+            </button>
+            {open && made && supersets(made).map((group, j) => {
               // У пары — строкой на человека: «Евгений: 3 × 12 · 25 кг». В
               // суперсете круги стоят у скобки, у упражнения — без них.
               const line = group.superset ? roundLine : doneLine;
@@ -558,7 +578,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
               const rounds = Math.max(...group.items.map((ex) => Math.round(ex.sets.length / people(ex))));
               return <Superset rounds={rounds} key={'m' + j}>{rows}</Superset>;
             })}
-            {!made && supersets(block.exercises).map((group, j) => (
+            {open && !made && supersets(block.exercises).map((group, j) => (
               group.superset
                 ? (
                   <Superset rounds={Number(group.sets) || 0} key={j}>

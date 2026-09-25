@@ -112,6 +112,9 @@ test('вход в кабинет доходит до программы', async 
 test('в блоке видны все упражнения, включая первое', async () => {
   const block = section('Тренировка 1 — верх');
 
+  // Тренировка свёрнута: упражнения — по нажатию на «Упражнения»
+  assert.equal(await block.locator('.exercise').count(), 0, 'по умолчанию свёрнута');
+  await block.locator('.plan__toggle').click();
   await assert.doesNotReject(block.getByText('Жим лёжа', { exact: true }).waitFor({ timeout: 5000 }));
   assert.equal(await block.locator('.exercise').count(), 4, 'ни одно упражнение не потерялось');
 });
@@ -130,6 +133,7 @@ test('в программе нет весов — только подходы и
 
 /** Суперсет в таблице не подписан словом — он должен собраться в группу */
 test('суперсет показан одной группой с числом кругов', async () => {
+  await section('Тренировка 2 — низ').locator('.plan__toggle').click();
   const group = section('Тренировка 2 — низ').locator('.superset');
 
   assert.equal(await group.count(), 1);
@@ -189,6 +193,8 @@ test('тренировку можно провести, и блок станов
   await assert.doesNotReject(done.getByText('Тренировка проведена').waitFor({ timeout: 5000 }));
 
   const block = section('Тренировка 1 — верх');
+  // Свёрнута и во «Выполненных»: «Что сделано» разворачивает
+  await block.locator('.plan__toggle').click();
   await assert.doesNotReject(block.getByText('Жим на наклонной скамье').waitFor({ timeout: 5000 }),
     'во «Выполненных» — упражнение, сделанное на занятии');
   assert.equal(await block.locator('.exercise__name', { hasText: /^Жим лёжа$/ }).count(), 0, 'а не из плана');

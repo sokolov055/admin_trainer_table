@@ -294,6 +294,13 @@ export const IconArrowUp = (p) => (
   </Icon>
 );
 
+/** Шеврон — «развернуть/свернуть»; поворачивается стилем */
+export const IconChevron = (p) => (
+  <Icon {...p}>
+    <path d="M6 9l6 6 6-6" />
+  </Icon>
+);
+
 export const IconArrowDown = (p) => (
   <Icon {...p}>
     <path d="M12 5v14M6 13l6 6 6-6" />
