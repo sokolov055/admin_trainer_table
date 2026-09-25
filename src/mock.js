@@ -14,6 +14,7 @@
  * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
+import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
 
 const daysAgo = (n) => {
@@ -621,6 +622,20 @@ const MOCK = {
   },
   'food.add': (params) => ({ food: { id: 99, name: params.name, kcal: Number(params.kcal) || 0, protein: Number(params.protein) || 0, fat: Number(params.fat) || 0, carbs: Number(params.carbs) || 0, piece: Number(params.piece) || 0, uses: 0 }, existed: false }),
   'food.use': () => ({ ok: true }),
+  'dishes.list': () => ({
+    dishes: RECIPES_DEMO.map((r, i) => ({
+      ...r,
+      items: r.items,
+      minutes: 20 + (i % 4) * 10,
+      steps: ['Подготовьте продукты.', 'Приготовьте по привычному рецепту.', 'Подавайте тёплым.'],
+      tags: i % 3 ? ['быстро'] : ['вегетарианское', 'без молочного'],
+      status: i < 3 ? 'draft' : 'published',
+      budget: true,
+    })),
+    foods: Object.entries(FOOD_DEMO).map(([name, f]) => ({ name, ...f, source: 'ru' })),
+  }),
+  'dish.status': (params) => ({ id: params.id, status: params.status }),
+  'dish.save': (params) => ({ id: 'demo-dish', ...params, per: { kcal: 300, protein: 20, fat: 10, carbs: 30 }, tags: [], status: 'draft', items: params.items || [], steps: params.steps || [] }),
   'ration.get': () => ({ saved: false, pantry: null, liked: [], seen: [], extras: [], day: '' }),
   'ration.save': () => ({ ok: true }),
   'ration.extra.add': (params) => ({ id: Date.now(), product: params.product, grams: params.grams, pieces: params.pieces || 0 }),

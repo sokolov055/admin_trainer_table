@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Section, Panel, Note, Search, formatNumber, plural } from '../ui.jsx';
 import { IconCheck, IconClose, IconBack, IconNutrition } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { FOOD, MEALS } from './recipes.js';
+import { MEALS } from './recipes.js';
+import { CATALOG, setCatalog } from './catalog.js';
 import {
   rankRecipes, planVariants, shoppingList, foodByGroup, defaultPantry, splitItems,
   portionWeight, per100, extraTotals, remainingTarget, addTotals,
@@ -218,6 +219,29 @@ function Hundred({ recipe }) {
 }
 
 /**
+ * Рецепт: как готовить и сколько времени. Свёрнут — карточка отвечает на
+ * «буду или не буду», а шаги нужны, когда уже решил готовить.
+ */
+function Recipe({ recipe }) {
+  const steps = recipe.steps || [];
+  if (!steps.length) return null;
+  return (
+    <details className="recipe" onClick={(e) => e.stopPropagation()}>
+      <summary>Как готовить{recipe.minutes ? ' · ' + recipe.minutes + ' мин' : ''}</summary>
+      <ol className="recipe__steps">
+        {steps.map((step, i) => <li key={i}>{step}</li>)}
+      </ol>
+    </details>
+  );
+}
+
+/** Метки блюда: быстро, вегетарианское, без молочного… */
+function Tags({ recipe }) {
+  if (!recipe.tags || !recipe.tags.length) return null;
+  return <div className="card__tags">{recipe.tags.map((t) => <span key={t} className="card__tag">{t}</span>)}</div>;
+}
+
+/**
  * Карточка блюда: то, что нужно для ответа «буду или не буду».
  *
  * Крупно калории — по ним человек и решает. Состав ниже, и в нём видно, чего
@@ -242,6 +266,7 @@ function Card({ entry, offset, style, handlers, flying }) {
       <div className="card__top">
         <span className="card__meal">{mealTitle}</span>
         <h3 className="card__name">{recipe.name}</h3>
+        <Tags recipe={recipe} />
       </div>
 
       <div className="card__macros">
@@ -283,6 +308,8 @@ function Card({ entry, offset, style, handlers, flying }) {
           : 'Готовится на ' + recipe.portions + ' '
             + plural(recipe.portions, 'порцию', 'порции', 'порций')}
       </p>
+
+      <Recipe recipe={recipe} />
     </article>
   );
 }
@@ -546,6 +573,7 @@ function Day({ variants, index, targets, pantry, eaten, extras, onOther, onResta
                     {' '}Ж {formatNumber(Math.round(dish.recipe.per.fat * dish.servings * 10) / 10)} ·
                     {' '}У {formatNumber(Math.round(dish.recipe.per.carbs * dish.servings * 10) / 10)}
                   </p>
+                  <Recipe recipe={dish.recipe} />
                 </div>
               );
             })}
@@ -720,13 +748,34 @@ export default function Ration({ targets, onClose, trial = false }) {
   };
 
 
+  // Каталог блюд — с сервера: там рецепты и то, что опубликовал тренер.
+  // Пока не пришёл — встроенный набор (catalog.js); пришёл — пересчёт.
+  const [catalogVersion, setCatalogVersion] = useState(CATALOG.fromServer ? 1 : 0);
+  useEffect(() => {
+    let alive = true;
+    apiPublic('dishes.list', {})
+      .then((r) => { if (alive && setCatalog(r || {})) setCatalogVersion((v) => v + 1); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // Фильтр колоды по меткам: «быстро», «вегетарианское», «без молочного»…
+  const [tag, setTag] = useState('');
+  const tagOptions = useMemo(() => {
+    const seenTags = new Set();
+    CATALOG.RECIPES.forEach((r) => (r.tags || []).forEach((t) => seenTags.add(t)));
+    return ['быстро', 'высокобелковое', 'вегетарианское', 'без молочного', 'бюджетно'].filter((t) => seenTags.has(t));
+  }, [catalogVersion]);
+
   const deck = useMemo(
-    () => rankRecipes(pantry).filter((entry) => !seen.includes(entry.recipe.id)),
-    [pantry, seen]
+    () => rankRecipes(pantry)
+      .filter((entry) => !seen.includes(entry.recipe.id))
+      .filter((entry) => !tag || (entry.recipe.tags || []).includes(tag)),
+    [pantry, seen, tag, catalogVersion]
   );
 
   // Блюда подбираются под то, что осталось от нормы после своего
-  const variants = useMemo(() => planVariants(liked, rest), [liked, rest]);
+  const variants = useMemo(() => planVariants(liked, rest), [liked, rest, catalogVersion]);
 
   const toggle = (name) => setPantry((list) => (
     list.includes(name) ? list.filter((n) => n !== name) : [...list, name]
@@ -791,6 +840,21 @@ export default function Ration({ targets, onClose, trial = false }) {
 
       {step === 'pantry' && (
         <Pantry pantry={pantry} onToggle={toggle} onNext={() => setStep('swipe')} />
+      )}
+
+      {step === 'swipe' && tagOptions.length > 0 && (
+        <div className="ration__tags" role="radiogroup" aria-label="Какие блюда показывать">
+          {[''].concat(tagOptions).map((t) => (
+            <button
+              key={t || 'all'}
+              type="button"
+              role="radio"
+              aria-checked={tag === t}
+              className={'chip' + (tag === t ? ' chip--active' : '')}
+              onClick={() => { setTag(t); haptic(); }}
+            >{t || 'все'}</button>
+          ))}
+        </div>
       )}
 
       {step === 'swipe' && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { useData } from '../useData.js';
 import { Section, Panel, Rows, Row, Loading, formatNumber, plural } from '../ui.jsx';
 import { RECIPES } from './recipes.js';
+import { useData as useCatalogData } from '../useData.js';
 import { extraTotals } from './match.js';
 
 /**
@@ -14,6 +15,8 @@ import { extraTotals } from './match.js';
  */
 export default function RationSummary({ clientRow }) {
   const { loading, data: raw } = useData('ration.summary', { clientRow }, [clientRow]);
+  // Названия блюд — из каталога сервера (там и новые); встроенный — запасной
+  const catalog = useCatalogData('dishes.list', {}, []);
 
   if (loading) return <Loading lead={false} rows={2} />;
   // Старый сервер или сбой — поля может не быть: пусто, а не падение экрана
@@ -33,6 +36,7 @@ export default function RationSummary({ clientRow }) {
 
   const eaten = extraTotals(data.extras);
   const names = new Map(RECIPES.map((r) => [r.id, r.name]));
+  ((catalog.data && catalog.data.dishes) || []).forEach((d) => names.set(d.id, d.name));
   const likedNames = (data.liked || []).map((id) => names.get(id)).filter(Boolean);
 
   return (

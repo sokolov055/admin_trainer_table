@@ -35,6 +35,7 @@ export const GROUPS = [
   { id: 'dairy', title: 'Молочное' },
   { id: 'veg', title: 'Овощи, фрукты, грибы' },
   { id: 'beans', title: 'Бобовые' },
+  { id: 'nuts', title: 'Орехи и семена' },
   { id: 'other', title: 'Прочее' },
 ];
 
@@ -89,7 +90,7 @@ export const FOOD = {
   'кабачок': { kcal: 24, protein: 0.6, fat: 0.3, carbs: 4.6, group: 'veg' },
   'брокколи': { kcal: 34, protein: 3.0, fat: 0.4, carbs: 5.2, group: 'veg' },
   'свёкла': { kcal: 42, protein: 1.5, fat: 0.1, carbs: 8.8, group: 'veg' },
-  'тыква': { kcal: 28, protein: 1.3, fat: 0.3, carbs: 7.7, group: 'veg' },
+  'тыква': { kcal: 29, protein: 1.0, fat: 0.1, carbs: 6.0, group: 'veg' }, // 25.09: было 28 ккал при 1,3/0,3/7,7 — не сходилось с 4/9/4; USDA 168448
   'шампиньоны': { kcal: 27, protein: 4.3, fat: 1.0, carbs: 0.1, group: 'veg' },
   'горошек зелёный': { kcal: 55, protein: 5.0, fat: 0.2, carbs: 8.3, group: 'veg' },
   'зелень': { kcal: 38, protein: 3.0, fat: 0.5, carbs: 4.0, group: 'veg' },
@@ -212,7 +213,7 @@ export const RECIPES = [
     name: 'Пшённая каша с тыквой',
     meal: 'завтрак',
     portions: 2,
-    per: { kcal: 369, protein: 13.2, fat: 10.3, carbs: 58.7 },
+    per: { kcal: 371, protein: 12.8, fat: 10, carbs: 56.1 },
     items: [
       { food: 'пшено', grams: 120 },
       { food: 'тыква', grams: 300 },

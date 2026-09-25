@@ -508,3 +508,13 @@
 .extras__picked { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
 
 .ration__trial-reset { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* Рецепт блюда: свёрнут до нажатия */
+.recipe { margin-top: var(--space-2); }
+.recipe summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: var(--text-sm); list-style: none; }
+.recipe summary::-webkit-details-marker { display: none; }
+.recipe__steps { margin: var(--space-2) 0 0; padding-left: 1.3em; display: grid; gap: 6px; font-size: var(--text-sm); line-height: 1.45; }
+.card__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.card__tag { font-size: var(--text-xs); color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+.ration__tags { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 var(--space-3); }
+.ration__tags::-webkit-scrollbar { display: none; }

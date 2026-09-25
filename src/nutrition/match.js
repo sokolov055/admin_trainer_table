@@ -1,4 +1,5 @@
-import { RECIPES, FOOD, STAPLES, MAIN_GRAMS, MEALS, GROUPS } from './recipes.js';
+import { STAPLES, MAIN_GRAMS, MEALS, GROUPS } from './recipes.js';
+import { CATALOG } from './catalog.js';
 
 /**
  * ==========================================================================
@@ -92,7 +93,7 @@ export function per100(recipe) {
 export function rankRecipes(pantry, { limit = 20, maxMissing = 3 } = {}) {
   const have = asSet(pantry);
 
-  const scored = RECIPES.map((recipe) => {
+  const scored = CATALOG.RECIPES.map((recipe) => {
     const { main, minor } = splitItems(recipe);
     const missing = main.filter((i) => !have.has(i.food)).map((i) => i.food);
     return {
@@ -258,7 +259,7 @@ function search(pool, target, servings) {
  */
 export function planVariants(likedIds, target, { limit = 6 } = {}) {
   const liked = new Set(likedIds || []);
-  const pool = RECIPES.filter((r) => liked.has(r.id));
+  const pool = CATALOG.RECIPES.filter((r) => liked.has(r.id));
   if (!target || !target.kcal || !pool.length) return [];
 
   let found = search(pool, target, [1]);
@@ -322,7 +323,7 @@ export function shoppingList(dishes, pantry) {
   const rows = [...totals.entries()].map(([food, grams]) => ({
     food,
     grams,
-    group: (FOOD[food] && FOOD[food].group) || 'other',
+    group: (CATALOG.FOOD[food] && CATALOG.FOOD[food].group) || 'other',
     minor: grams < MAIN_GRAMS,
   }));
 
@@ -341,13 +342,13 @@ export function shoppingList(dishes, pantry) {
 export function foodByGroup() {
   return GROUPS.map((group) => ({
     ...group,
-    items: Object.keys(FOOD).filter((name) => FOOD[name].group === group.id),
+    items: Object.keys(CATALOG.FOOD).filter((name) => CATALOG.FOOD[name].group === group.id),
   })).filter((group) => group.items.length);
 }
 
 /** Набор, с которого начинается пустой холодильник. */
 export function defaultPantry() {
-  return STAPLES.filter((name) => FOOD[name]);
+  return STAPLES.filter((name) => CATALOG.FOOD[name]);
 }
 
 /* ==================================================================

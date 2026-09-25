@@ -4,6 +4,7 @@ import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
+import Dishes from './Dishes.jsx';
 import { uploadVideo, mediaUrl, youtubeEmbed, monthName } from '../library.js';
 import {
   Section, Panel, Loading, ErrorState, Empty, Badge, Chips, Search, Segmented, Field, Note, plural,
@@ -27,6 +28,8 @@ export const LIBRARY_PANES = [
   { value: 'program', label: 'Программы' },
   { value: 'workout', label: 'Тренировки' },
   { value: 'exercises', label: 'Упражнения' },
+  // Блюда для рациона клиентов: черновики на проверку, публикация, правка
+  { value: 'dishes', label: 'Блюда' },
 ];
 
 const SCOPES = [
@@ -75,6 +78,7 @@ const LEVELS = [
 ];
 
 export default function Library({ pane }) {
+  if (pane === 'dishes') return <Dishes />;
   return pane === 'exercises' ? <Exercises /> : <Templates key={pane} kind={pane} />;
 }
 
