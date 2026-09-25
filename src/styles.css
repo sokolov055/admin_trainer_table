@@ -3849,3 +3849,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .superset__count { display: grid; justify-items: center; line-height: 1.05; min-width: 40px; }
 .superset__count strong { font-size: var(--text-xl, 1.5rem); font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
 .superset__count span { font-size: var(--text-xs); color: var(--text-muted); }
+
+/* Галочки типа упражнения в библиотеке */
+.library__check { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; font-size: var(--text-sm); }
+.library__check input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }

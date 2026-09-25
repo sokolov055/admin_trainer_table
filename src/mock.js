@@ -55,20 +55,24 @@ const PLAN_BLOCKS = [
     title: 'Тренировка 1 — верх',
     exercises: [
       { name: 'Жим лёжа', weight: '72.5', prevWeight: '70', sets: '4', reps: '8', rpe: '8' },
-      { name: 'Тяга штанги в наклоне', weight: '65', prevWeight: '62.5', sets: '4', reps: '10', rpe: '7' },
-      { name: 'Жим гантелей сидя', weight: '24', prevWeight: '24', sets: '3', reps: '12', rpe: '8' },
-      { name: 'Подтягивания', weight: '+5', prevWeight: '0', sets: '4', reps: 'макс', rpe: '9' },
+      // Типы упражнений (track) — как их отдаёт сервер: дропсет, вес
+      // одной гантели, свой вес с добавкой
+      { name: 'Тяга штанги в наклоне', weight: '65', prevWeight: '62.5', sets: '4', reps: '10', rpe: '7', technique: 'dropset' },
+      { name: 'Жим гантелей сидя', weight: '24', prevWeight: '24', sets: '3', reps: '12', rpe: '8', track: { kind: 'strength', machine: '', unilateral: false, perSide: true } },
+      { name: 'Подтягивания', weight: '+5', prevWeight: '0', sets: '4', reps: 'макс', rpe: '9', track: { kind: 'bodyweight', machine: '', unilateral: false, perSide: false } },
     ],
   },
   {
     title: 'Тренировка 2 — низ',
     exercises: [
+      // Кардио-разминка: время, скорость, наклон
+      { name: 'Беговая дорожка', weight: '6 км/ч, 5%', prevWeight: '', sets: '1', reps: '10', rpe: '', track: { kind: 'cardio', machine: 'treadmill', unilateral: false, perSide: false } },
       { name: 'Присед со штангой', weight: '95', prevWeight: '90', sets: '5', reps: '5', rpe: '8' },
       { name: 'Румынская тяга', weight: '85', prevWeight: '80', sets: '4', reps: '10', rpe: '7' },
       // Суперсет: в таблице это объединённая ячейка «Подходы», здесь —
       // общая группа. Демо должно показывать и его, иначе увидеть эту
       // часть экрана можно только на живом клиенте.
-      { name: 'Выпады с гантелями', weight: '20', prevWeight: '20', sets: '3', reps: '12', rpe: '8', supersetGroup: 'superset-9-10' },
+      { name: 'Выпады с гантелями', weight: '20', prevWeight: '20', sets: '3', reps: '12', rpe: '8', supersetGroup: 'superset-9-10', track: { kind: 'strength', machine: '', unilateral: true, perSide: true } },
       { name: 'Подъём на носки', weight: '40', prevWeight: '40', sets: '3', reps: '15', rpe: '7', supersetGroup: 'superset-9-10' },
     ],
   },

@@ -1,3 +1,4 @@
+import { KIND_LABELS, MACHINE_LABELS } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
@@ -914,6 +915,8 @@ function ExerciseView({ exercise, onBack, onEdit, onDeleted, onRemove }) {
             </div>
           )}
 
+        {e.track && <p className="small muted">Записывается: {trackLine(e.track)}</p>}
+
         {e.notes && <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{e.notes}</p>}
 
         <div className="library__actions">
@@ -944,12 +947,29 @@ function ExerciseView({ exercise, onBack, onEdit, onDeleted, onRemove }) {
   );
 }
 
+/** «Кардио · Беговая дорожка», «Силовое · вес с одной стороны» (+ «авто») */
+function trackLine(t) {
+  return [
+    KIND_LABELS[t.kind],
+    t.kind === 'cardio' && MACHINE_LABELS[t.machine],
+    t.unilateral && 'повторы на сторону',
+    t.perSide && 'вес с одной стороны',
+  ].filter(Boolean).join(' · ') + (t.auto ? ' (определено само)' : '');
+}
+
 function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
   const [name, setName] = useState(exercise ? exercise.name : '');
   const [muscle, setMuscle] = useState(exercise ? exercise.muscle : '');
   const [equipment, setEquipment] = useState(exercise ? exercise.equipment : '');
   const [notes, setNotes] = useState(exercise ? exercise.notes : '');
   const [link, setLink] = useState(exercise && exercise.media && exercise.media.kind === 'link' ? exercise.media.url : '');
+  // Тип учёта: «авто» — угадывается по названию и инвентарю; остальное —
+  // выбор тренера, когда угадано не так
+  const known = exercise && exercise.track;
+  const [kind, setKind] = useState(known && !known.auto ? known.kind : 'auto');
+  const [machine, setMachine] = useState((known && known.machine) || 'treadmill');
+  const [unilateral, setUnilateral] = useState(!!(known && known.unilateral));
+  const [perSide, setPerSide] = useState(!!(known && known.perSide));
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -970,6 +990,7 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
         muscle,
         equipment,
         notes,
+        track: kind === 'auto' ? { auto: true } : { kind, machine, unilateral, perSide },
         // Ссылку не трогаем, если загружен файл и поле пустое
         ...(link || !keepsMedia ? { link } : {}),
       });
@@ -1002,6 +1023,28 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
           </div>
 
           <Field label="Инвентарь" inputMode="text" value={equipment} onChange={setEquipment} placeholder="Гантели" />
+
+          <div>
+            <span className="field__label">Что записывать в подходе</span>
+            <Chips
+              items={[{ value: 'auto', label: known && known.auto ? 'Само: ' + KIND_LABELS[known.kind].toLowerCase() : 'Определить само' },
+                ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label }))]}
+              value={kind}
+              onChange={setKind}
+            />
+          </div>
+          {kind === 'cardio' && (
+            <div>
+              <span className="field__label">Тренажёр</span>
+              <Chips items={Object.entries(MACHINE_LABELS).map(([value, label]) => ({ value, label }))} value={machine} onChange={setMachine} />
+            </div>
+          )}
+          {kind !== 'auto' && kind !== 'cardio' && (
+            <label className="library__check"><input type="checkbox" checked={unilateral} onChange={(e) => setUnilateral(e.target.checked)} />Повторы на каждую сторону (выпады, тяга одной рукой)</label>
+          )}
+          {kind === 'strength' && (
+            <label className="library__check"><input type="checkbox" checked={perSide} onChange={(e) => setPerSide(e.target.checked)} />Вес с одной стороны (гантели, Смит, рычажные)</label>
+          )}
 
           <label className="field">
             <span className="field__label">Техника и подсказки</span>

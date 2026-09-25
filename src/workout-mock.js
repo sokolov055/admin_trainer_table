@@ -10,8 +10,8 @@ export function workoutMock(action, params) {
   if (action === 'workout.list') return { owner: String(owner), sessions: sessions.map(s => ({ ...s, done: summary(s).done,
     // Как на сервере (doneSummary): у завершённого — только сделанное
     exercises: s.status === 'completed'
-      ? s.exercises.map(e => ({ name: e.name, supersetGroup: e.supersetGroup || '',
-        sets: e.sets.filter(x => x.state === 'done' && x.kind !== 'warmup').map(x => ({ weight: x.weight || '', reps: x.reps || '', ...(x.who ? { who: x.who } : {}) })) }))
+      ? s.exercises.map(e => ({ name: e.name, supersetGroup: e.supersetGroup || '', ...(e.track ? { track: e.track } : {}),
+        sets: e.sets.filter(x => x.state === 'done' && x.kind !== 'warmup').map(({ state, kind, rpe, ...x }) => ({ ...x, weight: x.weight || '', reps: x.reps || '' })) }))
         .filter(e => e.sets.length)
       : undefined })).reverse() };
   const previous = sessions.find(s => s.id === (params.id || params.session?.id));

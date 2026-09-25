@@ -157,10 +157,12 @@ test('суперсет из программы виден в занятии', as
     // у каждого свой вес и повторы, потом следующий круг
     const heads = () => local.root.findAllByType('h3').map(text);
     const rounds = () => local.root.findAllByProps({ className: 'workout__round' }).map(r =>
-      r.findAllByProps({ className: 'workout__round-name' }).map(text));
+      r.findAllByProps({ className: 'workout__round-name' }).map(n => text(n).split(' · ')[0]));
     assert.deepEqual(heads(), ['Суперсет · 3 круга', '3. Планка']);
     assert.deepEqual(rounds(), [['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока']]);
     assert.equal(local.root.findAllByProps({ className: 'workout__round-title' }).map(text).join(), 'Круг 1,Круг 2,Круг 3');
+    // Поля в круге без заголовков колонок — единицы стоят у названия
+    assert.equal(text(local.root.findAllByProps({ className: 'workout__round-units' })[0]), ' · кг · повт.');
     const press = async label => {
       const b = local.root.findAllByType('button').find(x => text(x) === label);
       assert.ok(b, label);

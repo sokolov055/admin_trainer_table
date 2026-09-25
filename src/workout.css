@@ -243,7 +243,7 @@
 .workout__set-row,
 .workout__set-head {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 48px;
+  grid-template-columns: 44px repeat(var(--cols, 2), minmax(0, 1fr)) 48px;
   align-items: center;
   gap: var(--space-2);
 }
@@ -431,7 +431,7 @@
 /* Сплит: у подхода имя («Екатерина · 2») — оно не помещается в узкую
    колонку номера, поэтому стоит строкой над весом и повторами */
 .workout__set-row--who,
-.workout__set-head--who { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 48px; }
+.workout__set-head--who { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)) 48px; }
 .workout__set-row--who > span:first-child { grid-column: 1 / -1; font-weight: 600; color: var(--text); }
 .workout__set-head--who > span:first-child { display: none; }
 
@@ -455,3 +455,24 @@
 .workout__join svg { width: 16px; height: 16px; }
 .workout__join:hover { color: var(--accent); border-color: var(--accent); }
 .workout__join:disabled { display: none; }
+
+/* Тип упражнения: сбросы дропсета и стороны Л/П — строками под подходом,
+   тем же шагом колонок, но тише: это продолжение подхода, а не новый */
+.workout__drop { margin-top: 6px; }
+.workout__drop > span { font-size: var(--text-xs); color: var(--text-muted); }
+.workout__drop input { min-height: 40px; }
+.workout__drop-remove {
+  width: 48px; min-height: 40px; display: grid; place-items: center;
+  border: 0; background: none; color: var(--text-muted); cursor: pointer;
+}
+.workout__drop-add {
+  display: block; margin: 6px 0 0 52px; padding: 6px 0; border: 0; background: none;
+  color: var(--accent); font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
+.workout__extras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-2) 0; }
+.workout__extras label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
+.workout__extras input { width: 100%; text-align: center; }
+.workout__track { display: grid; gap: var(--space-2); margin: var(--space-2) 0; }
+.workout__check-line { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); min-height: 40px; }
+.workout__check-line input { width: 20px; height: 20px; accent-color: var(--accent); }
+.workout__round-units { font-weight: 400; color: var(--text-muted); font-size: var(--text-xs); }

@@ -1,6 +1,7 @@
 import ExercisePicker from './ExercisePicker.jsx';
 import React, { useState } from 'react';
 import { apiMutate } from '../api.js';
+import { trackOf } from '../exercise-track.js';
 import { useData } from '../useData.js';
 import { Note } from '../ui.jsx';
 import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash } from '../icons.jsx';
@@ -31,7 +32,27 @@ const blank = () => ({
   performers: [], splitWeights: {}, splitPrev: {},
   // Ссылка на упражнение из базы: выбрано в подсказках или связано по названию
   exerciseId: null,
+  // Приём: 'dropset' — последний подход со сбросами веса
+  technique: '',
 });
+
+/**
+ * Подписи колонок по типу упражнения. Колонки те же четыре — меняется
+ * смысл: у кардио «повторы» — время, «вес» — режим тренажёра («8 км/ч,
+ * 3%», «уровень 6»); у статики «повторы» — секунды.
+ */
+function columns(exercise) {
+  const t = trackOf(exercise);
+  const sets = exercise.supersetGroup ? 'Круги' : 'Подходы';
+  if (t.kind === 'cardio') {
+    const mode = t.machine === 'treadmill' ? 'км/ч, %' : t.machine === 'other' ? 'режим' : 'уровень';
+    return { heads: ['Отрезки', 'Время', 'Режим', 'RPE'], ph: ['Отр.', 'мин', mode, 'RPE'] };
+  }
+  if (t.kind === 'timed') return { heads: [sets, 'Время, с', 'Доп. вес', 'RPE'], ph: ['Подх.', 'сек', 'свой', 'RPE'] };
+  const reps = t.unilateral ? 'Повт./стор.' : 'Повторы';
+  if (t.kind === 'bodyweight') return { heads: [sets, reps, 'Доп. вес', 'RPE'], ph: ['Подх.', 'Повт.', 'свой', 'RPE'] };
+  return { heads: [sets, reps, t.perSide ? 'Кг/стор.' : 'Вес', 'RPE'], ph: ['Подх.', 'Повт.', 'Вес', 'RPE'] };
+}
 
 /**
  * Тот же редактор правит и шаблоны из библиотеки: у шаблона те же блоки.
@@ -258,19 +279,21 @@ export default function PlanEditor({
                   onPick={({ name, exerciseId }) => change((next) => {
                     next[bi].exercises[ei].name = name;
                     next[bi].exercises[ei].exerciseId = exerciseId;
+                    const base = exerciseId && exercises.find((x) => x.id === exerciseId);
+                    if (base && base.track) next[bi].exercises[ei].track = base.track;
                     return next;
                   })}
                   onAdded={(saved) => setExtra((prev) => [...prev, saved])}
                 />
 
                 <div className={'plan-edit__numbers plan-edit__labels' + (split ? ' plan-edit__numbers--split' : '')} aria-hidden="true">
-                  <span>{exercise.supersetGroup ? 'Круги' : 'Подходы'}</span><span>Повторы</span>{!split && <span>Вес</span>}<span>RPE</span>
+                  <span>{columns(exercise).heads[0]}</span><span>{columns(exercise).heads[1]}</span>{!split && <span>{columns(exercise).heads[2]}</span>}<span>RPE</span>
                 </div>
                 <div className={'plan-edit__numbers' + (split ? ' plan-edit__numbers--split' : '')}>
-                  <input className="field__input" placeholder="Подх." inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
-                  <input className="field__input" placeholder="Повт." inputMode="text" value={exercise.reps} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
-                  {!split && <input className="field__input" placeholder="Вес" inputMode="decimal" value={exercise.weight} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
-                  <input className="field__input" placeholder="RPE" inputMode="decimal" value={exercise.rpe} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'rpe', e.target.value)} />
+                  <input className="field__input" aria-label={columns(exercise).heads[0]} placeholder={columns(exercise).ph[0]} inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
+                  <input className="field__input" aria-label={columns(exercise).heads[1]} placeholder={columns(exercise).ph[1]} inputMode="text" value={exercise.reps} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
+                  {!split && <input className="field__input" aria-label={columns(exercise).heads[2]} placeholder={columns(exercise).ph[2]} inputMode={trackOf(exercise).kind === 'cardio' ? 'text' : 'decimal'} value={exercise.weight} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
+                  <input className="field__input" aria-label="RPE" placeholder="RPE" inputMode="decimal" value={exercise.rpe} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'rpe', e.target.value)} />
                 </div>
 
                 {!split && exercise.prevWeight && <span className="plan-edit__prev">было {exercise.prevWeight}</span>}
@@ -324,6 +347,17 @@ export default function PlanEditor({
                     <IconLinkPair size={16} />
                     {paired ? 'В суперсете' : 'Суперсет'}
                   </button>
+                  {/* Дропсет — в последнем подходе: в зале там уже будет
+                      строка первого сброса */}
+                  {(trackOf(exercise).kind === 'strength' || trackOf(exercise).kind === 'bodyweight') && (
+                    <button
+                      type="button"
+                      className={'button button--ghost plan-edit__pair' + (exercise.technique === 'dropset' ? ' plan-edit__pair--on' : '')}
+                      aria-pressed={exercise.technique === 'dropset'}
+                      disabled={busy}
+                      onClick={() => setExercise(bi, ei, 'technique', exercise.technique === 'dropset' ? '' : 'dropset')}
+                    >Дропсет</button>
+                  )}
                   <button className="icon-button plan-edit__icon plan-edit__remove" aria-label="Убрать упражнение" title="Убрать" disabled={busy} onClick={() => change((next) => {
                     next[bi].exercises.splice(ei, 1);
                     if (!next[bi].exercises.length) next[bi].exercises.push(blank());

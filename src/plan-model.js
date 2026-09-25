@@ -1,3 +1,5 @@
+import { setsLine, trackOf } from './exercise-track.js';
+
 /**
  * Разбор программы месяца для экрана плана.
  *
@@ -55,14 +57,8 @@ export function blockSessions(sessions, blockTitle, month) {
  * журнале, и показывать там блок программы значило показывать не то, что
  * человек делал.
  */
-export function doneLine(sets) {
-  const list = sets || [];
-  if (!list.length) return '';
-  const same = list.every((x) => x.weight === list[0].weight && x.reps === list[0].reps);
-  if (same) {
-    return list.length + ' × ' + (list[0].reps || '?') + (list[0].weight ? ' · ' + list[0].weight + ' кг' : '');
-  }
-  return list.map((x) => (x.weight ? x.weight + ' кг × ' : '') + (x.reps || '?')).join(', ');
+export function doneLine(sets, track) {
+  return setsLine(sets, trackOf({ track }), true);
 }
 
 /**
@@ -70,10 +66,6 @@ export function doneLine(sets) {
  * каждого упражнения повторяло бы их. «15 повт. · 10 кг», а если подходы
  * разные — каждый: «10 кг × 12, 12 кг × 10».
  */
-export function roundLine(sets) {
-  const list = sets || [];
-  if (!list.length) return '';
-  const same = list.every((x) => x.weight === list[0].weight && x.reps === list[0].reps);
-  if (same) return (list[0].reps || '?') + ' повт.' + (list[0].weight ? ' · ' + list[0].weight + ' кг' : '');
-  return list.map((x) => (x.weight ? x.weight + ' кг × ' : '') + (x.reps || '?')).join(', ');
+export function roundLine(sets, track) {
+  return setsLine(sets, trackOf({ track }), false);
 }

@@ -15,6 +15,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
+import { planScheme } from '../exercise-track.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
 import { TemplateApply, SaveAsTemplate, Media } from '../trainer/Library.jsx';
 
@@ -516,9 +517,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                       <div className="exercise__name">{ex.name}</div>
                       {who.length
                         ? who.map((w) => (
-                          <div className="exercise__scheme" key={w}>{w}: {line(ex.sets.filter((x) => x.who === w))}</div>
+                          <div className="exercise__scheme" key={w}>{w}: {line(ex.sets.filter((x) => x.who === w), ex.track)}</div>
                         ))
-                        : <div className="exercise__scheme">{line(ex.sets)}</div>}
+                        : <div className="exercise__scheme">{line(ex.sets, ex.track)}</div>}
                     </div>
                   </div>
                 );
@@ -613,7 +614,8 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
   const [open, setOpen] = useState(false);
   const card = ex.exercise;
   const scheme = [
-    inSuperset ? (ex.reps && ex.reps + ' повт.') : (ex.sets && ex.sets + ' × ' + (ex.reps || '?')),
+    // По типу: «3 × 12 на сторону», «20 мин · 8 км/ч», «4 × 60 с»
+    planScheme(ex, inSuperset),
     ex.rpe && 'RPE ' + ex.rpe,
   ].filter(Boolean).join('   ·   ');
 

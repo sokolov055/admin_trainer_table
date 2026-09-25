@@ -3,9 +3,10 @@ import { apiPublic, apiMutate } from './api.js';
 import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
-import { IconCheck, IconLinkPair } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair } from './icons.jsx';
 import { useBackGesture } from './gestures.jsx';
 import { useFlip } from './flip.js';
+import { KIND_LABELS, MACHINE_LABELS, trackOf, rowFields, cardioExtras, missing } from './exercise-track.js';
 import './workout.css';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
@@ -303,12 +304,27 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    */
   const setRow = (ex, ei, si, label, restAfter = true) => {
     const set = ex.sets[si];
+    const track = trackOf(ex);
+    const fields = rowFields(track);
+    const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
+    const drops = set.drops || [];
+    const editDrop = (di, key, value) => updateSet(ei, si, s => ({ ...s, drops: s.drops.map((d, i) => (i === di ? { ...d, [key]: value } : d)) }));
+    // Стороны разошлись: пишем обе, а в «повторы» — меньшее, по нему
+    // сервер и проверяет, что подход сделан
+    const side = (key, value) => updateSet(ei, si, s => {
+      const next = { ...s, [key]: value };
+      const l = Number(next.left), r = Number(next.right);
+      if (l >= 1 && r >= 1) next.reps = String(Math.min(l, r));
+      return next;
+    });
     return <div className={'workout__set ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si} data-flip={ex.id + ':' + si} data-flip-delay={si * 140}>
-            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')}><span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span>
-              <input aria-label={`${ex.name}, подход ${si + 1}, вес в кг`} inputMode="decimal" value={set.weight} maxLength={12} onChange={e => updateSet(ei, si, s => ({ ...s, weight: e.target.value }))} />
-              <input aria-label={`${ex.name}, подход ${si + 1}, повторы`} inputMode="numeric" value={set.reps} maxLength={6} onChange={e => updateSet(ei, si, s => ({ ...s, reps: e.target.value }))} />
+            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')} style={{ '--cols': fields.length }}><span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span>
+              {fields.map(f => (
+                <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
+              ))}
               <button className="workout__check" aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
-                if (set.state !== 'done' && (!/^\d+$/.test(set.reps) || Number(set.reps) < 1)) { setMessage('Введите число повторов перед отметкой подхода.'); return; }
+                const lack = set.state !== 'done' && missing(set, track);
+                if (lack) { setMessage(lack); return; }
                 const starting = set.state !== 'done';
                 updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
                 // Отдых начинается там, где человек нажал, а не там, где
@@ -316,15 +332,71 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 if (starting && restAfter) startRest();
               }}><IconCheck size={20} /></button>
             </div>
+            {/* Дропсет: сбросы идут сразу за подходом, без отдыха, — поэтому
+                они на виду, а не в настройках */}
+            {drops.map((d, di) => (
+              <div className="workout__set-row workout__drop" key={'d' + di} style={{ '--cols': 2 }}>
+                <span>сброс</span>
+                <input aria-label={`${ex.name}, подход ${si + 1}, сброс ${di + 1}, вес`} inputMode="decimal" placeholder="кг" maxLength={12} value={d.weight} onChange={e => editDrop(di, 'weight', e.target.value)} />
+                <input aria-label={`${ex.name}, подход ${si + 1}, сброс ${di + 1}, повторы`} inputMode="numeric" placeholder="повт." maxLength={6} value={d.reps} onChange={e => editDrop(di, 'reps', e.target.value)} />
+                <button type="button" className="workout__drop-remove" aria-label={`Убрать сброс ${di + 1}`} onClick={() => updateSet(ei, si, s => ({ ...s, drops: s.drops.filter((_, i) => i !== di) }))}><IconClose size={16} /></button>
+              </div>
+            ))}
+            {drops.length > 0 && drops.length < 5 && (
+              <button type="button" className="workout__drop-add" onClick={() => updateSet(ei, si, s => ({ ...s, drops: [...s.drops, { weight: '', reps: '' }] }))}>Ещё сброс</button>
+            )}
+            {track.unilateral && set.left !== undefined && (
+              <div className="workout__set-row workout__drop" style={{ '--cols': 2 }}>
+                <span>Л / П</span>
+                <input aria-label={`${ex.name}, подход ${si + 1}, повторы левой`} inputMode="numeric" placeholder="левая" maxLength={6} value={set.left} onChange={e => side('left', e.target.value)} />
+                <input aria-label={`${ex.name}, подход ${si + 1}, повторы правой`} inputMode="numeric" placeholder="правая" maxLength={6} value={set.right || ''} onChange={e => side('right', e.target.value)} />
+                <button type="button" className="workout__drop-remove" aria-label="Стороны поровну" onClick={() => updateSet(ei, si, ({ left, right, ...s }) => s)}><IconClose size={16} /></button>
+              </div>
+            )}
             <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
+              {track.kind === 'cardio' && (
+                <div className="workout__extras">
+                  {cardioExtras(track).map(f => (
+                    <label key={f.key}>{f.head}<input inputMode={f.mode} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
+                  ))}
+                </div>
+              )}
+              {(track.kind === 'bodyweight' || track.kind === 'timed') && (
+                <label className="workout__field">Поддержка<input placeholder="резинка, гравитрон 20" maxLength={40} value={set.assist || ''} onChange={e => edit('assist', e.target.value)} /></label>
+              )}
               <div className="workout__toolbar">
                 <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
                 <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
+                {(track.kind === 'strength' || track.kind === 'bodyweight') && !drops.length && (
+                  <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, drops: [{ weight: '', reps: '' }] }))}>Дропсет</button>
+                )}
+                {track.unilateral && set.left === undefined && (
+                  <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, left: s.reps || '', right: s.reps || '' }))}>Л и П отдельно</button>
+                )}
                 <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
                 <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить подход</button>
               </div>
             </details>
           </div>;
+  };
+
+  /**
+   * Тип упражнения — для этого занятия: снимок, база не меняется. Нужен,
+   * когда упражнение вписано руками или тип в базе угадан не так.
+   */
+  const trackEditor = (ex, ei) => {
+    const track = trackOf(ex);
+    const set = patch => updateExercise(ei, x => ({ ...x, track: { ...trackOf(x), ...patch } }));
+    return <div className="workout__track">
+      <label className="workout__field">Что записывать<select value={track.kind} onChange={e => set({ kind: e.target.value, machine: e.target.value === 'cardio' ? (track.machine || 'treadmill') : '' })}>
+        {Object.entries(KIND_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select></label>
+      {track.kind === 'cardio' && <label className="workout__field">Тренажёр<select value={track.machine} onChange={e => set({ machine: e.target.value })}>
+        {Object.entries(MACHINE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select></label>}
+      {track.kind !== 'cardio' && <label className="workout__check-line"><input type="checkbox" checked={track.unilateral} onChange={e => set({ unilateral: e.target.checked })} />Повторы на каждую сторону</label>}
+      {track.kind === 'strength' && <label className="workout__check-line"><input type="checkbox" checked={track.perSide} onChange={e => set({ perSide: e.target.checked })} />Вес с одной стороны</label>}
+    </div>;
   };
 
   /**
@@ -357,7 +429,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 140}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
             <div className="workout__round-item" key={ex.id}>
-              <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>{ex.name}</div>
+              <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>{ex.name}<span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span></div>
               {setRow(ex, ei, r, '', k === members.length - 1)}
             </div>
           ))}
@@ -368,6 +440,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {members.map(({ ex, ei }) => (
           <div key={ex.id} className="workout__round-edit">
             <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, x => ({ ...x, name: e.target.value }))} /></label>
+            {trackEditor(ex, ei)}
             <label className="workout__field">Заметка<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, x => ({ ...x, note: e.target.value }))} /></label>
           </div>
         ))}
@@ -468,13 +541,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           )}
           <details><summary>Изменить упражнение</summary>
             <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ex => ({ ...ex, name: e.target.value }))} /></label>
+            {trackEditor(ex, ei)}
             <div className="workout__toolbar">
               <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
               <button className="button button--ghost" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
               <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
             </div>
           </details>
-          <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} aria-hidden="true"><span>Подход</span><span>Вес, кг</span><span>Повторы</span><span>Готово</span></div>
+          <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}<span>Готово</span></div>
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
           {/* У пары подход добавляется кругом — по одному каждому, кто
               делает упражнение, с его последним весом */}
@@ -485,7 +559,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               : [{ ...ex.sets[ex.sets.length - 1], state: 'pending' }];
             return (
               <button className="button button--block" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
-                {who.length > 1 ? 'Добавить круг' : 'Добавить подход'}
+                {who.length > 1 ? 'Добавить круг' : trackOf(ex).kind === 'cardio' ? 'Добавить отрезок' : 'Добавить подход'}
               </button>
             );
           })()}
