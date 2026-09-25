@@ -21,7 +21,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
  */
 // Медленно намеренно: перелёт должен читаться глазом — откуда и куда
 // ушёл подход, — а не мелькнуть
-const DURATION = 1000;
+const DURATION = 700;
 const EASE = 'cubic-bezier(0.45, 0, 0.2, 1)';
 
 function scrollParent(el) {
@@ -55,10 +55,18 @@ export function useFlip(rootRef) {
       const shift = anchor.getBoundingClientRect().top - was.top;
       if (box === window) window.scrollBy(0, shift); else box.scrollTop += shift;
     }
+    // Своя длительность у жеста: суперсет — медленно, чтобы перелёт
+    // читался; вставка упражнения — быстро, это просто «раздвинуться»
+    const duration = old.duration || DURATION;
+    const stagger = old.duration ? old.duration / DURATION : 1;
     root.querySelectorAll('[data-flip], [data-flip-enter]').forEach((el) => {
       if (typeof el.animate !== 'function') return;
-      const delay = Number(el.dataset.flipDelay) || 0;
-      const from = el.dataset.flip && old.get(el.dataset.flip);
+      // Ограничение по ключам: при вставке едут только карточки целиком,
+      // иначе название и подходы внутри сдвинутой карточки уехали бы вдвое
+      if (old.only && !String(el.dataset.flip || el.dataset.flipScope || '').startsWith(old.only)) return;
+      const delay = (Number(el.dataset.flipDelay) || 0) * stagger;
+      const key = el.dataset.flip || el.dataset.flipScope;
+      const from = key && old.get(key);
       if (from) {
         const to = el.getBoundingClientRect();
         const dx = from.left - to.left;
@@ -70,26 +78,28 @@ export function useFlip(rootRef) {
             { transform: `translate(${dx * 0.1}px, ${dy * 0.1}px) scale(1.02)`, offset: 0.7 },
             { transform: 'none' },
           ],
-          { duration: DURATION, easing: EASE, delay, fill: 'backwards' },
+          { duration, easing: EASE, delay, fill: 'backwards' },
         );
       } else if (el.hasAttribute('data-flip-enter')) {
         el.animate(
-          [{ opacity: 0, transform: 'scale(0.98)' }, { opacity: 1, transform: 'none' }],
-          { duration: 600, easing: 'ease-out', delay, fill: 'backwards' },
+          [{ opacity: 0, transform: 'translateY(-8px) scale(0.97)' }, { opacity: 1, transform: 'none' }],
+          { duration: Math.min(600, duration), easing: 'cubic-bezier(0.23, 1, 0.32, 1)', delay, fill: 'backwards' },
         );
       }
     });
   }, [tick]);
 
-  return function capture(anchor) {
+  return function capture(anchor, options = {}) {
     const root = rootRef.current;
     if (!root || reduced()) return;
     const map = new Map();
-    root.querySelectorAll('[data-flip]').forEach((el) => {
+    root.querySelectorAll('[data-flip], [data-flip-scope]').forEach((el) => {
       const r = el.getBoundingClientRect();
-      map.set(el.dataset.flip, { left: r.left, top: r.top });
+      map.set(el.dataset.flip || el.dataset.flipScope, { left: r.left, top: r.top });
     });
     map.anchor = anchor;
+    map.duration = options.duration || 0;
+    map.only = options.only || '';
     const first = anchor && root.querySelector(`[data-flip="${anchor}"]`);
     const box = first ? scrollParent(first) : window;
     map.scroll = box === window ? window.scrollY : box.scrollTop;

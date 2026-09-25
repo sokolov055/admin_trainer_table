@@ -3,9 +3,10 @@ import { apiPublic, apiMutate } from './api.js';
 import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
+import { dust } from './dust.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
@@ -340,7 +341,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const key = ex.id + ':' + si;
     const current = focus.ex === ex.id && focus.set === si;
     const removeSet = () => { setUndo(s.exercises, 'Подход удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
-    return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}
+    return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
             <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')} style={{ '--cols': fields.length }}>
               {inRound
@@ -392,7 +393,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
                 {setTools(ex, ei, si)}
                 <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-                <button className="button" disabled={ex.sets.length === 1} onClick={removeSet}>Удалить подход</button>
+                <button className="button" disabled={ex.sets.length === 1} onClick={(e) => dust(e.currentTarget.closest('.workout__set')).then(removeSet)}>Удалить подход</button>
               </div>
             </div>}
           </SwipeRow>;
@@ -411,7 +412,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const key = ex.id + ':' + si;
     const current = focus.ex === ex.id && focus.set === si;
     const removeSet = () => { setUndo(s.exercises, 'Отрезок удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
-    return <SwipeRow className={'workout__set workout__set--cardio' + (set.state === 'done' ? ' workout__set--done' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}
+    return <SwipeRow className={'workout__set workout__set--cardio' + (set.state === 'done' ? ' workout__set--done' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить отрезок ${si + 1}`} onDelete={removeSet}>
       <div className="workout__cardio-head">
         {inRound
@@ -437,7 +438,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
           <label>RPE<input aria-label={`${ex.name}, отрезок ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
           <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-          <button className="button" disabled={ex.sets.length === 1} onClick={removeSet}>Удалить отрезок</button>
+          <button className="button" disabled={ex.sets.length === 1} onClick={(e) => dust(e.currentTarget.closest('.workout__set')).then(removeSet)}>Удалить отрезок</button>
         </div>
       </div>}
     </SwipeRow>;
@@ -555,7 +556,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         : e)),
     }));
     const currentHere = members.some(({ ex }) => ex.id === focus.ex);
-    return <section className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-flip-enter="">
+    return <section className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
       <div className="workout__rounds-head">
         <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
         <button className="button button--ghost" onClick={split}>Разъединить</button>
@@ -566,7 +567,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       )}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
-          <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 140}>Круг {r + 1}</h4>
+          <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
             <div className="workout__round-item" key={ex.id}>
               <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>{ex.name}<span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span></div>
@@ -600,22 +601,40 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const a = list[ei - 1];
     const b = list[ei];
     if (!a || !b || (a.supersetGroup && a.supersetGroup === b.supersetGroup)) return null;
-    if (a.sets.some(x => x.who) || b.sets.some(x => x.who)) return null;
+    const canJoin = !a.sets.some(x => x.who) && !b.sets.some(x => x.who);
+    // Вставить упражнение прямо здесь — между этими двумя, а не в конец.
+    // Нижние карточки съезжают вниз, освобождая место, новая проявляется
+    const add = () => { flip('', { duration: 380, only: 'sec:' }); change(v => {
+      const exercises = [...v.exercises];
+      const at = exercises.findIndex(e => e.id === b.id);
+      exercises.splice(at, 0, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] });
+      return { ...v, exercises };
+    }); };
     const join = () => {
       const group = a.supersetGroup || b.supersetGroup || 'superset-' + uid();
       const merged = [a.supersetGroup, b.supersetGroup].filter(Boolean);
       flip('name:' + ((a.supersetGroup ? list.find(e => e.supersetGroup === a.supersetGroup) : a).id));
       change(v => ({ ...v, exercises: v.exercises.map(e => (e.id === a.id || e.id === b.id || merged.includes(e.supersetGroup) ? { ...e, supersetGroup: group } : e)) }));
     };
-    return <button type="button" className="workout__join" onClick={join}><IconLinkPair aria-hidden="true" />Соединить в суперсет</button>;
+    return (
+      <div className="workout__between">
+        <button type="button" className="workout__join" disabled={list.length >= 30} onClick={add}><IconPlus aria-hidden="true" />Упражнение</button>
+        {canJoin && <button type="button" className="workout__join" onClick={join}><IconLinkPair aria-hidden="true" />Соединить в суперсет</button>}
+      </div>
+    );
   };
 
   const togglePick = (id) => setPicked(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const endPick = () => { setPicking(false); setPicked(new Set()); };
   const pickDelete = () => {
-    setUndo(record.session.exercises, picked.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + picked.size);
-    change(v => ({ ...v, exercises: v.exercises.filter(e => !picked.has(e.id)) }));
+    const ids = new Set(picked);
+    const snapshot = record.session.exercises;
+    const cards = [...ids].map(id => fieldsRef.current && fieldsRef.current.querySelector(`[data-flip-scope="sec:${id}"]`)).filter(Boolean);
     endPick();
+    Promise.all(cards.map(dust)).then(() => {
+      setUndo(snapshot, ids.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + ids.size);
+      change(v => ({ ...v, exercises: v.exercises.filter(e => !ids.has(e.id)) }));
+    });
   };
   // Копия — сразу за своим упражнением, с неотмеченными подходами
   const pickCopy = () => {
@@ -720,8 +739,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
           const finished = doneSets === ex.sets.length;
           const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
-          return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '')} key={ex.id} data-flip-enter="">
-          <SwipeRow className="workout__ex-swipe" disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
+          return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '')} key={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
+          <SwipeRow className="workout__ex-swipe" dustClosest=".workout__exercise" disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}
@@ -743,7 +762,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <div className="workout__toolbar">
               <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
               <button className="button button--ghost" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
-              <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
+              <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={(e) => { const snapshot = s.exercises; dust(e.currentTarget.closest('.workout__exercise')).then(() => { setUndo(snapshot, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(x => x.id !== ex.id) })); }); }}>Убрать</button>
             </div>
           </details>
           {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}

@@ -117,5 +117,7 @@ export function useSwipe({ width = 88, disabled = false } = {}) {
     content,
     action,
     close: () => self.current(),
+    // После удаления узел может достаться соседней строке — закрыть сразу
+    reset: () => { place(0, false); open.current = false; if (closeOpen === self.current) closeOpen = null; },
   };
 }

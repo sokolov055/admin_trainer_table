@@ -4021,12 +4021,12 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-edit__float .button--primary { flex: 1; }
 .plan-edit__float-space { height: 88px; }
 
-/* Промежуток между упражнениями: «+ Упражнение» и «Суперсет» — тихие
-   кнопки-пилюли на линии-разделителе */
-.plan-edit__between { position: relative; display: flex; justify-content: center; gap: var(--space-2); padding: var(--space-2) 0; }
-.plan-edit__between::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--border); }
-.plan-edit__between--paired::before { border-top-style: dashed; border-top-color: var(--accent); }
-.plan-edit__between-btn { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
-.plan-edit__between-btn:active { transform: scale(0.96); }
-.plan-edit__between-btn--on { border-color: var(--accent); color: var(--accent); background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface); }
+/* Промежуток между упражнениями — как на экране тренировки: пунктирные
+   пилюли «+ Упражнение» и «Суперсет» по центру, без линии; в суперсете —
+   акцентом «В суперсете — разъединить» */
+.plan-edit__between { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) 0; }
+.plan-edit__between-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 14px; border: 1px dashed var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+.plan-edit__between-btn svg { width: 16px; height: 16px; }
+.plan-edit__between-btn:hover { color: var(--accent); border-color: var(--accent); }
+.plan-edit__between-btn--on { border-style: solid; border-color: var(--accent); color: var(--accent); background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface); }
 .plan-edit__between + .plan-edit__row { border-top: 0; }

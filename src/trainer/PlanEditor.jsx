@@ -1,5 +1,7 @@
 import ExercisePicker from './ExercisePicker.jsx';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { dust } from '../dust.js';
+import { haptic } from '../telegram.js';
 import { createPortal } from 'react-dom';
 import { useTabLock } from '../gestures.jsx';
 import { apiMutate } from '../api.js';
@@ -101,6 +103,63 @@ export default function PlanEditor({
   };
 
   const [ordering, setOrdering] = useState(false);
+
+  /*
+   * Анимации правки — одним местом:
+   *   вставка — нижние упражнения раздвигаются, новое проявляется на своём
+   *     месте и сразу получает курсор в названии;
+   *   суперсет — два упражнения «притягиваются», как магниты, с коротким
+   *     акцентным контуром; разъединение — короткий отскок врозь.
+   * Только transform, opacity и тень; с reduce motion — без движения.
+   */
+  const rootRef = useRef(null);
+  const pending = useRef(null);
+  const reducedMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return true; } };
+  const rowsOf = (bi) => {
+    const block = rootRef.current && rootRef.current.querySelectorAll('.plan-edit__block')[bi];
+    return block ? [...block.querySelectorAll('.plan-edit__row')] : [];
+  };
+  const insertAt = (bi, at, make) => {
+    pending.current = { kind: 'insert', bi, at, rects: rowsOf(bi).map((r) => r.getBoundingClientRect().top) };
+    change((next) => { next[bi].exercises.splice(at, 0, make()); return next; });
+  };
+  useLayoutEffect(() => {
+    const p = pending.current;
+    pending.current = null;
+    if (!p) return;
+    const rows = rowsOf(p.bi);
+    const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
+    if (p.kind === 'insert') {
+      const fresh = rows[p.at];
+      if (fresh) {
+        const input = fresh.querySelector('input');
+        if (input) input.focus({ preventScroll: true });
+        if (!reducedMotion()) {
+          fresh.animate([{ opacity: 0, transform: 'translateY(-10px) scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: EASE });
+        }
+      }
+      if (!reducedMotion()) {
+        rows.forEach((row, i) => {
+          if (i <= p.at || p.rects[i - 1] === undefined) return;
+          const dy = p.rects[i - 1] - row.getBoundingClientRect().top;
+          if (Math.abs(dy) > 1) row.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 320, easing: EASE });
+        });
+      }
+      return;
+    }
+    if (reducedMotion()) return;
+    const a = rows[p.ei];
+    const b = rows[p.ei + 1];
+    if (!a || !b) return;
+    if (p.kind === 'join') {
+      const ring = '0 0 0 2px var(--accent)';
+      a.animate([{ transform: 'translateY(-12px)', boxShadow: ring }, { transform: 'none', boxShadow: '0 0 0 0 transparent' }], { duration: 420, easing: EASE });
+      b.animate([{ transform: 'translateY(12px)', boxShadow: ring }, { transform: 'none', boxShadow: '0 0 0 0 transparent' }], { duration: 420, easing: EASE });
+    } else {
+      a.animate([{ transform: 'none' }, { transform: 'translateY(-8px)', offset: 0.35 }, { transform: 'none' }], { duration: 340, easing: EASE });
+      b.animate([{ transform: 'none' }, { transform: 'translateY(8px)', offset: 0.35 }, { transform: 'none' }], { duration: 340, easing: EASE });
+    }
+  }, [draft]);
   // Правка программы — не раздел: смахнуть влево в соседний раздел значило
   // бы бросить несохранённое. Выход — «Сохранить» или «Отмена»
   useTabLock(true);
@@ -246,7 +305,7 @@ export default function PlanEditor({
   // Карточка в карточке (панель → тренировка → упражнение) и была тем,
   // из-за чего тренировки сливались.
   return (
-    <div className="plan-edit">
+    <div className="plan-edit" ref={rootRef}>
       <p className="small muted" style={{ marginTop: 0 }}>
         Пустые строки не сохраняются — упражнение без названия просто исчезнет.
       </p>
@@ -439,11 +498,11 @@ export default function PlanEditor({
                       onClick={() => setExercise(bi, ei, 'technique', exercise.technique === 'dropset' ? '' : 'dropset')}
                     >Дропсет</button>
                   )}
-                  <button className="icon-button plan-edit__icon plan-edit__remove" aria-label="Убрать упражнение" title="Убрать" disabled={busy} onClick={() => change((next) => {
+                  <button className="icon-button plan-edit__icon plan-edit__remove" aria-label="Убрать упражнение" title="Убрать" disabled={busy} onClick={(e) => dust(e.currentTarget.closest('.plan-edit__row')).then(() => change((next) => {
                     next[bi].exercises.splice(ei, 1);
                     if (!next[bi].exercises.length) next[bi].exercises.push(blank());
                     return next;
-                  })}>
+                  }))}>
                     <IconTrash size={18} />
                   </button>
                 </div>
@@ -454,10 +513,7 @@ export default function PlanEditor({
                   а не в конце тренировки */}
               {ei < block.exercises.length - 1 && (
                 <div className={'plan-edit__between' + (paired ? ' plan-edit__between--paired' : '')}>
-                  <button type="button" className="plan-edit__between-btn" disabled={busy} onClick={() => change((next) => {
-                    next[bi].exercises.splice(ei + 1, 0, blank());
-                    return next;
-                  })}>
+                  <button type="button" className="plan-edit__between-btn" disabled={busy} onClick={() => insertAt(bi, ei + 1, blank)}>
                     <IconPlus size={16} />
                     Упражнение
                   </button>
@@ -466,7 +522,7 @@ export default function PlanEditor({
                     className={'plan-edit__between-btn' + (paired ? ' plan-edit__between-btn--on' : '')}
                     aria-pressed={paired}
                     disabled={busy}
-                    onClick={() => toggleSuperset(bi, ei)}
+                    onClick={() => { pending.current = { kind: paired ? 'split' : 'join', bi, ei }; toggleSuperset(bi, ei); haptic(); }}
                   >
                     <IconLinkPair size={16} />
                     {paired ? 'В суперсете — разъединить' : 'Суперсет'}
@@ -478,15 +534,9 @@ export default function PlanEditor({
           })}
 
           <div className="plan-edit__block-actions">
-            <button className="button" disabled={busy} onClick={() => change((next) => {
-              next[bi].exercises.push(blank());
-              return next;
-            })}>Добавить упражнение</button>
+            <button className="button" disabled={busy} onClick={() => insertAt(bi, block.exercises.length, blank)}>Добавить упражнение</button>
             {/* Кардио после силовой — в конец этой же тренировки */}
-            <button className="button" disabled={busy} onClick={() => change((next) => {
-              next[bi].exercises.push(cardioExercise());
-              return next;
-            })}>Добавить кардио</button>
+            <button className="button" disabled={busy} onClick={() => insertAt(bi, block.exercises.length, () => cardioExercise())}>Добавить кардио</button>
 
             {!single && (
               <button className="button button--ghost" disabled={busy || draft.length === 1} onClick={() => change((next) => {

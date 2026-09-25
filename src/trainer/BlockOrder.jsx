@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { haptic } from '../telegram.js';
 import { plural } from '../ui.jsx';
 import { IconGrip, IconCopy, IconTrash, IconCheck } from '../icons.jsx';
+import { dust } from '../dust.js';
 
 /**
  * Порядок тренировок в программе — перетаскиванием.
@@ -205,14 +206,8 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     haptic('success');
     const rows = indices.map((i) => listRef.current && listRef.current.children[i]).filter(Boolean);
     const done = () => { onRemove(indices); setSelected(new Set()); setSelecting(false); };
-    if (reduced() || !rows.length || typeof rows[0].animate !== 'function') { done(); return; }
-    Promise.all(rows.map((row) => row.animate(
-      [{ transform: 'translate3d(0,0,0)', opacity: 1 }, { transform: 'translate3d(-24%,0,0)', opacity: 0 }],
-      { duration: 200, easing: EASE, fill: 'forwards' },
-    ).finished.catch(() => {}))).then(() => {
-      rows.forEach((row) => row.getAnimations().forEach((a) => a.cancel()));
-      done();
-    });
+    // В пыль: тренировка рассыпается и гаснет (dust.js)
+    Promise.all(rows.map(dust)).then(done);
   };
 
   const onKey = (e, index) => {
