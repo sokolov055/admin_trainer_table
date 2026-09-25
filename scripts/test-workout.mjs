@@ -153,12 +153,30 @@ test('суперсет из программы виден в занятии', as
       await delay();
     });
 
-    const marks = local.root.findAllByProps({ className: 'workout__superset' }).map(text);
+    // В зале суперсет делают кругами: круг — оба упражнения подряд,
+    // у каждого свой вес и повторы, потом следующий круг
+    const heads = () => local.root.findAllByType('h3').map(text);
+    const rounds = () => local.root.findAllByProps({ className: 'workout__round' }).map(r =>
+      r.findAllByProps({ className: 'workout__round-name' }).map(text));
+    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3. Планка']);
+    assert.deepEqual(rounds(), [['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока']]);
+    assert.equal(local.root.findAllByProps({ className: 'workout__round-title' }).map(text).join(), 'Круг 1,Круг 2,Круг 3');
+    const press = async label => {
+      const b = local.root.findAllByType('button').find(x => text(x) === label);
+      assert.ok(b, label);
+      await act(async () => { b.props.onClick(); await delay(); });
+    };
 
-    assert.deepEqual(marks, [
-      'Суперсет · 1 из 2, без отдыха между упражнениями',
-      'Суперсет · 2 из 2, без отдыха между упражнениями',
-    ], 'подпись стоит у обоих упражнений группы и ни у кого больше');
+    // Разъединили — два отдельных упражнения, подходов у каждого столько,
+    // сколько было кругов
+    await press('Разъединить');
+    assert.deepEqual(heads(), ['1. Подтягивания', '2. Тяга блока', '3. Планка']);
+    assert.equal(local.root.findAllByProps({ className: 'workout__set ' }).length, 9);
+    assert.equal(rounds().length, 0);
+
+    // И обратно — из первого упражнения
+    await press('Суперсет со следующим');
+    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3. Планка']);
   } finally {
     if (local) local.unmount();
   }

@@ -434,3 +434,11 @@
 .workout__set-head--who { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 48px; }
 .workout__set-row--who > span:first-child { grid-column: 1 / -1; font-weight: 600; color: var(--text); }
 .workout__set-head--who > span:first-child { display: none; }
+
+/* Суперсет в тренировке — кругами: круг, в нём упражнения подряд */
+.workout__rounds-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.workout__rounds-head h3 { margin: 0; }
+.workout__round { border-top: 1px solid var(--border); padding-top: var(--space-2); margin-top: var(--space-2); }
+.workout__round-title { margin: 0 0 4px; font-size: var(--text-sm); color: var(--accent); font-weight: 700; }
+.workout__round-name { font-size: var(--text-sm); font-weight: 600; margin: 6px 0 2px; }
+.workout__round-edit { display: grid; gap: var(--space-2); margin-top: var(--space-2); }

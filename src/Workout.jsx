@@ -5,6 +5,7 @@ import { getToken } from './session.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
 import { IconCheck } from './icons.jsx';
 import { useBackGesture } from './gestures.jsx';
+import { useFlip } from './flip.js';
 import './workout.css';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
@@ -53,6 +54,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // подтвердит удаление не того занятия.
   const [erase, setErase] = useState('');
   const [undo, setUndo] = useState(null);
+  // Разъединили или соединили суперсет — подходы перелетают на новые места
+  const fieldsRef = useRef(null);
+  const flip = useFlip(fieldsRef);
   const [now, setNow] = useState(Date.now());
   const state = useRef(null), key = useRef(''), saving = useRef(false), mounted = useRef(true);
   const conflictRef = useRef(null);
@@ -290,6 +294,87 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     store({ session: remote, revision: remote.revision, dirty: false, tick: Date.now() });
   };
 
+
+  /**
+   * Строка подхода: вес, повторы, отметка, настройки. Одна и та же в обычном
+   * упражнении и в круге суперсета. restAfter — запускать ли отдых по
+   * отметке: в суперсете отдыхают после круга, а не после каждого
+   * упражнения.
+   */
+  const setRow = (ex, ei, si, label, restAfter = true) => {
+    const set = ex.sets[si];
+    return <div className={'workout__set ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si} data-flip={ex.id + ':' + si} data-flip-delay={si * 70}>
+            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')}><span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span>
+              <input aria-label={`${ex.name}, подход ${si + 1}, вес в кг`} inputMode="decimal" value={set.weight} maxLength={12} onChange={e => updateSet(ei, si, s => ({ ...s, weight: e.target.value }))} />
+              <input aria-label={`${ex.name}, подход ${si + 1}, повторы`} inputMode="numeric" value={set.reps} maxLength={6} onChange={e => updateSet(ei, si, s => ({ ...s, reps: e.target.value }))} />
+              <button className="workout__check" aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
+                if (set.state !== 'done' && (!/^\d+$/.test(set.reps) || Number(set.reps) < 1)) { setMessage('Введите число повторов перед отметкой подхода.'); return; }
+                const starting = set.state !== 'done';
+                updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
+                // Отдых начинается там, где человек нажал, а не там, где
+                // стоит переключатель: подход отмечен — время пошло.
+                if (starting && restAfter) startRest();
+              }}><IconCheck size={20} /></button>
+            </div>
+            <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
+              <div className="workout__toolbar">
+                <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
+                <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
+                <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
+                <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить подход</button>
+              </div>
+            </details>
+          </div>;
+  };
+
+  /**
+   * Суперсет — кругами: «Круг 1» — все упражнения группы подряд, каждое со
+   * своим весом и повторами, потом «Круг 2». Так его и делают в зале.
+   * «Разъединить» делает упражнения отдельными; подходов у каждого остаётся
+   * столько, сколько было кругов.
+   */
+  const supersetBlock = (members) => {
+    const rounds = Math.max(...members.map(({ ex }) => ex.sets.length));
+    const group = members[0].ex.supersetGroup;
+    const split = () => { flip('name:' + members[0].ex.id); change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group ? { ...e, supersetGroup: '' } : e)) })); };
+    const addRound = () => change(v => ({
+      ...v,
+      exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets.length < 20
+        ? { ...e, sets: [...e.sets, { ...e.sets[e.sets.length - 1], state: 'pending' }] }
+        : e)),
+    }));
+    return <section className="workout__exercise workout__rounds" key={'g' + group} data-flip-enter="">
+      <div className="workout__rounds-head">
+        <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
+        <button className="button button--ghost" onClick={split}>Разъединить</button>
+      </div>
+      <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.</p>
+      {(members[0].ex.prescription || members.some(({ ex }) => ex.prevWeight)) && (
+        <p className="small muted">{members.map(({ ex }) => ex.name + (ex.prescription ? ': ' + ex.prescription : '') + (ex.prevWeight ? ' · было ' + ex.prevWeight : '')).join('; ')}</p>
+      )}
+      {Array.from({ length: rounds }, (_, r) => (
+        <div className="workout__round" key={r}>
+          <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 70}>Круг {r + 1}</h4>
+          {members.map(({ ex, ei }, k) => ex.sets[r] && (
+            <div className="workout__round-item" key={ex.id}>
+              <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>{ex.name}</div>
+              {setRow(ex, ei, r, '', k === members.length - 1)}
+            </div>
+          ))}
+        </div>
+      ))}
+      <button className="button button--block" disabled={members.some(({ ex }) => ex.sets.length >= 20)} onClick={addRound}>Добавить круг</button>
+      <details><summary>Упражнения суперсета</summary>
+        {members.map(({ ex, ei }) => (
+          <div key={ex.id} className="workout__round-edit">
+            <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, x => ({ ...x, name: e.target.value }))} /></label>
+            <label className="workout__field">Заметка<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, x => ({ ...x, note: e.target.value }))} /></label>
+          </div>
+        ))}
+      </details>
+    </section>;
+  };
+
   const s = record?.session;
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
@@ -324,7 +409,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         </div>
         <p className="workout__status" role="status">{busy ? 'Сохраняем…' : record.dirty ? 'Есть несохранённые изменения' : 'Сохранено в облаке'}</p>
       </header>
-      <fieldset disabled={!editable || !!conflict} className="workout__fields">
+      <fieldset disabled={!editable || !!conflict} className="workout__fields" ref={fieldsRef}>
         <label className="workout__field">Название занятия<input value={s.title} maxLength={160} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
         {editable && <div className="workout__toolbar">
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
@@ -344,8 +429,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <button className="button" onClick={() => change(v => ({ ...v, restUntil: 0 }))}>Сбросить</button>
           </span>
         </div>}
-        {s.exercises.map((ex, ei) => <section className="workout__exercise" key={ex.id}>
-          <h3>{ei + 1}. {ex.name || 'Новое упражнение'}</h3>
+        {s.exercises.map((ex, ei) => {
+          const group = ex.supersetGroup;
+          const members = group ? s.exercises.map((e, i) => ({ ex: e, ei: i })).filter(m => m.ex.supersetGroup === group) : [];
+          // Круги — для обычного суперсета; у сплита подходы по людям, там по-старому
+          if (members.length > 1 && !members.some(m => m.ex.sets.some(x => x.who))) {
+            return members[0].ei === ei ? supersetBlock(members) : null;
+          }
+          const next = s.exercises[ei + 1];
+          const canJoin = next && !ex.sets.some(x => x.who) && !next.sets.some(x => x.who);
+          return <section className="workout__exercise" key={ex.id} data-flip-enter="">
+          <h3 data-flip={'name:' + ex.id}>{ei + 1}. {ex.name || 'Новое упражнение'}</h3>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {(ex.prescription || ex.prevWeight) && (
             <p className="small muted">
@@ -359,31 +453,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
               <button className="button button--ghost" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
               <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
+              {canJoin && <button className="button button--ghost" onClick={() => {
+                // Соединяем с соседом: он уже в суперсете — встаём в его группу
+                const group = ex.supersetGroup || next.supersetGroup || 'superset-' + uid();
+                const joined = next.supersetGroup;
+                flip('name:' + ex.id);
+                change(v => ({ ...v, exercises: v.exercises.map(e => (e.id === ex.id || e.id === next.id || (joined && e.supersetGroup === joined) ? { ...e, supersetGroup: group } : e)) }));
+              }}>Суперсет со следующим</button>}
             </div>
           </details>
           <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} aria-hidden="true"><span>Подход</span><span>Вес, кг</span><span>Повторы</span><span>Готово</span></div>
-          {ex.sets.map((set, si) => <div className={'workout__set ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si}>
-            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')}><span>{setLabel(ex.sets, si)}{set.kind === 'warmup' ? ' · Р' : ''}</span>
-              <input aria-label={`${ex.name}, подход ${si + 1}, вес в кг`} inputMode="decimal" value={set.weight} maxLength={12} onChange={e => updateSet(ei, si, s => ({ ...s, weight: e.target.value }))} />
-              <input aria-label={`${ex.name}, подход ${si + 1}, повторы`} inputMode="numeric" value={set.reps} maxLength={6} onChange={e => updateSet(ei, si, s => ({ ...s, reps: e.target.value }))} />
-              <button className="workout__check" aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
-                if (set.state !== 'done' && (!/^\d+$/.test(set.reps) || Number(set.reps) < 1)) { setMessage('Введите число повторов перед отметкой подхода.'); return; }
-                const starting = set.state !== 'done';
-                updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
-                // Отдых начинается там, где человек нажал, а не там, где
-                // стоит переключатель: подход отмечен — время пошло.
-                if (starting) startRest();
-              }}><IconCheck size={20} /></button>
-            </div>
-            <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
-              <div className="workout__toolbar">
-                <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
-                <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
-                <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-                <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить подход</button>
-              </div>
-            </details>
-          </div>)}
+          {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
           {/* У пары подход добавляется кругом — по одному каждому, кто
               делает упражнение, с его последним весом */}
           {(() => {
@@ -398,7 +478,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             );
           })()}
           <label className="workout__field">Заметка к упражнению<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} /></label>
-        </section>)}
+        </section>;
+        })}
         {undo && <button className="button" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Отменить последнее удаление</button>}
         <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
