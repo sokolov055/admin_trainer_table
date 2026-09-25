@@ -16,6 +16,7 @@ import { useBackGesture, captureScreen } from '../gestures.jsx';
 import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
+import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
 import PlanEditor from '../trainer/PlanEditor.jsx';
 import { TemplateApply, SaveAsTemplate, Media } from '../trainer/Library.jsx';
 
@@ -803,6 +804,10 @@ function useProgressBundle(clientRow, familyRow = null) {
 export function Progress({ clientRow, familyRow = null }) {
   const { loading, data, error, reload } = useProgressBundle(clientRow, familyRow);
   const [field, setField] = useState('Вес');
+  // Изменение за всё время или с прошлого замера: первое отвечает «куда я
+  // пришёл», второе — «что дала последняя неделя-две»
+  const [period, setPeriodState] = useState(savedPeriod);
+  const setPeriod = (value) => { setPeriodState(value); savePeriod(value); };
 
   // Форма нового замера. Открыта или нет — состояние экрана, а не данных:
   // после записи закрывается сама и просит перечитать замеры.
@@ -822,11 +827,15 @@ export function Progress({ clientRow, familyRow = null }) {
   const progressSeries = (progress && progress.series) || [];
   const base = measureSeries.length ? measureSeries : progressSeries;
 
-  const series = base.map((s, i) => ({
-    label: s.label || '',
-    rows: s.rows || [],
-    deltas: (progressSeries[i] && progressSeries[i].deltas) || s.deltas || {},
-  }));
+  const series = base.map((s, i) => {
+    const total = (progressSeries[i] && progressSeries[i].deltas) || s.deltas || {};
+    return {
+      label: s.label || '',
+      rows: s.rows || [],
+      // С прошлого замера — по тем же показателям, что и итог
+      deltas: period === 'last' ? recentDeltas(s.rows || [], Object.keys(total)) : total,
+    };
+  });
 
   const lifts = (progress && progress.lifts) || [];
   const grew = lifts.filter((l) => l.delta > 0);
@@ -906,8 +915,8 @@ export function Progress({ clientRow, familyRow = null }) {
   // Ведущая серия — первая: у сольного клиента она единственная, у
   // сплит-пары крупная цифра всё равно может быть только чья-то одна.
   const points = (chartSeries[0] && chartSeries[0].points) || [];
-  const first = points.length ? points[0] : null;
   const last = points.length ? points[points.length - 1] : null;
+  const first = points.length > 1 ? (period === 'last' ? points[points.length - 2] : points[0]) : (points[0] || null);
   const change = points.length > 1 ? Math.round((last.y - first.y) * 10) / 10 : null;
 
   const facts = [
@@ -928,13 +937,24 @@ export function Progress({ clientRow, familyRow = null }) {
     <>
       {addMeasure}
 
+      {/* Период изменений — над итогом, который он меняет, и над таблицей */}
+      {hasRows && series.some((s) => s.rows.length > 1) && (
+        <div className="progress__period">
+          <Chips
+            items={[{ value: 'all', label: 'За всё время' }, { value: 'last', label: 'С прошлого замера' }]}
+            value={period}
+            onChange={setPeriod}
+          />
+        </div>
+      )}
+
       {hasRows ? (
         <Lead
           label={activeField}
           value={last ? formatNumber(last.y) + unit : '—'}
           hint={
             change !== null
-              ? 'было ' + formatNumber(first.y) + unit + ' с ' + formatDate(first.x, false)
+              ? 'было ' + formatNumber(first.y) + unit + (period === 'last' ? ' на прошлом замере, ' : ' с ') + formatDate(first.x, false)
               : last ? 'замер от ' + formatDate(last.x) : undefined
           }
           facts={facts.length ? facts : undefined}
@@ -969,7 +989,7 @@ export function Progress({ clientRow, familyRow = null }) {
       )}
 
       {hasDeltas && (
-        <Section title="Изменения по замерам" note="от первого к последнему">
+        <Section title="Изменения по замерам" note={period === 'last' ? 'от прошлого замера к последнему' : 'от первого к последнему'}>
           <Panel pad>
             {series.map((s, i) => (
               <div key={i} style={{ marginBottom: series.length > 1 && i < series.length - 1 ? 20 : 0 }}>

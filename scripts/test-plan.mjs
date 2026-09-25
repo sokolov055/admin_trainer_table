@@ -101,3 +101,16 @@ test('подход суперсета — без числа кругов: кру
   assert.equal(roundLine([{ weight: '10', reps: '12' }, { weight: '10', reps: '12' }]), '12 повт. · 10 кг');
   assert.equal(roundLine([{ weight: '10', reps: '12' }, { weight: '12', reps: '10' }]), '10 кг × 12, 12 кг × 10');
 });
+
+test('прогресс: изменения с прошлого замера — по двум последним, где показатель есть', async () => {
+  const { recentDeltas } = await import('../src/client/deltas.js');
+  const rows = [
+    { date: '2026-09-09', 'Вес': 90, 'Талия': 91 },
+    { date: '2026-09-18', 'Вес': 92.9 },
+    { date: '2026-09-25', 'Вес': 93.3, 'Талия': 92 },
+  ];
+  assert.deepEqual(recentDeltas(rows, ['Вес', 'Талия', 'Грудь']), {
+    'Вес': { first: 92.9, last: 93.3, delta: 0.4, from: '2026-09-18' },
+    'Талия': { first: 91, last: 92, delta: 1, from: '2026-09-09' },
+  });
+});

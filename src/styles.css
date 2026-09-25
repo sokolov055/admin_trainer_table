@@ -3853,3 +3853,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Галочки типа упражнения в библиотеке */
 .library__check { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; font-size: var(--text-sm); }
 .library__check input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
+
+/* Прогресс: переключатель периода изменений */
+.progress__period { margin: var(--space-3) 0; }
