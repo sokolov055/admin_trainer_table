@@ -506,3 +506,5 @@
 .extras__like:active { transform: scale(0.9); }
 .extras__picked-actions { display: flex; align-items: center; gap: 4px; }
 .extras__picked { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+
+.ration__trial-reset { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }

@@ -621,6 +621,16 @@ const MOCK = {
   },
   'food.add': (params) => ({ food: { id: 99, name: params.name, kcal: Number(params.kcal) || 0, protein: Number(params.protein) || 0, fat: Number(params.fat) || 0, carbs: Number(params.carbs) || 0, piece: Number(params.piece) || 0, uses: 0 }, existed: false }),
   'food.use': () => ({ ok: true }),
+  'ration.get': () => ({ saved: false, pantry: null, liked: [], seen: [], extras: [], day: '' }),
+  'ration.save': () => ({ ok: true }),
+  'ration.extra.add': (params) => ({ id: Date.now(), product: params.product, grams: params.grams, pieces: params.pieces || 0 }),
+  'ration.extra.remove': () => ({ ok: true }),
+  'ration.summary': () => ({
+    saved: true, pantry: ['гречка', 'яйцо', 'курица', 'творог', 'банан'], liked: ['ovsyanka-na-moloke-s-bananom', 'grechnevaya-kasha-na-moloke'], seen: [],
+    extras: [{ id: 1, product: { id: 1, name: 'Сникерс', kcal: 507, protein: 9.3, fat: 27.6, carbs: 55.5, piece: 50 }, grams: 50, pieces: 1 }],
+    frequent: [{ name: 'Сникерс', times: 6, kcal: 1521 }, { name: 'Капучино 300 мл', times: 4, kcal: 540 }],
+    days: [],
+  }),
   'food.like': (params) => ({ id: params.id, liked: !!params.liked }),
 
   'expense.list': (params) => ({

@@ -17,7 +17,7 @@ import { extraOf, cleanProduct } from './match.js';
 
 const macros = (v) => `${formatNumber(v.kcal)} ккал · Б ${formatNumber(v.protein)} · Ж ${formatNumber(v.fat)} · У ${formatNumber(v.carbs)}`;
 
-export default function Extras({ extras, products, onAdd, onRemove }) {
+export default function Extras({ extras, products, onAdd, onRemove, trial = false }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -41,7 +41,7 @@ export default function Extras({ extras, products, onAdd, onRemove }) {
       )}
 
       {open
-        ? <AddForm products={products} onAdd={(entry) => { onAdd(entry); setOpen(false); }} onCancel={() => setOpen(false)} />
+        ? <AddForm products={products} trial={trial} onAdd={(entry) => { onAdd(entry); setOpen(false); }} onCancel={() => setOpen(false)} />
         : (
           <button className="button button--block extras__add" onClick={() => setOpen(true)}>
             Добавить своё
@@ -60,7 +60,7 @@ function amountLabel(item) {
  * Выбрать из своих или завести новый. Цифры — ровно как на упаковке: на
  * 100 г. Вес штуки нужен, чтобы дальше считать батончиками, а не граммами.
  */
-function AddForm({ products, onAdd, onCancel }) {
+function AddForm({ products, onAdd, onCancel, trial = false }) {
   const [picked, setPicked] = useState(null);
   const [fields, setFields] = useState({ name: '', kcal: '', protein: '', fat: '', carbs: '', piece: '' });
   const [amount, setAmount] = useState('');
@@ -104,7 +104,9 @@ function AddForm({ products, onAdd, onCancel }) {
     setBusy(true);
     setErrors([]);
     try {
-      if (!picked) {
+      if (trial) {
+        // Проба тренера: общую базу не трогаем — ни новых продуктов, ни счётчиков
+      } else if (!picked) {
         // Новый — в общую базу. Такое название там уже есть — берутся его
         // цифры, и об этом говорим: человек вписывал свои.
         const saved = await apiPublic('food.add', fields);
@@ -132,6 +134,7 @@ function AddForm({ products, onAdd, onCancel }) {
     const next = !isLiked(p);
     setLikes((m) => ({ ...m, [p.id]: next }));
     haptic();
+    if (trial) return; // в пробе лайк только на экране
     apiPublic('food.like', { id: p.id, liked: next })
       .catch(() => setLikes((m) => ({ ...m, [p.id]: !next })));
   };
@@ -193,7 +196,9 @@ function AddForm({ products, onAdd, onCancel }) {
               </div>
             )}
             {q && matches.length === 0 && (
-              <p className="small muted" style={{ margin: 0 }}>В базе такого нет — впишите цифры, и продукт появится у всех.</p>
+              <p className="small muted" style={{ margin: 0 }}>
+                {trial ? 'В базе такого нет — в пробе продукт останется только у вас.' : 'В базе такого нет — впишите цифры, и продукт появится у всех.'}
+              </p>
             )}
 
             <p className="small muted" style={{ margin: 0 }}>С упаковки, на 100 г. Белки, жиры и углеводы — если написаны.</p>

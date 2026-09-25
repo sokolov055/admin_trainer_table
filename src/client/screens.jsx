@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import Ration from '../nutrition/Ration.jsx';
+import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
 import {
@@ -1298,9 +1299,12 @@ export function Nutrition({ clientRow, clientView = false }) {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(null);
   const [ration, setRation] = useState(false);
+  // Проба тренера: тот же раздел, но на своём устройстве (см. Ration trial)
+  const [trial, setTrial] = useState(false);
 
   // Рацион — экран поверх питания: смахнуть вправо возвращает к норме
   useBackGesture(() => setRation(false), ration);
+  useBackGesture(() => setTrial(false), trial);
 
   // Тренер переключается между клиентами в одной и той же карточке, и
   // экран при этом не размонтируется. Без сброса «норма записана» осталось
@@ -1310,6 +1314,7 @@ export function Nutrition({ clientRow, clientView = false }) {
     setSaved(null);
     setEditing(false);
     setRation(false);
+    setTrial(false);
   }, [clientRow]);
 
   if (loading) return <Loading rows={3} />;
@@ -1350,8 +1355,11 @@ export function Nutrition({ clientRow, clientView = false }) {
   // В режиме просмотра он не открывается совсем (см. ниже про clientView):
   // открытый, он показал бы тренеру его собственный холодильник под именем
   // клиента.
-  if (ration && configured && !clientView) {
+  if (ration && configured && !clientView && !byTrainer) {
     return <Ration targets={targets} onClose={() => setRation(false)} />;
+  }
+  if (trial && configured) {
+    return <Ration targets={targets} trial onClose={() => setTrial(false)} />;
   }
 
   const onSaved = (result) => {
@@ -1426,6 +1434,22 @@ export function Nutrition({ clientRow, clientView = false }) {
           но не открывается. Открытый, он брал бы продукты и выбор блюд с
           устройства ТРЕНЕРА и показывал их как рацион клиента: экран из
           чужой еды, посчитанный под чужую норму. */}
+      {!editing && byTrainer && <RationSummary clientRow={clientRow} />}
+
+      {configured && !editing && byTrainer && (
+        <Section title="Как это видит клиент">
+          <Panel pad>
+            <p className="small muted" style={{ marginTop: 0 }}>
+              Пройти подбор рациона самому — с нормой этого клиента. Ваши
+              отметки в пробе останутся только у вас.
+            </p>
+            <button className="button button--block" onClick={() => { captureScreen(); setTrial(true); }}>
+              Попробовать — пробный режим
+            </button>
+          </Panel>
+        </Section>
+      )}
+
       {configured && !editing && !byTrainer && (
         <Section>
           <Panel pad>
@@ -1437,11 +1461,16 @@ export function Nutrition({ clientRow, clientView = false }) {
               соберёт из них день под вашу норму и покажет, что докупить.
             </p>
             {clientView ? (
-              <Note tone="info">
-                Отсюда клиент открывает подбор блюд. В режиме просмотра он не
-                откроется: продукты и выбранные блюда хранятся на устройстве
-                клиента, а не в таблице.
-              </Note>
+              <>
+                <Note tone="info">
+                  Отмеченное клиентом видно в его карточке, во вкладке «Питание».
+                  Пройти раздел, как клиент, можно в пробе — с его нормой и своими
+                  отметками.
+                </Note>
+                <button className="button button--block" onClick={() => { captureScreen(); setTrial(true); }}>
+                  Попробовать — пробный режим
+                </button>
+              </>
             ) : (
               <button className="button button--block button--primary" onClick={() => { captureScreen(); setRation(true); }}>
                 Собрать рацион

@@ -8,6 +8,7 @@ import {
   portionWeight, per100, extraTotals, remainingTarget, addTotals,
 } from './match.js';
 import Extras from './Extras.jsx';
+import { apiPublic } from '../api.js';
 import './ration.css';
 
 /**
@@ -62,9 +63,16 @@ const reduced = () => typeof window !== 'undefined'
   && window.matchMedia
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function load() {
+/**
+ * Пробный режим — тренер проходит раздел так, как его видит клиент. Отметки
+ * в отдельном хранилище: собственный рацион тренера (если он клиент сам
+ * себе) и пробы не смешиваются.
+ */
+const TRIAL_STORE = 'ration_trial_v1';
+
+function load(key = STORE) {
   try {
-    return JSON.parse(localStorage.getItem(STORE)) || {};
+    return JSON.parse(localStorage.getItem(key)) || {};
   } catch {
     // Приватный режим и заблокированные куки роняют localStorage на чтении.
     // Раздел от этого не перестаёт работать — просто не помнит прошлый раз.
@@ -72,9 +80,9 @@ function load() {
   }
 }
 
-function save(state) {
+function save(state, key = STORE) {
   try {
-    localStorage.setItem(STORE, JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(state));
   } catch {
     /* см. load: молчим намеренно, терять здесь нечего */
   }
@@ -621,8 +629,11 @@ function Day({ variants, index, targets, pantry, eaten, extras, onOther, onResta
  * Сборка
  * ================================================================== */
 
-export default function Ration({ targets, onClose }) {
-  const saved = useMemo(load, []);
+// trial — тренер пробует раздел: всё то же, но на своём устройстве и
+// без записи в общую базу продуктов
+export default function Ration({ targets, onClose, trial = false }) {
+  const key = trial ? TRIAL_STORE : STORE;
+  const saved = useMemo(() => load(key), [key]);
   const [pantry, setPantry] = useState(() => saved.pantry || defaultPantry());
   const [liked, setLiked] = useState(() => saved.liked || []);
   const [seen, setSeen] = useState(() => saved.seen || []);
@@ -631,23 +642,82 @@ export default function Ration({ targets, onClose }) {
 
   // Своё — на сегодня: завтра начинается с чистого дня. Недавние продукты
   // — на устройстве, на случай без сети; основная база общая, на сервере.
-  const today = new Date().toISOString().slice(0, 10);
+  // День — по Москве, как на сервере: иначе ночью своё уезжало бы во вчера
+  const today = new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
   const [extras, setExtras] = useState(() => (saved.extras && saved.extras.date === today ? saved.extras.items : []));
   const [products, setProducts] = useState(() => saved.products || []);
 
   useEffect(() => {
-    save({ pantry, liked, seen, extras: { date: today, items: extras }, products });
-  }, [pantry, liked, seen, extras, products]);
+    save({ pantry, liked, seen, extras: { date: today, items: extras }, products }, key);
+  }, [pantry, liked, seen, extras, products, key]);
+
+  // ------------------------------------------------------------------
+  // Сервер — главное хранилище рациона клиента (ration.*): отметки живут на
+  // всех его устройствах, тренер видит их в карточке, а журнал своего
+  // показывает, кто что ест. Телефон — кеш: экран открывается сразу, без
+  // сети работает, а записанное без сети досылается при следующем заходе.
+  // Проба тренера (trial) сервера не касается вовсе.
+  // ------------------------------------------------------------------
+  const [synced, setSynced] = useState(trial);
+
+  useEffect(() => {
+    if (trial) return undefined;
+    let alive = true;
+    apiPublic('ration.get', { day: today })
+      .then(async (srv) => {
+        if (!alive) return;
+        if (srv.saved) {
+          setPantry(srv.pantry || defaultPantry());
+          setLiked(srv.liked || []);
+          setSeen(srv.seen || []);
+        } else if (saved.pantry || (saved.liked || []).length) {
+          // Первый заход после переезда на сервер: отмеченное на телефоне —
+          // туда, а не в пустоту
+          await apiPublic('ration.save', { pantry, liked, seen }).catch(() => {});
+        }
+        // Своё, записанное без сети, — досылаем; дальше верим серверу
+        const pending = extras.filter((e) => e.pending);
+        const sent = [];
+        for (const e of pending) {
+          try {
+            sent.push(await apiPublic('ration.extra.add', { day: today, product: e.product, grams: e.grams, pieces: e.pieces }));
+          } catch (_) { sent.push(e); }
+        }
+        if (alive) setExtras([...(srv.extras || []), ...sent]);
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setSynced(true); });
+    return () => { alive = false; };
+  }, [trial]);
+
+  // Подбор — на сервер с паузой: листают колоду быстро, и каждое касание
+  // отдельным запросом не нужно
+  useEffect(() => {
+    if (trial || !synced) return undefined;
+    const timer = setTimeout(() => {
+      apiPublic('ration.save', { pantry, liked, seen }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [pantry, liked, seen, synced, trial]);
 
   const eaten = useMemo(() => extraTotals(extras), [extras]);
   const rest = useMemo(() => remainingTarget(targets, eaten), [targets, eaten]);
 
   const addExtra = ({ product, grams, pieces }) => {
-    setExtras((list) => [...list, { id: 'e' + Date.now().toString(36), product, grams, pieces }]);
+    const temp = { id: 'e' + Date.now().toString(36), product, grams, pieces, pending: !trial };
+    setExtras((list) => [...list, temp]);
     setProducts((list) => [product, ...list.filter((p) => p.id !== product.id && p.name.toLowerCase() !== product.name.toLowerCase())].slice(0, 40));
     setVariant(0);
+    if (trial) return;
+    apiPublic('ration.extra.add', { day: today, product, grams, pieces })
+      .then((saved) => setExtras((list) => list.map((e) => (e.id === temp.id ? saved : e))))
+      .catch(() => { /* останется pending и уйдёт при следующем заходе */ });
   };
-  const removeExtra = (id) => { setExtras((list) => list.filter((e) => e.id !== id)); setVariant(0); };
+  const removeExtra = (id) => {
+    setExtras((list) => list.filter((e) => e.id !== id));
+    setVariant(0);
+    if (!trial && typeof id === 'number') apiPublic('ration.extra.remove', { id }).catch(() => {});
+  };
 
 
   const deck = useMemo(
@@ -704,6 +774,21 @@ export default function Ration({ targets, onClose }) {
         <h2 className="ration__title">{titles[step]}</h2>
       </div>
 
+      {trial && (
+        <Section>
+          <Note tone="info">
+            Пробный режим: так раздел видит клиент, с его нормой. Ваши отметки
+            хранятся только на этом устройстве и клиенту не видны; новые
+            продукты и лайки в общую базу не уходят.{' '}
+            <button type="button" className="ration__trial-reset" onClick={() => {
+              try { localStorage.removeItem(TRIAL_STORE); } catch { /* ничего */ }
+              setPantry(defaultPantry()); setLiked([]); setSeen([]); setExtras([]); setProducts([]);
+              setVariant(0); setStep('pantry');
+            }}>Начать пробу заново</button>
+          </Note>
+        </Section>
+      )}
+
       {step === 'pantry' && (
         <Pantry pantry={pantry} onToggle={toggle} onNext={() => setStep('swipe')} />
       )}
@@ -742,7 +827,7 @@ export default function Ration({ targets, onClose }) {
           pantry={pantry}
           eaten={eaten}
           extras={(
-            <Extras extras={extras} products={products} onAdd={addExtra} onRemove={removeExtra} />
+            <Extras extras={extras} products={products} onAdd={addExtra} onRemove={removeExtra} trial={trial} />
           )}
           onOther={() => setVariant((n) => n + 1)}
           onRestart={restart}

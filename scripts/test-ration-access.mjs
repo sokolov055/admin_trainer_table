@@ -110,22 +110,26 @@ test('клиент открывает подбор рациона', async () => 
   tree.unmount();
 });
 
-test('в карточке клиента у тренера раздела нет вовсе', async () => {
+test('в карточке клиента у тренера — не рацион клиента, а проба', async () => {
   const tree = await render({ clientRow: 17 });
   assert.ok(!whole(tree).includes('Что приготовить из того, что дома'));
-  assert.equal(button(tree, 'Собрать рацион'), undefined);
+  assert.equal(button(tree, 'Собрать рацион'), undefined, 'рацион клиента с устройства тренера');
+  assert.ok(button(tree, 'Попробовать — пробный режим'), 'пробы нет');
   tree.unmount();
 });
 
-test('в режиме «глазами клиента» раздел виден, но не открывается', async () => {
+test('в режиме «глазами клиента» раздел виден, открывается только проба', async () => {
   const tree = await render({ clientRow: 17, clientView: true });
   const shown = whole(tree);
 
   // Виден: тренер должен знать, что у клиента здесь есть раздел.
   assert.ok(shown.includes('Что приготовить из того, что дома'));
-  // Но не открывается: за кнопкой стояли бы продукты с устройства тренера.
+  // Клиентская кнопка не открывается у тренера: за ней стояли бы продукты
+  // с устройства тренера под именем клиента. Вместо неё — проба.
   assert.equal(button(tree, 'Собрать рацион'), undefined, 'кнопка вернулась');
-  assert.ok(shown.includes('В режиме просмотра он не откроется'), 'нет объяснения');
   assert.ok(!shown.includes('ration-screen'));
+
+  await act(async () => button(tree, 'Попробовать — пробный режим').props.onClick());
+  assert.ok(whole(tree).includes('ration-screen'), 'проба не открылась');
   tree.unmount();
 });
