@@ -3,7 +3,7 @@ import { apiPublic, apiMutate } from './api.js';
 import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
-import { IconCheck } from './icons.jsx';
+import { IconCheck, IconLinkPair } from './icons.jsx';
 import { useBackGesture } from './gestures.jsx';
 import { useFlip } from './flip.js';
 import './workout.css';
@@ -303,7 +303,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    */
   const setRow = (ex, ei, si, label, restAfter = true) => {
     const set = ex.sets[si];
-    return <div className={'workout__set ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si} data-flip={ex.id + ':' + si} data-flip-delay={si * 70}>
+    return <div className={'workout__set ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si} data-flip={ex.id + ':' + si} data-flip-delay={si * 140}>
             <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')}><span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span>
               <input aria-label={`${ex.name}, подход ${si + 1}, вес в кг`} inputMode="decimal" value={set.weight} maxLength={12} onChange={e => updateSet(ei, si, s => ({ ...s, weight: e.target.value }))} />
               <input aria-label={`${ex.name}, подход ${si + 1}, повторы`} inputMode="numeric" value={set.reps} maxLength={6} onChange={e => updateSet(ei, si, s => ({ ...s, reps: e.target.value }))} />
@@ -354,7 +354,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       )}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
-          <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 70}>Круг {r + 1}</h4>
+          <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 140}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
             <div className="workout__round-item" key={ex.id}>
               <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>{ex.name}</div>
@@ -373,6 +373,27 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         ))}
       </details>
     </section>;
+  };
+
+  /**
+   * Между карточками — «Соединить в суперсет»: упражнение с упражнением,
+   * суперсет с соседом. Решают это в зале, глядя на следующее упражнение,
+   * поэтому кнопка там, где его видно, а не в настройках. У сплита подходы
+   * идут по людям, круги там не собрать — кнопки нет.
+   */
+  const joinBefore = (ei) => {
+    const list = record?.session?.exercises || [];
+    const a = list[ei - 1];
+    const b = list[ei];
+    if (!a || !b || (a.supersetGroup && a.supersetGroup === b.supersetGroup)) return null;
+    if (a.sets.some(x => x.who) || b.sets.some(x => x.who)) return null;
+    const join = () => {
+      const group = a.supersetGroup || b.supersetGroup || 'superset-' + uid();
+      const merged = [a.supersetGroup, b.supersetGroup].filter(Boolean);
+      flip('name:' + ((a.supersetGroup ? list.find(e => e.supersetGroup === a.supersetGroup) : a).id));
+      change(v => ({ ...v, exercises: v.exercises.map(e => (e.id === a.id || e.id === b.id || merged.includes(e.supersetGroup) ? { ...e, supersetGroup: group } : e)) }));
+    };
+    return <button type="button" className="workout__join" onClick={join}><IconLinkPair aria-hidden="true" />Соединить в суперсет</button>;
   };
 
   const s = record?.session;
@@ -434,11 +455,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const members = group ? s.exercises.map((e, i) => ({ ex: e, ei: i })).filter(m => m.ex.supersetGroup === group) : [];
           // Круги — для обычного суперсета; у сплита подходы по людям, там по-старому
           if (members.length > 1 && !members.some(m => m.ex.sets.some(x => x.who))) {
-            return members[0].ei === ei ? supersetBlock(members) : null;
+            return members[0].ei === ei ? <React.Fragment key={'g' + group}>{joinBefore(ei)}{supersetBlock(members)}</React.Fragment> : null;
           }
-          const next = s.exercises[ei + 1];
-          const canJoin = next && !ex.sets.some(x => x.who) && !next.sets.some(x => x.who);
-          return <section className="workout__exercise" key={ex.id} data-flip-enter="">
+          return <React.Fragment key={ex.id}>{joinBefore(ei)}<section className="workout__exercise" key={ex.id} data-flip-enter="">
           <h3 data-flip={'name:' + ex.id}>{ei + 1}. {ex.name || 'Новое упражнение'}</h3>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {(ex.prescription || ex.prevWeight) && (
@@ -453,13 +472,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
               <button className="button button--ghost" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
               <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
-              {canJoin && <button className="button button--ghost" onClick={() => {
-                // Соединяем с соседом: он уже в суперсете — встаём в его группу
-                const group = ex.supersetGroup || next.supersetGroup || 'superset-' + uid();
-                const joined = next.supersetGroup;
-                flip('name:' + ex.id);
-                change(v => ({ ...v, exercises: v.exercises.map(e => (e.id === ex.id || e.id === next.id || (joined && e.supersetGroup === joined) ? { ...e, supersetGroup: group } : e)) }));
-              }}>Суперсет со следующим</button>}
             </div>
           </details>
           <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} aria-hidden="true"><span>Подход</span><span>Вес, кг</span><span>Повторы</span><span>Готово</span></div>
@@ -478,7 +490,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             );
           })()}
           <label className="workout__field">Заметка к упражнению<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} /></label>
-        </section>;
+        </section></React.Fragment>;
         })}
         {undo && <button className="button" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Отменить последнее удаление</button>}
         <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>

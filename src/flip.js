@@ -19,8 +19,10 @@ import { useLayoutEffect, useRef, useState } from 'react';
  * должен остаться на месте экрана: без него браузер после перестройки
  * прокручивает страницу, и глаз теряет то, на что только что нажали.
  */
-const DURATION = 560;
-const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+// Медленно намеренно: перелёт должен читаться глазом — откуда и куда
+// ушёл подход, — а не мелькнуть
+const DURATION = 1000;
+const EASE = 'cubic-bezier(0.45, 0, 0.2, 1)';
 
 function scrollParent(el) {
   for (let node = el.parentElement; node; node = node.parentElement) {
@@ -73,7 +75,7 @@ export function useFlip(rootRef) {
       } else if (el.hasAttribute('data-flip-enter')) {
         el.animate(
           [{ opacity: 0, transform: 'scale(0.98)' }, { opacity: 1, transform: 'none' }],
-          { duration: 320, easing: 'ease-out', delay, fill: 'backwards' },
+          { duration: 600, easing: 'ease-out', delay, fill: 'backwards' },
         );
       }
     });

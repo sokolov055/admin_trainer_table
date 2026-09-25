@@ -174,8 +174,8 @@ test('суперсет из программы виден в занятии', as
     assert.equal(local.root.findAllByProps({ className: 'workout__set ' }).length, 9);
     assert.equal(rounds().length, 0);
 
-    // И обратно — из первого упражнения
-    await press('Суперсет со следующим');
+    // И обратно — кнопкой между карточками
+    await press('Соединить в суперсет');
     assert.deepEqual(heads(), ['Суперсет · 3 круга', '3. Планка']);
   } finally {
     if (local) local.unmount();

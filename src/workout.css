@@ -442,3 +442,16 @@
 .workout__round-title { margin: 0 0 4px; font-size: var(--text-sm); color: var(--accent); font-weight: 700; }
 .workout__round-name { font-size: var(--text-sm); font-weight: 600; margin: 6px 0 2px; }
 .workout__round-edit { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
+/* «Соединить в суперсет» — в промежутке между карточками, негромко:
+   это не действие подхода, а решение о порядке */
+.workout__join {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: fit-content; margin: var(--space-3) auto 0;
+  min-height: 36px; padding: 6px 14px;
+  border: 1px dashed var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-secondary);
+  font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
+.workout__join svg { width: 16px; height: 16px; }
+.workout__join:hover { color: var(--accent); border-color: var(--accent); }
+.workout__join:disabled { display: none; }
