@@ -22,6 +22,7 @@ const output = await build({
       stub(/Metrics\.jsx$/, 'metrics');
       stub(/Expenses\.jsx$/, 'expenses');
       stub(/Schedule\.jsx$/, 'schedule');
+      stub(/ScheduleStats\.jsx$/, 'schedule');
       stub(/client[\\/]ClientApp\.jsx$/, 'client-app');
       stub(/client[\\/]screens\.jsx$/, 'client-screens');
       stub(/Payments\.jsx$/, 'payments');

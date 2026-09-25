@@ -204,6 +204,12 @@ export function Overview({ clientRow, clientView = false }) {
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>
             )}
             {clientRow && !clientView && data.startDate && <Row label="Занимается с">{formatDate(data.startDate)}</Row>}
+            {clientRow && !clientView && data.scheduleChanges && (
+              <>
+                <Row label="Отмены">{changeLine(data.scheduleChanges, 'cancel')}</Row>
+                <Row label="Переносы">{changeLine(data.scheduleChanges, 'move')}</Row>
+              </>
+            )}
           </Rows>
         </Panel>
       </Section>
@@ -232,6 +238,21 @@ export function Overview({ clientRow, clientView = false }) {
 
 // familyRow — программа члена семьи: только чтение, без журнала и без
 // «Начать тренировку». Записывать подходы за другого человека нельзя.
+/**
+ * Отмены или переносы клиента строкой: «2 в этом месяце · 5 всего (клиент 4,
+ * тренер 1; поздних 2, списано 1)». Нет ни одной — «не было».
+ */
+function changeLine(counts, kind) {
+  const part = (c) => (kind === 'cancel' ? c.cancelClient + c.cancelTrainer : c.moveClient + c.moveTrainer);
+  const all = part(counts.total);
+  if (!all) return 'не было';
+  const t = counts.total;
+  const detail = kind === 'cancel'
+    ? ['клиент ' + t.cancelClient, 'тренер ' + t.cancelTrainer, t.cancelLate ? 'поздних ' + t.cancelLate : '', t.cancelCharged ? 'списано ' + t.cancelCharged : '']
+    : ['клиент ' + t.moveClient, 'тренер ' + t.moveTrainer];
+  return part(counts.month) + ' в этом месяце · ' + all + ' всего (' + detail.filter(Boolean).join(', ') + ')';
+}
+
 export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [workout, setWorkout] = useState(null);
   // Из журнала тренировки — обратно к тому же месту программы

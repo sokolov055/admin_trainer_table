@@ -1,3 +1,4 @@
+import ScheduleStats from './ScheduleStats.jsx';
 import { useReturnScroll } from '../scroll.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clients, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
@@ -86,6 +87,7 @@ const CLIENT_PANES = [
 const DASH_PANES = [
   { value: 'finance', label: 'Финансы' },
   { value: 'processes', label: 'Процессы' },
+  { value: 'sessions', label: 'Занятия' },
 ];
 
 /**
@@ -309,6 +311,7 @@ export default function TrainerApp({ me }) {
           <div key={dashPane}>
             {dashPane === 'finance' && <Finance />}
             {dashPane === 'processes' && <Processes />}
+            {dashPane === 'sessions' && <ScheduleStats />}
           </div>
         </main>
       )}

@@ -636,6 +636,11 @@ const MOCK = {
     monthSheetStatus: '✅ Сентябрь 2026',
     currentMonthName: 'Сентябрь 2026',
     hasPersonalSheet: true,
+    // Отмены и переносы — как отдаёт сервер тренеру
+    scheduleChanges: {
+      month: { cancelClient: 1, cancelTrainer: 0, cancelLate: 1, cancelCharged: 1, moveClient: 1, moveTrainer: 0 },
+      total: { cancelClient: 3, cancelTrainer: 1, cancelLate: 2, cancelCharged: 1, moveClient: 4, moveTrainer: 1 },
+    },
   }),
 
   'trainer.split.save': (params) => ({ row: params.clientRow, name: '', members: params.members || [] }),
@@ -697,13 +702,31 @@ const MOCK = {
       startsAt: c.nextTrainingDate,
       endsAt: new Date(new Date(c.nextTrainingDate).getTime() + 3600000).toISOString(),
       done: false,
+      // Одно — отменено клиентом со списанием: так оно выглядит в списке
+      cancelledCharged: i === 1,
     })),
     calendar: true,
     serviceEmail: 'demo@example.iam.gserviceaccount.com',
     feedUrl: 'https://example.invalid/ics/t-demo.ics',
   }),
   'trainer.schedule.save': () => ({ id: 'demo-ev-new' }),
-  'trainer.schedule.delete': (params) => ({ deleted: params.id }),
+  'trainer.schedule.delete': (params) => {
+    if (!['client', 'trainer', 'error'].includes(params.who)) throw new Error('Отметьте, кто отменил занятие.');
+    return params.charge ? { cancelled: params.id, charged: true } : { deleted: params.id };
+  },
+  'trainer.schedule.stats': () => ({
+    total: { done: 41, cancelClient: 5, cancelTrainer: 1, cancelLate: 3, cancelCharged: 2, moveClient: 4, moveTrainer: 2 },
+    lateHours: 24,
+    clients: [
+      { clientRow: 3, name: 'Анна Морозова', done: 6, cancelClient: 2, cancelTrainer: 0, cancelLate: 1, cancelCharged: 1, moveClient: 2, moveTrainer: 0 },
+      { clientRow: 4, name: 'Евгений и Екатерина', done: 8, cancelClient: 1, cancelTrainer: 1, cancelLate: 1, cancelCharged: 0, moveClient: 1, moveTrainer: 1 },
+    ],
+    recent: [
+      { kind: 'cancel', who: 'client', late: true, charged: true, reason: 'заболела', clientRow: 3, clientName: 'Анна Морозова', fromAt: daysAgo(1), toAt: null },
+      { kind: 'move', who: 'client', late: false, charged: false, reason: 'работа', clientRow: 3, clientName: 'Анна Морозова', fromAt: daysAgo(4), toAt: daysAgo(3) },
+      { kind: 'cancel', who: 'trainer', late: false, charged: false, reason: '', clientRow: 4, clientName: 'Евгений и Екатерина', fromAt: daysAgo(6), toAt: null },
+    ],
+  }),
   'client.schedule.feed': () => ({ url: 'https://example.invalid/ics/c-demo.ics' }),
 
   // Семья в демо: у Анны — брат, за которого она платит
