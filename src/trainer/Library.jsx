@@ -1,4 +1,4 @@
-import { KIND_LABELS, MACHINE_LABELS } from '../exercise-track.js';
+import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
@@ -248,6 +248,8 @@ function Back({ onClick, children = 'Назад' }) {
 
 /** Упражнение одной строкой: «Жим гантелей лёжа — 3×12, 20 кг» */
 function exerciseLine(e) {
+  // Кардио — целями, режимом и интервалами, а не «подходы × повторы»
+  if (e.cardio) return `${e.name} — ${cardioLine(e.cardio, trackOf(e))}`;
   const volume = [e.sets, e.reps].filter(Boolean).join('×');
   const extra = [volume, e.weight && e.weight + (/\d$/.test(e.weight) ? ' кг' : ''), e.rpe && 'RPE ' + e.rpe].filter(Boolean).join(', ');
   return extra ? `${e.name} — ${extra}` : e.name;

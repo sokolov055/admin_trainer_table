@@ -1,7 +1,8 @@
 import ExercisePicker from './ExercisePicker.jsx';
 import React, { useState } from 'react';
 import { apiMutate } from '../api.js';
-import { trackOf } from '../exercise-track.js';
+import { trackOf, cardioFrom } from '../exercise-track.js';
+import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
 import { useData } from '../useData.js';
 import { Note } from '../ui.jsx';
 import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash } from '../icons.jsx';
@@ -34,15 +35,21 @@ const blank = () => ({
   exerciseId: null,
   // Приём: 'dropset' — последний подход со сбросами веса
   technique: '',
+  // Кардио: тренажёр, метрики с целями, режим, интервалы (CardioPlan)
+  cardio: null,
 });
+
+/** Упражнение кардио по тренажёру — после силовой или отдельным днём */
+const cardioExercise = (machine = 'treadmill') => ({ ...blank(), name: MACHINE_NAMES[machine], sets: '1', cardio: newCardio(machine) });
+
+const norm = (v) => String(v || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 
 /**
  * Подписи колонок по типу упражнения. Колонки те же четыре — меняется
  * смысл: у кардио «повторы» — время, «вес» — режим тренажёра («8 км/ч,
  * 3%», «уровень 6»); у статики «повторы» — секунды.
  */
-function columns(exercise) {
-  const t = trackOf(exercise);
+function columns(exercise, t) {
   const sets = exercise.supersetGroup ? 'Круги' : 'Подходы';
   if (t.kind === 'cardio') {
     const mode = t.machine === 'treadmill' ? 'км/ч, %' : t.machine === 'other' ? 'режим' : 'уровень';
@@ -79,6 +86,17 @@ export default function PlanEditor({
 
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
+
+  // Тип — по базе, как только название узнано: вписал «Стульчик» — колонки
+  // сразу «на время», не дожидаясь сохранения. Переименовали строку — тип
+  // идёт за новым названием, а не остаётся от прежнего.
+  const trackIn = (exercise) => {
+    if (exercise.cardio) return trackOf(exercise);
+    const key = norm(exercise.name);
+    const base = (key && exercises.find((x) => norm(x.name) === key))
+      || (exercise.exerciseId && exercises.find((x) => x.id === exercise.exerciseId));
+    return trackOf(base && base.track ? { ...exercise, track: base.track } : exercise);
+  };
 
   const [ordering, setOrdering] = useState(false);
 
@@ -265,6 +283,8 @@ export default function PlanEditor({
           </div>
 
           {block.exercises.map((exercise, ei) => {
+            const track = trackIn(exercise);
+            const cols = columns(exercise, track);
             const paired = !!exercise.supersetGroup
               && block.exercises[ei + 1]
               && block.exercises[ei + 1].supersetGroup === exercise.supersetGroup;
@@ -286,15 +306,36 @@ export default function PlanEditor({
                   onAdded={(saved) => setExtra((prev) => [...prev, saved])}
                 />
 
+                {track.kind === 'cardio' ? (
+                  <CardioPlan
+                    value={cardioFrom(exercise, track)}
+                    track={track}
+                    disabled={busy}
+                    onChange={(c) => change((next) => {
+                      const e = next[bi].exercises[ei];
+                      // Название по тренажёру меняем, только если оно и было
+                      // названием тренажёра, а не своим («Бег в горку»)
+                      if (c.machine && c.machine !== track.machine && (!e.name || Object.values(MACHINE_NAMES).includes(e.name))) {
+                        e.name = MACHINE_NAMES[c.machine];
+                        e.exerciseId = null;
+                      }
+                      e.cardio = c;
+                      return next;
+                    })}
+                  />
+                ) : (
+                <>
                 <div className={'plan-edit__numbers plan-edit__labels' + (split ? ' plan-edit__numbers--split' : '')} aria-hidden="true">
-                  <span>{columns(exercise).heads[0]}</span><span>{columns(exercise).heads[1]}</span>{!split && <span>{columns(exercise).heads[2]}</span>}<span>RPE</span>
+                  <span>{cols.heads[0]}</span><span>{cols.heads[1]}</span>{!split && <span>{cols.heads[2]}</span>}<span>RPE</span>
                 </div>
                 <div className={'plan-edit__numbers' + (split ? ' plan-edit__numbers--split' : '')}>
-                  <input className="field__input" aria-label={columns(exercise).heads[0]} placeholder={columns(exercise).ph[0]} inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
-                  <input className="field__input" aria-label={columns(exercise).heads[1]} placeholder={columns(exercise).ph[1]} inputMode="text" value={exercise.reps} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
-                  {!split && <input className="field__input" aria-label={columns(exercise).heads[2]} placeholder={columns(exercise).ph[2]} inputMode={trackOf(exercise).kind === 'cardio' ? 'text' : 'decimal'} value={exercise.weight} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
+                  <input className="field__input" aria-label={cols.heads[0]} placeholder={cols.ph[0]} inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
+                  <input className="field__input" aria-label={cols.heads[1]} placeholder={cols.ph[1]} inputMode="text" value={exercise.reps} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
+                  {!split && <input className="field__input" aria-label={cols.heads[2]} placeholder={cols.ph[2]} inputMode={'decimal'} value={exercise.weight} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
                   <input className="field__input" aria-label="RPE" placeholder="RPE" inputMode="decimal" value={exercise.rpe} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'rpe', e.target.value)} />
                 </div>
+                </>
+                )}
 
                 {!split && exercise.prevWeight && <span className="plan-edit__prev">было {exercise.prevWeight}</span>}
 
@@ -349,7 +390,7 @@ export default function PlanEditor({
                   </button>
                   {/* Дропсет — в последнем подходе: в зале там уже будет
                       строка первого сброса */}
-                  {(trackOf(exercise).kind === 'strength' || trackOf(exercise).kind === 'bodyweight') && (
+                  {(track.kind === 'strength' || track.kind === 'bodyweight') && (
                     <button
                       type="button"
                       className={'button button--ghost plan-edit__pair' + (exercise.technique === 'dropset' ? ' plan-edit__pair--on' : '')}
@@ -375,6 +416,11 @@ export default function PlanEditor({
               next[bi].exercises.push(blank());
               return next;
             })}>Добавить упражнение</button>
+            {/* Кардио после силовой — в конец этой же тренировки */}
+            <button className="button" disabled={busy} onClick={() => change((next) => {
+              next[bi].exercises.push(cardioExercise());
+              return next;
+            })}>Добавить кардио</button>
 
             {!single && (
               <button className="button button--ghost" disabled={busy || draft.length === 1} onClick={() => change((next) => {
@@ -387,10 +433,18 @@ export default function PlanEditor({
       ))}
 
       {!single && !ordering && (
-        <button className="button button--block" disabled={busy} onClick={() => change((next) => {
-          next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blank()] });
-          return next;
-        })}>Добавить тренировку</button>
+        <>
+          <button className="button button--block" disabled={busy} onClick={() => change((next) => {
+            next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blank()] });
+            return next;
+          })}>Добавить тренировку</button>
+          {/* Кардио отдельным днём: тренировка из одного кардио, тренажёр
+              выбирается в ней же */}
+          <button className="button button--block" disabled={busy} onClick={() => change((next) => {
+            next.push({ title: 'Кардио', exercises: [cardioExercise()] });
+            return next;
+          })}>Добавить кардиотренировку</button>
+        </>
       )}
 
       {/* Программа-шаблон: тренировка из шаблона тренировки — копией, которая

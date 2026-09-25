@@ -17,7 +17,9 @@ export function fromPlan(block, month, members = []) {
       id: uid(), name: e.name, note: '',
       // Тип учёта — что записывать в подходе; снимок, в занятии правится
       // только для этого занятия
-      ...(e.track ? { track: trackOf(e) } : {}),
+      ...(e.track || e.cardio ? { track: trackOf(e) } : {}),
+      // Кардио-план: цели, режим, интервалы — для подсказки и таймера
+      ...(e.cardio && trackOf(e).kind === 'cardio' ? { cardio: e.cardio } : {}),
       // Вес прошлого месяца — подсказка, а не план: человек в зале решает
       // по ней, добавлять ли сегодня.
       prevWeight: split

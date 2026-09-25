@@ -3856,3 +3856,13 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 /* Прогресс: переключатель периода изменений */
 .progress__period { margin: var(--space-3) 0; }
+
+/* Кардио в редакторе программы: тренажёр, режим, метрики с целями, интервалы */
+.cardio-plan { display: grid; gap: var(--space-3); }
+.cardio-plan .chips { margin-bottom: 0; }
+.cardio-plan__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-2); }
+.cardio-plan__grid label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); min-width: 0; }
+.cardio-plan__grid input, .cardio-plan__rounds input { text-align: center; font-variant-numeric: tabular-nums; }
+.cardio-plan__rounds { display: grid; grid-template-columns: auto 88px; align-items: center; gap: var(--space-2); justify-content: start; }
+.cardio-plan__phase { display: grid; gap: 6px; }
+.cardio-plan .chips { flex-wrap: wrap; overflow: visible; }

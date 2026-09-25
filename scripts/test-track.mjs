@@ -92,3 +92,36 @@ test('занятие из плана: кардио — один отрезок �
   run.sets[0] = { ...run.sets[0], state: 'done' };
   assert.equal(summary(s).volume, 60 * 10 + 40 * 6);
 });
+
+test('кардио-план: строка, фазы интервалов, отметка по любому итогу', async () => {
+  const { cardioLine, intervalPhases, intervalsText, seconds, cardioFrom } = await import('../src/exercise-track.js');
+  const plan = { machine: 'elliptical', metrics: ['time', 'kcal', 'pulse'], targets: { time: '30', kcal: '300', pulse: '130–150' },
+    settings: { level: '6' }, intervals: { rounds: 2, fast: { time: '1:00', level: '12' }, slow: { time: '90', level: '5' } } };
+  const t = trackOf({ cardio: plan });
+  assert.equal(t.machine, 'elliptical');
+  assert.deepEqual(t.metrics, ['time', 'kcal', 'pulse']);
+  assert.equal(cardioLine(plan, t), '30 мин · 300 ккал · пульс 130–150 · уровень 6 · интервалы 2 × ускорение 1:00 (уровень 12) / замедление 1:30 (уровень 5)');
+  assert.equal(seconds('1:30'), 90);
+  assert.deepEqual(intervalPhases(plan.intervals, t).map((p) => p.label + ' ' + p.round + ' ' + p.seconds), [
+    'Ускорение 1 60', 'Замедление 1 90', 'Ускорение 2 60', 'Замедление 2 90',
+  ]);
+  assert.match(intervalsText(plan.intervals, t), /^2 × ускорение/);
+  assert.equal(missing({ kcal: '310' }, t), '', 'калорий достаточно');
+  assert.match(missing({ pulse: '140' }, t), /время, расстояние или калории/);
+  // Старая запись: время в «повторах», режим в «весе»
+  const legacy = cardioFrom({ reps: '10', weight: '6 км/ч, 5%' }, cardio);
+  assert.deepEqual([legacy.targets.time, legacy.settings.speed, legacy.settings.incline], ['10', '6', '5']);
+});
+
+test('занятие из кардио-плана: режим и время-цель в отрезке, план — в снимке', () => {
+  const plan = { machine: 'treadmill', metrics: ['time', 'distance'], targets: { time: '30', distance: '5' }, settings: { speed: '8', incline: '3' },
+    intervals: { rounds: 4, fast: { time: '1:00', speed: '12' }, slow: { time: '2:00', speed: '6' } } };
+  const s = fromPlan({ title: 'Кардио', exercises: [{ name: 'Беговая дорожка', cardio: plan }] }, 'Сентябрь 2026');
+  const run = s.exercises[0];
+  assert.equal(run.track.kind, 'cardio');
+  assert.deepEqual(run.track.metrics, ['time', 'distance']);
+  assert.equal(run.cardio.intervals.rounds, 4);
+  assert.equal(run.sets.length, 1);
+  assert.deepEqual([run.sets[0].time, run.sets[0].speed, run.sets[0].incline], ['30', '8', '3']);
+  assert.match(run.prescription, /^30 мин · 5 км · 8 км\/ч, 3% · интервалы 4 ×/);
+});

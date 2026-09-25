@@ -331,3 +331,44 @@ test('сплит: подходы кругами по людям, у каждог
   assert.equal(solo.exercises[0].sets[0].who, undefined);
   assert.equal(setLabel(solo.exercises[0].sets, 1), '2');
 });
+
+/**
+ * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
+ * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.
+ */
+test('кардио в занятии: режим, метрики, «+ метрика», интервалы', async () => {
+  data.clear();
+  const block = { title: 'Кардио', exercises: [{ name: 'Беговая дорожка', cardio: {
+    machine: 'treadmill', metrics: ['distance'], targets: { distance: '5' }, settings: { speed: '8', incline: '3' },
+    intervals: { rounds: 3, fast: { time: '1:00', speed: '12' }, slow: { time: '2:00', speed: '6' } } } }] };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const labels = () => local.root.findAllByType('input').map(n => n.props['aria-label'] || '').filter(l => /отрезок 1/.test(l));
+    assert.deepEqual(labels(), [
+      'Беговая дорожка, отрезок 1, скорость, км/ч',
+      'Беговая дорожка, отрезок 1, наклон, %',
+      'Беговая дорожка, отрезок 1, расстояние, км',
+      'Беговая дорожка, отрезок 1, RPE',
+    ]);
+    const button = label => local.root.findAllByType('button').find(b => text(b) === label);
+    assert.ok(button('Запустить интервалы'), 'таймер интервалов на месте');
+
+    // Отметить без итога нельзя: скорость — не результат
+    const check = () => local.root.findAllByType('button').find(n => /отрезок 1: выполнен/.test(n.props['aria-label'] || ''));
+    await act(async () => { check().props.onClick(); await delay(); });
+    assert.ok(local.root.findAllByType('p').some(p => /время, расстояние или калории/.test(text(p))));
+
+    await act(async () => { button('+ Калории').props.onClick(); await delay(); });
+    assert.ok(labels().includes('Беговая дорожка, отрезок 1, калории'));
+    const kcal = local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Беговая дорожка, отрезок 1, калории');
+    await act(async () => { kcal.props.onChange({ target: { value: '280' } }); await delay(); });
+    await act(async () => { check().props.onClick(); await delay(); });
+    assert.ok(local.root.findAllByType('button').some(n => /отрезок 1: снять отметку/.test(n.props['aria-label'] || '')));
+  } finally {
+    if (local) local.unmount();
+  }
+});

@@ -480,3 +480,22 @@
 .workout__round-options { margin-top: var(--space-2); }
 .workout__round-set { border-bottom: 1px solid var(--border); padding-bottom: var(--space-2); margin-bottom: var(--space-2); }
 .workout__round-set-name { font-size: var(--text-sm); font-weight: 600; margin: var(--space-2) 0 4px; }
+
+/* Кардио: отрезок — подписанные поля сеткой, отметка в строке заголовка */
+.workout__cardio-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.workout__set--done .workout__cardio-head > span { color: var(--good-text); font-weight: 640; }
+.workout__cardio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--space-2); margin-top: var(--space-2); }
+.workout__cardio-grid label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); min-width: 0; }
+.workout__cardio-grid input { width: 100%; text-align: center; font-variant-numeric: tabular-nums; }
+.workout__metric-add { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--space-2) 0; }
+
+/* Таймер интервалов: фаза и остаток крупно — на дорожке в телефон смотрят мельком */
+.intervals { margin: var(--space-3) 0; padding: var(--space-3); border-radius: var(--radius-md, 12px); background: var(--surface-2, var(--surface)); border: 1px solid var(--border); }
+.intervals__now { text-align: center; margin: var(--space-2) 0; }
+.intervals__phase { font-weight: 700; font-size: var(--text-lg, 18px); }
+.intervals--fast .intervals__phase { color: var(--accent); }
+.intervals__left { font-size: 48px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.intervals__round { color: var(--text-muted); }
+.intervals__bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: var(--space-2); }
+.intervals__bar span { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform 250ms linear; }
+@media (prefers-reduced-motion: reduce) { .intervals__bar span { transition: none; } }

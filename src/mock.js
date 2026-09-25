@@ -66,7 +66,8 @@ const PLAN_BLOCKS = [
     title: 'Тренировка 2 — низ',
     exercises: [
       // Кардио-разминка: время, скорость, наклон
-      { name: 'Беговая дорожка', weight: '6 км/ч, 5%', prevWeight: '', sets: '1', reps: '10', rpe: '', track: { kind: 'cardio', machine: 'treadmill', unilateral: false, perSide: false } },
+      { name: 'Беговая дорожка', weight: '', prevWeight: '', sets: '1', reps: '', rpe: '', track: { kind: 'cardio', machine: 'treadmill', unilateral: false, perSide: false },
+        cardio: { machine: 'treadmill', metrics: ['time', 'distance'], targets: { time: '10', distance: '1.2', kcal: '', pulse: '' }, settings: { speed: '6', incline: '5', level: '' }, intervals: null } },
       { name: 'Присед со штангой', weight: '95', prevWeight: '90', sets: '5', reps: '5', rpe: '8' },
       { name: 'Румынская тяга', weight: '85', prevWeight: '80', sets: '4', reps: '10', rpe: '7' },
       // Суперсет: в таблице это объединённая ячейка «Подходы», здесь —
@@ -74,6 +75,15 @@ const PLAN_BLOCKS = [
       // часть экрана можно только на живом клиенте.
       { name: 'Выпады с гантелями', weight: '20', prevWeight: '20', sets: '3', reps: '12', rpe: '8', supersetGroup: 'superset-9-10', track: { kind: 'strength', machine: '', unilateral: true, perSide: true } },
       { name: 'Подъём на носки', weight: '40', prevWeight: '40', sets: '3', reps: '15', rpe: '7', supersetGroup: 'superset-9-10' },
+    ],
+  },
+  {
+    // Кардио отдельным днём: цели по калориям и пульсу, интервалы
+    title: 'Кардио — интервалы',
+    exercises: [
+      { name: 'Эллипс', weight: '', prevWeight: '', sets: '1', reps: '', rpe: '', track: { kind: 'cardio', machine: 'elliptical', unilateral: false, perSide: false },
+        cardio: { machine: 'elliptical', metrics: ['time', 'kcal', 'pulse'], targets: { time: '30', distance: '', kcal: '300', pulse: '130–150' }, settings: { speed: '', incline: '', level: '6' },
+          intervals: { rounds: 6, fast: { time: '1:00', speed: '', incline: '', level: '12' }, slow: { time: '2:00', speed: '', incline: '', level: '5' } } } },
     ],
   },
 ];

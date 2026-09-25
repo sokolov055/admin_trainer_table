@@ -6,7 +6,8 @@ import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-mod
 import { IconCheck, IconClose, IconLinkPair } from './icons.jsx';
 import { useBackGesture } from './gestures.jsx';
 import { useFlip } from './flip.js';
-import { KIND_LABELS, MACHINE_LABELS, trackOf, rowFields, cardioExtras, missing } from './exercise-track.js';
+import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
+import IntervalTimer from './IntervalTimer.jsx';
 import './workout.css';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
@@ -303,6 +304,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * упражнения.
    */
   const setRow = (ex, ei, si, label, restAfter = true, inRound = false) => {
+    if (trackOf(ex).kind === 'cardio') return cardioSet(ex, ei, si, label, restAfter, inRound);
     const set = ex.sets[si];
     const track = trackOf(ex);
     const fields = rowFields(track);
@@ -368,19 +370,61 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           </div>;
   };
 
-  /** Поля подхода сверх строки: у кардио — дистанция, калории, пульс; у своего веса — поддержка */
+  /**
+   * Отрезок кардио: режим тренажёра и выбранные метрики — подписанными
+   * полями сеткой, а не строкой колонок: полей бывает до шести, и в строку
+   * телефона они не помещаются.
+   */
+  const cardioSet = (ex, ei, si, label, restAfter, inRound) => {
+    const set = ex.sets[si];
+    const track = trackOf(ex);
+    const fields = [...settingsFields(track), ...track.metrics.map(m => metricField(m, track))];
+    const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
+    return <div className={'workout__set workout__set--cardio ' + (set.state === 'done' ? 'workout__set--done' : '')} key={si} data-flip={ex.id + ':' + si} data-flip-delay={si * 140}>
+      <div className="workout__cardio-head">
+        <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}{set.kind === 'warmup' ? ' · разминка' : ''}</span>
+        <button className="workout__check" aria-label={`${ex.name}, отрезок ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
+          const lack = set.state !== 'done' && missing(set, track);
+          if (lack) { setMessage(lack); return; }
+          const starting = set.state !== 'done';
+          updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
+          if (starting && restAfter) startRest();
+        }}><IconCheck size={20} /></button>
+      </div>
+      <div className="workout__cardio-grid">
+        {fields.map(f => (
+          <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
+        ))}
+      </div>
+      {!inRound && <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки отрезка'}</summary>
+        <div className="workout__toolbar">
+          <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
+          <label>RPE<input aria-label={`${ex.name}, отрезок ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
+          <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
+          <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить отрезок</button>
+        </div>
+      </details>}
+    </div>;
+  };
+
+  /** Кардио: добавить метрику, которой нет в плане, — калории с экрана тренажёра, пульс с часов */
+  const metricAdd = (ex, ei) => {
+    const track = trackOf(ex);
+    const rest = METRICS.filter(m => !track.metrics.includes(m));
+    if (!rest.length) return null;
+    return <div className="workout__metric-add">
+      {rest.map(m => (
+        <button type="button" key={m} className="chip" onClick={() => updateExercise(ei, x => ({ ...x, track: { ...trackOf(x), metrics: [...trackOf(x).metrics, m] } }))}>+ {metricField(m, track).short}</button>
+      ))}
+    </div>;
+  };
+
+  /** Поля подхода сверх строки: у своего веса и статики — поддержка */
   const setExtras = (ex, ei, si) => {
     const set = ex.sets[si];
     const track = trackOf(ex);
     const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
     return <>
-      {track.kind === 'cardio' && (
-        <div className="workout__extras">
-          {cardioExtras(track).map(f => (
-            <label key={f.key}>{f.head}<input aria-label={`${ex.name}, подход ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
-          ))}
-        </div>
-      )}
       {(track.kind === 'bodyweight' || track.kind === 'timed') && (
         <label className="workout__field">Поддержка<input aria-label={`${ex.name}, подход ${si + 1}, поддержка`} placeholder="резинка, гравитрон 20" maxLength={40} value={set.assist || ''} onChange={e => edit('assist', e.target.value)} /></label>
       )}
@@ -440,7 +484,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    */
   const trackEditor = (ex, ei) => {
     const track = trackOf(ex);
-    const set = patch => updateExercise(ei, x => ({ ...x, track: { ...trackOf(x), ...patch } }));
+    const set = patch => updateExercise(ei, x => {
+      const next = { ...x, track: { ...trackOf(x), ...patch } };
+      if (next.track.kind !== 'cardio') delete next.cardio;
+      else if (x.cardio && patch.machine) next.cardio = { ...x.cardio, machine: patch.machine };
+      return next;
+    });
     return <div className="workout__track">
       <label className="workout__field">Что записывать<select value={track.kind} onChange={e => set({ kind: e.target.value, machine: e.target.value === 'cardio' ? (track.machine || 'treadmill') : '' })}>
         {Object.entries(KIND_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -603,8 +652,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               <button className="button button--ghost" disabled={s.exercises.length === 1} onClick={() => { setUndo(s.exercises); change(s => ({ ...s, exercises: s.exercises.filter(e => e.id !== ex.id) })); }}>Убрать</button>
             </div>
           </details>
-          <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}<span>Готово</span></div>
+          {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}
+          {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}<span>Готово</span></div>}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
+          {trackOf(ex).kind === 'cardio' && metricAdd(ex, ei)}
           {/* У пары подход добавляется кругом — по одному каждому, кто
               делает упражнение, с его последним весом */}
           {(() => {
