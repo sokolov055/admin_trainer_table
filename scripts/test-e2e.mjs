@@ -133,7 +133,10 @@ test('суперсет показан одной группой с числом 
   const group = section('Тренировка 2 — низ').locator('.superset');
 
   assert.equal(await group.count(), 1);
-  await assert.doesNotReject(group.getByText(/Суперсет · 3 круга/).waitFor({ timeout: 5000 }));
+  // Число кругов — у скобки справа, один раз на группу
+  const count = group.locator('.superset__count');
+  await assert.doesNotReject(count.waitFor({ timeout: 5000 }));
+  assert.equal((await count.innerText()).replace(/\s+/g, ' ').trim(), '3 круга');
   assert.equal(await group.locator('.exercise').count(), 2, 'в группе оба упражнения');
 });
 
