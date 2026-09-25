@@ -135,6 +135,22 @@ export function useBackGesture(handler, enabled = true, snapshotName = null) {
 let tabHost = null;
 const tabSnapshots = new Map();
 
+/**
+ * Замок на листание разделов. Экран поверх раздела, из которого нельзя
+ * уйти в соседний раздел, — идущая тренировка: смахнуть влево значило бы
+ * бросить занятие посреди подхода. Выход с такого экрана — только «назад»
+ * (смахнуть вправо). Замков может быть несколько — считаем.
+ */
+let tabLocks = 0;
+
+export function useTabLock(enabled = true) {
+  useEffect(() => {
+    if (!enabled) return undefined;
+    tabLocks += 1;
+    return () => { tabLocks -= 1; };
+  }, [enabled]);
+}
+
 export function rememberTab(id) {
   if (typeof document === 'undefined' || !id) return;
   const app = document.querySelector('#root .app');
@@ -774,7 +790,9 @@ export function Gestures() {
         mode: null,
         atTop: (window.scrollY || document.documentElement.scrollTop) <= 0,
         canBack: backStack.length > 0 && free,
-        canTabs: !!tabHost && free,
+        // Строка со смахиванием влево (удалить подход) забирает себе
+        // движение влево; «назад» вправо с неё по-прежнему работает
+        canTabs: !!tabHost && free && tabLocks === 0 && !(e.target.closest && e.target.closest('[data-swipe-left]')),
         startPull: pullY,
         startSlide: slideX,
         startPager: pagerX,

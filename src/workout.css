@@ -557,3 +557,39 @@
    заливка на экране — «готово» у следующего подхода */
 .workout__check[aria-pressed="true"] { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
 .workout__ex-num { min-width: 0; margin-right: 2px; }
+
+/* ==========================================================================
+ * Смахнуть влево — удалить (SwipeRow, swipe.js). Подход и заголовок
+ * упражнения: содержимое непрозрачное поверх красной корзины.
+ * ========================================================================== */
+.swipe { position: relative; overflow: hidden; touch-action: pan-y; }
+.swipe__action { position: absolute; inset: 0 0 0 auto; width: 88px; display: flex; opacity: 0; background: var(--critical); }
+.swipe__trash { flex: 1; display: grid; place-items: center; align-content: center; gap: 2px; border: 0; background: none; color: #fff; font: inherit; font-size: var(--text-xs); font-weight: 600; cursor: pointer; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.swipe__trash:active { transform: scale(0.94); }
+.swipe__trash:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
+.swipe__content { position: relative; background: var(--surface); }
+
+/* Подход: отступы и подсветка — у содержимого, иначе под ним видно красное */
+.workout__set.swipe { padding: 0; background: transparent; }
+.workout__set > .swipe__content { padding: var(--space-1) var(--space-2); }
+.workout__set--done > .swipe__content { background: var(--good-fill); }
+.workout__set--current > .swipe__content { background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface); }
+.workout__set.swipe { border-radius: var(--radius-sm); }
+.workout__ex-swipe { margin: calc(var(--space-1) * -1) calc(var(--space-2) * -1) 0; border-radius: var(--radius-sm); }
+.workout__ex-swipe > .swipe__content { padding: var(--space-1) var(--space-2); }
+
+/* Выбор упражнений: кружок у названия, выбранное — с акцентом */
+.workout__ex-head--pick { cursor: pointer; align-items: center; }
+.workout__pick { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--border-strong); color: var(--accent-text); transition: background-color 160ms ease, border-color 160ms ease; }
+.workout__pick.is-on { background: var(--accent); border-color: var(--accent); }
+.workout__exercise--picked { border-color: var(--accent); }
+.workout__pick-bar, .workout__undo {
+  position: sticky; bottom: calc(76px + var(--space-3)); z-index: 4;
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  margin: var(--space-3) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.35);
+}
+.workout__pick-bar .button { gap: 6px; }
+.workout__pick-count, .workout__undo > span { flex: 1; min-width: 8ch; font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .swipe__trash, .workout__pick { transition: none; } }

@@ -4,7 +4,8 @@ import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders } from './icons.jsx';
-import { useBackGesture } from './gestures.jsx';
+import { useBackGesture, useTabLock } from './gestures.jsx';
+import SwipeRow from './SwipeRow.jsx';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
@@ -55,7 +56,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // привязано к конкретной строке, иначе список перерисуется и человек
   // подтвердит удаление не того занятия.
   const [erase, setErase] = useState('');
-  const [undo, setUndo] = useState(null);
+  const [undo, setUndoState] = useState(null);
+  const [undoText, setUndoText] = useState('');
+  const setUndo = (value, text = 'Удалено') => { setUndoState(value); setUndoText(value ? text : ''); };
+  useEffect(() => {
+    if (!undo) return undefined;
+    const t = setTimeout(() => setUndo(null), 8000);
+    return () => clearTimeout(t);
+  }, [undo]);
+  // Выбор нескольких упражнений: удалить, дублировать, соединить в суперсет
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState(() => new Set());
   // Настройки подхода открываются по номеру подхода — одна за раз, а не
   // строкой «Настройки подхода» под каждым: их читают редко, а место они
   // занимали у цифр, ради которых экран и открыт
@@ -287,6 +298,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   // Смахнуть вправо — то же, что «Назад»: с сохранением незаписанного
   useBackGesture(close);
+  // Идущая тренировка — не раздел: смахнуть влево в «Прогресс» посреди
+  // подхода нельзя, выход только «назад» (смахнуть вправо)
+  useTabLock(true);
   const exportDraft = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(state.current, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'тренировка.json'; a.click(); URL.revokeObjectURL(url);
@@ -325,7 +339,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     });
     const key = ex.id + ':' + si;
     const current = focus.ex === ex.id && focus.set === si;
-    return <div className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}>
+    const removeSet = () => { setUndo(s.exercises, 'Подход удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
+    return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}
+      disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
             <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')} style={{ '--cols': fields.length }}>
               {inRound
                 ? <span>{label}</span>
@@ -376,10 +392,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
                 {setTools(ex, ei, si)}
                 <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-                <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить подход</button>
+                <button className="button" disabled={ex.sets.length === 1} onClick={removeSet}>Удалить подход</button>
               </div>
             </div>}
-          </div>;
+          </SwipeRow>;
   };
 
   /**
@@ -394,7 +410,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
     const key = ex.id + ':' + si;
     const current = focus.ex === ex.id && focus.set === si;
-    return <div className={'workout__set workout__set--cardio' + (set.state === 'done' ? ' workout__set--done' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}>
+    const removeSet = () => { setUndo(s.exercises, 'Отрезок удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
+    return <SwipeRow className={'workout__set workout__set--cardio' + (set.state === 'done' ? ' workout__set--done' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 140}
+      disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить отрезок ${si + 1}`} onDelete={removeSet}>
       <div className="workout__cardio-head">
         {inRound
           ? <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}</span>
@@ -419,10 +437,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
           <label>RPE<input aria-label={`${ex.name}, отрезок ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
           <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
-          <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить отрезок</button>
+          <button className="button" disabled={ex.sets.length === 1} onClick={removeSet}>Удалить отрезок</button>
         </div>
       </div>}
-    </div>;
+    </SwipeRow>;
   };
 
   /** Кардио: добавить метрику, которой нет в плане, — калории с экрана тренажёра, пульс с часов */
@@ -592,6 +610,39 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return <button type="button" className="workout__join" onClick={join}><IconLinkPair aria-hidden="true" />Соединить в суперсет</button>;
   };
 
+  const togglePick = (id) => setPicked(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const endPick = () => { setPicking(false); setPicked(new Set()); };
+  const pickDelete = () => {
+    setUndo(record.session.exercises, picked.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + picked.size);
+    change(v => ({ ...v, exercises: v.exercises.filter(e => !picked.has(e.id)) }));
+    endPick();
+  };
+  // Копия — сразу за своим упражнением, с неотмеченными подходами
+  const pickCopy = () => {
+    change(v => ({
+      ...v,
+      exercises: v.exercises.flatMap(e => (picked.has(e.id)
+        ? [e, { ...e, id: uid(), supersetGroup: '', note: '', sets: e.sets.map(x => ({ ...x, state: 'pending' })) }]
+        : [e])).slice(0, 30),
+    }));
+    endPick();
+  };
+  // Выбранные — в один суперсет; вместе с их прежними группами
+  const pickSuperset = () => {
+    const first = record.session.exercises.find(e => picked.has(e.id));
+    flip('name:' + first.id);
+    const group = 'superset-' + uid();
+    change(v => {
+      // Суперсет делают подряд: выбранные встают за первым из них
+      const chosen = v.exercises.filter(e => picked.has(e.id)).map(e => ({ ...e, supersetGroup: group }));
+      const at = v.exercises.findIndex(e => picked.has(e.id));
+      const rest = v.exercises.filter(e => !picked.has(e.id));
+      const before = v.exercises.slice(0, at).filter(e => !picked.has(e.id)).length;
+      return { ...v, exercises: [...rest.slice(0, before), ...chosen, ...rest.slice(before)] };
+    });
+    endPick();
+  };
+
   const s = record?.session;
 
   // Куда смотреть: первое упражнение с неотмеченным подходом и этот
@@ -642,6 +693,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <label className="workout__field">Название занятия<input value={s.title} maxLength={160} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
         {editable && <div className="workout__toolbar">
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
+          <button className="button button--ghost workout__pick-toggle" onClick={() => (picking ? endPick() : setPicking(true))}>{picking ? 'Готово' : 'Выбрать'}</button>
           {/* Длительность не только запускает отдых, но и запоминается:
               дальше он стартует сам после каждого отмеченного подхода.
               Раньше за ним приходилось возвращаться в шапку экрана
@@ -668,11 +720,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
           const finished = doneSets === ex.sets.length;
           const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
-          return <React.Fragment key={ex.id}>{joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '')} key={ex.id} data-flip-enter="">
-          <div className="workout__ex-head">
+          return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '')} key={ex.id} data-flip-enter="">
+          <SwipeRow className="workout__ex-swipe" disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
+            onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
+          <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
+            {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}
             <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {ex.name || 'Новое упражнение'}</h3>
             <span className="workout__ex-count" aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{finished ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
           </div>
+          </SwipeRow>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {(main || ex.prevWeight) && (
             <p className="workout__target">
@@ -715,7 +771,22 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           </details>
         </section></React.Fragment>;
         })}
-        {undo && <button className="button" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Отменить последнее удаление</button>}
+        {undo && (
+          <div className="workout__undo" role="status">
+            <span>{undoText}</span>
+            <button type="button" className="button button--ghost" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Вернуть</button>
+          </div>
+        )}
+        {picking && (
+          <div className="workout__pick-bar" role="toolbar" aria-label="Действия с выбранными упражнениями">
+            <span className="workout__pick-count">{picked.size ? 'Выбрано ' + picked.size : 'Отметьте упражнения'}</span>
+            <button type="button" className="button" disabled={picked.size < 2 || s.exercises.some(e => picked.has(e.id) && e.sets.some(x => x.who))} onClick={pickSuperset}>
+              <IconLinkPair size={16} />Суперсет
+            </button>
+            <button type="button" className="button" disabled={!picked.size} onClick={pickCopy}>Дублировать</button>
+            <button type="button" className="button button--critical" disabled={!picked.size || picked.size >= s.exercises.length} onClick={pickDelete}>Удалить</button>
+          </div>
+        )}
         <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>

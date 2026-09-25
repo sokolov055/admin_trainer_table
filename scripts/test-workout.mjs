@@ -182,7 +182,7 @@ test('суперсет из программы виден в занятии', as
     // сколько было кругов
     await press('Разъединить');
     assert.deepEqual(heads(), ['1 Подтягивания', '2 Тяга блока', '3 Планка']);
-    assert.equal(local.root.findAll(n => n.type === 'div' && String(n.props.className || '').split(' ')[0] === 'workout__set').length, 9);
+    assert.equal(local.root.findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set')).length, 9);
     assert.equal(rounds().length, 0);
 
     // И обратно — кнопкой между карточками
@@ -368,6 +368,47 @@ test('кардио в занятии: режим, метрики, «+ метри
     await act(async () => { kcal.props.onChange({ target: { value: '280' } }); await delay(); });
     await act(async () => { check().props.onClick(); await delay(); });
     assert.ok(local.root.findAllByType('button').some(n => /отрезок 1: снять отметку/.test(n.props['aria-label'] || '')));
+  } finally {
+    if (local) local.unmount();
+  }
+});
+
+/**
+ * Удалить подход смахиванием и вернуть; выбрать два упражнения —
+ * соединить в суперсет. Жест в тестовом рендере не повторить, поэтому
+ * здесь — то, что делает кнопка корзины и панель выбора.
+ */
+test('корзина подхода удаляет с «Вернуть»; выбор упражнений — суперсет', async () => {
+  data.clear();
+  const block = { title: 'Выбор', exercises: [
+    { name: 'Жим', sets: '3', reps: '10', weight: '40' },
+    { name: 'Тяга', sets: '3', reps: '12', weight: '30' },
+  ] };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const press = async (match) => {
+      const b = local.root.findAllByType('button').find(x => (typeof match === 'string' ? text(x) === match : match.test(x.props['aria-label'] || '')));
+      assert.ok(b, String(match));
+      await act(async () => { b.props.onClick({ stopPropagation() {} }); await delay(); });
+    };
+    const sets = () => local.root.findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set')).length;
+    assert.equal(sets(), 6);
+    await press(/^Удалить подход 2$/);
+    assert.equal(sets(), 5);
+    assert.ok(local.root.findAllByType('span').some(x => text(x) === 'Подход удалён'));
+    await press('Вернуть');
+    assert.equal(sets(), 6, 'вернулся');
+
+    await press('Выбрать');
+    const heads = local.root.findAll(n => n.props.role === 'checkbox');
+    assert.equal(heads.length, 2);
+    for (const h of heads) await act(async () => { h.props.onClick(); await delay(); });
+    await press('Суперсет');
+    assert.equal(local.root.findAllByProps({ className: 'workout__round-title' }).length, 3, 'стали суперсетом из трёх кругов');
   } finally {
     if (local) local.unmount();
   }
