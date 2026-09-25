@@ -518,3 +518,7 @@
 .card__tag { font-size: var(--text-xs); color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
 .ration__tags { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 var(--space-3); }
 .ration__tags::-webkit-scrollbar { display: none; }
+
+/* Яйца штуками: граммы рядом, мельче — для тех, кто взвешивает */
+.amount__grams { color: var(--text-muted); font-size: var(--text-xs); margin-left: 4px; }
+.eggs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 var(--space-3); }

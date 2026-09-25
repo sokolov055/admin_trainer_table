@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, createContext, useContext } from 'react';
 import { Section, Panel, Note, Search, formatNumber, plural } from '../ui.jsx';
 import { IconCheck, IconClose, IconBack, IconNutrition } from '../icons.jsx';
 import { haptic } from '../telegram.js';
@@ -9,6 +9,37 @@ import {
   portionWeight, per100, extraTotals, remainingTarget, addTotals,
 } from './match.js';
 import Extras from './Extras.jsx';
+import { EGG_SIZES, getEggSize, saveEggSize, pieceLabel, mlLabel } from './pieces.js';
+
+/** Размер яиц, выбранный человеком: по нему «110 г» показываются как «2 яйца» */
+const EggContext = createContext(EGG_SIZES[2]);
+
+/** Вес продукта — штуками, если он штучный (яйца), иначе граммами */
+function Amount({ food, grams: g }) {
+  const size = useContext(EggContext);
+  const pieces = pieceLabel(food, g, size) || mlLabel(food, g);
+  if (!pieces) return <>{grams(g)}</>;
+  return <>{pieces} <span className="amount__grams">({grams(g)})</span></>;
+}
+
+/** Какие яйца у человека дома: мелкие, средние, крупные */
+function EggPicker({ value, onChange }) {
+  return (
+    <div className="eggs" role="radiogroup" aria-label="Размер яиц">
+      <span className="small muted">Яйца у вас:</span>
+      {EGG_SIZES.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          role="radio"
+          aria-checked={value.id === s.id}
+          className={'chip' + (value.id === s.id ? ' chip--active' : '')}
+          onClick={() => { onChange(s); haptic(); }}
+        >{s.label} {s.mark}</button>
+      ))}
+    </div>
+  );
+}
 import { apiPublic } from '../api.js';
 import './ration.css';
 
@@ -297,7 +328,7 @@ function Card({ entry, offset, style, handlers, flying }) {
             className={entry.have.includes(item.food) ? '' : 'card__items--miss'}
           >
             <span>{item.food}</span>
-            <span>{grams(item.grams)}</span>
+            <span><Amount food={item.food} grams={item.grams} /></span>
           </li>
         ))}
       </ul>
@@ -488,7 +519,7 @@ function Bar({ label, value, goal, unit }) {
   );
 }
 
-function Day({ variants, index, targets, pantry, eaten, extras, onOther, onRestart, onPantry }) {
+function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSize, onOther, onRestart, onPantry }) {
   // Своё может закрыть норму целиком — тогда блюд не остаётся, и это не ошибка
   const plan = variants.length ? variants[index % variants.length] : { dishes: [], totals: { kcal: 0, protein: 0, fat: 0, carbs: 0 } };
   const list = useMemo(() => shoppingList(plan.dishes, pantry), [plan, pantry]);
@@ -592,6 +623,10 @@ function Day({ variants, index, targets, pantry, eaten, extras, onOther, onResta
         </div>
       </Section>
 
+      {list.buy.concat(list.athome).some((row) => row.food === 'яйцо' || row.food === 'белок яичный') && (
+        <EggPicker value={eggSize} onChange={onEggSize} />
+      )}
+
       <Section
         title="Список покупок"
         note={list.buy.length ? 'на всё, что готовится' : undefined}
@@ -611,7 +646,7 @@ function Day({ variants, index, targets, pantry, eaten, extras, onOther, onResta
                   {group.items.map((row) => (
                     <div key={row.food} className="shop__row">
                       <span>{row.food}</span>
-                      <span className="shop__grams">{grams(row.grams)}</span>
+                      <span className="shop__grams"><Amount food={row.food} grams={row.grams} /></span>
                     </div>
                   ))}
                 </div>
@@ -640,7 +675,7 @@ function Day({ variants, index, targets, pantry, eaten, extras, onOther, onResta
                   {group.items.map((row) => (
                     <div key={row.food} className="shop__row shop__row--have">
                       <span>{row.food}</span>
-                      <span className="shop__grams">{grams(row.grams)}</span>
+                      <span className="shop__grams"><Amount food={row.food} grams={row.grams} /></span>
                     </div>
                   ))}
                 </div>
@@ -759,6 +794,9 @@ export default function Ration({ targets, onClose, trial = false }) {
     return () => { alive = false; };
   }, []);
 
+  const [eggSize, setEggSize] = useState(getEggSize);
+  const pickEggs = (s) => { setEggSize(s); saveEggSize(s.id); };
+
   // Фильтр колоды по меткам: «быстро», «вегетарианское», «без молочного»…
   const [tag, setTag] = useState('');
   const tagOptions = useMemo(() => {
@@ -806,6 +844,7 @@ export default function Ration({ targets, onClose, trial = false }) {
   const dayReady = step === 'day' && (variants.length > 0 || extras.length > 0);
 
   return (
+    <EggContext.Provider value={eggSize}>
     <div className="ration">
       <div className="ration__head">
         <button
@@ -890,6 +929,8 @@ export default function Ration({ targets, onClose, trial = false }) {
           targets={targets}
           pantry={pantry}
           eaten={eaten}
+          eggSize={eggSize}
+          onEggSize={pickEggs}
           extras={(
             <Extras extras={extras} products={products} onAdd={addExtra} onRemove={removeExtra} trial={trial} />
           )}
@@ -899,5 +940,6 @@ export default function Ration({ targets, onClose, trial = false }) {
         />
       )}
     </div>
+    </EggContext.Provider>
   );
 }

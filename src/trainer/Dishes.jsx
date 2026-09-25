@@ -6,6 +6,7 @@ import {
   Section, Panel, Chips, Loading, ErrorState, Empty, Note, Field, Badge, Search, formatNumber, plural,
 } from '../ui.jsx';
 import { IconAlert, IconBack, IconNutrition, IconTrash } from '../icons.jsx';
+import { EGG_SIZES, pieceLabel, mlLabel } from '../nutrition/pieces.js';
 
 /**
  * Блюда для рациона клиентов (Шаблоны → Блюда).
@@ -138,8 +139,15 @@ function DishView({ dish, onBack, onEdit, onChanged }) {
 
         <h3 className="dish__h">Состав на всё блюдо</h3>
         <ul className="dish__items">
-          {dish.items.map((i) => <li key={i.food}><span>{i.food}</span><span>{formatNumber(i.grams)} г</span></li>)}
+          {dish.items.map((i) => {
+            // Яйца — штуками, жидкости — миллилитрами; граммы в скобках
+            const shown = pieceLabel(i.food, i.grams, EGG_SIZES[2]) || mlLabel(i.food, i.grams);
+            return <li key={i.food}><span>{i.food}</span><span>{shown ? shown + ' (' + formatNumber(i.grams) + ' г)' : formatNumber(i.grams) + ' г'}</span></li>;
+          })}
         </ul>
+        {dish.items.some((i) => pieceLabel(i.food, i.grams, EGG_SIZES[2])) && (
+          <p className="small muted" style={{ margin: '6px 0 0' }}>Яйца в штуках — для крупных (С0, 55 г без скорлупы); клиент выбирает свой размер.</p>
+        )}
 
         <h3 className="dish__h">Как готовить</h3>
         <ol className="recipe__steps">{dish.steps.map((s, k) => <li key={k}>{s}</li>)}</ol>

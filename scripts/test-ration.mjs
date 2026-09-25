@@ -305,3 +305,25 @@ test('своё: продукт с упаковки проверяется', asyn
   assert.ok(cleanProduct({ name: 'X', kcal: '' }).errors.length);
   assert.ok(cleanProduct({ name: 'X', kcal: 'много' }).errors.length);
 });
+
+test('яйца — штуками под выбранный размер, между — диапазоном', async () => {
+  const { EGG_SIZES, pieceLabel } = await import('../src/nutrition/pieces.js');
+  const [small, medium, large] = EGG_SIZES;
+  assert.equal(pieceLabel('яйцо', 55, large), '1 яйцо');
+  assert.equal(pieceLabel('яйцо', 110, large), '2 яйца');
+  assert.equal(pieceLabel('яйцо', 165, large), '3 яйца');
+  assert.equal(pieceLabel('яйцо', 110, medium), '2–3 яйца', '110/47 = 2,3 — между, честнее диапазоном');
+  assert.equal(pieceLabel('яйцо', 165, medium), '3–4 яйца');
+  assert.equal(pieceLabel('яйцо', 110, small), '3 яйца', '110/40 = 2,75 — почти три');
+  assert.equal(pieceLabel('белок яичный', 150, large), '4–5 белков');
+  assert.equal(pieceLabel('творог 5%', 180, large), null, 'не штучное — граммами');
+});
+
+test('жидкости — миллилитрами по плотности', async () => {
+  const { mlLabel } = await import('../src/nutrition/pieces.js');
+  assert.equal(mlLabel('молоко 2.5%', 200), '195 мл');
+  assert.equal(mlLabel('молоко миндальное', 200), '200 мл');
+  assert.equal(mlLabel('масло растительное', 10), '10 мл');
+  assert.equal(mlLabel('масло оливковое', 5), '5 мл');
+  assert.equal(mlLabel('гречка', 60), null);
+});
