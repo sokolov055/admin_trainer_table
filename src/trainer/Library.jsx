@@ -1,3 +1,4 @@
+import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate, apiPublic } from '../api.js';
@@ -114,6 +115,8 @@ function Templates({ kind }) {
   useBackGesture(() => setEditing(null), !!editing);
   useBackGesture(() => setAssigning(null), !editing && !!assigning);
   useBackGesture(() => setOpen(null), !editing && !assigning && !!open);
+  // Из карточки шаблона — обратно на то же место списка
+  useReturnScroll(!!(editing || assigning || open));
 
   if (editing) {
     return (
@@ -677,6 +680,7 @@ function Exercises() {
   useBackGesture(() => setEditing(null), !!editing);
   useBackGesture(() => setShowHidden(false), !editing && showHidden);
   useBackGesture(() => setOpen(null), !editing && !showHidden && !!open);
+  useReturnScroll(!!(editing || showHidden || open));
 
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;

@@ -1,3 +1,4 @@
+import { useReturnScroll } from '../scroll.js';
 import React, { useMemo, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
@@ -30,6 +31,7 @@ export default function Schedule() {
   const [week, setWeek] = useState(() => mondayOf(new Date()));
   const [day, setDay] = useState(() => startOfDay(new Date()));
   const [editing, setEditing] = useState(null); // null | {} — новое | событие
+  useReturnScroll(!!editing);
 
   const params = useMemo(() => ({
     from: week.toISOString(),

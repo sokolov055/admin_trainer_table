@@ -1,3 +1,4 @@
+import { useReturnScroll } from '../scroll.js';
 import React, { useState } from 'react';
 import { Plan, Progress } from './screens.jsx';
 import { Chips, Section, Empty } from '../ui.jsx';
@@ -22,6 +23,7 @@ export default function Family({ members, preview = false }) {
 
   // Жест «назад» с человека возвращает к списку семьи
   useBackGesture(() => setOpen(null), !!open, 'family-member');
+  useReturnScroll(!!open);
 
   if (open) {
     return (

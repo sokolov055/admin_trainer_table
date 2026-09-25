@@ -1,3 +1,4 @@
+import { useReturnScroll } from '../scroll.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clients, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
 import { Finance, Processes } from './Metrics.jsx';
@@ -144,6 +145,8 @@ export default function TrainerApp({ me }) {
 
   // Переходы по нажатию — въезд на 320 мс (viewMotion.js)
   const screen = previewClient ? 'preview' : openClient ? 'card' : view;
+  // Из карточки клиента — на то же место в списке клиентов
+  useReturnScroll(!!(openClient || previewClient));
   useViewMotion(screen, {
     direction: screenDirection(TABS.map((t) => t.id)),
     target: () => (screen === 'card' || screen === 'preview' ? document.querySelector('#root .app') : visibleMain()),

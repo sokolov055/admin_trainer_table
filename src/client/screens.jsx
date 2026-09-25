@@ -1,3 +1,4 @@
+import { useReturnScroll } from '../scroll.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import Ration from '../nutrition/Ration.jsx';
@@ -231,6 +232,8 @@ export function Overview({ clientRow, clientView = false }) {
 // «Начать тренировку». Записывать подходы за другого человека нельзя.
 export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [workout, setWorkout] = useState(null);
+  // Из журнала тренировки — обратно к тому же месту программы
+  useReturnScroll(!!workout);
 
   // Переход вперёд снимает экран — его покажет жест «назад» под журналом
   const openWorkout = (value) => { captureScreen(); setWorkout(value); };

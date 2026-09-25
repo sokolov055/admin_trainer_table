@@ -1,3 +1,4 @@
+import { useReturnScroll } from '../scroll.js';
 import React, { useMemo, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
@@ -31,6 +32,8 @@ export default function Dishes() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(null);
   const [editing, setEditing] = useState(null);
+  // Из карточки блюда — обратно на то же место списка
+  useReturnScroll(!!(open || editing));
 
   if (loading) return <Loading rows={4} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
