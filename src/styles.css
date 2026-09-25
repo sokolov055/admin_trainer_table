@@ -56,6 +56,22 @@
   --series-1: #2a78d6;
   --series-2: #1b8f66;
 
+  /* --- графики (26.09.2026) ---
+     Один выделенный элемент на график — выбранный период или последнее
+     значение; всё остальное — средней насыщенности. Прежние столбики
+     все были «кислотными» (#0ca30c), линия — тонкой и прозрачной.
+     Прошлые столбики держат контраст ≥3:1 к поверхности: их должно быть
+     видно, просто не громко. */
+  --chart-up: #55a46b;
+  --chart-up-strong: #23733f;
+  --chart-down: #cf6457;
+  --chart-down-fill: #fbe7e4;
+  --chart-down-strong: #b23d30;
+  --chart-down-strong-fill: #f3c6bf;
+  --chart-neutral: #a39d92;
+  --chart-focus: rgba(26, 24, 21, 0.045);
+  --chart-area-top: 0.30;
+
   /* --- смысловые тона ---
      Зелёный за деньги и «всё в порядке», красный за долг — то, как это
      читается здесь по умолчанию. Заливка, рамка и текст идут комплектом,
@@ -174,6 +190,16 @@
   --series-1: #3987e5;
   --series-2: #22a97a;
 
+  --chart-up: #3f8f5a;
+  --chart-up-strong: #66cf8a;
+  --chart-down: #b8655d;
+  --chart-down-fill: #2d1f1f;
+  --chart-down-strong: #ef8174;
+  --chart-down-strong-fill: #4d2723;
+  --chart-neutral: #5a5560;
+  --chart-focus: rgba(255, 255, 255, 0.05);
+  --chart-area-top: 0.38;
+
   /* Тёмная тема собрана отдельно, а не получена инверсией светлой:
      тонировки здесь глубокие и малонасыщенные, иначе цветная заливка
      на тёмном фоне начинает светиться. */
@@ -227,6 +253,16 @@
 
     --series-1: #3987e5;
     --series-2: #22a97a;
+
+    --chart-up: #3f8f5a;
+    --chart-up-strong: #66cf8a;
+    --chart-down: #b8655d;
+    --chart-down-fill: #2d1f1f;
+    --chart-down-strong: #ef8174;
+    --chart-down-strong-fill: #4d2723;
+    --chart-neutral: #5a5560;
+    --chart-focus: rgba(255, 255, 255, 0.05);
+    --chart-area-top: 0.38;
 
     /* Тёмная тема собрана отдельно, а не получена инверсией светлой:
        тонировки здесь глубокие и малонасыщенные, иначе цветная заливка
@@ -3262,24 +3298,32 @@ code {
 .bars__delta--flat { color: var(--text-muted); }
 
 .bars__svg { display: block; touch-action: pan-y; }
-.bars__grid { stroke: var(--grid); stroke-width: 1; }
+.bars__grid { stroke: var(--grid); stroke-width: 1; stroke-dasharray: 2 4; }
 .bars__zero { stroke: var(--border-strong); stroke-width: 1; }
 .bars__tick, .bars__axis { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .bars__axis--current { fill: var(--text); font-weight: 600; }
 
 /* Рост — сплошной столбик, падение — «пустой» с контуром, как свеча:
    так их различают и те, кто не видит разницы красного и зелёного. */
-.bars__bar { opacity: 0.8; transition: opacity var(--dur) var(--ease-out); }
-.bars__bar--up { fill: var(--good); }
-.bars__bar--down { fill: var(--critical-fill); stroke: var(--critical); stroke-width: 1.5; }
-.bars__bar--flat { fill: var(--text-muted); opacity: 0.5; }
-.bars__bar--current { opacity: 1; }
+/* Столбики: прошлые периоды — спокойного тона, выбранный — насыщенный.
+   Падение — контуром, как свеча падения: цвет не единственный признак */
+.bars__bar { transition: fill var(--dur) var(--ease-out), stroke var(--dur) var(--ease-out); }
+.bars__bar--up { fill: var(--chart-up); }
+.bars__bar--down { fill: var(--chart-down-fill); stroke: var(--chart-down); stroke-width: 1.5; }
+.bars__bar--flat { fill: var(--chart-neutral); }
+.bars__bar--current.bars__bar--up { fill: var(--chart-up-strong); }
+.bars__bar--current.bars__bar--down { fill: var(--chart-down-strong-fill); stroke: var(--chart-down-strong); stroke-width: 2; }
+.bars__focus { fill: var(--chart-focus); }
+
+
+
+
 
 /* Идущий период — пунктиром и прозрачнее: месяц не кончился, и его
    «падение» к прошлому — не провал, а неполные данные. */
 .bars__bar--partial { fill-opacity: 0.35; stroke-dasharray: 3 2; stroke-width: 1.5; }
-.bars__bar--partial.bars__bar--up { stroke: var(--good); }
-.bars__bar--partial.bars__bar--flat { stroke: var(--text-muted); }
+.bars__bar--partial.bars__bar--up { stroke: var(--chart-up); }
+.bars__bar--partial.bars__bar--flat { stroke: var(--chart-neutral); }
 
 .bars__toggle {
   margin-top: var(--space-1);
@@ -3887,3 +3931,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .option--pace .option__kcal { font-size: var(--text-md); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .option--pace .option__top > span:first-child { font-weight: 640; }
 .option__macros { display: block; margin-top: 2px; font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Линейный график: подпись последнего значения — плашкой у точки */
+.chart__last { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart__last-bg { fill: var(--surface); stroke: var(--border-strong); }

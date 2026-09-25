@@ -107,6 +107,7 @@ export function LineChart({ series, formatValue, unit = '' }) {
               y2={t.y}
               stroke="var(--grid)"
               strokeWidth="1"
+              strokeDasharray="2 4"
             />
             <text
               x={PADDING.left - 7}
@@ -152,8 +153,9 @@ export function LineChart({ series, formatValue, unit = '' }) {
         <defs>
           {geom.series.map((s, i) => (
             <linearGradient key={i} id={gradientId + '-' + i} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={s.color} stopOpacity="0.22" />
-              <stop offset="100%" stopColor={s.color} stopOpacity="0.02" />
+              <stop offset="0%" stopColor={s.color} style={{ stopOpacity: 'var(--chart-area-top, 0.3)' }} />
+              <stop offset="60%" stopColor={s.color} stopOpacity="0.08" />
+              <stop offset="100%" stopColor={s.color} stopOpacity="0" />
             </linearGradient>
           ))}
         </defs>
@@ -165,28 +167,38 @@ export function LineChart({ series, formatValue, unit = '' }) {
               d={s.path}
               fill="none"
               stroke={s.color}
-              strokeWidth="2"
+              strokeWidth="2.5"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
             {/* Точки рисуем, только когда их немного: на плотном ряду они
-                сливаются в гусеницу и мешают читать саму линию. */}
+                сливаются в гусеницу и мешают читать саму линию. Прошлые —
+                полые: главная точка графика одна, последняя. */}
             {s.coords.length <= 14 &&
-              s.coords.map((c, ci) => (
-                <circle key={ci} cx={c.x} cy={c.y} r="4" fill={s.color} stroke="var(--surface)" strokeWidth="2" />
+              s.coords.slice(0, -1).map((c, ci) => (
+                <circle key={ci} cx={c.x} cy={c.y} r="3.5" fill="var(--surface)" stroke={s.color} strokeWidth="2" />
               ))}
-            {/* Подпись только у последнего значения — прямая маркировка
-                без превращения графика в таблицу чисел. */}
-            {s.coords.length > 0 && (
-              <circle
-                cx={s.coords[s.coords.length - 1].x}
-                cy={s.coords[s.coords.length - 1].y}
-                r="4.5"
-                fill={s.color}
-                stroke="var(--surface)"
-                strokeWidth="2"
-              />
-            )}
+            {/* Последнее значение — ореол и подпись: ради него график и
+                открывают */}
+            {s.coords.length > 0 && (() => {
+              const last = s.coords[s.coords.length - 1];
+              const text = fmt(last.value);
+              const w = text.length * 7 + 14;
+              const lx = Math.min(Math.max(last.x - w / 2, PADDING.left), width - PADDING.right - w);
+              const ly = last.y - 30 < PADDING.top - 6 ? last.y + 12 : last.y - 30;
+              return (
+                <g>
+                  <circle cx={last.x} cy={last.y} r="10" fill={s.color} opacity="0.18" />
+                  <circle cx={last.x} cy={last.y} r="5" fill={s.color} stroke="var(--surface)" strokeWidth="2" />
+                  {visible.length === 1 && !hover && (
+                    <g>
+                      <rect x={lx} y={ly} width={w} height="20" rx="10" className="chart__last-bg" />
+                      <text x={lx + w / 2} y={ly + 14} textAnchor="middle" className="chart__last" fill="var(--text)">{text}</text>
+                    </g>
+                  )}
+                </g>
+              );
+            })()}
           </g>
         ))}
 
@@ -531,6 +543,16 @@ export function BarChart({ points, aim = 1, format, highlight, label }) {
               <text x={BAR_PAD.left - 6} y={y(t) + 4} textAnchor="end" className="bars__tick">{shortNumber(t)}</text>
             </g>
           ))}
+
+          {/* Выбранный период — подложка во всю колонку: глаз находит его сразу */}
+          <rect
+            x={BAR_PAD.left + slot * current.i + 1}
+            y={BAR_PAD.top - 6}
+            width={Math.max(slot - 2, 4)}
+            height={plotH + 6}
+            rx="6"
+            className="bars__focus"
+          />
 
           <line x1={BAR_PAD.left} x2={width - BAR_PAD.right} y1={zero} y2={zero} className="bars__zero" />
 
