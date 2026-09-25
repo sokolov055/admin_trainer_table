@@ -471,6 +471,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         ))}
 
 
+      {/* Пока программа правится, текущие тренировки под редактором не
+          показываем: они мешали и путали, что правится, а что нет */}
+      {!editing && (<>
       {blocks.length === 0 && (
         <Empty
           icon={IconPlan}
@@ -597,6 +600,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           Откройте тренировку, чтобы записывать подходы и рабочие веса
         </p>
       )}
+      </>)}
     </>
   );
 }

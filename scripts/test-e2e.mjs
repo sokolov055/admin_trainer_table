@@ -660,12 +660,14 @@ test('тренировки программы переставляются пе�
 
     const rows = tab.locator('.block-order__row');
     await rows.first().waitFor({ timeout: 5000 });
-    const a = await rows.nth(0).boundingBox();
+    // Тащат за ручку справа — остальная строка листает страницу
+    const a = await rows.nth(0).locator('.block-order__handle').boundingBox();
     const b = await rows.nth(1).boundingBox();
+    const r0 = await rows.nth(0).boundingBox();
     await tab.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
     await tab.mouse.down();
     for (let i = 1; i <= 8; i += 1) {
-      await tab.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + ((b.y - a.y + 10) * i) / 8);
+      await tab.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + ((b.y - r0.y + 10) * i) / 8);
     }
     await tab.mouse.up();
 

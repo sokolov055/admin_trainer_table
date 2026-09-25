@@ -237,7 +237,7 @@ export default function PlanEditor({
           >
             {ordering ? 'Готово' : 'Порядок тренировок'}
           </button>
-          {ordering && <span className="small muted">Перетащите на новое место. Смахните влево — удалить. Долгое нажатие — копировать</span>}
+          {ordering && <span className="small muted">Тащите за значок справа. Смахните влево — удалить. Долгое нажатие — копировать</span>}
         </div>
       )}
 

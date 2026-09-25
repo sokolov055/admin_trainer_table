@@ -93,6 +93,9 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, disabled 
     gesture.current = {
       from: index, to: index, x0: e.clientX, y0: e.clientY, t0: performance.now(),
       step, rows, id: e.pointerId, axis: null, x: 0, base: openRow === index ? -ACTION_W : 0,
+      // Перестановка — только за ручку: остальная строка листает страницу,
+      // иначе длинный список не пролистать, положив палец на строку
+      grip: !!(e.target.closest && e.target.closest('.block-order__handle')),
     };
 
     // Держат, не двигая, — это вызов действий
@@ -117,6 +120,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, disabled 
       if (Math.max(Math.abs(dx), Math.abs(dy)) < SLOP) return;
       clearTimeout(holdTimer.current);
       g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (g.axis === 'y' && !g.grip) { gesture.current = null; return; }
       if (g.axis === 'y') {
         closeOpen();
         setDragging(g.from);
@@ -298,7 +302,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, disabled 
                   <span className="block-order__title">{title}</span>
                   <span className="block-order__meta">{count} {plural(count, 'упражнение', 'упражнения', 'упражнений')}</span>
                 </span>
-                {!selecting && <IconGrip size={20} className="block-order__grip" />}
+                {!selecting && <span className="block-order__handle" aria-hidden="true"><IconGrip size={20} className="block-order__grip" /></span>}
                 {menu === i && (
                   <div className="block-order__menu" onPointerDown={(e) => e.stopPropagation()}>
                     <button className="button" onClick={() => { setMenu(null); onCopy([i]); haptic('success'); }}>

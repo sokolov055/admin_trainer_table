@@ -1977,7 +1977,7 @@ th.sticky, td.sticky {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  touch-action: none;
+  touch-action: pan-y;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -3970,13 +3970,15 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Выбор нескольких: кружок вместо номера, выбранная — с акцентом */
 .block-order__bar { display: flex; justify-content: flex-end; gap: var(--space-2); margin: calc(var(--space-2) * -1) 0 var(--space-2); }
 .block-order__bar .button { gap: 6px; }
-.block-order--selecting .block-order__row { cursor: pointer; }
+/* В выборе перетаскивания нет — палец листает страницу, как везде;
+   запрет прокрутки (touch-action: none) нужен строке только для перестановки */
+.block-order--selecting .block-order__row { cursor: pointer; touch-action: pan-y; }
 .block-order__pick { flex: none; width: 26px; height: 26px; margin: 0 7px; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--border-strong); color: var(--accent-text); transition: background-color 160ms ease, border-color 160ms ease; }
 .block-order__pick.is-on { background: var(--accent); border-color: var(--accent); }
 .block-order__row.is-picked { border-color: var(--accent); }
 .block-order__row.is-picked .block-order__content { background: var(--accent-wash); }
 .block-order__actions {
-  position: sticky; bottom: calc(var(--tabbar-h, 76px) + var(--space-3)); z-index: 3;
+  position: sticky; bottom: var(--float-bottom); z-index: 3;
   display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
   margin: calc(var(--space-4) * -1) 0 var(--space-4); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -3988,3 +3990,22 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* «Удалено · Вернуть» — вместо подтверждения */
 .block-order__undo { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: calc(var(--space-3) * -1) 0 var(--space-4); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border-radius: var(--radius); background: var(--surface-sunken); font-size: var(--text-sm); }
 @media (prefers-reduced-motion: reduce) { .block-order__trash, .block-order__pick { transition: none; } }
+
+/* «Сохранить» в редакторе программы и шаблона — всегда под рукой: поменял
+   одно упражнение в середине — сохранил, не долистывая до конца */
+.plan-edit__footer {
+  position: sticky; bottom: var(--float-bottom); z-index: 4;
+  padding: var(--space-2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.35);
+}
+.plan-edit__footer .button--primary { flex: 1; }
+
+/* Плавающие панели (сохранить, выбрано, вернуть) — над нижним меню, а
+   где меню нет или оно спрятано — у края экрана, с учётом выреза */
+:root { --float-bottom: calc(76px + var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+:root:has(.tabbar--hidden), :root:not(:has(.tabbar)) { --float-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+
+/* Ручка перестановки: палец на ней не листает страницу, а тащит строку */
+.block-order__handle { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -8px -8px -8px 0; touch-action: none; cursor: grab; }
+.block-order__row { cursor: default; }
