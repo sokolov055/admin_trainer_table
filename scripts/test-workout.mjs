@@ -169,6 +169,14 @@ test('суперсет из программы виден в занятии', as
       await act(async () => { b.props.onClick(); await delay(); });
     };
 
+    // Настройки — одни на круг, а не у каждого упражнения
+    const summaries = () => local.root.findAllByType('summary').map(text);
+    assert.equal(summaries().filter(t => t === 'Настройки подхода').length, 3, 'только у планки');
+    assert.equal(summaries().filter(t => t === 'Настройки круга').length, 3);
+    await press('Пропустить круг');
+    assert.equal(summaries().filter(t => t === 'Круг пропущен · изменить').length, 1);
+    await press('Вернуть круг');
+
     // Разъединили — два отдельных упражнения, подходов у каждого столько,
     // сколько было кругов
     await press('Разъединить');

@@ -302,7 +302,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * отметке: в суперсете отдыхают после круга, а не после каждого
    * упражнения.
    */
-  const setRow = (ex, ei, si, label, restAfter = true) => {
+  const setRow = (ex, ei, si, label, restAfter = true, inRound = false) => {
     const set = ex.sets[si];
     const track = trackOf(ex);
     const fields = rowFields(track);
@@ -353,31 +353,85 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 <button type="button" className="workout__drop-remove" aria-label="Стороны поровну" onClick={() => updateSet(ei, si, ({ left, right, ...s }) => s)}><IconClose size={16} /></button>
               </div>
             )}
-            <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
-              {track.kind === 'cardio' && (
-                <div className="workout__extras">
-                  {cardioExtras(track).map(f => (
-                    <label key={f.key}>{f.head}<input inputMode={f.mode} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
-                  ))}
-                </div>
-              )}
-              {(track.kind === 'bodyweight' || track.kind === 'timed') && (
-                <label className="workout__field">Поддержка<input placeholder="резинка, гравитрон 20" maxLength={40} value={set.assist || ''} onChange={e => edit('assist', e.target.value)} /></label>
-              )}
+            {/* В круге суперсета своих настроек у подхода нет — они общие,
+                «Настройки круга» под кругом */}
+            {!inRound && <details className="workout__set-options"><summary>{set.state === 'skipped' ? 'Пропущен · изменить' : 'Настройки подхода'}</summary>
+              {setExtras(ex, ei, si)}
               <div className="workout__toolbar">
                 <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
                 <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
-                {(track.kind === 'strength' || track.kind === 'bodyweight') && !drops.length && (
-                  <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, drops: [{ weight: '', reps: '' }] }))}>Дропсет</button>
-                )}
-                {track.unilateral && set.left === undefined && (
-                  <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, left: s.reps || '', right: s.reps || '' }))}>Л и П отдельно</button>
-                )}
+                {setTools(ex, ei, si)}
                 <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
                 <button className="button" disabled={ex.sets.length === 1} onClick={() => { setUndo(s.exercises); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); }}>Удалить подход</button>
               </div>
-            </details>
+            </details>}
           </div>;
+  };
+
+  /** Поля подхода сверх строки: у кардио — дистанция, калории, пульс; у своего веса — поддержка */
+  const setExtras = (ex, ei, si) => {
+    const set = ex.sets[si];
+    const track = trackOf(ex);
+    const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
+    return <>
+      {track.kind === 'cardio' && (
+        <div className="workout__extras">
+          {cardioExtras(track).map(f => (
+            <label key={f.key}>{f.head}<input aria-label={`${ex.name}, подход ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
+          ))}
+        </div>
+      )}
+      {(track.kind === 'bodyweight' || track.kind === 'timed') && (
+        <label className="workout__field">Поддержка<input aria-label={`${ex.name}, подход ${si + 1}, поддержка`} placeholder="резинка, гравитрон 20" maxLength={40} value={set.assist || ''} onChange={e => edit('assist', e.target.value)} /></label>
+      )}
+    </>;
+  };
+
+  /** Кнопки подхода по типу: дропсет, стороны отдельно */
+  const setTools = (ex, ei, si) => {
+    const set = ex.sets[si];
+    const track = trackOf(ex);
+    return <>
+      {(track.kind === 'strength' || track.kind === 'bodyweight') && !(set.drops || []).length && (
+        <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, drops: [{ weight: '', reps: '' }] }))}>Дропсет</button>
+      )}
+      {track.unilateral && set.left === undefined && (
+        <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, left: s.reps || '', right: s.reps || '' }))}>Л и П отдельно</button>
+      )}
+    </>;
+  };
+
+  /**
+   * Настройки круга суперсета — одни на круг, а не у каждого упражнения:
+   * разминочный круг, пропустить или убрать круг целиком. RPE, поддержка,
+   * дропсет — у каждого упражнения внутри.
+   */
+  const roundOptions = (members, r) => {
+    const group = members[0].ex.supersetGroup;
+    const inRound = members.filter(({ ex }) => ex.sets[r]);
+    const skipped = inRound.every(({ ex }) => ex.sets[r].state === 'skipped');
+    const kind = inRound.every(({ ex }) => ex.sets[r].kind === 'warmup') ? 'warmup' : 'work';
+    const rounds = Math.max(...members.map(({ ex }) => ex.sets.length));
+    const all = fn => change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] ? fn(e) : e)) }));
+    const setAll = patch => all(e => ({ ...e, sets: e.sets.map((x, i) => (i === r ? { ...x, ...patch } : x)) }));
+    return <details className="workout__set-options workout__round-options">
+      <summary>{skipped ? 'Круг пропущен · изменить' : 'Настройки круга'}</summary>
+      {inRound.map(({ ex, ei }) => (
+        <div className="workout__round-set" key={ex.id}>
+          <div className="workout__round-set-name">{ex.name}</div>
+          {setExtras(ex, ei, r)}
+          <div className="workout__toolbar">
+            <label>RPE<input aria-label={`${ex.name}, круг ${r + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={ex.sets[r].rpe} onChange={e => updateSet(ei, r, s => ({ ...s, rpe: e.target.value }))} /></label>
+            {setTools(ex, ei, r)}
+          </div>
+        </div>
+      ))}
+      <div className="workout__toolbar">
+        <label>Круг<select value={kind} onChange={e => setAll({ kind: e.target.value })}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
+        <button className="button" onClick={() => setAll({ state: skipped ? 'pending' : 'skipped' })}>{skipped ? 'Вернуть круг' : 'Пропустить круг'}</button>
+        <button className="button" disabled={rounds === 1} onClick={() => { setUndo(s.exercises); all(e => (e.sets.length > 1 ? { ...e, sets: e.sets.filter((_, i) => i !== r) } : e)); }}>Удалить круг</button>
+      </div>
+    </details>;
   };
 
   /**
@@ -430,9 +484,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
             <div className="workout__round-item" key={ex.id}>
               <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>{ex.name}<span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span></div>
-              {setRow(ex, ei, r, '', k === members.length - 1)}
+              {setRow(ex, ei, r, '', k === members.length - 1, true)}
             </div>
           ))}
+          {roundOptions(members, r)}
         </div>
       ))}
       <button className="button button--block" disabled={members.some(({ ex }) => ex.sets.length >= 20)} onClick={addRound}>Добавить круг</button>

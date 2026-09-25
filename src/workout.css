@@ -476,3 +476,7 @@
 .workout__check-line { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); min-height: 40px; }
 .workout__check-line input { width: 20px; height: 20px; accent-color: var(--accent); }
 .workout__round-units { font-weight: 400; color: var(--text-muted); font-size: var(--text-xs); }
+/* Настройки круга: по упражнению — строкой с названием, общее — внизу */
+.workout__round-options { margin-top: var(--space-2); }
+.workout__round-set { border-bottom: 1px solid var(--border); padding-bottom: var(--space-2); margin-bottom: var(--space-2); }
+.workout__round-set-name { font-size: var(--text-sm); font-weight: 600; margin: var(--space-2) 0 4px; }
