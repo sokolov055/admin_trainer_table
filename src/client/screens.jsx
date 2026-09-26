@@ -108,6 +108,26 @@ export function Overview({ clientRow, clientView = false }) {
   if (loading) return <Loading rows={2} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
+  // Тренера пока нет: ни оплат, ни занятий, ни программы. Пустые нули
+  // «Баланс 0 ₽ · исчерпан» читались бы как долг, поэтому вместо них —
+  // что можно делать уже сейчас и как появится остальное.
+  if (data.unlinked) {
+    return (
+      <Section title="Тренера пока нет">
+        <Panel pad>
+          <p className="small">
+            Уже сейчас можно считать норму и собирать рацион в «Питании», записывать
+            замеры и смотреть шаги в «Прогрессе».
+          </p>
+          <p className="small muted">
+            Когда тренер привяжет вас — по ID из меню «Мой тренер» или своей ссылкой, —
+            здесь появятся занятия, программа и оплата.
+          </p>
+        </Panel>
+      </Section>
+    );
+  }
+
   const sinceTraining = daysSince(data.lastTrainingDate);
 
   // Главный вопрос клиента — «сколько у меня оплачено вперёд». Отвечаем

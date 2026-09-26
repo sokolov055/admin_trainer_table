@@ -4,6 +4,7 @@ import { apiPublic, apiMutate } from '../api.js';
 import { resetClientAccess } from '../client-access.js';
 import { createClient } from '../access.js';
 import { ClientInviteLink } from './InviteLink.jsx';
+import LinkClient, { LinkExisting } from './LinkClient.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
   SignOut, DataTable, Field, Note, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
@@ -107,6 +108,8 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
             reload();
           }}
         />
+        {/* Клиент, зарегистрировавшийся сам: по его ID или своей ссылкой */}
+        <LinkClient />
 
         <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
         <Chips items={filters} value={filter} onChange={setFilter} />
@@ -618,6 +621,9 @@ export function ClientCard({ client }) {
       {client.members && client.members.length > 1
         ? client.members.map((m, i) => <ClientInviteLink key={m} client={client} member={i} memberName={m} quiet={i > 0} />)
         : <ClientInviteLink client={client} />}
+
+      {/* Скачал приложение и зарегистрировался сам — связать с этой карточкой */}
+      {!(client.members && client.members.length > 1) && <LinkExisting client={client} />}
 
       {client.family && <ClientFamily client={client} />}
 

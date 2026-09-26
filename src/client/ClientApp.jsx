@@ -7,7 +7,7 @@ import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../ge
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion } from '../viewMotion.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink } from '../icons.jsx';
 import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
@@ -20,6 +20,8 @@ import ThemeSetting from '../ThemeSetting.jsx';
 import Family from './Family.jsx';
 import { PhoneCalendar } from '../trainer/Schedule.jsx';
 import { apiPublic } from '../api.js';
+import MyTrainer, { LinkOffers } from './MyTrainer.jsx';
+import { accountState, pendingTrainerLink } from '../trainer-link.js';
 
 /**
  * Панель клиента.
@@ -62,6 +64,10 @@ const MENU = [
 // есть кого показать. Пустой пункт «Семья» у одиночки только сбивал бы.
 const FAMILY = { id: 'family', label: 'Семья', note: 'Тренировки и прогресс близких', Icon: IconUsers };
 
+// Тренер и ID для привязки — только в своём кабинете: у участника пары и
+// у тренера, открывшего карточку, привязываться нечему
+const TRAINER = { id: 'trainer', label: 'Мой тренер', note: 'ID и привязка к тренеру', Icon: IconLink };
+
 export default function ClientApp({ me, clientRow, preview }) {
   const [view, setView] = useState('overview');
 
@@ -81,7 +87,8 @@ export default function ClientApp({ me, clientRow, preview }) {
   // Android в браузере — пункт про приложение: вернуть закрытую плашку
   // «Установить / Открыть в приложении» (AppHint.jsx)
   const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...android];
+  const own = !clientRow && !preview && !(me && me.member);
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...(own ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -242,6 +249,7 @@ export default function ClientApp({ me, clientRow, preview }) {
               карточки клиента, и сторис оттуда читались бы как что-то,
               относящееся к этому клиенту. */}
           {t.id === 'overview' && !preview && <TelegramTransferCard />}
+          {t.id === 'overview' && own && ((me && me.unlinked) || pendingTrainerLink()) && <OverviewOffers />}
           {t.id === 'overview' && <Stories />}
           <t.Screen clientRow={clientRow} clientView={!!preview} />
         </main>
@@ -260,6 +268,8 @@ export default function ClientApp({ me, clientRow, preview }) {
         )}
 
         {view === 'family' && <Family members={familyMembers} preview={!!preview} />}
+
+        {view === 'trainer' && <MyTrainer />}
 
         {view === 'settings' && (
           <>
@@ -286,6 +296,25 @@ export default function ClientApp({ me, clientRow, preview }) {
       <TabBar tabs={TABS} active={view} onSelect={go} />
     </div>
   );
+}
+
+/**
+ * Приглашения тренера на обзоре: запрос по ID или открытая ссылка тренера.
+ * Нет ни того ни другого — ничего не рисуем и лишний раз не спрашиваем
+ * сервер: у клиента с тренером запросов не бывает.
+ */
+function OverviewOffers() {
+  const [requests, setRequests] = useState([]);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    accountState()
+      .then((r) => { if (alive) setRequests((r && r.requests) || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [revision]);
+  if (!requests.length && !pendingTrainerLink()) return null;
+  return <LinkOffers requests={requests} onChanged={() => setRevision((n) => n + 1)} />;
 }
 
 /**

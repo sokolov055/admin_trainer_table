@@ -2126,6 +2126,66 @@ th.sticky, td.sticky {
   text-align: left;
 }
 
+/* Вход и регистрация клиента по почте — главное на экране входа */
+.login__email {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  text-align: left;
+}
+
+.login__text--second {
+  margin-top: var(--space-5);
+}
+
+/* Мой тренер: ID крупно и посимвольно — его диктуют вслух */
+.my-trainer__id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.my-trainer__code {
+  font-size: var(--text-xl, 1.5rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
+.my-trainer__name {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
+.my-trainer__offer {
+  margin: 0 0 var(--space-2);
+}
+
+.link-client {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.link-client__row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.link-client__url {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
 .login__trainer-toggle {
   margin-top: var(--space-4);
   width: 100%;

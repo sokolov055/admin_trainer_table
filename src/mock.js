@@ -618,9 +618,27 @@ const MOCK = {
     tgUsername: 'demo',
     photoUrl: '',
     hasPersonalSheet: true,
+    // ?mockUnlinked=1 — клиент, зарегистрировавшийся сам, без тренера
+    unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',
   }),
 
+  // Аккаунт без тренера и привязка (lib/accounts.js на сервере)
+  'auth.client.request': () => ({ sent: true, ttlMin: 15 }),
+  'auth.client.confirm': (p) => (p.name ? { token: 'demo-session', created: true } : { needName: true }),
+  'auth.trainer.link.inspect': () => ({ trainerName: 'Константин Соколов' }),
+  'account.get': () => (new URLSearchParams(window.location.search).get('mockUnlinked') === '1'
+    ? { publicId: 'FT-7K2QM4', trainer: null, requests: [{ id: 1, trainerName: 'Константин Соколов', createdAt: daysAgo(0) }] }
+    : { publicId: 'FT-A3B9CD', trainer: { name: 'Константин Соколов' }, requests: [] }),
+  'account.link.answer': (p) => ({ linked: !!p.accept }),
+  'account.link.join': () => ({ linked: true, trainerName: 'Константин Соколов' }),
+  'trainer.link.byid': (p) => {
+    if (!/^FT-?[A-Z0-9]{6}$/i.test(String(p.publicId || '').trim())) throw new Error('ID выглядит как FT-XXXXXX — проверьте, что вписано.');
+    return { sent: true, publicId: String(p.publicId).toUpperCase() };
+  },
+  'trainer.link.url': () => ({ token: 'demo-trainer-link', pending: [{ publicId: 'FT-7K2QM4', createdAt: daysAgo(0) }] }),
+
   'client.overview': () => ({
+    unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',
     name: 'Анна Морозова',
     row: 3,
     balance: 12000,
