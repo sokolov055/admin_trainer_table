@@ -428,7 +428,12 @@ function findNearest(geom, x) {
 const BAR_PAD = { top: 16, right: 8, bottom: 24, left: 46 };
 const BAR_HEIGHT = 180;
 
-export function BarChart({ points, aim = 1, format, highlight, label }) {
+/*
+ * plain — без оценки «лучше или хуже»: столбики одного цвета, без
+ * «к прошлому периоду». Для шагов день ниже вчерашнего — не провал, и
+ * красить его красным значило бы ругать за обычный вторник.
+ */
+export function BarChart({ points, aim = 1, format, highlight, label, plain = false }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(320);
   const [active, setActive] = useState(null);
@@ -483,8 +488,8 @@ export function BarChart({ points, aim = 1, format, highlight, label }) {
 
     // Лучше или хуже: направление изменения, развёрнутое для «меньше — лучше».
     // Там, где сторона не определена (aim 0), — просто рост и падение.
-    let trend = 'flat';
-    if (delta) trend = (aim < 0 ? -delta : delta) > 0 ? 'up' : 'down';
+    let trend = plain ? 'plain' : 'flat';
+    if (delta && !plain) trend = (aim < 0 ? -delta : delta) > 0 ? 'up' : 'down';
 
     const x = BAR_PAD.left + slot * i + (slot - barW) / 2;
     const top = has ? Math.min(y(p.value), zero) : zero;
@@ -506,7 +511,7 @@ export function BarChart({ points, aim = 1, format, highlight, label }) {
       <div className="bars__readout" aria-live="polite">
         <span className="bars__period">{current.label}{current.partial ? ' · ещё идёт, данные неполные' : ''}</span>
         <span className="bars__value">{current.has ? format(current.value) : '—'}</span>
-        {current.delta !== null && current.delta !== 0 && (
+        {!plain && current.delta !== null && current.delta !== 0 && (
           <span className={'bars__delta bars__delta--' + current.trend}>
             <IconDelta value={current.delta} size={14} />
             {format(Math.abs(current.delta))} к прошлому периоду

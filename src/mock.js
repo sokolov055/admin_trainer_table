@@ -1047,6 +1047,22 @@ const MOCK = {
     return { revoked: 1 };
   },
 
+  // Шаги из телефона (client/Steps.jsx): две недели похожих на правду чисел
+  'steps.list': () => {
+    const days = [];
+    const base = [7400, 9100, 6200, 11800, 8300, 4100, 12600, 9800, 7200, 10400, 6900, 8800, 13100, 5300];
+    for (let i = 13; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      days.push({ member: '', date, steps: base[13 - i] });
+    }
+    return { from: days[0].date, days, syncedAt: daysAgo(0) };
+  },
+  'steps.sync': (params) => ({ saved: (params.days || []).length }),
+  'push.native.status': () => ({ enabled: true }),
+  'push.native.register': () => ({ saved: true }),
+  'push.native.unregister': () => ({ dropped: 1 }),
   'auth.access.inspect': () => ({
     active: true, name: 'Анна Морозова', expiresAt: daysAhead(30, '12:00'), usesLeft: 5,
   }),

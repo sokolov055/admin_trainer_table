@@ -5,6 +5,7 @@ import Ration from '../nutrition/Ration.jsx';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
+import Steps from './Steps.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta,
@@ -948,6 +949,7 @@ export function Progress({ clientRow, familyRow = null }) {
                + 'Рабочие веса подтянутся из программы месяца.'
           }
         />
+        {!familyRow && <Steps clientRow={clientRow} />}
       </>
     );
   }
@@ -1137,6 +1139,8 @@ export function Progress({ clientRow, familyRow = null }) {
             </Panel>
           </Section>
         )}
+
+      {!familyRow && <Steps clientRow={clientRow} />}
     </>
   );
 }

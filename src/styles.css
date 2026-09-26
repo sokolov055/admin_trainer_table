@@ -3317,6 +3317,9 @@ code {
 .bars__bar--up { fill: var(--chart-up); }
 .bars__bar--down { fill: var(--chart-down-fill); stroke: var(--chart-down); stroke-width: 1.5; }
 .bars__bar--flat { fill: var(--chart-neutral); }
+.bars__bar--plain { fill: var(--series-1); fill-opacity: 0.55; }
+.bars__bar--current.bars__bar--plain { fill-opacity: 1; }
+.bars__bar--partial.bars__bar--plain { stroke: var(--series-1); }
 .bars__bar--current.bars__bar--up { fill: var(--chart-up-strong); }
 .bars__bar--current.bars__bar--down { fill: var(--chart-down-strong-fill); stroke: var(--chart-down-strong); stroke-width: 2; }
 .bars__focus { fill: var(--chart-focus); }
@@ -4081,3 +4084,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-edit__row--superset.plan-edit__row--swipe { padding: 0; }
 .plan-edit__row-in { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); padding: var(--space-3) 0; }
 .plan-edit__row--superset > .plan-edit__row-in { padding-left: var(--space-2); padding-right: var(--space-2); background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface); }
+
+/* Шаги в «Прогрессе» (client/Steps.jsx) */
+.steps__lead { margin: 0 0 var(--space-2); font-weight: 600; }
+.steps__facts { margin: var(--space-2) 0 0; }

@@ -14,23 +14,11 @@
  *   - вышла новая версия самой оболочки — внизу «Обновить» (checkUpdate).
  */
 import { goBack } from './gestures.jsx';
+import { isNativeApp, plugin } from './native-bridge.js';
+import { refreshNativePush, listenNativeTaps } from './native-push.js';
+import { syncSteps } from './native-steps.js';
 
-function bridge() {
-  return typeof window !== 'undefined' && window.Capacitor ? window.Capacitor : null;
-}
-
-/** Запущено в Android-приложении, а не в браузере */
-export function isNativeApp() {
-  const cap = bridge();
-  try { return !!(cap && cap.isNativePlatform && cap.isNativePlatform()); } catch (_) { return false; }
-}
-
-function plugin(name) {
-  const cap = bridge();
-  if (!cap) return null;
-  if (cap.Plugins && cap.Plugins[name]) return cap.Plugins[name];
-  try { return cap.registerPlugin ? cap.registerPlugin(name) : null; } catch (_) { return null; }
-}
+export { isNativeApp };
 
 export function startNative() {
   if (!isNativeApp()) return;
@@ -48,7 +36,15 @@ export function startNative() {
       if (app.minimizeApp) app.minimizeApp(); else if (app.exitApp) app.exitApp();
     });
     if (app.getInfo) app.getInfo().then(checkUpdate).catch(() => {});
+    // Вернулись в приложение — шаги за это время могли прибавиться
+    app.addListener('resume', () => { syncSteps().catch(() => {}); });
   }
+
+  // Уведомления: свежий адрес телефона — серверу; нажали на уведомление —
+  // открыть то, о чём оно. Шаги — отправить, если подключены
+  refreshNativePush();
+  listenNativeTaps((url) => openLink(new URL(url, window.location.href).href));
+  syncSteps().catch(() => {});
 
   const bar = plugin('StatusBar');
   if (bar && bar.setBackgroundColor) {

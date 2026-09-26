@@ -13,8 +13,17 @@
 
 import { apiPublic, apiMutate } from './api.js';
 import { describeDevice } from './session.js';
+import { isNativeApp } from './native-bridge.js';
+import { nativePushAvailable, nativePushStatus, enableNativePush, disableNativePush } from './native-push.js';
+
+/*
+ * В Android-приложении Web Push не работает — там свой канал, Firebase
+ * (native-push.js). Функции ниже в приложении ведут туда, и экран настроек
+ * одинаковый: «Включить уведомления».
+ */
 
 export function pushSupported() {
+  if (isNativeApp()) return nativePushAvailable();
   return typeof window !== 'undefined'
     && 'serviceWorker' in navigator
     && 'PushManager' in window
@@ -43,6 +52,7 @@ export function installedAsApp() {
  * настройка молча зависала бы на «проверяю».
  */
 export async function pushStatus() {
+  if (isNativeApp()) return nativePushStatus();
   if (!pushSupported()) return { supported: false, permission: 'unsupported', subscribed: false };
 
   const permission = Notification.permission;
@@ -74,6 +84,7 @@ function toBytes(base64) {
  * и должен узнать, что произошло, даже если дело в его браузере.
  */
 export async function enablePush(clientRow) {
+  if (isNativeApp()) return enableNativePush(clientRow);
   if (!pushSupported()) {
     return { ok: false, reason: 'Этот браузер не умеет уведомления.' };
   }
@@ -117,6 +128,7 @@ export async function enablePush(clientRow) {
 }
 
 export async function disablePush() {
+  if (isNativeApp()) return disableNativePush();
   if (!pushSupported()) return { ok: true };
 
   const registration = await navigator.serviceWorker.getRegistration();
