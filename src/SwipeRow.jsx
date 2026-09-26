@@ -12,8 +12,15 @@ import { IconTrash } from './icons.jsx';
  * схлопывается. Если задан removeClosest — уходит ближайший такой предок
  * (заголовок упражнения удаляет всю карточку). Тянуть дальше кнопки до
  * порога и отпустить — то же, что нажать её (полное смахивание).
+ *
+ * contentClassName — разметка самой строки (сетка, отступы): она должна
+ * ехать вместе с содержимым, а не стоять на месте поверх корзины.
+ * actionText — подпись на кнопке: «Удалить», «Убрать».
  */
-export default function SwipeRow({ className = '', children, onDelete, label, disabled = false, removeClosest = '', removeWith = null, ...rest }) {
+export default function SwipeRow({
+  className = '', contentClassName = '', children, onDelete, label, actionText = 'Удалить',
+  disabled = false, removeClosest = '', removeWith = null, ...rest
+}) {
   const root = useRef(null);
   const firing = useRef(false);
   const fire = (e) => {
@@ -43,12 +50,12 @@ export default function SwipeRow({ className = '', children, onDelete, label, di
           >
             <span className="swipe__label">
               <IconTrash size={20} />
-              <span>Удалить</span>
+              <span>{actionText}</span>
             </span>
           </button>
         </div>
       )}
-      <div className="swipe__content" ref={sw.content}>{children}</div>
+      <div className={'swipe__content' + (contentClassName ? ' ' + contentClassName : '')} ref={sw.content}>{children}</div>
     </div>
   );
 }

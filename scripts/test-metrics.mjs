@@ -433,27 +433,34 @@ test('без статьи и суммы кнопка не работает', () 
  * приложении с домашнего экрана оно выглядит чужим, а в отдельных случаях
  * и вовсе подвешивает страницу.
  */
-test('удаление сначала спрашивает', () => {
+/**
+ * Удаление — как в списках iPhone: смахнули и нажали «Удалить» (или
+ * протянули до конца) — строка пропадает сразу, а на сервер уходит через
+ * несколько секунд, если не нажали «Вернуть». Вопроса «Удалить?» нет.
+ */
+test('удалённый расход пропадает сразу, а на сервер уходит не сразу', async () => {
   const { tree, sent } = draw(Expenses, () => EXPENSES);
 
   press(tree, 'Удалить расход «Реклама»');
-  assert.equal(sent.length, 0, 'один нажатие корзины ничего не удаляет');
+  await act(async () => {});
 
-  press(tree, 'Удалить');
+  assert.equal(sent.length, 0, 'пока можно вернуть — на сервер не отправлено');
+  const left = tree.root.findAll((node) => node.type === 'button' && node.props['aria-label'] === 'Удалить расход «Реклама»', { deep: true });
+  assert.equal(left.length, 0, 'строки уже нет');
+  assert.ok(button(tree, 'Удалить расход «Аренда зала»'), 'соседние на месте');
+});
+
+test('ушли с экрана — удаление не теряется, а уходит на сервер', async () => {
+  const { tree, sent } = draw(Expenses, () => EXPENSES);
+
+  press(tree, 'Удалить расход «Реклама»');
+  await act(async () => {});
+  act(() => { tree.unmount(); });
+  await act(async () => {});
 
   assert.equal(sent.length, 1);
   assert.equal(sent[0].action, 'expense.delete');
   assert.equal(sent[0].params.id, 2);
-});
-
-test('от удаления можно отказаться', () => {
-  const { tree, sent } = draw(Expenses, () => EXPENSES);
-
-  press(tree, 'Удалить расход «Реклама»');
-  press(tree, 'Отмена');
-
-  assert.equal(sent.length, 0);
-  assert.ok(button(tree, 'Удалить расход «Реклама»'), 'корзина вернулась на место');
 });
 
 test('другой месяц спрашивается у сервера', () => {

@@ -6,7 +6,9 @@ import {
   formatMoney, formatDate, plural,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
-import { IconMoney, IconTrash, IconAlert, IconCheck } from '../icons.jsx';
+import { IconMoney, IconAlert, IconCheck } from '../icons.jsx';
+import SwipeRow from '../SwipeRow.jsx';
+import { usePendingDelete } from '../pendingDelete.jsx';
 import { monthLabel, thisMonth } from './Metrics.jsx';
 
 /**
@@ -27,6 +29,13 @@ export function Expenses() {
   const [month, setMonth] = useState(thisMonth);
   const [revision, setRevision] = useState(0);
   const { loading, data, error, reload } = useData('expense.list', { month }, [month, revision]);
+  const [failure, setFailure] = useState(null);
+  // Смахнули — пропадает сразу, на сервер через несколько секунд, если не
+  // вернули (pendingDelete.jsx). Прибыль пересчитается после перечитки
+  const del = usePendingDelete((item) => apiMutate('expense.delete', { id: item.id }), {
+    onDone: () => { haptic(); setRevision((value) => value + 1); },
+    onError: setFailure,
+  });
 
   if (loading) return <Loading rows={3} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -58,14 +67,16 @@ export function Expenses() {
         ) : (
           <Panel>
             <div className="rows">
-              {list.map((item) => (
-                <ExpenseRow key={item.id} item={item} onDeleted={again} />
+              {list.filter((item) => !del.hidden(item.id)).map((item) => (
+                <ExpenseRow key={item.id} item={item} onDelete={() => del.remove(item.id, item, 'Расход удалён')} />
               ))}
             </div>
           </Panel>
         )}
       </Section>
 
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не удалось удалить'}</Note>}
+      {del.bar}
       <MonthSwitch month={data.month} onChange={setMonth} />
     </>
   );
@@ -181,57 +192,23 @@ function AddExpense({ month, categories, onAdded }) {
   );
 }
 
-function ExpenseRow({ item, onDeleted }) {
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState(null);
-  const [asking, setAsking] = useState(false);
-
-  const remove = () => {
-    setBusy(true);
-    setFailure(null);
-
-    apiMutate('expense.delete', { id: item.id })
-      .then(() => { haptic(); onDeleted(); })
-      .catch((error) => { setFailure(error); setBusy(false); setAsking(false); });
-  };
-
+function ExpenseRow({ item, onDelete }) {
+  // Смахнуть влево — удалить, как в списках iPhone; протянуть до конца —
+  // то же без нажатия. Вместо вопроса «Удалить?» — «Вернуть» внизу
   return (
-    <div className="rows__item expense">
+    <SwipeRow className="expense-swipe" contentClassName="rows__item expense" label={'Удалить расход «' + item.category + '»'} onDelete={onDelete}>
       <span className="expense__body">
         <span className="expense__category">{item.category}</span>
         <span className="expense__meta small muted">
           {formatDate(item.spent_at, false)}
           {item.note ? ' · ' + item.note : ''}
         </span>
-        {failure && <span className="small danger">{failure.message || 'Не удалось удалить'}</span>}
       </span>
 
       <span className="expense__right">
         <span className="expense__amount">{formatMoney(item.amount)}</span>
-
-        {/* Спрашиваем на месте, а не окном браузера: диалог браузера в
-            приложении, добавленном на домашний экран, выглядит чужим, а
-            в отдельных случаях и вовсе подвешивает страницу. */}
-        {asking ? (
-          <span className="expense__confirm">
-            <button className="button button--small danger" onClick={remove} disabled={busy}>
-              {busy ? '…' : 'Удалить'}
-            </button>
-            <button className="button button--small button--ghost" onClick={() => setAsking(false)} disabled={busy}>
-              Отмена
-            </button>
-          </span>
-        ) : (
-          <button
-            className="icon-button"
-            onClick={() => { setAsking(true); haptic(); }}
-            aria-label={'Удалить расход «' + item.category + '»'}
-          >
-            <IconTrash size={17} />
-          </button>
-        )}
       </span>
-    </div>
+    </SwipeRow>
   );
 }
 

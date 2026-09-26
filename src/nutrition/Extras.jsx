@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiPublic } from '../api.js';
 import { Section, Panel, Note, formatNumber } from '../ui.jsx';
 import { IconClose, IconAlert, IconHeart } from '../icons.jsx';
+import SwipeRow from '../SwipeRow.jsx';
 import { haptic } from '../telegram.js';
 import { extraOf, cleanProduct } from './match.js';
 
@@ -25,16 +26,15 @@ export default function Extras({ extras, products, onAdd, onRemove, trial = fals
       {extras.length > 0 && (
         <Panel>
           <div className="extras__list">
+            {/* Смахнуть влево — убрать, как в списках iPhone */}
             {extras.map((item) => (
-              <div className="extras__row" key={item.id}>
+              <SwipeRow key={item.id} contentClassName="extras__row" label={'Убрать ' + item.product.name} actionText="Убрать"
+                onDelete={() => { onRemove(item.id); haptic(); }}>
                 <div>
                   <div className="extras__name">{item.product.name}</div>
                   <div className="extras__meta">{amountLabel(item)} · {macros(extraOf(item.product, item.grams))}</div>
                 </div>
-                <button className="icon-button" aria-label={'Убрать ' + item.product.name} onClick={() => { onRemove(item.id); haptic(); }}>
-                  <IconClose size={18} />
-                </button>
-              </div>
+              </SwipeRow>
             ))}
           </div>
         </Panel>

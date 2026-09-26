@@ -1,6 +1,7 @@
 import ExercisePicker from './ExercisePicker.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { vanish, separatorOf } from '../remove.js';
+import { separatorOf } from '../remove.js';
+import SwipeRow from '../SwipeRow.jsx';
 import { haptic } from '../telegram.js';
 import { createPortal } from 'react-dom';
 import { useTabLock } from '../gestures.jsx';
@@ -9,7 +10,7 @@ import { trackOf, cardioFrom } from '../exercise-track.js';
 import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
 import { useData } from '../useData.js';
 import { Note } from '../ui.jsx';
-import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconTrash, IconPlus } from '../icons.jsx';
+import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconPlus } from '../icons.jsx';
 import BlockOrder from './BlockOrder.jsx';
 
 /**
@@ -398,7 +399,20 @@ export default function PlanEditor({
 
             return (
               <React.Fragment key={ei}>
-              <div className={'plan-edit__row' + (exercise.supersetGroup ? ' plan-edit__row--superset' : '')}>
+              {/* Смахнуть упражнение влево — удалить, как в списках iPhone;
+                  полоска «+ Упражнение» под ним уходит вместе с ним */}
+              <SwipeRow
+                className={'plan-edit__row plan-edit__row--swipe' + (exercise.supersetGroup ? ' plan-edit__row--superset' : '')}
+                contentClassName="plan-edit__row-in"
+                disabled={busy}
+                label={'Удалить упражнение ' + (exercise.name || (ei + 1))}
+                removeWith={(row) => [separatorOf(row, '.plan-edit__between', 'next')]}
+                onDelete={() => change((next) => {
+                  next[bi].exercises.splice(ei, 1);
+                  if (!next[bi].exercises.length) next[bi].exercises.push(blank());
+                  return next;
+                })}
+              >
                 <ExercisePicker
                   value={exercise.name}
                   exerciseId={exercise.exerciseId}
@@ -498,15 +512,8 @@ export default function PlanEditor({
                       onClick={() => setExercise(bi, ei, 'technique', exercise.technique === 'dropset' ? '' : 'dropset')}
                     >Дропсет</button>
                   )}
-                  <button className="icon-button plan-edit__icon plan-edit__remove" aria-label="Убрать упражнение" title="Убрать" disabled={busy} onClick={(e) => { const row = e.currentTarget.closest('.plan-edit__row'); vanish(row, () => change((next) => {
-                    next[bi].exercises.splice(ei, 1);
-                    if (!next[bi].exercises.length) next[bi].exercises.push(blank());
-                    return next;
-                  }), [separatorOf(row, '.plan-edit__between', 'next')]); }}>
-                    <IconTrash size={18} />
-                  </button>
                 </div>
-              </div>
+              </SwipeRow>
 
               {/* Между упражнениями: вставить ещё одно прямо здесь и
                   соединить соседей в суперсет — там, где об этом думают,

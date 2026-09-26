@@ -6,7 +6,8 @@ import { haptic } from '../telegram.js';
 import {
   Section, Panel, Chips, Loading, ErrorState, Empty, Note, Field, Badge, Search, formatNumber, plural,
 } from '../ui.jsx';
-import { IconAlert, IconBack, IconNutrition, IconTrash } from '../icons.jsx';
+import { IconAlert, IconBack, IconNutrition } from '../icons.jsx';
+import SwipeRow from '../SwipeRow.jsx';
 import { EGG_SIZES, pieceLabel, mlLabel } from '../nutrition/pieces.js';
 
 /**
@@ -228,12 +229,13 @@ function DishEditor({ dish, foods, onCancel, onSaved }) {
           <div>
             <span className="field__label">Состав на всё блюдо (граммы до готовки)</span>
             <div className="dish__edit-items">
+              {/* Смахнуть продукт влево — убрать из состава */}
               {items.map((it, k) => (
-                <div className="dish__edit-row" key={k}>
+                <SwipeRow key={k} contentClassName="dish__edit-row" label="Убрать продукт" actionText="Убрать"
+                  onDelete={() => setItems((l) => l.filter((_, i) => i !== k))}>
                   <FoodInput names={names} value={it.food} onChange={(v) => setItem(k, 'food', v)} />
                   <input className="field__input" inputMode="decimal" placeholder="г" value={it.grams} onChange={(e) => setItem(k, 'grams', e.target.value)} />
-                  <button type="button" className="icon-button" aria-label="Убрать продукт" onClick={() => setItems((l) => l.filter((_, i) => i !== k))}><IconTrash size={16} /></button>
-                </div>
+                </SwipeRow>
               ))}
             </div>
             <button type="button" className="button button--ghost" onClick={() => setItems((l) => [...l, { food: '', grams: '' }])}>Добавить продукт</button>

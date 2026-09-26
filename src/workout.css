@@ -408,22 +408,9 @@
 
 .workout__history-row .workout__history { flex: 1; min-width: 0; }
 
-/* Подтверждение занимает место самой строки: так видно, что удаляют
-   именно её, и промахнуться по соседней невозможно. */
-.workout__erase {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  flex: 1;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--critical-fill);
-  border: 1px solid var(--critical-line);
-  color: var(--critical-text);
-}
-
-.workout__erase .small { flex: 1; min-width: 12ch; }
+/* Строка журнала смахивается влево (SwipeRow): под ней фон страницы */
+.workout__history-row { --swipe-bg: var(--bg); }
+.workout__history-row > .swipe__content { flex: 1; min-width: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .workout__check:active { transform: none; }
@@ -558,19 +545,6 @@
 .workout__check[aria-pressed="true"] { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
 .workout__ex-num { min-width: 0; margin-right: 2px; }
 
-/* ==========================================================================
- * Смахнуть влево — удалить (SwipeRow, swipe.js). Подход и заголовок
- * упражнения: содержимое непрозрачное поверх красной корзины.
- * ========================================================================== */
-.swipe { position: relative; overflow: hidden; touch-action: pan-y; }
-.swipe__action { position: absolute; inset: 0 0 0 auto; width: 88px; display: flex; opacity: 0; background: var(--critical); }
-.swipe__trash { flex: 1; display: flex; justify-content: flex-end; align-items: stretch; padding: 0; border: 0; background: none; color: #fff; font: inherit; font-size: var(--text-xs); font-weight: 600; cursor: pointer; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
-/* Подпись шириной с кнопку у правого края; при полном смахивании
-   (swipe.js, paintSwipe) переезжает к левому краю полосы — к пальцу */
-.swipe__label { width: 88px; flex: none; display: grid; place-items: center; align-content: center; gap: 2px; transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1); }
-.swipe__trash:active { transform: scale(0.94); }
-.swipe__trash:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
-.swipe__content { position: relative; background: var(--surface); }
 
 /* Подход: отступы и подсветка — у содержимого, иначе под ним видно красное */
 .workout__set.swipe { padding: 0; background: transparent; }

@@ -12,6 +12,8 @@ import {
   Section, Panel, Loading, ErrorState, Empty, Badge, Chips, Search, Segmented, Field, Note, plural,
 } from '../ui.jsx';
 import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash } from '../icons.jsx';
+import SwipeRow from '../SwipeRow.jsx';
+import { usePendingDelete } from '../pendingDelete.jsx';
 
 /**
  * Библиотека тренера: шаблоны программ и тренировок, упражнения.
@@ -100,17 +102,13 @@ function Templates({ kind }) {
 
   const list = useData('library.templates', { scope, kind }, [scope, kind]);
 
-  const remove = async (t) => {
-    if (!window.confirm(`Удалить шаблон «${t.title}»? Программ клиентов это не коснётся.`)) return;
-    setFailure(null);
-    try {
-      await apiMutate('library.template.delete', { id: t.id });
-      haptic('success');
-      list.reload();
-    } catch (err) {
-      setFailure(err);
-    }
-  };
+  // Смахнули или нажали «Удалить» в правке списка — пропадает сразу, на
+  // сервер через несколько секунд, если не вернули (pendingDelete.jsx)
+  const del = usePendingDelete((t) => apiMutate('library.template.delete', { id: t.id }), {
+    onDone: () => { haptic('success'); list.reload(); },
+    onError: setFailure,
+  });
+  const remove = (t) => { setFailure(null); del.remove(t.id, t, 'Шаблон удалён'); };
 
   // Вложенные экраны закрываются смахиванием вправо, как всё остальное
   useBackGesture(() => setEditing(null), !!editing);
@@ -191,10 +189,11 @@ function Templates({ kind }) {
         />
       )}
 
-      {shown.map((t) => (
+      {shown.filter((t) => !del.hidden(t.id)).map((t) => (
         <Row
           key={t.id}
           pruning={pruning && t.mine}
+          canRemove={t.mine}
           onOpen={() => { setOpen(t.id); haptic(); }}
           onRemove={() => remove(t)}
           removeLabel={`Удалить «${t.title}»`}
@@ -214,17 +213,25 @@ function Templates({ kind }) {
           </div>
         </Row>
       ))}
+      {del.bar}
     </>
   );
 }
 
 /**
- * Строка списка. В режиме правки она не открывается, а показывает кнопку
- * удаления: так удаляют сразу несколько, не заходя в каждое.
+ * Строка списка. Своё смахивается влево — удалить, как в списках iPhone.
+ * В режиме правки строка не открывается, а показывает кнопку удаления:
+ * так удаляют сразу несколько, не заходя в каждое.
  */
-function Row({ pruning, onOpen, onRemove, removeLabel, removeText = 'Удалить', children }) {
+function Row({ pruning, canRemove = true, onOpen, onRemove, removeLabel, removeText = 'Удалить', children }) {
   if (!pruning) {
-    return <button className="item" onClick={onOpen}>{children}</button>;
+    const item = <button className="item" onClick={onOpen}>{children}</button>;
+    if (!canRemove || !onRemove) return item;
+    return (
+      <SwipeRow className="item-swipe" label={removeLabel} actionText={removeText} onDelete={onRemove}>
+        {item}
+      </SwipeRow>
+    );
   }
   return (
     <div className="item library__row">
@@ -685,27 +692,21 @@ function Exercises() {
   useBackGesture(() => setOpen(null), !editing && !showHidden && !!open);
   useReturnScroll(!!(editing || showHidden || open));
 
+  // Смахнули или нажали в правке списка — пропадает сразу, на сервер через
+  // несколько секунд, если не вернули (pendingDelete.jsx). Общее не
+  // удаляется, а убирается у себя — вернуть его можно и позже, в «Убранных»
+  const del = usePendingDelete((e) => apiMutate('library.exercise.delete', { id: e.id }), {
+    onDone: () => { haptic('success'); reload(); },
+    onError: setFailure,
+  });
+  const remove = (e) => { setFailure(null); del.remove(e.id, e, e.common ? 'Упражнение убрано' : 'Упражнение удалено'); };
+
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
   if (showHidden) {
     return <HiddenExercises onBack={() => { setShowHidden(false); reload(); }} />;
   }
-
-  const remove = async (e) => {
-    const question = e.common
-      ? `Убрать «${e.name}» из вашего списка? У других тренеров оно останется, а вернуть его можно в «Убранных».`
-      : `Удалить «${e.name}»? В программах клиентов оно останется.`;
-    if (!window.confirm(question)) return;
-    setFailure(null);
-    try {
-      await apiMutate('library.exercise.delete', { id: e.id });
-      haptic('success');
-      reload();
-    } catch (err) {
-      setFailure(err);
-    }
-  };
 
   const all = data.exercises;
   const current = open ? all.find((e) => e.id === open) : null;
@@ -728,7 +729,7 @@ function Exercises() {
         onBack={() => setOpen(null)}
         onEdit={() => setEditing(current)}
         onDeleted={() => { setOpen(null); reload(); }}
-        onRemove={() => remove(current).then(() => setOpen(null))}
+        onRemove={() => { remove(current); setOpen(null); }}
       />
     );
   }
@@ -761,7 +762,7 @@ function Exercises() {
       </div>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
 
-      {shown.slice(0, 200).map((e) => (
+      {shown.filter((e) => !del.hidden(e.id)).slice(0, 200).map((e) => (
         <Row
           key={e.id}
           pruning={pruning}
@@ -781,6 +782,7 @@ function Exercises() {
         </Row>
       ))}
       {shown.length > 200 && <p className="small muted">Показаны первые 200 — уточните поиск.</p>}
+      {del.bar}
     </>
   );
 }

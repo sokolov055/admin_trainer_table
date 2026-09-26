@@ -7,6 +7,7 @@ import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-mod
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
+import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
@@ -57,7 +58,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // состоянием, а не флагом «показать диалог»: подтверждение обязано быть
   // привязано к конкретной строке, иначе список перерисуется и человек
   // подтвердит удаление не того занятия.
-  const [erase, setErase] = useState('');
   const [undo, setUndoState] = useState(null);
   const [undoText, setUndoText] = useState('');
   const setUndo = (value, text = 'Удалено') => { setUndoState(value); setUndoText(value ? text : ''); };
@@ -101,15 +101,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Отмена оставляет занятие в истории, и для несостоявшейся тренировки
   // это правильно. Но пробные и ошибочные записи копятся там же, а убрать
   // их можно было только руками в таблице.
-  const remove = async id => {
-    setBusy(true); setMessage('');
-    try {
-      await apiMutate('workout.delete', { ...params, id });
-      setErase('');
-      await list();
-    } catch (e) { setMessage(e.message); }
-    finally { setBusy(false); }
-  };
+  // Смахнули занятие в журнале — пропадает сразу, на сервер уходит через
+  // несколько секунд, если не нажали «Вернуть» (pendingDelete.jsx)
+  const erase = usePendingDelete(id => apiMutate('workout.delete', { ...params, id }), {
+    onDone: () => list().catch(e => setMessage(e.message)),
+    onError: e => setMessage(e.message),
+  });
 
   const open = async id => {
     setBusy(true); setMessage('');
@@ -849,20 +846,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       <h2>Журнал тренировок</h2><p className="muted">Начните занятие из программы или соберите свободную тренировку.</p>
       <button className="button button--primary button--block" disabled={busy} onClick={() => store(freshRecord(fromPlan({ title: 'Свободная тренировка', exercises: [{ name: 'Первое упражнение', sets: 3 }] }, '')))}>Начать свободную тренировку</button>
       {!history.length && <p className="small muted">Здесь появятся проведённые занятия и их результаты.</p>}
-      {history.map(s => <div className="workout__history-row" key={s.id}>
+      {/* Удаление только у тренера: журнал — это его записи о клиенте.
+          Смахнуть влево — как в списках iPhone; вместо вопроса «навсегда?»
+          — «Вернуть» внизу, пока удаление не ушло на сервер */}
+      {history.filter(s => !erase.hidden(s.id)).map(s => <SwipeRow className="workout__history-row" key={s.id}
+        disabled={!clientRow || clientView} label={'Удалить занятие ' + s.title}
+        onDelete={() => erase.remove(s.id, s.id, 'Занятие удалено')}>
         <button className="workout__history" disabled={busy} onClick={() => open(s.id)}><strong>{s.title}</strong><span>{new Date(s.startedAt).toLocaleDateString('ru-RU')} · {labels[s.status]} · {s.done} подходов</span></button>
-
-        {/* Кнопка удаления только у тренера: журнал — это его записи о
-            клиенте. Подтверждение обязательно и называет занятие: удаление
-            безвозвратно, а строки в списке похожи друг на друга. */}
-        {clientRow && !clientView && (erase === s.id
-          ? <span className="workout__erase" role="alert">
-              <span className="small">Удалить «{s.title}» навсегда?</span>
-              <button className="button" disabled={busy} onClick={() => remove(s.id)}>Удалить</button>
-              <button className="button" onClick={() => setErase('')}>Отмена</button>
-            </span>
-          : <button className="button" disabled={busy} onClick={() => setErase(s.id)} aria-label={'Удалить занятие ' + s.title}>Удалить</button>)}
-      </div>)}
+      </SwipeRow>)}
+      {erase.bar}
     </>}
   </div>;
 }
