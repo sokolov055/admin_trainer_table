@@ -62,7 +62,8 @@ export default function LedgerCheck() {
           <p className="small muted">
             Сервер считал так: остаток {formatMoney(r.opening)} на {formatDate(r.openedAt, false)}
             {' + '}оплаты {formatMoney(r.paid)}
-            {' − '}{r.trainings} {plural(r.trainings, 'занятие', 'занятия', 'занятий')} × {formatMoney(r.price || 0)}
+            {' − '}списано {formatMoney(r.spent || 0)} за {r.trainings} {plural(r.trainings, 'занятие', 'занятия', 'занятий')}
+            {' '}(свои и тех, за кого платит, — по цене на день занятия)
             {r.adjusted ? ' + поправки ' + formatMoney(r.adjusted) : ''}.
             {' '}На сервере на {formatMoney(Math.abs(r.diff))} {r.diff < 0 ? 'меньше' : 'больше'}.
           </p>
