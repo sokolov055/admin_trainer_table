@@ -15,6 +15,7 @@ import { APP_VERSION } from '../version.js';
 import Profile from './Profile.jsx';
 import PushSetting from '../PushSetting.jsx';
 import DeleteAccount from '../DeleteAccount.jsx';
+import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import Family from './Family.jsx';
 import { PhoneCalendar } from '../trainer/Schedule.jsx';
@@ -276,6 +277,7 @@ export default function ClientApp({ me, clientRow, preview }) {
                 выхода быть не должно — он вышел бы из своего. */}
             {!clientRow && <SignOut />}
             {!clientRow && <DeleteAccount />}
+            <PrivacyLink />
           </>
         )}
       </main>

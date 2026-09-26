@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { inspectInvite, requestInviteEmail, confirmInviteEmail } from './invites.js';
 import { IconAlert, IconCheck, IconKey, IconMail, IconRefresh, IconSend } from './icons.jsx';
+import { iosApp } from './native-bridge.js';
 
 export default function InviteRegistration({ token, onComplete, details }) {
   const [state, setState] = useState({ loading: true, invite: null, error: null });
@@ -37,13 +38,18 @@ export default function InviteRegistration({ token, onComplete, details }) {
     return <EmailRegistration token={token} onBack={() => setEmailOpen(false)} onComplete={onComplete} />;
   }
 
+  // В приложении для iPhone — без Telegram (см. iosApp в native-bridge.js)
+  const telegram = state.invite.methods.telegram && !iosApp();
+
   return (
     <InviteShell
       icon={<IconKey size={28} />}
       title="Ваш кабинет готов к созданию"
-      text="Подтвердите Telegram. Мы создадим карточку клиента и сразу откроем доступ."
+      text={telegram
+        ? 'Подтвердите Telegram. Мы создадим карточку клиента и сразу откроем доступ.'
+        : 'Подтвердите почту. Мы создадим карточку клиента и сразу откроем доступ.'}
     >
-      {state.invite.methods.telegram && (
+      {telegram && (
         <>
           <a className="button button--primary button--block invite__primary" href={state.invite.telegramUrl}>
             <IconSend size={18} />
@@ -59,7 +65,7 @@ export default function InviteRegistration({ token, onComplete, details }) {
           Продолжить по почте
         </button>
       )}
-      {!state.invite.methods.telegram && !state.invite.methods.email && (
+      {!telegram && !state.invite.methods.email && (
         <div className="invite__error" role="alert"><IconAlert size={17} />Регистрация временно недоступна. Напишите тренеру.</div>
       )}
       {details}

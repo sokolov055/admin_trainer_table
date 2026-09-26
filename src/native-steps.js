@@ -101,7 +101,7 @@ export async function syncSteps(force = false) {
     .map((s) => ({ date: localDate(new Date(s.startDate)), steps: Math.round(Number(s.value) || 0) }))
     .filter((d) => d.steps >= 0);
   if (!days.length) return { sent: 0 };
-  await apiMutate('steps.sync', { days, source: 'health-connect' });
+  await apiMutate('steps.sync', { days, source: onIphone() ? 'healthkit' : 'health-connect' });
   try { localStorage.setItem(SENT_KEY, String(Date.now())); } catch (_) {}
   return { sent: days.length };
 }

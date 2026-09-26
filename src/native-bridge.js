@@ -21,3 +21,13 @@ export function plugin(name) {
   if (cap.Plugins && cap.Plugins[name]) return cap.Plugins[name];
   try { return cap.registerPlugin ? cap.registerPlugin(name) : null; } catch (_) { return null; }
 }
+
+/**
+ * Приложение для iPhone. Там нет входа через Telegram: сторонний вход по
+ * правилам App Store (4.8) требует рядом «Вход с Apple», а у нас хватает
+ * своего — персональной ссылки и кода на почту.
+ */
+export function iosApp() {
+  const cap = bridge();
+  try { return isNativeApp() && cap.getPlatform && cap.getPlatform() === 'ios'; } catch (_) { return false; }
+}

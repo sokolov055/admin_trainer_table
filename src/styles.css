@@ -4096,3 +4096,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Удаление аккаунта (DeleteAccount.jsx): подтверждение на месте */
 .delete-account__confirm { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--critical-fill); color: var(--critical-text); }
 .delete-account__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Ссылка на политику конфиденциальности (PrivacyLink.jsx) — внизу настроек */
+.privacy-link { margin: var(--space-4) 0 var(--space-2); text-align: center; font-size: var(--text-sm); }
+.privacy-link a { color: var(--text-muted); }

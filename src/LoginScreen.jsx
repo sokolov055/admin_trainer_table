@@ -6,7 +6,7 @@ import {
 } from './session.js';
 import { IconSend, IconKey, IconAlert, IconRefresh } from './icons.jsx';
 import PasteLink from './PasteLink.jsx';
-import { isNativeApp } from './native-bridge.js';
+import { isNativeApp, iosApp } from './native-bridge.js';
 
 /**
  * Экран для тех, кто пришёл без ссылки.
@@ -141,7 +141,8 @@ export default function LoginScreen({ details }) {
           >
             <summary>Другой способ входа</summary>
             <div className="login__alternative-body">
-              {status === 'waiting' && login
+              {/* Вход через бота Telegram — не в приложении для iPhone (iosApp) */}
+              {iosApp() ? null : status === 'waiting' && login
                 ? <Waiting login={login} />
                 : <CodeStart status={status} problem={problem} onStart={requestCode} />}
 

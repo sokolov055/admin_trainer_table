@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { haptic } from './telegram.js';
 import { ART, COVERS } from './storyArt.jsx';
 import { IconClose } from './icons.jsx';
+import { detectBrowser } from './browser.js';
 
 /**
  * Версия, в которой вышли эти новости.
@@ -108,6 +109,9 @@ export const TOPICS = [
     frames: [
       {
         id: 'android-app',
+        // На iPhone (в Safari и в приложении) этого кадра нет: там своё
+        // приложение, и рассказ про Android — чужие кнопки (2.3.10 App Store)
+        only: 'android',
         date: '26 сентября',
         art: 'android',
         tint: '#7fd97f',
@@ -127,6 +131,10 @@ export const TOPICS = [
         body: 'В приложении для Android откройте «Прогресс» и нажмите «Подключить '
           + 'шаги», затем «Разрешить». Шаги берутся из телефона и браслета сами — '
           + 'вводить ничего не нужно. Под графиком — сегодня и в среднем за день, '
+          + 'а тренер видит ваши шаги у себя.',
+        bodyIos: 'В приложении Fit Track откройте «Прогресс» и нажмите «Подключить '
+          + 'шаги», затем разрешите чтение шагов в «Здоровье». Дальше шаги с iPhone '
+          + 'и Apple Watch приходят сами. Под графиком — сегодня и в среднем за день, '
           + 'а тренер видит ваши шаги у себя.',
       },
       {
@@ -191,6 +199,18 @@ export const TOPICS = [
     ],
   },
 ];
+
+/**
+ * Кадры под устройство: на iPhone — без кадров «только Android» и с текстом
+ * для iPhone там, где он свой (bodyIos). Один раз при загрузке: дальше лента
+ * работает с готовым списком, как раньше.
+ */
+const IOS = detectBrowser().platform === 'ios';
+TOPICS.forEach((topic) => {
+  topic.frames = topic.frames
+    .filter((frame) => !(IOS && frame.only === 'android'))
+    .map((frame) => (IOS && frame.bodyIos ? { ...frame, body: frame.bodyIos } : frame));
+});
 
 /* ==========================================================================
    Ряд кружков

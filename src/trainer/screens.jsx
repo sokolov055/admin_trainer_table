@@ -12,6 +12,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture, usePullRefresh, captureScreen } from '../gestures.jsx';
 import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
+import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 
 /* ==================================================================
@@ -1042,6 +1043,7 @@ export function Settings() {
       {/* Выход стоит последним и сам прячется внутри Telegram: там выходить
           не из чего, см. SignOut */}
       <SignOut />
+      <PrivacyLink />
     </>
   );
 }
