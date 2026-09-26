@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { getInitData } from './telegram.js';
 import { getToken } from './session.js';
@@ -627,12 +628,40 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const pickDelete = () => {
     const ids = new Set(picked);
     const snapshot = record.session.exercises;
+    // Выйти из выбора до рассыпания: полоски между карточками в выборе
+    // спрятаны, и узнать, какие из них уйдут, можно только когда они есть
+    flushSync(endPick);
     const cards = [...ids].map(id => fieldsRef.current && fieldsRef.current.querySelector(`[data-flip-scope="sec:${id}"]`)).filter(Boolean);
-    endPick();
     vanish(cards, () => {
       setUndo(snapshot, ids.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + ids.size);
       change(v => ({ ...v, exercises: v.exercises.filter(e => !ids.has(e.id)) }));
+    }, leavingBars(cards));
+  };
+  /**
+   * Полоски «+ Упражнение / Соединить», которые исчезнут вместе с
+   * карточками: полоска стоит перед карточкой и живёт, пока у той
+   * остаётся сосед сверху. Уходят — вместе, иначе в конце ступенька.
+   */
+  const leavingBars = (cards) => {
+    const root = fieldsRef.current;
+    if (!root || !cards.length) return [];
+    const gone = (node) => {
+      if (cards.includes(node)) return true;
+      const inner = node.matches('.workout__exercise') ? [] : [...node.querySelectorAll('.workout__exercise')];
+      return inner.length > 0 && inner.every((card) => cards.includes(card));
+    };
+    const parent = cards[0].parentElement;
+    const bars = [];
+    let alive = false;
+    [...parent.children].forEach((node) => {
+      if (node.matches('.workout__between')) {
+        const owner = node.nextElementSibling;
+        if (!owner || gone(owner) || !alive) bars.push(node);
+        return;
+      }
+      if (!gone(node) && (node.matches('.workout__exercise') || node.querySelector('.workout__exercise'))) alive = true;
     });
+    return bars;
   };
   // Копия — сразу за своим упражнением, с неотмеченными подходами
   const pickCopy = () => {
@@ -738,7 +767,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const finished = doneSets === ex.sets.length;
           const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
           return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '')} key={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
-          <SwipeRow className="workout__ex-swipe" dustClosest=".workout__exercise" disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
+          <SwipeRow className="workout__ex-swipe" dustClosest=".workout__exercise" dustWith={(card) => leavingBars([card])} disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}

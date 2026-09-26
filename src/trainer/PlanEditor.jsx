@@ -1,6 +1,6 @@
 import ExercisePicker from './ExercisePicker.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { vanish } from '../dust.js';
+import { vanish, separatorOf } from '../dust.js';
 import { haptic } from '../telegram.js';
 import { createPortal } from 'react-dom';
 import { useTabLock } from '../gestures.jsx';
@@ -498,11 +498,11 @@ export default function PlanEditor({
                       onClick={() => setExercise(bi, ei, 'technique', exercise.technique === 'dropset' ? '' : 'dropset')}
                     >Дропсет</button>
                   )}
-                  <button className="icon-button plan-edit__icon plan-edit__remove" aria-label="Убрать упражнение" title="Убрать" disabled={busy} onClick={(e) => vanish(e.currentTarget.closest('.plan-edit__row'), () => change((next) => {
+                  <button className="icon-button plan-edit__icon plan-edit__remove" aria-label="Убрать упражнение" title="Убрать" disabled={busy} onClick={(e) => { const row = e.currentTarget.closest('.plan-edit__row'); vanish(row, () => change((next) => {
                     next[bi].exercises.splice(ei, 1);
                     if (!next[bi].exercises.length) next[bi].exercises.push(blank());
                     return next;
-                  }))}>
+                  }), [separatorOf(row, '.plan-edit__between', 'next')]); }}>
                     <IconTrash size={18} />
                   </button>
                 </div>

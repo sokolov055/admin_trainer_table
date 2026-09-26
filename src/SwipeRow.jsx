@@ -12,7 +12,7 @@ import { IconTrash } from './icons.jsx';
  * dustClosest — ближайший такой предок (заголовок упражнения удаляет всю
  * карточку, и рассыпаться должна карточка).
  */
-export default function SwipeRow({ className = '', children, onDelete, label, disabled = false, dustClosest = '', ...rest }) {
+export default function SwipeRow({ className = '', children, onDelete, label, disabled = false, dustClosest = '', dustWith = null, ...rest }) {
   const sw = useSwipe({ disabled });
   const root = useRef(null);
   const firing = useRef(false);
@@ -21,7 +21,8 @@ export default function SwipeRow({ className = '', children, onDelete, label, di
     if (firing.current) return;
     firing.current = true;
     const el = (dustClosest && root.current && root.current.closest(dustClosest)) || root.current;
-    vanish(el, () => { onDelete(); sw.reset(); }).then(() => { firing.current = false; });
+    // dustWith — что уходит вместе с ней (полоска между карточками)
+    vanish(el, () => { onDelete(); sw.reset(); }, dustWith ? dustWith(el) : []).then(() => { firing.current = false; });
   };
   return (
     <div className={'swipe ' + className} ref={root} {...(disabled ? {} : sw.bind)} {...rest}>
