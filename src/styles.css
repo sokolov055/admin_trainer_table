@@ -710,6 +710,30 @@ button { font-family: inherit; }
 
 }
 
+/* Приложение для Android и iPhone (mobile/, класс is-native ставит
+   native.js). WebView там считает себя браузером, а не «приложением на
+   экране», поэтому медиазапрос выше не срабатывает — и шапка уходила под
+   строку состояния. Отступ — больший из двух: env() браузера и переменной,
+   которую передаёт Capacitor (на WebView старше 140-й версии env() — ноль,
+   хотя страница уже под строкой состояния). */
+:root.is-native {
+  --inset-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+  --inset-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+}
+.is-native body::before { height: var(--inset-top); }
+.is-native .client-preview { padding-top: calc(10px + var(--inset-top)); }
+.is-native .client-preview + .app__header { padding-top: var(--space-5); }
+.is-native .app__header {
+  padding-top: calc(var(--space-5) + var(--inset-top));
+  padding-left: calc(var(--space-4) + var(--inset-left));
+  padding-right: calc(var(--space-4) + var(--inset-right));
+}
+.is-native .app__body {
+  padding-left: calc(var(--space-4) + var(--inset-left));
+  padding-right: calc(var(--space-4) + var(--inset-right));
+}
+
 /* ==========================================================================
    Боковое меню
    Здесь редкое: логи, листы, настройки. Панель приезжает справа — с той же

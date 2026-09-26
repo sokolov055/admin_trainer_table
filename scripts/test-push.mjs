@@ -300,3 +300,39 @@ test('на iPhone из браузера объясняем, что сначал�
   assert.match(screen(tree), /на экран «Домой»/);
   assert.equal(buttons(tree).length, 0);
 });
+
+/**
+ * Android-приложение: уведомления через Firebase (native-push.js). Адрес
+ * телефона уходит полем pushToken — НЕ token: token в запросе — ключ
+ * входа, и адрес телефона на его месте сервер принял за чужую сессию и
+ * выкинул клиента на экран входа (26.09.2026, первый тест на Android).
+ */
+test('в приложении включение уведомлений не трогает ключ входа', async () => {
+  const browser = makeBrowser();
+  const listeners = {};
+  const push = {
+    async checkPermissions() { return { receive: 'granted' }; },
+    async requestPermissions() { return { receive: 'granted' }; },
+    async createChannel() {},
+    async addListener(event, cb) { listeners[event] = cb; return { remove() {} }; },
+    async register() { setTimeout(() => listeners.registration && listeners.registration({ value: 'fcm-token-1' }), 0); },
+    async unregister() {},
+  };
+  globalThis.window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android', Plugins: { PushNotifications: push } };
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+  try {
+    const { tree, calls } = await open({ browser, onCall: (action) => (action === 'push.native.status' ? { enabled: true } : null) });
+    await press(tree, 'Включить уведомления');
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+
+    const register = calls.find((c) => c.action === 'push.native.register');
+    assert.ok(register, 'телефон зарегистрирован на сервере');
+    assert.equal(register.params.pushToken, 'fcm-token-1');
+    assert.equal('token' in register.params, false, 'ГЛАВНОЕ: поле token — ключ входа, его не перезаписываем');
+    assert.equal(register.params.platform, 'android');
+  } finally {
+    delete globalThis.window.Capacitor;
+    delete globalThis.localStorage;
+  }
+});

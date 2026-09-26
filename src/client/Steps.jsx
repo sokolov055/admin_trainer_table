@@ -3,7 +3,7 @@ import { useData } from '../useData.js';
 import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
-import { connectSteps, stepsConnected, stepsOn, onIphone } from '../native-steps.js';
+import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, STEPS_SENT } from '../native-steps.js';
 
 /**
  * Шаги — в «Прогрессе» клиента и в карточке клиента у тренера.
@@ -28,6 +28,13 @@ export default function Steps({ clientRow }) {
   const [connected, setConnected] = useState(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
+
+  // Шаги ушли на сервер (при запуске, возврате, подключении) — перечитать
+  useEffect(() => {
+    const again = () => reload();
+    window.addEventListener(STEPS_SENT, again);
+    return () => window.removeEventListener(STEPS_SENT, again);
+  }, []);
 
   useEffect(() => {
     if (!native) return undefined;
@@ -65,7 +72,16 @@ export default function Steps({ clientRow }) {
       <Section title="Шаги">
         <Panel pad>
           {connected ? (
-            <p className="small muted">Шаги подключены. Как только телефон их посчитает, здесь появится график за две недели.</p>
+            <>
+              <p className="small muted">
+                Шаги подключены, но телефон пока их не передал. {onIphone()
+                  ? 'Шаги считает сам iPhone и Apple Watch — обычно они появляются через несколько минут.'
+                  : 'Health Connect сам шаги не считает — их туда пишет приложение: Google Fit, Samsung Health, Mi Fitness или приложение браслета. Откройте его и включите передачу шагов в Health Connect.'}
+              </p>
+              <div className="survey__actions">
+                <button className="button" onClick={() => syncSteps(true).catch(() => {})}>Проверить ещё раз</button>
+              </div>
+            </>
           ) : (
             <>
               <p className="steps__lead">Тренер увидит, сколько вы ходите, — без ручного ввода.</p>

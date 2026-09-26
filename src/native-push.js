@@ -54,7 +54,9 @@ function register(push) {
 
 async function send(token, clientRow) {
   await apiMutate('push.native.register', {
-    token,
+    // Не «token»: это поле в запросе — ключ входа, и адрес телефона на его
+    // месте сервер принимал за чужую сессию и разлогинивал человека
+    pushToken: token,
     platform: platform(),
     device: describeDevice(),
     ...(clientRow ? { clientRow } : {}),
@@ -106,7 +108,7 @@ export async function disableNativePush() {
   const push = plugin('PushNotifications');
   const token = recall(TOKEN_KEY);
   if (token) {
-    try { await apiMutate('push.native.unregister', { token }); } catch (_) { /* сервер сам уберёт мёртвый токен */ }
+    try { await apiMutate('push.native.unregister', { pushToken: token }); } catch (_) { /* сервер сам уберёт мёртвый токен */ }
   }
   remember(TOKEN_KEY, '');
   // Выключили сами — при запуске не включать обратно

@@ -22,8 +22,11 @@ export function onIphone() {
 const DAYS = 30;
 const ON_KEY = 'native_steps_on_v1';
 const SENT_KEY = 'native_steps_sent_v1';
-/** Не чаще раза в 10 минут: шаги копятся медленно, а запрос — это батарея */
-const EVERY_MS = 10 * 60 * 1000;
+/** При возврате в приложение — не чаще раза в 3 минуты: шаги копятся
+ *  медленно, а запрос — это батарея. При запуске — всегда */
+const EVERY_MS = 3 * 60 * 1000;
+/** Событие «шаги ушли на сервер» — «Прогресс» перечитывает график */
+export const STEPS_SENT = 'fittrack:steps-sent';
 
 function health() { return plugin('Health'); }
 
@@ -103,6 +106,8 @@ export async function syncSteps(force = false) {
   if (!days.length) return { sent: 0 };
   await apiMutate('steps.sync', { days, source: onIphone() ? 'healthkit' : 'health-connect' });
   try { localStorage.setItem(SENT_KEY, String(Date.now())); } catch (_) {}
+  // Экран «Прогресс» мог загрузиться раньше, чем шаги ушли, — пусть перечитает
+  try { window.dispatchEvent(new Event(STEPS_SENT)); } catch (_) {}
   return { sent: days.length };
 }
 

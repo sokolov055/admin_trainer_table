@@ -48,7 +48,8 @@ export function startNative() {
   startBundleUpdates();
   refreshNativePush();
   listenNativeTaps((url) => openLink(new URL(url, window.location.href).href));
-  syncSteps().catch(() => {});
+  // При запуске — сразу, без паузы: человек открыл приложение посмотреть шаги
+  syncSteps(true).catch(() => {});
 
   const bar = plugin('StatusBar');
   if (bar && bar.setBackgroundColor) {
