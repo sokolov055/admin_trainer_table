@@ -255,7 +255,7 @@ function EventForm({ event, day, clients, serviceEmail, onDone, onCancel }) {
                 disabled={busy}
               />
               {change && change !== 'fix' && (
-                <Field label="Причина — по желанию" value={reason} onChange={setReason} placeholder="заболел, работа, отпуск…" inputMode="text" />
+                <Field label="Причина — по желанию" value={reason} onChange={setReason} placeholder="работа, отпуск, семейные дела…" inputMode="text" />
               )}
             </div>
           )}
@@ -286,7 +286,7 @@ function EventForm({ event, day, clients, serviceEmail, onDone, onCancel }) {
                 </label>
               )}
               {who && who !== 'error' && (
-                <Field label="Причина — по желанию" value={reason} onChange={setReason} placeholder="заболел, работа, отпуск…" inputMode="text" />
+                <Field label="Причина — по желанию" value={reason} onChange={setReason} placeholder="работа, отпуск, семейные дела…" inputMode="text" />
               )}
             </div>
           )}

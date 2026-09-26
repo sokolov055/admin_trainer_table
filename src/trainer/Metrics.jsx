@@ -7,6 +7,7 @@ import {
 import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
 import { IconBack } from '../icons.jsx';
+import LedgerCheck from './LedgerCheck.jsx';
 
 /**
  * Показатели: финансы и процессы.
@@ -429,6 +430,8 @@ export function Finance() {
 
   return (
     <>
+      {/* Сверка — над цифрами: пока она не разобрана, деньги считает таблица */}
+      <LedgerCheck />
       {top}
 
       {/* Крупно — прибыль, а не выручка. Выручка — отработанное, та же

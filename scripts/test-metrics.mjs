@@ -44,6 +44,7 @@ const output = await build({
         };
         if (args.path === 'api') return {
           contents: `export const apiMutate = (action, params) => globalThis.__metrics.apiMutate(action, params);
+            export const apiPrimary = async () => ({});
             export const apiPublic = async () => ({});
             export const logout = () => {};
             export const apiStale = () => ({ data: null, stale: false, promise: Promise.resolve({}) });`,
@@ -168,6 +169,8 @@ function draw(Screen, answer, { onMutate } = {}) {
           reload() {},
         };
       }
+      // Сверка денег (LedgerCheck) о периоде не спрашивает — не считаем
+      if (action === 'trainer.ledger') return { loading: false, data: null, error: null, reload() {} };
       asked.push({ action, params });
       return { loading: false, data: answer(action, params), error: null, reload() {} };
     },

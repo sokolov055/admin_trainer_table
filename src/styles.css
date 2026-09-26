@@ -2138,6 +2138,13 @@ th.sticky, td.sticky {
   margin-top: var(--space-5);
 }
 
+/* Сверка денег (LedgerCheck.jsx): две цифры рядом, крупно */
+.ledger-check { display: grid; gap: var(--space-2); }
+.ledger-check__gap { height: var(--space-4); }
+.ledger-check__name { margin: 0; font-weight: 600; }
+.ledger-check__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); font-size: var(--text-sm); color: var(--text-secondary); }
+.ledger-check__pair strong { display: block; font-size: var(--text-lg, 19px); color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* Две отметки согласия — отдельно от кнопки и друг от друга (156-ФЗ) */
 .consent {
   display: grid;

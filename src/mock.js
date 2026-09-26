@@ -624,6 +624,15 @@ const MOCK = {
     consentNeeded: params.__role !== 'trainer' && new URLSearchParams(window.location.search).get('mockConsent') === '1',
   }),
   'consent.accept': () => ({ version: '2026-09-26', givenAt: new Date().toISOString() }),
+  // Сверка денег таблица ↔ сервер (LedgerCheck.jsx): одно расхождение
+  'trainer.ledger': () => ({
+    state: { open: true, since: daysAgo(4), clients: 5, matched: 4, off: 1 },
+    rows: [
+      { row: 3, name: 'Анна Морозова', price: 3000, inSheet: 12000, opening: 15000, openedAt: daysAgo(4), paid: 0, trainings: 2, adjusted: 0, spent: 6000, ours: 9000, diff: -3000, settled: false },
+      { row: 5, name: 'Дмитрий Соколов', price: 2500, inSheet: 7500, opening: 7500, openedAt: daysAgo(4), paid: 0, trainings: 0, adjusted: 0, spent: 0, ours: 7500, diff: 0, settled: true },
+    ],
+  }),
+  'trainer.ledger.settle': (p) => ({ row: { row: p.clientRow, settled: true } }),
 
   // Аккаунт без тренера и привязка (lib/accounts.js на сервере)
   'auth.client.request': () => ({ sent: true, ttlMin: 15 }),
