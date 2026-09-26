@@ -151,14 +151,15 @@ export default function AccessLogin({ token, onComplete, details }) {
           ? 'Пароль не нужен: ссылка сама подтверждает, что это вы.'
           : 'Пароль не нужен. После входа приложение можно поставить на домашний экран — подскажем, как только откроется кабинет.'}
       </p>
-      {where.deadEnd && <OpenOutside where={where} />}
-      {where.platform === 'android' && where.kind === 'ok' && (
-        /* Та же ссылка — в Android-приложение, если оно стоит; нет его —
-           Chrome просто откроет эту страницу снова. Вход и там по кнопке */
-        <a className="invite__app" href={androidBrowserUrl(window.location.href, ANDROID_APP_PACKAGE)}>
-          Стоит приложение Fit Track? Открыть в нём
+      {where.platform === 'android' && (where.kind === 'ok' || where.kind === 'webview') && (
+        /* Та же ссылка — в Android-приложение, если оно стоит. Из браузера
+           Telegram тоже: intent:// WebView отдаёт Android, а тот —
+           приложению по пакету. Нет приложения — откроется эта же страница */
+        <a className="button button--block invite__app" href={androidBrowserUrl(window.location.href, ANDROID_APP_PACKAGE)}>
+          Открыть в приложении Fit Track
         </a>
       )}
+      {where.deadEnd && <OpenOutside where={where} />}
       {details}
     </AccessShell>
   );

@@ -2227,15 +2227,7 @@ th.sticky, td.sticky {
 }
 /* Открыть ту же ссылку в Android-приложении — тихая ссылка, не вторая
    кнопка: у большинства приложения ещё нет */
-.invite__app {
-  display: block;
-  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
-  padding: var(--space-2) 0;
-  color: var(--accent);
-  font-size: var(--text-sm);
-  text-align: center;
-  text-decoration: none;
-}
+.invite__app { margin: calc(-1 * var(--space-2)) 0 var(--space-5); }
 /* Совет открыть ссылку в настоящем браузере. Стоит под входом и отделён
    линией: это отдельный разговор — про иконку на экране, — а не второй
    шаг входа, и спорить за внимание с главной кнопкой ему незачем. */
@@ -4088,3 +4080,10 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Шаги в «Прогрессе» (client/Steps.jsx) */
 .steps__lead { margin: 0 0 var(--space-2); font-weight: 600; }
 .steps__facts { margin: var(--space-2) 0 0; }
+
+/* Вход в Android-приложении по вставленной ссылке (PasteLink.jsx) */
+.paste-link { display: grid; gap: var(--space-2); margin: var(--space-4) 0 var(--space-5); text-align: left; }
+.paste-link__lead { margin: 0; font-weight: 600; }
+.paste-link .small { margin: 0; }
+.paste-link__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.paste-link__actions .button { flex: 1 1 auto; }

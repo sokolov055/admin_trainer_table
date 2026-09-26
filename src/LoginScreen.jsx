@@ -5,6 +5,8 @@ import {
   readPendingLogin, writePendingLogin, clearPendingLogin,
 } from './session.js';
 import { IconSend, IconKey, IconAlert, IconRefresh } from './icons.jsx';
+import PasteLink from './PasteLink.jsx';
+import { isNativeApp } from './native-bridge.js';
 
 /**
  * Экран для тех, кто пришёл без ссылки.
@@ -122,11 +124,15 @@ export default function LoginScreen({ details }) {
             тренер. Пароль придумывать не нужно.
           </p>
 
-          <ol className="login__steps">
-            <li>Найдите сообщение со ссылкой от тренера.</li>
-            <li>Откройте её — кабинет запустится сразу.</li>
-            <li>Ссылки нет или она устарела — напишите тренеру, он пришлёт новую.</li>
-          </ol>
+          {/* В Android-приложении ссылка из Telegram сама не доходит —
+              её вставляют сюда (PasteLink.jsx) */}
+          {isNativeApp() ? <PasteLink /> : (
+            <ol className="login__steps">
+              <li>Найдите сообщение со ссылкой от тренера.</li>
+              <li>Откройте её — кабинет запустится сразу.</li>
+              <li>Ссылки нет или она устарела — напишите тренеру, он пришлёт новую.</li>
+            </ol>
+          )}
 
           <details
             className="login__alternative"

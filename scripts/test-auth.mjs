@@ -6,7 +6,7 @@ import {
 import { installGuidance, isIosDevice, isIosSafari, readInstallBridgeTicket } from '../src/install.js';
 import { resetClientAccess } from '../src/client-access.js';
 import { readInviteToken, removeInviteToken } from '../src/invites.js';
-import { enterByAccessLink, readAccessToken, removeAccessToken } from '../src/access.js';
+import { enterByAccessLink, readAccessToken, removeAccessToken, linkTarget } from '../src/access.js';
 
 test('invite token is read from query and removed without losing other parameters or hash', () => {
   const location = {
@@ -204,4 +204,19 @@ test('a login without a token is a failure, not a silent half-entry', async () =
     }),
     /ключ входа/,
   );
+});
+
+/**
+ * Вставленная в Android-приложение ссылка из Telegram: вместе с текстом
+ * сообщения, с лишними пробелами — вход находится; чужое — нет.
+ */
+test('вставленная ссылка из Telegram превращается во вход внутри приложения', () => {
+  const base = 'https://sokolov055.github.io/admin_trainer_table/';
+  assert.equal(
+    linkTarget('Анна, ваш кабинет: https://sokolov055.github.io/admin_trainer_table/?access=AbC-12_x  ', base),
+    base + '?access=AbC-12_x',
+  );
+  assert.equal(linkTarget('https://sokolov055.github.io/admin_trainer_table/#loginTicket=t123', base), base + '#loginTicket=t123');
+  assert.equal(linkTarget('https://example.com/просто ссылка', base), '');
+  assert.equal(linkTarget('', base), '');
 });

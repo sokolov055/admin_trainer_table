@@ -136,3 +136,17 @@ export async function copyText(text, navigatorObject = navigator, documentObject
   input.remove();
   return copied;
 }
+
+/**
+ * Адрес входа внутри приложения из вставленного текста (PasteLink.jsx):
+ * персональная ссылка (?access=) или одноразовый вход (#loginTicket=).
+ * Пусто — это не ссылка для входа.
+ */
+export function linkTarget(text, base) {
+  const raw = String(text || '').trim();
+  const access = /[?&]access=([^&#\s]+)/.exec(raw);
+  if (access) return new URL('./?access=' + access[1], base).href;
+  const ticket = /[#&]loginTicket=([^&\s]+)/.exec(raw);
+  if (ticket) return new URL('./#loginTicket=' + ticket[1], base).href;
+  return '';
+}
