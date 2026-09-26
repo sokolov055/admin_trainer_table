@@ -4087,3 +4087,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .paste-link .small { margin: 0; }
 .paste-link__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .paste-link__actions .button { flex: 1 1 auto; }
+
+/* Приложение для Android (AppHint.jsx) — две кнопки рядом */
+.app-hint__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.app-hint__actions .install-hint__action { margin: 0; flex: 1 1 auto; }
+.app-hint__note { margin: var(--space-2) 0 0; }

@@ -9,6 +9,8 @@ import AccessLogin from './AccessLogin.jsx';
 import InviteRegistration from './InviteRegistration.jsx';
 import { Loading, ErrorState } from './ui.jsx';
 import { InstallHint, TransferLoginScreen } from './AuthTransfer.jsx';
+import AppHint from './AppHint.jsx';
+import { canOpenInApp } from './open-in-app.js';
 import ClientApp from './client/ClientApp.jsx';
 import TrainerApp from './trainer/TrainerApp.jsx';
 import LoginScreen from './LoginScreen.jsx';
@@ -207,7 +209,11 @@ export default function App() {
           Внутри Telegram не показываем вовсе: там приложение открыто мини-
           приложением, то есть намеренно, и советовать «смените браузер»
           человеку, который ничего не выбирал, не за что. */}
-      <InstallHint active={!initData} installReady={installReady} />
+      {/* На Android вместо ярлыка на экране — настоящее приложение: поставить
+          и перенести в него кабинет прямо отсюда (AppHint.jsx) */}
+      {canOpenInApp()
+        ? <AppHint active={!initData} />
+        : <InstallHint active={!initData} installReady={installReady} />}
     </>
   );
 }

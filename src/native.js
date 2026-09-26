@@ -17,6 +17,7 @@ import { goBack } from './gestures.jsx';
 import { isNativeApp, plugin } from './native-bridge.js';
 import { refreshNativePush, listenNativeTaps } from './native-push.js';
 import { syncSteps } from './native-steps.js';
+import { ticketToHash } from './open-in-app.js';
 
 export { isNativeApp };
 
@@ -112,7 +113,10 @@ function showUpdate(latest) {
 
 function openLink(href, launch = false) {
   let url;
-  try { url = new URL(href); } catch (_) { return; }
+  // Кабинет перенесли из браузера (open-in-app.js): билет пришёл в строке
+  // запроса — intent:// занимает решётку. Переносим его за решётку, где его
+  // ждёт вход (readLoginTicket), и он не уходит на сервер в адресе
+  try { url = new URL(ticketToHash(href)); } catch (_) { return; }
   const here = window.location;
   if (url.origin !== here.origin || !url.pathname.startsWith(new URL('./', here.href).pathname)) return;
   if (url.href === here.href) return;
@@ -124,7 +128,11 @@ function openLink(href, launch = false) {
       sessionStorage.setItem('native_launch_url', url.href);
     } catch (_) {}
   }
+  // Отличается только часть после решётки — браузер не перезагрузит
+  // страницу, а вход читает билет при загрузке. Перезагружаем сами
+  const sameDocument = url.origin + url.pathname + url.search === here.origin + here.pathname + here.search;
   window.location.replace(url.href);
+  if (sameDocument) window.location.reload();
 }
 
 function toHex(rgb) {

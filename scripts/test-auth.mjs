@@ -7,6 +7,7 @@ import { installGuidance, isIosDevice, isIosSafari, readInstallBridgeTicket } fr
 import { resetClientAccess } from '../src/client-access.js';
 import { readInviteToken, removeInviteToken } from '../src/invites.js';
 import { enterByAccessLink, readAccessToken, removeAccessToken, linkTarget } from '../src/access.js';
+import { appIntentUrl, ticketToHash, canOpenInApp } from '../src/open-in-app.js';
 
 test('invite token is read from query and removed without losing other parameters or hash', () => {
   const location = {
@@ -219,4 +220,28 @@ test('вставленная ссылка из Telegram превращается
   assert.equal(linkTarget('https://sokolov055.github.io/admin_trainer_table/#loginTicket=t123', base), base + '#loginTicket=t123');
   assert.equal(linkTarget('https://example.com/просто ссылка', base), '');
   assert.equal(linkTarget('', base), '');
+});
+
+/**
+ * Перенос открытого кабинета в Android-приложение: ссылка открывает
+ * именно приложение (пакет), билет едет в строке запроса, нет приложения —
+ * скачивается APK. В приложении билет уходит за решётку.
+ */
+test('кабинет из браузера переносится в приложение одноразовым билетом', () => {
+  const url = appIntentUrl('T'.repeat(43), 'https://sokolov055.github.io/admin_trainer_table/?tab=progress');
+  assert.match(url, /^intent:\/\/sokolov055\.github\.io\/admin_trainer_table\/\?loginTicket=T{43}#Intent;/);
+  assert.match(url, /;package=app\.fittrack;/);
+  assert.match(url, /S\.browser_fallback_url=https%3A%2F%2Fraw\.githubusercontent\.com%2F.*fit-track\.apk;end$/);
+
+  assert.equal(
+    ticketToHash('https://sokolov055.github.io/admin_trainer_table/?loginTicket=abc'),
+    'https://sokolov055.github.io/admin_trainer_table/#loginTicket=abc',
+  );
+  assert.equal(ticketToHash('https://sokolov055.github.io/admin_trainer_table/?access=x'), 'https://sokolov055.github.io/admin_trainer_table/?access=x');
+
+  assert.equal(canOpenInApp({ where: { platform: 'android', kind: 'ok' }, token: 't' }), true);
+  assert.equal(canOpenInApp({ where: { platform: 'android', kind: 'webview' }, token: 't' }), true, 'из Telegram тоже');
+  assert.equal(canOpenInApp({ where: { platform: 'android', kind: 'installed' }, token: 't' }), false, 'в самом приложении — нет');
+  assert.equal(canOpenInApp({ where: { platform: 'ios', kind: 'ok' }, token: 't' }), false);
+  assert.equal(canOpenInApp({ where: { platform: 'android', kind: 'ok' }, token: '' }), false, 'без входа переносить нечего');
 });

@@ -7,7 +7,9 @@ import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../ge
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion } from '../viewMotion.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone } from '../icons.jsx';
+import { canOpenInApp } from '../open-in-app.js';
+import { showAppHint } from '../AppHint.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
 import Profile from './Profile.jsx';
@@ -74,7 +76,10 @@ export default function ClientApp({ me, clientRow, preview }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [clientRow, preview]);
-  const menu = familyMembers.length ? [FAMILY, ...MENU] : MENU;
+  // Android в браузере — пункт про приложение: вернуть закрытую плашку
+  // «Установить / Открыть в приложении» (AppHint.jsx)
+  const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -198,7 +203,7 @@ export default function ClientApp({ me, clientRow, preview }) {
               <button
                 key={m.id}
                 className={'menu__item' + (active ? ' menu__item--active' : '')}
-                onClick={() => go(m.id)}
+                onClick={() => (m.action ? (setMenuOpen(false), m.action()) : go(m.id))}
                 aria-current={active ? 'page' : undefined}
               >
                 <span className="menu__icon"><Icon size={20} /></span>
