@@ -78,6 +78,13 @@ test('настоящий Mac остаётся компьютером', () => {
  * Android: мешаем только встроенному WebView
  * ========================================================================== */
 
+test('своё Android-приложение — тоже WebView, но это цель, а не тупик', () => {
+  const where = detectBrowser({ userAgent: UA.androidTelegram, native: true });
+  assert.equal(where.platform, 'android');
+  assert.equal(where.kind, 'installed');
+  assert.equal(where.deadEnd, false);
+});
+
 test('встроенный браузер Telegram на Android — тупик', () => {
   const at = detectBrowser({ userAgent: UA.androidTelegram });
   assert.equal(at.platform, 'android');

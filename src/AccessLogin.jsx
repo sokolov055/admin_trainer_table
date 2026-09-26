@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { enterByAccessLink, inspectAccessLink, removeAccessToken } from './access.js';
 import { prepareIosInstallBridge } from './install.js';
-import { detectBrowser, androidBrowserUrl, copyCurrentLink } from './browser.js';
+import { detectBrowser, androidBrowserUrl, copyCurrentLink, ANDROID_APP_PACKAGE } from './browser.js';
 import {
   IconAlert, IconCheck, IconCopy, IconExternal, IconKey, IconRefresh,
 } from './icons.jsx';
@@ -147,10 +147,18 @@ export default function AccessLogin({ token, onComplete, details }) {
       </button>
       {problem && <div className="invite__error" role="alert"><IconAlert size={17} />{problem}</div>}
       <p className="invite__hint">
-        Пароль не нужен. После входа приложение можно поставить на домашний экран —
-        подскажем, как только откроется кабинет.
+        {where.kind === 'installed'
+          ? 'Пароль не нужен: ссылка сама подтверждает, что это вы.'
+          : 'Пароль не нужен. После входа приложение можно поставить на домашний экран — подскажем, как только откроется кабинет.'}
       </p>
       {where.deadEnd && <OpenOutside where={where} />}
+      {where.platform === 'android' && where.kind === 'ok' && (
+        /* Та же ссылка — в Android-приложение, если оно стоит; нет его —
+           Chrome просто откроет эту страницу снова. Вход и там по кнопке */
+        <a className="invite__app" href={androidBrowserUrl(window.location.href, ANDROID_APP_PACKAGE)}>
+          Стоит приложение Fit Track? Открыть в нём
+        </a>
+      )}
       {details}
     </AccessShell>
   );

@@ -4,6 +4,7 @@ import App from './App.jsx';
 import { initTelegramUi } from './telegram.js';
 import { startInstallPromptCapture } from './install.js';
 import { startOffline } from './offline.js';
+import { startNative } from './native.js';
 import './styles.css';
 
 // Тему и размеры окна выставляем до первого рендера, иначе приложение
@@ -11,6 +12,7 @@ import './styles.css';
 initTelegramUi();
 startInstallPromptCapture();
 startOffline();
+startNative();
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -121,6 +121,19 @@ export function useBackGesture(handler, enabled = true, snapshotName = null) {
 }
 
 /**
+ * «Назад» без жеста — системная кнопка Android (native.js). Открытая
+ * красная корзина закрывается первой, как и при смахивании; дальше —
+ * верхний экран из стопки. false — назад некуда, это главный экран.
+ */
+export function goBack() {
+  if (openSwipeRow()) { closeSwipeRow(); return true; }
+  const top = backStack[backStack.length - 1];
+  if (!top) return false;
+  top.run();
+  return true;
+}
+
+/**
  * Разделы нижнего меню, между которыми листают жестом.
  *
  * Регистрирует оболочка (клиента или тренера), пока открыт один из

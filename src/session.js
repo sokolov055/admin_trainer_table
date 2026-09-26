@@ -113,6 +113,9 @@ export function clearPendingLogin() {
 /** Запущено ли приложение с иконки на рабочем столе, а не во вкладке */
 export function isStandalone() {
   try {
+    // Android-приложение (native.js): установлено, подсказки про установку
+    // и «с рабочего стола» к нему тоже относятся
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
     if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
     // iOS до сих пор сообщает об этом собственным свойством, а не
     // медиазапросом — на старых версиях без него режим не определить

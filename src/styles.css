@@ -2227,6 +2227,17 @@ th.sticky, td.sticky {
   font-size: var(--text-xs);
   line-height: 1.55;
 }
+/* Открыть ту же ссылку в Android-приложении — тихая ссылка, не вторая
+   кнопка: у большинства приложения ещё нет */
+.invite__app {
+  display: block;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
+  padding: var(--space-2) 0;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  text-align: center;
+  text-decoration: none;
+}
 /* Совет открыть ссылку в настоящем браузере. Стоит под входом и отделён
    линией: это отдельный разговор — про иконку на экране, — а не второй
    шаг входа, и спорить за внимание с главной кнопкой ему незачем. */

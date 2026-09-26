@@ -43,6 +43,11 @@ export function detectBrowser(options = {}) {
   const ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && touches > 1);
   const android = /Android/i.test(ua);
 
+  // Своё Android-приложение (native.js) — тоже WebView, со строкой `; wv)`,
+  // но это уже цель пути, а не тупик
+  const native = options.native !== undefined ? options.native : nativeShell();
+  if (native) return frame(android ? 'android' : ios ? 'ios' : 'other', 'installed');
+
   if (ios) {
     // Установленное приложение — уже цель пути, дальше вести некуда
     if (standalone === true) return frame('ios', 'installed');
@@ -59,6 +64,18 @@ export function detectBrowser(options = {}) {
   // или само собой разумеется. Мешать не надо.
   return frame('other', 'ok');
 }
+
+function nativeShell() {
+  try {
+    const cap = typeof window !== 'undefined' ? window.Capacitor : null;
+    return !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Пакет Android-приложения (каталог mobile/ основного репозитория) */
+export const ANDROID_APP_PACKAGE = 'app.fittrack';
 
 function frame(platform, kind) {
   return {
