@@ -638,7 +638,7 @@ const MOCK = {
     if (!/^FT-?[A-Z0-9]{6}$/i.test(String(p.publicId || '').trim())) throw new Error('ID выглядит как FT-XXXXXX — проверьте, что вписано.');
     return { sent: true, publicId: String(p.publicId).toUpperCase() };
   },
-  'trainer.link.url': () => ({ token: 'demo-trainer-link', pending: [{ publicId: 'FT-7K2QM4', createdAt: daysAgo(0) }] }),
+  'trainer.link.url': () => ({ token: 'Vx3kP9qLm2Rt8YwZ4nB7cJ5h', pending: [{ publicId: 'FT-7K2QM4', createdAt: daysAgo(0) }] }),
 
   'client.overview': () => ({
     unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',
