@@ -1060,6 +1060,7 @@ const MOCK = {
     return { from: days[0].date, days, syncedAt: daysAgo(0) };
   },
   'steps.sync': (params) => ({ saved: (params.days || []).length }),
+  'account.delete': () => ({ deleted: true }),
   'push.native.status': () => ({ enabled: true }),
   'push.native.register': () => ({ saved: true }),
   'push.native.unregister': () => ({ dropped: 1 }),

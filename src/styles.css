@@ -4092,3 +4092,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .app-hint__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 .app-hint__actions .install-hint__action { margin: 0; flex: 1 1 auto; }
 .app-hint__note { margin: var(--space-2) 0 0; }
+
+/* Удаление аккаунта (DeleteAccount.jsx): подтверждение на месте */
+.delete-account__confirm { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--critical-fill); color: var(--critical-text); }
+.delete-account__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
