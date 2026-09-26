@@ -10,7 +10,8 @@
  * Что даёт оболочка:
  *   - системная кнопка «Назад» ведёт по экранам приложения, как жест
  *     «смахнуть вправо», а с главного экрана сворачивает приложение;
- *   - строка состояния телефона — цвета фона приложения и в тёмной теме.
+ *   - строка состояния телефона — цвета фона приложения и в тёмной теме;
+ *   - вышла новая версия самой оболочки — внизу «Обновить» (checkUpdate).
  */
 import { goBack } from './gestures.jsx';
 
@@ -46,6 +47,7 @@ export function startNative() {
       if (goBack()) return;
       if (app.minimizeApp) app.minimizeApp(); else if (app.exitApp) app.exitApp();
     });
+    if (app.getInfo) app.getInfo().then(checkUpdate).catch(() => {});
   }
 
   const bar = plugin('StatusBar');
@@ -65,6 +67,51 @@ export function startNative() {
     try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', later); } catch (_) {}
     if (document.body) later(); else window.addEventListener('DOMContentLoaded', later);
   }
+}
+
+/**
+ * Новая версия оболочки. Экраны приходят с сайта и обновляются сами, а
+ * APK меняется редко — иконка, уведомления, разрешения. Магазина нет,
+ * поэтому номер последней версии лежит рядом с сайтом (android/latest.json,
+ * пишет mobile/build-apk.sh). Свежее — показываем «Обновить»: скачивание
+ * открывается в браузере телефона (APK на другом адресе, и оболочка сама
+ * отдаёт его браузеру), дальше Android ставит поверх — подпись та же.
+ */
+function checkUpdate(info) {
+  const mine = Number(info && info.build) || 0;
+  if (!mine) return;
+  fetch(new URL('android/latest.json', window.location.href).href, { cache: 'no-store' })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((latest) => {
+      if (!latest || !(Number(latest.versionCode) > mine) || !latest.apk) return;
+      try { if (sessionStorage.getItem('native_update_later') === String(latest.versionCode)) return; } catch (_) {}
+      showUpdate(latest);
+    })
+    .catch(() => {});
+}
+
+function showUpdate(latest) {
+  if (document.querySelector('.update-bar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'undo-bar update-bar';
+  bar.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  text.textContent = 'Вышла новая версия приложения';
+  const later = document.createElement('button');
+  later.type = 'button';
+  later.className = 'button button--ghost';
+  later.textContent = 'Позже';
+  later.onclick = () => {
+    try { sessionStorage.setItem('native_update_later', String(latest.versionCode)); } catch (_) {}
+    bar.remove();
+  };
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'button button--primary';
+  go.textContent = 'Обновить';
+  go.onclick = () => { window.location.href = latest.apk; bar.remove(); };
+  bar.append(text, later, go);
+  document.body.appendChild(bar);
 }
 
 function openLink(href, launch = false) {
