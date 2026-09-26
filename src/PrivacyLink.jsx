@@ -9,6 +9,9 @@ import React from 'react';
  * никуда; внешняя ссылка открывается в браузере телефона.
  */
 export const PRIVACY_URL = 'https://sokolov055.github.io/admin_trainer_table/privacy.html';
+/** Согласие на обработку ПДн и пользовательское соглашение — отдельные тексты (156-ФЗ) */
+export const CONSENT_URL = 'https://sokolov055.github.io/admin_trainer_table/consent.html';
+export const TERMS_URL = 'https://sokolov055.github.io/admin_trainer_table/terms.html';
 /** Поддержка — почта разработчика (App Store 1.5: способ связаться) */
 export const SUPPORT_URL = 'https://sokolov055.github.io/admin_trainer_table/support.html';
 
@@ -16,6 +19,10 @@ export default function PrivacyLink() {
   return (
     <p className="privacy-link">
       <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a>
+      {' · '}
+      <a href={CONSENT_URL} target="_blank" rel="noopener noreferrer">Согласие</a>
+      {' · '}
+      <a href={TERMS_URL} target="_blank" rel="noopener noreferrer">Соглашение</a>
       {' · '}
       <a href={SUPPORT_URL} target="_blank" rel="noopener noreferrer">Поддержка</a>
     </p>

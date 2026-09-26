@@ -620,7 +620,10 @@ const MOCK = {
     hasPersonalSheet: true,
     // ?mockUnlinked=1 — клиент, зарегистрировавшийся сам, без тренера
     unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',
+    // ?mockConsent=1 — согласие по новым правилам ещё не подтверждено
+    consentNeeded: params.__role !== 'trainer' && new URLSearchParams(window.location.search).get('mockConsent') === '1',
   }),
+  'consent.accept': () => ({ version: '2026-09-26', givenAt: new Date().toISOString() }),
 
   // Аккаунт без тренера и привязка (lib/accounts.js на сервере)
   'auth.client.request': () => ({ sent: true, ttlMin: 15 }),

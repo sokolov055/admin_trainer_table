@@ -2138,6 +2138,43 @@ th.sticky, td.sticky {
   margin-top: var(--space-5);
 }
 
+/* Две отметки согласия — отдельно от кнопки и друг от друга (156-ФЗ) */
+.consent {
+  display: grid;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.consent__line {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.consent__line input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.consent a { color: var(--accent); }
+
+.consent__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.consent-gate {
+  display: grid;
+  gap: var(--space-4);
+}
+
 /* Мой тренер: ID крупно и посимвольно — его диктуют вслух */
 .my-trainer__id {
   display: flex;

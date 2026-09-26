@@ -21,6 +21,7 @@ import Family from './Family.jsx';
 import { PhoneCalendar } from '../trainer/Schedule.jsx';
 import { apiPublic } from '../api.js';
 import MyTrainer, { LinkOffers } from './MyTrainer.jsx';
+import { ConsentGate } from '../Consent.jsx';
 import { accountState, pendingTrainerLink } from '../trainer-link.js';
 
 /**
@@ -88,6 +89,8 @@ export default function ClientApp({ me, clientRow, preview }) {
   // «Установить / Открыть в приложении» (AppHint.jsx)
   const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
   const own = !clientRow && !preview && !(me && me.member);
+  // Согласие по новым правилам ещё не подтверждено — сначала оно
+  const [consented, setConsented] = useState(false);
   const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...(own ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
@@ -154,6 +157,11 @@ export default function ClientApp({ me, clientRow, preview }) {
     haptic();
   };
   goRef.current = go;
+
+  // Здесь, после всех хуков: ранний выход выше сломал бы их порядок
+  if (me && me.consentNeeded && own && !consented) {
+    return <ConsentGate onDone={() => setConsented(true)} />;
+  }
 
   return (
     <div className="app">

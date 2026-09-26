@@ -6,7 +6,7 @@ import {
 } from './session.js';
 import { IconSend, IconKey, IconAlert, IconRefresh } from './icons.jsx';
 import PasteLink from './PasteLink.jsx';
-import { PRIVACY_URL } from './PrivacyLink.jsx';
+import { ConsentChecks } from './Consent.jsx';
 import { isNativeApp, iosApp } from './native-bridge.js';
 
 /**
@@ -168,6 +168,7 @@ function ClientEmailLogin() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
+  const [agree, setAgree] = useState({ consent: false, terms: false });
   const [step, setStep] = useState('email');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
@@ -185,7 +186,8 @@ function ClientEmailLogin() {
 
   const enter = () => run(async () => {
     const res = await apiPublic('auth.client.confirm', {
-      email, code, device: describeDevice(), ...(step === 'name' ? { name } : {}),
+      email, code, device: describeDevice(),
+      ...(step === 'name' ? { name, consent: agree.consent, terms: agree.terms } : {}),
     });
     if (res && res.needName) { setStep('name'); return; }
     setToken(res.token);
@@ -199,7 +201,7 @@ function ClientEmailLogin() {
 
   const ready = step === 'email' ? !!email.trim()
     : step === 'code' ? code.length === 6
-      : name.trim().length >= 2;
+      : name.trim().length >= 2 && agree.consent && agree.terms;
 
   return (
     <form className="login__email" onSubmit={submit}>
@@ -249,14 +251,8 @@ function ClientEmailLogin() {
         </label>
       )}
 
-      {/* Регистрация открыта всем: человек должен видеть, на что соглашается */}
-      {step === 'name' && (
-        <p className="field__hint">
-          Нажимая «Завести кабинет», вы соглашаетесь с{' '}
-          <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">политикой конфиденциальности</a>{' '}
-          и обработкой ваших данных, включая замеры и сведения о здоровье.
-        </p>
-      )}
+      {/* Согласие — отдельной отметкой, не «нажимая кнопку» (156-ФЗ) */}
+      {step === 'name' && <ConsentChecks value={agree} onChange={setAgree} disabled={busy} />}
 
       {problem && <p className="login__problem" role="alert">{problem}</p>}
 
@@ -268,7 +264,7 @@ function ClientEmailLogin() {
         <button
           type="button"
           className="button button--ghost"
-          onClick={() => { setStep('email'); setCode(''); setName(''); setProblem(''); }}
+          onClick={() => { setStep('email'); setCode(''); setName(''); setAgree({ consent: false, terms: false }); setProblem(''); }}
           disabled={busy}
         >
           Другой адрес
