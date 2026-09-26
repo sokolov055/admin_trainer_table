@@ -6,7 +6,7 @@ import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-mod
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
-import { dust } from './dust.js';
+import { vanish } from './dust.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
@@ -629,7 +629,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const snapshot = record.session.exercises;
     const cards = [...ids].map(id => fieldsRef.current && fieldsRef.current.querySelector(`[data-flip-scope="sec:${id}"]`)).filter(Boolean);
     endPick();
-    Promise.all(cards.map(dust)).then(() => {
+    vanish(cards, () => {
       setUndo(snapshot, ids.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + ids.size);
       change(v => ({ ...v, exercises: v.exercises.filter(e => !ids.has(e.id)) }));
     });

@@ -657,6 +657,8 @@ test('тренировки программы переставляются пе�
     await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).first().click();
     await tab.getByRole('button', { name: 'Изменить' }).click();
     await tab.getByRole('button', { name: 'Свернуть тренировки' }).click();
+    // Свёрнутый список плавно подъезжает к экрану — ждём, пока встанет
+    await tab.waitForTimeout(700);
 
     const rows = tab.locator('.block-order__row');
     await rows.first().waitFor({ timeout: 5000 });

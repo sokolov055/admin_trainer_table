@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useSwipe } from './swipe.js';
-import { dust } from './dust.js';
+import { vanish } from './dust.js';
 import { IconTrash } from './icons.jsx';
 
 /**
@@ -21,7 +21,7 @@ export default function SwipeRow({ className = '', children, onDelete, label, di
     if (firing.current) return;
     firing.current = true;
     const el = (dustClosest && root.current && root.current.closest(dustClosest)) || root.current;
-    dust(el).then(() => { onDelete(); sw.reset(); firing.current = false; });
+    vanish(el, () => { onDelete(); sw.reset(); }).then(() => { firing.current = false; });
   };
   return (
     <div className={'swipe ' + className} ref={root} {...(disabled ? {} : sw.bind)} {...rest}>

@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { haptic } from '../telegram.js';
 import { plural } from '../ui.jsx';
 import { IconGrip, IconCopy, IconTrash, IconCheck } from '../icons.jsx';
-import { dust } from '../dust.js';
+import { vanish } from '../dust.js';
 
 /**
  * Порядок тренировок в программе — перетаскиванием.
@@ -82,6 +82,15 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     setOpenRow(null);
   };
 
+  /** Палец на ручке — по координатам, а не по элементу под ним: касание
+   *  часто приходит в обёртку ручки, и проверка по цели его теряла */
+  const onHandle = (e) => {
+    const h = e.currentTarget.querySelector('.block-order__handle');
+    if (!h) return false;
+    const r = h.getBoundingClientRect();
+    return e.clientX >= r.left - 6 && e.clientX <= r.right + 6 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
+  };
+
   const start = (e, index) => {
     if (disabled || selecting || gesture.current || (e.button !== undefined && e.button !== 0)) return;
     // Открыты действия — касание их закрывает, а не начинает жест
@@ -96,7 +105,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
       step, rows, id: e.pointerId, axis: null, x: 0, base: openRow === index ? -ACTION_W : 0,
       // Перестановка — только за ручку: остальная строка листает страницу,
       // иначе длинный список не пролистать, положив палец на строку
-      grip: !!(e.target.closest && e.target.closest('.block-order__handle')),
+      grip: onHandle(e),
     };
 
     // Держат, не двигая, — это вызов действий
@@ -185,7 +194,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
       // Просто касание: открытая корзина закрывается, а если закрывать
       // нечего — открывается сама тренировка
       if (openRow !== null) closeOpen();
-      else if (onOpen && !(e.target.closest && e.target.closest('.block-order__handle'))) onOpen(g.from);
+      else if (onOpen && !g.grip) onOpen(g.from);
       return;
     }
 
@@ -209,7 +218,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     const rows = indices.map((i) => listRef.current && listRef.current.children[i]).filter(Boolean);
     const done = () => { removing.current = false; onRemove(indices); setSelected(new Set()); setSelecting(false); };
     // В пыль: тренировка рассыпается и гаснет (dust.js)
-    Promise.all(rows.map(dust)).then(done);
+    vanish(rows, done);
   };
 
   const onKey = (e, index) => {
