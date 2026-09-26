@@ -7,7 +7,7 @@ import { installGuidance, isIosDevice, isIosSafari, readInstallBridgeTicket } fr
 import { resetClientAccess } from '../src/client-access.js';
 import { readInviteToken, removeInviteToken } from '../src/invites.js';
 import { enterByAccessLink, readAccessToken, removeAccessToken, linkTarget } from '../src/access.js';
-import { appIntentUrl, ticketToHash, canOpenInApp } from '../src/open-in-app.js';
+import { appIntentUrl, ticketToHash, canOpenInApp, localLink } from '../src/open-in-app.js';
 
 test('invite token is read from query and removed without losing other parameters or hash', () => {
   const location = {
@@ -244,4 +244,20 @@ test('кабинет из браузера переносится в прило�
   assert.equal(canOpenInApp({ where: { platform: 'android', kind: 'installed' }, token: 't' }), false, 'в самом приложении — нет');
   assert.equal(canOpenInApp({ where: { platform: 'ios', kind: 'ok' }, token: 't' }), false);
   assert.equal(canOpenInApp({ where: { platform: 'android', kind: 'ok' }, token: '' }), false, 'без входа переносить нечего');
+});
+
+/**
+ * Ссылки, пришедшие в приложение: на iPhone экраны вшиты (capacitor://),
+ * и и fittrack://, и адрес сайта должны попасть на СВОЮ страницу; на
+ * Android открыт живой сайт — адрес остаётся как есть.
+ */
+test('ссылка в приложение попадает на его собственную страницу', () => {
+  const ios = 'capacitor://localhost/index.html';
+  assert.equal(localLink('fittrack://open?access=abc', ios), 'capacitor://localhost/?access=abc');
+  assert.equal(localLink('fittrack://open?loginTicket=T1', ios), 'capacitor://localhost/#loginTicket=T1');
+  assert.equal(localLink('https://sokolov055.github.io/admin_trainer_table/?access=abc', ios), 'capacitor://localhost/?access=abc');
+
+  const android = 'https://sokolov055.github.io/admin_trainer_table/';
+  assert.equal(localLink('https://sokolov055.github.io/admin_trainer_table/?access=abc', android), android + '?access=abc');
+  assert.equal(localLink('https://sokolov055.github.io/admin_trainer_table/?loginTicket=T1', android), android + '#loginTicket=T1');
 });

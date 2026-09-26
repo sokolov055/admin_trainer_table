@@ -12,10 +12,16 @@
  */
 import { apiPublic, apiMutate } from './api.js';
 import { describeDevice } from './session.js';
-import { plugin } from './native-bridge.js';
+import { plugin, bridge } from './native-bridge.js';
 
 const TOKEN_KEY = 'native_push_token_v1';
 const OFF_KEY = 'native_push_off_v1';
+
+/** 'ios' или 'android': сервер шлёт на iPhone через Apple, на Android — через Firebase */
+function platform() {
+  const cap = bridge();
+  try { return (cap && cap.getPlatform && cap.getPlatform()) || 'android'; } catch (_) { return 'android'; }
+}
 
 function remember(key, value) {
   try { if (value) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch (_) {}
@@ -49,7 +55,7 @@ function register(push) {
 async function send(token, clientRow) {
   await apiMutate('push.native.register', {
     token,
-    platform: 'android',
+    platform: platform(),
     device: describeDevice(),
     ...(clientRow ? { clientRow } : {}),
   });
@@ -72,7 +78,7 @@ export async function enableNativePush(clientRow) {
   const push = plugin('PushNotifications');
   if (!push) return { ok: false, reason: 'Эта версия приложения не умеет уведомления — обновите её.' };
 
-  const { enabled } = await apiPublic('push.native.status', {});
+  const { enabled } = await apiPublic('push.native.status', { platform: platform() });
   if (!enabled) return { ok: false, reason: 'Уведомления пока не настроены на сервере.' };
 
   let res = await push.checkPermissions();

@@ -17,6 +17,10 @@ export function startOffline(options = {}) {
   const base = options.baseURI || (typeof document !== 'undefined' ? document.baseURI : '');
 
   if (!enabled || !nav || !nav.serviceWorker || !base) return false;
+  // Внутри приложения (mobile/) оболочку держит само приложение, а на
+  // iPhone воркер и не работает — адрес там не https
+  if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform
+    && window.Capacitor.isNativePlatform()) return false;
 
   // Адрес считается от базового, а не от текущей страницы: у приложения
   // она бывает с «?access=…», и относительный путь от неё увёл бы область

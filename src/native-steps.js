@@ -10,7 +10,14 @@
  * Разрешение — только на чтение шагов, и только по нажатию «Подключить».
  */
 import { apiMutate } from './api.js';
-import { plugin } from './native-bridge.js';
+import { plugin, bridge } from './native-bridge.js';
+
+/** iPhone: шаги из «Здоровья» (HealthKit). Apple не говорит приложению,
+ *  выдано ли чтение, — поэтому там «подключено» значит «прошли окно» */
+export function onIphone() {
+  const cap = bridge();
+  try { return !!(cap && cap.getPlatform && cap.getPlatform() === 'ios'); } catch (_) { return false; }
+}
 
 const DAYS = 30;
 const ON_KEY = 'native_steps_on_v1';
@@ -39,6 +46,7 @@ export async function stepsAvailability() {
 export async function stepsConnected() {
   const h = health();
   if (!h) return false;
+  if (onIphone()) return stepsOn();
   try {
     const res = await h.checkAuthorization({ read: ['steps'] });
     return (res.readAuthorized || []).includes('steps');
@@ -53,10 +61,15 @@ export async function connectSteps() {
   if (!h) return { ok: false, reason: 'Обновите приложение — в этой версии шагов ещё нет.' };
   const avail = await stepsAvailability();
   if (!avail.available) {
-    return { ok: false, reason: 'На телефоне нет Health Connect. Установите «Health Connect» из Google Play (на Android 14 и новее он уже встроен) и попробуйте снова.' };
+    return {
+      ok: false,
+      reason: onIphone()
+        ? 'На этом устройстве нет приложения «Здоровье» — шаги здесь недоступны.'
+        : 'На телефоне нет Health Connect. Установите «Health Connect» из Google Play (на Android 14 и новее он уже встроен) и попробуйте снова.',
+    };
   }
   const res = await h.requestAuthorization({ read: ['steps'] });
-  if (!(res.readAuthorized || []).includes('steps')) {
+  if (!onIphone() && !(res.readAuthorized || []).includes('steps')) {
     return { ok: false, reason: 'Доступ к шагам не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track.' };
   }
   try { localStorage.setItem(ON_KEY, '1'); } catch (_) {}

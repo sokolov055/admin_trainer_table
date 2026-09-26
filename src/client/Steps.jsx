@@ -3,7 +3,7 @@ import { useData } from '../useData.js';
 import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
-import { connectSteps, stepsConnected, stepsOn } from '../native-steps.js';
+import { connectSteps, stepsConnected, stepsOn, onIphone } from '../native-steps.js';
 
 /**
  * Шаги — в «Прогрессе» клиента и в карточке клиента у тренера.
@@ -69,7 +69,11 @@ export default function Steps({ clientRow }) {
           ) : (
             <>
               <p className="steps__lead">Тренер увидит, сколько вы ходите, — без ручного ввода.</p>
-              <p className="small muted">Шаги берутся из Health Connect на телефоне: туда их пишут Google Fit, Samsung Health, Mi Fitness и браслеты. Приложение только читает шаги — больше ничего.</p>
+              <p className="small muted">
+                {onIphone()
+                  ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает шаги — больше ничего.'
+                  : 'Шаги берутся из Health Connect на телефоне: туда их пишут Google Fit, Samsung Health, Mi Fitness и браслеты. Приложение только читает шаги — больше ничего.'}
+              </p>
               <div className="survey__actions">
                 <button className="button button--primary" onClick={connect} disabled={busy}>
                   {busy ? 'Подключаю…' : 'Подключить шаги'}

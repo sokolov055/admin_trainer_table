@@ -17,7 +17,8 @@ import { goBack } from './gestures.jsx';
 import { isNativeApp, plugin } from './native-bridge.js';
 import { refreshNativePush, listenNativeTaps } from './native-push.js';
 import { syncSteps } from './native-steps.js';
-import { ticketToHash } from './open-in-app.js';
+import { localLink } from './open-in-app.js';
+import { startBundleUpdates } from './native-update.js';
 
 export { isNativeApp };
 
@@ -43,6 +44,8 @@ export function startNative() {
 
   // Уведомления: свежий адрес телефона — серверу; нажали на уведомление —
   // открыть то, о чём оно. Шаги — отправить, если подключены
+  // iPhone: экраны вшиты — свежие скачиваются с сайта на следующий запуск
+  startBundleUpdates();
   refreshNativePush();
   listenNativeTaps((url) => openLink(new URL(url, window.location.href).href));
   syncSteps().catch(() => {});
@@ -115,8 +118,9 @@ function openLink(href, launch = false) {
   let url;
   // Кабинет перенесли из браузера (open-in-app.js): билет пришёл в строке
   // запроса — intent:// занимает решётку. Переносим его за решётку, где его
-  // ждёт вход (readLoginTicket), и он не уходит на сервер в адресе
-  try { url = new URL(ticketToHash(href)); } catch (_) { return; }
+  // ждёт вход (readLoginTicket), и он не уходит на сервер в адресе. Ссылки
+  // fittrack:// и адрес сайта у вшитых экранов (iPhone) — на свою страницу
+  try { url = new URL(localLink(href, window.location.href)); } catch (_) { return; }
   const here = window.location;
   if (url.origin !== here.origin || !url.pathname.startsWith(new URL('./', here.href).pathname)) return;
   if (url.href === here.href) return;

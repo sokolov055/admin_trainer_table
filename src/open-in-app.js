@@ -70,6 +70,27 @@ export function ticketToHash(href) {
   return url.href;
 }
 
+/**
+ * Ссылка, пришедшая в приложение, — в адрес его собственной страницы.
+ * fittrack://open?access=… (iPhone: из Safari по кнопке) и адрес сайта
+ * (когда экраны вшиты в приложение и живут на capacitor://localhost)
+ * переносят только своё — строку запроса и часть после решётки — на
+ * страницу приложения. Билет входа при этом уходит за решётку.
+ */
+export const APP_SCHEME = 'fittrack';
+
+export function localLink(href, hereHref) {
+  let url;
+  try { url = new URL(href); } catch (_) { return ''; }
+  const here = new URL(hereHref);
+  const base = new URL('./', here.href);
+  const site = url.protocol === 'https:' && url.host === 'sokolov055.github.io' && url.pathname.startsWith('/admin_trainer_table');
+  if (url.protocol === APP_SCHEME + ':' || (site && here.origin !== url.origin)) {
+    return ticketToHash(new URL(url.search + url.hash, base).href);
+  }
+  return ticketToHash(url.href);
+}
+
 export async function openInApp(options = {}) {
   const request = options.request || apiPrimary;
   const result = await request('auth.install.create', {});

@@ -52,6 +52,18 @@ jobs:
           sed -i "s|</head>|<meta name=\"build-sha\" content=\"${GITHUB_SHA:0:7}\"></head>|" dist/index.html
           grep -o 'build-sha[^>]*' dist/index.html
 
+      # Экраны для приложения на iPhone: там они лежат внутри, а свежие
+      # приложение скачивает отсюда само (src/native-update.js) — архив этой
+      # же сборки и номер. Имя архива с хешем: старый не застрянет в кеше.
+      # APK и сами архивы внутрь не кладём — им там нечего делать.
+      - name: Архив экранов для приложения
+        run: |
+          SHA=${GITHUB_SHA:0:7}
+          mkdir -p dist/app
+          (cd dist && zip -r -q "app/web-$SHA.zip" . -x 'android/*' 'app/*')
+          printf '{"version":"%s","url":"https://sokolov055.github.io/admin_trainer_table/app/web-%s.zip"}\n' "$SHA" "$SHA" > dist/app/web.json
+          cat dist/app/web.json
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
