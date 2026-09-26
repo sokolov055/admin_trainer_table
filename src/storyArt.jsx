@@ -643,7 +643,69 @@ export function ArtSwipe() {
   );
 }
 
+/**
+ * Приложение для Android: телефон с нашей иконкой — те же три столбика, что
+ * на значке, — и уведомление сверху. Уведомление — то, ради чего приложение
+ * и ставят поверх кабинета в браузере, поэтому оно на картинке главное.
+ */
+export function ArtAndroid() {
+  const IX = 138;
+  const IY = 82;
+  const T = 44;
+  return (
+    <Art label="Телефон с иконкой Fit Track и уведомлением сверху">
+      <rect x={96} y={10} width={128} height={166} rx={20} opacity={0.4} />
+
+      {/* уведомление: значок, название и строка текста */}
+      <rect x={56} y={26} width={208} height={40} rx={12}
+        fill="currentColor" fillOpacity={0.1} stroke="currentColor" strokeOpacity={0.35} />
+      <rect x={66} y={36} width={20} height={20} rx={6} fill="var(--tint)" stroke="none" />
+      <path d="M96 40h58" strokeWidth={3} opacity={0.75} />
+      <path d="M96 52h120" strokeWidth={3} opacity={0.35} />
+
+      {/* наша иконка: три столбика по росту, как на значке приложения */}
+      <rect x={IX} y={IY} width={T} height={T} rx={12} fill="var(--tint)" stroke="none" />
+      <g fill="var(--story-bg)" stroke="none">
+        <rect x={IX + 9} y={IY + 24} width={6} height={11} rx={1} />
+        <rect x={IX + 19} y={IY + 17} width={6} height={18} rx={1} />
+        <rect x={IX + 29} y={IY + 10} width={6} height={25} rx={1} />
+      </g>
+      <text x={IX + T / 2} y={IY + T + 18} textAnchor="middle" fill="currentColor" stroke="none"
+        fontSize={12} opacity={0.6}>Fit Track</text>
+    </Art>
+  );
+}
+
+/**
+ * Шаги: неделя столбиками, сегодняшний — цветом, и одно число. Как в
+ * «Прогрессе»: картинка повторяет то, что человек там увидит.
+ */
+export function ArtSteps() {
+  const days = [0.55, 0.72, 0.48, 0.9, 0.64, 0.38, 0.8];
+  const X0 = 150;
+  const BASE = 150;
+  const H = 110;
+  const W = 16;
+  const GAP = 8;
+  return (
+    <Art label="Шаги за неделю столбиками, сегодня девять тысяч восемьсот">
+      <text x={40} y={92} fill="currentColor" stroke="none" fontSize={30} fontWeight={680} letterSpacing="-0.02em">
+        9 800
+      </text>
+      <text x={40} y={114} fill="currentColor" stroke="none" fontSize={13} opacity={0.6}>шагов сегодня</text>
+      <path d={'M' + (X0 - 6) + ' ' + BASE + 'h' + (days.length * (W + GAP) + 4)} opacity={0.35} />
+      {days.map((d, i) => (
+        <rect key={i} x={X0 + i * (W + GAP)} y={BASE - d * H} width={W} height={d * H} rx={3}
+          fill={i === days.length - 1 ? 'var(--tint)' : 'currentColor'}
+          fillOpacity={i === days.length - 1 ? 1 : 0.18} stroke="none" />
+      ))}
+    </Art>
+  );
+}
+
 export const ART = {
+  android: ArtAndroid,
+  steps: ArtSteps,
   schedule: ArtSchedule,
   nutrition: ArtNutrition,
   progress: ArtProgress,
