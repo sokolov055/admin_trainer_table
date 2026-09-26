@@ -7,7 +7,7 @@ import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-mod
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
-import { vanish } from './dust.js';
+import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
@@ -767,7 +767,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const finished = doneSets === ex.sets.length;
           const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
           return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '')} key={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
-          <SwipeRow className="workout__ex-swipe" dustClosest=".workout__exercise" dustWith={(card) => leavingBars([card])} disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
+          <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}

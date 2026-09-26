@@ -1,6 +1,6 @@
 import ExercisePicker from './ExercisePicker.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { vanish, separatorOf } from '../dust.js';
+import { vanish, separatorOf } from '../remove.js';
 import { haptic } from '../telegram.js';
 import { createPortal } from 'react-dom';
 import { useTabLock } from '../gestures.jsx';

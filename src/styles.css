@@ -3970,7 +3970,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 }
 .block-order__swipe { position: absolute; inset: 0 0 0 auto; width: 88px; display: flex; opacity: 0; background: var(--critical); }
 .block-order__trash {
-  flex: 1; display: grid; place-items: center; align-content: center; gap: 2px;
+  flex: 1; display: flex; justify-content: flex-end; align-items: stretch; padding: 0;
   border: 0; background: none; color: #fff; font: inherit; font-size: var(--text-xs); font-weight: 600; cursor: pointer;
   transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }

@@ -756,6 +756,45 @@ test('смахнуть подход и нажать корзину пальце�
   }
 });
 
+/**
+ * Полное смахивание, как на iPhone: протянуть подход далеко влево и
+ * отпустить — то же, что нажать «Удалить». Настоящими касаниями.
+ */
+test('протянуть подход далеко влево и отпустить — подход удаляется', async () => {
+  const context = await browser.newContext({ viewport: { width: 412, height: 915 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const c = await context.newPage();
+  c.on('pageerror', (error) => consoleErrors.push(String(error)));
+  const cdp = await context.newCDPSession(c);
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  try {
+    await c.goto(origin);
+    await c.getByText('Другой способ входа').tap();
+    await c.getByRole('button', { name: /Войти через код/ }).tap();
+    await c.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
+    await c.getByRole('button', { name: 'Тренировки', exact: true }).tap();
+    const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });
+    await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
+    const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
+    await rows.nth(1).waitFor({ timeout: 20000 });
+    await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await c.waitForTimeout(300);
+    const before = await rows.count();
+    const b = await rows.nth(1).boundingBox();
+    const x0 = b.x + b.width - 20;
+    const y = b.y + 10;
+    await touch('touchStart', x0, y);
+    for (let i = 1; i <= 16; i += 1) { await touch('touchMove', x0 - i * 18, y); await c.waitForTimeout(16); }
+    // За порогом подпись «Удалить» переехала к пальцу
+    const shift = await rows.nth(1).locator('.swipe__label').evaluate((el) => el.style.transform);
+    assert.match(shift, /translate3d\(-/, 'за порогом подпись едет к пальцу');
+    if (process.env.SHOT_FULL) await c.screenshot({ path: process.env.SHOT_FULL });
+    await touch('touchEnd', 0, 0);
+    await c.waitForFunction((n) => document.querySelectorAll('.workout__exercise')[1].querySelectorAll('.workout__set').length === n - 1, before, { timeout: 5000 });
+  } finally {
+    await context.close();
+  }
+});
+
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
 });

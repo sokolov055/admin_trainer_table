@@ -2,7 +2,8 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { haptic } from '../telegram.js';
 import { plural } from '../ui.jsx';
 import { IconGrip, IconCopy, IconTrash, IconCheck } from '../icons.jsx';
-import { vanish } from '../dust.js';
+import { vanish } from '../remove.js';
+import { paintSwipe, followFinger, fullSwipeAt } from '../swipe.js';
 
 /**
  * Порядок тренировок в программе — перетаскиванием.
@@ -28,12 +29,6 @@ const SLOP = 8;
 const ACTION_W = 88;
 /** Смахнули быстрее — открываем, даже если протянули недалеко */
 const FLICK = 0.11;
-const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
-const SNAP_MS = 240;
-
-function reduced() {
-  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
-}
 
 export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, disabled }) {
   const [menu, setMenu] = useState(null);
@@ -63,18 +58,13 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     setSelected((prev) => new Set([...prev].filter((i) => i < blocks.length)));
   }, [blocks]);
 
-  /** Сдвинуть содержимое строки — анимацией или сразу (за пальцем) */
-  const slide = (i, x, animate) => {
+  /** Сдвинуть содержимое строки — анимацией или сразу (за пальцем);
+   *  рисует так же, как строки тренировки (swipe.js) */
+  const slide = (i, x, animate, armed = false) => {
     const el = contents.current[i];
     if (!el) return;
-    el.style.transition = animate && !reduced() ? `transform ${SNAP_MS}ms ${EASE}` : 'none';
-    el.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
     const action = el.parentElement && el.parentElement.querySelector('.block-order__swipe');
-    if (action) {
-      const p = Math.min(1, Math.abs(x) / ACTION_W);
-      action.style.transition = el.style.transition.replace('transform', 'opacity');
-      action.style.opacity = String(p);
-    }
+    paintSwipe(el, action, x, { width: ACTION_W, animate, armed });
   };
 
   const closeOpen = () => {
@@ -103,6 +93,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     gesture.current = {
       from: index, to: index, x0: e.clientX, y0: e.clientY, t0: performance.now(),
       step, rows, id: e.pointerId, axis: null, x: 0, base: openRow === index ? -ACTION_W : 0,
+      rowWidth: e.currentTarget.offsetWidth || 320, armed: false,
       // Перестановка — только за ручку: остальная строка листает страницу,
       // иначе длинный список не пролистать, положив палец на строку
       grip: onHandle(e),
@@ -143,12 +134,14 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     }
 
     if (g.axis === 'x') {
-      // За кнопкой и вправо — с сопротивлением, а не в невидимую стену
-      let x = g.base + dx;
-      if (x > 0) x *= 0.2;
-      if (x < -ACTION_W) x = -ACTION_W + (x + ACTION_W) * 0.3;
+      // Вправо — с сопротивлением; влево дальше кнопки — полное смахивание:
+      // за порогом отпустить значит удалить (последнюю удалить нельзя)
+      const canFull = blocks.length > 1;
+      const x = followFinger(g.base + dx, g.rowWidth, canFull, ACTION_W);
       g.x = x;
-      slide(g.from, x, false);
+      const armed = canFull && x <= -fullSwipeAt(ACTION_W, g.rowWidth);
+      if (armed !== g.armed) { g.armed = armed; haptic(armed ? 'medium' : 'light'); }
+      slide(g.from, x, false, armed);
       return;
     }
 
@@ -178,6 +171,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     gesture.current = null;
 
     if (g.axis === 'x') {
+      if (g.armed && e.type === 'pointerup') { remove([g.from]); return; }
       const dx = e.clientX - g.x0;
       const velocity = Math.abs(dx) / Math.max(1, performance.now() - g.t0);
       const flick = velocity > FLICK;
@@ -217,7 +211,7 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
     haptic('success');
     const rows = indices.map((i) => listRef.current && listRef.current.children[i]).filter(Boolean);
     const done = () => { removing.current = false; onRemove(indices); setSelected(new Set()); setSelecting(false); };
-    // В пыль: тренировка рассыпается и гаснет (dust.js)
+    // Как на iPhone: строка уезжает влево, место схлопывается (remove.js)
     vanish(rows, done);
   };
 
@@ -300,8 +294,10 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
                   onPointerUp={(e) => { e.stopPropagation(); remove([i]); }}
                   onClick={(e) => { e.stopPropagation(); remove([i]); }}
                 >
-                  <IconTrash size={22} />
-                  <span>Удалить</span>
+                  <span className="swipe__label">
+                    <IconTrash size={22} />
+                    <span>Удалить</span>
+                  </span>
                 </button>
               </div>
 

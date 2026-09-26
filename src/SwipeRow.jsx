@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useSwipe } from './swipe.js';
-import { vanish } from './dust.js';
+import { vanish } from './remove.js';
 import { IconTrash } from './icons.jsx';
 
 /**
@@ -8,22 +8,24 @@ import { IconTrash } from './icons.jsx';
  * корзина (см. swipe.js). disabled — жеста нет (последний подход удалить
  * нельзя, в кругах суперсета подходы удаляются кругом).
  *
- * Удаление — «в пыль» (dust.js): рассыпается сама строка, а если задан
- * dustClosest — ближайший такой предок (заголовок упражнения удаляет всю
- * карточку, и рассыпаться должна карточка).
+ * Удаление — как на iPhone (remove.js): строка уезжает влево, место
+ * схлопывается. Если задан removeClosest — уходит ближайший такой предок
+ * (заголовок упражнения удаляет всю карточку). Тянуть дальше кнопки до
+ * порога и отпустить — то же, что нажать её (полное смахивание).
  */
-export default function SwipeRow({ className = '', children, onDelete, label, disabled = false, dustClosest = '', dustWith = null, ...rest }) {
-  const sw = useSwipe({ disabled });
+export default function SwipeRow({ className = '', children, onDelete, label, disabled = false, removeClosest = '', removeWith = null, ...rest }) {
   const root = useRef(null);
   const firing = useRef(false);
   const fire = (e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     if (firing.current) return;
     firing.current = true;
-    const el = (dustClosest && root.current && root.current.closest(dustClosest)) || root.current;
-    // dustWith — что уходит вместе с ней (полоска между карточками)
-    vanish(el, () => { onDelete(); sw.reset(); }, dustWith ? dustWith(el) : []).then(() => { firing.current = false; });
+    const el = (removeClosest && root.current && root.current.closest(removeClosest)) || root.current;
+    // removeWith — что уходит вместе с ней (полоска между карточками)
+    vanish(el, () => { onDelete(); sw.reset(); }, removeWith ? removeWith(el) : []).then(() => { firing.current = false; });
   };
+  // Полное смахивание — то же, что кнопка
+  const sw = useSwipe({ disabled, onFull: () => fire() });
   return (
     <div className={'swipe ' + className} ref={root} {...(disabled ? {} : sw.bind)} {...rest}>
       {!disabled && (
@@ -39,8 +41,10 @@ export default function SwipeRow({ className = '', children, onDelete, label, di
             onPointerUp={fire}
             onClick={fire}
           >
-            <IconTrash size={20} />
-            <span>Удалить</span>
+            <span className="swipe__label">
+              <IconTrash size={20} />
+              <span>Удалить</span>
+            </span>
           </button>
         </div>
       )}
