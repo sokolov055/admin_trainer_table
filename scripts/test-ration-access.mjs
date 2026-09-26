@@ -44,7 +44,7 @@ const output = await build({
           contents: `export const useData = () => globalThis.__nutritionData;`,
         };
         if (args.path === 'api') return {
-          contents: `export const apiMutate = async () => ({}); export const apiPublic = apiMutate; export const api = apiMutate; export const apiBatch = apiMutate; export const logout = () => {}; export const apiStale = () => ({ data: null, promise: Promise.resolve() });`,
+          contents: `export const apiMutate = async () => ({}); export const apiPublic = apiMutate; export const apiPrimary = apiMutate; export const api = apiMutate; export const apiBatch = apiMutate; export const logout = () => {}; export const apiStale = () => ({ data: null, promise: Promise.resolve() });`,
         };
         if (args.path === 'telegram') return { contents: `export const haptic = () => {}; export const environmentInfo = () => ({}); export const getInitData = () => ''; export const diagnoseMissingInitData = () => '';` };
         if (args.path === 'charts') return {

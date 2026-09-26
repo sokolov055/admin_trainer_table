@@ -9,8 +9,9 @@
  *
  * Разрешение — только на чтение шагов, и только по нажатию «Подключить».
  */
-import { apiMutate } from './api.js';
-import { plugin, bridge } from './native-bridge.js';
+import { apiMutate, apiPrimary } from './api.js';
+import { plugin, bridge, isNativeApp } from './native-bridge.js';
+import { APP_VERSION } from './version.js';
 
 /** iPhone: шаги из «Здоровья» (HealthKit). Apple не говорит приложению,
  *  выдано ли чтение, — поэтому там «подключено» значит «прошли окно» */
@@ -22,6 +23,11 @@ export function onIphone() {
 const DAYS = 30;
 const ON_KEY = 'native_steps_on_v1';
 const SENT_KEY = 'native_steps_sent_v1';
+/** Нашлись ли шаги при последнем чтении: '1' — да, '0' — Health Connect пуст */
+const HAD_KEY = 'native_steps_had_v1';
+const REPORT_KEY = 'native_device_report_v1';
+/** Тот же отчёт о телефоне — не чаще раза в полчаса; изменился — сразу */
+const REPORT_EVERY_MS = 30 * 60 * 1000;
 /** При возврате в приложение — не чаще раза в 3 минуты: шаги копятся
  *  медленно, а запрос — это батарея. При запуске — всегда */
 const EVERY_MS = 3 * 60 * 1000;
@@ -103,6 +109,7 @@ export async function syncSteps(force = false) {
   const days = (res.samples || [])
     .map((s) => ({ date: localDate(new Date(s.startDate)), steps: Math.round(Number(s.value) || 0) }))
     .filter((d) => d.steps >= 0);
+  try { localStorage.setItem(HAD_KEY, days.some((d) => d.steps > 0) ? '1' : '0'); } catch (_) {}
   if (!days.length) return { sent: 0 };
   await apiMutate('steps.sync', { days, source: onIphone() ? 'healthkit' : 'health-connect' });
   try { localStorage.setItem(SENT_KEY, String(Date.now())); } catch (_) {}
@@ -113,7 +120,49 @@ export async function syncSteps(force = false) {
 
 /** Отключить на этом телефоне: больше не читать и не отправлять */
 export function disconnectSteps() {
-  try { localStorage.removeItem(ON_KEY); localStorage.removeItem(SENT_KEY); } catch (_) {}
+  try { localStorage.removeItem(ON_KEY); localStorage.removeItem(SENT_KEY); localStorage.removeItem(HAD_KEY); } catch (_) {}
+}
+
+/** Что с шагами на этом телефоне — словами, понятными тренеру */
+async function stepsState() {
+  if (!health()) return 'unavailable';
+  if (!(await stepsAvailability()).available) return 'unavailable';
+  if (!stepsOn() || !(await stepsConnected())) return 'off';
+  try { return localStorage.getItem(HAD_KEY) === '1' ? 'on' : 'empty'; } catch (_) { return 'empty'; }
+}
+
+/**
+ * Рассказать серверу о телефоне: оболочка, её версия, версия экранов и
+ * что с шагами. Тренер экрана клиента не видит, а «шагов нет» бывает по
+ * разным причинам — не поставил приложение, не нажал «Подключить», Samsung
+ * Health не передаёт шаги в Health Connect. По этой строке он поймёт какая.
+ *
+ * Только сервер (apiPrimary): Apps Script о телефонах не знает, а сбой
+ * отчёта не должен ни мешать человеку, ни сбрасывать кэш экранов.
+ */
+export async function reportDevice(force = false) {
+  if (!isNativeApp()) return;
+  let appVersion = null;
+  try {
+    const app = plugin('App');
+    const info = app && app.getInfo ? await app.getInfo() : null;
+    if (info && info.version) appVersion = info.build ? `${info.version} (${info.build})` : String(info.version);
+  } catch (_) {}
+  const report = {
+    platform: onIphone() ? 'ios' : 'android',
+    appVersion,
+    webVersion: APP_VERSION,
+    steps: await stepsState(),
+  };
+  const sig = JSON.stringify(report);
+  try {
+    const last = JSON.parse(localStorage.getItem(REPORT_KEY) || 'null');
+    if (!force && last && last.sig === sig && Date.now() - last.at < REPORT_EVERY_MS) return;
+  } catch (_) {}
+  try {
+    await apiPrimary('device.report', report);
+    localStorage.setItem(REPORT_KEY, JSON.stringify({ sig, at: Date.now() }));
+  } catch (_) {}
 }
 
 export function stepsOn() {

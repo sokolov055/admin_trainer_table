@@ -48,6 +48,7 @@ const output = await build({
         if (args.path === 'api') return {
           contents: `export const apiMutate = (action, params) => globalThis.__overview.apiMutate(action, params);
             export const apiPublic = async () => ({});
+            export const apiPrimary = async () => ({});
             export const logout = () => {};
             export const apiBatch = async () => ({});
             export const apiStale = () => ({ data: null, stale: false, promise: Promise.resolve({}) });`,

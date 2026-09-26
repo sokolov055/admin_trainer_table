@@ -3,7 +3,7 @@ import { useData } from '../useData.js';
 import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
-import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, STEPS_SENT } from '../native-steps.js';
+import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, reportDevice, STEPS_SENT } from '../native-steps.js';
 
 /**
  * Шаги — в «Прогрессе» клиента и в карточке клиента у тренера.
@@ -11,11 +11,44 @@ import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, STEPS_SENT 
  * Считает их телефон (Health Connect, native-steps.js), сервер хранит
  * суммы по дням. Здесь — последние две недели столбиками, сегодня и
  * среднее. Клиенту в Android-приложении, пока не подключено, — кнопка
- * «Подключить шаги» и зачем это. В браузере и у тренера без данных блока
- * нет вовсе: пустая рамка «шагов нет» ничего не объясняет.
+ * «Подключить шаги» и зачем это. В браузере без данных блока нет вовсе:
+ * пустая рамка «шагов нет» ничего не объясняет.
+ *
+ * Тренер экрана клиента не видит. Если клиент заходил из приложения,
+ * тренеру — откуда и почему шагов нет (что приложение сообщило о телефоне,
+ * reportDevice): иначе «пусто» не отличить от «не нажал Подключить».
  */
 const DAYS = 14;
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+
+/** «Android-приложение 1.2 (3) · последний вход 26 сентября» */
+function deviceLine(device) {
+  const shell = (device.platform === 'ios' ? 'iPhone' : 'Android') + '-приложение'
+    + (device.appVersion ? ' ' + device.appVersion : '');
+  const seen = new Date(device.seenAt);
+  return isNaN(seen.getTime()) ? shell : shell + ' · последний вход ' + seen.getDate() + ' ' + MONTHS[seen.getMonth()];
+}
+
+/** Почему у клиента нет шагов — и что ему сделать */
+function deviceReason(device) {
+  const ios = device.platform === 'ios';
+  switch (device.steps) {
+    case 'off':
+      return 'Шаги не подключены. У клиента в «Прогрессе» кнопка «Подключить шаги» — попросите нажать её и разрешить доступ.';
+    case 'empty':
+      return ios
+        ? 'Шаги подключены, но «Здоровье» пока ничего не отдало.'
+        : 'Шаги подключены, но в Health Connect их нет — туда их никто не пишет. На Samsung: Samsung Health → Настройки → Health Connect → разрешить запись шагов.';
+    case 'unavailable':
+      return ios
+        ? 'На телефоне клиента шаги недоступны.'
+        : 'На телефоне клиента нет Health Connect или приложение устарело — шаги недоступны.';
+    case 'on':
+      return 'Шаги подключены, но за две недели телефон ничего не прислал.';
+    default:
+      return 'Что с шагами — телефон не сообщил.';
+  }
+}
 
 function localDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -63,10 +96,21 @@ export default function Steps({ clientRow }) {
       setProblem(e.message || 'Не получилось подключить шаги.');
     } finally {
       setBusy(false);
+      reportDevice(true);
     }
   };
 
   if (!byDate.size) {
+    if (!own && data.device) {
+      return (
+        <Section title="Шаги">
+          <Panel pad>
+            <p className="small muted">{deviceReason(data.device)}</p>
+            <p className="small muted">{deviceLine(data.device)}</p>
+          </Panel>
+        </Section>
+      );
+    }
     if (!native) return null;
     return (
       <Section title="Шаги">
@@ -136,6 +180,7 @@ export default function Steps({ clientRow }) {
           {average !== null ? ' · в среднем ' + formatNumber(average) + ' в день' : ''}
           {data.syncedAt ? ' · обновлено ' + formatDate(data.syncedAt, false) : ''}
         </p>
+        {!own && data.device && <p className="small muted">{deviceLine(data.device)}</p>}
         {problem && <p className="small muted">{problem}</p>}
       </Panel>
     </Section>

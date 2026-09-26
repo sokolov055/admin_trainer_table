@@ -1048,7 +1048,12 @@ const MOCK = {
   },
 
   // Шаги из телефона (client/Steps.jsx): две недели похожих на правду чисел
-  'steps.list': () => {
+  // У Дмитрия (строка 5) приложение стоит, а шагов нет — тренер видит почему
+  'steps.list': (params = {}) => {
+    const device = { platform: 'android', appVersion: '1.2 (3)', webVersion: '2.1', steps: 'on', seenAt: daysAgo(0) };
+    if (Number(params.clientRow) === 5) {
+      return { from: daysAgo(13), days: [], syncedAt: null, device: { ...device, steps: 'empty' } };
+    }
     const days = [];
     const base = [7400, 9100, 6200, 11800, 8300, 4100, 12600, 9800, 7200, 10400, 6900, 8800, 13100, 5300];
     for (let i = 13; i >= 0; i -= 1) {
@@ -1057,9 +1062,10 @@ const MOCK = {
       const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       days.push({ member: '', date, steps: base[13 - i] });
     }
-    return { from: days[0].date, days, syncedAt: daysAgo(0) };
+    return { from: days[0].date, days, syncedAt: daysAgo(0), ...(params.clientRow ? { device } : {}) };
   },
   'steps.sync': (params) => ({ saved: (params.days || []).length }),
+  'device.report': () => ({ saved: true }),
   'account.delete': () => ({ deleted: true }),
   'push.native.status': () => ({ enabled: true }),
   'push.native.register': () => ({ saved: true }),
