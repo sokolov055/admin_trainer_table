@@ -217,9 +217,11 @@ export default function TrainerApp({ me }) {
     );
   }
 
-  if (openClient) {
-    return <ClientDetail client={openClient} onBack={() => setOpenClient(null)} />;
-  }
+  // Карточка клиента — поверх, а панель под ней остаётся на месте, скрытой:
+  // раньше список «Клиенты» при каждом возврате из карточки строился заново
+  // и перечитывал данные — выглядело как обновление. Свежие данные он и так
+  // получит после любой записи (onMutated) и по «потянуть вниз»
+  const card = openClient && <ClientDetail client={openClient} onBack={() => setOpenClient(null)} />;
 
   const current = VIEWS.find((v) => v.id === view) || VIEWS[0];
 
@@ -242,7 +244,9 @@ export default function TrainerApp({ me }) {
   };
 
   return (
-    <div className="app">
+    <>
+    {card}
+    <div className="app" hidden={!!openClient}>
       <header className="app__header">
         <div className="app__bar">
           <div className="app__headline">
@@ -396,6 +400,7 @@ export default function TrainerApp({ me }) {
         <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
     </div>
+    </>
   );
 }
 

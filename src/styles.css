@@ -4258,3 +4258,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .privacy-link a { color: var(--text-muted); }
 /* Дата замера — нажать, чтобы исправить (ошиблись годом) */
 .link-button { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+/* Панель тренера под открытой карточкой клиента — на месте, но скрыта
+   (TrainerApp): display: flex у .app иначе перебивает атрибут hidden */
+.app[hidden] { display: none; }
