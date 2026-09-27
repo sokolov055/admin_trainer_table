@@ -260,4 +260,10 @@ test('ссылка в приложение попадает на его собс
   const android = 'https://sokolov055.github.io/admin_trainer_table/';
   assert.equal(localLink('https://sokolov055.github.io/admin_trainer_table/?access=abc', android), android + '?access=abc');
   assert.equal(localLink('https://sokolov055.github.io/admin_trainer_table/?loginTicket=T1', android), android + '#loginTicket=T1');
+
+  // Ссылка тренера на своём домене (с 27.09.2026): iPhone открывает её в
+  // приложении — и приложение открывает у себя ту же страницу
+  assert.equal(localLink('https://app.fitness100.ru/?access=abc', ios), 'capacitor://localhost/?access=abc');
+  assert.equal(localLink('https://app.fitness100.ru/?trainer=T9', ios), 'capacitor://localhost/?trainer=T9');
+  assert.equal(localLink('https://app.fitness100.ru/?access=abc', android), android + '?access=abc');
 });

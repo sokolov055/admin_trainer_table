@@ -78,13 +78,18 @@ export function ticketToHash(href) {
  * страницу приложения. Билет входа при этом уходит за решётку.
  */
 export const APP_SCHEME = 'fittrack';
+/** Адрес ссылок тренера (server/deploy/app-links): открывает приложение на iPhone */
+export const LINK_HOST = 'app.fitness100.ru';
 
 export function localLink(href, hereHref) {
   let url;
   try { url = new URL(href); } catch (_) { return ''; }
   const here = new URL(hereHref);
   const base = new URL('./', here.href);
-  const site = url.protocol === 'https:' && url.host === 'sokolov055.github.io' && url.pathname.startsWith('/admin_trainer_table');
+  // Сайт — прежний адрес; app.fitness100.ru — адрес для ссылок (с 27.09.2026):
+  // на iPhone он открывает приложение, и приложение открывает у себя ту же страницу
+  const site = url.protocol === 'https:' && ((url.host === 'sokolov055.github.io' && url.pathname.startsWith('/admin_trainer_table'))
+    || url.host === LINK_HOST);
   if (url.protocol === APP_SCHEME + ':' || (site && here.origin !== url.origin)) {
     return ticketToHash(new URL(url.search + url.hash, base).href);
   }
