@@ -86,7 +86,8 @@ export default function PushSetting({ clientRow }) {
         <Control status={status} busy={busy} onOn={turnOn} onOff={turnOff} />
       )}
 
-      {problem && <p className="small muted">{problem}</p>}
+      {/* Запрет уже объяснён под кнопкой — второй раз то же не повторяем */}
+      {problem && !(status && status.permission === 'denied') && <p className="small muted">{problem}</p>}
     </div>
   );
 }
