@@ -41,6 +41,14 @@ const STALE_TTL_MS = 12 * 60 * 60 * 1000;
 /** Без связи показываем и более старое — лишь бы не пустой экран */
 const OFFLINE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Дольше ответа не ждём. Без предела запрос на плохой мобильной связи
+ * висел бесконечно, и экран так и стоял на «Открываем журнал…»
+ * (27.09.2026, LTE: запросы до сервера не доходили вовсе). Через 20 с —
+ * «сервер не отвечает», и экран работает с тем, что есть на телефоне.
+ */
+const REQUEST_TIMEOUT_MS = 20000;
+
 const STORAGE_PREFIX = 'api_cache_v1:';
 
 export class ApiError extends Error {
@@ -311,7 +319,7 @@ async function request(action, params) {
 
   const payload = { action, initData, ...(token ? { token } : {}), ...params };
 
-  let body = await tryEndpoint(url, payload);
+  let body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS);
 
   // Запасной адрес нужен на время переезда: новый сервер не отозвался —
   // молча уходим на старый, вместо того чтобы показывать клиенту ошибку
@@ -354,11 +362,16 @@ async function request(action, params) {
   return body.data;
 }
 
-/** Один адрес: сначала POST, при сбое — GET. null, если не отозвался вовсе */
-async function tryEndpoint(url, payload) {
+/**
+ * Один адрес: сначала POST, при сбое — GET. null, если не отозвался вовсе.
+ * Не дождались ответа — GET не пробуем: запрос мог дойти до сервера, и
+ * повтор записи (оплата, занятие) задвоил бы её.
+ */
+async function tryEndpoint(url, payload, timeoutMs) {
   try {
-    return await postJson(url, payload);
-  } catch (_) {
+    return await postJson(url, payload, timeoutMs);
+  } catch (error) {
+    if (error && error.name === 'AbortError') return null;
     try {
       return await getJson(url, payload);
     } catch (_) {

@@ -74,3 +74,27 @@ test('чего никогда не читали — без связи честн
   online = false;
   await assert.rejects(api('client.plan', { month: 'нет' }, { fresh: true }), /не отвечает/);
 });
+
+test('сервер молчит — через 20 с отказ «не отвечает», а не вечное ожидание; GET не повторяем', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const seen = [];
+  const saved = globalThis.fetch;
+  globalThis.fetch = (url, init = {}) => {
+    seen.push(init.method || 'GET');
+    if (String(url).includes('config.json')) return Promise.resolve({ ok: false, json: async () => null });
+    return new Promise((_, reject) => {
+      if (init.signal) init.signal.addEventListener('abort', () => { const e = new Error('aborted'); e.name = 'AbortError'; reject(e); });
+    });
+  };
+  try {
+    // Итог ловим сразу: отказ приходит раньше, чем до него дойдёт проверка
+    const pending = api('workout.list', {}, { fresh: true }).then(() => null, (e) => e);
+    await Promise.resolve();
+    for (let i = 0; i < 5; i += 1) { t.mock.timers.tick(5000); await new Promise((r) => setImmediate(r)); }
+    const error = await pending;
+    assert.match(String(error && error.message), /не отвечает/);
+    assert.equal(seen.filter((m) => m === 'GET').length, 0, 'после таймаута запрос не повторяется GET-ом');
+  } finally {
+    globalThis.fetch = saved;
+  }
+});
