@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { enablePush, disablePush, pushStatus, pushSupported, installedAsApp } from './push.js';
+import { isNativeApp, iosApp } from './native-bridge.js';
 
 /**
  * Уведомления на этом устройстве.
@@ -33,7 +34,9 @@ export default function PushSetting({ clientRow }) {
 
   if (!pushSupported()) return null;
 
-  const iphone = /iPhone|iPad/.test(navigator.userAgent) && !installedAsApp();
+  // Приложение для iPhone (TestFlight, App Store) — не сайт: уведомления в
+  // нём свои, APNs (native-push.js), и «добавьте на экран Домой» ему ни к чему
+  const iphone = /iPhone|iPad/.test(navigator.userAgent) && !installedAsApp() && !isNativeApp();
 
   const turnOn = async () => {
     setBusy(true);
@@ -102,7 +105,9 @@ function Control({ status, busy, onOn, onOff }) {
     return (
       <p className="small muted">
         {status.native
-          ? 'Уведомления запрещены. Включить их можно в настройках телефона: Приложения → Fit Track → Уведомления.'
+          ? (iosApp()
+            ? 'Уведомления запрещены. Включить их можно в настройках iPhone: Уведомления → Fit Track.'
+            : 'Уведомления запрещены. Включить их можно в настройках телефона: Приложения → Fit Track → Уведомления.')
           : 'Уведомления запрещены для этого сайта. Включить их можно в настройках браузера — приложение спросить повторно уже не может.'}
       </p>
     );
