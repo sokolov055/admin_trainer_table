@@ -60,6 +60,9 @@ export function usePinch({ onIn, onOut, enabled = true, target = null, morph = n
     let speed = 0;
     let cards = [];   // { el, full, row, rest: [элементы, которые гаснут] }
     let rows = [];    // строки свёрнутого вида — раздвигаются при разведении
+    // Якорь: элемент под пальцами. После смены вида он остаётся на том же
+    // месте экрана — иначе короткий свёрнутый список «съезжал» к концу
+    let anchor = null; // { index, top }
     const gap = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const pick = (v) => (typeof v === 'function' ? v() : v);
 
@@ -102,8 +105,20 @@ export function usePinch({ onIn, onOut, enabled = true, target = null, morph = n
       speed = 0;
       cards = [];
       rows = [];
-      if (reduced()) return;
+      anchor = null;
       const { morph: m, collapsed: folded, target: t } = opts.current;
+      if (m) {
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const list = [...((folded ? (pick(t) && pick(t).querySelectorAll(m.rows)) : pick(m.items)) || [])];
+        let best = -1; let bestD = Infinity;
+        list.forEach((el, i) => {
+          const r = el.getBoundingClientRect();
+          const d = midY < r.top ? r.top - midY : midY > r.bottom ? midY - r.bottom : 0;
+          if (d < bestD) { bestD = d; best = i; }
+        });
+        if (best >= 0) anchor = { index: best, top: list[best].getBoundingClientRect().top };
+      }
+      if (reduced()) return;
       if (m && !folded) {
         // Запоминаем высоты: полная карточка и её строка-заголовок
         [...(pick(m.items) || [])].forEach((el) => {
@@ -162,9 +177,18 @@ export function usePinch({ onIn, onOut, enabled = true, target = null, morph = n
       fn();
       // Новый вид уже отрисован React'ом — снимаем временные стили и
       // мягко проявляем его
+      const { morph: m } = opts.current;
+      const hold = anchor;
       nextFrame(() => {
         clearCards(false);
         clearRows(false);
+        // Тот же элемент — на то же место экрана
+        if (hold && m) {
+          const root = pick(t);
+          const list = closing ? (root && root.querySelectorAll(m.rows)) : pick(m.items);
+          const el = list && list[Math.min(hold.index, list.length - 1)];
+          if (el && typeof window.scrollBy === 'function') window.scrollBy(0, el.getBoundingClientRect().top - hold.top);
+        }
         enter(pick(t), closing);
       });
     };

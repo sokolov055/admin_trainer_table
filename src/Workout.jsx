@@ -720,11 +720,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   const togglePick = (id) => setPicked(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const endPick = () => { setPicking(false); setPicked(new Set()); };
-  useEffect(() => {
-    if (!picking) return;
-    const first = document.querySelector && document.querySelector('.workout__exercise');
-    if (first && first.scrollIntoView) first.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  }, [picking]);
+  // Кнопкой «Выбрать» — к началу короткого списка; щипок держит место сам
+  const pickFromButton = () => {
+    setPicking(true);
+    (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 0))(() => {
+      const first = document.querySelector && document.querySelector('.workout__exercise');
+      if (first && first.scrollIntoView) first.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  };
   // Щипок: свели пальцы — выбор упражнений (удалить, суперсет), развели — обычный вид
   usePinch({
     // Своя проверка, а не editable: та объявлена ниже, в разметке
@@ -854,7 +857,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <label className="workout__field">Название занятия<input value={s.title} maxLength={160} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
         {editable && <div className="workout__toolbar">
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
-          <button className="button button--ghost workout__pick-toggle" onClick={() => (picking ? endPick() : setPicking(true))}>{picking ? 'Готово' : 'Выбрать'}</button>
+          <button className="button button--ghost workout__pick-toggle" onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>
           {/* Длительность не только запускает отдых, но и запоминается:
               дальше он стартует сам после каждого отмеченного подхода.
               Раньше за ним приходилось возвращаться в шапку экрана

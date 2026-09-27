@@ -185,8 +185,10 @@ export default function PlanEditor({
       head: '.plan-edit__block-head',
       rows: '.block-order__row',
     },
-    onIn: () => { if (!ordering) toggleOrdering(); },
-    onOut: () => { if (ordering) toggleOrdering(); },
+    // Без toggleOrdering: тот прокручивает к началу списка, а щипок держит
+    // на месте то, над чем свели пальцы (pinch.js, якорь)
+    onIn: () => { if (!ordering) setOrdering(true); },
+    onOut: () => { if (ordering) setOrdering(false); },
   });
 
   const toggleOrdering = () => {
