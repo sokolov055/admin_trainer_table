@@ -177,8 +177,14 @@ export default function PlanEditor({
   // Щипок: свели пальцы — свернуть тренировки, развели — развернуть
   usePinch({
     enabled: !single && draft.length > 1 && !busy,
-    // Редактор следует за пальцами, как фото при зуме
+    // Вслед за пальцами тренировки ужимаются до строк названия (pinch.js)
     target: () => rootRef.current,
+    collapsed: ordering,
+    morph: {
+      items: () => rootRef.current && rootRef.current.querySelectorAll('.plan-edit__block'),
+      head: '.plan-edit__block-head',
+      rows: '.block-order__row',
+    },
     onIn: () => { if (!ordering) toggleOrdering(); },
     onOut: () => { if (ordering) toggleOrdering(); },
   });

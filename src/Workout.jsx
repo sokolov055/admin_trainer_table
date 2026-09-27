@@ -729,8 +729,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   usePinch({
     // Своя проверка, а не editable: та объявлена ниже, в разметке
     enabled: !!record && ['active', 'paused'].includes(record.session && record.session.status),
-    // Экран следует за пальцами, как фото при зуме
-    target: () => document.querySelector('.workout'),
+    // Вслед за пальцами упражнения ужимаются до строк названия (pinch.js)
+    target: () => document.querySelector && document.querySelector('.workout'),
+    collapsed: picking,
+    morph: {
+      items: () => document.querySelectorAll && document.querySelectorAll('.workout__exercise'),
+      head: '.workout__ex-head, .workout__rounds-head',
+      rows: '.workout__exercise--compact',
+    },
     onIn: () => { if (!picking) setPicking(true); },
     onOut: () => { if (picking) endPick(); },
   });
