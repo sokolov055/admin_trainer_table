@@ -13,9 +13,8 @@ import { IconAlert, IconCheck } from '../icons.jsx';
  * заполняют такое между делом, по одному полю за раз.
  *
  * Telegram здесь — контакт, а не вход: тренеру нужна ссылка, по которой
- * открывается переписка. Вписать имя можно руками, но набирать «@» с
- * телефона и ошибаться в букве незачем, поэтому есть кнопка: она ведёт в
- * бота, а имя приходит от самого Telegram.
+ * открывается переписка. Имя вписывается руками: бота, который подставлял
+ * его сам, с 27.09.2026 нет.
  */
 
 const EMPTY = { birthAt: '', sex: '', height: '', phone: '', email: '', telegram: '', telegramUrl: '' };
@@ -42,29 +41,6 @@ export default function Profile({ clientRow }) {
 
   useEffect(load, [clientRow]);
 
-  // Ссылку на бота — заранее. iPhone не открывает ссылку, полученную уже
-  // после нажатия (ожидание ответа сервера разрывает связь с касанием), и
-  // кнопка молчала. Готовая ссылка открывается сразу, как обычная.
-  const [tgUrl, setTgUrl] = useState('');
-  useEffect(() => {
-    let alive = true;
-    apiPublic('profile.telegram.link', params)
-      .then((r) => { if (alive && r && r.url) setTgUrl(r.url); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [clientRow]);
-
-  // Вернулись из бота — перечитываем анкету: имя уже записал бот
-  const [awaitingBot, setAwaitingBot] = useState(false);
-  useEffect(() => {
-    if (!awaitingBot) return undefined;
-    const back = () => {
-      if (document.visibilityState === 'visible') { setAwaitingBot(false); load(); }
-    };
-    document.addEventListener('visibilitychange', back);
-    return () => document.removeEventListener('visibilitychange', back);
-  }, [awaitingBot]);
-
   const set = (field, value) => {
     setForm((f) => ({ ...f, [field]: value }));
     setFailure(null);
@@ -83,28 +59,6 @@ export default function Profile({ clientRow }) {
       setForm({ ...EMPTY, ...(result.profile || {}) });
       setState((s) => ({ ...s, age: result.age }));
       setSaved(true);
-    } catch (error) {
-      setFailure(error);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /**
-   * Уводим человека в бота и возвращаем обратно. Ответ придёт не сюда, а
-   * на сервер — поэтому по возвращении просто перечитываем профиль:
-   * гадать, успел он нажать «Старт» или передумал, бессмысленно.
-   */
-  const fillFromTelegram = async () => {
-    setBusy(true);
-    setFailure(null);
-    try {
-      const { url } = await apiPublic('profile.telegram.link', params);
-      // Переход в том же окне: открытие нового после ожидания iPhone
-      // блокирует, а t.me всё равно уводит в приложение Telegram
-      setAwaitingBot(true);
-      window.location.href = url;
-      setSaved(false);
     } catch (error) {
       setFailure(error);
     } finally {
@@ -177,22 +131,13 @@ export default function Profile({ clientRow }) {
 
           <Field label="Имя пользователя" placeholder="@anna_fit" inputMode="text" value={form.telegram} onChange={(v) => set('telegram', v)} disabled={busy} />
 
-          <div className="survey__actions">
-            {tgUrl ? (
-              <a className="button" href={tgUrl} onClick={() => setAwaitingBot(true)}>Заполнить из Telegram</a>
-            ) : (
-              <button className="button" onClick={fillFromTelegram} disabled={busy}>Заполнить из Telegram</button>
-            )}
-            {form.telegramUrl && (
+          {/* Бота больше нет (27.09.2026): ник — просто контакт, вписывается
+              руками; входить через Telegram нельзя */}
+          {form.telegramUrl && (
+            <div className="survey__actions">
               <a className="button button--ghost" href={form.telegramUrl} target="_blank" rel="noreferrer">Открыть переписку</a>
-            )}
-          </div>
-
-          <p className="small muted">
-            Нажмите «Заполнить из Telegram», в чате с ботом — «Старт». Бот
-            подставит имя сам и пришлёт его отдельным сообщением — если поле
-            осталось пустым, скопируйте его оттуда.
-          </p>
+            </div>
+          )}
         </div>
       </div>
 

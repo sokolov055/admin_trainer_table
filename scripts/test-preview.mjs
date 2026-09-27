@@ -110,13 +110,14 @@ test('режим тренера передаёт выбранного клиен
   tree.unmount();
 });
 
-test('обычный клиент остаётся на собственных данных и видит карточку переноса входа', async () => {
+test('обычный клиент остаётся на собственных данных; карточки переноса из Telegram нет', async () => {
   let tree;
   await act(async () => {
     tree = renderer.create(React.createElement(ClientApp, { me: { name: 'Клиент' } }));
   });
   assert.equal(text(tree.root.findByProps({ 'data-screen-row': 'self' })), 'row:self');
   assert.equal(tree.root.findByProps({ 'data-screen-row': 'self' }).props['data-client-view'], 'no');
-  assert.equal(tree.root.findAll((node) => text(node) === 'transfer-card').length > 0, true);
+  // Перенос входа из Telegram убран вместе с Telegram (27.09.2026)
+  assert.equal(tree.root.findAll((node) => text(node) === 'transfer-card').length, 0);
   tree.unmount();
 });

@@ -1,7 +1,7 @@
 import ScheduleStats from './ScheduleStats.jsx';
 import { useReturnScroll } from '../scroll.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clients, Lost, Logs, Sheets, Settings, ClientCard } from './screens.jsx';
+import { Clients, Lost, Logs, Settings, ClientCard } from './screens.jsx';
 import { Finance, Processes } from './Metrics.jsx';
 import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
@@ -20,7 +20,7 @@ import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
-  IconUsers, IconChart, IconLog, IconSheet, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
+  IconUsers, IconChart, IconLog, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
   IconPlan, IconCalendar,
 } from '../icons.jsx';
 import Library, { LIBRARY_PANES } from './Library.jsx';
@@ -70,7 +70,6 @@ const MENU = [
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
   { id: 'client-preview', label: 'Клиентская версия', note: 'Проверить приложение глазами клиента', Icon: IconPhone },
   { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog },
-  { id: 'sheets', label: 'Листы', note: 'Таблица как есть', Icon: IconSheet },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
 
@@ -332,7 +331,6 @@ export default function TrainerApp({ me }) {
       <main className="app__body" key={view}>
         {view === 'expenses' && <Expenses />}
         {view === 'logs' && <Logs />}
-        {view === 'sheets' && <Sheets />}
         {view === 'settings' && <Settings />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
       </main>

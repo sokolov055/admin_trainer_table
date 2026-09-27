@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
 import { Stories } from '../stories.jsx';
-import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
@@ -256,7 +255,6 @@ export default function ClientApp({ me, clientRow, preview }) {
               Здесь, а не внутри Overview: тот же экран открывает тренер из
               карточки клиента, и сторис оттуда читались бы как что-то,
               относящееся к этому клиенту. */}
-          {t.id === 'overview' && !preview && <TelegramTransferCard />}
           {t.id === 'overview' && own && ((me && me.unlinked) || pendingTrainerLink()) && <OverviewOffers />}
           {t.id === 'overview' && <Stories />}
           <t.Screen clientRow={clientRow} clientView={!!preview} />

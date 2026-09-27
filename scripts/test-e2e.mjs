@@ -89,14 +89,19 @@ const section = (title) => page.locator('.section', { has: page.getByRole('headi
 test('вход в кабинет доходит до программы', async () => {
   await page.goto(origin);
 
-  // Главный путь — персональная ссылка от тренера; код спрятан во второй
-  // способ, и это осознанно. Проверяем именно его: ссылку в демо взять
-  // неоткуда, а пройти вход целиком надо.
-  await page.getByText('Другой способ входа').click();
-  await page.getByRole('button', { name: /Войти через код/ }).click();
+  // Вход по почте — главный путь с 27.09.2026 (Telegram убран): адрес,
+  // код из письма, имя и две отдельные отметки согласия (156-ФЗ). Ссылку
+  // тренера в демо взять неоткуда, а пройти вход целиком надо.
+  await page.fill('input[type=email]', 'demo@example.com');
+  await page.getByRole('button', { name: 'Прислать код' }).click();
+  await page.locator('input[autocomplete=one-time-code]').fill('ABC123');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await page.fill('input[autocomplete=name]', 'Анна Морозова');
+  const checks = page.locator('.consent input[type=checkbox]');
+  await checks.nth(0).check();
+  await checks.nth(1).check();
+  await page.getByRole('button', { name: 'Завести кабинет' }).click();
 
-  // Демо-сервер подтверждает код сам через несколько опросов — как человек
-  // с телефоном, только быстрее.
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
 
   await openTab('Тренировки');
@@ -727,9 +732,10 @@ test('смахнуть подход и нажать корзину пальце�
   const cdp = await context.newCDPSession(c);
   const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
   try {
+    // Вход сам по себе проверен первым тестом — здесь готовый демо-ключ
     await c.goto(origin);
-    await c.getByText('Другой способ входа').tap();
-    await c.getByRole('button', { name: /Войти через код/ }).tap();
+    await c.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await c.goto(origin);
     await c.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
     await c.getByRole('button', { name: 'Тренировки', exact: true }).tap();
     const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });
@@ -767,9 +773,10 @@ test('протянуть подход далеко влево и отпусти�
   const cdp = await context.newCDPSession(c);
   const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
   try {
+    // Вход сам по себе проверен первым тестом — здесь готовый демо-ключ
     await c.goto(origin);
-    await c.getByText('Другой способ входа').tap();
-    await c.getByRole('button', { name: /Войти через код/ }).tap();
+    await c.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await c.goto(origin);
     await c.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
     await c.getByRole('button', { name: 'Тренировки', exact: true }).tap();
     const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });

@@ -84,12 +84,10 @@ export function isInsideTelegram() {
  * локальной разработки.
  */
 export function getInitData() {
-  if (launchParams.tgWebAppData) return launchParams.tgWebAppData;
-
-  const app = tg();
-  if (app && app.initData) return app.initData;
-
-  return import.meta.env.VITE_DEV_INIT_DATA || '';
+  // Вход по подписи Telegram выключен 27.09.2026 (сервер: TELEGRAM_OFF):
+  // открытое внутри мессенджера приложение ведёт себя как браузер — вход по
+  // почте или ссылке. Подпись не отправляем, чтобы не получать отказ.
+  return '';
 }
 
 /** Готовим окно: раскрыть на всю высоту и сообщить Telegram, что мы готовы */

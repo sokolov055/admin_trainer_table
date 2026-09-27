@@ -38,7 +38,7 @@ export default function PasteLink() {
 
   return (
     <form className="paste-link" onSubmit={(e) => { e.preventDefault(); setProblem(''); open(value); }}>
-      <p className="paste-link__lead">Ссылка пришла в Telegram?</p>
+      <p className="paste-link__lead">Ссылка от тренера пришла в мессенджер?</p>
       <p className="small muted">Зажмите её в чате → «Копировать» — и вставьте сюда.</p>
       <input
         className="field__input"
