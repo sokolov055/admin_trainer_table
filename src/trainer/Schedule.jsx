@@ -104,12 +104,18 @@ export default function Schedule() {
       {loading && <Loading lead={false} rows={3} />}
       {error && <ErrorState error={error} onRetry={reload} />}
 
-      {!loading && !error && data && !data.calendar && (
+      {/* Google Календарь — только у владельца сервиса; у других тренеров
+          расписание живёт в приложении, и предупреждать не о чем */}
+      {!loading && !error && data && !data.calendar && data.owner !== false && (
         <Note tone="critical" icon={IconAlert}>Календарь не подключён на сервере.</Note>
       )}
 
       {!loading && !error && ofDay.length === 0 && (
-        <Empty icon={IconCalendar} title="Свободный день" text="Занятий нет. Добавьте здесь или в Google Календаре." />
+        <Empty
+          icon={IconCalendar}
+          title="Свободный день"
+          text={data && data.calendar ? 'Занятий нет. Добавьте здесь или в Google Календаре.' : 'Занятий нет. Добавьте здесь — прошедшее спишется с пакета клиента.'}
+        />
       )}
 
       {ofDay.length > 0 && (

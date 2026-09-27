@@ -2461,6 +2461,26 @@ th.sticky, td.sticky {
   .invite-row__actions .button:first-child { flex: 1; }
 }
 
+/* Тренеры сервиса — экран владельца (Trainers.jsx) */
+.trainer-list { display: grid; gap: var(--space-2); }
+.trainer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.trainer-row__copy { display: grid; gap: 3px; min-width: 0; }
+.trainer-row__copy strong { font-size: var(--text-sm); overflow-wrap: anywhere; }
+.trainer-row__copy span { color: var(--text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.trainer-row__actions { display: flex; flex: 0 0 auto; gap: var(--space-2); }
+.trainer-row__actions .button { min-height: 40px; padding: 7px 10px; }
+
+@media (max-width: 520px) {
+  .trainer-row { align-items: stretch; flex-direction: column; }
+  .trainer-row__actions { width: 100%; }
+  .trainer-row__actions .button { flex: 1; }
+}
+
 .transfer-card {
   margin: 0 var(--space-4) var(--space-5);
   padding: var(--space-4);

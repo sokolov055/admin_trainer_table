@@ -56,14 +56,14 @@ const output = await build({
           loader: 'jsx',
           contents: `import React from 'react';
             export const Chips=()=>null; export const Empty=()=>null; export const ErrorState=()=>null; export const Loading=()=>null; export const Search=()=>null;
-            export const Drawer=({children})=><div>{children}</div>; export const Section=({children})=><section>{children}</section>;`,
+            export const Drawer=({children})=><div>{children}</div>; export const Section=({children})=><section>{children}</section>; export const Panel=({children})=><div>{children}</div>;`,
         };
         if (args.path === 'icons') return {
           loader: 'jsx',
           contents: `import React from 'react'; const I=()=> <i />;
             export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
-            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I;`,
+            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I;`,
         };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Processes=()=>null;` };
@@ -125,6 +125,34 @@ test('календарь обновляется в фоне при входе и
 
   assert.equal(clients().props['data-revision'], '1', 'после пересчёта список перечитывается');
 
+  tree.unmount();
+  delete globalThis.__calendarRefreshHarness;
+});
+
+test('тренер не владелец: календарь не пересчитывается, логов и заявок тренеров в меню нет', async () => {
+  let calls = 0;
+  globalThis.__calendarRefreshHarness = { apiMutate() { calls += 1; return Promise.resolve({}); } };
+
+  let tree;
+  await act(async () => {
+    tree = renderer.create(React.createElement(TrainerApp, { me: { name: 'Мария', owner: false } }));
+  });
+
+  assert.equal(calls, 0, 'Google Календарь только у владельца');
+  const labels = tree.root.findAll((node) => node.props && node.props.className === 'menu__label')
+    .map((node) => node.children.join(''));
+  assert.ok(labels.includes('Расходы'));
+  assert.ok(!labels.includes('Логи'));
+  assert.ok(!labels.includes('Тренеры'));
+
+  tree.unmount();
+
+  await act(async () => {
+    tree = renderer.create(React.createElement(TrainerApp, { me: { name: 'Константин', owner: true } }));
+  });
+  const ownerLabels = tree.root.findAll((node) => node.props && node.props.className === 'menu__label')
+    .map((node) => node.children.join(''));
+  assert.ok(ownerLabels.includes('Тренеры') && ownerLabels.includes('Логи'), 'у владельца — есть');
   tree.unmount();
   delete globalThis.__calendarRefreshHarness;
 });

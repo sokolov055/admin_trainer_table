@@ -40,6 +40,36 @@ export function ConsentChecks({ value, onChange, disabled }) {
 }
 
 /**
+ * Заявка тренера (LoginScreen.jsx). Свои условия: тренер — не клиент, он
+ * ведёт в сервисе данные своих клиентов. Текст — trainer-terms.html, по
+ * итогам юридической проверки; до неё регистрация на сервере выключена
+ * (TRAINER_SIGNUP), и сюда никто не попадает.
+ */
+export function TrainerConsentChecks({ value, onChange, disabled }) {
+  const set = (key) => (event) => onChange({ ...value, [key]: event.target.checked });
+  return (
+    <div className="consent">
+      <label className="consent__line">
+        <input type="checkbox" checked={!!value.consent} onChange={set('consent')} disabled={disabled} />
+        <span>
+          Даю <a href={BASE + 'consent.html'} target="_blank" rel="noopener noreferrer">согласие на обработку персональных данных</a>
+        </span>
+      </label>
+      <label className="consent__line">
+        <input type="checkbox" checked={!!value.terms} onChange={set('terms')} disabled={disabled} />
+        <span>
+          Принимаю <a href={BASE + 'trainer-terms.html'} target="_blank" rel="noopener noreferrer">условия для тренеров</a>,
+          в том числе о данных моих клиентов
+        </span>
+      </label>
+      <p className="consent__note">
+        Как обрабатываются данные — в <a href={BASE + 'privacy.html'} target="_blank" rel="noopener noreferrer">политике</a>.
+      </p>
+    </div>
+  );
+}
+
+/**
  * Для тех, кто уже пользовался приложением, когда согласие брали иначе
  * (или вовсе не брали), и для новой версии текста. Кабинет открывается
  * после подтверждения; не хочет — может выйти или удалить аккаунт.

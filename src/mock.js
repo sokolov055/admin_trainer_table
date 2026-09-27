@@ -50,6 +50,13 @@ const FIELDS = ['Вес', 'Талия', 'Ягодицы', 'Грудь', 'Рук�
  *  оба состояния кнопки должны быть видны без лишних нажатий. */
 let hiddenMonths = ['Июль 2026'];
 
+// Тренеры сервиса: владелец, одна заявка и работающий тренер
+let mockTrainers = [
+  { id: 1, email: 'owner@fittrack.demo', name: 'Константин Соколов', status: 'active', owner: true, clients: 23, appliedAt: null },
+  { id: 2, email: 'maria@fittrack.demo', name: 'Мария Ковалёва', status: 'pending', owner: false, clients: 0, appliedAt: daysAgo(0) },
+  { id: 3, email: 'igor@fittrack.demo', name: 'Игорь Власов', status: 'active', owner: false, clients: 6, appliedAt: daysAgo(12) },
+];
+
 const PLAN_BLOCKS = [
   {
     title: 'Тренировка 1 — верх',
@@ -622,8 +629,23 @@ const MOCK = {
     unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',
     // ?mockConsent=1 — согласие по новым правилам ещё не подтверждено
     consentNeeded: params.__role !== 'trainer' && new URLSearchParams(window.location.search).get('mockConsent') === '1',
+    // ?mockCoach=1 — тренер со своими клиентами, не владелец сервиса
+    owner: new URLSearchParams(window.location.search).get('mockCoach') !== '1',
   }),
   'consent.accept': () => ({ version: '2026-09-26', givenAt: new Date().toISOString() }),
+  // Вход тренера и заявка на кабинет: новый адрес — имя и согласия, потом
+  // «ждёт одобрения»; адрес owner@… — сразу кабинет
+  'auth.trainer.request': () => ({ sent: true, ttlMin: 15 }),
+  'auth.trainer.confirm': (p) => (String(p.email || '').startsWith('owner@')
+    ? { token: 'demo-session', email: p.email }
+    : p.name ? { pending: true, email: p.email } : { needName: true, email: p.email }),
+  // Тренеры сервиса — экран владельца (Trainers.jsx)
+  'owner.trainers': () => ({ trainers: mockTrainers }),
+  'owner.trainer.decide': (p) => {
+    const next = { approve: 'active', reject: 'rejected', block: 'blocked', unblock: 'active' }[p.decision];
+    mockTrainers = mockTrainers.map((t) => (t.id === p.id ? { ...t, status: next } : t));
+    return { trainers: mockTrainers };
+  },
   // Сверка денег таблица ↔ сервер (LedgerCheck.jsx): одно расхождение
   'trainer.ledger': () => ({
     state: { open: true, since: daysAgo(4), clients: 5, matched: 4, off: 1 },

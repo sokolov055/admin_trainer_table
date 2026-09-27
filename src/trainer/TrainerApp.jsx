@@ -21,10 +21,11 @@ import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
-  IconPlan, IconCalendar,
+  IconPlan, IconCalendar, IconKey,
 } from '../icons.jsx';
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
+import Trainers from './Trainers.jsx';
 
 /**
  * Панель тренера.
@@ -66,14 +67,17 @@ const TABS = [
   { id: 'dashboard', label: 'Сводка', Icon: IconChart },
 ];
 
+/*
+ * owner — только владельцу сервиса. Логи и заявки тренеров — его хозяйство;
+ * другой тренер получил бы на них отказ сервера (api/routes.js, owner).
+ */
 const MENU = [
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
   { id: 'client-preview', label: 'Клиентская версия', note: 'Проверить приложение глазами клиента', Icon: IconPhone },
-  { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog },
+  { id: 'trainers', label: 'Тренеры', note: 'Заявки на кабинет тренера', Icon: IconKey, owner: true },
+  { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog, owner: true },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
-
-const VIEWS = TABS.concat(MENU);
 
 /** Клиенты: работающие и ушедшие — один список людей в двух состояниях,
  *  поэтому это подразделы одного раздела, а не соседние вкладки. */
@@ -84,10 +88,17 @@ const CLIENT_PANES = [
 
 /** Сводка: две половины одного BSC — деньги и процессы за ними */
 const DASH_PANES = [
-  { value: 'finance', label: 'Финансы' },
-  { value: 'processes', label: 'Процессы' },
+  { value: 'finance', label: 'Финансы', owner: true },
+  { value: 'processes', label: 'Процессы', owner: true },
   { value: 'sessions', label: 'Занятия' },
 ];
+
+/**
+ * Владелец сервиса или тренер со своими клиентами. Старый сервер флага не
+ * присылает — тогда это владелец: тренер был один.
+ */
+const isOwner = (me) => !me || me.owner !== false;
+const forRole = (list, owner) => list.filter((item) => owner || !item.owner);
 
 /**
  * Разделы карточки клиента.
@@ -106,9 +117,15 @@ const CLIENT_VIEWS = [
 ];
 
 export default function TrainerApp({ me }) {
+  const owner = isOwner(me);
+  // «Тренеры» — только когда сервер сам сказал owner: true: старый сервер
+  // этих действий не знает, и пункт отвечал бы ошибкой
+  const MENU_ITEMS = forRole(MENU, owner).filter((m) => m.id !== 'trainers' || (me && me.owner === true));
+  const VIEWS = TABS.concat(MENU_ITEMS);
+  const DASH = forRole(DASH_PANES, owner);
   const [view, setView] = useState('clients');
   const [clientPane, setClientPane] = useState('active');
-  const [dashPane, setDashPane] = useState('finance');
+  const [dashPane, setDashPane] = useState(DASH[0].value);
   const [libPane, setLibPane] = useState('program');
   const [menuOpen, setMenuOpen] = useState(false);
   const [openClient, setOpenClient] = useState(null);
@@ -154,7 +171,7 @@ export default function TrainerApp({ me }) {
   });
   const paneTarget = () => { const m = visibleMain(); return m && m.firstElementChild; };
   useViewMotion(clientPane, { direction: byOrder(CLIENT_PANES.map((p) => p.value)), target: paneTarget });
-  useViewMotion(dashPane, { direction: byOrder(DASH_PANES.map((p) => p.value)), target: paneTarget });
+  useViewMotion(dashPane, { direction: byOrder(DASH.map((p) => p.value)), target: paneTarget });
   useViewMotion(libPane, { direction: byOrder(LIBRARY_PANES.map((p) => p.value)), target: paneTarget });
   const [calendarRevision, setCalendarRevision] = useState(0);
   const calendarRequest = useRef(null);
@@ -165,6 +182,9 @@ export default function TrainerApp({ me }) {
   // Та же функция срабатывает, когда страницу тянут вниз, поэтому два
   // одновременных запуска склеиваются ещё до серверной защиты от дублей.
   const runCalendarRefresh = useCallback(() => {
+    // Google Календарь — только у владельца; у остальных расписание в
+    // приложении, и пересчитывать нечего
+    if (!owner) return Promise.resolve(null);
     if (calendarRequest.current) return calendarRequest.current;
 
     const request = apiMutate('calendar.refresh', {}, { quiet: true })
@@ -179,7 +199,7 @@ export default function TrainerApp({ me }) {
 
     calendarRequest.current = request;
     return request;
-  }, []);
+  }, [owner]);
 
   useEffect(() => { runCalendarRefresh(); }, [runCalendarRefresh]);
 
@@ -249,7 +269,7 @@ export default function TrainerApp({ me }) {
         )}
         {view === 'dashboard' && (
           <div className="app__subnav">
-            <Chips items={DASH_PANES} value={dashPane} onChange={switchPane(setDashPane)} variant="nav" />
+            <Chips items={DASH} value={dashPane} onChange={switchPane(setDashPane)} variant="nav" />
           </div>
         )}
         {view === 'library' && (
@@ -330,7 +350,8 @@ export default function TrainerApp({ me }) {
       {inMenu && (
       <main className="app__body" key={view}>
         {view === 'expenses' && <Expenses />}
-        {view === 'logs' && <Logs />}
+        {view === 'logs' && owner && <Logs />}
+        {view === 'trainers' && owner && <Trainers />}
         {view === 'settings' && <Settings />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
       </main>
@@ -347,7 +368,7 @@ export default function TrainerApp({ me }) {
         </div>
 
         <div className="menu__list">
-          {MENU.map((m) => {
+          {MENU_ITEMS.map((m) => {
             const Icon = m.Icon;
             const active = m.id === view;
             return (

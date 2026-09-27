@@ -3,7 +3,7 @@ import { apiPublic } from './api.js';
 import { setToken, describeDevice } from './session.js';
 import { IconKey } from './icons.jsx';
 import PasteLink from './PasteLink.jsx';
-import { ConsentChecks } from './Consent.jsx';
+import { ConsentChecks, TrainerConsentChecks } from './Consent.jsx';
 import { isNativeApp } from './native-bridge.js';
 
 /**
@@ -174,50 +174,51 @@ function ClientEmailLogin() {
 }
 
 /**
- * Вход тренера по почте.
+ * Вход тренера по почте — и заявка на кабинет.
  *
  * Спрятан под «другим способом» намеренно: клиенту он не нужен и только
  * мешал бы — его дорога одна, персональная ссылка. А тренер заходит с
- * любого устройства и не должен для этого искать бота: до сих пор
- * потерянный вход означал поход в Telegram, и случалось это почти
- * ежедневно.
+ * любого устройства и не должен для этого искать бота.
  *
- * Пароля нет: доказательством служит доступ к почтовому ящику. Придумывать
- * и восстанавливать нечего, а восстанавливать пароль пришлось бы всё равно
- * по почте.
+ * Пароля нет: доказательством служит доступ к почтовому ящику. Если
+ * адрес ещё не тренерский и регистрация тренеров включена, сервер после
+ * кода отвечает needName — тогда те же поля превращаются в заявку: имя и
+ * согласия. Кабинет откроется, когда владелец сервиса её одобрит
+ * (ответ pending), и придёт письмо. Выключена регистрация — всё как было.
  */
 function TrainerLogin() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
-  const [sent, setSent] = useState(false);
+  const [name, setName] = useState('');
+  const [agree, setAgree] = useState({ consent: false, terms: false });
+  const [step, setStep] = useState('email'); // email → code → apply → pending
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
 
-  const ask = async () => {
+  const run = async (fn) => {
     setBusy(true);
     setProblem('');
-    try {
-      await apiPublic('auth.trainer.request', { email });
-      setSent(true);
-    } catch (error) {
-      setProblem(error.message);
-    } finally {
-      setBusy(false);
-    }
+    try { await fn(); } catch (error) { setProblem(error.message); } finally { setBusy(false); }
   };
 
-  const enter = async () => {
-    setBusy(true);
-    setProblem('');
-    try {
-      const res = await apiPublic('auth.trainer.confirm', { email, code, device: describeDevice() });
-      setToken(res.token);
-    } catch (error) {
-      setProblem(error.message);
-    } finally {
-      setBusy(false);
-    }
+  const ask = () => run(async () => {
+    await apiPublic('auth.trainer.request', { email });
+    setStep('code');
+  });
+
+  const enter = () => run(async () => {
+    const res = await apiPublic('auth.trainer.confirm', {
+      email, code, device: describeDevice(),
+      ...(step === 'apply' ? { name, consent: agree.consent, terms: agree.terms } : {}),
+    });
+    if (res && res.needName) { setStep('apply'); return; }
+    if (res && res.pending) { setStep('pending'); return; }
+    setToken(res.token);
+  });
+
+  const reset = () => {
+    setStep('email'); setCode(''); setName(''); setAgree({ consent: false, terms: false }); setProblem('');
   };
 
   if (!open) {
@@ -227,6 +228,22 @@ function TrainerLogin() {
       </button>
     );
   }
+
+  if (step === 'pending') {
+    return (
+      <div className="login__trainer" role="status">
+        <p className="login__text">
+          Заявка на кабинет тренера отправлена. Когда её одобрят, на {email} придёт
+          письмо — тогда войдите этим же адресом.
+        </p>
+        <button className="button button--ghost" onClick={reset}>Другой адрес</button>
+      </div>
+    );
+  }
+
+  const ready = step === 'email' ? !!email.trim()
+    : step === 'code' ? code.length === 6
+      : name.trim().length >= 2 && agree.consent && agree.terms;
 
   return (
     <div className="login__trainer">
@@ -239,11 +256,11 @@ function TrainerLogin() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          disabled={busy || sent}
+          disabled={busy || step !== 'email'}
         />
       </label>
 
-      {sent && (
+      {step !== 'email' && (
         <label className="field">
           <span className="field__label">Код из письма</span>
           <input
@@ -253,24 +270,42 @@ function TrainerLogin() {
             maxLength={6}
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
-            disabled={busy}
+            disabled={busy || step === 'apply'}
           />
-          <span className="field__hint">Код живёт 15 минут. Письмо приходит за несколько секунд.</span>
+          {step === 'code' && <span className="field__hint">Код живёт 15 минут. Письмо приходит за несколько секунд.</span>}
         </label>
       )}
 
-      {problem && <p className="login__problem">{problem}</p>}
+      {step === 'apply' && (
+        <label className="field">
+          <span className="field__label">Как вас зовут</span>
+          <input
+            className="field__input"
+            autoComplete="name"
+            maxLength={120}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={busy}
+            autoFocus
+          />
+          <span className="field__hint">Кабинета тренера с этой почтой нет — оставьте заявку, её рассмотрят.</span>
+        </label>
+      )}
+
+      {step === 'apply' && <TrainerConsentChecks value={agree} onChange={setAgree} disabled={busy} />}
+
+      {problem && <p className="login__problem" role="alert">{problem}</p>}
 
       <button
         className="button button--primary button--block"
-        onClick={sent ? enter : ask}
-        disabled={busy || (sent ? code.length < 6 : !email)}
+        onClick={step === 'email' ? ask : enter}
+        disabled={busy || !ready}
       >
-        {busy ? 'Минуту…' : sent ? 'Войти' : 'Прислать код'}
+        {busy ? 'Минуту…' : step === 'email' ? 'Прислать код' : step === 'code' ? 'Войти' : 'Отправить заявку'}
       </button>
 
-      {sent && (
-        <button className="button button--ghost" onClick={() => { setSent(false); setCode(''); setProblem(''); }} disabled={busy}>
+      {step !== 'email' && (
+        <button className="button button--ghost" onClick={reset} disabled={busy}>
           Другой адрес
         </button>
       )}
