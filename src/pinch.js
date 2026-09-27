@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { haptic } from './telegram.js';
 
 /**
@@ -116,7 +117,7 @@ export function usePinch({ onIn, onOut, enabled = true, target = null, morph = n
           const d = midY < r.top ? r.top - midY : midY > r.bottom ? midY - r.bottom : 0;
           if (d < bestD) { bestD = d; best = i; }
         });
-        if (best >= 0) anchor = { index: best, top: list[best].getBoundingClientRect().top };
+        if (best >= 0) anchor = { index: best, el: list[best], top: 0 };
       }
       if (reduced()) return;
       if (m && !folded) {
@@ -173,24 +174,26 @@ export function usePinch({ onIn, onOut, enabled = true, target = null, morph = n
       const { onIn: fnIn, onOut: fnOut, target: t } = opts.current;
       const fn = (far || flick) ? (closing ? fnIn : fnOut) : null;
       if (!fn) { clearCards(true); clearRows(true); return; }
-      haptic();
-      fn();
-      // Новый вид уже отрисован React'ом — снимаем временные стили и
-      // мягко проявляем его
       const { morph: m } = opts.current;
+      // Место якоря — в момент отпускания, а не касания: пока сводили
+      // пальцы, карточки выше ужались, и он уехал вверх. Возвращать его на
+      // место касания значило сдвигать экран вниз (27.09.2026)
       const hold = anchor;
-      nextFrame(() => {
-        clearCards(false);
-        clearRows(false);
-        // Тот же элемент — на то же место экрана
-        if (hold && m) {
-          const root = pick(t);
-          const list = closing ? (root && root.querySelectorAll(m.rows)) : pick(m.items);
-          const el = list && list[Math.min(hold.index, list.length - 1)];
-          if (el && typeof window.scrollBy === 'function') window.scrollBy(0, el.getBoundingClientRect().top - hold.top);
-        }
-        enter(pick(t), closing);
-      });
+      if (hold && hold.el) hold.top = hold.el.getBoundingClientRect().top;
+      haptic();
+      // Новый вид — сразу (flushSync), и в том же кадре — поправка
+      // прокрутки: иначе React перерисовывал позже, а поправка считалась
+      // по старому экрану
+      flushSync(fn);
+      clearCards(false);
+      clearRows(false);
+      if (hold && m) {
+        const root = pick(t);
+        const list = closing ? (root && root.querySelectorAll(m.rows)) : pick(m.items);
+        const el = list && list[Math.min(hold.index, list.length - 1)];
+        if (el && typeof window.scrollBy === 'function') window.scrollBy(0, el.getBoundingClientRect().top - hold.top);
+      }
+      nextFrame(() => enter(pick(t), closing));
     };
 
     document.addEventListener('touchstart', begin, { passive: true });
