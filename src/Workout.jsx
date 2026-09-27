@@ -15,6 +15,8 @@ import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
+import ExercisePicker from './trainer/ExercisePicker.jsx';
+import { useData } from './useData.js';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
 
@@ -718,10 +720,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   const togglePick = (id) => setPicked(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const endPick = () => { setPicking(false); setPicked(new Set()); };
+  useEffect(() => {
+    if (!picking) return;
+    const first = document.querySelector && document.querySelector('.workout__exercise');
+    if (first && first.scrollIntoView) first.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [picking]);
   // Щипок: свели пальцы — выбор упражнений (удалить, суперсет), развели — обычный вид
   usePinch({
     // Своя проверка, а не editable: та объявлена ниже, в разметке
     enabled: !!record && ['active', 'paused'].includes(record.session && record.session.status),
+    // Экран следует за пальцами, как фото при зуме
+    target: () => document.querySelector('.workout'),
     onIn: () => { if (!picking) setPicking(true); },
     onOut: () => { if (picking) endPick(); },
   });
@@ -861,12 +870,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const members = group ? s.exercises.map((e, i) => ({ ex: e, ei: i })).filter(m => m.ex.supersetGroup === group) : [];
           // Круги — для обычного суперсета; у сплита подходы по людям, там по-старому
           if (members.length > 1 && !members.some(m => m.ex.sets.some(x => x.who))) {
-            return members[0].ei === ei ? <React.Fragment key={'g' + group}>{joinBefore(ei)}{supersetBlock(members)}</React.Fragment> : null;
+            if (members[0].ei !== ei) return null;
+            // В режиме выбора — одной строкой, как остальные упражнения
+            if (picking) {
+              return <section className="workout__exercise workout__exercise--compact" key={'g' + group}>
+                <div className="workout__ex-head"><h3><span className="workout__ex-num">{ei + 1}</span> Суперсет: {members.map(m => m.ex.name).join(' + ')}</h3></div>
+              </section>;
+            }
+            return <React.Fragment key={'g' + group}>{joinBefore(ei)}{supersetBlock(members)}</React.Fragment>;
           }
           const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
           const finished = doneSets === ex.sets.length;
           const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
-          return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '')} key={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
+          return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (picking ? ' workout__exercise--compact' : '')} key={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
@@ -875,6 +891,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <span className="workout__ex-count" aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{finished ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
           </div>
           </SwipeRow>
+          {/* Режим выбора — свёрнутый: одна строка на упражнение, чтобы
+              выделять, удалять и собирать суперсет, не листая подходы */}
+          {!picking && <>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {(main || ex.prevWeight) && (
             <p className="workout__target">
@@ -884,7 +903,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             </p>
           )}
           <details><summary>Изменить упражнение</summary>
-            <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ex => ({ ...ex, name: e.target.value }))} /></label>
+            {clientRow
+              ? <NameFromBase ex={ex} onPick={(patch) => updateExercise(ei, x => ({ ...x, ...patch }))} />
+              : <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ex => ({ ...ex, name: e.target.value }))} /></label>}
             {trackEditor(ex, ei)}
             <div className="workout__toolbar">
               <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
@@ -914,6 +935,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <summary>{ex.note ? 'Заметка' : 'Добавить заметку'}</summary>
             <textarea aria-label="Заметка к упражнению" value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} />
           </details>
+          </>}
         </section></React.Fragment>;
         })}
         {undo && (
@@ -959,5 +981,27 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       </SwipeRow>)}
       {erase.bar}
     </>}
+  </div>;
+}
+
+/**
+ * Название упражнения с подсказками из базы — как в редакторе программы
+ * (ExercisePicker): набрал «жим» — выбрал из списка, и занятие получает
+ * тип учёта и технику из базы. Только у тренера: база упражнений — его.
+ */
+function NameFromBase({ ex, onPick }) {
+  const library = useData('library.exercises', {}, []);
+  const exercises = library.data ? library.data.exercises : [];
+  return <div className="workout__field">Название
+    <ExercisePicker
+      value={ex.name}
+      exerciseId={ex.exerciseId}
+      exercises={exercises}
+      onPick={({ name, exerciseId }) => {
+        const base = exerciseId && exercises.find((x) => x.id === exerciseId);
+        onPick({ name, exerciseId: exerciseId || null, ...(base && base.track ? { track: base.track } : {}) });
+      }}
+      onAdded={() => library.reload()}
+    />
   </div>;
 }

@@ -26,12 +26,13 @@ const gesture = (from, to, ms = 400) => {
   listeners.touchend({ touches: [] });
 };
 
-test('свели на 14% ширины — свёрнуто, развели — развёрнуто, мелочь — ничего', async () => {
+test('свели на 28% ширины или взмахом — свёрнуто, развели — развёрнуто, мелочь — ничего', async () => {
   const calls = [];
   const Probe = () => { usePinch({ onIn: () => calls.push('in'), onOut: () => calls.push('out') }); return null; };
   await act(async () => { renderer.create(React.createElement(Probe)); });
-  gesture(200, 130); // −70 px из 400: больше 14% (56)
-  gesture(130, 200);
-  gesture(200, 190, 2000); // −10 px медленно: не жест
-  assert.deepEqual(calls, ['in', 'out']);
+  gesture(200, 80, 2000);  // −120 px из 400: больше 28% (112) — свернуть
+  gesture(80, 200, 2000);  // обратно — развернуть
+  gesture(200, 130, 2000); // −70 px медленно: меньше 28% и без взмаха — ничего
+  gesture(200, 170, 100);  // −30 px быстро (300 px/с): взмах — свернуть
+  assert.deepEqual(calls, ['in', 'out', 'in']);
 });

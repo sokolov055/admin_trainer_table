@@ -177,6 +177,8 @@ export default function PlanEditor({
   // Щипок: свели пальцы — свернуть тренировки, развели — развернуть
   usePinch({
     enabled: !single && draft.length > 1 && !busy,
+    // Редактор следует за пальцами, как фото при зуме
+    target: () => rootRef.current,
     onIn: () => { if (!ordering) toggleOrdering(); },
     onOut: () => { if (ordering) toggleOrdering(); },
   });

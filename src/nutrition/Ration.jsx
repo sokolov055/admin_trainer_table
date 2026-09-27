@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, createContext, useContext 
 import { Section, Panel, Note, Search, formatNumber, plural } from '../ui.jsx';
 import { IconCheck, IconClose, IconBack, IconNutrition, IconShare } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import { useTabLock } from '../gestures.jsx';
 import { MEALS } from './recipes.js';
 import { CATALOG, setCatalog } from './catalog.js';
 import {
@@ -763,6 +764,10 @@ export default function Ration({ targets, onClose, trial = false }) {
   const [seen, setSeen] = useState(() => saved.seen || []);
   const [variant, setVariant] = useState(0);
   const [step, setStep] = useState(() => ((saved.liked || []).length >= 2 ? 'day' : 'pantry'));
+  // Карточки рецептов смахивают вправо-влево («буду / не буду») — этот же
+  // жест листал разделы, и клиент улетал на соседнюю страницу. Пока открыт
+  // рацион, разделы пальцем не листаются: выход — кнопкой «Назад»
+  useTabLock(true);
 
   // Своё — на сегодня: завтра начинается с чистого дня. Недавние продукты
   // — на устройстве, на случай без сети; основная база общая, на сервере.
