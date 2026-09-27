@@ -178,6 +178,22 @@ test('суперсет из программы виден в занятии', as
     assert.equal(summaries().filter(t => t === 'Круг пропущен · изменить').length, 1);
     await press('Вернуть круг');
 
+    // Отметка — одна на круг, а не у каждого упражнения (27.09.2026)
+    const round1 = () => local.root.findAllByProps({ className: 'workout__round' })[0];
+    assert.equal(round1().findAll(n => n.type === 'button' && String(n.props.className || '').includes('workout__check')).length, 0, 'своих галочек у упражнений круга нет');
+    // Повторов у подтягиваний нет — подсказка под кнопкой, с названием
+    const reps = round1().findAll(n => n.type === 'input' && /Подтягивания, подход 1, повторы/.test(n.props['aria-label'] || ''))[0];
+    await act(async () => { reps.props.onChange({ target: { value: '' } }); await delay(); });
+    await press('Круг 1 — готово');
+    assert.match(text(round1().findByProps({ className: 'workout__round-lack' })), /Подтягивания: введите число повторов/);
+    // Вписали — подсказка ушла, кнопка отмечает оба упражнения
+    await act(async () => { reps.props.onChange({ target: { value: '10' } }); await delay(); });
+    assert.equal(round1().findAllByProps({ className: 'workout__round-lack' }).length, 0);
+    await press('Круг 1 — готово');
+    assert.equal(round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length, 2, 'оба упражнения круга отмечены');
+    await press('Круг 1 выполнен');
+    assert.equal(round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length, 0, 'второе нажатие снимает отметку');
+
     // Разъединили — два отдельных упражнения, подходов у каждого столько,
     // сколько было кругов
     await press('Разъединить');

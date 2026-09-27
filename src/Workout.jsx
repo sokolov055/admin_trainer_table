@@ -82,6 +82,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const conflictRef = useRef(null);
   // Просили сохранить, пока шло прежнее сохранение (см. save)
   const saveAgain = useRef(false);
+  // Чего не хватает, чтобы отметить круг суперсета: { key: 'группа:круг', text }
+  const [roundLack, setRoundLack] = useState(null);
   const params = clientRow ? { clientRow } : {};
 
   const store = value => {
@@ -174,6 +176,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const session = transform({ ...r.session, elapsedMs: Math.min(604800000, r.session.elapsedMs + elapsed) });
     store({ ...r, session, tick: Date.now(), dirty: true, edit: (r.edit || 0) + 1 });
     setMessage('');
+    // Вписали недостающее — подсказка под кнопкой круга больше не нужна
+    setRoundLack(null);
   };
 
   const save = async () => {
@@ -386,7 +390,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const removeSet = () => { setUndo(s.exercises, 'Подход удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
     return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
-            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '')} style={{ '--cols': fields.length }}>
+            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '') + (inRound ? ' workout__set-row--round' : '')} style={{ '--cols': fields.length }}>
               {inRound
                 ? <span>{label}</span>
                 : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, подход ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
@@ -395,7 +399,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               {fields.map(f => (
                 <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
               ))}
-              <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
+              {!inRound && <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
                 const lack = set.state !== 'done' && missing(set, track);
                 if (lack) { setMessage(lack); return; }
                 const starting = set.state !== 'done';
@@ -403,7 +407,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 // Отдых начинается там, где человек нажал, а не там, где
                 // стоит переключатель: подход отмечен — время пошло.
                 if (starting && restAfter) startRest();
-              }}><IconCheck size={20} /></button>
+              }}><IconCheck size={20} /></button>}
             </div>
             {/* Дропсет: сбросы идут сразу за подходом, без отдыха, — поэтому
                 они на виду, а не в настройках */}
@@ -462,13 +466,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, отрезок ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
             <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}{set.kind === 'warmup' ? ' · разминка' : ''}</span><IconSliders size={12} aria-hidden="true" />
           </button>}
-        <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, отрезок ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
+        {!inRound && <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, отрезок ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
           const lack = set.state !== 'done' && missing(set, track);
           if (lack) { setMessage(lack); return; }
           const starting = set.state !== 'done';
           updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
           if (starting && restAfter) startRest();
-        }}><IconCheck size={20} /></button>
+        }}><IconCheck size={20} /></button>}
       </div>
       <div className="workout__cardio-grid">
         {fields.map(f => (
@@ -520,6 +524,51 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {track.unilateral && set.left === undefined && (
         <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, left: s.reps || '', right: s.reps || '' }))}>Л и П отдельно</button>
       )}
+    </>;
+  };
+
+  /**
+   * Круг суперсета — одной кнопкой. Упражнения идут подряд без отдыха, и
+   * отмечать каждое своей галочкой в зале неудобно: в круге их делают
+   * вместе и отмечают вместе (27.09.2026, просьба владельца). Кнопка
+   * отмечает все упражнения круга и запускает отдых; второе нажатие —
+   * снимает. Чего не хватает (повторов, времени) — пишем прямо под
+   * кнопкой с названием упражнения: подсказка вверху экрана не видна за
+   * клавиатурой, и казалось, что кнопка не нажимается.
+   */
+  const roundCheck = (members, r) => {
+    const group = members[0].ex.supersetGroup;
+    const inRound = members.filter(({ ex }) => ex.sets[r] && ex.sets[r].state !== 'skipped');
+    if (!inRound.length) return null;
+    const done = inRound.every(({ ex }) => ex.sets[r].state === 'done');
+    // Ближайший невыполненный круг — кнопка яркая, как «следующая» галочка
+    const open = (i) => members.some(({ ex }) => ex.sets[i] && ex.sets[i].state === 'pending');
+    const current = !done && open(r) && !Array.from({ length: r }, (_, i) => i).some(open);
+    const key = group + ':' + r;
+    const toggle = () => {
+      if (done) {
+        setRoundLack(null);
+        change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] && e.sets[r].state === 'done'
+          ? { ...e, sets: e.sets.map((x, i) => (i === r ? { ...x, state: 'pending' } : x)) } : e)) }));
+        return;
+      }
+      const lack = inRound
+        .filter(({ ex }) => ex.sets[r].state !== 'done')
+        .map(({ ex }) => { const why = missing(ex.sets[r], trackOf(ex)); return why ? ex.name + ': ' + why.replace(/ перед отметкой.*$/, '').toLowerCase() : ''; })
+        .filter(Boolean);
+      if (lack.length) { setRoundLack({ key, text: lack.join('; ') }); return; }
+      setRoundLack(null);
+      change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] && e.sets[r].state !== 'skipped'
+        ? { ...e, sets: e.sets.map((x, i) => (i === r ? { ...x, state: 'done' } : x)) } : e)) }));
+      // Отдых — после круга
+      startRest();
+    };
+    return <>
+      <button type="button" className={'button button--block workout__round-check' + (done ? ' workout__round-check--done' : current ? ' button--primary' : '')}
+        aria-pressed={done} onClick={toggle}>
+        <IconCheck size={18} />{done ? `Круг ${r + 1} выполнен` : `Круг ${r + 1} — готово`}
+      </button>
+      {roundLack && roundLack.key === key && <p className="workout__round-lack" role="alert">{roundLack.text}</p>}
     </>;
   };
 
@@ -615,6 +664,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
             </div>
           ))}
+          {roundCheck(members, r)}
           {roundOptions(members, r)}
         </div>
       ))}

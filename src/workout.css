@@ -430,6 +430,12 @@
 .workout__round { border-top: 1px solid var(--border); padding-top: var(--space-2); margin-top: var(--space-2); }
 .workout__round-title { margin: 0 0 4px; font-size: var(--text-sm); color: var(--accent); font-weight: 700; }
 .workout__round-name { font-size: var(--text-sm); font-weight: 600; margin: 6px 0 2px; }
+/* В круге галочка одна на круг — строка упражнения только из полей */
+.workout__set-row--round { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); }
+.workout__set-row--round > span:first-child { display: none; }
+.workout__round-check { margin-top: var(--space-2); gap: 8px; }
+.button.workout__round-check--done, .button.workout__round-check--done:hover { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
+.workout__round-lack { margin: 6px 0 0; font-size: var(--text-sm); color: var(--critical-text, #b42318); }
 .workout__round-edit { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
 /* «Соединить в суперсет» — в промежутке между карточками, негромко:
    это не действие подхода, а решение о порядке */
