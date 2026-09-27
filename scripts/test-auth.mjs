@@ -267,3 +267,15 @@ test('ссылка в приложение попадает на его собс
   assert.equal(localLink('https://app.fitness100.ru/?trainer=T9', ios), 'capacitor://localhost/?trainer=T9');
   assert.equal(localLink('https://app.fitness100.ru/?access=abc', android), android + '?access=abc');
 });
+
+test('ссылка тренера — на адресе для ссылок, а не от адреса приложения', async () => {
+  const saved = globalThis.window;
+  // В приложении для iPhone адрес страницы — capacitor://localhost
+  globalThis.window = { location: { href: 'capacitor://localhost/' } };
+  try {
+    const { trainerLinkUrl } = await import('../src/trainer-link.js');
+    assert.equal(trainerLinkUrl('T9'), 'https://app.fitness100.ru/?trainer=T9');
+  } finally {
+    globalThis.window = saved;
+  }
+});

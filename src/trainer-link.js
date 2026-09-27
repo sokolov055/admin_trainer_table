@@ -1,4 +1,5 @@
 import { api, apiPrimary, clearApiCache } from './api.js';
+import { LINK_HOST } from './open-in-app.js';
 
 /**
  * Ссылка тренера «привязаться ко мне» (?trainer=…).
@@ -53,9 +54,14 @@ export async function answerRequest(requestId, accept) {
   return result;
 }
 
-/** Адрес ссылки тренера — от адреса самого приложения */
+/**
+ * Адрес ссылки тренера — на адресе для ссылок (app.fitness100.ru): на
+ * iPhone с Fit Track она откроет приложение, у остальных — сайт. Не от
+ * адреса самого приложения: в приложении для iPhone он capacitor://localhost,
+ * и ссылка вида «capacitor://localhost/?trainer=…» никуда не вела.
+ */
 export function trainerLinkUrl(token) {
-  const url = new URL('./', window.location.href);
+  const url = new URL('https://' + LINK_HOST + '/');
   url.searchParams.set('trainer', token);
   return url.href;
 }
