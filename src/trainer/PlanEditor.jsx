@@ -12,6 +12,7 @@ import { useData } from '../useData.js';
 import { Note } from '../ui.jsx';
 import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconPlus } from '../icons.jsx';
 import BlockOrder from './BlockOrder.jsx';
+import { usePinch } from '../pinch.js';
 
 /**
  * Редактор программы месяца.
@@ -173,6 +174,13 @@ export default function PlanEditor({
       if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }));
   };
+  // Щипок: свели пальцы — свернуть тренировки, развели — развернуть
+  usePinch({
+    enabled: !single && draft.length > 1 && !busy,
+    onIn: () => { if (!ordering) toggleOrdering(); },
+    onOut: () => { if (ordering) toggleOrdering(); },
+  });
+
   const toggleOrdering = () => {
     const next = !ordering;
     setOrdering(next);

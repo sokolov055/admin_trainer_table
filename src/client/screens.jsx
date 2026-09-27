@@ -494,6 +494,23 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 }}>
                   {creating ? 'Создаю…' : 'Новый месяц'}
                 </button>
+                {data.month && (
+                  <button className="button" disabled={creating} onClick={async () => {
+                    // Ошиблись при заведении: «Октябрь 2026» вместо «Сентябрь 2026»
+                    const to = window.prompt('Новое название месяца:', data.month);
+                    if (!to || to.trim() === data.month) return;
+                    setCreating(true);
+                    try {
+                      await apiMutate('plan.month.rename', { clientRow, from: data.month, to: to.trim() });
+                      setMonth(to.trim());
+                      reload();
+                    } catch (error) {
+                      window.alert(error.message);
+                    } finally {
+                      setCreating(false);
+                    }
+                  }}>Переименовать месяц</button>
+                )}
               </div>
               {savedTemplate && (
                 <p className="small muted" style={{ marginBottom: 0 }}>
@@ -1157,7 +1174,20 @@ export function Progress({ clientRow, familyRow = null }) {
         ? series.map((s, i) => (
             <Section key={i} title={s.label ? 'Замеры: ' + s.label : 'Замеры'}>
               <Panel pad>
-                <MeasureTable rows={s.rows} fields={fields} />
+                <MeasureTable rows={s.rows} fields={fields} onMove={familyRow ? null : async (from) => {
+                  // Ошиблись датой (годом) — перенести замер целиком
+                  const typed = window.prompt('Правильная дата замера (ДД.ММ.ГГГГ):', formatDate(from));
+                  const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(typed || '').trim());
+                  if (!typed) return;
+                  if (!m) { window.alert('Дата — в виде ДД.ММ.ГГГГ, например 09.10.2026.'); return; }
+                  const to = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+                  try {
+                    await apiMutate('measure.move', { ...(clientRow ? { clientRow } : {}), sheetName: measureSeries[i] && measureSeries[i].sheetName, from: String(from).slice(0, 10), to });
+                    reload();
+                  } catch (error) {
+                    window.alert(error.message);
+                  }
+                }} />
               </Panel>
             </Section>
           ))
@@ -1367,7 +1397,7 @@ function measureFields(measurements, series) {
   return out;
 }
 
-function MeasureTable({ rows, fields }) {
+function MeasureTable({ rows, fields, onMove = null }) {
   if (!rows || rows.length === 0) return <Empty text="Нет записей" />;
 
   const used = fields.filter((f) => rows.some((r) => r[f] !== null && r[f] !== undefined));
@@ -1385,7 +1415,11 @@ function MeasureTable({ rows, fields }) {
         <tbody>
           {recent.map((r, i) => (
             <tr key={i}>
-              <td className="sticky nowrap">{formatDate(r.date)}</td>
+              <td className="sticky nowrap">
+                {onMove
+                  ? <button type="button" className="link-button" title="Исправить дату" onClick={() => onMove(r.date)}>{formatDate(r.date)}</button>
+                  : formatDate(r.date)}
+              </td>
               {used.map((f) => (
                 <td key={f} className="num">
                   {r[f] === null || r[f] === undefined ? '—' : formatNumber(r[f])}

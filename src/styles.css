@@ -4256,3 +4256,5 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Ссылка на политику конфиденциальности (PrivacyLink.jsx) — внизу настроек */
 .privacy-link { margin: var(--space-4) 0 var(--space-2); text-align: center; font-size: var(--text-sm); }
 .privacy-link a { color: var(--text-muted); }
+/* Дата замера — нажать, чтобы исправить (ошиблись годом) */
+.link-button { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }

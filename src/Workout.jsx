@@ -14,6 +14,7 @@ import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metr
 import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
 import './workout.css';
+import { usePinch } from './pinch.js';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
 
@@ -717,6 +718,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   const togglePick = (id) => setPicked(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const endPick = () => { setPicking(false); setPicked(new Set()); };
+  // Щипок: свели пальцы — выбор упражнений (удалить, суперсет), развели — обычный вид
+  usePinch({
+    // Своя проверка, а не editable: та объявлена ниже, в разметке
+    enabled: !!record && ['active', 'paused'].includes(record.session && record.session.status),
+    onIn: () => { if (!picking) setPicking(true); },
+    onOut: () => { if (picking) endPick(); },
+  });
   const pickDelete = () => {
     const ids = new Set(picked);
     const snapshot = record.session.exercises;
