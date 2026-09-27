@@ -75,7 +75,9 @@ export async function startBundleUpdates() {
     }
 
     remember('скачиваю ' + latest.version);
-    const bundle = await updater.download({ url: latest.url, version: latest.version });
+    // checksum обязателен: без него модуль не скачивает («Checksum required»)
+    if (!latest.checksum) { remember('нет контрольной суммы'); return; }
+    const bundle = await updater.download({ url: latest.url, version: latest.version, checksum: latest.checksum });
     await updater.next({ id: bundle.id });
     remember('ждёт перезапуска', latest.version);
   } catch (error) {
