@@ -191,9 +191,25 @@ export function apiStale(action, params = {}) {
  * поэтому последующий api() за тем же действием попадёт в кэш.
  */
 export async function apiBatch(requests) {
-  const body = await request('batch', {
-    requests: requests.map((r) => ({ action: r.action, params: r.params || {} })),
-  });
+  let body;
+  try {
+    body = await request('batch', {
+      requests: requests.map((r) => ({ action: r.action, params: r.params || {} })),
+    });
+  } catch (error) {
+    // Нет связи — собираем пакет из того, что знали (как api() без сети):
+    // «Прогресс» раньше без сети был пустым, хотя замеры лежали на телефоне
+    if (!error || error.code !== 0) throw error;
+    const out = {};
+    let any = false;
+    requests.forEach((r) => {
+      const old = readStored(cacheKey(r.action, r.params || {}), true);
+      if (old) { any = true; out[r.action] = { ok: true, data: old.data }; }
+      else out[r.action] = { ok: false, error };
+    });
+    if (!any) throw error;
+    return out;
+  }
 
   const out = {};
 

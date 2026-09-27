@@ -36,6 +36,9 @@ globalThis.fetch = async (url, init = {}) => {
   if (!online) throw new TypeError('Network request failed');
   const body = init.body ? JSON.parse(init.body) : {};
   served.push(body.action);
+  if (body.action === 'batch') {
+    return { ok: true, json: async () => ({ ok: true, data: { results: body.requests.map((r) => ({ action: r.action, ok: true, data: { was: r.action } })) } }) };
+  }
   const data = body.action === 'me' ? { role: 'client', name: 'Анна' } : { ok: true };
   return { ok: true, json: async () => ({ ok: true, data }) };
 };
@@ -45,7 +48,7 @@ const output = await build({ entryPoints: ['src/api.js'], bundle: true, write: f
   define: { 'import.meta.env.VITE_MOCK': '"0"', 'import.meta.env.VITE_API_URL': '"https://api.test/"', 'import.meta.env.PROD': 'false', 'import.meta.env.DEV': 'false' } });
 const mod = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0].text + '\n})')(createRequire(import.meta.url), mod, mod.exports);
-const { api, apiMutate } = mod.exports;
+const { api, apiMutate, apiBatch } = mod.exports;
 
 test('после записи и без связи кабинет открывается на последнем известном', async () => {
   const fresh = await api('me', {}, { fresh: true });
@@ -97,4 +100,15 @@ test('сервер молчит — через 20 с отказ «не отве�
   } finally {
     globalThis.fetch = saved;
   }
+});
+
+test('«Прогресс» пакетом без связи — из сохранённого', async () => {
+  online = true;
+  const reqs = [{ action: 'client.progress', params: { a: 1 } }, { action: 'client.measurements', params: { a: 1 } }];
+  const fresh = await apiBatch(reqs);
+  assert.equal(fresh['client.progress'].data.was, 'client.progress');
+  online = false;
+  const offline = await apiBatch(reqs);
+  assert.equal(offline['client.progress'].ok, true);
+  assert.equal(offline['client.measurements'].data.was, 'client.measurements');
 });

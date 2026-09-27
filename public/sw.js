@@ -67,7 +67,11 @@ self.addEventListener('fetch', (event) => {
 
   if (url.origin !== self.location.origin) return;
 
-  if (request.mode === 'navigate') {
+  // Оболочку — только на адрес самого приложения (корень или index.html).
+  // Остальные страницы (privacy.html, terms.html, support.html…) — как
+  // есть: раньше на любой переход приходила оболочка, и «Политика» из
+  // настроек открывала вместо документа список клиентов (27.09.2026).
+  if (request.mode === 'navigate' && isShellPath(url.pathname)) {
     event.respondWith(openShell());
     return;
   }
@@ -111,6 +115,12 @@ async function openShell() {
     // Своя заглушка здесь врала бы: приложение не сломано, сети нет.
     return Response.error();
   }
+}
+
+/** Адрес самого приложения: корень области воркера или index.html в нём */
+function isShellPath(pathname) {
+  const root = new URL(self.registration.scope).pathname;
+  return pathname === root || pathname === root + 'index.html';
 }
 
 async function cacheForever(request) {

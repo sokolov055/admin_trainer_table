@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiPublic, apiMutate } from '../api.js';
+import { api, apiMutate } from '../api.js';
 import { Field, Segmented, Note, Loading, ErrorState, Panel } from '../ui.jsx';
 import { IconAlert, IconCheck } from '../icons.jsx';
 
@@ -31,7 +31,8 @@ export default function Profile({ clientRow }) {
   const load = () => {
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    apiPublic('profile.get', params)
+    // Через api(): без связи — последние сохранённые данные, а не ошибка
+    api('profile.get', params, { fresh: true })
       .then((r) => {
         setForm({ ...EMPTY, ...(r.profile || {}) });
         setState({ loading: false, error: null, age: r.age });
