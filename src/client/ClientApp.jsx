@@ -292,7 +292,7 @@ export default function ClientApp({ me, clientRow, preview }) {
                 Когда этот же кабинет открывает тренер из карточки клиента,
                 выхода быть не должно — он вышел бы из своего. */}
             {!clientRow && <SignOut />}
-            {!clientRow && <DeleteAccount />}
+            {!clientRow && <DeleteAccount unlinked={!!(me && me.unlinked)} />}
             <PrivacyLink />
           </>
         )}

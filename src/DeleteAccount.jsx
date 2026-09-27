@@ -15,7 +15,7 @@ import { Section, Panel } from './ui.jsx';
  * Подтверждение — на месте, а не окном браузера: окно в приложении выглядит
  * чужим, а это решение без пути назад.
  */
-export default function DeleteAccount() {
+export default function DeleteAccount({ unlinked = false }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
@@ -40,8 +40,10 @@ export default function DeleteAccount() {
       <Panel pad>
         <div className="setting">
           <div className="setting__note">
-            Удалятся ваш вход на всех устройствах, персональная ссылка, шаги и уведомления.
-            Карточку с тренировками и оплатами ведёт тренер — он получит сообщение и удалит её.
+            {/* Без тренера карточку вести некому — сервер стирает её целиком */}
+            {unlinked
+              ? 'Удалится всё: вход на всех устройствах, замеры, питание, шаги, профиль и уведомления.'
+              : 'Удалятся ваш вход на всех устройствах, персональная ссылка, шаги и уведомления. Карточку с тренировками и оплатами ведёт тренер — он получит сообщение и удалит её.'}
           </div>
           {asking ? (
             <div className="delete-account__confirm" role="alert">
