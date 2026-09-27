@@ -321,20 +321,23 @@ async function request(action, params) {
 
   let body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS);
 
-  // Запасной адрес нужен на время переезда: новый сервер не отозвался —
-  // молча уходим на старый, вместо того чтобы показывать клиенту ошибку
+  // Запасной адрес: основной не соединился — идём на запасной. С
+  // 27.09.2026 это тот же сервер под прежним именем (nip.io рядом с
+  // api.fitness100.ru), поэтому годится для всего.
   //
-  // Кроме данных члена семьи: Apps Script про семью не знает, familyRow
-  // пропустил бы мимо и отдал спросившему его собственные замеры — под
-  // именем родственника. Лучше честное «сервер не отвечает».
+  // Раньше запасным был Apps Script — тогда без данных семьи (он про семью
+  // не знал) и без тренировок (они живут только на сервере). Эти запреты
+  // остаются, если запасной адрес снова окажется скриптом.
   //
-  // И кроме тренировок: программы и журнал с 25 сентября живут только на
-  // сервере, а Apps Script читал бы и писал их в таблицы — показал бы
-  // устаревшую копию или записал занятие туда, откуда его никто не прочтёт.
-  if (body === null && !JSON.stringify(params).includes('"familyRow"') && !trainingAction(action, params)) {
-    const spare = fallbackApiUrl();
-    if (spare && spare !== url) body = await tryEndpoint(spare, payload);
+  // Не дождались ответа (TIMED_OUT) — на запасной не идём: запрос мог дойти
+  // до сервера, и повтор записи задвоил бы её.
+  const spare = fallbackApiUrl();
+  const spareIsScript = /script\.google/.test(spare || '');
+  const scriptWouldLie = spareIsScript && (JSON.stringify(params).includes('"familyRow"') || trainingAction(action, params));
+  if (body === null && spare && spare !== url && !scriptWouldLie) {
+    body = await tryEndpoint(spare, payload, REQUEST_TIMEOUT_MS);
   }
+  if (body === TIMED_OUT) body = null;
 
   if (body === null) {
     throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
@@ -362,6 +365,9 @@ async function request(action, params) {
   return body.data;
 }
 
+/** Не дождались ответа — это не «не соединились»: см. запасной адрес в request */
+const TIMED_OUT = Symbol('timed-out');
+
 /**
  * Один адрес: сначала POST, при сбое — GET. null, если не отозвался вовсе.
  * Не дождались ответа — GET не пробуем: запрос мог дойти до сервера, и
@@ -371,7 +377,7 @@ async function tryEndpoint(url, payload, timeoutMs) {
   try {
     return await postJson(url, payload, timeoutMs);
   } catch (error) {
-    if (error && error.name === 'AbortError') return null;
+    if (error && error.name === 'AbortError') return TIMED_OUT;
     try {
       return await getJson(url, payload);
     } catch (_) {
