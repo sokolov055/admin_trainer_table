@@ -38,6 +38,9 @@ import { loadApiConfig, currentApiUrl, fallbackApiUrl } from './apiConfig.js';
  *  Не «свежими» — именно пригодными: их всё равно тут же обновляют. */
 const STALE_TTL_MS = 12 * 60 * 60 * 1000;
 
+/** Без связи показываем и более старое — лишь бы не пустой экран */
+const OFFLINE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 const STORAGE_PREFIX = 'api_cache_v1:';
 
 export class ApiError extends Error {
@@ -72,14 +75,20 @@ export function clearApiCache() {
  * Хранилище между запусками
  * ========================================================================== */
 
-function readStored(key) {
+/**
+ * offline — связи нет: годится и старше 12 часов, и помеченное после
+ * записи (dirty). Пустой экран «сервер не отвечает» хуже вчерашних цифр:
+ * приложение открывают и в зале без сети (27.09.2026, iPhone в авиарежиме).
+ */
+function readStored(key, offline = false) {
   try {
     const raw = localStorage.getItem(STORAGE_PREFIX + key);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed.at !== 'number') return null;
-    if (Date.now() - parsed.at > STALE_TTL_MS) return null;
+    if (Date.now() - parsed.at > (offline ? OFFLINE_TTL_MS : STALE_TTL_MS)) return null;
+    if (parsed.dirty && !offline) return null;
 
     return parsed;
   } catch (_) {
@@ -128,6 +137,12 @@ export async function api(action, params = {}, options = {}) {
     })
     .catch((err) => {
       inFlight.delete(key);
+      // Нет связи (код 0 — сервер не ответил вовсе) — последнее, что
+      // знали. Отказ сервера (права, вход) так не подменяем.
+      if (err && err.code === 0) {
+        const old = readStored(key, true);
+        if (old) return old.data;
+      }
       throw err;
     });
 
@@ -406,10 +421,18 @@ export async function apiMutate(action, params = {}, { quiet = false } = {}) {
   const data = await request(action, params);
 
   memory.clear();
+  // Не стираем, а помечаем: при связи экраны всё равно перечитают свежее,
+  // а без связи прежнее лучше пустого экрана (readStored, offline)
   try {
     Object.keys(localStorage)
       .filter((k) => k.indexOf(STORAGE_PREFIX) === 0)
-      .forEach((k) => localStorage.removeItem(k));
+      .forEach((k) => {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(k));
+          if (parsed && typeof parsed === 'object') localStorage.setItem(k, JSON.stringify({ ...parsed, dirty: true }));
+          else localStorage.removeItem(k);
+        } catch (_) { localStorage.removeItem(k); }
+      });
   } catch (_) {}
 
   // Разделы нижнего меню не пересобираются при переходах (keptTabs.js), и
