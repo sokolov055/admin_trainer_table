@@ -216,7 +216,7 @@ function EventForm({ event, day, clients, serviceEmail, onDone, onCancel }) {
           <strong>{event.id ? 'Занятие' : 'Новое занятие'}</strong>
           {event.id && !event.clientRow && (
             <p className="small muted" style={{ margin: 0 }}>
-              «{event.title}» — клиент не узнан. Выберите его: название события в календаре станет его именем.
+              «{event.title}» — клиент не узнан. Выберите его — занятие привяжется к нему, а в Google Календаре останутся только инициалы и номер.
             </p>
           )}
           <label className="field">
