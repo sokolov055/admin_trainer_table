@@ -451,10 +451,10 @@ export default function PlanEditor({
                   <span>{cols.heads[0]}</span><span>{cols.heads[1]}</span>{!split && <span>{cols.heads[2]}</span>}<span>RPE</span>
                 </div>
                 <div className={'plan-edit__numbers' + (split ? ' plan-edit__numbers--split' : '')}>
-                  <input className="field__input" aria-label={cols.heads[0]} placeholder={cols.ph[0]} inputMode="numeric" value={exercise.sets} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
-                  <input className="field__input" aria-label={cols.heads[1]} placeholder={cols.ph[1]} inputMode="text" value={exercise.reps} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
-                  {!split && <input className="field__input" aria-label={cols.heads[2]} placeholder={cols.ph[2]} inputMode={'decimal'} value={exercise.weight} maxLength={24} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
-                  <input className="field__input" aria-label="RPE" placeholder="RPE" inputMode="decimal" value={exercise.rpe} maxLength={12} disabled={busy} onChange={(e) => setExercise(bi, ei, 'rpe', e.target.value)} />
+                  <input className="field__input" aria-label={cols.heads[0]} placeholder={cols.ph[0]} inputMode="numeric" value={exercise.sets} maxLength={40} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
+                  <input className="field__input" aria-label={cols.heads[1]} placeholder={cols.ph[1]} inputMode="text" value={exercise.reps} maxLength={80} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
+                  {!split && <input className="field__input" aria-label={cols.heads[2]} placeholder={cols.ph[2]} inputMode={'decimal'} value={exercise.weight} maxLength={80} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
+                  <input className="field__input" aria-label="RPE" placeholder="RPE" inputMode="decimal" value={exercise.rpe} maxLength={40} disabled={busy} onChange={(e) => setExercise(bi, ei, 'rpe', e.target.value)} />
                 </div>
                 </>
                 )}
@@ -483,7 +483,7 @@ export default function PlanEditor({
                             placeholder={doing ? 'Вес' : 'не делает'}
                             inputMode="decimal"
                             value={(exercise.splitWeights && exercise.splitWeights[m]) || ''}
-                            maxLength={24}
+                            maxLength={80}
                             disabled={busy || !doing}
                             onChange={(e) => setSplitWeight(bi, ei, m, e.target.value)}
                           />
