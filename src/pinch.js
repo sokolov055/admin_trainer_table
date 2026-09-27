@@ -30,9 +30,9 @@ const LOCK = 10;       // px до того, как скорость что-то 
 const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
 // Медленнее по просьбе владельца (27.09.2026): пружина и вход — мягче,
 // ужимание за пальцами — на четверть длиннее хода до порога
-const BACK_MS = 500;
-const ENTER_MS = 420;
-const FOLLOW = 1.25;
+const BACK_MS = 650;
+const ENTER_MS = 550;
+const FOLLOW = 1.45;
 
 const nextFrame = (fn) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : setTimeout(fn, 0));
 
