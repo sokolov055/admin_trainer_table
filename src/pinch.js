@@ -28,7 +28,11 @@ const COMMIT = 0.28;   // доля ширины экрана — вдвое бо
 const FLICK = 220;     // px/с — как BACK_FLICK
 const LOCK = 10;       // px до того, как скорость что-то решает — как LOCK
 const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
-const BACK_MS = 300;
+// Медленнее по просьбе владельца (27.09.2026): пружина и вход — мягче,
+// ужимание за пальцами — на четверть длиннее хода до порога
+const BACK_MS = 500;
+const ENTER_MS = 420;
+const FOLLOW = 1.25;
 
 const nextFrame = (fn) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : setTimeout(fn, 0));
 
@@ -41,7 +45,7 @@ function enter(node, closing) {
   if (!node || !node.animate || reduced()) return;
   node.animate(
     [{ opacity: 0.5, transform: `scale(${closing ? 1.02 : 0.98})` }, { opacity: 1, transform: 'scale(1)' }],
-    { duration: 240, easing: EASE },
+    { duration: ENTER_MS, easing: EASE },
   );
 }
 
@@ -131,7 +135,7 @@ export function usePinch({ onIn, onOut, enabled = true, target = null, morph = n
       const span = COMMIT * window.innerWidth;
       if (cards.length) {
         // Сводим — карточки ужимаются до строк; дальше порога — чуть туже
-        const raw = Math.max(0, -change / span);
+        const raw = Math.max(0, -change / (span * FOLLOW));
         const p = raw <= 1 ? raw : 1 + (raw - 1) * 0.15;
         cards.forEach(({ el, full, row, rest }) => {
           el.style.height = Math.max(row * 0.9, full - (full - row) * Math.min(p, 1.1)) + 'px';
@@ -140,7 +144,7 @@ export function usePinch({ onIn, onOut, enabled = true, target = null, morph = n
         });
       } else if (rows.length) {
         // Разводим над свёрнутым — строки раздвигаются
-        const p = Math.max(0, Math.min(1.2, change / span));
+        const p = Math.max(0, Math.min(1.2, change / (span * FOLLOW)));
         rows.forEach((el) => { el.style.marginBottom = (p * 18).toFixed(1) + 'px'; });
       }
     };
