@@ -26,6 +26,7 @@ import {
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Trainers from './Trainers.jsx';
+import { screensNote } from '../native-update.js';
 
 /**
  * Панель тренера.
@@ -392,7 +393,7 @@ export default function TrainerApp({ me }) {
             Она нужна не каждый день, а в один конкретный момент: когда
             что-то не показывается и надо понять, та ли это сборка.
             Поэтому место — последнее, а вид — приглушённый. */}
-        <p className="menu__version">Версия {APP_VERSION}</p>
+        <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
     </div>
   );

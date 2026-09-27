@@ -11,6 +11,7 @@ import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
+import { screensNote } from '../native-update.js';
 import Profile from './Profile.jsx';
 import PushSetting from '../PushSetting.jsx';
 import DeleteAccount from '../DeleteAccount.jsx';
@@ -232,7 +233,7 @@ export default function ClientApp({ me, clientRow, preview }) {
           })}
         </div>
 
-        <p className="menu__version">Версия {APP_VERSION}</p>
+        <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
 
       {/* key на контейнере перезапускает появление при смене вкладки:
