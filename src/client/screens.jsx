@@ -1,7 +1,6 @@
 import { useReturnScroll } from '../scroll.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
-import Ration from '../nutrition/Ration.jsx';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
@@ -14,12 +13,20 @@ import {
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
-import WorkoutJournal from '../Workout.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
-import PlanEditor from '../trainer/PlanEditor.jsx';
-import { TemplateApply, SaveAsTemplate, Media } from '../trainer/Library.jsx';
+import { Media } from '../media.jsx';
+import { lazyPage, Deferred } from '../lazy.js';
+
+// По требованию (lazy.js): тренировка и рацион — когда их открыли,
+// редактор программы и шаблоны — только тренеру
+export const WorkoutJournal = lazyPage(() => import('../Workout.jsx'));
+export const Ration = lazyPage(() => import('../nutrition/Ration.jsx'));
+export const PlanEditor = lazyPage(() => import('../trainer/PlanEditor.jsx'));
+const TemplateApply = lazyPage(() => import('../trainer/Library.jsx'), 'TemplateApply');
+const SaveAsTemplate = lazyPage(() => import('../trainer/Library.jsx'), 'SaveAsTemplate');
+const waiting = <Loading lead={false} rows={3} />;
 
 /* ==================================================================
  * Обзор
@@ -338,7 +345,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     return () => { alive = false; };
   }, [clientRow, workout, familyRow]);
 
-  if (workout) return <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => setWorkout(null)} />;
+  if (workout) return <Deferred fallback={waiting}><WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => setWorkout(null)} /></Deferred>;
 
   if (loading || error) return <>
     {!familyRow && <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>}
@@ -416,37 +423,43 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           стоят под ним, а не над переключателем месяцев. */}
       {data.canHide && !editing && templateTool === 'apply' && (
         <Section title="Программа из шаблона">
-          <TemplateApply
-            clientRow={clientRow}
-            month={data.month}
-            onApplied={(m) => { setTemplateTool(null); setMonth(m); reload(); }}
-            onCancel={() => setTemplateTool(null)}
-          />
+          <Deferred fallback={waiting}>
+            <TemplateApply
+              clientRow={clientRow}
+              month={data.month}
+              onApplied={(m) => { setTemplateTool(null); setMonth(m); reload(); }}
+              onCancel={() => setTemplateTool(null)}
+            />
+          </Deferred>
         </Section>
       )}
 
       {data.canHide && !editing && templateTool === 'save' && (
         <Section title="Сохранить как шаблон">
-          <SaveAsTemplate
-            clientRow={clientRow}
-            month={data.month}
-            onDone={() => { setTemplateTool(null); setSavedTemplate(true); }}
-            onCancel={() => setTemplateTool(null)}
-          />
+          <Deferred fallback={waiting}>
+            <SaveAsTemplate
+              clientRow={clientRow}
+              month={data.month}
+              onDone={() => { setTemplateTool(null); setSavedTemplate(true); }}
+              onCancel={() => setTemplateTool(null)}
+            />
+          </Deferred>
         </Section>
       )}
 
       {data.canHide && !templateTool && (editing
         ? (
           <Section title={'Правлю: ' + data.month}>
-            <PlanEditor
-              clientRow={clientRow}
-              month={data.month}
-              blocks={blocks}
-              members={data.members || []}
-              onSaved={() => { setEditing(false); reload(); }}
-              onCancel={() => setEditing(false)}
-            />
+            <Deferred fallback={waiting}>
+              <PlanEditor
+                clientRow={clientRow}
+                month={data.month}
+                blocks={blocks}
+                members={data.members || []}
+                onSaved={() => { setEditing(false); reload(); }}
+                onCancel={() => setEditing(false)}
+              />
+            </Deferred>
           </Section>
         )
         : (
@@ -1487,10 +1500,10 @@ export function Nutrition({ clientRow, clientView = false }) {
   // открытый, он показал бы тренеру его собственный холодильник под именем
   // клиента.
   if (ration && configured && !clientView && !byTrainer) {
-    return <Ration targets={targets} onClose={() => setRation(false)} />;
+    return <Deferred fallback={waiting}><Ration targets={targets} onClose={() => setRation(false)} /></Deferred>;
   }
   if (trial && configured) {
-    return <Ration targets={targets} trial onClose={() => setTrial(false)} />;
+    return <Deferred fallback={waiting}><Ration targets={targets} trial onClose={() => setTrial(false)} /></Deferred>;
   }
 
   const onSaved = (result) => {

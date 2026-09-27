@@ -5,15 +5,34 @@ import { clearToken, getToken, onTokenChange } from './session.js';
 import { readLoginTicket } from './auth-transfer.js';
 import { readInviteToken, removeInviteToken } from './invites.js';
 import { readAccessToken, removeAccessToken } from './access.js';
-import AccessLogin from './AccessLogin.jsx';
-import InviteRegistration from './InviteRegistration.jsx';
 import { Loading, ErrorState } from './ui.jsx';
 import { InstallHint, TransferLoginScreen } from './AuthTransfer.jsx';
 import AppHint from './AppHint.jsx';
 import { canOpenInApp } from './open-in-app.js';
-import ClientApp from './client/ClientApp.jsx';
-import TrainerApp from './trainer/TrainerApp.jsx';
-import LoginScreen from './LoginScreen.jsx';
+import { lazyPage, Deferred, warmUp } from './lazy.js';
+
+// Кабинеты и экраны входа — по требованию (lazy.js): клиенту не нужен
+// кабинет тренера, вошедшему — экраны входа
+const ClientApp = lazyPage(() => import('./client/ClientApp.jsx'));
+const TrainerApp = lazyPage(() => import('./trainer/TrainerApp.jsx'));
+const LoginScreen = lazyPage(() => import('./LoginScreen.jsx'));
+const AccessLogin = lazyPage(() => import('./AccessLogin.jsx'));
+const InviteRegistration = lazyPage(() => import('./InviteRegistration.jsx'));
+
+/** Что роли понадобится дальше — догружаем в фоне, чтобы работало и без сети */
+const LATER = {
+  client: [{ preload: () => import('./Workout.jsx') }, { preload: () => import('./nutrition/Ration.jsx') }],
+  trainer: [TrainerApp, { preload: () => import('./Workout.jsx') }, { preload: () => import('./trainer/PlanEditor.jsx') }],
+};
+
+/** Пока часть грузится — тот же скелет, что и при загрузке данных */
+const waitingPage = (
+  <div className="app">
+    <main className="app__body">
+      <Loading rows={3} />
+    </main>
+  </div>
+);
 import { Gestures } from './gestures.jsx';
 
 /**
@@ -54,8 +73,15 @@ export default function App() {
 
   useEffect(() => onTokenChange(setSignedToken), []);
 
+  // Кабинет показан — догружаем остальное, пока человек смотрит на него
+  const role = state.me && state.me.role;
+  useEffect(() => { if (role) warmUp(LATER[role] || LATER.client); }, [role]);
+
   const load = () => {
     const cached = apiStale('me', {});
+    // Кабинет грузим сразу, параллельно с «кто я»: роль с прошлого раза
+    // известна, а новичок почти всегда клиент
+    (cached.data && cached.data.role === 'trainer' ? TrainerApp : ClientApp).preload().catch(() => {});
 
     if (cached.data) {
       // Роль известна — показываем панель немедленно, проверяем в фоне
@@ -112,7 +138,7 @@ export default function App() {
   // человеку не его данные.
   if (accessToken) {
     return (
-      <AccessLogin
+      <Deferred fallback={waitingPage}><AccessLogin
         token={accessToken}
         details={<LaunchDetails />}
         onComplete={() => {
@@ -125,7 +151,7 @@ export default function App() {
           setAccessToken('');
           setInstallReady(true);
         }}
-      />
+      /></Deferred>
     );
   }
 
@@ -134,7 +160,7 @@ export default function App() {
   // приглашённого человека, затем возвращаемся в обычный запуск.
   if (inviteToken) {
     return (
-      <InviteRegistration
+      <Deferred fallback={waitingPage}><InviteRegistration
         token={inviteToken}
         details={<LaunchDetails />}
         onComplete={() => {
@@ -142,7 +168,7 @@ export default function App() {
           removeInviteToken();
           setInviteToken('');
         }}
-      />
+      /></Deferred>
     );
   }
 
@@ -171,7 +197,7 @@ export default function App() {
   // Ни подписи, ни ключа — приложение открыли снаружи Telegram и на этом
   // устройстве ещё не входили. Это обычное начало, а не тупик.
   if (!authorized) {
-    return <LoginScreen details={<LaunchDetails />} />;
+    return <Deferred fallback={waitingPage}><LoginScreen details={<LaunchDetails />} /></Deferred>;
   }
 
   if (state.loading) {
@@ -198,7 +224,9 @@ export default function App() {
 
   return (
     <>
-      {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
+      <Deferred fallback={waitingPage}>
+        {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
+      </Deferred>
       <Gestures />
       {/* Подсказка живёт не только сразу после входа. Ставят приложение
           редко с первого раза: человек заходит посмотреть баланс, закрывает
