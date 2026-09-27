@@ -12,6 +12,7 @@ import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
+import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
 import './workout.css';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
@@ -79,6 +80,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [now, setNow] = useState(Date.now());
   const state = useRef(null), key = useRef(''), saving = useRef(false), mounted = useRef(true);
   const conflictRef = useRef(null);
+  // Просили сохранить, пока шло прежнее сохранение (см. save)
+  const saveAgain = useRef(false);
   const params = clientRow ? { clientRow } : {};
 
   const store = value => {
@@ -175,6 +178,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   const save = async () => {
     let r = state.current;
+    // Идёт прежнее сохранение — не теряем просьбу, а повторяем сразу после
+    // него. Иначе отдых, начатый вслед за отметкой подхода, ждал обычную
+    // задержку, телефон тем временем уходил в карман, iPhone замораживал
+    // страницу — и сервер не узнавал об отдыхе (уведомление не приходило).
+    if (r && r.dirty && saving.current) { saveAgain.current = true; return; }
     if (!r || !r.dirty || saving.current || conflictRef.current || !key.current) return;
     saving.current = true; if (mounted.current) setBusy(true);
     // Повторяем ровно тот снимок, чей ответ потерялся. Новые нажатия
@@ -212,8 +220,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       if (mounted.current) setMessage('Не сохранено в облаке: ' + e.message + ' Черновик остаётся на устройстве.');
     } finally {
       saving.current = false; if (mounted.current) setBusy(false);
+      if (saveAgain.current) { saveAgain.current = false; save(); }
     }
   };
+
+  // Отдых закончился раньше срока: сбросили, пауза, занятие завершено
+  const restUntil = record?.session?.restUntil || 0;
+  const restStatus = record?.session?.status;
+  useEffect(() => {
+    if (!restUntil || restStatus !== 'active') cancelRestEnd();
+  }, [restUntil, restStatus]);
 
   useEffect(() => {
     if (!ready || !record?.dirty || busy || message || conflict) return;
@@ -225,9 +241,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const interval = setInterval(() => setNow(Date.now()), 1000);
     const online = () => { setMessage(''); save(); };
     const unload = e => { if (state.current?.dirty) { e.preventDefault(); e.returnValue = ''; } };
+    // Свернули приложение или заблокировали экран — несохранённое уходит
+    // сразу: на iPhone у страницы после этого мгновения, не секунды
+    const hide = () => { if (document.hidden) save(); };
     window.addEventListener('online', online);
     window.addEventListener('beforeunload', unload);
-    return () => { clearInterval(interval); window.removeEventListener('online', online); window.removeEventListener('beforeunload', unload); };
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', save);
+    return () => {
+      clearInterval(interval); window.removeEventListener('online', online); window.removeEventListener('beforeunload', unload);
+      document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', save);
+    };
   }, []);
 
   /**
@@ -287,8 +311,29 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const length = seconds || (state.current && state.current.session.restSeconds);
     if (!length) return;
 
-    change(v => ({ ...v, restUntil: Date.now() + length * 1000 }));
+    restAt(Date.now() + length * 1000);
+  };
+
+  /** +30 секунд к отдыху — и уведомление переставить */
+  const extendRest = () => {
+    restAt(Math.max(Date.now(), (state.current && state.current.session.restUntil) || 0) + 30000);
+  };
+
+  /**
+   * Отдых до времени until. Сначала — на сервер (он пришлёт уведомление,
+   * если телефон не сможет сам), потом телефон ставит своё
+   * (native-rest.js) и, только если поставил, говорит серверу молчать:
+   * restLocal — платформа этого телефона. Запрещены уведомления — отметки
+   * нет, и уведомление придёт с сервера, как раньше.
+   */
+  const restAt = (until) => {
+    change(v => ({ ...v, restUntil: until, restLocal: '' }));
     save();
+    scheduleRestEnd(until).then((ok) => {
+      if (!ok || state.current?.session.restUntil !== until) return;
+      change(v => (v.restUntil === until ? { ...v, restLocal: localRestPlatform() } : v));
+      save();
+    });
   };
 
   const updateExercise = (index, fn) => change(s => ({ ...s, exercises: s.exercises.map((e, i) => i === index ? fn(e) : e) }));
@@ -749,7 +794,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {!!s.restUntil && <div className="workout__rest workout__rest--float" role="status">
           <span>{now < s.restUntil ? 'Отдых ' + clock(s.restUntil - now) : 'Отдых закончен — следующий подход'}</span>
           <span className="workout__rest-actions">
-            <button className="button" onClick={() => change(v => ({ ...v, restUntil: Math.max(now, v.restUntil) + 30000 }))}>+30 с</button>
+            <button className="button" onClick={extendRest}>+30 с</button>
             <button className="button" onClick={() => change(v => ({ ...v, restUntil: 0 }))}>Сбросить</button>
           </span>
         </div>}
