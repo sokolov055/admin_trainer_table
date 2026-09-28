@@ -12,7 +12,7 @@
  * старой сборке, на Android и в браузере всё здесь молча ничего не делает.
  */
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
-import { trackOf } from './exercise-track.js';
+import { trackOf, volumeOf } from './exercise-track.js';
 
 function activity() {
   if (!isNativeApp()) return null;
@@ -86,6 +86,12 @@ export function activityPayload(record) {
     sets: setQueue(s),
     // Кнопка «Отдых» на плашке: выбранная длительность, «вручную» — 1:30
     restSeconds: s.restSeconds || 90,
+    // Первый экран часов: объём и упражнения
+    volume: Math.round(s.exercises.reduce((n, e) => n + e.sets
+      .filter((x) => x.state === 'done' && x.kind !== 'warmup')
+      .reduce((m, x) => m + volumeOf(x, trackOf(e)), 0), 0)),
+    exercisesDone: s.exercises.filter((e) => e.sets.length && !e.sets.some((x) => x.state === 'pending')).length,
+    exercisesTotal: s.exercises.length,
   };
 }
 
@@ -194,16 +200,23 @@ const mine = (ex, a) => ex.id === String(a.exerciseId || '');
 const whose = (set, a) => (set.who || '') === String(a.who || '');
 
 /**
- * Проиграть нажатое на плашке в занятие:
+ * Проиграть нажатое на плашке и часах в занятие:
  *  - weight — вес в текущий и оставшиеся подходы упражнения (у пары — своему);
  *  - done — первый неотмеченный подход упражнения сделан, с весом с плашки;
- *  - rest — отдых до restUntil (если позже нынешнего).
+ *  - rest — отдых до restUntil (если позже нынешнего); restStop — закончить;
+ *  - restSeconds — длительность отдыха;
+ *  - skipExercise — оставшиеся подходы упражнения пропущены;
+ *  - pause / resume — со временем нажатия: страница спала, а секундомер
+ *    должен встать и пойти тогда, когда нажали, а не когда открыли;
+ *  - finish — занятие завершено, неотмеченное пропущено.
+ * now — когда проигрываем: время занятия уже досчитано до него (change).
  * Чужое занятие и непонятное пропускаем.
  */
-export function applyActions(session, actions, platform = '') {
+export function applyActions(session, actions, platform = '', now = Date.now()) {
   let s = session;
   for (const a of actions) {
-    if (String(a.sessionId) !== s.id) continue;
+    if (String(a.sessionId) !== s.id || !['active', 'paused'].includes(s.status)) continue;
+    const at = Math.min(now, Number(a.at) || now);
     if (a.kind === 'weight' && WEIGHT_RE.test(String(a.value))) {
       s = { ...s, exercises: s.exercises.map((ex) => !mine(ex, a) ? ex : {
         ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) ? { ...set, weight: String(a.value) } : set),
@@ -219,6 +232,22 @@ export function applyActions(session, actions, platform = '') {
       }) };
     } else if (a.kind === 'rest' && Number(a.restUntil) > (s.restUntil || 0) && s.status === 'active') {
       s = { ...s, restUntil: Math.round(Number(a.restUntil)), restLocal: platform };
+    } else if (a.kind === 'restStop' && s.restUntil) {
+      s = { ...s, restUntil: 0 };
+    } else if (a.kind === 'restSeconds' && Number(a.value) > 0 && Number(a.value) <= 1800) {
+      s = { ...s, restSeconds: Math.round(Number(a.value)) };
+    } else if (a.kind === 'skipExercise') {
+      s = { ...s, exercises: s.exercises.map((ex) => !mine(ex, a) ? ex : {
+        ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) ? { ...set, state: 'skipped' } : set),
+      }) };
+    } else if (a.kind === 'pause' && s.status === 'active') {
+      // Время с нажатия до открытия — не тренировка
+      s = { ...s, status: 'paused', restUntil: 0, elapsedMs: Math.max(0, (s.elapsedMs || 0) - (now - at)) };
+    } else if (a.kind === 'resume' && s.status === 'paused') {
+      s = { ...s, status: 'active', elapsedMs: (s.elapsedMs || 0) + (now - at) };
+    } else if (a.kind === 'finish') {
+      s = { ...s, status: 'completed', restUntil: 0,
+        exercises: s.exercises.map((ex) => ({ ...ex, sets: ex.sets.map((set) => set.state === 'pending' ? { ...set, state: 'skipped' } : set) })) };
     }
   }
   return s;

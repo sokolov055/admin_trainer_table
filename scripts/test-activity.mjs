@@ -144,3 +144,36 @@ test('журнал с плашки: вес, «Отдых» (подход сде�
   assert.equal(out.restLocal, 'ios');
   assert.equal(la.applyActions(s, []), s, 'пусто — занятие то же');
 });
+
+test('часы: пауза и продолжение — по времени нажатия, а не открытия', () => {
+  const now = 1_000_000_600_000;
+  const s = { ...record({}).session, elapsedMs: 600000 };
+  const paused = la.applyActions(s, [{ kind: 'pause', sessionId: 's1', at: now - 120000 }], '', now);
+  assert.equal(paused.status, 'paused');
+  assert.equal(paused.elapsedMs, 480000, 'две минуты после паузы не считаем');
+  const back = la.applyActions(paused, [{ kind: 'resume', sessionId: 's1', at: now - 60000 }], '', now);
+  assert.equal(back.status, 'active');
+  assert.equal(back.elapsedMs, 540000, 'минута после продолжения — тренировка');
+});
+
+test('часы: следующее упражнение, время отдыха, отдых закончить, завершить', () => {
+  const s = { ...record({}).session, restUntil: Date.now() + 60000 };
+  const out = la.applyActions(s, [
+    { kind: 'restSeconds', sessionId: 's1', value: 120 },
+    { kind: 'restStop', sessionId: 's1' },
+    { kind: 'skipExercise', sessionId: 's1', exerciseId: 'e1', who: '' },
+  ]);
+  assert.equal(out.restSeconds, 120);
+  assert.equal(out.restUntil, 0);
+  assert.deepEqual(out.exercises[0].sets.map((x) => x.state), ['done', 'skipped', 'skipped']);
+  const done = la.applyActions(out, [{ kind: 'finish', sessionId: 's1' }, { kind: 'weight', sessionId: 's1', exerciseId: 'e2', who: '', value: '5' }]);
+  assert.equal(done.status, 'completed');
+  assert.equal(done.exercises[1].sets[0].state, 'skipped');
+  assert.equal(done.exercises[1].sets[0].weight, '', 'после завершения нажатия не применяем');
+});
+
+test('первый экран часов: объём и упражнения', () => {
+  const p = la.activityPayload(record({}));
+  assert.equal(p.volume, 480, '60 кг × 8');
+  assert.deepEqual([p.exercisesDone, p.exercisesTotal], [0, 2]);
+});
