@@ -62,6 +62,31 @@ export default function Steps({ clientRow, self = false }) {
   const [connected, setConnected] = useState(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
+  // Итог «Проверить ещё раз» — словами: раньше кнопка молчала при любом исходе
+  const [checked, setChecked] = useState('');
+
+  const recheck = async () => {
+    setBusy(true);
+    setChecked('');
+    try {
+      // iPhone: окно разрешения могло не завершиться — спрашиваем снова
+      // (если доступ уже решён, iOS окна не покажет, только прочитает)
+      const res = onIphone() ? await connectSteps() : await syncSteps(true);
+      if (res.reason && res.ok === false) setChecked(res.reason);
+      else if (res.sent) { setChecked('Готово: телефон передал шаги за ' + res.sent + ' дн.'); reload(); }
+      else if (res.reason === 'empty') {
+        setChecked(onIphone()
+          ? 'iPhone не отдал ни одного шага за месяц — похоже, доступа нет. «Здоровье» → ваш профиль (вверху справа) → Приложения → Fit Track → включите «Шаги», затем проверьте ещё раз.'
+          : 'Health Connect не отдал ни одного шага за месяц. Включите передачу шагов в Health Connect из Google Fit, Samsung Health или приложения браслета.');
+      } else if (res.reason === 'denied') setChecked('Доступ к шагам не выдан — нажмите «Подключить шаги» ещё раз.');
+      else setChecked('Телефону пока нечего передать.');
+    } catch (e) {
+      setChecked('Не получилось: ' + (e.message || 'ошибка связи') + '.');
+    } finally {
+      setBusy(false);
+      reportDevice(true);
+    }
+  };
 
   // Шаги ушли на сервер (при запуске, возврате, подключении) — перечитать
   useEffect(() => {
@@ -126,8 +151,9 @@ export default function Steps({ clientRow, self = false }) {
                   : 'Health Connect сам шаги не считает — их туда пишет приложение: Google Fit, Samsung Health, Mi Fitness или приложение браслета. Откройте его и включите передачу шагов в Health Connect.'}
               </p>
               <div className="survey__actions">
-                <button className="button" onClick={() => syncSteps(true).catch(() => {})}>Проверить ещё раз</button>
+                <button className="button" onClick={recheck} disabled={busy}>{busy ? 'Проверяем…' : 'Проверить ещё раз'}</button>
               </div>
+              {checked && <p className="small" role="status" style={{ marginBottom: 0 }}>{checked}</p>}
             </>
           ) : (
             <>

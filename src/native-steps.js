@@ -82,22 +82,29 @@ export async function connectSteps() {
     return { ok: false, reason: 'Доступ к шагам не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track.' };
   }
   try { localStorage.setItem(ON_KEY, '1'); } catch (_) {}
-  await syncSteps(true);
-  return { ok: true };
+  // Итог первой отправки — тому, кто нажал: «Проверить ещё раз» показывает его
+  const sent = await syncSteps(true);
+  return { ok: true, ...sent };
 }
 
-/** Прочитать суммы по дням и отправить. force — без паузы в 10 минут */
+/**
+ * Прочитать суммы по дням и отправить. force — без паузы в 10 минут.
+ *
+ * reason — почему ничего не ушло, для кнопки «Проверить ещё раз»: раньше
+ * она молчала при любом исходе, и было не понять, сломано что-то или
+ * телефону просто нечего отдать (28.09.2026).
+ */
 export async function syncSteps(force = false) {
   const h = health();
-  if (!h) return { sent: 0 };
-  try { if (!localStorage.getItem(ON_KEY)) return { sent: 0 }; } catch (_) { return { sent: 0 }; }
+  if (!h) return { sent: 0, reason: 'app' };
+  try { if (!localStorage.getItem(ON_KEY)) return { sent: 0, reason: 'off' }; } catch (_) { return { sent: 0, reason: 'off' }; }
   if (!force) {
     try {
       const last = Number(localStorage.getItem(SENT_KEY) || 0);
-      if (Date.now() - last < EVERY_MS) return { sent: 0 };
+      if (Date.now() - last < EVERY_MS) return { sent: 0, reason: 'recent' };
     } catch (_) {}
   }
-  if (!(await stepsConnected())) return { sent: 0 };
+  if (!(await stepsConnected())) return { sent: 0, reason: 'denied' };
 
   const end = new Date();
   const start = new Date(end);
@@ -109,13 +116,17 @@ export async function syncSteps(force = false) {
   const days = (res.samples || [])
     .map((s) => ({ date: localDate(new Date(s.startDate)), steps: Math.round(Number(s.value) || 0) }))
     .filter((d) => d.steps >= 0);
-  try { localStorage.setItem(HAD_KEY, days.some((d) => d.steps > 0) ? '1' : '0'); } catch (_) {}
-  if (!days.length) return { sent: 0 };
+  const had = days.some((d) => d.steps > 0);
+  try { localStorage.setItem(HAD_KEY, had ? '1' : '0'); } catch (_) {}
+  // Месяц нулей — это не «не ходил», а «доступа нет»: iPhone без разрешения
+  // отдаёт пустые дни и не говорит, что чтение запрещено. Нули в прогресс
+  // не шлём — там они выглядели бы как месяц без движения
+  if (!days.length || !had) return { sent: 0, reason: 'empty' };
   await apiMutate('steps.sync', { days, source: onIphone() ? 'healthkit' : 'health-connect' });
   try { localStorage.setItem(SENT_KEY, String(Date.now())); } catch (_) {}
   // Экран «Прогресс» мог загрузиться раньше, чем шаги ушли, — пусть перечитает
   try { window.dispatchEvent(new Event(STEPS_SENT)); } catch (_) {}
-  return { sent: days.length };
+  return { sent: days.length, reason: 'ok' };
 }
 
 /** Отключить на этом телефоне: больше не читать и не отправлять */
