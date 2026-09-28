@@ -310,6 +310,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // Журнал занятий: из него берутся и незакрытое занятие, и отметка
   // «тренировка проведена» у блоков программы.
   const [sessions, setSessions] = useState([]);
+  // Переименование тренировки или месяца меняет и журнал (на сервере) —
+  // перечитать его, иначе проведённые на миг окажутся в «Очереди»
+  const [journalTick, setJournalTick] = useState(0);
 
   // Правка программы доступна только тренеру и только из карточки
   // клиента: в режиме «смотрю как клиент» кнопок быть не должно.
@@ -343,7 +346,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       })
       .catch(() => { if (alive) setSessions([]); });
     return () => { alive = false; };
-  }, [clientRow, workout, familyRow]);
+  }, [clientRow, workout, familyRow, journalTick]);
 
   if (workout) return <Deferred fallback={waiting}><WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => setWorkout(null)} /></Deferred>;
 
@@ -456,7 +459,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 month={data.month}
                 blocks={blocks}
                 members={data.members || []}
-                onSaved={() => { setEditing(false); reload(); }}
+                onSaved={() => { setEditing(false); reload(); setJournalTick((t) => t + 1); }}
                 onCancel={() => setEditing(false)}
               />
             </Deferred>
@@ -504,6 +507,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                       await apiMutate('plan.month.rename', { clientRow, from: data.month, to: to.trim() });
                       setMonth(to.trim());
                       reload();
+                      setJournalTick((t) => t + 1);
                     } catch (error) {
                       window.alert(error.message);
                     } finally {

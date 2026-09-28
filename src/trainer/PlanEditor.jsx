@@ -87,7 +87,9 @@ export default function PlanEditor({
   const [extra, setExtra] = useState([]);
   const exercises = (library.data ? library.data.exercises : []).concat(extra);
   const [draft, setDraft] = useState(() => (blocks.length
-    ? blocks.map((b) => ({ title: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blank(), ...e })) }))
+    // was — название, под которым тренировка открылась: по нему сервер
+    // переименовывает её и в журнале занятий
+    ? blocks.map((b) => ({ title: b.title, was: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blank(), ...e })) }))
     : [{ title: 'Тренировка № 1', exercises: [blank()] }]));
 
   const [busy, setBusy] = useState(false);
@@ -304,6 +306,7 @@ export default function PlanEditor({
     try {
       const clean = draft.map((b) => ({
         title: b.title,
+        ...(b.was ? { was: b.was } : {}),
         ...(b.sourceId ? { sourceId: b.sourceId } : {}),
         exercises: b.exercises.filter((e) => String(e.name || '').trim()),
       }));
@@ -359,6 +362,8 @@ export default function PlanEditor({
               const copy = {
                 ...next[i],
                 title: next[i].title + ' (копия)',
+                // Копия — новая тренировка: журнала оригинала у неё нет
+                was: '',
                 // Суперсеты копии — свои группы, чтобы не склеиться с оригиналом
                 exercises: next[i].exercises.map((e) => ({
                   ...e, supersetGroup: e.supersetGroup ? e.supersetGroup + '-c' + Date.now() + '-' + i : '',
