@@ -129,6 +129,24 @@ export async function syncSteps(force = false) {
   return { sent: days.length, reason: 'ok' };
 }
 
+/**
+ * Открыть, где выдаётся доступ к шагам. iPhone спрашивает доступ один раз:
+ * отказали или закрыли окно — повторно iOS его не покажет, включить можно
+ * только в «Здоровье». Плагин на iOS такого не умеет — открываем «Здоровье»
+ * ссылкой x-apple-health://, оболочка Capacitor отдаёт такие ссылки системе.
+ * Android — настройки Health Connect через плагин.
+ */
+export async function openHealthSettings() {
+  if (onIphone()) {
+    window.location.href = 'x-apple-health://';
+    return true;
+  }
+  const h = health();
+  if (!h || !h.openHealthConnectSettings) return false;
+  await h.openHealthConnectSettings();
+  return true;
+}
+
 /** Отключить на этом телефоне: больше не читать и не отправлять */
 export function disconnectSteps() {
   try { localStorage.removeItem(ON_KEY); localStorage.removeItem(SENT_KEY); localStorage.removeItem(HAD_KEY); } catch (_) {}

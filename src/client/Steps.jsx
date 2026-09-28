@@ -3,7 +3,7 @@ import { useData } from '../useData.js';
 import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
-import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, reportDevice, STEPS_SENT } from '../native-steps.js';
+import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, reportDevice, openHealthSettings, STEPS_SENT } from '../native-steps.js';
 
 /**
  * Шаги — в «Прогрессе» клиента и в карточке клиента у тренера.
@@ -76,8 +76,8 @@ export default function Steps({ clientRow, self = false }) {
       else if (res.sent) { setChecked('Готово: телефон передал шаги за ' + res.sent + ' дн.'); reload(); }
       else if (res.reason === 'empty') {
         setChecked(onIphone()
-          ? 'iPhone не отдал ни одного шага за месяц — похоже, доступа нет. «Здоровье» → ваш профиль (вверху справа) → Приложения → Fit Track → включите «Шаги», затем проверьте ещё раз.'
-          : 'Health Connect не отдал ни одного шага за месяц. Включите передачу шагов в Health Connect из Google Fit, Samsung Health или приложения браслета.');
+          ? 'Шагов по-прежнему нет: доступ в «Здоровье» не включён.'
+          : 'Шагов по-прежнему нет: Health Connect их не получает.');
       } else if (res.reason === 'denied') setChecked('Доступ к шагам не выдан — нажмите «Подключить шаги» ещё раз.');
       else setChecked('Телефону пока нечего передать.');
     } catch (e) {
@@ -143,14 +143,24 @@ export default function Steps({ clientRow, self = false }) {
         <Panel pad>
           {connected ? (
             <>
+              {/* iOS не говорит приложению, что чтение запрещено: запрет
+                  выглядит как «шагов нет». И окно разрешения iPhone
+                  показывает один раз — дальше доступ включают только в
+                  «Здоровье», поэтому главная кнопка ведёт туда */}
+              <p className="steps__lead">
+                {onIphone()
+                  ? 'Шаги не приходят: похоже, в «Здоровье» не включён доступ для Fit Track.'
+                  : 'Шаги не приходят: похоже, Health Connect их не получает.'}
+              </p>
               <p className="small muted">
-                Шаги подключены, но телефон пока их не передал. {onIphone()
-                  // iOS не говорит приложению, что чтение запрещено: для него
-                  // запрет выглядит как «шагов пока нет», поэтому подсказываем, где проверить
-                  ? 'Шаги считает сам iPhone и Apple Watch — обычно они появляются через несколько минут. Нет дольше — проверьте доступ: приложение «Здоровье» → ваш профиль (вверху справа) → Приложения → Fit Track → включите «Шаги».'
-                  : 'Health Connect сам шаги не считает — их туда пишет приложение: Google Fit, Samsung Health, Mi Fitness или приложение браслета. Откройте его и включите передачу шагов в Health Connect.'}
+                {onIphone()
+                  ? 'В «Здоровье»: ваш профиль (вверху справа), затем «Приложения», Fit Track и включите «Шаги». Вернитесь сюда, шаги подтянутся сами.'
+                  : 'Шаги в Health Connect пишет приложение: Google Fit, Samsung Health, Mi Fitness или браслет. Включите в нём передачу шагов и разрешите Fit Track их читать.'}
               </p>
               <div className="survey__actions">
+                <button className="button button--primary" onClick={() => openHealthSettings().catch(() => setChecked('Не получилось открыть настройки — откройте их вручную.'))} disabled={busy}>
+                  {onIphone() ? 'Открыть «Здоровье»' : 'Открыть Health Connect'}
+                </button>
                 <button className="button" onClick={recheck} disabled={busy}>{busy ? 'Проверяем…' : 'Проверить ещё раз'}</button>
               </div>
               {checked && <p className="small" role="status" style={{ marginBottom: 0 }}>{checked}</p>}

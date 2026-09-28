@@ -26,7 +26,7 @@ globalThis.localStorage = {
   setItem: (k, v) => store.set(k, String(v)),
   removeItem: (k) => store.delete(k),
 };
-globalThis.window = { dispatchEvent: () => true };
+globalThis.window = { dispatchEvent: () => true, location: { href: 'https://app.example/' } };
 globalThis.Event = class { constructor(type) { this.type = type; } };
 
 const stubs = {
@@ -40,6 +40,7 @@ const stubs = {
       checkAuthorization: async () => ({ readAuthorized: f().authorized ? ['steps'] : [] }),
       requestAuthorization: async () => ({ readAuthorized: f().authorized ? ['steps'] : [] }),
       queryAggregated: async () => ({ samples: f().samples }),
+      openHealthConnectSettings: async () => { f().opened = (f().opened || 0) + 1; },
     });`,
   './api.js': `
     export const apiMutate = async (op, params) => {
@@ -99,4 +100,13 @@ test('не подключали на этом телефоне — «выклю�
   steps.disconnectSteps();
   const res = await steps.syncSteps(true);
   assert.equal(res.reason, 'off');
+});
+
+test('«Открыть „Здоровье“»: iPhone — ссылкой в «Здоровье», Android — настройки Health Connect', async () => {
+  fake.platform = 'ios';
+  assert.equal(await steps.openHealthSettings(), true);
+  assert.equal(window.location.href, 'x-apple-health://');
+  fake.platform = 'android';
+  assert.equal(await steps.openHealthSettings(), true);
+  assert.equal(fake.opened, 1);
 });
