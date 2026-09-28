@@ -77,6 +77,10 @@ const TABS = [
 const MENU = [
   // Журнал тренировок клиента — все его занятия по месяцам, свободные и
   // отменённые; то же занятие, что в «Выполненных» его программы
+  // Свои тренировки тренера — как у клиента, но правит он сам. Пока
+  // только владельцу: данные о здоровье других тренеров — после
+  // юридической проверки (docs/legal/2026-09-28-my-workouts.md)
+  { id: 'my-workouts', label: 'Мои тренировки', note: 'Своя программа, прогресс и питание', Icon: IconPlan, owner: true },
   { id: 'journal', label: 'Журнал тренировок', note: 'Все занятия клиента', Icon: IconProgress },
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
   { id: 'client-preview', label: 'Клиентская версия', note: 'Проверить приложение глазами клиента', Icon: IconPhone },
@@ -359,7 +363,8 @@ export default function TrainerApp({ me }) {
 
       {inMenu && (
       <main className="app__body" key={view}>
-        {view === 'journal' && <JournalScreen />}
+        {view === 'my-workouts' && <MyWorkouts />}
+        {view === 'journal' && <JournalScreen owner={owner} />}
         {view === 'expenses' && <Expenses />}
         {view === 'logs' && owner && <Logs />}
         {view === 'trainers' && owner && <Trainers />}
@@ -416,8 +421,10 @@ export default function TrainerApp({ me }) {
  * по кнопке во вкладке «Тренировки» карточки: занятие одно, правка в
  * любом месте — правка его же.
  */
-function JournalScreen() {
+function JournalScreen({ owner }) {
   const [client, setClient] = useState(null);
+  // Свой журнал владельца — первым в списке («Мои тренировки»)
+  const self = useSelfCard(owner);
   if (client) {
     return (
       <Section title={'Журнал · ' + client.name}>
@@ -432,6 +439,7 @@ function JournalScreen() {
       title="Журнал тренировок"
       note="Выберите клиента — откроются все его занятия"
       action="Открыть журнал"
+      first={self.card ? { row: self.card.clientRow, name: 'Я · ' + self.card.name, note: 'Мои тренировки' } : null}
       onSelect={setClient}
     />
   );
@@ -449,14 +457,73 @@ function ClientPreviewPicker({ onSelect }) {
   );
 }
 
-function ClientPicker({ title, note, action, Icon = null, onSelect }) {
+/**
+ * Карточка самого тренера («Мои тренировки», сервер: trainer.self). Заводится
+ * при первом обращении; не владельцу — не спрашиваем: раздел пока его.
+ */
+function useSelfCard(enabled) {
+  const [state, setState] = useState({ card: null, error: null, loading: !!enabled });
+  const load = useCallback(() => {
+    if (!enabled) return;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    apiMutate('trainer.self', {})
+      .then((card) => setState({ card, error: null, loading: false }))
+      .catch((error) => setState({ card: null, error, loading: false }));
+  }, [enabled]);
+  useEffect(() => { load(); }, [load]);
+  return { ...state, reload: load };
+}
+
+const MY_VIEWS = [
+  { value: 'plan', label: 'Тренировки', Screen: Plan },
+  { value: 'progress', label: 'Прогресс', Screen: Progress },
+  { value: 'nutrition', label: 'Питание', Screen: Nutrition },
+];
+
+/**
+ * «Мои тренировки» (решение владельца 28.09.2026): тренер — сам себе
+ * клиент. Те же экраны, что в карточке клиента (программа из шаблона,
+ * прогресс с замерами, питание), и те же права тренера; без обзора со
+ * следующей тренировкой, оплат и записи. Журнал — в «Журнале тренировок».
+ */
+function MyWorkouts() {
+  const self = useSelfCard(true);
+  const [view, setView] = useState('plan');
+  const sections = useKeptTabs(view, MY_VIEWS.map((v) => v.value), { keepScroll: false });
+
+  if (self.loading && !self.card) return <Loading lead={false} rows={4} />;
+  if (self.error) return <ErrorState error={self.error} onRetry={self.reload} />;
+  if (!self.card) return null;
+
+  return (
+    <>
+      <div className="app__subnav card-bar">
+        <NavTabs items={MY_VIEWS} value={view} onChange={(id) => { sections.leave(); setView(id); haptic(); }} />
+      </div>
+      {MY_VIEWS.map((v) => sections.shown(v.value) && (
+        <div
+          key={v.value}
+          hidden={view !== v.value}
+          data-kept={sections.kept(v.value) ? '' : undefined}
+          className="card-section"
+          data-view={v.value}
+          style={{ marginTop: 'var(--space-4)' }}
+        >
+          <v.Screen clientRow={self.card.clientRow} />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function ClientPicker({ title, note, action, Icon = null, first = null, onSelect }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, []);
   const [query, setQuery] = useState('');
 
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
-  const clients = (data.clients || []).filter((client) => (
+  const clients = [...(first ? [first] : []), ...(data.clients || [])].filter((client) => (
     !query || client.name.toLowerCase().includes(query.trim().toLowerCase())
   ));
 
@@ -476,7 +543,7 @@ function ClientPicker({ title, note, action, Icon = null, onSelect }) {
             <span className="item__name">{client.name}</span>
             {Icon && <Icon size={18} />}
           </span>
-          <span className="item__meta">{action}</span>
+          <span className="item__meta">{client.note || action}</span>
         </button>
       ))}
     </Section>

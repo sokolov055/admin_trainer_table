@@ -884,6 +884,8 @@ const MOCK = {
       available: visible,
       hidden: trainer ? hiddenMonths.slice() : [],
       canHide: trainer,
+      // «Мои тренировки» в демо — карточка №99
+      self: trainer && Number(params.clientRow) === 99,
       // Сплит в демо — «Евгений и Екатерина» (строка 4)
       members: Number(params.clientRow) === 4 ? ['Евгений', 'Екатерина'] : [],
       blocks: month
@@ -1173,6 +1175,8 @@ const MOCK = {
     ids.forEach((id) => demoHidden.delete(id));
     return { restored: ids.length };
   },
+  // «Мои тренировки»: карточка самого тренера — в демо №99 (своей нет в списке клиентов)
+  'trainer.self': () => ({ clientRow: 99, name: 'Константин' }),
   // Похожие: одна демо-группа — общее, своя копия и вписанное руками
   'library.exercises.similar': () => (demoMerged ? { groups: [] } : { groups: [{ keep: 9001, items: [
     { kind: 'library', id: 9001, name: 'Жим лёжа', common: true, mine: false, clients: 5, templates: 2 },

@@ -413,7 +413,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {data.canHide && data.month && (
+      {/* Своя программа тренера («Мои тренировки») — прятать не от кого */}
+      {data.canHide && !data.self && data.month && (
         <MonthVisibility
           month={data.month}
           hidden={isHidden}

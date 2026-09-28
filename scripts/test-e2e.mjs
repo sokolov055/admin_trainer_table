@@ -582,6 +582,37 @@ test('журнал тренировок открывается из меню п�
 });
 
 /**
+ * «Мои тренировки» (28.09.2026): тренер — сам себе клиент; разделы
+ * программы, прогресса и питания, свой журнал — первым в «Журнале».
+ */
+test('мои тренировки: программа, прогресс, питание и свой журнал', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    await phone.getByRole('button', { name: 'Изменить программу' }).waitFor({ timeout: 10000 });
+    if (process.env.SHOT_MY) await phone.screenshot({ path: process.env.SHOT_MY });
+    for (const tab of ['Прогресс', 'Питание']) {
+      await phone.getByRole('tab', { name: tab, exact: true }).click();
+      await phone.locator(`.card-section[data-view]:not([hidden])`).waitFor({ timeout: 5000 });
+    }
+
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Журнал тренировок/ }).click();
+    await phone.getByText('Я · Константин').click();
+    await phone.getByRole('button', { name: 'К списку клиентов' }).waitFor({ timeout: 10000 });
+  } finally {
+    await context.close();
+  }
+});
+
+/**
  * Похожие упражнения (28.09.2026): группа копий — оставить одно, остальные
  * влить; после объединения группа пропадает.
  */
