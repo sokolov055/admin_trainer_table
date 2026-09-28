@@ -23,6 +23,7 @@ const stub = `
   export const plugin = () => ({
     update: async (p) => { f().calls.push(['update', p]); return { shown: true }; },
     end: async () => { f().calls.push(['end']); },
+    takePendingRest: async () => { const r = f().pending || {}; f().pending = null; return r; },
   });`;
 
 const dir = mkdtempSync(join(tmpdir(), 'activity-test-'));
@@ -106,4 +107,12 @@ test('сборка без плашки — ничего не зовём', async 
   assert.equal(await la.showWorkoutActivity(record({ title: 'Низ' })), false);
   assert.equal(fake.calls.length, 0);
   fake.available = true;
+});
+
+test('отдых с кнопки на плашке: страница забирает его один раз', async () => {
+  fake.pending = { sessionId: 's1', restUntil: 1790000000000.4 };
+  assert.deepEqual(await la.takePendingRest(), { sessionId: 's1', restUntil: 1790000000000 });
+  assert.equal(await la.takePendingRest(), null, 'второй раз — пусто');
+  assert.equal(la.activityPayload(record({})).restSeconds, 90, '«вручную» — 1:30');
+  assert.equal(la.activityPayload(record({ restSeconds: 120 })).restSeconds, 120);
 });

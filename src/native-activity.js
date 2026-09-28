@@ -5,7 +5,8 @@
  * данные даёт эта страница: тренировка, упражнение, подход, вес и конец
  * отдыха, полоска подходов, следующее упражнение и тема приложения (светлая
  * или тёмная плашка). Секундомер и отсчёт отдыха система ведёт сама —
- * телефон может спать в кармане. Кнопок пока нет (28.09.2026).
+ * телефон может спать в кармане. Кнопка «Отдых» на плашке запускает отдых
+ * без приложения; страница забирает его при возврате (takePendingRest).
  *
  * Модуль WorkoutActivity есть только в сборке приложения с плашкой. В
  * старой сборке, на Android и в браузере всё здесь молча ничего не делает.
@@ -82,6 +83,8 @@ export function activityPayload(record) {
     exerciseTotal,
     next,
     dark: darkTheme(),
+    // Кнопка «Отдых» на плашке: выбранная длительность, «вручную» — 1:30
+    restSeconds: s.restSeconds || 90,
   };
 }
 
@@ -118,6 +121,19 @@ export function showWorkoutActivity(record) {
   last = sig;
   shown = payload.sessionId;
   return la.update(payload).then((r) => !!(r && r.shown)).catch(() => { last = ''; return false; });
+}
+
+/**
+ * Отдых, начатый кнопкой «Отдых» на плашке, пока страница спала:
+ * { sessionId, restUntil } или null. Забирается один раз.
+ */
+export async function takePendingRest() {
+  const la = activity();
+  if (!la || !la.takePendingRest) return null;
+  try {
+    const r = await la.takePendingRest();
+    return r && r.sessionId && Number(r.restUntil) > 0 ? { sessionId: String(r.sessionId), restUntil: Math.round(Number(r.restUntil)) } : null;
+  } catch (_) { return null; }
 }
 
 /** Занятие завершено или отменено — плашку убрать. sessionId — только

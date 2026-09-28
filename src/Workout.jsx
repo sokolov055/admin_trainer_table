@@ -13,7 +13,7 @@ import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
-import { showWorkoutActivity, endWorkoutActivity } from './native-activity.js';
+import { showWorkoutActivity, endWorkoutActivity, takePendingRest } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -247,6 +247,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (!restUntil || restStatus !== 'active') cancelRestEnd();
   }, [restUntil, restStatus]);
 
+  // Отдых, начатый кнопкой на плашке, пока приложение спало: в занятие —
+  // и на сервер. Уведомление о конце уже поставил телефон (restLocal)
+  const applyPendingRest = async () => {
+    const rest = await takePendingRest();
+    const s = state.current?.session;
+    if (!rest || !s || s.id !== rest.sessionId || s.status !== 'active' || rest.restUntil <= (s.restUntil || 0)) return;
+    change(v => ({ ...v, restUntil: rest.restUntil, restLocal: localRestPlatform() }));
+    save();
+  };
+  useEffect(() => { if (ready) applyPendingRest(); }, [ready]);
+
   // Плашка на экране блокировки iPhone: идёт занятие — показать и
   // обновлять, завершили или отменили — убрать (native-activity.js)
   useEffect(() => {
@@ -267,7 +278,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const unload = e => { if (state.current?.dirty) { e.preventDefault(); e.returnValue = ''; } };
     // Свернули приложение или заблокировали экран — несохранённое уходит
     // сразу: на iPhone у страницы после этого мгновения, не секунды
-    const hide = () => { if (document.hidden) save(); };
+    const hide = () => { if (document.hidden) save(); else applyPendingRest(); };
     window.addEventListener('online', online);
     window.addEventListener('beforeunload', unload);
     document.addEventListener('visibilitychange', hide);
