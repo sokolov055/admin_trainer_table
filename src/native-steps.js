@@ -147,6 +147,71 @@ export async function openHealthSettings() {
   return true;
 }
 
+/*
+ * Тренировки с часов (28.09.2026) — пока только iPhone и только «Мои
+ * тренировки» владельца. Приложение читает из «Здоровья» тренировки за
+ * месяц (тип, начало, конец, калории, дистанция) и отправляет на сервер;
+ * тот совмещает их с занятиями в приложении. Доступ спрашивается отдельно
+ * от шагов — по нажатию «Подключить тренировки».
+ *
+ * Android пока нет: манифест приложения разрешает Health Connect только
+ * шаги, для тренировок нужна новая сборка.
+ */
+const WORKOUTS_ON_KEY = 'native_workouts_on_v1';
+const WORKOUTS_SENT_KEY = 'native_workouts_sent_v1';
+/** Событие «тренировки ушли на сервер» — блок в «Прогрессе» перечитывает список */
+export const WORKOUTS_SENT = 'fittrack:workouts-sent';
+
+export function workoutsOn() {
+  try { return !!localStorage.getItem(WORKOUTS_ON_KEY); } catch (_) { return false; }
+}
+
+/** Можно ли подключить тренировки на этом устройстве */
+export function workoutsAvailable() {
+  const h = health();
+  return !!(h && h.queryWorkouts && onIphone());
+}
+
+/** По нажатию «Подключить тренировки»: окно «Здоровья», затем первая отправка */
+export async function connectWorkouts() {
+  if (!workoutsAvailable()) return { ok: false, reason: 'Тренировки из «Здоровья» пока подтягиваются только на iPhone.' };
+  await health().requestAuthorization({ read: ['steps', 'workouts'] });
+  try { localStorage.setItem(WORKOUTS_ON_KEY, '1'); } catch (_) {}
+  const sent = await syncWorkouts(true);
+  return { ok: true, ...sent };
+}
+
+/**
+ * Прочитать тренировки за месяц и отправить. Как и с шагами, iPhone не
+ * говорит, что чтение запрещено: запрет выглядит как «тренировок нет».
+ */
+export async function syncWorkouts(force = false) {
+  if (!workoutsAvailable()) return { sent: 0, reason: 'app' };
+  if (!workoutsOn()) return { sent: 0, reason: 'off' };
+  if (!force) {
+    try {
+      const last = Number(localStorage.getItem(WORKOUTS_SENT_KEY) || 0);
+      if (Date.now() - last < EVERY_MS) return { sent: 0, reason: 'recent' };
+    } catch (_) {}
+  }
+  const end = new Date();
+  const start = new Date(end.getTime() - DAYS * 86400000);
+  const res = await health().queryWorkouts({ startDate: start.toISOString(), endDate: end.toISOString(), limit: 200 });
+  const workouts = (res.workouts || []).map((w) => ({
+    platformId: w.platformId, workoutType: w.workoutType, startDate: w.startDate, endDate: w.endDate,
+    duration: w.duration, totalEnergyBurned: w.totalEnergyBurned, totalDistance: w.totalDistance, sourceName: w.sourceName,
+  }));
+  if (!workouts.length) return { sent: 0, reason: 'empty' };
+  await apiMutate('health.workouts.sync', { workouts });
+  try { localStorage.setItem(WORKOUTS_SENT_KEY, String(Date.now())); } catch (_) {}
+  try { window.dispatchEvent(new Event(WORKOUTS_SENT)); } catch (_) {}
+  return { sent: workouts.length, reason: 'ok' };
+}
+
+export function disconnectWorkouts() {
+  try { localStorage.removeItem(WORKOUTS_ON_KEY); localStorage.removeItem(WORKOUTS_SENT_KEY); } catch (_) {}
+}
+
 /** Отключить на этом телефоне: больше не читать и не отправлять */
 export function disconnectSteps() {
   try { localStorage.removeItem(ON_KEY); localStorage.removeItem(SENT_KEY); localStorage.removeItem(HAD_KEY); } catch (_) {}

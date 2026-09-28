@@ -5,6 +5,7 @@ import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
+import HealthWorkouts from './HealthWorkouts.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta,
@@ -1007,6 +1008,7 @@ export function Progress({ clientRow, familyRow = null, self = false }) {
           }
         />
         {!familyRow && <Steps clientRow={clientRow} self={self} />}
+      {self && <HealthWorkouts clientRow={clientRow} />}
       </>
     );
   }
@@ -1211,6 +1213,7 @@ export function Progress({ clientRow, familyRow = null, self = false }) {
         )}
 
       {!familyRow && <Steps clientRow={clientRow} self={self} />}
+      {self && <HealthWorkouts clientRow={clientRow} />}
     </>
   );
 }

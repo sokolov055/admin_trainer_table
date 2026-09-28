@@ -4262,6 +4262,15 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .steps__lead { margin: 0 0 var(--space-2); font-weight: 600; }
 .steps__facts { margin: var(--space-2) 0 0; }
 
+/* Тренировки с часов (client/HealthWorkouts.jsx) */
+.hw { list-style: none; margin: 0; padding: 0; }
+.hw__item { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); }
+.hw__item + .hw__item { border-top: 1px solid var(--border); }
+.hw__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.hw__title { font-weight: 600; }
+.hw__merged { margin-top: var(--space-1); }
+.hw__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); }
+
 /* Вход в Android-приложении по вставленной ссылке (PasteLink.jsx) */
 .paste-link { display: grid; gap: var(--space-2); margin: var(--space-4) 0 var(--space-5); text-align: left; }
 .paste-link__lead { margin: 0; font-weight: 600; }

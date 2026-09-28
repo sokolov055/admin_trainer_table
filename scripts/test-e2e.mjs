@@ -601,6 +601,12 @@ test('мои тренировки: программа, прогресс, пит�
     for (const tab of ['Прогресс', 'Питание']) {
       await phone.getByRole('tab', { name: tab, exact: true }).click();
       await phone.locator(`.card-section[data-view]:not([hidden])`).waitFor({ timeout: 5000 });
+      if (tab === 'Прогресс') {
+        // Тренировки с часов — рядом с шагами; совпавшая с занятием совмещена
+        await phone.getByText('Тренировки с часов').waitFor({ timeout: 5000 });
+        await phone.getByText('Совмещено с «Верх»').waitFor({ timeout: 5000 });
+        if (process.env.SHOT_HW) { await phone.getByText('Тренировки с часов').scrollIntoViewIfNeeded(); await phone.screenshot({ path: process.env.SHOT_HW }); }
+      }
     }
 
     await phone.getByRole('button', { name: 'Меню' }).click();

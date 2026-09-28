@@ -1121,6 +1121,19 @@ const MOCK = {
     return { from: days[0].date, days, syncedAt: daysAgo(0), ...(params.clientRow ? { device } : {}) };
   },
   'steps.sync': (params) => ({ saved: (params.days || []).length }),
+  // Тренировки с часов в «Моих тренировках»: одна совмещена с занятием
+  'health.workouts.list': () => {
+    const at = (dAgo, h, m) => { const d = new Date(); d.setDate(d.getDate() - dAgo); d.setHours(h, m, 0, 0); return d.toISOString(); };
+    return {
+      workouts: [
+        { id: 'hw1', type: 'traditionalStrengthTraining', startedAt: at(1, 19, 12), endedAt: at(1, 20, 20), duration: 4080, kcal: 412, distance: null, source: 'Apple Watch',
+          session: { id: 's1', title: 'Верх', minutes: 75, notes: ['часы включили на 7 мин позже'] } },
+        { id: 'hw2', type: 'running', startedAt: at(3, 8, 5), endedAt: at(3, 8, 41), duration: 2160, kcal: 356, distance: 5230, source: 'Apple Watch' },
+        { id: 'hw3', type: 'walking', startedAt: at(5, 18, 30), endedAt: at(5, 19, 25), duration: 3300, kcal: 190, distance: 4800, source: 'iPhone' },
+      ],
+    };
+  },
+  'health.workouts.sync': (params) => ({ saved: (params.workouts || []).length }),
   'device.report': () => ({ saved: true }),
   'account.delete': () => ({ deleted: true }),
   'push.native.status': () => ({ enabled: true }),

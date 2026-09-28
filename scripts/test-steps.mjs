@@ -40,13 +40,14 @@ const stubs = {
       checkAuthorization: async () => ({ readAuthorized: f().authorized ? ['steps'] : [] }),
       requestAuthorization: async () => ({ readAuthorized: f().authorized ? ['steps'] : [] }),
       queryAggregated: async () => ({ samples: f().samples }),
+      queryWorkouts: async (o) => { f().workoutQuery = o; return { workouts: f().workouts || [] }; },
       openHealthConnectSettings: async () => { f().opened = (f().opened || 0) + 1; },
     });`,
   './api.js': `
     export const apiMutate = async (op, params) => {
       if (globalThis.__steps.fail) throw new Error(globalThis.__steps.fail);
       globalThis.__steps.sent.push({ op, params });
-      return { saved: params.days.length };
+      return { saved: (params.days || params.workouts).length };
     };
     export const apiPrimary = async () => ({});`,
   './version.js': `export const APP_VERSION = 'test';`,
@@ -109,4 +110,30 @@ test('«Открыть „Здоровье“»: iPhone — ссылкой в «
   fake.platform = 'android';
   assert.equal(await steps.openHealthSettings(), true);
   assert.equal(fake.opened, 1);
+});
+
+test('тренировки с часов: не подключали — не читаем; подключили — уходят на сервер', async () => {
+  fake.platform = 'ios';
+  fake.authorized = true;
+  assert.equal((await steps.syncWorkouts(true)).reason, 'off');
+  fake.workouts = [{
+    platformId: 'W1', workoutType: 'traditionalStrengthTraining', startDate: new Date(Date.now() - 3600000).toISOString(),
+    endDate: new Date().toISOString(), duration: 3600, totalEnergyBurned: 400, sourceName: 'Apple Watch', metadata: { x: 'лишнее' },
+  }];
+  const res = await steps.connectWorkouts();
+  assert.deepEqual([res.ok, res.sent], [true, 1]);
+  const last = fake.sent.at(-1);
+  assert.equal(last.op, 'health.workouts.sync');
+  assert.equal(last.params.workouts[0].platformId, 'W1');
+  assert.equal(last.params.workouts[0].metadata, undefined, 'лишнего с часов не шлём');
+  assert.ok(Date.now() - Date.parse(fake.workoutQuery.startDate) >= 29 * 86400000, 'за месяц');
+  assert.equal((await steps.syncWorkouts()).reason, 'recent');
+});
+
+test('тренировки на Android пока не подключаются', async () => {
+  fake.platform = 'android';
+  const res = await steps.connectWorkouts();
+  assert.equal(res.ok, false);
+  assert.match(res.reason, /iPhone/);
+  fake.platform = 'ios';
 });

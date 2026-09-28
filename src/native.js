@@ -16,7 +16,7 @@
 import { goBack } from './gestures.jsx';
 import { isNativeApp, plugin } from './native-bridge.js';
 import { refreshNativePush, listenNativeTaps } from './native-push.js';
-import { syncSteps, reportDevice } from './native-steps.js';
+import { syncSteps, syncWorkouts, reportDevice } from './native-steps.js';
 import { localLink } from './open-in-app.js';
 import { startBundleUpdates } from './native-update.js';
 
@@ -39,7 +39,10 @@ export function startNative() {
     });
     if (app.getInfo) app.getInfo().then(checkUpdate).catch(() => {});
     // Вернулись в приложение — шаги за это время могли прибавиться
-    app.addListener('resume', () => { syncSteps().catch(() => {}).then(() => reportDevice()); });
+    app.addListener('resume', () => {
+      syncSteps().catch(() => {}).then(() => reportDevice());
+      syncWorkouts().catch(() => {});
+    });
   }
 
   // Уведомления: свежий адрес телефона — серверу; нажали на уведомление —
@@ -51,6 +54,8 @@ export function startNative() {
   // При запуске — сразу, без паузы: человек открыл приложение посмотреть шаги
   // и сразу за ними — отчёт о телефоне для тренера (reportDevice)
   syncSteps(true).catch(() => {}).then(() => reportDevice(true));
+  // Тренировки с часов — только если подключали на этом телефоне
+  syncWorkouts(true).catch(() => {});
 
   const bar = plugin('StatusBar');
   if (bar && bar.setBackgroundColor) {
