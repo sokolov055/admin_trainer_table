@@ -291,6 +291,29 @@ test('клиенту правка программы не предлагаетс
 });
 
 /**
+ * Журнал тренировок у клиента — в боковом меню, а не кнопкой во вкладке
+ * «Тренировки» (28.09.2026: один журнал вместо двух).
+ */
+test('клиентский журнал — в меню, во вкладке кнопки журнала нет', async () => {
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 30000 });
+  await openTab('Тренировки');
+  await page.getByText(/Очередь/).first().waitFor({ timeout: 20000 });
+  assert.equal(await page.getByRole('button', { name: /журнал тренировок/i }).count(), 0, 'во вкладке кнопки нет');
+
+  await page.getByRole('button', { name: 'Меню' }).click();
+  await page.getByRole('button', { name: /Журнал тренировок/ }).click();
+  // Журнал открывает последнее открытое занятие — «К журналу» ведёт к списку
+  await page.getByRole('button', { name: 'К тренировкам' }).waitFor({ timeout: 10000 });
+  const toList = page.getByRole('button', { name: 'К журналу' });
+  if (await toList.count()) await toList.click();
+  await page.getByRole('button', { name: 'Начать свободную тренировку' }).waitFor({ timeout: 10000 });
+  if (process.env.SHOT_CLIENT_JOURNAL) await page.screenshot({ path: process.env.SHOT_CLIENT_JOURNAL });
+  await page.getByRole('button', { name: 'К тренировкам' }).click();
+  await page.getByText(/Очередь/).first().waitFor({ timeout: 10000 });
+});
+
+/**
  * Вход по персональной ссылке — так клиенты попадают в кабинет.
  *
  * Здесь жили две поломки, которые видел только человек с телефоном.
@@ -553,6 +576,34 @@ test('журнал тренировок открывается из меню п�
     await phone.getByRole('button', { name: 'К списку клиентов' }).click();
     await phone.getByText('Выберите клиента — откроются все его занятия').waitFor({ timeout: 5000 });
     if (process.env.SHOT_JOURNAL) await phone.screenshot({ path: process.env.SHOT_JOURNAL });
+  } finally {
+    await context.close();
+  }
+});
+
+/**
+ * Похожие упражнения (28.09.2026): группа копий — оставить одно, остальные
+ * влить; после объединения группа пропадает.
+ */
+test('похожие упражнения объединяются в одно', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+
+    await phone.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await phone.getByRole('tab', { name: 'Упражнения', exact: true }).click();
+    await phone.getByRole('button', { name: 'Похожие', exact: true }).click();
+    await phone.getByText('жим лежа со штангой').waitFor({ timeout: 10000 });
+    if (process.env.SHOT_SIMILAR) await phone.screenshot({ path: process.env.SHOT_SIMILAR, fullPage: true });
+
+    await phone.getByRole('button', { name: 'Объединить в «Жим лёжа»' }).click();
+    await phone.getByText('Теперь это «Жим лёжа».').waitFor({ timeout: 5000 });
+    await phone.getByRole('button', { name: 'Обновить список' }).click();
+    await phone.getByText('Копий не найдено').waitFor({ timeout: 5000 });
   } finally {
     await context.close();
   }

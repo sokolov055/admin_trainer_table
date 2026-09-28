@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Overview, Plan, Progress, Nutrition } from './screens.jsx';
+import { Overview, Plan, Progress, Nutrition, WorkoutJournal } from './screens.jsx';
+import { Deferred } from '../lazy.js';
 import { Stories } from '../stories.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
@@ -57,6 +58,9 @@ const TABS = [
  * зашедший включить уведомления не должен листать свой рост и телефон.
  */
 const MENU = [
+  // Журнал тренировок — в меню, а не кнопкой во вкладке «Тренировки»: один
+  // журнал на всё приложение (решение владельца 28.09.2026), как у тренера
+  { id: 'journal', label: 'Журнал тренировок', note: 'Все занятия и свободная тренировка', Icon: IconProgress },
   { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, Telegram', Icon: IconUsers },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
@@ -272,6 +276,13 @@ export default function ClientApp({ me, clientRow, preview }) {
             </p>
             <Profile clientRow={clientRow} />
           </>
+        )}
+
+        {view === 'journal' && (
+          <Deferred fallback={<p className="small muted">Открываем журнал…</p>}>
+            <WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={!!preview} launch={null}
+              backLabel="К тренировкам" onClose={() => setView('plan')} />
+          </Deferred>
         )}
 
         {view === 'family' && <Family members={familyMembers} preview={!!preview} />}

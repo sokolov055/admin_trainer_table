@@ -354,7 +354,6 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   if (workout) return <Deferred fallback={waiting}><WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => { setWorkout(null); reload(); }} /></Deferred>;
 
   if (loading || error) return <>
-    {!familyRow && <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>}
     {loading ? <Loading lead={false} rows={4} /> : <ErrorState error={error} onRetry={reload} />}
   </>;
 
@@ -396,10 +395,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
 
   return (
     <>
-      {!familyRow && <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>}
-
-      {/* Сразу под входом в журнал: если занятие не закрыто, это первое,
-          что человек должен узнать на этом экране. */}
+      {/* Журнал тренировок — в боковом меню (решение владельца 28.09.2026:
+          один журнал, а не два). Здесь — только незакрытое занятие: это
+          первое, что человек должен узнать на этом экране. */}
       {runningLine}
 
       {months.length > 1 && (

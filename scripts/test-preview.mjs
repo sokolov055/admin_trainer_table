@@ -37,7 +37,7 @@ const output = await build({
           contents: `import React from 'react';
             const Screen = ({ clientRow, clientView }) => <div data-screen-row={String(clientRow ?? 'self')} data-client-view={clientView ? 'yes' : 'no'}>row:{clientRow ?? 'self'}</div>;
             export const Overview = Screen; export const Plan = Screen;
-            export const Progress = Screen; export const Nutrition = Screen;`,
+            export const Progress = Screen; export const Nutrition = Screen; export const WorkoutJournal = Screen;`,
         };
         if (args.path === 'stories') return { loader: 'jsx', contents: `import React from 'react'; export const Stories=()=> <div>stories</div>;` };
         if (args.path === 'transfer') return { loader: 'jsx', contents: `import React from 'react'; export const TelegramTransferCard=()=> <div>transfer-card</div>;` };

@@ -686,8 +686,10 @@ function Exercises() {
   const [editing, setEditing] = useState(null);
   const [pruning, setPruning] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
+  const [showSimilar, setShowSimilar] = useState(false);
   const [failure, setFailure] = useState(null);
 
+  useBackGesture(() => setShowSimilar(false), !editing && showSimilar);
   useBackGesture(() => setEditing(null), !!editing);
   useBackGesture(() => setShowHidden(false), !editing && showHidden);
   useBackGesture(() => setOpen(null), !editing && !showHidden && !!open);
@@ -707,6 +709,10 @@ function Exercises() {
 
   if (showHidden) {
     return <HiddenExercises onBack={() => { setShowHidden(false); reload(); }} />;
+  }
+
+  if (showSimilar) {
+    return <SimilarExercises onBack={() => { setShowSimilar(false); reload(); }} />;
   }
 
   const all = data.exercises;
@@ -755,6 +761,9 @@ function Exercises() {
 
       <div className="library__count">
         <p className="small muted">{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
+        <button className="button button--ghost" onClick={() => { setShowSimilar(true); setPruning(false); }}>
+          Похожие
+        </button>
         {data.hiddenCount > 0 && (
           <button className="button button--ghost" onClick={() => { setShowHidden(true); setPruning(false); }}>
             Убранные · {data.hiddenCount}
@@ -785,6 +794,123 @@ function Exercises() {
       {shown.length > 200 && <p className="small muted">Показаны первые 200 — уточните поиск.</p>}
       {del.bar}
     </>
+  );
+}
+
+/**
+ * Похожие упражнения (решение владельца 28.09.2026): одно упражнение — один
+ * id и одно название. Сервер предлагает группы вероятных копий — из базы,
+ * программ клиентов и шаблонов; тренер выбирает, какое оставить и что влить.
+ * После объединения программы и шаблоны называют упражнение одинаково, а
+ * история весов собирается по одному id.
+ */
+function SimilarExercises({ onBack }) {
+  const { loading, data, error, reload } = useData('library.exercises.similar', {}, []);
+  const groups = data ? data.groups : [];
+
+  return (
+    <>
+      <Back onClick={onBack} />
+      <Section
+        title="Похожие упражнения"
+        note="Вероятные копии одного упражнения. Выберите, какое оставить, — программы клиентов, шаблоны и история весов перейдут на него"
+      >
+        {loading && <Loading lead={false} rows={3} />}
+        {error && <ErrorState error={error} onRetry={reload} />}
+        {!loading && !error && groups.length === 0 && <Empty icon={IconCheck} title="Копий не найдено" text="Каждое упражнение встречается под одним названием." />}
+        {groups.map((g) => <SimilarGroup key={g.items.map((x) => x.id || x.key).join('|')} group={g} onMerged={reload} />)}
+      </Section>
+    </>
+  );
+}
+
+function SimilarGroup({ group, onMerged }) {
+  const idOf = (x) => (x.kind === 'library' ? 'id:' + x.id : 'key:' + x.key);
+  const [keep, setKeep] = useState(group.keep);
+  const [picked, setPicked] = useState(() => new Set(group.items.filter((x) => !(x.kind === 'library' && x.id === group.keep)).map(idOf)));
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const [done, setDone] = useState(null);
+
+  const others = group.items.filter((x) => !(x.kind === 'library' && x.id === keep));
+  const chosen = others.filter((x) => picked.has(idOf(x)));
+  const keepName = (group.items.find((x) => x.kind === 'library' && x.id === keep) || {}).name;
+
+  const where = (x) => [
+    x.clients ? x.clients + ' ' + plural(x.clients, 'клиент', 'клиента', 'клиентов') : '',
+    x.templates ? x.templates + ' ' + plural(x.templates, 'шаблон', 'шаблона', 'шаблонов') : '',
+  ].filter(Boolean).join(' · ') || 'нигде не используется';
+
+  const merge = async () => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      const r = await apiMutate('library.exercise.merge', {
+        keepId: keep,
+        ids: chosen.filter((x) => x.kind === 'library').map((x) => x.id),
+        keys: chosen.filter((x) => x.kind === 'name').map((x) => x.key),
+      });
+      haptic('success');
+      setDone(r);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <Panel pad>
+        <p style={{ margin: 0 }}>Теперь это «{done.keep.name}».</p>
+        <p className="small muted" style={{ marginBottom: 12 }}>
+          Строк в программах: {done.plans} · шаблонов: {done.templates} · занятий в журнале: {done.sessions}
+        </p>
+        <button className="button" onClick={onMerged}>Обновить список</button>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel pad>
+      {group.items.map((x) => {
+        const isKeep = x.kind === 'library' && x.id === keep;
+        return (
+          <div className="library__similar-row" key={idOf(x)}>
+            <label className="library__check">
+              <input
+                type="checkbox"
+                disabled={isKeep || busy}
+                checked={isKeep || picked.has(idOf(x))}
+                onChange={(e) => setPicked((prev) => {
+                  const next = new Set(prev);
+                  if (e.target.checked) next.add(idOf(x)); else next.delete(idOf(x));
+                  return next;
+                })}
+              />
+              <span>
+                <span className="item__name">{x.name}</span>
+                <span className="item__meta">
+                  <span>{where(x)}</span>
+                  {x.kind === 'name' ? <Badge>не в базе</Badge> : x.mine ? <Badge kind="good">своё</Badge> : <Badge>общее</Badge>}
+                  {isKeep && <Badge kind="good">остаётся</Badge>}
+                </span>
+              </span>
+            </label>
+            {x.kind === 'library' && !isKeep && (
+              <button className="button button--ghost" disabled={busy} onClick={() => {
+                setPicked((prev) => new Set([...prev, 'id:' + keep].filter((v) => v !== idOf(x))));
+                setKeep(x.id);
+              }}>Оставить это</button>
+            )}
+          </div>
+        );
+      })}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+      <button className="button button--primary button--block" style={{ marginTop: 12 }} disabled={busy || !chosen.length} onClick={merge}>
+        {busy ? 'Объединяем…' : chosen.length ? 'Объединить в «' + keepName + '»' : 'Отметьте, что объединить'}
+      </button>
+    </Panel>
   );
 }
 

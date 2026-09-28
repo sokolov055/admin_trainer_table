@@ -477,6 +477,8 @@ let demoExercises = [
 }));
 
 let demoHidden = new Set();
+// Похожие упражнения объединены (демо): группа больше не показывается
+let demoMerged = false;
 
 const demoBlocks = [
   { title: 'Тренировка 1 — верх', exercises: [
@@ -1170,6 +1172,16 @@ const MOCK = {
     const ids = (params.ids || [params.id]).map(Number);
     ids.forEach((id) => demoHidden.delete(id));
     return { restored: ids.length };
+  },
+  // Похожие: одна демо-группа — общее, своя копия и вписанное руками
+  'library.exercises.similar': () => (demoMerged ? { groups: [] } : { groups: [{ keep: 9001, items: [
+    { kind: 'library', id: 9001, name: 'Жим лёжа', common: true, mine: false, clients: 5, templates: 2 },
+    { kind: 'library', id: 9002, name: 'Жим штанги лёжа на скамье 30', common: false, mine: true, clients: 2, templates: 1 },
+    { kind: 'name', key: 'жим лежа со штангой', name: 'жим лежа со штангой', clients: 1, templates: 0 },
+  ] }] }),
+  'library.exercise.merge': () => {
+    demoMerged = true;
+    return { plans: 3, templates: 1, sessions: 4, removed: 1, hidden: 0, keep: { id: 9001, name: 'Жим лёжа' } };
   },
   'library.templates': (params) => demoTemplatesList(params),
   'library.template.get': (params) => demoTemplateCard(demoTemplate(params.id), true),
