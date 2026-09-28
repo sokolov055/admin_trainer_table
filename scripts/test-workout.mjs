@@ -337,7 +337,7 @@ test('сплит: подходы кругами по людям, у каждог
 
   const [both, hers] = s.exercises;
   assert.deepEqual(both.sets.map((x) => x.who), ['Евгений', 'Екатерина', 'Евгений', 'Екатерина', 'Евгений', 'Екатерина']);
-  assert.deepEqual(both.sets.slice(0, 2).map((x) => x.weight), ['30', '20']);
+  assert.deepEqual(both.sets.slice(0, 2).map((x) => x.weight), ['27.5', '20'], 'прошлый вес человека, нет — из программы');
   assert.equal(both.prevWeight, 'Евгений 27,5');
   assert.equal(setLabel(both.sets, 3), 'Екатерина · 2');
   assert.equal(hers.sets.length, 4);
@@ -345,6 +345,9 @@ test('сплит: подходы кругами по людям, у каждог
 
   const solo = fromPlan({ title: 'X', exercises: [{ name: 'Жим', sets: '2', reps: '8', weight: '50' }] }, '', []);
   assert.equal(solo.exercises[0].sets.length, 2);
+  assert.equal(solo.exercises[0].sets[0].weight, '50', 'истории нет — из программы');
+  const again = fromPlan({ title: 'X', exercises: [{ name: 'Жим', sets: '2', reps: '8', weight: '50', lastWeight: '55' }] }, '', []);
+  assert.deepEqual(again.exercises[0].sets.map((x) => x.weight), ['55', '55'], 'начинаем с прошлого веса');
   assert.equal(solo.exercises[0].sets[0].who, undefined);
   assert.equal(setLabel(solo.exercises[0].sets, 1), '2');
 });

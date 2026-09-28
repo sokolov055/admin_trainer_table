@@ -43,13 +43,16 @@ export function fromPlan(block, month, members = []) {
           .flatMap(() => doersOf(e, members).map(d => ({
             ...blankSet(),
             who: d,
-            weight: num(e.splitWeights && e.splitWeights[d]),
+            // Начальный вес — прошлый у этого человека, нет — из программы
+            weight: num(e.splitPrev && e.splitPrev[d]) || num(e.splitWeights && e.splitWeights[d]),
             ...planSet(e, trackOf(e)),
           })))
         // Кардио по умолчанию — один отрезок, а не три подхода
         : Array.from({ length: Math.min(20, Math.max(1, parseInt(e.sets) || (trackOf(e).kind === 'cardio' ? 1 : 3))) }, () => ({
           ...blankSet(),
-          weight: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.weight),
+          // Начальный вес (решение владельца 28.09.2026): прошлый рабочий
+          // вес клиента в упражнении, нет — из программы, нет и там — пусто
+          weight: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight),
           ...planSet(e, trackOf(e)),
         })),
     })) };
