@@ -8,7 +8,9 @@ export function fromPlan(block, month, members = []) {
   const split = members.length > 1;
   // «+5» у подтягиваний — добавка к своему весу: в поле идёт 5
   const num = (v) => { const x = String(v || '').replace(/^\+\s*/, ''); return /^\d+([.,]\d+)?$/.test(x) ? x.replace(',', '.') : ''; };
-  return { id: uid(), title: block.title, sourceBlock: block.title, month,
+  // sourceBlockId — id тренировки программы: по нему занятие видно в её
+  // «Выполненных», какое бы название ни носили она и занятие
+  return { id: uid(), title: block.title, sourceBlock: block.title, sourceBlockId: block.id || '', month,
     // restSeconds — сколько отдыхать после отмеченного подхода. Ноль
     // значит «не запускать сам»: пока человек не выбрал длительность,
     // таймер ведёт себя как раньше.

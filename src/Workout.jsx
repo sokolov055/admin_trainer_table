@@ -120,7 +120,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     setBusy(true); setMessage('');
     try {
       const result = await apiPublic('workout.get', { ...params, id });
-      store({ session: result.session, revision: result.session.revision, dirty: false, tick: Date.now() });
+      store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: Date.now() });
     } catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
   };
@@ -197,7 +197,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (!r.pending) {
       const elapsed = r.session.status === 'active' ? Math.max(0, Date.now() - r.tick) : 0;
       r = { ...r, session: { ...r.session, elapsedMs: Math.min(604800000, r.session.elapsedMs + elapsed) }, tick: Date.now() };
-      r.pending = { session: r.session, revision: r.revision, requestId: uid(), edit: r.edit };
+      // baseTitle — название, которое сервер отдал последним. По нему сервер
+      // отличает «переименовали здесь» (тогда переименует и тренировку в
+      // программе) от «здесь не знали, что её переименовали в программе»
+      r.pending = { session: r.session, revision: r.revision, requestId: uid(), edit: r.edit,
+        ...(typeof r.serverTitle === 'string' ? { baseTitle: r.serverTitle } : {}) };
       store(r);
     }
     try {
@@ -220,8 +224,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         ...current.session, startedAt: result.session.startedAt, updatedAt: result.session.updatedAt,
         // Связь с программой и месяц ведёт сервер: переименование тренировки
         // или месяца меняет их, пока здесь дописывают занятие
-        sourceBlock: result.session.sourceBlock, month: result.session.month,
-      }, revision: result.session.revision, pending: null, dirty: !unchanged });
+        sourceBlock: result.session.sourceBlock, sourceBlockId: result.session.sourceBlockId, month: result.session.month,
+      }, revision: result.session.revision, serverTitle: result.session.title, pending: null, dirty: !unchanged });
       if (mounted.current) { setMessage(''); list().catch(() => {}); }
     } catch (e) {
       // Явный отказ валидации позволяет исправить снимок. При потере
@@ -288,7 +292,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       try {
         const result = await apiPublic('workout.get', { ...params, id: r.session.id });
         if (!mounted.current || state.current?.dirty || state.current?.session.id !== r.session.id) return;
-        if (result.session.revision !== r.revision) store({ session: result.session, revision: result.session.revision, dirty: false, tick: Date.now() });
+        if (result.session.revision !== r.revision) store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: Date.now() });
       } catch (_) { /* Сбой чтения не должен мешать записи локального подхода. */ }
     };
 
@@ -365,7 +369,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     catch (_) { setMessage('Скачайте черновик перед загрузкой другой версии.'); return; }
     const remote = conflict.session;
     conflictRef.current = null; setConflict(null);
-    store({ session: remote, revision: remote.revision, dirty: false, tick: Date.now() });
+    store({ session: remote, revision: remote.revision, serverTitle: remote.title, dirty: false, tick: Date.now() });
   };
 
 

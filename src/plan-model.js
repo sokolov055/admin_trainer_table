@@ -33,18 +33,19 @@ export function supersets(exercises) {
 }
 
 /**
- * Проведённые занятия этого блока, свежие сверху.
+ * Проведённые занятия этой тренировки, свежие сверху.
  *
- * Блок опознаётся по sourceBlock, а не по названию занятия: занятие
- * переименовывают прямо в зале («ноги, спина болит»), и связь с
- * программой от этого не меняется. Месяц нужен потому, что блоки с одним
- * названием есть в каждом месяце, а отметка «проведено» относится к
- * открытому сейчас.
+ * Тренировка опознаётся по id (sourceBlockId), а не по названию: в месяце
+ * бывает несколько одноимённых («Грудь, трицепс» дважды в неделю), и
+ * название меняют и в программе, и в журнале (28.09.2026). Занятия,
+ * заведённые до id, — по названию тренировки (sourceBlock), как раньше.
+ * Месяц нужен им же: одноимённые блоки есть в каждом месяце.
  */
-export function blockSessions(sessions, blockTitle, month) {
+export function blockSessions(sessions, block, month) {
+  const { id, title } = typeof block === 'string' ? { id: '', title: block } : (block || {});
   return (sessions || [])
     .filter((s) => s.status === 'completed'
-      && s.sourceBlock === blockTitle
+      && (s.sourceBlockId ? s.sourceBlockId === id : s.sourceBlock === title)
       && (!month || s.month === month))
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }

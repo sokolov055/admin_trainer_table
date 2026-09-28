@@ -391,8 +391,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
 
   // Проведённой считается тренировка, у которой есть завершённое занятие
   // этого месяца. Порядок внутри вкладок — тот же, что в программе.
-  const doneBlocks = blocks.filter((b) => blockSessions(sessions, b.title, data.month).length > 0);
-  const queueBlocks = blocks.filter((b) => !blockSessions(sessions, b.title, data.month).length);
+  const doneBlocks = blocks.filter((b) => blockSessions(sessions, b, data.month).length > 0);
+  const queueBlocks = blocks.filter((b) => !blockSessions(sessions, b, data.month).length);
 
   return (
     <>
@@ -562,7 +562,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       )}
 
       {(planTab === 'done' ? doneBlocks : queueBlocks).map((block, i) => {
-        const past = blockSessions(sessions, block.title, data.month);
+        const past = blockSessions(sessions, block, data.month);
 
         // Во «Выполненных» — то, что сделано на последнем занятии, а не
         // план: в зале упражнение могли заменить или добавить, а программа

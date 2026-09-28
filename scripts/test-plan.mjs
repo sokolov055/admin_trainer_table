@@ -95,6 +95,32 @@ test('свободная тренировка ни к одному блоку н
   assert.deepEqual(blockSessions(free, 'Тренировка № 1', 'Сентябрь 2026'), []);
 });
 
+/**
+ * Тренировка — по id (28.09.2026): в месяце бывает несколько одноимённых
+ * («Грудь, трицепс» дважды в неделю), и название меняют и в программе,
+ * и в журнале.
+ */
+test('одноимённые тренировки различаются по id', () => {
+  const first = { id: 'b1', title: 'Грудь, трицепс' };
+  const second = { id: 'b2', title: 'Грудь, трицепс' };
+  const done = [
+    { id: 'p', status: 'completed', title: 'Грудь, трицепс', sourceBlock: 'Грудь, трицепс', sourceBlockId: 'b2', month: 'Сентябрь 2026', updatedAt: '2026-09-18T10:00:00Z' },
+  ];
+  assert.deepEqual(blockSessions(done, first, 'Сентябрь 2026'), []);
+  assert.deepEqual(blockSessions(done, second, 'Сентябрь 2026').map((s) => s.id), ['p']);
+});
+
+test('по id занятие остаётся при своей тренировке, как бы их ни переименовали', () => {
+  const block = { id: 'b1', title: 'Грудь, трицепс, плечи' };
+  const done = [{ id: 'q', status: 'completed', title: 'Верх', sourceBlock: 'Тренировка № 1', sourceBlockId: 'b1', month: 'Сентябрь 2026', updatedAt: '2026-09-18T10:00:00Z' }];
+  assert.deepEqual(blockSessions(done, block, 'Сентябрь 2026').map((s) => s.id), ['q']);
+});
+
+test('занятие, заведённое до id, находится по названию тренировки', () => {
+  const legacy = [{ id: 'r', status: 'completed', sourceBlock: 'Спина', month: 'Сентябрь 2026', updatedAt: '2026-09-18T10:00:00Z' }];
+  assert.deepEqual(blockSessions(legacy, { id: 'b9', title: 'Спина' }, 'Сентябрь 2026').map((s) => s.id), ['r']);
+});
+
 test('подход суперсета — без числа кругов: круги стоят у скобки', async () => {
   const { roundLine } = await import('../src/plan-model.js');
   assert.equal(roundLine([{ weight: '', reps: '15' }, { weight: '', reps: '15' }]), '15 повт.');
