@@ -50,6 +50,13 @@ export async function scheduleRestEnd(until) {
         body: 'Следующий подход.',
         schedule: { at: new Date(until), allowWhileIdle: true },
         extra: { url: '?tab=plan' },
+        // iPhone: без звука уведомление беззвучное — ни вибрации, ни тапа
+        // на Apple Watch (28.09.2026 так и было). Звук есть — есть и
+        // вибрация, а часы, пока iPhone заблокирован, стучат по руке.
+        // timeSensitive — пробивать режим «Фитнес»/«Не беспокоить», когда
+        // в приложении включат это право (entitlement); до того iOS
+        // считает уведомление обычным
+        ...(platformName() === 'ios' ? { sound: 'default', interruptionLevel: 'timeSensitive' } : {}),
       }],
     });
     return true;
