@@ -13,6 +13,8 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
 const fake = { calls: [], available: true };
+globalThis.document = { documentElement: { getAttribute: () => fake.theme || null } };
+globalThis.window = { matchMedia: () => ({ matches: false }) };
 globalThis.__la = fake;
 const stub = `
   const f = () => globalThis.__la;
@@ -52,13 +54,25 @@ test('упражнение, подход, вес и секундомер — с 
   assert.deepEqual([p.done, p.total], [1, 4]);
   assert.equal(p.startedAt, 1_000_000_000_000 - 600000, 'от начала без пауз');
   assert.equal(p.pausedSeconds, undefined);
+  assert.deepEqual([p.exerciseDone, p.exerciseTotal], [1, 3], 'полоска подходов упражнения');
+  assert.equal(p.next, 'Тяга · 1 × 12');
+  assert.equal(p.dark, false);
 });
 
 test('пауза — секундомер стоит; отдых идёт — его конец', () => {
   assert.equal(la.activityPayload(record({ status: 'paused' })).pausedSeconds, 600);
   const until = Date.now() + 60000;
   assert.equal(la.activityPayload(record({ restUntil: until })).restUntil, until);
-  assert.equal(la.activityPayload(record({ restUntil: Date.now() - 1000 })).restUntil, undefined, 'прошедший отдых не шлём');
+  const over = Date.now() - 60000;
+  assert.equal(la.activityPayload(record({ restUntil: over })).restUntil, over, 'кончившийся отдых — плашка считает «+»');
+  assert.equal(la.activityPayload(record({ restUntil: Date.now() - 3600000 })).restUntil, undefined, 'давний — уже нет');
+  assert.equal(la.activityPayload(record({ status: 'paused', restUntil: until })).restUntil, undefined, 'на паузе отдыха нет');
+});
+
+test('тема приложения: тёмная — тёмная плашка', () => {
+  fake.theme = 'dark';
+  assert.equal(la.activityPayload(record({})).dark, true);
+  fake.theme = null;
 });
 
 test('пара: номер подхода у своего человека', () => {
