@@ -13,6 +13,7 @@ import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
+import { showWorkoutActivity, endWorkoutActivity } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -245,6 +246,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   useEffect(() => {
     if (!restUntil || restStatus !== 'active') cancelRestEnd();
   }, [restUntil, restStatus]);
+
+  // Плашка на экране блокировки iPhone: идёт занятие — показать и
+  // обновлять, завершили или отменили — убрать (native-activity.js)
+  useEffect(() => {
+    const status = record?.session?.status;
+    if (['active', 'paused'].includes(status)) showWorkoutActivity(record);
+    else if (['completed', 'cancelled'].includes(status)) endWorkoutActivity(record.session.id);
+  }, [record]);
 
   useEffect(() => {
     if (!ready || !record?.dirty || busy || message || conflict) return;
