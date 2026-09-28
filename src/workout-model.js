@@ -17,16 +17,19 @@ export function fromPlan(block, month, members = []) {
     status: 'active', elapsedMs: 0, restUntil: 0, restSeconds: 0, note: '',
     exercises: block.exercises.slice(0, 30).map(e => withTechnique(e, {
       id: uid(), name: e.name, note: '',
+      // Упражнение из базы: по нему сервер ведёт историю весов клиента
+      ...(e.exerciseId ? { exerciseId: e.exerciseId } : {}),
       // Тип учёта — что записывать в подходе; снимок, в занятии правится
       // только для этого занятия
       ...(e.track || e.cardio ? { track: trackOf(e) } : {}),
       // Кардио-план: цели, режим, интервалы — для подсказки и таймера
       ...(e.cardio && trackOf(e).kind === 'cardio' ? { cardio: e.cardio } : {}),
-      // Вес прошлого месяца — подсказка, а не план: человек в зале решает
-      // по ней, добавлять ли сегодня.
+      // «Было» — подсказка, а не план: человек в зале решает по ней,
+      // добавлять ли сегодня. Из журнала клиента по упражнению (lastWeight,
+      // сервер); нет истории — число из программы
       prevWeight: split
         ? doersOf(e, members).map(d => (e.splitPrev && e.splitPrev[d] ? d + ' ' + e.splitPrev[d] : '')).filter(Boolean).join(' · ')
-        : String(e.prevWeight || '').trim(),
+        : String(e.lastWeight || e.prevWeight || '').trim(),
       // Суперсет приезжает из плана и должен дожить до занятия: человек
       // смотрит в экран между подходами и должен видеть, что следующее
       // упражнение делается сразу, а не после отдыха.

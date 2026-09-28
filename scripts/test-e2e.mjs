@@ -528,6 +528,37 @@ test('из просмотра глазами клиента смахивание
 });
 
 /**
+ * Журнал тренировок — в боковом меню тренера (28.09.2026): выбрал клиента
+ * по имени — открылся его журнал.
+ */
+test('журнал тренировок открывается из меню по имени клиента', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Журнал тренировок/ }).click();
+    await phone.getByText('Выберите клиента — откроются все его занятия').waitFor({ timeout: 10000 });
+    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+
+    const first = phone.locator('#root main:not([hidden]) .item').first();
+    const name = (await first.locator('.item__name').textContent()).trim();
+    await first.click();
+    await phone.getByRole('button', { name: 'Начать свободную тренировку' }).waitFor({ timeout: 10000 });
+    await assert.doesNotReject(phone.locator('#root').getByRole('heading', { name: 'Журнал · ' + name }).waitFor({ timeout: 5000 }), 'журнал этого клиента');
+    await phone.getByRole('button', { name: 'К списку клиентов' }).click();
+    await phone.getByText('Выберите клиента — откроются все его занятия').waitFor({ timeout: 5000 });
+    if (process.env.SHOT_JOURNAL) await phone.screenshot({ path: process.env.SHOT_JOURNAL });
+  } finally {
+    await context.close();
+  }
+});
+
+/**
  * Разделы карточки клиента листаются пальцем, как нижнее меню, а с
  * первого раздела смахивание вправо возвращает к списку клиентов.
  */

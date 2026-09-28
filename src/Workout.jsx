@@ -48,7 +48,8 @@ function supersetMark(exercises, index) {
   return `Суперсет · ${same.indexOf(exercises[index]) + 1} из ${same.length}, без отдыха между упражнениями`;
 }
 
-export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose }) {
+// backLabel — куда ведёт «назад»: из программы — к ней, из меню — к списку клиентов
+export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose, backLabel = 'К программе' }) {
   const [record, setRecord] = useState(null);
   const [history, setHistory] = useState([]);
   const [ready, setReady] = useState(false);
@@ -831,7 +832,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
   return <div className="workout">
-    <button className="button" onClick={close}>К программе</button>
+    <button className="button" onClick={close}>{backLabel}</button>
     {!ready && <p role="status">Открываем журнал тренировок…</p>}
     {storageError && <p role="alert" className="workout__error">Устройство не сохранило черновик. Не закрывайте экран до сохранения в облаке.</p>}
     {message && <div role="alert" className="workout__error"><p>{message}</p><button className="button" disabled={busy} onClick={() => { setMessage(''); record?.dirty ? save() : list().catch(e => setMessage(e.message)); }}>Повторить</button></div>}
@@ -921,7 +922,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <details><summary>Изменить упражнение</summary>
             {clientRow
               ? <NameFromBase ex={ex} onPick={(patch) => updateExercise(ei, x => ({ ...x, ...patch }))} />
-              : <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ex => ({ ...ex, name: e.target.value }))} /></label>}
+              : <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ({ exerciseId, ...ex }) => ({ ...ex, name: e.target.value }))} /></label>}
             {trackEditor(ex, ei)}
             <div className="workout__toolbar">
               <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>

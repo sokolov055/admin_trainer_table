@@ -21,8 +21,10 @@ import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconLog, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
-  IconPlan, IconCalendar, IconKey,
+  IconPlan, IconCalendar, IconKey, IconProgress,
 } from '../icons.jsx';
+import { WorkoutJournal } from '../client/screens.jsx';
+import { Deferred } from '../lazy.js';
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Trainers from './Trainers.jsx';
@@ -73,6 +75,9 @@ const TABS = [
  * другой тренер получил бы на них отказ сервера (api/routes.js, owner).
  */
 const MENU = [
+  // Журнал тренировок клиента — все его занятия по месяцам, свободные и
+  // отменённые; то же занятие, что в «Выполненных» его программы
+  { id: 'journal', label: 'Журнал тренировок', note: 'Все занятия клиента', Icon: IconProgress },
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
   { id: 'client-preview', label: 'Клиентская версия', note: 'Проверить приложение глазами клиента', Icon: IconPhone },
   { id: 'trainers', label: 'Тренеры', note: 'Заявки на кабинет тренера', Icon: IconKey, owner: true },
@@ -354,6 +359,7 @@ export default function TrainerApp({ me }) {
 
       {inMenu && (
       <main className="app__body" key={view}>
+        {view === 'journal' && <JournalScreen />}
         {view === 'expenses' && <Expenses />}
         {view === 'logs' && owner && <Logs />}
         {view === 'trainers' && owner && <Trainers />}
@@ -404,7 +410,46 @@ export default function TrainerApp({ me }) {
   );
 }
 
+/**
+ * Журнал тренировок из бокового меню (решение владельца 28.09.2026):
+ * выбрал клиента по имени — открылся его журнал. Это тот же журнал, что
+ * по кнопке во вкладке «Тренировки» карточки: занятие одно, правка в
+ * любом месте — правка его же.
+ */
+function JournalScreen() {
+  const [client, setClient] = useState(null);
+  if (client) {
+    return (
+      <Section title={'Журнал · ' + client.name}>
+        <Deferred fallback={<Loading lead={false} rows={4} />}>
+          <WorkoutJournal key={client.row} clientRow={client.row} launch={null} backLabel="К списку клиентов" onClose={() => setClient(null)} />
+        </Deferred>
+      </Section>
+    );
+  }
+  return (
+    <ClientPicker
+      title="Журнал тренировок"
+      note="Выберите клиента — откроются все его занятия"
+      action="Открыть журнал"
+      onSelect={setClient}
+    />
+  );
+}
+
 function ClientPreviewPicker({ onSelect }) {
+  return (
+    <ClientPicker
+      title="Выберите клиента"
+      note="Откроется его настоящий интерфейс, но вы останетесь тренером"
+      action="Открыть клиентское приложение"
+      Icon={IconPhone}
+      onSelect={onSelect}
+    />
+  );
+}
+
+function ClientPicker({ title, note, action, Icon = null, onSelect }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, []);
   const [query, setQuery] = useState('');
 
@@ -416,10 +461,7 @@ function ClientPreviewPicker({ onSelect }) {
   ));
 
   return (
-    <Section
-      title="Выберите клиента"
-      note="Откроется его настоящий интерфейс, но вы останетесь тренером"
-    >
+    <Section title={title} note={note}>
       <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
       {clients.length === 0 && (
         <Empty icon={IconSearch} title="Клиент не найден" text="Проверьте имя или очистите поиск." />
@@ -432,9 +474,9 @@ function ClientPreviewPicker({ onSelect }) {
         >
           <span className="item__top">
             <span className="item__name">{client.name}</span>
-            <IconPhone size={18} />
+            {Icon && <Icon size={18} />}
           </span>
-          <span className="item__meta">Открыть клиентское приложение</span>
+          <span className="item__meta">{action}</span>
         </button>
       ))}
     </Section>

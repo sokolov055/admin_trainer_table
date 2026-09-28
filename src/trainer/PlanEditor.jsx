@@ -442,6 +442,14 @@ export default function PlanEditor({
                   exercises={exercises}
                   disabled={busy}
                   onPick={({ name, exerciseId }) => change((next) => {
+                    // Другое упражнение — «было» от прежнего ему не подходит
+                    // (был жим лёжа, стали подтягивания). Своё «было» из
+                    // журнала сервер покажет после сохранения
+                    const e0 = next[bi].exercises[ei];
+                    if ((exerciseId || null) !== (e0.exerciseId || null) || name !== e0.name) {
+                      e0.prevWeight = '';
+                      e0.lastWeight = '';
+                    }
                     next[bi].exercises[ei].name = name;
                     next[bi].exercises[ei].exerciseId = exerciseId;
                     const base = exerciseId && exercises.find((x) => x.id === exerciseId);
@@ -482,7 +490,7 @@ export default function PlanEditor({
                 </>
                 )}
 
-                {!split && exercise.prevWeight && <span className="plan-edit__prev">было {exercise.prevWeight}</span>}
+                {!split && (exercise.lastWeight || exercise.prevWeight) && <span className="plan-edit__prev">было {exercise.lastWeight || exercise.prevWeight}</span>}
 
                 {/* Сплит: кто делает и с каким весом — строкой на человека.
                     Кнопка с именем — «делает»; снятому вес не нужен. */}
