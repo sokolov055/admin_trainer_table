@@ -5,9 +5,8 @@
  * данные даёт эта страница: тренировка, упражнение, подход, вес и конец
  * отдыха, полоска подходов, следующее упражнение и тема приложения (светлая
  * или тёмная плашка). Секундомер и отсчёт отдыха система ведёт сама —
- * телефон может спать в кармане. Кнопки «Отдых» и вес ±2,5 / ±10 кг на
- * плашке работают без приложения; страница забирает нажатое при возврате
- * (takePending).
+ * телефон может спать в кармане. Кнопка «Отдых» на плашке запускает отдых
+ * без приложения; страница забирает его при возврате (takePendingRest).
  *
  * Модуль WorkoutActivity есть только в сборке приложения с плашкой. В
  * старой сборке, на Android и в браузере всё здесь молча ничего не делает.
@@ -48,11 +47,6 @@ export function activityPayload(record) {
   let exerciseDone = 0;
   let exerciseTotal = 0;
   let next = '';
-  // Силовое — вес отдельно: его меняют кнопки на плашке (±2,5 / ±10 кг)
-  let weightFields = {};
-  let amount = '';
-  let exerciseId = '';
-  let who = '';
   if (ei >= 0) {
     const ex = s.exercises[ei];
     const si = ex.sets.findIndex((x) => x.state === 'pending');
@@ -68,14 +62,8 @@ export function activityPayload(record) {
     detail = [
       set.who || '',
       (trackOf(ex).kind === 'cardio' ? 'Отрезок ' : 'Подход ') + n + ' из ' + own.length + (set.kind === 'warmup' ? ', разминка' : ''),
+      setText(set),
     ].filter(Boolean).join(' · ');
-    exerciseId = ex.id || '';
-    who = set.who || '';
-    if (trackOf(ex).kind === 'strength' && exerciseId) {
-      weightFields = { weight: String(set.weight || '').trim(), reps: String(set.reps || '').trim() };
-    } else {
-      amount = setText(set);
-    }
   }
   const paused = s.status !== 'active';
   const tick = record.tick || Date.now();
@@ -84,10 +72,6 @@ export function activityPayload(record) {
     title: s.title || 'Тренировка',
     exercise,
     detail,
-    amount,
-    ...weightFields,
-    exerciseId,
-    who,
     // Секундомер идёт от «начала без пауз»: так он совпадает с экраном
     startedAt: Math.round((tick - (s.elapsedMs || 0)) / 1000) * 1000,
     ...(paused ? { pausedSeconds: Math.round((s.elapsedMs || 0) / 1000) } : {}),
@@ -140,35 +124,16 @@ export function showWorkoutActivity(record) {
 }
 
 /**
- * Что нажали на плашке, пока страница спала: { rest: { sessionId,
- * restUntil }, weight: { sessionId, exerciseId, who, value } } — любое из
- * двух или ничего (null). Забирается один раз.
+ * Отдых, начатый кнопкой «Отдых» на плашке, пока страница спала:
+ * { sessionId, restUntil } или null. Забирается один раз.
  */
-export async function takePending() {
+export async function takePendingRest() {
   const la = activity();
-  if (!la || !la.takePending) return null;
+  if (!la || !la.takePendingRest) return null;
   try {
-    const r = (await la.takePending()) || {};
-    const rest = r.rest && r.rest.sessionId && Number(r.rest.restUntil) > 0
-      ? { sessionId: String(r.rest.sessionId), restUntil: Math.round(Number(r.rest.restUntil)) } : null;
-    const weight = r.weight && r.weight.sessionId && r.weight.exerciseId && /^\d+(\.\d+)?$/.test(String(r.weight.value))
-      ? { sessionId: String(r.weight.sessionId), exerciseId: String(r.weight.exerciseId), who: String(r.weight.who || ''), value: String(r.weight.value) } : null;
-    return rest || weight ? { rest, weight } : null;
+    const r = await la.takePendingRest();
+    return r && r.sessionId && Number(r.restUntil) > 0 ? { sessionId: String(r.sessionId), restUntil: Math.round(Number(r.restUntil)) } : null;
   } catch (_) { return null; }
-}
-
-/**
- * Вес с плашки — в занятие: текущий и все неотмеченные подходы
- * упражнения (у пары — только того, чей подход)
- */
-export function applyWeight(session, weight) {
-  return {
-    ...session,
-    exercises: session.exercises.map((ex) => ex.id !== weight.exerciseId ? ex : {
-      ...ex,
-      sets: ex.sets.map((set) => set.state === 'pending' && (set.who || '') === weight.who ? { ...set, weight: weight.value } : set),
-    }),
-  };
 }
 
 /** Занятие завершено или отменено — плашку убрать. sessionId — только

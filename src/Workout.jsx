@@ -13,7 +13,7 @@ import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
-import { showWorkoutActivity, endWorkoutActivity, takePending, applyWeight } from './native-activity.js';
+import { showWorkoutActivity, endWorkoutActivity, takePendingRest } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -247,21 +247,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (!restUntil || restStatus !== 'active') cancelRestEnd();
   }, [restUntil, restStatus]);
 
-  // Нажатое на плашке, пока приложение спало («Отдых», вес): в занятие —
-  // и на сервер. Уведомление о конце отдыха уже поставил телефон (restLocal)
+  // Отдых, начатый кнопкой на плашке, пока приложение спало: в занятие —
+  // и на сервер. Уведомление о конце уже поставил телефон (restLocal)
   const applyPendingRest = async () => {
-    const pending = await takePending();
+    const rest = await takePendingRest();
     const s = state.current?.session;
-    if (!pending || !s || !['active', 'paused'].includes(s.status)) return;
-    const { rest, weight } = pending;
-    const takeRest = rest && rest.sessionId === s.id && s.status === 'active' && rest.restUntil > (s.restUntil || 0);
-    const takeWeight = weight && weight.sessionId === s.id;
-    if (!takeRest && !takeWeight) return;
-    change(v => {
-      let next = takeWeight ? applyWeight(v, weight) : v;
-      if (takeRest) next = { ...next, restUntil: rest.restUntil, restLocal: localRestPlatform() };
-      return next;
-    });
+    if (!rest || !s || s.id !== rest.sessionId || s.status !== 'active' || rest.restUntil <= (s.restUntil || 0)) return;
+    change(v => ({ ...v, restUntil: rest.restUntil, restLocal: localRestPlatform() }));
     save();
   };
   useEffect(() => { if (ready) applyPendingRest(); }, [ready]);
