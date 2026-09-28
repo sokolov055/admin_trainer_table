@@ -222,13 +222,20 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) ? { ...set, weight: String(a.value) } : set),
       }) };
     } else if (a.kind === 'done') {
+      // setIndex — какой по счёту подход (у пары — у своего человека): его и
+      // отмечаем, если он ещё не отмечен. Тренер и клиент нажали «Отдых» на
+      // одном подходе со своих часов — отметится один, а не два. Без setIndex
+      // (старые сборки) — первый неотмеченный
+      const index = Number.isInteger(Number(a.setIndex)) && a.setIndex !== '' && a.setIndex !== undefined ? Number(a.setIndex) : -1;
       let marked = false;
-      s = { ...s, exercises: s.exercises.map((ex) => !mine(ex, a) || marked ? ex : {
-        ...ex, sets: ex.sets.map((set) => {
-          if (marked || set.state !== 'pending' || !whose(set, a)) return set;
-          marked = true;
-          return { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { weight: String(a.weight) } : {}) };
-        }),
+      s = { ...s, exercises: s.exercises.map((ex) => {
+        if (!mine(ex, a) || marked) return ex;
+        const own = ex.sets.filter((set) => whose(set, a));
+        const target = index >= 0 ? own[index] : own.find((set) => set.state === 'pending');
+        if (!target || target.state !== 'pending') return ex;
+        marked = true;
+        return { ...ex, sets: ex.sets.map((set) => set !== target ? set
+          : { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { weight: String(a.weight) } : {}) }) };
       }) };
     } else if (a.kind === 'rest' && Number(a.restUntil) > (s.restUntil || 0) && s.status === 'active') {
       s = { ...s, restUntil: Math.round(Number(a.restUntil)), restLocal: platform };

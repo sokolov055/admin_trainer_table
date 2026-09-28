@@ -177,3 +177,10 @@ test('первый экран часов: объём и упражнения', (
   assert.equal(p.volume, 480, '60 кг × 8');
   assert.deepEqual([p.exercisesDone, p.exercisesTotal], [0, 2]);
 });
+
+test('«Отдых» с двух часов на одном подходе (setIndex) — отмечен один', () => {
+  const s = record({}).session;
+  const press = { kind: 'done', sessionId: 's1', exerciseId: 'e1', who: '', weight: '62.5', setIndex: 1 };
+  const out = la.applyActions(s, [press, press]);
+  assert.deepEqual(out.exercises[0].sets.map((x) => x.state), ['done', 'done', 'pending']);
+});
