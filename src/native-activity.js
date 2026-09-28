@@ -246,7 +246,9 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
     } else if (a.kind === 'resume' && s.status === 'paused') {
       s = { ...s, status: 'active', elapsedMs: (s.elapsedMs || 0) + (now - at) };
     } else if (a.kind === 'finish') {
-      s = { ...s, status: 'completed', restUntil: 0,
+      // Ни одного сделанного подхода — занятия не было: отмена, как в приложении
+      const any = s.exercises.some((ex) => ex.sets.some((set) => set.state === 'done'));
+      s = { ...s, status: any ? 'completed' : 'cancelled', restUntil: 0,
         exercises: s.exercises.map((ex) => ({ ...ex, sets: ex.sets.map((set) => set.state === 'pending' ? { ...set, state: 'skipped' } : set) })) };
     }
   }

@@ -17,6 +17,7 @@ import { goBack } from './gestures.jsx';
 import { isNativeApp, plugin } from './native-bridge.js';
 import { refreshNativePush, listenNativeTaps } from './native-push.js';
 import { syncSteps, syncWorkouts, reportDevice } from './native-steps.js';
+import { linkWatch } from './native-watch.js';
 import { localLink } from './open-in-app.js';
 import { startBundleUpdates } from './native-update.js';
 
@@ -42,6 +43,7 @@ export function startNative() {
     app.addListener('resume', () => {
       syncSteps().catch(() => {}).then(() => reportDevice());
       syncWorkouts().catch(() => {});
+      linkWatch();
     });
   }
 
@@ -56,6 +58,8 @@ export function startNative() {
   syncSteps(true).catch(() => {}).then(() => reportDevice(true));
   // Тренировки с часов — только если подключали на этом телефоне
   syncWorkouts(true).catch(() => {});
+  // Apple Watch: ключ входа часам, если он им нужен (native-watch.js)
+  linkWatch();
 
   const bar = plugin('StatusBar');
   if (bar && bar.setBackgroundColor) {
