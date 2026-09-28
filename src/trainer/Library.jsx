@@ -813,33 +813,49 @@ function SimilarExercises({ onBack }) {
       <Back onClick={onBack} />
       <Section
         title="Похожие упражнения"
-        note="Вероятные копии одного упражнения. Выберите, какое оставить, — программы клиентов, шаблоны и история весов перейдут на него"
+        note="Вероятные копии одного упражнения. Оставьте одно: программы клиентов, шаблоны и история весов перейдут на него."
       >
         {loading && <Loading lead={false} rows={3} />}
         {error && <ErrorState error={error} onRetry={reload} />}
         {!loading && !error && groups.length === 0 && <Empty icon={IconCheck} title="Копий не найдено" text="Каждое упражнение встречается под одним названием." />}
-        {groups.map((g) => <SimilarGroup key={g.items.map((x) => x.id || x.key).join('|')} group={g} onMerged={reload} />)}
+        {groups.map((g) => <SimilarGroup key={g.items.map((x) => x.id || x.key).join('|')} group={g} />)}
       </Section>
     </>
   );
 }
 
-function SimilarGroup({ group, onMerged }) {
+/** Откуда упражнение и где встречается — одной строкой, с одним разделителем */
+function similarMeta(x) {
+  const origin = x.kind === 'name' ? 'вписано вручную' : x.mine ? 'своё' : 'общее';
+  const where = [
+    x.clients ? x.clients + ' ' + plural(x.clients, 'клиент', 'клиента', 'клиентов') : '',
+    x.templates ? x.templates + ' ' + plural(x.templates, 'шаблон', 'шаблона', 'шаблонов') : '',
+  ].filter(Boolean).join(', ') || 'не используется';
+  return origin + ' · ' + where;
+}
+
+/**
+ * Одна группа: сверху то, что остаётся, ниже то, что в него вливается.
+ * Объединение не отменить (своя копия удаляется, программы переписываются),
+ * поэтому второе нажатие подтверждает, а не запускает сразу.
+ */
+function SimilarGroup({ group }) {
   const idOf = (x) => (x.kind === 'library' ? 'id:' + x.id : 'key:' + x.key);
   const [keep, setKeep] = useState(group.keep);
-  const [picked, setPicked] = useState(() => new Set(group.items.filter((x) => !(x.kind === 'library' && x.id === group.keep)).map(idOf)));
+  const [picked, setPicked] = useState(() => new Set(group.items.map(idOf)));
+  const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
   const [done, setDone] = useState(null);
 
-  const others = group.items.filter((x) => !(x.kind === 'library' && x.id === keep));
+  const main = group.items.find((x) => x.kind === 'library' && x.id === keep);
+  const others = group.items.filter((x) => x !== main);
   const chosen = others.filter((x) => picked.has(idOf(x)));
-  const keepName = (group.items.find((x) => x.kind === 'library' && x.id === keep) || {}).name;
 
-  const where = (x) => [
-    x.clients ? x.clients + ' ' + plural(x.clients, 'клиент', 'клиента', 'клиентов') : '',
-    x.templates ? x.templates + ' ' + plural(x.templates, 'шаблон', 'шаблона', 'шаблонов') : '',
-  ].filter(Boolean).join(' · ') || 'нигде не используется';
+  const toggle = (x, on) => {
+    setConfirming(false);
+    setPicked((prev) => { const next = new Set(prev); if (on) next.add(idOf(x)); else next.delete(idOf(x)); return next; });
+  };
 
   const merge = async () => {
     setBusy(true);
@@ -854,6 +870,7 @@ function SimilarGroup({ group, onMerged }) {
       setDone(r);
     } catch (err) {
       setFailure(err);
+      setConfirming(false);
     } finally {
       setBusy(false);
     }
@@ -861,55 +878,59 @@ function SimilarGroup({ group, onMerged }) {
 
   if (done) {
     return (
-      <Panel pad>
-        <p style={{ margin: 0 }}>Теперь это «{done.keep.name}».</p>
-        <p className="small muted" style={{ marginBottom: 12 }}>
-          Строк в программах: {done.plans} · шаблонов: {done.templates} · занятий в журнале: {done.sessions}
+      <Panel pad className="library__similar library__similar--done">
+        <p className="library__similar-done"><IconCheck size={18} /> Объединено в «{done.keep.name}»</p>
+        <p className="small muted">
+          Строк в программах: {done.plans}. Шаблонов: {done.templates}. Занятий в журнале: {done.sessions}.
         </p>
-        <button className="button" onClick={onMerged}>Обновить список</button>
       </Panel>
     );
   }
 
   return (
-    <Panel pad>
-      {group.items.map((x) => {
-        const isKeep = x.kind === 'library' && x.id === keep;
-        return (
-          <div className="library__similar-row" key={idOf(x)}>
-            <label className="library__check">
-              <input
-                type="checkbox"
-                disabled={isKeep || busy}
-                checked={isKeep || picked.has(idOf(x))}
-                onChange={(e) => setPicked((prev) => {
-                  const next = new Set(prev);
-                  if (e.target.checked) next.add(idOf(x)); else next.delete(idOf(x));
-                  return next;
-                })}
-              />
-              <span>
-                <span className="item__name">{x.name}</span>
-                <span className="item__meta">
-                  <span>{where(x)}</span>
-                  {x.kind === 'name' ? <Badge>не в базе</Badge> : x.mine ? <Badge kind="good">своё</Badge> : <Badge>общее</Badge>}
-                  {isKeep && <Badge kind="good">остаётся</Badge>}
-                </span>
-              </span>
-            </label>
-            {x.kind === 'library' && !isKeep && (
-              <button className="button button--ghost" disabled={busy} onClick={() => {
-                setPicked((prev) => new Set([...prev, 'id:' + keep].filter((v) => v !== idOf(x))));
-                setKeep(x.id);
-              }}>Оставить это</button>
-            )}
-          </div>
-        );
-      })}
+    <Panel pad className="library__similar">
+      <p className="library__similar-label">Остаётся</p>
+      <p className="library__similar-main">{main.name}</p>
+      <p className="small muted library__similar-meta">{similarMeta(main)}</p>
+
+      <p className="library__similar-label">Влить в него</p>
+      {others.map((x) => (
+        <div className="library__similar-row" key={idOf(x)}>
+          <label className="library__check">
+            <input type="checkbox" disabled={busy} checked={picked.has(idOf(x))} onChange={(e) => toggle(x, e.target.checked)} />
+            <span>
+              <span className="item__name">{x.name}</span>
+              <span className="small muted library__similar-meta">{similarMeta(x)}</span>
+            </span>
+          </label>
+          {x.kind === 'library' && (
+            <button className="button button--ghost library__similar-swap" disabled={busy} onClick={() => {
+              setConfirming(false);
+              setPicked((prev) => new Set([...prev, 'id:' + keep]));
+              setKeep(x.id);
+            }}>Оставить это</button>
+          )}
+        </div>
+      ))}
+
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      <button className="button button--primary button--block" style={{ marginTop: 12 }} disabled={busy || !chosen.length} onClick={merge}>
-        {busy ? 'Объединяем…' : chosen.length ? 'Объединить в «' + keepName + '»' : 'Отметьте, что объединить'}
-      </button>
+
+      {confirming ? (
+        <div className="library__similar-confirm" role="alert">
+          <p className="small">
+            Отменить нельзя. {chosen.length} {plural(chosen.length, 'вариант станет', 'варианта станут', 'вариантов станут')} «{main.name}»
+            в программах клиентов и шаблонах; свои копии удалятся, общие скроются у вас.
+          </p>
+          <div className="library__similar-actions">
+            <button className="button" disabled={busy} onClick={() => setConfirming(false)}>Отмена</button>
+            <button className="button button--primary" disabled={busy} onClick={merge}>{busy ? 'Объединяем…' : 'Объединить'}</button>
+          </div>
+        </div>
+      ) : (
+        <button className="button button--primary button--block library__similar-go" disabled={!chosen.length} onClick={() => { setConfirming(true); haptic(); }}>
+          {chosen.length ? 'Объединить в «' + main.name + '»' : 'Отметьте, что влить'}
+        </button>
+      )}
     </Panel>
   );
 }

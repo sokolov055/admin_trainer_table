@@ -601,8 +601,14 @@ test('похожие упражнения объединяются в одно',
     if (process.env.SHOT_SIMILAR) await phone.screenshot({ path: process.env.SHOT_SIMILAR, fullPage: true });
 
     await phone.getByRole('button', { name: 'Объединить в «Жим лёжа»' }).click();
-    await phone.getByText('Теперь это «Жим лёжа».').waitFor({ timeout: 5000 });
-    await phone.getByRole('button', { name: 'Обновить список' }).click();
+    // Отменить нельзя — второе нажатие подтверждает
+    await phone.getByText('Отменить нельзя.', { exact: false }).waitFor({ timeout: 5000 });
+    if (process.env.SHOT_SIMILAR_CONFIRM) await phone.screenshot({ path: process.env.SHOT_SIMILAR_CONFIRM, fullPage: true });
+    await phone.getByRole('button', { name: 'Объединить', exact: true }).click();
+    await phone.getByText('Объединено в «Жим лёжа»').waitFor({ timeout: 5000 });
+
+    await phone.getByRole('button', { name: 'Назад' }).click();
+    await phone.getByRole('button', { name: 'Похожие', exact: true }).click();
     await phone.getByText('Копий не найдено').waitFor({ timeout: 5000 });
   } finally {
     await context.close();
