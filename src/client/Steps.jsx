@@ -54,8 +54,9 @@ function localDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export default function Steps({ clientRow }) {
-  const own = !clientRow;
+// self — «Мои тренировки» тренера: карточка чужая по номеру, но шаги свои
+export default function Steps({ clientRow, self = false }) {
+  const own = !clientRow || self;
   const native = own && isNativeApp();
   const { loading, data, error, reload } = useData('steps.list', clientRow ? { clientRow, days: DAYS } : { days: DAYS }, [clientRow]);
   const [connected, setConnected] = useState(null);
@@ -130,7 +131,7 @@ export default function Steps({ clientRow }) {
             </>
           ) : (
             <>
-              <p className="steps__lead">Тренер увидит, сколько вы ходите, — без ручного ввода.</p>
+              <p className="steps__lead">{self ? 'Шаги с этого телефона появятся в вашем прогрессе, без ручного ввода.' : 'Тренер увидит, сколько вы ходите, — без ручного ввода.'}</p>
               <p className="small muted">
                 {onIphone()
                   ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает шаги — больше ничего.'

@@ -915,7 +915,8 @@ function useProgressBundle(clientRow, familyRow = null) {
 }
 
 // familyRow — показатели члена семьи: смотреть можно, записывать замер — нет
-export function Progress({ clientRow, familyRow = null }) {
+// self — «Мои тренировки» тренера: шаги подключаются с его телефона, как у клиента
+export function Progress({ clientRow, familyRow = null, self = false }) {
   const { loading, data, error, reload } = useProgressBundle(clientRow, familyRow);
   const [field, setField] = useState('Вес');
   // Изменение за всё время или с прошлого замера: первое отвечает «куда я
@@ -1005,7 +1006,7 @@ export function Progress({ clientRow, familyRow = null }) {
                + 'Рабочие веса подтянутся из программы месяца.'
           }
         />
-        {!familyRow && <Steps clientRow={clientRow} />}
+        {!familyRow && <Steps clientRow={clientRow} self={self} />}
       </>
     );
   }
@@ -1209,7 +1210,7 @@ export function Progress({ clientRow, familyRow = null }) {
           </Section>
         )}
 
-      {!familyRow && <Steps clientRow={clientRow} />}
+      {!familyRow && <Steps clientRow={clientRow} self={self} />}
     </>
   );
 }

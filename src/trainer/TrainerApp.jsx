@@ -509,7 +509,7 @@ function MyWorkouts() {
           data-view={v.value}
           style={{ marginTop: 'var(--space-4)' }}
         >
-          <v.Screen clientRow={self.card.clientRow} />
+          <v.Screen clientRow={self.card.clientRow} self />
         </div>
       ))}
     </>
