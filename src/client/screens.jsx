@@ -348,7 +348,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     return () => { alive = false; };
   }, [clientRow, workout, familyRow, journalTick]);
 
-  if (workout) return <Deferred fallback={waiting}><WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => setWorkout(null)} /></Deferred>;
+  // Выход из журнала — перечитать и программу: тренер мог переименовать
+  // занятие, и тренировка в программе переименовалась вместе с ним
+  // (сервер, renameBlockFromJournal). Старые данные остаются на экране до ответа.
+  if (workout) return <Deferred fallback={waiting}><WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => { setWorkout(null); reload(); }} /></Deferred>;
 
   if (loading || error) return <>
     {!familyRow && <button className="button button--block plan__journal" onClick={() => openWorkout({})}>Текущее занятие и журнал тренировок</button>}

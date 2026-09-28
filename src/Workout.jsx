@@ -218,6 +218,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       const unchanged = current.edit === r.pending.edit;
       store({ ...current, session: unchanged ? result.session : {
         ...current.session, startedAt: result.session.startedAt, updatedAt: result.session.updatedAt,
+        // Связь с программой и месяц ведёт сервер: переименование тренировки
+        // или месяца меняет их, пока здесь дописывают занятие
+        sourceBlock: result.session.sourceBlock, month: result.session.month,
       }, revision: result.session.revision, pending: null, dirty: !unchanged });
       if (mounted.current) { setMessage(''); list().catch(() => {}); }
     } catch (e) {
