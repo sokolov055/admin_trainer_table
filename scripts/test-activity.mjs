@@ -42,8 +42,8 @@ const set = (state, weight = '60', reps = '8', extra = {}) => ({ state, weight, 
 const record = (session, tick = 1_000_000_000_000) => ({ tick, session: {
   id: 's1', title: 'Верх', status: 'active', elapsedMs: 600000, restUntil: 0,
   exercises: [
-    { name: 'Жим лёжа', sets: [set('done'), set('pending', '62.5'), set('pending')] },
-    { name: 'Тяга', sets: [set('pending', '', '12')] },
+    { id: 'e1', name: 'Жим лёжа', sets: [set('done'), set('pending', '62.5'), set('pending')] },
+    { id: 'e2', name: 'Тяга', sets: [set('pending', '', '12')] },
   ],
   ...session,
 } });
@@ -115,4 +115,32 @@ test('отдых с кнопки на плашке: страница забир�
   assert.equal(await la.takePendingRest(), null, 'второй раз — пусто');
   assert.equal(la.activityPayload(record({})).restSeconds, 90, '«вручную» — 1:30');
   assert.equal(la.activityPayload(record({ restSeconds: 120 })).restSeconds, 120);
+});
+
+test('очередь подходов для плашки: текущий и следующие, с «Дальше» у каждого', () => {
+  const q = la.setQueue(record({}).session);
+  assert.deepEqual(q.map((x) => [x.exercise, x.detail, x.weight, x.exerciseDone]), [
+    ['Жим лёжа', 'Подход 2 из 3', '62.5', 1],
+    ['Жим лёжа', 'Подход 3 из 3', '60', 2],
+    ['Тяга', 'Подход 1 из 1', '', 0],
+  ]);
+  assert.equal(q[0].next, 'Тяга · 1 × 12');
+  assert.equal(q[2].next, '');
+  assert.equal(la.activityPayload(record({})).sets.length, 3);
+});
+
+test('журнал с плашки: вес, «Отдых» (подход сделан + отдых), снова вес — по порядку', () => {
+  const s = record({}).session;
+  const until = Date.now() + 90000;
+  const out = la.applyActions(s, [
+    { kind: 'weight', sessionId: 's1', exerciseId: 'e1', who: '', value: '65' },
+    { kind: 'done', sessionId: 's1', exerciseId: 'e1', who: '', weight: '65' },
+    { kind: 'rest', sessionId: 's1', restUntil: until },
+    { kind: 'weight', sessionId: 's1', exerciseId: 'e1', who: '', value: '67.5' },
+    { kind: 'done', sessionId: 'чужое', exerciseId: 'e1', who: '' },
+  ], 'ios');
+  assert.deepEqual(out.exercises[0].sets.map((x) => [x.state, x.weight]), [['done', '60'], ['done', '65'], ['pending', '67.5']]);
+  assert.equal(out.restUntil, until);
+  assert.equal(out.restLocal, 'ios');
+  assert.equal(la.applyActions(s, []), s, 'пусто — занятие то же');
 });

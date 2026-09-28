@@ -83,6 +83,7 @@ export function activityPayload(record) {
     exerciseTotal,
     next,
     dark: darkTheme(),
+    sets: setQueue(s),
     // Кнопка «Отдых» на плашке: выбранная длительность, «вручную» — 1:30
     restSeconds: s.restSeconds || 90,
   };
@@ -101,6 +102,42 @@ function darkTheme() {
 function nextText(ex) {
   const reps = String((ex.sets[0] && ex.sets[0].reps) || '').trim();
   return ex.name + ' · ' + ex.sets.length + (reps ? ' × ' + reps : ' подх.');
+}
+
+/** Сколько подходов вперёд знает плашка: «Отдых» на ней отмечает подход
+ *  и переходит к следующему, пока страница спит */
+const QUEUE = 12;
+
+/**
+ * Очередь подходов для плашки: текущий и следующие по порядку занятия.
+ * У силовых вес отдельно — его меняют кнопки плашки; у остальных — что
+ * сделать строкой (amount). Старая сборка очередь не читает.
+ */
+export function setQueue(s) {
+  const out = [];
+  s.exercises.forEach((ex, ei) => {
+    ex.sets.forEach((set) => {
+      if (set.state !== 'pending' || out.length >= QUEUE) return;
+      const own = set.who ? ex.sets.filter((x) => x.who === set.who) : ex.sets;
+      const n = own.indexOf(set) + 1;
+      const after = s.exercises.slice(ei + 1).find((e) => e.sets.some((x) => x.state === 'pending'));
+      const strength = trackOf(ex).kind === 'strength' && !!ex.id;
+      out.push({
+        exerciseId: ex.id || '',
+        who: set.who || '',
+        exercise: ex.name,
+        detail: [set.who || '', (trackOf(ex).kind === 'cardio' ? 'Отрезок ' : 'Подход ') + n + ' из ' + own.length
+          + (set.kind === 'warmup' ? ', разминка' : '')].filter(Boolean).join(' · '),
+        ...(strength ? { weight: String(set.weight || '').trim() } : {}),
+        reps: strength ? String(set.reps || '').trim() : '',
+        amount: strength ? '' : setText(set),
+        exerciseDone: n - 1,
+        exerciseTotal: own.length,
+        next: after ? nextText(after) : '',
+      });
+    });
+  });
+  return out;
 }
 
 /** Отдых кончился давно — «+» на плашке уже ничего не говорит */
@@ -134,6 +171,57 @@ export async function takePendingRest() {
     const r = await la.takePendingRest();
     return r && r.sessionId && Number(r.restUntil) > 0 ? { sessionId: String(r.sessionId), restUntil: Math.round(Number(r.restUntil)) } : null;
   } catch (_) { return null; }
+}
+
+/**
+ * Нажатое на плашке, пока страница спала, — по порядку: «Отдых» (подход
+ * сделан + отдых), вес. Сборка с очередью подходов (takeActions).
+ * Забирается один раз; пусто — [].
+ */
+export async function takeActions() {
+  const la = activity();
+  if (!la || !la.takeActions) return [];
+  try {
+    const r = await la.takeActions();
+    return Array.isArray(r && r.actions) ? r.actions.filter((a) => a && a.sessionId && a.kind) : [];
+  } catch (_) { return []; }
+}
+
+const WEIGHT_RE = /^\d+(\.\d+)?$/;
+
+/** Подходы упражнения того же человека */
+const mine = (ex, a) => ex.id === String(a.exerciseId || '');
+const whose = (set, a) => (set.who || '') === String(a.who || '');
+
+/**
+ * Проиграть нажатое на плашке в занятие:
+ *  - weight — вес в текущий и оставшиеся подходы упражнения (у пары — своему);
+ *  - done — первый неотмеченный подход упражнения сделан, с весом с плашки;
+ *  - rest — отдых до restUntil (если позже нынешнего).
+ * Чужое занятие и непонятное пропускаем.
+ */
+export function applyActions(session, actions, platform = '') {
+  let s = session;
+  for (const a of actions) {
+    if (String(a.sessionId) !== s.id) continue;
+    if (a.kind === 'weight' && WEIGHT_RE.test(String(a.value))) {
+      s = { ...s, exercises: s.exercises.map((ex) => !mine(ex, a) ? ex : {
+        ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) ? { ...set, weight: String(a.value) } : set),
+      }) };
+    } else if (a.kind === 'done') {
+      let marked = false;
+      s = { ...s, exercises: s.exercises.map((ex) => !mine(ex, a) || marked ? ex : {
+        ...ex, sets: ex.sets.map((set) => {
+          if (marked || set.state !== 'pending' || !whose(set, a)) return set;
+          marked = true;
+          return { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { weight: String(a.weight) } : {}) };
+        }),
+      }) };
+    } else if (a.kind === 'rest' && Number(a.restUntil) > (s.restUntil || 0) && s.status === 'active') {
+      s = { ...s, restUntil: Math.round(Number(a.restUntil)), restLocal: platform };
+    }
+  }
+  return s;
 }
 
 /** Занятие завершено или отменено — плашку убрать. sessionId — только

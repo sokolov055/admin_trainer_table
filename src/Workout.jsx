@@ -13,7 +13,7 @@ import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
-import { showWorkoutActivity, endWorkoutActivity, takePendingRest } from './native-activity.js';
+import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -250,6 +250,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Отдых, начатый кнопкой на плашке, пока приложение спало: в занятие —
   // и на сервер. Уведомление о конце уже поставил телефон (restLocal)
   const applyPendingRest = async () => {
+    // Сборка с очередью подходов: журнал нажатий — «Отдых» (подход сделан
+    // + отдых) и вес — проигрываем по порядку
+    const actions = await takeActions();
+    const cur = state.current?.session;
+    if (actions.length && cur && ['active', 'paused'].includes(cur.status)) {
+      if (applyActions(cur, actions) !== cur) { change(v => applyActions(v, actions, localRestPlatform())); save(); }
+    }
     const rest = await takePendingRest();
     const s = state.current?.session;
     if (!rest || !s || s.id !== rest.sessionId || s.status !== 'active' || rest.restUntil <= (s.restUntil || 0)) return;
