@@ -2347,6 +2347,15 @@ th.sticky, td.sticky {
 .login__alternative-text { margin: 0; font-size: var(--text-sm); line-height: 1.55; }
 .login__inline-alert { margin-top: var(--space-3); color: var(--critical-text); }
 .login__recovery { margin-top: var(--space-3); }
+.login__about {
+  display: block;
+  width: fit-content;
+  margin: var(--space-5) auto 0;
+  color: var(--accent-text);
+  font-size: var(--text-sm);
+  text-underline-offset: 4px;
+}
+.login__about:hover { text-decoration: underline; }
 
 .login__mark--success { color: var(--good-text); opacity: 1; }
 

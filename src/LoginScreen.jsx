@@ -49,6 +49,9 @@ export default function LoginScreen({ details }) {
             </div>
           </details>
           {details}
+          <a className="login__about" href={import.meta.env.BASE_URL + 'site/'}>
+            Возможности Fit Track
+          </a>
         </div>
       </main>
     </div>
