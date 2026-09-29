@@ -22,10 +22,13 @@
     "test:browser": "node --test scripts/test-browser.mjs",
     "dev": "vite",
     "build": "vite build",
+    "build:site": "node scripts/build-marketing-site.mjs",
     "preview": "vite preview",
     "switch-api": "node scripts/switch-api.js"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.2.8",
+    "gsap": "^3.13.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

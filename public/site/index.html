@@ -3,11 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f4f1e9">
-  <meta name="description" content="Fit Track объединяет программу тренировок, журнал, прогресс, питание и работу с персональным тренером.">
-  <title>Fit Track | Тренер и клиент в одном приложении</title>
-  <link rel="icon" href="../icon-192.png">
-  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
+  <meta name="theme-color" content="#111512">
+  <meta name="description" content="Fit Track соединяет программу тренера, фактические тренировки клиента, прогресс и питание в одном приложении.">
+  <title>Fit Track | Тренировки под контролем</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23111512'/%3E%3Cpath fill='%23f2f4ee' d='M11 35h11v18H11zm16-12h11v30H27z'/%3E%3Cpath fill='%2367d17b' d='M43 10h11v43H43z'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -23,18 +22,19 @@
       <symbol id="arrow" viewBox="0 0 24 24">
         <path d="M5 12h13M13 7l5 5-5 5"/>
       </symbol>
-      <symbol id="icon-download" viewBox="0 0 24 24">
+      <symbol id="download" viewBox="0 0 24 24">
         <path d="M12 3v12M7 10l5 5 5-5M5 20h14"/>
       </symbol>
     </defs>
   </svg>
 
-  <header class="topbar">
+  <header class="topbar hero-animate">
     <a class="brand" href="#top" aria-label="Fit Track, к началу страницы">
       <svg class="brand__mark" aria-hidden="true"><use href="#logo"/></svg>
       <span>Fit Track</span>
     </a>
     <nav class="topbar__nav" aria-label="Разделы страницы">
+      <a href="#how">Как работает</a>
       <a href="#client">Клиенту</a>
       <a href="#trainer">Тренеру</a>
       <a class="topbar__cta" href="#download">Скачать</a>
@@ -43,134 +43,122 @@
 
   <main id="main">
     <section class="hero" id="top">
-      <div class="hero__copy reveal">
-        <p class="eyebrow">Личный кабинет для персональных тренировок</p>
-        <h1>Тренер и клиент работают в одном ритме.</h1>
-        <p class="hero__lead">Программа, тренировки, прогресс и питание собраны в одном спокойном кабинете.</p>
-        <div class="hero__actions">
-          <a class="button button--primary" href="#client">
-            Посмотреть возможности
+      <div class="hero__copy">
+        <h1 class="hero-animate">Тренировки остаются в работе.</h1>
+        <p class="hero__lead hero-animate">Тренер задаёт план. Клиент фиксирует подходы. Прогресс остаётся у обоих перед глазами.</p>
+        <div class="hero__actions hero-animate">
+          <a class="button button--primary" href="#how">
+            Смотреть возможности
             <svg aria-hidden="true"><use href="#arrow"/></svg>
           </a>
-          <a class="button button--quiet" href="../">Открыть веб-версию</a>
+          <a class="button button--quiet" href="https://sokolov055.github.io/admin_trainer_table/">Открыть кабинет</a>
         </div>
-        <p class="hero__note">Для работы в зале, онлайн-ведения и контроля между занятиями.</p>
       </div>
 
-      <div class="hero__visual reveal" aria-label="Настоящие экраны Fit Track для клиента и тренера">
-        <div class="phone phone--trainer">
-          <span class="phone__label">Тренер</span>
-          <img src="trainer.png" width="780" height="1688" alt="Список клиентов и сводка тренера в Fit Track">
+      <div class="hero__visual" aria-label="Настоящие экраны Fit Track для тренера и клиента">
+        <div class="hero__rail hero-animate" aria-hidden="true">
+          <span>План</span><i></i><span>Занятие</span><i></i><span>Результат</span>
         </div>
-        <div class="phone phone--client">
-          <span class="phone__label">Клиент</span>
-          <img src="client.png" width="780" height="1688" alt="Обзор тренировок клиента в Fit Track">
-        </div>
-        <span class="hero__orbit" aria-hidden="true"></span>
+        <figure class="device device--trainer hero-device">
+          <figcaption>Тренер</figcaption>
+          <img src="trainer.png" width="780" height="1688" alt="Панель тренера со списком клиентов и рабочей сводкой">
+        </figure>
+        <figure class="device device--client hero-device">
+          <figcaption>Клиент</figcaption>
+          <img src="client.png" width="780" height="1688" alt="Кабинет клиента с балансом и ближайшей тренировкой">
+        </figure>
       </div>
     </section>
 
-    <section class="promise" aria-label="Главная идея приложения">
-      <p class="promise__index">01</p>
-      <p class="promise__text">Не ещё один фитнес-трекер. Рабочее пространство, где программа тренера превращается в понятные действия клиента.</p>
+    <section class="mechanism" id="how">
+      <div class="mechanism__intro reveal">
+        <h2>Один цикл вместо разрозненных сообщений.</h2>
+        <p>Fit Track сохраняет связь между тем, что запланировал тренер, что сделал клиент и как меняется результат.</p>
+      </div>
+      <div class="flow reveal" aria-label="Цикл работы в Fit Track">
+        <article>
+          <strong>План</strong>
+          <p>Программа, упражнения, подходы, суперсеты и кардио.</p>
+        </article>
+        <article>
+          <strong>Занятие</strong>
+          <p>Фактический вес, повторы, RPE, заметки и таймер отдыха.</p>
+        </article>
+        <article>
+          <strong>Разбор</strong>
+          <p>История тренировок, замеры, шаги и динамика нагрузок.</p>
+        </article>
+      </div>
     </section>
 
-    <section class="role role--client" id="client">
-      <div class="role__media reveal">
-        <div class="shot shot--client">
-          <img src="client.png" width="780" height="1688" loading="lazy" alt="Главный экран клиента с балансом и ближайшей тренировкой">
-        </div>
-        <div class="metric" aria-hidden="true">
-          <span>Сегодня</span>
-          <strong>Всё по плану</strong>
-        </div>
+    <section class="role" id="client">
+      <div class="role__visual reveal">
+        <figure class="screen screen--client">
+          <img src="client.png" width="780" height="1688" loading="lazy" alt="Главный экран клиента Fit Track">
+        </figure>
+        <p class="screen-note">Всё нужное перед тренировкой видно сразу.</p>
       </div>
-
-      <div class="role__copy reveal">
-        <p class="eyebrow">Клиенту</p>
-        <h2>Понятно, что делать сегодня.</h2>
-        <p class="role__lead">Клиент видит план, фиксирует фактическую работу и замечает прогресс без таблиц и переписки.</p>
+      <div class="role__content reveal">
+        <h2>Клиент знает, что делать сегодня.</h2>
+        <p class="role__lead">Никаких поисков программы в переписке. План, занятие и история открываются в одном кабинете.</p>
         <div class="feature-list">
-          <article>
-            <span>01</span>
-            <div><h3>Программа в телефоне</h3><p>Упражнения, подходы, веса, суперсеты и кардио всегда под рукой.</p></div>
-          </article>
-          <article>
-            <span>02</span>
-            <div><h3>Журнал прямо в зале</h3><p>Фактические повторы, нагрузка, RPE и таймер отдыха сохраняются по ходу занятия.</p></div>
-          </article>
-          <article>
-            <span>03</span>
-            <div><h3>Прогресс без догадок</h3><p>Вес, замеры, рабочие веса и шаги складываются в понятную динамику.</p></div>
-          </article>
-          <article>
-            <span>04</span>
-            <div><h3>Вся рутина рядом</h3><p>Расписание, баланс тренировок, норма питания и рацион находятся в одном кабинете.</p></div>
-          </article>
+          <article><h3>Программа в телефоне</h3><p>Упражнения и нагрузка доступны прямо в зале.</p></article>
+          <article><h3>Журнал по ходу занятия</h3><p>Подходы сохраняются вместе с весом, повторами и самочувствием.</p></article>
+          <article><h3>Прогресс в контексте</h3><p>Замеры, шаги и рабочие веса показывают реальную динамику.</p></article>
+          <article><h3>Расписание и питание</h3><p>Ближайшее занятие, баланс пакета и рацион всегда рядом.</p></article>
         </div>
       </div>
     </section>
 
     <section class="role role--trainer" id="trainer">
-      <div class="role__copy reveal">
-        <p class="eyebrow">Тренеру</p>
-        <h2>Видно, где нужна помощь.</h2>
-        <p class="role__lead">Fit Track собирает операционную работу тренера в одну систему и оставляет больше времени на людей.</p>
-        <div class="feature-list feature-list--dark">
-          <article>
-            <span>01</span>
-            <div><h3>Клиенты и расписание</h3><p>Карточки, ближайшие занятия и статусы собраны в общей рабочей картине.</p></div>
-          </article>
-          <article>
-            <span>02</span>
-            <div><h3>Программы и шаблоны</h3><p>Тренировочные месяцы, библиотека упражнений и готовые шаблоны редактируются в приложении.</p></div>
-          </article>
-          <article>
-            <span>03</span>
-            <div><h3>Контроль прогресса</h3><p>Тренер видит выполненные тренировки, замеры, питание и динамику клиента.</p></div>
-          </article>
-          <article>
-            <span>04</span>
-            <div><h3>Оплаты и сводка</h3><p>Баланс пакетов, платежи, выручка и рабочие показатели не теряются между сервисами.</p></div>
-          </article>
+      <div class="role__content reveal">
+        <h2>Тренер видит, кому нужна помощь.</h2>
+        <p class="role__lead">Рабочий день складывается в одну систему: клиенты, программы, расписание, прогресс и оплаты.</p>
+        <div class="feature-list">
+          <article><h3>Клиенты и расписание</h3><p>Ближайшие занятия и важные статусы собраны в общей картине.</p></article>
+          <article><h3>Программы и шаблоны</h3><p>Месяцы тренировок и библиотека упражнений редактируются в приложении.</p></article>
+          <article><h3>Фактическая работа</h3><p>Тренер открывает выполненное занятие и видит каждый подход.</p></article>
+          <article><h3>Оплаты и сводка</h3><p>Баланс пакетов, платежи и рабочие показатели не теряются.</p></article>
         </div>
       </div>
-
-      <div class="role__media reveal">
-        <div class="shot shot--trainer">
-          <img src="trainer.png" width="780" height="1688" loading="lazy" alt="Панель тренера со списком клиентов и рабочей сводкой">
-        </div>
-        <div class="metric metric--dark" aria-hidden="true">
-          <span>Рабочий день</span>
-          <strong>Фокус на клиентах</strong>
-        </div>
+      <div class="role__visual reveal">
+        <figure class="screen screen--trainer">
+          <img src="trainer.png" width="780" height="1688" loading="lazy" alt="Панель тренера Fit Track">
+        </figure>
+        <p class="screen-note">Сначала те клиенты, которым нужно внимание.</p>
       </div>
     </section>
 
-    <section class="connection reveal">
-      <p class="eyebrow">Одна система</p>
-      <h2>План тренера.<br>Действия клиента.<br><em>Общий результат.</em></h2>
-      <p>Изменения в программе, фактические тренировки и прогресс остаются в одном контексте. Обоим понятно, что происходит дальше.</p>
+    <section class="together">
+      <div class="together__line" aria-hidden="true"></div>
+      <div class="together__copy reveal">
+        <h2>Один журнал.<br>Две точки зрения.</h2>
+        <p>Клиент отмечает работу в зале. Тренер видит факт, корректирует следующий план и сохраняет общий контекст.</p>
+      </div>
+      <div class="together__facts reveal">
+        <p><strong>Без ручного переноса</strong><span>Факт занятия уже связан с программой.</span></p>
+        <p><strong>Без потери контекста</strong><span>История остаётся рядом с текущим планом.</span></p>
+      </div>
     </section>
 
     <section class="download" id="download">
       <div class="download__copy reveal">
-        <p class="eyebrow">Fit Track на вашем устройстве</p>
-        <h2>Кабинет уже можно открыть.</h2>
-        <p>Мобильные версии готовятся к публикации. На Android уже доступна прямая установка приложения.</p>
+        <h2>Fit Track уже можно использовать.</h2>
+        <p>Откройте кабинет в браузере или установите Android-приложение. Версии для магазинов готовятся к публикации.</p>
       </div>
       <div class="download__actions reveal">
-        <a class="store store--active" href="https://raw.githubusercontent.com/sokolov055/admin_trainer_table/main/public/android/fit-track.apk">
-          <svg aria-hidden="true"><use href="#icon-download"/></svg>
+        <a class="store store--primary" href="https://raw.githubusercontent.com/sokolov055/admin_trainer_table/main/public/android/fit-track.apk">
+          <svg aria-hidden="true"><use href="#download"/></svg>
           <span><small>Скачать сейчас</small>Android APK</span>
         </a>
-        <button class="store" type="button" disabled>
-          <span><small>Готовится к публикации</small>App Store</span>
-        </button>
-        <button class="store" type="button" disabled>
-          <span><small>Готовится к публикации</small>Google Play</span>
-        </button>
-        <a class="web-link" href="../">Открыть Fit Track в браузере <svg aria-hidden="true"><use href="#arrow"/></svg></a>
+        <a class="store" href="https://sokolov055.github.io/admin_trainer_table/">
+          <span><small>Без установки</small>Открыть в браузере</span>
+          <svg aria-hidden="true"><use href="#arrow"/></svg>
+        </a>
+        <div class="stores-soon" aria-label="Версии в магазинах готовятся">
+          <span><small>Скоро</small>App Store</span>
+          <span><small>Скоро</small>Google Play</span>
+        </div>
       </div>
     </section>
   </main>
@@ -180,15 +168,16 @@
       <svg class="brand__mark" aria-hidden="true"><use href="#logo"/></svg>
       <span>Fit Track</span>
     </a>
-    <p>Персональные тренировки в общем ритме.</p>
     <nav aria-label="Документы">
-      <a href="../privacy.html">Политика</a>
-      <a href="../terms.html">Соглашение</a>
-      <a href="../support.html">Поддержка</a>
+      <a href="https://sokolov055.github.io/admin_trainer_table/privacy.html">Политика</a>
+      <a href="https://sokolov055.github.io/admin_trainer_table/terms.html">Соглашение</a>
+      <a href="https://sokolov055.github.io/admin_trainer_table/support.html">Поддержка</a>
     </nav>
-    <p class="footer__year">© <span id="year">2026</span> Fit Track</p>
+    <p>© <span id="year">2026</span> Fit Track</p>
   </footer>
 
+  <script src="vendor/gsap.min.js"></script>
+  <script src="vendor/ScrollTrigger.min.js"></script>
   <script src="site.js"></script>
 </body>
 </html>

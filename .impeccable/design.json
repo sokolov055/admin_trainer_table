@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T00:00:00+03:00",
+  "title": "Design System: Fit Track",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "Рабочий зелёный", "canonical": "#67d17b", "tonalRamp": ["#102715", "#1b4223", "#285f33", "#3b8249", "#50a95f", "#67d17b", "#9ae7a8", "#d6f7dc"] },
+      "canvas": { "role": "neutral", "displayName": "Графитовый холст", "canonical": "#111512", "tonalRamp": ["#080a08", "#111512", "#181d19", "#202621", "#343b35", "#59615a", "#a7aea7", "#f2f4ee"] },
+      "text": { "role": "neutral", "displayName": "Молочный текст", "canonical": "#f2f4ee", "tonalRamp": ["#171a17", "#303530", "#4c534c", "#6f776f", "#969d96", "#bcc2bc", "#dde1dc", "#f2f4ee"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Крупный тезис", "purpose": "Первый экран и ключевые смысловые повороты." },
+      "headline": { "displayName": "Заголовок раздела", "purpose": "Названия продуктовых разделов." },
+      "body": { "displayName": "Рабочий текст", "purpose": "Короткие объяснения и описания функций." },
+      "label": { "displayName": "Действие", "purpose": "Кнопки, роли и статусы." }
+    },
+    "shadows": [
+      { "name": "device", "value": "0 30px 75px rgba(0, 0, 0, .34)", "purpose": "Физическая глубина макета телефона." },
+      { "name": "note", "value": "0 18px 44px rgba(0, 0, 0, .22)", "purpose": "Связанная с экраном рабочая заметка." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(.23, 1, .32, 1)", "purpose": "Появление и реакция элементов управления." },
+      { "name": "ease-move", "value": "cubic-bezier(.77, 0, .175, 1)", "purpose": "Редкие выразительные перемещения." }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "1020px" },
+      { "name": "mobile", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Основная кнопка",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Главное действие на текущей поверхности.",
+      "html": "<button class=\"ds-btn-primary\">Смотреть возможности</button>",
+      "css": ".ds-btn-primary{min-height:54px;padding:14px 20px;border:1px solid #67d17b;border-radius:12px;background:#67d17b;color:#102715;font:720 .9rem Manrope,sans-serif;transition:transform 150ms cubic-bezier(.23,1,.32,1),background 160ms}.ds-btn-primary:hover{transform:translateY(-2px);background:#8be19b}.ds-btn-primary:focus-visible{outline:3px solid #9ee7ff;outline-offset:4px}.ds-btn-primary:active{transform:scale(.97)}"
+    },
+    {
+      "name": "Вторичная кнопка",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Спокойное действие рядом с основным.",
+      "html": "<button class=\"ds-btn-secondary\">Открыть кабинет</button>",
+      "css": ".ds-btn-secondary{min-height:54px;padding:14px 20px;border:1px solid #343b35;border-radius:12px;background:transparent;color:#f2f4ee;font:720 .9rem Manrope,sans-serif;transition:transform 150ms cubic-bezier(.23,1,.32,1),background 160ms}.ds-btn-secondary:hover{transform:translateY(-2px);background:#202621}.ds-btn-secondary:focus-visible{outline:3px solid #9ee7ff;outline-offset:4px}.ds-btn-secondary:active{transform:scale(.97)}"
+    },
+    {
+      "name": "Метка роли",
+      "kind": "chip",
+      "description": "Коротко обозначает тренерский или клиентский экран.",
+      "html": "<span class=\"ds-role\">Клиент</span>",
+      "css": ".ds-role{display:inline-flex;padding:7px 11px;border-radius:999px;background:rgba(17,21,18,.9);color:#f2f4ee;font:720 12px Manrope,sans-serif}"
+    },
+    {
+      "name": "Действие загрузки",
+      "kind": "custom",
+      "description": "Крупная строка для доступного способа установки.",
+      "html": "<a class=\"ds-store\" href=\"#\"><span><small>Скачать сейчас</small>Android APK</span><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 3v12m0 0 4-4m-4 4-4-4M5 20h14\"/></svg></a>",
+      "css": ".ds-store{display:flex;align-items:center;gap:16px;min-height:78px;padding:13px 20px;border:1px solid #67d17b;border-radius:14px;background:#67d17b;color:#102715;text-decoration:none;font:740 1rem Manrope,sans-serif}.ds-store small{display:block;color:#25472c;font-size:.72rem}.ds-store svg{width:20px;fill:none;stroke:currentColor;stroke-width:1.8}.ds-store:hover{background:#8be19b}.ds-store:focus-visible{outline:3px solid #9ee7ff;outline-offset:4px}"
+    },
+    {
+      "name": "Рабочая заметка",
+      "kind": "card",
+      "description": "Короткий вывод, визуально привязанный к экрану продукта.",
+      "html": "<p class=\"ds-note\">Весь журнал перед тренировкой виден сразу.</p>",
+      "css": ".ds-note{max-width:310px;margin:0;padding:20px 22px;border-radius:14px;background:#67d17b;color:#102715;box-shadow:0 18px 44px rgba(0,0,0,.22);font:700 .88rem/1.55 Manrope,sans-serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Живой тренировочный журнал",
+    "overview": "Спокойный профессиональный инструмент, в котором работа тренера и прогресс клиента собраны на одной странице. Графитовая основа напоминает рабочую запись в зале, а зелёный цвет отмечает только действие, прогресс и связь между ролями.",
+    "keyCharacteristics": ["Крупная плотная типографика с короткими строками", "Графитовые поверхности и один функциональный зелёный акцент", "Реальные экраны приложения", "Асимметрия и тонкие разделители", "Короткое физичное движение"],
+    "rules": [
+      { "name": "One Signal", "body": "Зелёный означает действие, прогресс или подтверждённую связь.", "section": "colors" },
+      { "name": "Short Line", "body": "Крупный заголовок сообщает одну мысль и занимает не более трёх строк на телефоне.", "section": "typography" },
+      { "name": "Flat Workspace", "body": "Обычные секции и списки остаются плоскими; глубина принадлежит экрану продукта.", "section": "elevation" }
+    ],
+    "dos": ["Показывать реальный интерфейс", "Использовать зелёный редко и функционально", "Проверять поверхность на 390 px"],
+    "donts": ["Не добавлять градиенты и декоративное свечение", "Не превращать каждую функцию в карточку", "Не использовать эмодзи вместо SVG-иконок"]
+  }
+}
