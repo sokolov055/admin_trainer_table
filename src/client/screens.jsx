@@ -390,9 +390,15 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const totalExercises = blocks.reduce((s, b) => s + b.exercises.length, 0);
 
   // Проведённой считается тренировка, у которой есть завершённое занятие
-  // этого месяца. Порядок внутри вкладок — тот же, что в программе.
-  const doneBlocks = blocks.filter((b) => blockSessions(sessions, b, data.month).length > 0);
+  // этого месяца. Порядок в «Очереди» — тот же, что в программе.
   const queueBlocks = blocks.filter((b) => !blockSessions(sessions, b, data.month).length);
+  // «Выполненные» (01.10.2026) — все завершённые занятия месяца, свежие
+  // сверху: тренировки программы (и повторы одной и той же), свободные
+  // тренировки — по дате занятия, у них месяца программы нет
+  const doneSessions = sessions
+    .filter((s) => s.status === 'completed' && (s.month ? s.month === data.month : inMonthLabel(s.startedAt || s.updatedAt, data.month)))
+    .sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
+  const freeWorkout = () => openWorkout({ block: FREE_BLOCK, month: '' });
 
   return (
     <>
@@ -542,18 +548,28 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {blocks.length > 0 && doneBlocks.length > 0 && (
+      {doneSessions.length > 0 && (
         <Chips
           items={[
             { value: 'queue', label: 'Очередь · ' + queueBlocks.length },
-            { value: 'done', label: 'Выполненные · ' + doneBlocks.length },
+            { value: 'done', label: 'Выполненные · ' + doneSessions.length },
           ]}
           value={planTab}
           onChange={setPlanTab}
         />
       )}
 
-      {planTab === 'queue' && queueBlocks.length === 0 && doneBlocks.length > 0 && (
+      {/* Свободная тренировка — без программы: что делал, то и записал.
+          Появится во «Выполненных» этого месяца */}
+      {!running && !familyRow && planTab === 'queue' && (
+        <button className="button button--block plan__free" onClick={freeWorkout}>Свободная тренировка</button>
+      )}
+
+      {planTab === 'done' && doneSessions.map((s) => (
+        <DoneSession key={s.id} session={s} canOpen={!familyRow} onOpen={() => openWorkout({ sessionId: s.id })} />
+      ))}
+
+      {planTab === 'queue' && queueBlocks.length === 0 && blocks.length > 0 && (
         <Empty
           icon={IconPlan}
           title="Все тренировки месяца проведены"
@@ -561,7 +577,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {(planTab === 'done' ? doneBlocks : queueBlocks).map((block, i) => {
+      {planTab === 'queue' && queueBlocks.map((block, i) => {
         const past = blockSessions(sessions, block, data.month);
 
         // Во «Выполненных» — то, что сделано на последнем занятии, а не
@@ -660,6 +676,75 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       )}
       </>)}
     </>
+  );
+}
+
+/** Заготовка свободной тренировки — как в журнале (Workout.jsx) */
+const FREE_BLOCK = { title: 'Свободная тренировка', exercises: [{ name: 'Первое упражнение', sets: 3 }] };
+
+const MONTH_NAMES = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+  'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+
+/** Дата занятия в месяце «Сентябрь 2026»; непонятное название — да (не терять) */
+function inMonthLabel(iso, label) {
+  const m = /^(\S+)\s+(\d{4})$/.exec(String(label || '').trim());
+  const d = new Date(iso);
+  if (!m || isNaN(d.getTime())) return !label;
+  const idx = MONTH_NAMES.indexOf(m[1].toLowerCase());
+  return idx === d.getMonth() && Number(m[2]) === d.getFullYear();
+}
+
+/**
+ * Проведённое занятие во «Выполненных»: название, когда, сколько подходов,
+ * «Посмотреть веса» и по нажатию — что сделано. Свободная тренировка и
+ * повтор той же тренировки программы — такие же строки.
+ */
+function DoneSession({ session: s, canOpen, onOpen }) {
+  const [open, setOpen] = useState(false);
+  const exercises = Array.isArray(s.exercises) ? s.exercises : [];
+  const names = exercises.map((ex) => ex.name).filter(Boolean);
+  const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
+  return (
+    <Section title={s.title} note={formatDate(s.startedAt || s.updatedAt)}>
+      <Panel>
+        <div className="plan__done">
+          <div>
+            <strong>{s.month ? 'Тренировка проведена' : 'Свободная тренировка'}</strong>
+            <span>{s.done ? s.done + ' ' + plural(s.done, 'подход', 'подхода', 'подходов') : 'без отмеченных подходов'}</span>
+          </div>
+          {canOpen && <button className="button" onClick={onOpen}>Посмотреть веса</button>}
+        </div>
+        {exercises.length > 0 && (
+          <button type="button" className="plan__toggle" aria-expanded={open} onClick={() => { setOpen(!open); haptic(); }}>
+            <span className="plan__toggle-text">
+              <strong>{open ? 'Свернуть' : 'Что сделано'}</strong>
+              {!open && preview && <span>{preview}</span>}
+            </span>
+            <IconChevron size={18} className={'plan__chevron' + (open ? ' plan__chevron--open' : '')} aria-hidden="true" />
+          </button>
+        )}
+        {open && supersets(exercises).map((group, j) => {
+          const line = group.superset ? roundLine : doneLine;
+          const rows = group.items.map((ex, k) => {
+            const who = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))];
+            return (
+              <div className="exercise" style={{ minWidth: 0 }} key={k}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="exercise__name">{ex.name}</div>
+                  {who.length
+                    ? who.map((w) => <div className="exercise__scheme" key={w}>{w}: {line(ex.sets.filter((x) => x.who === w), ex.track)}</div>)
+                    : <div className="exercise__scheme">{line(ex.sets, ex.track)}</div>}
+                </div>
+              </div>
+            );
+          });
+          if (!group.superset) return <React.Fragment key={'m' + j}>{rows}</React.Fragment>;
+          const people = (ex) => new Set(ex.sets.map((x) => x.who || '')).size || 1;
+          const rounds = Math.max(...group.items.map((ex) => Math.round(ex.sets.length / people(ex))));
+          return <Superset rounds={rounds} key={'m' + j}>{rows}</Superset>;
+        })}
+      </Panel>
+    </Section>
   );
 }
 

@@ -60,7 +60,7 @@ export default function Family({ members, preview = false }) {
       {members.map((m) => (
         <button className="item" key={m.row} onClick={() => { setOpen(m); setTab('plan'); haptic(); }}>
           <div className="item__top">
-            <span className="item__name">{m.name}</span>
+            <span className="item__name">{m.name}{m.archived ? ' · в архиве' : ''}</span>
           </div>
           <div className="item__meta">
             <span>{m.payer ? 'оплачивает тренировки семьи' : 'тренировки и прогресс'}</span>

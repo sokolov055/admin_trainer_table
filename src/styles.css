@@ -4388,3 +4388,10 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
    сетка едет за пальцем; вертикальную прокрутку браузер оставляет себе */
 .cal-swipe { overflow: hidden; touch-action: pan-y; }
 .cal-swipe__page { will-change: transform; }
+
+/* Свободная тренировка во вкладке «Тренировки» (client/screens.jsx, Plan) */
+.plan__free { margin-bottom: var(--space-3); }
+
+/* «Глазами клиента» в шапке карточки (01.10.2026: из бокового меню сюда) */
+.client-card__preview { margin-left: auto; min-height: 32px; padding: 4px 8px; gap: 6px; font-size: var(--text-sm); color: var(--accent); }
+.client-card__preview + .client-card__toggle { margin-left: 0; }

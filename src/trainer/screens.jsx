@@ -11,7 +11,7 @@ import {
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, usePullRefresh, captureScreen } from '../gestures.jsx';
-import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck } from '../icons.jsx';
+import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck, IconPhone } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
@@ -673,7 +673,7 @@ function ClientFamily({ client }) {
     }
   };
 
-  const others = family.members.map((m) => m.name + (m.enabled ? '' : ' (не включён)')).join(', ');
+  const others = family.members.map((m) => m.name + (m.archived ? ' (в архиве)' : '') + (m.enabled ? '' : ' (не включён)')).join(', ');
 
   return (
     <div className="client-family">
@@ -710,7 +710,7 @@ function readCardOpen() {
  * вперёд» — самое дорогое на экране. Выбор тренера запоминается на
  * устройстве и действует для всех карточек.
  */
-export function ClientCard({ client }) {
+export function ClientCard({ client, onPreview }) {
   const [expanded, setExpanded] = useState(readCardOpen);
   const toggle = () => {
     const next = !expanded;
@@ -772,6 +772,14 @@ export function ClientCard({ client }) {
             <Badge>{formatMoney(client.price)} за тренировку</Badge>
             {client.payer && <Badge>платит {client.payer}</Badge>}
           </>
+        )}
+        {/* Клиентская версия кабинета — глазами этого клиента (01.10.2026:
+            из бокового меню сюда) */}
+        {onPreview && (
+          <button type="button" className="button button--ghost client-card__preview" onClick={onPreview}>
+            <IconPhone size={15} />
+            Глазами клиента
+          </button>
         )}
         <button
           type="button"
@@ -1139,6 +1147,30 @@ function ClientContacts({ clientRow }) {
  * Ушедшие
  * ================================================================== */
 
+/** «Вернуть» — клиент из архива снова в списке клиентов */
+function RestoreClient({ row, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState('');
+  const run = async () => {
+    setBusy(true);
+    setFailure('');
+    try {
+      await apiMutate('trainer.client.update', { clientRow: row, archived: false });
+      haptic('success');
+      onDone();
+    } catch (error) {
+      setFailure(error.message || 'Не получилось');
+      setBusy(false);
+    }
+  };
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button className="button button--ghost" disabled={busy} onClick={run}>{busy ? 'Возвращаю…' : 'Вернуть в клиенты'}</button>
+      {failure && <span className="small" role="alert"> {failure}</span>}
+    </div>
+  );
+}
+
 export function Lost() {
   const { loading, data, error, reload } = useData('trainer.lost', {}, []);
 
@@ -1158,8 +1190,8 @@ export function Lost() {
       title={`${data.clients.length} ${plural(data.clients.length, 'человек', 'человека', 'человек')}`}
       note={unsettled.length ? `${unsettled.length} с незакрытым балансом` : 'все балансы закрыты'}
     >
-      {data.clients.map((c) => (
-        <div className="item item--static" key={c.row}>
+      {data.clients.map((c, i) => (
+        <div className="item item--static" key={c.row || 'sheet-' + i}>
           <div className="item__top">
             <span className="item__name">{c.name}</span>
             <span className="muted small nowrap">{formatDate(c.moveDate)}</span>
@@ -1168,12 +1200,21 @@ export function Lost() {
             <span>
               {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')}
             </span>
-            {c.balance !== 0 && (
-              <Badge kind={c.balance < 0 ? 'bad' : 'warn'}>
-                баланс {formatMoney(c.balance)}
+            {c.auto && <Badge>больше 35 дней без занятий</Badge>}
+            {/* Оплачено вперёд — сколько занятий: клиент вернётся, и их надо
+                отработать; долг — суммой (решение владельца 01.10.2026) */}
+            {/* За него платит тот, кто по-прежнему ходит: деньги у плательщика */}
+            {c.payer && <Badge>платит {c.payer}</Badge>}
+            {!c.payer && c.balance > 0 && (
+              <Badge kind="warn">
+                {c.price > 0
+                  ? 'оплачено ' + Math.floor(c.balance / c.price) + ' ' + plural(Math.floor(c.balance / c.price), 'занятие', 'занятия', 'занятий') + ' · ' + formatMoney(c.balance)
+                  : 'оплачено ' + formatMoney(c.balance)}
               </Badge>
             )}
+            {!c.payer && c.balance < 0 && <Badge kind="bad">долг {formatMoney(-c.balance)}</Badge>}
           </div>
+          {c.restorable && <RestoreClient row={c.row} onDone={reload} />}
         </div>
       ))}
     </Section>

@@ -291,26 +291,29 @@ test('клиенту правка программы не предлагаетс
 });
 
 /**
- * Журнал тренировок у клиента — в боковом меню, а не кнопкой во вкладке
- * «Тренировки» (28.09.2026: один журнал вместо двух).
+ * У клиента журнала в меню нет (01.10.2026): всё проведённое — во вкладке
+ * «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
  */
-test('клиентский журнал — в меню, во вкладке кнопки журнала нет', async () => {
+test('клиент: журнала в меню нет, свободная тренировка — во вкладке', async () => {
   await page.goto(origin);
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 30000 });
   await openTab('Тренировки');
-  await page.getByText(/Очередь/).first().waitFor({ timeout: 20000 });
-  assert.equal(await page.getByRole('button', { name: /журнал тренировок/i }).count(), 0, 'во вкладке кнопки нет');
+  const free = page.getByRole('button', { name: 'Свободная тренировка' });
+  await free.waitFor({ timeout: 20000 });
 
   await page.getByRole('button', { name: 'Меню' }).click();
-  await page.getByRole('button', { name: /Журнал тренировок/ }).click();
-  // Журнал открывает последнее открытое занятие — «К журналу» ведёт к списку
-  await page.getByRole('button', { name: 'К тренировкам' }).waitFor({ timeout: 10000 });
-  const toList = page.getByRole('button', { name: 'К журналу' });
-  if (await toList.count()) await toList.click();
-  await page.getByRole('button', { name: 'Начать свободную тренировку' }).waitFor({ timeout: 10000 });
-  if (process.env.SHOT_CLIENT_JOURNAL) await page.screenshot({ path: process.env.SHOT_CLIENT_JOURNAL });
-  await page.getByRole('button', { name: 'К тренировкам' }).click();
-  await page.getByText(/Очередь/).first().waitFor({ timeout: 10000 });
+  await page.getByRole('button', { name: /Мои данные/ }).waitFor({ timeout: 10000 });
+  assert.equal(await page.getByRole('button', { name: /Журнал тренировок/ }).count(), 0, 'в меню журнала нет');
+
+  await page.goto(origin);
+  await openTab('Тренировки');
+  await free.click();
+  // Из вкладки — экран занятия с «К программе»; первое упражнение заготовки
+  await page.getByRole('button', { name: 'К программе' }).waitFor({ timeout: 10000 });
+  await page.getByText('Свободная тренировка').first().waitFor({ timeout: 10000 });
+  if (process.env.SHOT_CLIENT_FREE) await page.screenshot({ path: process.env.SHOT_CLIENT_FREE });
+  await page.getByRole('button', { name: 'К программе' }).click();
+  await page.getByRole('button', { name: 'Свободная тренировка' }).waitFor({ timeout: 10000 });
 });
 
 /**
@@ -515,11 +518,11 @@ test('смахнуть вправо возвращает из «Моих дан�
 });
 
 /**
- * Просмотр глазами клиента — та же лента, что у клиента, а слева от
- * первого раздела — список клиентов тренера. Смахнули вправо с первого
- * раздела — вернулись к списку.
+ * Просмотр глазами клиента — из карточки клиента (01.10.2026: кнопка
+ * «Глазами клиента» вместо пункта меню). Смахнули вправо с первого
+ * раздела или «К карточке» — снова карточка этого клиента.
  */
-test('из просмотра глазами клиента смахивание вправо возвращает к списку клиентов', async () => {
+test('глазами клиента — из карточки, и обратно в неё', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
   const phone = await context.newPage();
   phone.on('pageerror', (error) => consoleErrors.push(String(error)));
@@ -530,21 +533,27 @@ test('из просмотра глазами клиента смахивание
     await phone.goto(origin + '/?mockRole=trainer');
 
     await phone.getByRole('button', { name: 'Меню' }).click();
-    await phone.getByRole('button', { name: /Клиентская версия/ }).click();
-    await phone.getByText('Выберите клиента').waitFor({ timeout: 10000 });
-    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+    assert.equal(await phone.getByRole('button', { name: /Клиентская версия/ }).count(), 0, 'в меню пункта нет');
+    await phone.goto(origin + '/?mockRole=trainer');
 
+    await phone.getByRole('tab', { name: /^Все · / }).click({ timeout: 10000 });
     await phone.locator('#root main:not([hidden]) .item').first().click();
+    await phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 10000 });
+    await phone.getByRole('button', { name: 'Глазами клиента' }).click();
     await phone.getByText('Вы смотрите как клиент').waitFor({ timeout: 10000 });
+    assert.equal(await phone.getByRole('button', { name: 'Сменить' }).count(), 0, 'из карточки менять некого');
     await phone.waitForTimeout(500);
 
     await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
     await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 4000 });
-
     await assert.doesNotReject(
-      phone.locator('#root').getByText('Выберите клиента').waitFor({ timeout: 5000 }),
-      'вернулись к списку клиентов',
+      phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 5000 }),
+      'вернулись в карточку клиента',
     );
+
+    await phone.getByRole('button', { name: 'Глазами клиента' }).click();
+    await phone.getByRole('button', { name: 'К карточке' }).click();
+    await phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 5000 });
   } finally {
     await context.close();
   }

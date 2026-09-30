@@ -83,7 +83,8 @@ const MENU = [
   { id: 'my-workouts', label: 'Мои тренировки', note: 'Своя программа, прогресс и питание', Icon: IconPlan, owner: true },
   { id: 'journal', label: 'Журнал тренировок', note: 'Все занятия клиента', Icon: IconProgress },
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
-  { id: 'client-preview', label: 'Клиентская версия', note: 'Проверить приложение глазами клиента', Icon: IconPhone },
+  // «Клиентская версия» — не в меню, а кнопкой в карточке каждого клиента
+  // (решение владельца 01.10.2026): заходят в неё через карточку
   { id: 'trainers', label: 'Тренеры', note: 'Заявки на кабинет тренера', Icon: IconKey, owner: true },
   { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog, owner: true },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
@@ -219,8 +220,11 @@ export default function TrainerApp({ me }) {
         me={{ ...me, name: previewClient.name }}
         clientRow={previewClient.row}
         preview={{
+          // Открыли из карточки — туда же и возвращаемся: карточка
+          // (openClient) под просмотром никуда не делась
           onChange: () => { setPreviewClient(null); haptic(); },
-          onExit: () => { setPreviewClient(null); setView('clients'); haptic(); },
+          onExit: () => { setPreviewClient(null); if (!openClient) setView('clients'); haptic(); },
+          single: !!openClient,
         }}
       />
     );
@@ -230,7 +234,13 @@ export default function TrainerApp({ me }) {
   // раньше список «Клиенты» при каждом возврате из карточки строился заново
   // и перечитывал данные — выглядело как обновление. Свежие данные он и так
   // получит после любой записи (onMutated) и по «потянуть вниз»
-  const card = openClient && <ClientDetail client={openClient} onBack={() => setOpenClient(null)} />;
+  const card = openClient && (
+    <ClientDetail
+      client={openClient}
+      onBack={() => setOpenClient(null)}
+      onPreview={() => { captureScreen('card'); setPreviewClient(openClient); haptic(); }}
+    />
+  );
 
   const current = VIEWS.find((v) => v.id === view) || VIEWS[0];
 
@@ -561,7 +571,7 @@ function ClientPicker({ title, note, action, Icon = null, first = null, onSelect
  * не должны быть одеты одинаково; месяцы остаются фишками в теле, потому
  * что это и есть фильтр.
  */
-function ClientDetail({ client, onBack }) {
+function ClientDetail({ client, onBack, onPreview }) {
   const [view, setView] = useState('overview');
   const current = CLIENT_VIEWS.find((v) => v.value === view) || CLIENT_VIEWS[0];
   const ids = CLIENT_VIEWS.map((v) => v.value);
@@ -615,7 +625,7 @@ function ClientDetail({ client, onBack }) {
       <main className="app__body app__body--plain">
         {/* Сначала — кто это и сколько на балансе, потом разделы: бар
             стоит прямо над тем, что он переключает */}
-        <ClientCard client={client} />
+        <ClientCard client={client} onPreview={onPreview} />
         <div className="app__subnav card-bar">
           <NavTabs ref={barRef} items={CLIENT_VIEWS} value={view} onChange={open} />
         </div>

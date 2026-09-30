@@ -255,11 +255,17 @@ test('убыток помечен тревожным, а не зелёным', (
  * ========================================================================== */
 
 test('шаг назад спрашивает у сервера прошлый месяц', () => {
-  const { tree, asked } = draw(Finance, () => metrics({ month: '2026-09' }));
+  // Экран открывается на текущем месяце — прошлый считаем от сегодня: с
+  // зашитым «2026-09» тест сломался первого октября (01.10.2026)
+  const now = new Date();
+  const current = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const back = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
+  const previous = back.getUTCFullYear() + '-' + String(back.getUTCMonth() + 1).padStart(2, '0');
+  const { tree, asked } = draw(Finance, () => metrics({ month: current }));
 
   press(tree, 'Предыдущий месяц');
 
-  assert.equal(asked[asked.length - 1].params.month, '2026-08');
+  assert.equal(asked[asked.length - 1].params.month, previous);
 });
 
 /**

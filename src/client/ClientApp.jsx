@@ -58,9 +58,10 @@ const TABS = [
  * зашедший включить уведомления не должен листать свой рост и телефон.
  */
 const MENU = [
-  // Журнал тренировок — в меню, а не кнопкой во вкладке «Тренировки»: один
-  // журнал на всё приложение (решение владельца 28.09.2026), как у тренера
-  { id: 'journal', label: 'Журнал тренировок', note: 'Все занятия и свободная тренировка', Icon: IconProgress },
+  // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
+  // всё проведённое, со свободными тренировками и повторами, — во вкладке
+  // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
+  // У тренера журнал клиентов в меню остался
   { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, Telegram', Icon: IconUsers },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
@@ -179,12 +180,15 @@ export default function ClientApp({ me, clientRow, preview }) {
             </span>
           </div>
           <div className="client-preview__actions">
-            <button className="button button--ghost client-preview__change" onClick={preview.onChange}>
-              Сменить
-            </button>
+            {/* Открыт из карточки клиента — менять некого, выход вернёт в неё */}
+            {!preview.single && (
+              <button className="button button--ghost client-preview__change" onClick={preview.onChange}>
+                Сменить
+              </button>
+            )}
             <button className="button client-preview__exit" onClick={preview.onExit}>
               <IconBack size={16} />
-              К тренеру
+              {preview.single ? 'К карточке' : 'К тренеру'}
             </button>
           </div>
         </aside>
