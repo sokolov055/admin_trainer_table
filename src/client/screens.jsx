@@ -398,6 +398,21 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // текущего календарного, даже если программа ещё прошлого (решение
   // владельца: в октябре сентябрьские занятия по умолчанию не показываем)
   const doneLabel = month ? data.month : currentMonthLabel();
+  // Листа текущего месяца ещё нет (в октябре программа сентябрьская) — в
+  // переключателе всё равно есть «Октябрь 2026»: по умолчанию выбран он
+  // («Выполненные» за октябрь), а «Сентябрь 2026» открывает сентябрьские.
+  // Иначе с одним листом переключателя не было, и прошлый месяц не открыть
+  const nowLabel = currentMonthLabel();
+  const monthChips = [
+    ...(months.indexOf(nowLabel) === -1 ? [{ value: '', label: nowLabel }] : []),
+    ...months.map((m) => ({
+      value: m,
+      // Пометка прямо в подписи, а не значком: тренер листает месяцы
+      // глазами, и «скрыт» должно читаться, не требуя расшифровки.
+      label: hiddenMonths.indexOf(m) !== -1 ? m + ' · скрыт' : m,
+    })),
+  ];
+  const chipValue = !month && months.indexOf(nowLabel) === -1 ? '' : data.month;
   const doneSessions = sessions
     .filter((s) => s.status === 'completed' && inMonthLabel(s.startedAt || s.updatedAt, doneLabel))
     .sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
@@ -410,15 +425,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           первое, что человек должен узнать на этом экране. */}
       {runningLine}
 
-      {months.length > 1 && (
+      {monthChips.length > 1 && (
         <Chips
-          items={months.map((m) => ({
-            value: m,
-            // Пометка прямо в подписи, а не значком: тренер листает месяцы
-            // глазами, и «скрыт» должно читаться, не требуя расшифровки.
-            label: hiddenMonths.indexOf(m) !== -1 ? m + ' · скрыт' : m,
-          }))}
-          value={data.month}
+          items={monthChips}
+          value={chipValue}
           onChange={setMonth}
         />
       )}
