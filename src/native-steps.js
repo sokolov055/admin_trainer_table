@@ -148,19 +148,37 @@ export async function openHealthSettings() {
 }
 
 /*
- * Тренировки с часов (28.09.2026) — пока только iPhone и только «Мои
- * тренировки» владельца. Приложение читает из «Здоровья» тренировки за
- * месяц (тип, начало, конец, калории, дистанция) и отправляет на сервер;
- * тот совмещает их с занятиями в приложении. Доступ спрашивается отдельно
- * от шагов — по нажатию «Подключить тренировки».
+ * Тренировки с часов (28.09.2026) — пока только «Мои тренировки» владельца.
+ * Приложение читает тренировки за месяц (тип, начало, конец, калории,
+ * дистанция) и отправляет на сервер; тот совмещает их с занятиями в
+ * приложении. Доступ спрашивается отдельно от шагов — по нажатию
+ * «Подключить тренировки».
  *
- * Android пока нет: манифест приложения разрешает Health Connect только
- * шаги, для тренировок нужна новая сборка.
+ * iPhone — из «Здоровья». Android — из Health Connect (с 30.09.2026), но
+ * только в APK с versionCode 4 и новее: манифест старых разрешает Health
+ * Connect одни шаги, и окно разрешения там молча не выдало бы тренировки.
+ * Сайт у Android живой и приходит сразу, а APK обновляют не все — поэтому
+ * номер сборки сверяем (noteAppBuild из native.js).
  */
 const WORKOUTS_ON_KEY = 'native_workouts_on_v1';
 const WORKOUTS_SENT_KEY = 'native_workouts_sent_v1';
+const APP_BUILD_KEY = 'native_app_build_v1';
+const ANDROID_WORKOUTS_BUILD = 4;
+/** На Android вместе с тренировками — калории и дистанция за время тренировки */
+const ANDROID_WORKOUT_READS = ['workouts', 'calories', 'totalCalories', 'distance'];
 /** Событие «тренировки ушли на сервер» — блок в «Прогрессе» перечитывает список */
 export const WORKOUTS_SENT = 'fittrack:workouts-sent';
+
+/** Номер сборки приложения (App.getInfo().build) — запоминаем при запуске */
+export function noteAppBuild(info) {
+  const build = Number(info && info.build) || 0;
+  if (!build) return;
+  try { localStorage.setItem(APP_BUILD_KEY, String(build)); } catch (_) {}
+}
+
+function appBuild() {
+  try { return Number(localStorage.getItem(APP_BUILD_KEY)) || 0; } catch (_) { return 0; }
+}
 
 export function workoutsOn() {
   try { return !!localStorage.getItem(WORKOUTS_ON_KEY); } catch (_) { return false; }
@@ -169,13 +187,38 @@ export function workoutsOn() {
 /** Можно ли подключить тренировки на этом устройстве */
 export function workoutsAvailable() {
   const h = health();
-  return !!(h && h.queryWorkouts && onIphone());
+  if (!h || !h.queryWorkouts) return false;
+  return onIphone() || appBuild() >= ANDROID_WORKOUTS_BUILD;
+}
+
+/**
+ * Приходят ли тренировки на Android. Health Connect, в отличие от iPhone,
+ * честно говорит, выдано ли чтение
+ */
+async function androidWorkoutsAllowed() {
+  try {
+    const res = await health().checkAuthorization({ read: ['workouts'] });
+    return (res.readAuthorized || []).includes('workouts');
+  } catch (_) {
+    return false;
+  }
 }
 
 /** По нажатию «Подключить тренировки»: окно «Здоровья», затем первая отправка */
 export async function connectWorkouts() {
-  if (!workoutsAvailable()) return { ok: false, reason: 'Тренировки из «Здоровья» пока подтягиваются только на iPhone.' };
-  await health().requestAuthorization({ read: ['steps', 'workouts'] });
+  if (!workoutsAvailable()) return { ok: false, reason: 'Обновите приложение — в этой версии тренировок из Health Connect ещё нет.' };
+  if (onIphone()) {
+    await health().requestAuthorization({ read: ['steps', 'workouts'] });
+  } else {
+    const avail = await stepsAvailability();
+    if (!avail.available) {
+      return { ok: false, reason: 'На телефоне нет Health Connect. Установите «Health Connect» из Google Play (на Android 14 и новее он уже встроен) и попробуйте снова.' };
+    }
+    const res = await health().requestAuthorization({ read: ANDROID_WORKOUT_READS });
+    if (!(res.readAuthorized || []).includes('workouts')) {
+      return { ok: false, reason: 'Доступ к тренировкам не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track → «Тренировки».' };
+    }
+  }
   try { localStorage.setItem(WORKOUTS_ON_KEY, '1'); } catch (_) {}
   const sent = await syncWorkouts(true);
   return { ok: true, ...sent };
@@ -194,18 +237,44 @@ export async function syncWorkouts(force = false) {
       if (Date.now() - last < EVERY_MS) return { sent: 0, reason: 'recent' };
     } catch (_) {}
   }
+  if (!onIphone() && !(await androidWorkoutsAllowed())) return { sent: 0, reason: 'denied' };
   const end = new Date();
   const start = new Date(end.getTime() - DAYS * 86400000);
   const res = await health().queryWorkouts({ startDate: start.toISOString(), endDate: end.toISOString(), limit: 200 });
   const workouts = (res.workouts || []).map((w) => ({
     platformId: w.platformId, workoutType: w.workoutType, startDate: w.startDate, endDate: w.endDate,
-    duration: w.duration, totalEnergyBurned: w.totalEnergyBurned, totalDistance: w.totalDistance, sourceName: w.sourceName,
+    duration: w.duration, totalEnergyBurned: w.totalEnergyBurned, totalDistance: w.totalDistance,
+    sourceName: sourceLabel(w.sourceName),
   }));
   if (!workouts.length) return { sent: 0, reason: 'empty' };
   await apiMutate('health.workouts.sync', { workouts });
   try { localStorage.setItem(WORKOUTS_SENT_KEY, String(Date.now())); } catch (_) {}
   try { window.dispatchEvent(new Event(WORKOUTS_SENT)); } catch (_) {}
   return { sent: workouts.length, reason: 'ok' };
+}
+
+/**
+ * Health Connect называет источник пакетом приложения
+ * («com.sec.android.app.shealth») — на экране нужно человеческое имя.
+ * Часы с моделью модуль подписывает сам («samsung SM-R960») — их не трогаем
+ */
+const ANDROID_SOURCES = {
+  'com.sec.android.app.shealth': 'Samsung Health',
+  'com.google.android.apps.fitness': 'Google Fit',
+  'com.google.android.apps.healthdata': 'Health Connect',
+  'com.huawei.health': 'Huawei Health',
+  'com.mi.health': 'Mi Fitness',
+  'com.xiaomi.wearable': 'Mi Fitness',
+  'com.xiaomi.hm.health': 'Zepp Life',
+  'com.huami.watch.hmwatchmanager': 'Zepp',
+  'com.garmin.android.apps.connectmobile': 'Garmin Connect',
+  'com.fitbit.FitbitMobile': 'Fitbit',
+  'com.strava': 'Strava',
+};
+
+function sourceLabel(name) {
+  const raw = String(name || '');
+  return ANDROID_SOURCES[raw] || raw;
 }
 
 export function disconnectWorkouts() {

@@ -37,8 +37,8 @@ const stubs = {
     export const iosApp = () => f().platform === 'ios';
     export const plugin = (name) => name !== 'Health' ? null : ({
       isAvailable: async () => ({ available: true }),
-      checkAuthorization: async () => ({ readAuthorized: f().authorized ? ['steps'] : [] }),
-      requestAuthorization: async () => ({ readAuthorized: f().authorized ? ['steps'] : [] }),
+      checkAuthorization: async (o) => ({ readAuthorized: f().authorized ? o.read : [] }),
+      requestAuthorization: async (o) => { f().requested = o.read; return { readAuthorized: f().authorized ? o.read : [] }; },
       queryAggregated: async () => ({ samples: f().samples }),
       queryWorkouts: async (o) => { f().workoutQuery = o; return { workouts: f().workouts || [] }; },
       openHealthConnectSettings: async () => { f().opened = (f().opened || 0) + 1; },
@@ -130,10 +130,44 @@ test('тренировки с часов: не подключали — не ч�
   assert.equal((await steps.syncWorkouts()).reason, 'recent');
 });
 
-test('тренировки на Android пока не подключаются', async () => {
+test('тренировки на Android: старый APK — «обновите», в нём Health Connect разрешает только шаги', async () => {
+  steps.disconnectWorkouts();
   fake.platform = 'android';
+  steps.noteAppBuild({ build: '3' });
+  assert.equal(steps.workoutsAvailable(), false);
   const res = await steps.connectWorkouts();
   assert.equal(res.ok, false);
-  assert.match(res.reason, /iPhone/);
+  assert.match(res.reason, /Обновите приложение/);
+  fake.platform = 'ios';
+});
+
+test('тренировки на Android: новый APK — просим тренировки с калориями и дистанцией, источник по-человечески', async () => {
+  fake.platform = 'android';
+  fake.authorized = true;
+  steps.noteAppBuild({ build: '4' });
+  assert.equal(steps.workoutsAvailable(), true);
+  fake.workouts = [{
+    platformId: 'hc-1', workoutType: 'strengthTraining', startDate: new Date(Date.now() - 3600000).toISOString(),
+    endDate: new Date().toISOString(), duration: 3600, totalEnergyBurned: 350, sourceName: 'com.sec.android.app.shealth',
+  }];
+  const res = await steps.connectWorkouts();
+  assert.deepEqual([res.ok, res.sent], [true, 1]);
+  assert.deepEqual(fake.requested, ['workouts', 'calories', 'totalCalories', 'distance']);
+  assert.equal(fake.sent.at(-1).params.workouts[0].sourceName, 'Samsung Health');
+  fake.platform = 'ios';
+});
+
+test('тренировки на Android: доступ не выдали или потом забрали — говорим прямо', async () => {
+  steps.disconnectWorkouts();
+  fake.platform = 'android';
+  fake.authorized = false;
+  const res = await steps.connectWorkouts();
+  assert.equal(res.ok, false);
+  assert.match(res.reason, /не выдан/);
+  fake.authorized = true;
+  await steps.connectWorkouts();
+  fake.authorized = false;
+  assert.equal((await steps.syncWorkouts(true)).reason, 'denied');
+  fake.authorized = true;
   fake.platform = 'ios';
 });

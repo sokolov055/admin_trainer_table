@@ -16,7 +16,7 @@
 import { goBack } from './gestures.jsx';
 import { isNativeApp, plugin } from './native-bridge.js';
 import { refreshNativePush, listenNativeTaps } from './native-push.js';
-import { syncSteps, syncWorkouts, reportDevice } from './native-steps.js';
+import { syncSteps, syncWorkouts, reportDevice, noteAppBuild } from './native-steps.js';
 import { linkWatch } from './native-watch.js';
 import { localLink } from './open-in-app.js';
 
@@ -37,7 +37,8 @@ export function startNative() {
       if (goBack()) return;
       if (app.minimizeApp) app.minimizeApp(); else if (app.exitApp) app.exitApp();
     });
-    if (app.getInfo) app.getInfo().then(checkUpdate).catch(() => {});
+    // Номер сборки нужен и тренировкам: на Android они есть только в новом APK
+    if (app.getInfo) app.getInfo().then((info) => { noteAppBuild(info); checkUpdate(info); }).catch(() => {});
     // Вернулись в приложение — шаги за это время могли прибавиться
     app.addListener('resume', () => {
       syncSteps().catch(() => {}).then(() => reportDevice());

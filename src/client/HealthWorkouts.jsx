@@ -2,18 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { Section, Panel, Badge, formatNumber, formatTime } from '../ui.jsx';
 import { isNativeApp } from '../native-bridge.js';
-import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, WORKOUTS_SENT } from '../native-steps.js';
+import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIphone, WORKOUTS_SENT } from '../native-steps.js';
 
 /**
  * Тренировки с часов — в «Моих тренировках» владельца, рядом с шагами.
  *
- * Телефон отдаёт тренировки из «Здоровья» (native-steps.js), сервер
- * совмещает их с занятиями в приложении: пересеклись по времени — одна
- * тренировка. Часы включили позже, в приложении забыли закрыть занятие —
- * сервер это учитывает и пишет словами (health-workouts.js).
+ * Телефон отдаёт тренировки из «Здоровья» или Health Connect
+ * (native-steps.js), сервер совмещает их с занятиями в приложении:
+ * пересеклись по времени — одна тренировка. Часы включили позже, в
+ * приложении забыли закрыть занятие — сервер это учитывает и пишет словами
+ * (health-workouts.js).
  *
- * Пока только iPhone и только владелец: клиентам — после юридической
- * проверки, Android — после новой сборки приложения.
+ * Пока только владелец: клиентам — после юридической проверки. Android —
+ * с APK versionCode 4.
  */
 const DAYS = 30;
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -30,6 +31,10 @@ const TYPES = {
   stairClimbing: 'Степпер', stairs: 'Лестница', jumpRope: 'Скакалка',
   boxing: 'Бокс', kickboxing: 'Кикбоксинг', martialArts: 'Единоборства',
   dance: 'Танцы', cardioDance: 'Танцы', tennis: 'Теннис', soccer: 'Футбол', basketball: 'Баскетбол',
+  // Названия Health Connect (Android)
+  dancing: 'Танцы', stairClimbingMachine: 'Степпер', calisthenics: 'Калистеника',
+  bootCamp: 'Функциональная', exerciseClass: 'Групповое занятие', tableTennis: 'Настольный теннис',
+  volleyball: 'Волейбол', skiing: 'Лыжи', skating: 'Коньки', iceSkating: 'Коньки',
 };
 
 export function workoutLabel(type) {
@@ -77,7 +82,10 @@ export default function HealthWorkouts({ clientRow }) {
       else {
         setOn(true);
         if (res.sent) { setMessage('Готово: телефон передал тренировок — ' + res.sent + '.'); reload(); }
-        else if (res.reason === 'empty') setMessage('За месяц тренировок нет — или в «Здоровье» не включён доступ к тренировкам для Fit Track.');
+        else if (res.reason === 'empty') setMessage(onIphone()
+          ? 'За месяц тренировок нет — или в «Здоровье» не включён доступ к тренировкам для Fit Track.'
+          : 'За месяц в Health Connect тренировок нет.');
+        else if (res.reason === 'denied') setMessage('Доступ к тренировкам выключен. Включите его в Health Connect: Разрешения приложений → Fit Track.');
         else setMessage('Телефону пока нечего передать.');
       }
     } catch (e) {
@@ -89,22 +97,28 @@ export default function HealthWorkouts({ clientRow }) {
 
   if (!list.length) {
     if (!phone) return null;
+    const ios = onIphone();
     return (
       <Section title="Тренировки с часов">
         <Panel pad>
           <p className="steps__lead">
-            {on ? 'Тренировки пока не пришли.' : 'Тренировки из «Здоровья» — рядом с занятиями из приложения.'}
+            {on ? 'Тренировки пока не пришли.' : (ios ? 'Тренировки из «Здоровья»' : 'Тренировки из Health Connect') + ' — рядом с занятиями из приложения.'}
           </p>
           <p className="small muted">
             {on
-              ? 'Если на часах тренировки были, включите доступ: «Здоровье» → ваш профиль → «Приложения» → Fit Track → «Тренировки».'
-              : 'Приложение читает тренировки с Apple Watch и iPhone: вид, время, калории и дистанцию. Совпала с занятием в приложении — покажем их как одну тренировку.'}
+              ? (ios
+                ? 'Если на часах тренировки были, включите доступ: «Здоровье» → ваш профиль → «Приложения» → Fit Track → «Тренировки».'
+                : 'Если тренировки были, проверьте, что часы или Samsung Health, Google Fit, Mi Fitness передают их в Health Connect, и что у Fit Track есть доступ к «Тренировкам».')
+              : (ios
+                ? 'Приложение читает тренировки с Apple Watch и iPhone: вид, время, калории и дистанцию.'
+                : 'Приложение читает тренировки, которые часы и фитнес-приложения записали в Health Connect: вид, время, калории и дистанцию.')
+                + ' Совпала с занятием в приложении — покажем их как одну тренировку.'}
           </p>
           <div className="survey__actions">
             <button className="button button--primary" onClick={connect} disabled={busy}>
               {busy ? 'Проверяем…' : on ? 'Проверить ещё раз' : 'Подключить тренировки'}
             </button>
-            {on && <button className="button" onClick={() => openHealthSettings().catch(() => {})}>Открыть «Здоровье»</button>}
+            {on && <button className="button" onClick={() => openHealthSettings().catch(() => {})}>{ios ? 'Открыть «Здоровье»' : 'Открыть Health Connect'}</button>}
           </div>
           {message && <p className="small" role="status" style={{ marginBottom: 0 }}>{message}</p>}
         </Panel>
