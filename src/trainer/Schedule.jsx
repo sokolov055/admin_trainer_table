@@ -206,14 +206,20 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot }) {
   const [now, setNow] = useState(() => new Date());
   const columns = Array.from({ length: days }, (_, i) => addDays(start, i));
 
-  // Открываем сетку с утра, а не с полуночи; сегодня — ближе к текущему часу
+  // Открываем сетку с самого раннего занятия на экране (на полчаса раньше),
+  // без занятий — с утра. Раньше сегодня открывалось с текущего часа, и
+  // вечером утреннее занятие завтрашнего дня уходило за верх сетки: тренер
+  // его не видел и решал, что занятия нет (30.09.2026)
+  const visible = events.filter((e) => columns.some((d) => sameDay(new Date(e.startsAt), d)));
+  const earliest = visible.reduce((m, e) => {
+    const s = new Date(e.startsAt);
+    return Math.min(m, s.getHours() * 60 + s.getMinutes());
+  }, FIRST_HOUR * 60);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const today = columns.some((d) => sameDay(d, new Date()));
-    const hour = today ? Math.max(FIRST_HOUR, new Date().getHours() - 1) : FIRST_HOUR;
-    el.scrollTop = hour * HOUR;
-  }, [start.getTime(), days]);
+    el.scrollTop = Math.max(0, (earliest - 30) / 60 * HOUR);
+  }, [start.getTime(), days, earliest]);
 
   // Линия «сейчас» двигается сама, раз в минуту
   useEffect(() => {
