@@ -57,9 +57,10 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
     return c.balance < 0 || days === null || days > s.staleDays;
   });
 
-  // Клиенты с назначенным занятием впереди. Прошедшие сюда не попадают:
-  // сервер отдаёт дату, только пока занятие не кончилось.
-  const upcoming = clients.filter((c) => c.nextTrainingDate);
+  // «Ближайшие» — только те, у кого занятие сегодня (решение владельца
+  // 30.09.2026): заходят сюда за сегодняшним днём, а не за неделей вперёд.
+  // Прошедшие не попадают: сервер отдаёт дату, пока занятие не кончилось.
+  const upcoming = clients.filter((c) => c.nextTrainingDate && isTodayLocal(c.nextTrainingDate));
 
   // Сплиты — пары, которые тренируются вместе по одной программе
   const splits = clients.filter((c) => c.members && c.members.length > 1);
@@ -77,7 +78,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   const filtered = (filter === 'tests' ? tests : clients).filter((c) => {
     if (query && c.name.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
 
-    if (filter === 'next') return !!c.nextTrainingDate;
+    if (filter === 'next') return upcoming.indexOf(c) !== -1;
     if (filter === 'splits') return splits.indexOf(c) !== -1;
     if (filter === 'attention') return needsAttention.indexOf(c) !== -1;
     if (filter === 'debt') return c.balance < 0;
@@ -132,6 +133,13 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
       </Section>
     </>
   );
+}
+
+/** Дата приходится на сегодня — по часам телефона */
+function isTodayLocal(iso) {
+  const d = new Date(iso);
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
 
 /** Строка списка клиентов */

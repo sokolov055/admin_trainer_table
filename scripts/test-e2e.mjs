@@ -668,6 +668,9 @@ test('разделы карточки клиента листаются смах
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
 
+    // «Ближайшие» по умолчанию — только занятия сегодня, в демо их может не
+    // быть: берём клиента из «Все»
+    await phone.getByRole('tab', { name: /^Все · / }).click({ timeout: 10000 });
     await phone.locator('#root main:not([hidden]) .item').first().click({ timeout: 10000 });
     await phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 10000 });
     await phone.waitForTimeout(400);
