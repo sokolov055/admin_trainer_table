@@ -392,11 +392,14 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // Проведённой считается тренировка, у которой есть завершённое занятие
   // этого месяца. Порядок в «Очереди» — тот же, что в программе.
   const queueBlocks = blocks.filter((b) => !blockSessions(sessions, b, data.month).length);
-  // «Выполненные» (01.10.2026) — все завершённые занятия месяца, свежие
-  // сверху: тренировки программы (и повторы одной и той же), свободные
-  // тренировки — по дате занятия, у них месяца программы нет
+  // «Выполненные» (01.10.2026) — все завершённые занятия месяца по дате
+  // занятия, свежие сверху: тренировки программы (и повторы), свободные.
+  // Какого месяца: открыли лист программы сами — того месяца; иначе —
+  // текущего календарного, даже если программа ещё прошлого (решение
+  // владельца: в октябре сентябрьские занятия по умолчанию не показываем)
+  const doneLabel = month ? data.month : currentMonthLabel();
   const doneSessions = sessions
-    .filter((s) => s.status === 'completed' && (s.month ? s.month === data.month : inMonthLabel(s.startedAt || s.updatedAt, data.month)))
+    .filter((s) => s.status === 'completed' && inMonthLabel(s.startedAt || s.updatedAt, doneLabel))
     .sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
   const freeWorkout = () => openWorkout({ block: FREE_BLOCK, month: '' });
 
@@ -548,7 +551,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {doneSessions.length > 0 && (
+      {(blocks.length > 0 || doneSessions.length > 0) && (
         <Chips
           items={[
             { value: 'queue', label: 'Очередь · ' + queueBlocks.length },
@@ -563,6 +566,14 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           Появится во «Выполненных» этого месяца */}
       {!running && !familyRow && planTab === 'queue' && (
         <button className="button button--block plan__free" onClick={freeWorkout}>Свободная тренировка</button>
+      )}
+
+      {planTab === 'done' && doneSessions.length === 0 && (
+        <Empty
+          icon={IconPlan}
+          title="Пока ничего не выполнено"
+          text={'В ' + monthIn(doneLabel) + ' ещё нет проведённых тренировок.'}
+        />
       )}
 
       {planTab === 'done' && doneSessions.map((s) => (
@@ -684,6 +695,20 @@ const FREE_BLOCK = { title: 'Свободная тренировка', exercises
 
 const MONTH_NAMES = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
   'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+
+/** «Октябрь 2026» — текущий месяц, как называются листы программы */
+function currentMonthLabel(now = new Date()) {
+  const name = MONTH_NAMES[now.getMonth()];
+  return name[0].toUpperCase() + name.slice(1) + ' ' + now.getFullYear();
+}
+
+/** «Октябрь 2026» → «октябре»: «в октябре ещё нет…» */
+function monthIn(label) {
+  const IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
+  const m = /^(\S+)/.exec(String(label || ''));
+  const i = m ? MONTH_NAMES.indexOf(m[1].toLowerCase()) : -1;
+  return i >= 0 ? IN[i] : 'этом месяце';
+}
 
 /** Дата занятия в месяце «Сентябрь 2026»; непонятное название — да (не терять) */
 function inMonthLabel(iso, label) {
