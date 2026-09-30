@@ -4261,6 +4261,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Шаги в «Прогрессе» (client/Steps.jsx) */
 .steps__lead { margin: 0 0 var(--space-2); font-weight: 600; }
 .steps__facts { margin: var(--space-2) 0 0; }
+/* Фоновая отправка шагов (Android): пояснение и кнопка под графиком */
+.steps__bg { margin-top: var(--space-3); }
+.steps__bg .button { margin-top: var(--space-2); }
 
 /* Тренировки с часов (client/HealthWorkouts.jsx) */
 .hw { list-style: none; margin: 0; padding: 0; }

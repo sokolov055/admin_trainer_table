@@ -4,6 +4,51 @@ import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, reportDevice, openHealthSettings, STEPS_SENT } from '../native-steps.js';
+import { backgroundSyncAvailable, backgroundSyncStatus, ensureBackgroundSync, requestBackgroundAccess } from '../native-sync.js';
+
+/**
+ * Строка под графиком на Android (APK 5+): шлёт ли телефон шаги сам, в
+ * фоне, или только когда открыто приложение, — и кнопка включить.
+ * Health Connect даёт читать в фоне по отдельному разрешению.
+ */
+function BackgroundLine() {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    backgroundSyncStatus().then((s) => { if (alive) setStatus(s); });
+    return () => { alive = false; };
+  }, []);
+
+  if (!status || !status.supported) return null;
+  if (status.background && status.enabled) {
+    return <p className="small muted">Телефон отправляет шаги сам, в фоне — примерно раз в 30 минут.</p>;
+  }
+
+  const turnOn = async () => {
+    setBusy(true);
+    setNote('');
+    try {
+      const res = await requestBackgroundAccess();
+      if (!res.granted) setNote('Доступ в фоне не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track → «Доступ к данным в фоновом режиме».');
+      setStatus(await backgroundSyncStatus());
+    } catch (e) {
+      setNote('Не получилось: ' + (e.message || 'ошибка') + '.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="steps__bg">
+      <p className="small muted">Сейчас шаги уходят тренеру, только когда вы открываете приложение. Разрешите отправлять их в фоне — раз в 30 минут, без открытого приложения.</p>
+      <button className="button" onClick={turnOn} disabled={busy}>{busy ? 'Открываю…' : 'Отправлять в фоне'}</button>
+      {note && <p className="small muted" role="status">{note}</p>}
+    </div>
+  );
+}
 
 /**
  * Шаги — в «Прогрессе» клиента и в карточке клиента у тренера.
@@ -117,7 +162,12 @@ export default function Steps({ clientRow, self = false }) {
     try {
       const res = await connectSteps();
       if (!res.ok) setProblem(res.reason);
-      else { setConnected(true); reload(); }
+      else {
+        setConnected(true);
+        reload();
+        // Android: ключ фоновой задаче — дальше шаги уходят и без приложения
+        ensureBackgroundSync().catch(() => {});
+      }
     } catch (e) {
       setProblem(e.message || 'Не получилось подключить шаги.');
     } finally {
@@ -220,6 +270,7 @@ export default function Steps({ clientRow, self = false }) {
           {data.syncedAt ? ' · обновлено ' + formatDate(data.syncedAt, false) : ''}
         </p>
         {!own && data.device && <p className="small muted">{deviceLine(data.device)}</p>}
+        {native && !onIphone() && backgroundSyncAvailable() && <BackgroundLine />}
         {problem && <p className="small muted">{problem}</p>}
       </Panel>
     </Section>

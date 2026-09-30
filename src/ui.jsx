@@ -3,6 +3,7 @@ import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefr
 import { environmentInfo } from './telegram.js';
 import { hasToken, describeDevice } from './session.js';
 import { logout } from './api.js';
+import { stopBackgroundSync } from './native-sync.js';
 
 /**
  * Состояние загрузки. Скелетоны повторяют форму будущего содержимого,
@@ -101,8 +102,11 @@ export function SignOut() {
 
   if (!hasToken()) return null;
 
-  const run = () => {
+  const run = async () => {
     setBusy(true);
+    // Фоновая отправка шагов (Android) не должна пережить выход: её ключ
+    // гасим первым, пока есть связь (native-sync.js)
+    await stopBackgroundSync().catch(() => {});
     // Сбрасывать busy не нужно: сразу после выхода экран сменится целиком
     logout();
   };

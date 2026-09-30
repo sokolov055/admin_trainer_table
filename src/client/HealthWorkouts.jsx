@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { Section, Panel, Badge, formatNumber, formatTime } from '../ui.jsx';
 import { isNativeApp } from '../native-bridge.js';
+import { ensureBackgroundSync } from '../native-sync.js';
 import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIphone, WORKOUTS_SENT } from '../native-steps.js';
 
 /**
@@ -81,6 +82,8 @@ export default function HealthWorkouts({ clientRow }) {
       if (res.ok === false) setMessage(res.reason);
       else {
         setOn(true);
+        // Android: фоновая задача начинает слать и тренировки
+        ensureBackgroundSync().catch(() => {});
         if (res.sent) { setMessage('Готово: телефон передал тренировок — ' + res.sent + '.'); reload(); }
         else if (res.reason === 'empty') setMessage(onIphone()
           ? 'За месяц тренировок нет — или в «Здоровье» не включён доступ к тренировкам для Fit Track.'

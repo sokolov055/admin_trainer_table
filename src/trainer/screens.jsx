@@ -47,28 +47,34 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
 
   const s = data.summary;
 
-  const needsAttention = data.clients.filter((c) => {
+  // Тестовые (флажок в карточке) — отдельным разделом внизу: ни в фильтры,
+  // ни в «день тренера» они не идут
+  const clients = data.clients.filter((c) => !c.test);
+  const tests = data.clients.filter((c) => c.test
+    && (!query || c.name.toLowerCase().indexOf(query.toLowerCase()) !== -1));
+
+  const needsAttention = clients.filter((c) => {
     const days = daysSince(c.lastTrainingDate);
     return c.balance < 0 || days === null || days > s.staleDays;
   });
 
   // Клиенты с назначенным занятием впереди. Прошедшие сюда не попадают:
   // сервер отдаёт дату, только пока занятие не кончилось.
-  const upcoming = data.clients.filter((c) => c.nextTrainingDate);
+  const upcoming = clients.filter((c) => c.nextTrainingDate);
 
   // Сплиты — пары, которые тренируются вместе по одной программе
-  const splits = data.clients.filter((c) => c.members && c.members.length > 1);
+  const splits = clients.filter((c) => c.members && c.members.length > 1);
 
   const filters = [
     { value: 'next', label: `Ближайшие · ${upcoming.length}` },
-    { value: 'all', label: `Все · ${data.clients.length}` },
+    { value: 'all', label: `Все · ${clients.length}` },
     { value: 'splits', label: `Сплиты · ${splits.length}` },
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
     { value: 'debt', label: `Долг · ${s.negativeBalance}` },
     { value: 'nomeasure', label: 'Без замера' },
   ];
 
-  const filtered = data.clients.filter((c) => {
+  const filtered = clients.filter((c) => {
     if (query && c.name.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
 
     if (filter === 'next') return !!c.nextTrainingDate;
@@ -92,7 +98,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
       {/* День тренера, а не деньги: деньги живут в сводке, а сюда
           заходят за людьми — кто сегодня, кто следующий, до кого не
           дошли руки. */}
-      <TrainerDay summary={s} clients={data.clients} attention={needsAttention.length} />
+      <TrainerDay summary={s} clients={clients} attention={needsAttention.length} />
 
       {/* Календарь пересчитывается сам — при входе и когда страницу тянут
           вниз, — и строка с кнопкой «Обновить» больше не нужна: список
@@ -122,7 +128,20 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
           <Empty icon={IconSearch} title="Никого не нашлось" text="Попробуйте другой фильтр или запрос." />
         )}
 
-        {shown.map((c) => {
+        {shown.map((c) => <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} />)}
+      </Section>
+
+      {tests.length > 0 && (
+        <Section title="Тестовые клиенты" note="отмечены в карточке — не в общем списке">
+          {tests.map((c) => <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} />)}
+        </Section>
+      )}
+    </>
+  );
+}
+
+/** Строка списка клиентов */
+function ClientItem({ c, s, onOpen: onOpenClient }) {
           // «Нет данных» и «давно не приходил» — разные вещи, и лечатся
           // по-разному: первое чинит пересчёт календаря, второе — звонок
           // клиенту. Раньше оба показывались одним словом «пропал», которое
@@ -133,7 +152,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
           const isStale = !noData && days > s.staleDays;
 
           return (
-            <button className="item" key={c.row} onClick={() => onOpenClient(c)}>
+            <button className="item" onClick={() => onOpenClient(c)}>
               <div className="item__top">
                 <span className="item__name">{c.name}</span>
                 <span
@@ -173,10 +192,6 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
               </div>
             </button>
           );
-        })}
-      </Section>
-    </>
-  );
 }
 
 /**
@@ -613,6 +628,7 @@ export function ClientCard({ client }) {
 
       <ClientContacts clientRow={client.row} />
 
+      <TestFlag client={client} />
       <ClientEdit client={client} />
 
       {/* Приглашение стоит выше сброса доступа намеренно: выдать вход —
@@ -801,6 +817,84 @@ function ClientEdit({ client }) {
           Отмена
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Флажок «Тестовый клиент» (30.09.2026): такие клиенты в списке —
+ * отдельным разделом внизу. Сохраняется сразу, без формы.
+ */
+function TestFlag({ client }) {
+  const [on, setOn] = useState(!!client.test);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState('');
+
+  const toggle = async (value) => {
+    setBusy(true);
+    setFailure('');
+    setOn(value);
+    try {
+      await apiMutate('trainer.client.update', { clientRow: client.row, test: value });
+    } catch (error) {
+      setOn(!value);
+      setFailure(error.message || 'Не получилось сохранить');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="client-test" style={{ marginTop: 12 }}>
+      <label className="library__check">
+        <input type="checkbox" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+        <span>Тестовый клиент</span>
+      </label>
+      <div className="small muted">В списке — отдельным разделом «Тестовые клиенты».</div>
+      {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
+      <ArchiveButton client={client} />
+    </div>
+  );
+}
+
+/**
+ * «В архив» — клиент уходит из списка, история занятий и оплат остаётся
+ * (выручка прошлых месяцев не меняется). Удаление карточки это бы сломало,
+ * поэтому кнопки «удалить» нет. Второе нажатие — подтверждение.
+ */
+function ArchiveButton({ client }) {
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [failure, setFailure] = useState('');
+
+  const run = async () => {
+    setBusy(true);
+    setFailure('');
+    try {
+      await apiMutate('trainer.client.update', { clientRow: client.row, archived: true });
+      setDone(true);
+    } catch (error) {
+      setFailure(error.message || 'Не получилось');
+    } finally {
+      setBusy(false);
+      setAsk(false);
+    }
+  };
+
+  if (done) return <Note tone="good" icon={IconCheck}>В архиве — из списка клиентов уберётся после обновления.</Note>;
+
+  return (
+    <div className="client-edit__actions" style={{ marginTop: 12 }}>
+      {ask ? (
+        <>
+          <button className="button button--primary" onClick={run} disabled={busy}>{busy ? 'Убираю…' : 'Да, в архив'}</button>
+          <button className="button" onClick={() => setAsk(false)} disabled={busy}>Отмена</button>
+        </>
+      ) : (
+        <button className="button button--ghost" onClick={() => setAsk(true)}>В архив</button>
+      )}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
     </div>
   );
 }

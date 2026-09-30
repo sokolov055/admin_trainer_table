@@ -19,6 +19,7 @@ import { refreshNativePush, listenNativeTaps } from './native-push.js';
 import { syncSteps, syncWorkouts, reportDevice, noteAppBuild } from './native-steps.js';
 import { linkWatch } from './native-watch.js';
 import { localLink } from './open-in-app.js';
+import { ensureBackgroundSync } from './native-sync.js';
 
 export { isNativeApp };
 
@@ -54,6 +55,8 @@ export function startNative() {
   // При запуске — сразу, без паузы: человек открыл приложение посмотреть шаги
   // и сразу за ними — отчёт о телефоне для тренера (reportDevice)
   syncSteps(true).catch(() => {}).then(() => reportDevice(true));
+  // Android: дальше шаги шлёт фоновая задача раз в 30 минут (native-sync.js)
+  ensureBackgroundSync().catch(() => {});
   // Тренировки с часов — только если подключали на этом телефоне
   syncWorkouts(true).catch(() => {});
   // Apple Watch: ключ входа часам, если он им нужен (native-watch.js)
