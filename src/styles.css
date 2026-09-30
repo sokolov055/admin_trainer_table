@@ -4021,8 +4021,16 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-fab:active { transform: scale(0.96); }
 
 .cal-grid { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: var(--space-4); }
-.cal-grid__head, .cal-grid__body { display: grid; grid-template-columns: 44px repeat(var(--cols), minmax(0, 1fr)); }
+/* Строка сетки: неподвижная колонка часов слева и окно, в котором едет
+   лента дней (втрое шире окна — соседи по обе стороны) */
+.cal-grid { touch-action: pan-y; }
+.cal-grid__row { display: grid; grid-template-columns: 44px minmax(0, 1fr); position: relative; }
+.cal-grid__gutter { position: relative; }
+.cal-grid__viewport { overflow: hidden; min-width: 0; }
+.cal-grid__track { display: grid; will-change: transform; }
 .cal-grid__head { border-bottom: 1px solid var(--border); }
+.cal-grid__allday { border-bottom: 1px solid var(--border); }
+.cal-grid__allcell { display: grid; gap: 2px; padding: 3px 2px; min-width: 0; align-content: start; }
 .cal-grid__day {
   display: grid; justify-items: center; gap: 2px; padding: 8px 0 6px; background: none; border: 0;
   color: var(--text); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -4036,7 +4044,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-grid__day--today span { color: var(--accent-solid); font-weight: 600; }
 .cal-grid__day--today strong { background: var(--accent-solid); color: #fff; }
 .cal-grid__scroll { max-height: min(62dvh, 620px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.cal-grid__body { position: relative; background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px 48px); }
+.cal-grid__body { position: relative; }
+.cal-grid__scroll > .cal-grid__row { background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px 48px); }
 .cal-grid__hours { position: relative; }
 .cal-grid__hours span {
   position: absolute; right: 6px; transform: translateY(-50%); font-size: 10.5px;

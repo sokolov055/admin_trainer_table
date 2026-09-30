@@ -95,11 +95,18 @@ export default function Schedule() {
   };
 
   const { start, days } = rangeOf(view, anchor);
+  // Сетке по часам — с соседними днями по обе стороны: они видны, пока
+  // сетку тянут пальцем, и после пролистывания уже с занятиями
+  const around = view === 'month' ? 0 : days;
   const params = useMemo(() => ({
-    from: start.toISOString(),
-    to: addDays(start, days).toISOString(),
-  }), [start.getTime(), days]);
+    from: addDays(start, -around).toISOString(),
+    to: addDays(start, days + around).toISOString(),
+  }), [start.getTime(), days, around]);
   const { loading, data, error, reload } = useData('trainer.schedule', params, [params.from, params.to]);
+  // Пока грузится новый период, показываем уже известное — а не пустую
+  // сетку: после пролистывания большинство занятий уже загружено
+  const known = useRef([]);
+  if (data && data.events) known.current = data.events;
   const clients = useData('trainer.clients', {}, []);
 
   if (editing) {
@@ -125,7 +132,7 @@ export default function Schedule() {
     );
   }
 
-  const events = (data && data.events) || [];
+  const events = (data && data.events) || known.current;
   const create = (when) => { setPreset(when || { date: startOfDay(anchor), minutes: 10 * 60 }); setEditing({}); haptic(); };
   const openDay = (d) => { setAnchor(startOfDay(d)); setView('day'); };
 
@@ -156,12 +163,13 @@ export default function Schedule() {
         <Note tone="critical" icon={IconAlert}>Календарь не подключён на сервере.</Note>
       )}
 
-      {!error && (loading && !data ? <Loading lead={false} rows={4} /> : (
+      {!error && (loading && !data && !known.current.length ? <Loading lead={false} rows={4} /> : view === 'month' ? (
         <SwipePager onShift={(dir) => { setAnchor(shifted(view, anchor, dir)); haptic(); }}>
-          {view === 'month'
-            ? <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} />
-            : <TimeGrid start={start} days={days} events={events} onDay={openDay} onEvent={setEditing} onSlot={create} />}
+          <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} />
         </SwipePager>
+      ) : (
+        <TimeGrid start={start} days={days} events={events} onDay={openDay} onEvent={setEditing} onSlot={create}
+          onShift={(n) => { setAnchor(addDays(anchor, n)); haptic(); }} />
       ))}
 
       {data && data.feedUrl && (
@@ -282,32 +290,109 @@ function layoutDay(list) {
   return out;
 }
 
-/** Сетка по часам на 1, 3 или 7 дней */
-function TimeGrid({ start, days, events, onDay, onEvent, onSlot }) {
-  const scroller = useRef(null);
-  const [now, setNow] = useState(() => new Date());
-  const columns = Array.from({ length: days }, (_, i) => addDays(start, i));
+/** Событие на весь день (день рождения, отпуск): в Google у него дата без
+ *  времени, к нам оно приходит сутками и больше. В сетку по часам его не
+ *  ставим — оно легло бы блоком через весь день — а показываем строкой под
+ *  датами, как Google */
+const isAllDay = (e) => new Date(e.endsAt) - new Date(e.startsAt) >= 20 * 3600000;
 
-  // Открываем сетку с самого раннего занятия на экране (на полчаса раньше),
-  // без занятий — с утра. Раньше сегодня открывалось с текущего часа, и
-  // вечером утреннее занятие завтрашнего дня уходило за верх сетки: тренер
-  // его не видел и решал, что занятия нет (30.09.2026)
-  const visible = events.filter((e) => columns.some((d) => sameDay(new Date(e.startsAt), d)));
-  const earliest = visible.reduce((m, e) => {
-    const s = new Date(e.startsAt);
-    return Math.min(m, s.getHours() * 60 + s.getMinutes());
-  }, FIRST_HOUR * 60);
+/** Быстрый взмах листает, даже если протянули мало (порог направления —
+ *  SWIPE_LOCK выше, общий с пролистыванием месяца) */
+const FLICK = 0.35; // px/мс — быстрый взмах листает, даже если протянули мало
+
+/**
+ * Сетка по часам на 1, 3 или 7 дней — как в Google Календаре.
+ *
+ * Колонки дней лежат лентой: по обе стороны от видимых — ещё столько же
+ * дней, уже с занятиями. Смахивание двигает только ленту (шапку дней,
+ * строку «весь день» и колонки), колонка часов стоит на месте. Отпустили —
+ * лента доезжает до ближайшего дня (у недели — до соседней недели), и
+ * тогда меняется опорная дата: onShift(на сколько дней). Вертикальная
+ * прокрутка решается по первым 10 px движения и сетку вбок не трогает.
+ */
+function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
+  const scroller = useRef(null);
+  const viewport = useRef(null);
+  const [now, setNow] = useState(() => new Date());
+  const [drag, setDrag] = useState({ x: 0, animate: false });
+  const gesture = useRef(null);
+  const settling = useRef(null);
+
+  // Лента: N дней до, N видимых, N после
+  const strip = Array.from({ length: days * 3 }, (_, i) => addDays(start, i - days));
+  const visibleDays = strip.slice(days, days * 2);
+  const timed = events.filter((e) => !isAllDay(e));
+  const allDay = events.filter(isAllDay);
+  // Дата без времени приходит полуночью по UTC: день события — его UTC-дата
+  // (у нескольких дней — по день перед концом), а не местные 03:00
+  const utcKey = (t) => new Date(t).toISOString().slice(0, 10);
+  const allDayOf = (d) => {
+    const k = dateValue(d);
+    return allDay.filter((e) => utcKey(e.startsAt) <= k && utcKey(new Date(e.endsAt).getTime() - 1) >= k);
+  };
+  // Строка «весь день» — когда такие события есть в видимых днях; пустой
+  // полосы ради соседей за краем не держим
+  const hasAllDay = visibleDays.some((d) => allDayOf(d).length);
+
+  // Открываем с самого раннего занятия на экране (на полчаса раньше), без
+  // занятий — с утра. С текущего часа вечером утреннее занятие завтрашнего
+  // дня уходило за верх сетки, и тренер решал, что его нет (30.09.2026)
+  const earliest = timed
+    .filter((e) => visibleDays.some((d) => sameDay(new Date(e.startsAt), d)))
+    .reduce((m, e) => { const s = new Date(e.startsAt); return Math.min(m, s.getHours() * 60 + s.getMinutes()); }, FIRST_HOUR * 60);
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (!el) return;
-    el.scrollTop = Math.max(0, (earliest - 30) / 60 * HOUR);
-  }, [start.getTime(), days, earliest]);
+    if (el) el.scrollTop = Math.max(0, (earliest - 30) / 60 * HOUR);
+  }, [start.getTime(), days]);
 
-  // Линия «сейчас» двигается сама, раз в минуту
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
+  useEffect(() => () => clearTimeout(settling.current), []);
+
+  const width = () => (viewport.current && viewport.current.offsetWidth) || 320;
+
+  const onTouchStart = (e) => {
+    if (e.touches.length > 1 || settling.current) { gesture.current = null; return; }
+    const t = e.touches[0];
+    gesture.current = { x: t.clientX, y: t.clientY, t: performance.now(), mode: null, dx: 0, v: 0 };
+  };
+  const onTouchMove = (e) => {
+    const g = gesture.current;
+    if (!g) return;
+    const t = e.touches[0];
+    const dx = t.clientX - g.x;
+    const dy = t.clientY - g.y;
+    if (!g.mode) {
+      if (Math.abs(dx) < SWIPE_LOCK && Math.abs(dy) < SWIPE_LOCK) return;
+      g.mode = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (g.mode !== 'x') return;
+    const nowT = performance.now();
+    g.v = (dx - g.dx) / Math.max(1, nowT - g.t);
+    g.t = nowT;
+    g.dx = dx;
+    setDrag({ x: dx, animate: false });
+  };
+  const onTouchEnd = () => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g || g.mode !== 'x') return;
+    const col = width() / days;
+    // Сколько дней проехали: до ближайшего дня; быстрый взмах — хотя бы на
+    // один. Неделя листается неделями
+    let shift = Math.round(-g.dx / col);
+    if (!shift && Math.abs(g.v) > FLICK) shift = g.v < 0 ? 1 : -1;
+    if (days === 7 && shift) shift = shift > 0 ? 7 : -7;
+    shift = Math.max(-days, Math.min(days, shift));
+    setDrag({ x: -shift * col, animate: true });
+    settling.current = setTimeout(() => {
+      settling.current = null;
+      if (shift) onShift(shift);
+      setDrag({ x: 0, animate: false });
+    }, 220);
+  };
 
   const slot = (d, ev) => {
     const rect = ev.currentTarget.getBoundingClientRect();
@@ -315,56 +400,92 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot }) {
     onSlot({ date: d, minutes: Math.max(0, Math.min(minutes, 23 * 60 + 30)) });
   };
 
+  // Лента втрое шире окна; в покое видна средняя треть
+  const track = {
+    width: '300%',
+    transform: `translate3d(calc(-100% / 3 + ${drag.x}px), 0, 0)`,
+    transition: drag.animate ? 'transform 220ms cubic-bezier(0.23, 1, 0.32, 1)' : 'none',
+    gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))`,
+  };
+
   return (
-    <div className={'cal-grid cal-grid--' + days} style={{ '--cols': days }}>
-      <div className="cal-grid__head">
-        <span />
-        {columns.map((d) => {
-          const today = sameDay(d, now);
-          return (
-            <button key={d.getTime()} className={'cal-grid__day' + (today ? ' cal-grid__day--today' : '')} onClick={() => onDay(d)}>
-              <span>{weekdayOf(d)}</span>
-              <strong>{d.getDate()}</strong>
-            </button>
-          );
-        })}
+    // data-no-swipe: жесты приложения (листание вкладок, «назад») над сеткой
+    // не работают — иначе вбок листалась страница, а не календарь (gestures.jsx)
+    <div className={'cal-grid cal-grid--' + days} data-no-swipe=""
+      onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+      <div className="cal-grid__row cal-grid__head">
+        <span className="cal-grid__gutter" />
+        <div className="cal-grid__viewport" ref={viewport}>
+          <div className="cal-grid__track" style={track}>
+            {strip.map((d) => {
+              const today = sameDay(d, now);
+              return (
+                <button key={d.getTime()} className={'cal-grid__day' + (today ? ' cal-grid__day--today' : '')} onClick={() => onDay(d)}>
+                  <span>{weekdayOf(d)}</span>
+                  <strong>{d.getDate()}</strong>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
+      {hasAllDay && (
+        <div className="cal-grid__row cal-grid__allday">
+          <span className="cal-grid__gutter" />
+          <div className="cal-grid__viewport">
+            <div className="cal-grid__track" style={track}>
+              {strip.map((d) => (
+                <div key={d.getTime()} className="cal-grid__allcell">
+                  {allDayOf(d).map((e) => (
+                    <button key={e.id} className={eventClass(e) + ' cal-event--chip'} onClick={() => onEvent(e)}>{labelOf(e)}</button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="cal-grid__scroll" ref={scroller}>
-        <div className="cal-grid__body" style={{ height: 24 * HOUR }}>
-          <div className="cal-grid__hours" aria-hidden="true">
+        <div className="cal-grid__row" style={{ height: 24 * HOUR }}>
+          <div className="cal-grid__gutter cal-grid__hours" aria-hidden="true">
             {Array.from({ length: 24 }, (_, h) => (
               <span key={h} style={{ top: h * HOUR }}>{h ? pad(h) + ':00' : ''}</span>
             ))}
           </div>
-          {columns.map((d) => {
-            const ofDay = events.filter((e) => sameDay(new Date(e.startsAt), d));
-            const today = sameDay(d, now);
-            return (
-              // Пустое место дня — кнопка «новое занятие на это время»
-              <div key={d.getTime()} className="cal-grid__col" onClick={(ev) => slot(d, ev)} role="presentation">
-                {layoutDay(ofDay).map(({ e, s, f, col, cols }) => {
-                  const from = new Date(s);
-                  const top = (from.getHours() * 60 + from.getMinutes()) / 60 * HOUR;
-                  const height = Math.max(((f - s) / 3600000) * HOUR - 2, 18);
-                  return (
-                    <button
-                      key={e.id}
-                      className={eventClass(e)}
-                      style={{ top, height, left: `calc(${(col / cols) * 100}% + 1px)`, width: `calc(${100 / cols}% - 3px)` }}
-                      onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}
-                    >
-                      <span className="cal-event__name">{days === 7 ? shortLabelOf(e) : labelOf(e)}</span>
-                      {days < 7 && height >= 34 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
-                    </button>
-                  );
-                })}
-                {today && (
-                  <span className="cal-grid__now" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR }} aria-hidden="true" />
-                )}
-              </div>
-            );
-          })}
+          <div className="cal-grid__viewport">
+            <div className="cal-grid__track cal-grid__body" style={{ ...track, height: 24 * HOUR }}>
+              {strip.map((d) => {
+                const ofDay = timed.filter((e) => sameDay(new Date(e.startsAt), d));
+                const today = sameDay(d, now);
+                return (
+                  // Пустое место дня — «новое занятие на это время»
+                  <div key={d.getTime()} className="cal-grid__col" onClick={(ev) => slot(d, ev)} role="presentation">
+                    {layoutDay(ofDay).map(({ e, s, f, col, cols }) => {
+                      const from = new Date(s);
+                      const top = (from.getHours() * 60 + from.getMinutes()) / 60 * HOUR;
+                      const height = Math.max(((f - s) / 3600000) * HOUR - 2, 18);
+                      return (
+                        <button
+                          key={e.id}
+                          className={eventClass(e)}
+                          style={{ top, height, left: `calc(${(col / cols) * 100}% + 1px)`, width: `calc(${100 / cols}% - 3px)` }}
+                          onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}
+                        >
+                          <span className="cal-event__name">{days === 7 ? shortLabelOf(e) : labelOf(e)}</span>
+                          {days < 7 && height >= 34 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
+                        </button>
+                      );
+                    })}
+                    {today && (
+                      <span className="cal-grid__now" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR }} aria-hidden="true" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>

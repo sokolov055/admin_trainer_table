@@ -763,6 +763,13 @@ const MOCK = {
     const now = Date.now();
     for (let d = new Date(from.getFullYear(), from.getMonth(), from.getDate()); d < to; d.setDate(d.getDate() + 1)) {
       const k = d.getDate();
+      // Событие на весь день, как день рождения в Google: дата без времени
+      // приходит полуночью по UTC и длится сутки
+      if (k % 7 === 4) {
+        const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(k).padStart(2, '0')}`;
+        events.push({ id: 'demo-all-' + k, clientRow: null, clientName: '', title: 'День рождения',
+          startsAt: day + 'T00:00:00.000Z', endsAt: new Date(Date.parse(day + 'T00:00:00.000Z') + 86400000).toISOString(), done: false });
+      }
       plan.forEach(([h, m, mins, row], j) => {
         if ((k + j) % 3 === 0) return;
         const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
