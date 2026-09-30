@@ -47,11 +47,10 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
 
   const s = data.summary;
 
-  // Тестовые (флажок в карточке) — отдельным разделом внизу: ни в фильтры,
-  // ни в «день тренера» они не идут
+  // Тестовые (флажок в карточке) из списка уходят: видны только фильтром
+  // «Тестовые», в остальные фильтры, счётчики и «день тренера» не идут
   const clients = data.clients.filter((c) => !c.test);
-  const tests = data.clients.filter((c) => c.test
-    && (!query || c.name.toLowerCase().indexOf(query.toLowerCase()) !== -1));
+  const tests = data.clients.filter((c) => c.test);
 
   const needsAttention = clients.filter((c) => {
     const days = daysSince(c.lastTrainingDate);
@@ -72,9 +71,10 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
     { value: 'debt', label: `Долг · ${s.negativeBalance}` },
     { value: 'nomeasure', label: 'Без замера' },
+    ...(tests.length ? [{ value: 'tests', label: `Тестовые · ${tests.length}` }] : []),
   ];
 
-  const filtered = clients.filter((c) => {
+  const filtered = (filter === 'tests' ? tests : clients).filter((c) => {
     if (query && c.name.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
 
     if (filter === 'next') return !!c.nextTrainingDate;
@@ -130,12 +130,6 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
 
         {shown.map((c) => <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} />)}
       </Section>
-
-      {tests.length > 0 && (
-        <Section title="Тестовые клиенты" note="отмечены в карточке — не в общем списке">
-          {tests.map((c) => <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} />)}
-        </Section>
-      )}
     </>
   );
 }
@@ -850,7 +844,7 @@ function TestFlag({ client }) {
         <input type="checkbox" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
         <span>Тестовый клиент</span>
       </label>
-      <div className="small muted">В списке — отдельным разделом «Тестовые клиенты».</div>
+      <div className="small muted">Уходит из списка и статистики; найти — фильтр «Тестовые».</div>
       {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
       <ArchiveButton client={client} />
     </div>
