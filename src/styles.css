@@ -4374,3 +4374,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Панель тренера под открытой карточкой клиента — на месте, но скрыта
    (TrainerApp): display: flex у .app иначе перебивает атрибут hidden */
 .app[hidden] { display: none; }
+
+/* Пролистывание расписания вбок (SwipePager в trainer/Schedule.jsx):
+   сетка едет за пальцем; вертикальную прокрутку браузер оставляет себе */
+.cal-swipe { overflow: hidden; touch-action: pan-y; }
+.cal-swipe__page { will-change: transform; }

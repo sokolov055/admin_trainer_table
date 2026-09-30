@@ -105,8 +105,18 @@ export default function Schedule() {
   if (editing) {
     return (
       <EventForm
+        key={editing.id || editing.copyKey || 'new'}
         event={editing}
         preset={preset}
+        onCopy={(e) => {
+          // Копия — на те же дату и время (решение владельца): тренер правит
+          // их перед сохранением
+          const s0 = new Date(e.startsAt);
+          setPreset({ date: startOfDay(s0), minutes: s0.getHours() * 60 + s0.getMinutes() });
+          setEditing({ copyKey: 'copy-' + e.id + '-' + Date.now(), clientRow: e.clientRow || '',
+            duration: Math.round((new Date(e.endsAt) - s0) / 60000), copyOf: e.clientName || e.title || '' });
+          haptic();
+        }}
         clients={(clients.data && clients.data.clients) || []}
         serviceEmail={data && data.serviceEmail}
         onDone={() => { setEditing(null); setPreset(null); reload(); }}
@@ -146,14 +156,84 @@ export default function Schedule() {
         <Note tone="critical" icon={IconAlert}>Календарь не подключён на сервере.</Note>
       )}
 
-      {!error && (loading && !data ? <Loading lead={false} rows={4} /> : view === 'month'
-        ? <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} />
-        : <TimeGrid start={start} days={days} events={events} onDay={openDay} onEvent={setEditing} onSlot={create} />)}
+      {!error && (loading && !data ? <Loading lead={false} rows={4} /> : (
+        <SwipePager onShift={(dir) => { setAnchor(shifted(view, anchor, dir)); haptic(); }}>
+          {view === 'month'
+            ? <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} />
+            : <TimeGrid start={start} days={days} events={events} onDay={openDay} onEvent={setEditing} onSlot={create} />}
+        </SwipePager>
+      ))}
 
       {data && data.feedUrl && (
         <PhoneCalendar url={data.feedUrl} text="Все занятия — в календаре телефона: подпишитесь один раз, дальше он обновляется сам." />
       )}
     </>
+  );
+}
+
+/**
+ * Пролистывание вбок, как в Google Календаре: сетка едет за пальцем, и
+ * если протянули дальше порога — уезжает целиком, а на её место приходит
+ * соседний период (onShift). Вертикальную прокрутку сетки не трогаем:
+ * направление решается по первым 10 px движения. От левого края экрана
+ * жест не берём — там «назад» приложения.
+ */
+const SWIPE_EDGE = 24;
+const SWIPE_LOCK = 10;
+
+function SwipePager({ onShift, children }) {
+  const box = useRef(null);
+  const g = useRef(null);
+  const reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const move = (x, animate) => {
+    const el = box.current;
+    if (!el) return;
+    el.style.transition = animate && !reduce ? 'transform 200ms cubic-bezier(0.23, 1, 0.32, 1)' : 'none';
+    el.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
+  };
+
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    g.current = t.clientX < SWIPE_EDGE || e.touches.length > 1 ? null : { x: t.clientX, y: t.clientY, mode: null, dx: 0 };
+  };
+  const onTouchMove = (e) => {
+    const s = g.current;
+    if (!s) return;
+    const t = e.touches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (!s.mode) {
+      if (Math.abs(dx) < SWIPE_LOCK && Math.abs(dy) < SWIPE_LOCK) return;
+      s.mode = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (s.mode !== 'x') return;
+    s.dx = dx;
+    move(dx, false);
+  };
+  const onTouchEnd = () => {
+    const s = g.current;
+    g.current = null;
+    if (!s || s.mode !== 'x') return;
+    const width = (box.current && box.current.offsetWidth) || 360;
+    if (Math.abs(s.dx) > width * 0.22) {
+      const dir = s.dx < 0 ? 1 : -1;
+      // Уезжает целиком, соседний период въезжает с другой стороны
+      move(-dir * width, true);
+      setTimeout(() => {
+        onShift(dir);
+        move(dir * width * 0.35, false);
+        requestAnimationFrame(() => move(0, true));
+      }, reduce ? 0 : 180);
+    } else {
+      move(0, true);
+    }
+  };
+
+  return (
+    <div className="cal-swipe" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+      <div ref={box} className="cal-swipe__page">{children}</div>
+    </div>
   );
 }
 
@@ -329,14 +409,14 @@ function MonthGrid({ start, anchor, events, onDay, onEvent }) {
 }
 
 /** Создать, перенести или отменить занятие */
-function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel }) {
+function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onCopy }) {
   // Новое — на время, куда нажали в сетке (или 10:00 опорного дня)
   const base = (preset && preset.date) || startOfDay(new Date());
   const presetMinutes = preset && Number.isFinite(preset.minutes) ? preset.minutes : 10 * 60;
   const start = event.startsAt
     ? new Date(event.startsAt)
     : new Date(base.getFullYear(), base.getMonth(), base.getDate(), Math.floor(presetMinutes / 60), presetMinutes % 60);
-  const initialMinutes = event.startsAt ? Math.round((new Date(event.endsAt) - new Date(event.startsAt)) / 60000) : 60;
+  const initialMinutes = event.startsAt ? Math.round((new Date(event.endsAt) - new Date(event.startsAt)) / 60000) : (event.duration || 60);
 
   const [clientRow, setClientRow] = useState(event.clientRow || '');
   const [date, setDate] = useState(dateValue(start));
@@ -408,7 +488,10 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel }) {
       <button className="button button--ghost library__back" onClick={onCancel}><IconBack size={16} />Расписание</button>
       <Panel pad>
         <div className="library__form">
-          <strong>{event.id ? 'Занятие' : 'Новое занятие'}</strong>
+          <strong>{event.id ? 'Занятие' : event.copyOf ? 'Копия занятия' : 'Новое занятие'}</strong>
+          {event.copyOf && (
+            <p className="small muted" style={{ margin: 0 }}>Тот же клиент, дата, время и длительность. Поменяйте дату и время и нажмите «Добавить».</p>
+          )}
           {event.id && !event.clientRow && (
             <p className="small muted" style={{ margin: 0 }}>
               «{event.title}» — клиент не узнан. Выберите его — занятие привяжется к нему, а в Google Календаре останутся только инициалы и номер.
@@ -509,7 +592,12 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel }) {
           )}
 
           {event.id && !step && (
-            <button className="button button--ghost" disabled={busy} onClick={() => setStep('cancel')}>Отменить занятие</button>
+            <div className="library__actions" style={{ marginTop: 0 }}>
+              <button className="button button--ghost" disabled={busy} onClick={() => onCopy && onCopy(event)}>
+                <IconCopy size={16} />Копировать
+              </button>
+              <button className="button button--ghost" disabled={busy} onClick={() => setStep('cancel')}>Отменить занятие</button>
+            </div>
           )}
           {serviceEmail && (
             <p className="small muted" style={{ margin: 0 }}>
