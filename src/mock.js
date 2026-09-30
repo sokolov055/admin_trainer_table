@@ -751,22 +751,42 @@ const MOCK = {
   }),
 
   // Расписание в демо: занятия клиентов на этой неделе
-  'trainer.schedule': () => ({
-    events: CLIENTS.filter((c) => c.nextTrainingDate).map((c, i) => ({
-      id: 'demo-ev-' + i,
-      clientRow: c.row,
-      clientName: c.name,
-      title: c.name,
-      startsAt: c.nextTrainingDate,
-      endsAt: new Date(new Date(c.nextTrainingDate).getTime() + 3600000).toISOString(),
-      done: false,
-      // Одно — отменено клиентом со списанием: так оно выглядит в списке
-      cancelledCharged: i === 1,
-    })),
-    calendar: true,
-    serviceEmail: 'demo@example.iam.gserviceaccount.com',
-    feedUrl: 'https://example.invalid/ics/t-demo.ics',
-  }),
+  // Демо-неделя тренера на любой запрошенный период: утро, день, вечер,
+  // одно пересечение, одно отменённое со списанием и одно «не узнано»
+  'trainer.schedule': (params = {}) => {
+    const from = new Date(params.from || Date.now());
+    const to = new Date(params.to || from.getTime() + 7 * 86400000);
+    const plan = [
+      [8, 0, 60, 3], [10, 30, 75, 5], [14, 0, 60, 7], [19, 0, 60, 30], [19, 30, 60, 6], [20, 30, 60, 3],
+    ];
+    const events = [];
+    const now = Date.now();
+    for (let d = new Date(from.getFullYear(), from.getMonth(), from.getDate()); d < to; d.setDate(d.getDate() + 1)) {
+      const k = d.getDate();
+      plan.forEach(([h, m, mins, row], j) => {
+        if ((k + j) % 3 === 0) return;
+        const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
+        const c = CLIENTS.find((x) => x.row === row);
+        const unknown = j === 2 && k % 5 === 0;
+        events.push({
+          id: 'demo-ev-' + k + '-' + j,
+          clientRow: unknown ? null : c.row,
+          clientName: unknown ? '' : c.name,
+          title: unknown ? 'Массаж' : c.name,
+          startsAt: s.toISOString(),
+          endsAt: new Date(s.getTime() + mins * 60000).toISOString(),
+          done: s.getTime() + mins * 60000 < now,
+          cancelledCharged: j === 1 && k % 4 === 0,
+        });
+      });
+    }
+    return {
+      events,
+      calendar: true,
+      serviceEmail: 'demo@example.iam.gserviceaccount.com',
+      feedUrl: 'https://example.invalid/ics/t-demo.ics',
+    };
+  },
   'trainer.schedule.save': () => ({ id: 'demo-ev-new' }),
   'trainer.schedule.delete': (params) => {
     if (!['client', 'trainer', 'error'].includes(params.who)) throw new Error('Отметьте, кто отменил занятие.');
