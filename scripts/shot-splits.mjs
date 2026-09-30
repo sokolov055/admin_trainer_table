@@ -36,6 +36,12 @@ for (const scheme of ['light', 'dark']) {
   if (await more.count()) await more.first().click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${DEST}-card-${scheme}.png`, fullPage: false });
+  const block = page.locator('.client-split').first();
+  if (await block.count()) {
+    await block.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${DEST}-payer-${scheme}.png`, fullPage: false });
+  }
   await page.close();
 }
 await browser.close();

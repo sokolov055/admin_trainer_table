@@ -586,16 +586,29 @@ function SeparateSplit({ client, members }) {
  * у пары, и смена плательщика ничего не пересчитывает.
  */
 function SplitMember({ client }) {
-  const [payer, setPayer] = useState(!!client.splitPayer);
+  const { data } = useData('trainer.clients', {}, []);
+  const [payerRow, setPayerRow] = useState(client.splitPayerRow || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
 
-  const makePayer = async () => {
+  const all = (data && data.clients) || [];
+  // Сначала участники этой пары, затем остальные клиенты — кто платит за
+  // пару как в семье (например, родитель за двоих детей)
+  const members = all.filter((c) => c.splitOf === client.splitOf);
+  const others = all.filter((c) => c.splitOf !== client.splitOf && !c.pairHidden && !c.test)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+
+  const choose = async (value) => {
+    const row = Number(value);
+    if (!row || row === Number(payerRow)) return;
     setBusy(true);
     setError(null);
+    setSaved(false);
     try {
-      await apiMutate('trainer.split.payer', { clientRow: client.row });
-      setPayer(true);
+      await apiMutate('trainer.split.payer', { clientRow: client.row, payerRow: row });
+      setPayerRow(row);
+      setSaved(true);
       haptic('success');
     } catch (err) {
       setError(err);
@@ -609,13 +622,24 @@ function SplitMember({ client }) {
       <strong className="small">Сплит</strong>
       <p className="small muted" style={{ margin: '2px 0 8px' }}>
         Программа и деньги общие у пары ({client.splitName}); замеры, шаги и питание — свои.
-        {payer ? ' Платит этот клиент — оплату вносите здесь.' : ' Платит ' + client.splitPayerName + '.'}
       </p>
-      {!payer && (
-        <button className="button button--ghost" disabled={busy} onClick={makePayer}>
-          {busy ? 'Сохраняю…' : 'Сделать плательщиком'}
-        </button>
-      )}
+      <label className="field">
+        <span className="field__label">Кто платит за пару</span>
+        <select className="field__input" value={payerRow} disabled={busy || !all.length} onChange={(e) => choose(e.target.value)}>
+          {!payerRow && <option value="">—</option>}
+          <optgroup label="Участники пары">
+            {members.map((c) => <option key={c.row} value={c.row}>{c.name}</option>)}
+          </optgroup>
+          <optgroup label="Другой клиент (семья)">
+            {others.map((c) => <option key={c.row} value={c.row}>{c.name}</option>)}
+          </optgroup>
+        </select>
+      </label>
+      <p className="small muted" style={{ margin: '4px 0 0' }}>
+        Участник пары — деньги у пары, оплату вносите в его карточке. Другой клиент — занятия пары и
+        одиночные списываются с его баланса, и участники попадают в его семью.
+      </p>
+      {saved && <Note tone="good" icon={IconCheck}>Сохранено — следующие занятия спишутся с нового плательщика.</Note>}
       {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
     </div>
   );
@@ -939,14 +963,12 @@ function ClientEdit({ client }) {
         <Field label="Размер пакета" inputMode="numeric" value={form.packageCount} onChange={(v) => set('packageCount', v)} disabled={busy} />
       </div>
 
-      <Field
-        label="Плательщик"
-        hint="Если за клиента платит другой человек — впишите его ФИО"
-        inputMode="text"
-        value={form.payer}
-        onChange={(v) => set('payer', v)}
-        disabled={busy}
-      />
+      {/* Плательщик — из списка клиентов: так клиента добавляют в семью
+          (семья — это плательщик и те, за кого он платит). У участника
+          сплита плательщик выбирается в блоке «Сплит» — за пару */}
+      {!client.splitOf && (
+        <PayerSelect client={client} value={form.payer} onChange={(v) => set('payer', v)} disabled={busy} />
+      )}
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
       {saved && !failure && <Note tone="good" icon={IconCheck}>Сохранено. Изменения появятся в карточке через несколько секунд.</Note>}
@@ -1038,6 +1060,33 @@ function ArchiveButton({ client }) {
       )}
       {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
     </div>
+  );
+}
+
+/**
+ * Плательщик из списка клиентов (30.09.2026): выбрал «Евгений Беляков» —
+ * клиент в его семье, занятия списываются с его баланса. Сервер хранит
+ * плательщика по ФИО, поэтому значение — имя. Прежнее имя, которого в
+ * списке нет (опечатка, ушедший клиент), остаётся выбранным, чтобы форма
+ * его не стёрла.
+ */
+function PayerSelect({ client, value, onChange, disabled }) {
+  const { data } = useData('trainer.clients', {}, []);
+  const others = ((data && data.clients) || [])
+    .filter((c) => c.row !== client.row && !c.pairHidden && !c.splitOf && !c.test)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const known = !value || others.some((c) => c.name === value);
+
+  return (
+    <label className="field">
+      <span className="field__label">Плательщик (семья)</span>
+      <select className="field__input" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Платит сам</option>
+        {!known && <option value={value}>{value}</option>}
+        {others.map((c) => <option key={c.row} value={c.name}>{c.name}</option>)}
+      </select>
+      <span className="field__hint">Если за клиента платит другой клиент — выберите его: клиент попадёт в его семью</span>
+    </label>
   );
 }
 
