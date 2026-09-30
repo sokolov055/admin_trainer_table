@@ -18,6 +18,7 @@ import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { useData } from './useData.js';
+import { SetupText } from './media.jsx';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
 
@@ -844,6 +845,20 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   const s = record?.session;
 
+  // «Как настроить тренажёр» — только проверенные тренером инструкции к
+  // упражнениям из базы. Грузим раз на набор упражнений: занятие правят
+  // часто, а список id при этом почти не меняется.
+  const setupIds = s ? [...new Set(s.exercises.map(e => e.exerciseId).filter(Boolean))].sort((a, b) => a - b).join(',') : '';
+  const [setups, setSetups] = useState({});
+  useEffect(() => {
+    if (!setupIds) return undefined;
+    let alive = true;
+    apiPublic('exercise.setup', { ...params, ids: setupIds })
+      .then(r => { if (alive && r && r.setups) setSetups(r.setups); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [setupIds]);
+
   // Куда смотреть: первое упражнение с неотмеченным подходом и этот
   // подход. Оно обведено, подход подсвечен, его «готово» — залито; всё
   // остальное тише. Иначе в зале глаза разбегаются по одинаковым строкам.
@@ -939,6 +954,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               выделять, удалять и собирать суперсет, не листая подходы */}
           {!picking && <>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
+          {ex.exerciseId && setups[ex.exerciseId] && (
+            <details className="workout__setup"><summary>Как настроить тренажёр</summary><SetupText text={setups[ex.exerciseId].setup} /></details>
+          )}
           {(main || ex.prevWeight) && (
             <p className="workout__target">
               {main && <strong>{main}</strong>}

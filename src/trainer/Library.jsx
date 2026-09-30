@@ -13,7 +13,7 @@ import {
 } from '../ui.jsx';
 import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
-import { Media } from '../media.jsx';
+import { Media, SetupText } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 
 /**
@@ -685,6 +685,8 @@ function Exercises() {
   const [open, setOpen] = useState(null);
   const [editing, setEditing] = useState(null);
   const [pruning, setPruning] = useState(false);
+  // Владелец: только упражнения с черновиком «Как настроить» — пройти и проверить
+  const [reviewing, setReviewing] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   const [failure, setFailure] = useState(null);
@@ -733,6 +735,8 @@ function Exercises() {
     return (
       <ExerciseView
         exercise={current}
+        owner={!!data.owner}
+        onSetup={reload}
         onBack={() => setOpen(null)}
         onEdit={() => setEditing(current)}
         onDeleted={() => { setOpen(null); reload(); }}
@@ -742,7 +746,9 @@ function Exercises() {
   }
 
   const muscles = [{ value: '', label: 'Все' }, ...data.muscles.map((m) => ({ value: m, label: m })), { value: '—', label: 'Без группы' }];
+  const drafts = data.owner ? all.filter((e) => e.setup && !e.setupOk).length : 0;
   const shown = all
+    .filter((e) => !reviewing || (e.setup && !e.setupOk))
     .filter((e) => !muscle || (muscle === '—' ? !e.muscle : e.muscle === muscle))
     .filter((e) => !q || e.name.toLowerCase().replace(/ё/g, 'е').includes(q.toLowerCase().replace(/ё/g, 'е')));
 
@@ -764,6 +770,11 @@ function Exercises() {
         <button className="button button--ghost" onClick={() => { setShowSimilar(true); setPruning(false); }}>
           Похожие
         </button>
+        {(drafts > 0 || reviewing) && (
+          <button className="button button--ghost" aria-pressed={reviewing} onClick={() => { setReviewing(!reviewing); haptic(); }}>
+            {reviewing ? 'Все упражнения' : 'Настройка на проверке · ' + drafts}
+          </button>
+        )}
         {data.hiddenCount > 0 && (
           <button className="button button--ghost" onClick={() => { setShowHidden(true); setPruning(false); }}>
             Убранные · {data.hiddenCount}
@@ -788,6 +799,7 @@ function Exercises() {
           <div className="item__meta">
             {[e.muscle, e.equipment].filter(Boolean).length > 0 && <span>{[e.muscle, e.equipment].filter(Boolean).join(' · ')}</span>}
             {e.media && <Badge>{e.media.kind === 'animation' ? 'анимация' : 'видео'}</Badge>}
+            {e.setup && (e.setupOk ? <Badge>настройка</Badge> : data.owner && <Badge kind="warn">настройка на проверке</Badge>)}
           </div>
         </Row>
       ))}
@@ -979,7 +991,7 @@ function HiddenExercises({ onBack }) {
   );
 }
 
-function ExerciseView({ exercise, onBack, onEdit, onDeleted, onRemove }) {
+function ExerciseView({ exercise, owner, onSetup, onBack, onEdit, onDeleted, onRemove }) {
   const [failure, setFailure] = useState(null);
   const e = exercise;
 
@@ -1006,6 +1018,8 @@ function ExerciseView({ exercise, onBack, onEdit, onDeleted, onRemove }) {
 
         {e.notes && <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{e.notes}</p>}
 
+        <SetupEditor exercise={e} canEdit={e.mine || (e.common && owner)} onSaved={onSetup} />
+
         <div className="library__actions">
           <button className="button" onClick={onEdit}>{e.mine ? 'Изменить' : 'Сделать свою версию'}</button>
           {e.mine && (
@@ -1031,6 +1045,65 @@ function ExerciseView({ exercise, onBack, onEdit, onDeleted, onRemove }) {
         {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       </Panel>
     </>
+  );
+}
+
+/**
+ * «Как настроить тренажёр» (01.10.2026) — инструкция клиенту без марок:
+ * сиденье, спинка, валик, упор. Черновики к общей базе написаны заранее и
+ * клиенту не видны, пока владелец не отметит «Проверено». Общую правит
+ * только владелец, прямо в базе; тренер — в своей версии упражнения.
+ * Сохраняется отдельно от «Изменить»: там правка общего создаёт свою версию.
+ */
+function SetupEditor({ exercise, canEdit, onSaved }) {
+  const e = exercise;
+  const [text, setText] = useState(e.setup || '');
+  const [ok, setOk] = useState(!!e.setupOk);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  useEffect(() => { setText(e.setup || ''); setOk(!!e.setupOk); }, [e.id, e.setup, e.setupOk]);
+
+  if (!canEdit) {
+    return e.setup && e.setupOk
+      ? <><h3 className="setup__title">Как настроить тренажёр</h3><SetupText text={e.setup} /></>
+      : null;
+  }
+
+  const changed = text.trim() !== (e.setup || '') || ok !== !!e.setupOk;
+  const save = async () => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      await apiMutate('library.exercise.setup', { id: e.id, setup: text, ok });
+      haptic('success');
+      onSaved();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="library__form" style={{ marginTop: 'var(--space-3)' }}>
+      <label className="field">
+        <span className="field__label">
+          Как настроить тренажёр {e.setup && !e.setupOk && <Badge kind="warn">черновик — клиенты не видят</Badge>}
+        </span>
+        <textarea className="field__input library__textarea" value={text} maxLength={1500} rows={5}
+          onChange={(ev) => setText(ev.target.value)}
+          placeholder={'Сиденье — рукояти на уровне груди.\nСпинка — лопатки прижаты.\nОшибка: локти выше плеч.'} />
+        <span className="field__hint">Шаг — строка. «Ошибка: …» клиент увидит отдельно, жёлтым.</span>
+      </label>
+      <label className="library__check">
+        <input type="checkbox" checked={ok} disabled={!text.trim()} onChange={(ev) => setOk(ev.target.checked)} />
+        Проверено — показывать клиентам
+      </label>
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+      {changed && (
+        <button className="button" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить инструкцию'}</button>
+      )}
+    </div>
   );
 }
 

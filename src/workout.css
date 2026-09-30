@@ -583,3 +583,6 @@
 /* Режим выбора — упражнения свёрнуты в строки */
 .workout__exercise--compact { padding-top: var(--space-2); padding-bottom: var(--space-2); }
 .workout__exercise--compact .workout__ex-head { margin: 0; }
+.workout__setup { margin: var(--space-1) 0; }
+.workout__setup summary { color: var(--accent); font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.workout__setup .setup { margin-top: var(--space-2); }

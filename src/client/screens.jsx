@@ -17,7 +17,7 @@ import { useBackGesture, captureScreen } from '../gestures.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
-import { Media } from '../media.jsx';
+import { Media, SetupText } from '../media.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
@@ -867,7 +867,7 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
           ? (
             <button type="button" className="exercise__name exercise__open" aria-expanded={open} onClick={() => { setOpen(!open); haptic(); }}>
               {ex.name}
-              <span className="exercise__hint">{open ? 'свернуть' : 'техника'}</span>
+              <span className="exercise__hint">{open ? 'свернуть' : card.setup ? 'техника и настройка' : 'техника'}</span>
             </button>
           )
           : <div className="exercise__name">{ex.name}</div>}
@@ -892,7 +892,13 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
             <Media media={card.media} />
             {card.notes
               ? <p className="small" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{card.notes}</p>
-              : !card.media && <p className="small muted" style={{ marginBottom: 0 }}>Техника к этому упражнению пока не записана.</p>}
+              : !card.media && !card.setup && <p className="small muted" style={{ marginBottom: 0 }}>Техника к этому упражнению пока не записана.</p>}
+            {card.setup && (
+              <>
+                <h4 className="setup__title">Как настроить тренажёр</h4>
+                <SetupText text={card.setup} />
+              </>
+            )}
           </div>
         )}
       </div>

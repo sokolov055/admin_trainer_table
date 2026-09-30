@@ -75,7 +75,10 @@ const PLAN_BLOCKS = [
       // Кардио-разминка: время, скорость, наклон
       { name: 'Беговая дорожка', weight: '', prevWeight: '', sets: '1', reps: '', rpe: '', track: { kind: 'cardio', machine: 'treadmill', unilateral: false, perSide: false },
         cardio: { machine: 'treadmill', metrics: ['time', 'distance'], targets: { time: '10', distance: '1.2', kcal: '', pulse: '' }, settings: { speed: '6', incline: '5', level: '' }, intervals: null } },
-      { name: 'Присед со штангой', weight: '95', prevWeight: '90', sets: '5', reps: '5', rpe: '8' },
+      // Из базы: карточка с техникой и проверенной инструкцией «Как настроить»
+      { name: 'Присед со штангой', weight: '95', prevWeight: '90', sets: '5', reps: '5', rpe: '8', exerciseId: 3,
+        exercise: { name: 'Приседания со штангой', muscle: 'Ноги', equipment: 'Штанга', notes: '', media: { kind: 'animation', url: 'Barbell_Squat' },
+          setup: 'Стойки — крюки на уровне середины груди.\nСтраховочные упоры — чуть ниже нижней точки приседа.\nОшибка: упоры выше нижней точки — штанга на них ляжет.' } },
       { name: 'Румынская тяга', weight: '85', prevWeight: '80', sets: '4', reps: '10', rpe: '7' },
       // Суперсет: в таблице это объединённая ячейка «Подходы», здесь —
       // общая группа. Демо должно показывать и его, иначе увидеть эту
@@ -478,7 +481,12 @@ let demoExercises = [
 ].map(([name, muscle, equipment, anim], i) => ({
   id: i + 1, name, muscle, equipment, notes: '', mine: false, common: true,
   media: anim ? { kind: 'animation', url: anim } : null,
+  setup: '', setupOk: false,
 }));
+Object.assign(demoExercises[7], { setup: 'Стойки — крюки чуть выше колена.\nОшибка: спина круглится внизу.' });
+// «Как настроить тренажёр»: одна проверенная инструкция и один черновик
+Object.assign(demoExercises[1], { setupOk: true, setup: 'Валик — плотно прижимает бёдра, стопы стоят на полу.\nСиденье — руки вверх дотягиваются до рукояти, чуть согнуты.\nХват — шире плеч, большой палец сверху.\nОшибка: раскачка корпусом назад.\nОшибка: тянуть за голову.' });
+Object.assign(demoExercises[2], { setupOk: true, setup: 'Стойки — крюки на уровне середины груди.\nСтраховочные упоры — чуть ниже нижней точки приседа.\nОшибка: упоры выше нижней точки — штанга на них ляжет.' });
 
 let demoHidden = new Set();
 // Похожие упражнения объединены (демо): группа больше не показывается
@@ -1192,10 +1200,24 @@ const MOCK = {
     unlinked: params.unlinkTelegram === true,
   }),
 
+  'library.exercise.setup': (params) => {
+    const e = demoExercises.find((x) => x.id === Number(params.id));
+    if (!e) throw new Error('Упражнение не найдено');
+    const setup = String(params.setup ?? e.setup).trim().slice(0, 1500);
+    Object.assign(e, { setup, setupOk: !!setup && (params.ok === undefined ? e.setupOk : !!params.ok) });
+    return { ...e };
+  },
+  'exercise.setup': (params = {}) => {
+    const ids = String(params.ids || '').split(',').map(Number);
+    const setups = {};
+    demoExercises.filter((e) => ids.includes(e.id) && e.setupOk && e.setup).forEach((e) => { setups[e.id] = { name: e.name, setup: e.setup }; });
+    return { setups };
+  },
   'library.exercises': (params = {}) => ({
     exercises: demoExercises.filter((e) => demoHidden.has(e.id) === !!params.hidden),
     muscles: DEMO_MUSCLES,
     hiddenCount: demoHidden.size,
+    owner: true,
   }),
   'library.exercise.save': (params) => {
     const existing = demoExercises.find((e) => e.id === Number(params.id));
