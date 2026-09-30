@@ -48,9 +48,11 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   const s = data.summary;
 
   // Тестовые (флажок в карточке) из списка уходят: видны только фильтром
-  // «Тестовые», в остальные фильтры, счётчики и «день тренера» не идут
-  const clients = data.clients.filter((c) => !c.test);
-  const tests = data.clients.filter((c) => c.test);
+  // «Тестовые», в остальные фильтры, счётчики и «день тренера» не идут.
+  // Пара, разделённая на карточки участников (pairHidden), в списке не
+  // видна — вместо неё участники в скобке «сплит»
+  const clients = data.clients.filter((c) => !c.test && !c.pairHidden);
+  const tests = data.clients.filter((c) => c.test && !c.pairHidden);
 
   const needsAttention = clients.filter((c) => {
     const days = daysSince(c.lastTrainingDate);
@@ -62,8 +64,9 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   // Прошедшие не попадают: сервер отдаёт дату, пока занятие не кончилось.
   const upcoming = clients.filter((c) => c.nextTrainingDate && isTodayLocal(c.nextTrainingDate));
 
-  // Сплиты — пары, которые тренируются вместе по одной программе
-  const splits = clients.filter((c) => c.members && c.members.length > 1);
+  // Сплиты — пары, которые тренируются вместе по одной программе: участники
+  // отдельными карточками (splitOf) и пары, ещё не разделённые на карточки
+  const splits = clients.filter((c) => c.splitOf || (c.members && c.members.length > 1));
 
   const filters = [
     { value: 'next', label: `Ближайшие · ${upcoming.length}` },
@@ -129,10 +132,39 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
           <Empty icon={IconSearch} title="Никого не нашлось" text="Попробуйте другой фильтр или запрос." />
         )}
 
-        {shown.map((c) => <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} />)}
+        {groupSplits(shown).map((g) => (g.split ? (
+          <div className="split-group" key={'split-' + g.split}>
+            <div className="split-group__items">
+              {g.items.map((c) => <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} />)}
+            </div>
+            <div className="split-group__bracket" aria-label={'Сплит: ' + g.items.map((c) => c.name).join(' и ')}>
+              <span className="split-group__line" />
+              <span className="split-group__label">сплит</span>
+            </div>
+          </div>
+        ) : <ClientItem key={g.items[0].row} c={g.items[0]} s={s} onOpen={onOpenClient} />))}
       </Section>
     </>
   );
+}
+
+/**
+ * Участники одного сплита — подряд, одной группой, на месте первого из
+ * них в списке (порядок фильтра сохраняется). Одиночка — группа из одного
+ */
+function groupSplits(list) {
+  const groups = [];
+  const bySplit = new Map();
+  list.forEach((c) => {
+    if (!c.splitOf) { groups.push({ split: null, items: [c] }); return; }
+    if (!bySplit.has(c.splitOf)) {
+      const g = { split: c.splitOf, items: [] };
+      bySplit.set(c.splitOf, g);
+      groups.push(g);
+    }
+    bySplit.get(c.splitOf).items.push(c);
+  });
+  return groups;
 }
 
 /** Дата приходится на сегодня — по часам телефона */
@@ -152,21 +184,27 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
           const days = daysSince(c.lastTrainingDate);
           const noData = days === null;
           const isStale = !noData && days > s.staleDays;
+          // Сплит: деньги пары — у плательщика; у остальных — кто платит
+          const money = c.splitOf ? c.splitBalance : c.balance;
 
           return (
             <button className="item" onClick={() => onOpenClient(c)}>
               <div className="item__top">
                 <span className="item__name">{c.name}</span>
-                <span
-                  className="item__amount"
-                  style={{
-                    color: c.balance < 0
-                      ? 'var(--critical-text)'
-                      : c.balance > 0 ? 'var(--text)' : 'var(--text-muted)',
-                  }}
-                >
-                  {formatMoney(c.balance)}
-                </span>
+                {c.splitOf && !c.splitPayer ? (
+                  <span className="item__amount small muted">платит {c.splitPayerName}</span>
+                ) : (
+                  <span
+                    className="item__amount"
+                    style={{
+                      color: money < 0
+                        ? 'var(--critical-text)'
+                        : money > 0 ? 'var(--text)' : 'var(--text-muted)',
+                    }}
+                  >
+                    {formatMoney(money)}
+                  </span>
+                )}
               </div>
               <div className="item__meta">
                 <span>
@@ -490,6 +528,94 @@ function ClientSplit({ client }) {
           ? <button className="button button--ghost" disabled={busy} onClick={() => save([])}>Не сплит</button>
           : <button className="button button--ghost" disabled={busy} onClick={() => setDraft(null)}>Отмена</button>}
       </div>
+      {saved.length > 1 && !changed && <SeparateSplit client={client} members={saved} />}
+      {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
+    </div>
+  );
+}
+
+/**
+ * «Разделить на карточки» (30.09.2026): у каждого участника своя карточка
+ * — обзор, прогресс, питание, вход; программа, журнал и деньги остаются
+ * общими у пары. Необратимо, поэтому второе нажатие — подтверждение.
+ */
+function SeparateSplit({ client, members }) {
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState(null);
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiMutate('trainer.split.separate', { clientRow: client.row });
+      setDone(true);
+      haptic('success');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+      setAsk(false);
+    }
+  };
+
+  if (done) return <Note tone="good" icon={IconCheck}>Разделено: в списке клиентов теперь {members.join(' и ')} — в скобке «сплит».</Note>;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <p className="small muted" style={{ margin: '0 0 6px' }}>
+        Отдельные карточки: у каждого свои обзор, прогресс, питание и вход. Программа, журнал и деньги — общие у пары.
+      </p>
+      {ask ? (
+        <div className="library__actions">
+          <button className="button button--primary" disabled={busy} onClick={run}>{busy ? 'Разделяю…' : 'Да, разделить'}</button>
+          <button className="button" disabled={busy} onClick={() => setAsk(false)}>Отмена</button>
+        </div>
+      ) : (
+        <button className="button button--ghost" onClick={() => setAsk(true)}>Разделить на карточки</button>
+      )}
+      {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
+    </div>
+  );
+}
+
+/**
+ * Карточка участника сплита (30.09.2026): с кем в паре и кто платит.
+ * Плательщик — тот, в чьей карточке вносят оплату; деньги при этом общие,
+ * у пары, и смена плательщика ничего не пересчитывает.
+ */
+function SplitMember({ client }) {
+  const [payer, setPayer] = useState(!!client.splitPayer);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const makePayer = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiMutate('trainer.split.payer', { clientRow: client.row });
+      setPayer(true);
+      haptic('success');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="client-split">
+      <strong className="small">Сплит</strong>
+      <p className="small muted" style={{ margin: '2px 0 8px' }}>
+        Программа и деньги общие у пары ({client.splitName}); замеры, шаги и питание — свои.
+        {payer ? ' Платит этот клиент — оплату вносите здесь.' : ' Платит ' + client.splitPayerName + '.'}
+      </p>
+      {!payer && (
+        <button className="button button--ghost" disabled={busy} onClick={makePayer}>
+          {busy ? 'Сохраняю…' : 'Сделать плательщиком'}
+        </button>
+      )}
       {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
     </div>
   );
@@ -602,13 +728,27 @@ export function ClientCard({ client }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px', alignItems: 'center' }}>
         {/* За клиента платит другой человек — свой нулевой баланс ничего не
             говорит, и «Баланс 0 ₽» только пугал. Долг показываем всегда. */}
-        {!(client.payer && client.balance === 0) && (
-          <Badge kind={client.balance < 0 ? 'bad' : client.balance > 0 ? 'good' : undefined}>
-            Баланс {formatMoney(client.balance)}
-          </Badge>
+        {/* Участник сплита: деньги — пары, общие; своя цена — за занятие без пары */}
+        {client.splitOf ? (
+          <>
+            <Badge kind={client.splitBalance < 0 ? 'bad' : client.splitBalance > 0 ? 'good' : undefined}>
+              Сплит: {formatMoney(client.splitBalance)}
+              {client.splitTrainingsLeft !== null && client.splitTrainingsLeft !== undefined ? ' · осталось ' + client.splitTrainingsLeft : ''}
+            </Badge>
+            <Badge>платит {client.splitPayerName}</Badge>
+            <Badge>{formatMoney(client.price)} — одному</Badge>
+          </>
+        ) : (
+          <>
+            {!(client.payer && client.balance === 0) && (
+              <Badge kind={client.balance < 0 ? 'bad' : client.balance > 0 ? 'good' : undefined}>
+                Баланс {formatMoney(client.balance)}
+              </Badge>
+            )}
+            <Badge>{formatMoney(client.price)} за тренировку</Badge>
+            {client.payer && <Badge>платит {client.payer}</Badge>}
+          </>
         )}
-        <Badge>{formatMoney(client.price)} за тренировку</Badge>
-        {client.payer && <Badge>платит {client.payer}</Badge>}
         <button
           type="button"
           className="button button--ghost client-card__toggle"
@@ -645,7 +785,7 @@ export function ClientCard({ client }) {
 
       {client.family && <ClientFamily client={client} />}
 
-      <ClientSplit client={client} />
+      {client.splitOf ? <SplitMember client={client} /> : <ClientSplit client={client} />}
 
       {access.done && (
         <div className="access-reset__result" role="status">
