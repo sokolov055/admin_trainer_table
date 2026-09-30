@@ -31,3 +31,18 @@ export function iosApp() {
   const cap = bridge();
   try { return isNativeApp() && cap.getPlatform && cap.getPlatform() === 'ios'; } catch (_) { return false; }
 }
+
+/**
+ * Подпись под версией в меню: какой коммит сайта вшит в приложение для
+ * iPhone. На сайте и в Android — пусто.
+ *
+ * Экраны на iPhone меняются только новой сборкой из App Store. До 30.09.2026
+ * приложение скачивало их с сайта само (@capgo/capacitor-updater), и Apple
+ * отклонила его по правилу 2.5.2: код, меняющий приложение после проверки,
+ * запрещён. Не возвращать — ни этот модуль, ни свою загрузку JS с сайта.
+ */
+export function screensNote() {
+  if (typeof window === 'undefined' || window.location.protocol !== 'capacitor:') return '';
+  const meta = document.querySelector('meta[name="build-sha"]');
+  return ' · экраны ' + ((meta && meta.getAttribute('content')) || '?');
+}

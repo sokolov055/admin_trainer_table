@@ -19,7 +19,6 @@ import { refreshNativePush, listenNativeTaps } from './native-push.js';
 import { syncSteps, syncWorkouts, reportDevice } from './native-steps.js';
 import { linkWatch } from './native-watch.js';
 import { localLink } from './open-in-app.js';
-import { startBundleUpdates } from './native-update.js';
 
 export { isNativeApp };
 
@@ -49,8 +48,6 @@ export function startNative() {
 
   // Уведомления: свежий адрес телефона — серверу; нажали на уведомление —
   // открыть то, о чём оно. Шаги — отправить, если подключены
-  // iPhone: экраны вшиты — свежие скачиваются с сайта на следующий запуск
-  startBundleUpdates();
   refreshNativePush();
   listenNativeTaps((url) => openLink(new URL(url, window.location.href).href));
   // При запуске — сразу, без паузы: человек открыл приложение посмотреть шаги

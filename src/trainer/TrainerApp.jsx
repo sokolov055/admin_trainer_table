@@ -28,7 +28,7 @@ import { Deferred } from '../lazy.js';
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Trainers from './Trainers.jsx';
-import { screensNote } from '../native-update.js';
+import { screensNote } from '../native-bridge.js';
 
 /**
  * Панель тренера.

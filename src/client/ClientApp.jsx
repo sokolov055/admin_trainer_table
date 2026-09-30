@@ -12,7 +12,7 @@ import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
-import { screensNote } from '../native-update.js';
+import { screensNote } from '../native-bridge.js';
 import Profile from './Profile.jsx';
 import PushSetting from '../PushSetting.jsx';
 import DeleteAccount from '../DeleteAccount.jsx';
