@@ -42,6 +42,10 @@ for (let d = 10; d <= 120; d += 20) await cdp.send('Input.dispatchTouchEvent', {
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 await page.waitForTimeout(600);
 const vertical = await days();
-console.log(JSON.stringify({ before, after, vertical }));
+// Страница не должна уехать на соседнюю вкладку: сетка на месте и видна
+const gridX = (await page.locator('.cal-grid').boundingBox()).x;
+const title = await page.locator('.cal-bar__title').boundingBox();
+console.log(JSON.stringify({ before, after, vertical, gridX: Math.round(gridX), titleX: Math.round(title.x) }));
+if (before === after || after !== vertical || gridX < 0 || gridX > 40) { console.error('ПРОВАЛ'); process.exitCode = 1; }
 await browser.close();
 server.close();

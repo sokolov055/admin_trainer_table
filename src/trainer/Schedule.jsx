@@ -231,7 +231,9 @@ function SwipePager({ onShift, children }) {
   };
 
   return (
-    <div className="cal-swipe" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+    // data-no-swipe: жесты приложения (листание вкладок, «назад») над сеткой
+    // не работают — иначе вбок листалась страница, а не календарь (gestures.jsx)
+    <div className="cal-swipe" data-no-swipe="" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
       <div ref={box} className="cal-swipe__page">{children}</div>
     </div>
   );
