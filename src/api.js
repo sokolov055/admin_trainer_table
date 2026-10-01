@@ -307,6 +307,8 @@ export async function logout() {
 
   clearApiCache();
   clearToken();
+  // Виджеты iPhone: на экране блокировки не должно остаться занятий
+  import('./native-widget.js').then((m) => m.forgetWidgets()).catch(() => {});
 }
 
 async function request(action, params) {

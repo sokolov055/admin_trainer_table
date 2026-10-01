@@ -21,6 +21,7 @@ import { linkWatch } from './native-watch.js';
 import { localLink } from './open-in-app.js';
 import { ensureBackgroundSync } from './native-sync.js';
 import { settleLive } from './live-settle.js';
+import { linkWidgets, reloadWidgets } from './native-widget.js';
 
 export { isNativeApp };
 
@@ -48,6 +49,8 @@ export function startNative() {
       linkWatch();
       // Плашка iPhone: «Завершить» с неё — сохранить, забытую — убрать
       settleLive().catch(() => {});
+      // Виджеты «Занятия сегодня»: ключ, если нет; свежее расписание
+      linkWidgets().then(reloadWidgets);
     });
   }
 
@@ -66,6 +69,8 @@ export function startNative() {
   linkWatch();
   // Плашка iPhone (live-settle.js) — когда вход уже прочитан
   setTimeout(() => settleLive().catch(() => {}), 1500);
+  // Виджеты iPhone «Занятия сегодня» — ключ, если его у них ещё нет
+  setTimeout(() => { linkWidgets(); }, 2000);
 
   const bar = plugin('StatusBar');
   if (bar && bar.setBackgroundColor) {

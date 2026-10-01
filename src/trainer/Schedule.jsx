@@ -2,6 +2,7 @@ import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
+import { reloadWidgets } from '../native-widget.js';
 import { haptic } from '../telegram.js';
 import { Section, Panel, Loading, ErrorState, Note, Field, Options, Chips } from '../ui.jsx';
 import { IconAlert, IconBack, IconCopy, IconPlus } from '../icons.jsx';
@@ -114,6 +115,9 @@ export default function Schedule() {
     to: addDays(start, days + around).toISOString(),
   }), [start.getTime(), days, around]);
   const { loading, data, error, reload } = useData('trainer.schedule', params, [params.from, params.to]);
+  // Виджеты iPhone «Занятия сегодня»: расписание перечитали (в том числе
+  // после правки) — пусть и они перечитают сейчас, а не через полчаса
+  useEffect(() => { if (data) reloadWidgets(); }, [data]);
   // Пока грузится новый период, показываем уже известное — а не пустую
   // сетку: после пролистывания большинство занятий уже загружено
   const known = useRef([]);
