@@ -29,6 +29,7 @@ import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Trainers from './Trainers.jsx';
 import { screensNote } from '../native-bridge.js';
+import { setSelfRow } from '../native-activity.js';
 
 /**
  * Панель тренера.
@@ -477,7 +478,7 @@ function useSelfCard(enabled) {
     if (!enabled) return;
     setState((s) => ({ ...s, loading: true, error: null }));
     apiMutate('trainer.self', {})
-      .then((card) => setState({ card, error: null, loading: false }))
+      .then((card) => { setSelfRow(card && card.clientRow); setState({ card, error: null, loading: false }); })
       .catch((error) => setState({ card: null, error, loading: false }));
   }, [enabled]);
   useEffect(() => { load(); }, [load]);

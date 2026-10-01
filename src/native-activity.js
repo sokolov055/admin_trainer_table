@@ -32,11 +32,35 @@ function setText(set) {
   return out.join(' ');
 }
 
+/** Упражнения с подходами — список на часах тренера: как exerciseList
+ *  сервера (server/src/lib/watch-workout.js) */
+export function exerciseList(s) {
+  return s.exercises.slice(0, 30).map((ex) => ({
+    id: ex.id || '',
+    name: ex.name || 'Упражнение',
+    sets: ex.sets.slice(0, 20).map((x) => x.state || 'pending'),
+    who: ex.sets.slice(0, 20).map((x) => x.who || ''),
+  }));
+}
+
+/** Карточка самого тренера («Мои тренировки»): её занятие — своё, не клиента */
+const SELF_KEY = 'fittrack_self_row';
+export function setSelfRow(row) {
+  try { if (row) localStorage.setItem(SELF_KEY, String(row)); } catch (_) {}
+}
+function selfRow() {
+  try { return Number(localStorage.getItem(SELF_KEY)) || 0; } catch (_) { return 0; }
+}
+/** Тренер ведёт клиента: на часах первым — список упражнений */
+export function isCoaching(clientRow, clientView = false) {
+  return !!clientRow && !clientView && Number(clientRow) !== selfRow();
+}
+
 /**
  * Что показать на плашке. record — черновик занятия из Workout.jsx:
  * session и tick (когда elapsedMs последний раз досчитан).
  */
-export function activityPayload(record) {
+export function activityPayload(record, { coach = false } = {}) {
   const s = record && record.session;
   if (!s || !['active', 'paused'].includes(s.status)) return null;
   const sets = s.exercises.flatMap((e) => e.sets);
@@ -92,6 +116,9 @@ export function activityPayload(record) {
       .reduce((m, x) => m + volumeOf(x, trackOf(e)), 0), 0)),
     exercisesDone: s.exercises.filter((e) => e.sets.length && !e.sets.some((x) => x.state === 'pending')).length,
     exercisesTotal: s.exercises.length,
+    // Часы тренера: список упражнений с подходами (01.10.2026)
+    exercises: exerciseList(s),
+    coach: !!coach,
   };
 }
 
@@ -165,9 +192,9 @@ export function liveOwner() {
 
 /** Показать или обновить плашку; повтор того же — без вызова телефона.
  *  clientRow — чьё занятие (у тренера); у клиента — пусто */
-export function showWorkoutActivity(record, clientRow) {
+export function showWorkoutActivity(record, clientRow, { coach = false } = {}) {
   const la = activity();
-  const payload = activityPayload(record);
+  const payload = activityPayload(record, { coach });
   if (!la || !payload) return Promise.resolve(false);
   const sig = JSON.stringify(payload);
   if (sig === last) return Promise.resolve(true);
@@ -263,6 +290,16 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
       s = { ...s, status: 'paused', restUntil: 0, elapsedMs: Math.max(0, (s.elapsedMs || 0) - (now - at)) };
     } else if (a.kind === 'resume' && s.status === 'paused') {
       s = { ...s, status: 'active', elapsedMs: (s.elapsedMs || 0) + (now - at) };
+    } else if (a.kind === 'move') {
+      // Перетащили упражнение в списке на часах: на место index
+      const from = s.exercises.findIndex((ex) => mine(ex, a));
+      const to = Math.max(0, Math.min(s.exercises.length - 1, Math.floor(Number(a.index))));
+      if (from >= 0 && Number.isFinite(to) && from !== to) {
+        const list = s.exercises.slice();
+        const [moved] = list.splice(from, 1);
+        list.splice(to, 0, moved);
+        s = { ...s, exercises: list };
+      }
     } else if (a.kind === 'finish') {
       // Ни одного сделанного подхода — занятия не было: отмена, как в приложении
       const any = s.exercises.some((ex) => ex.sets.some((set) => set.state === 'done'));

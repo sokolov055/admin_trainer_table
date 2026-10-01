@@ -184,3 +184,14 @@ test('«Отдых» с двух часов на одном подходе (setI
   const out = la.applyActions(s, [press, press]);
   assert.deepEqual(out.exercises[0].sets.map((x) => x.state), ['done', 'done', 'pending']);
 });
+
+test('часы тренера: список упражнений с подходами и перестановка (move)', () => {
+  const r = record({});
+  const p = la.activityPayload(r, { coach: true });
+  assert.equal(p.coach, true);
+  assert.deepEqual(p.exercises.map((e) => [e.name, e.sets]), [['Жим лёжа', ['done', 'pending', 'pending']], ['Тяга', ['pending']]]);
+  const moved = la.applyActions(r.session, [{ kind: 'move', sessionId: 's1', exerciseId: 'e2', index: 0 }]);
+  assert.deepEqual(moved.exercises.map((e) => e.id), ['e2', 'e1']);
+  assert.equal(la.applyActions(r.session, [{ kind: 'move', sessionId: 's1', exerciseId: 'nope', index: 0 }]), r.session, 'чужое — без изменений');
+  assert.equal(la.activityPayload(r).coach, false);
+});

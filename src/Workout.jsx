@@ -12,7 +12,7 @@ import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
-import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState } from './native-activity.js';
+import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, isCoaching } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -272,7 +272,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // обновлять, завершили или отменили — убрать (native-activity.js)
   useEffect(() => {
     const status = record?.session?.status;
-    if (['active', 'paused'].includes(status)) showWorkoutActivity(record, clientRow);
+    if (['active', 'paused'].includes(status)) showWorkoutActivity(record, clientRow, { coach: isCoaching(clientRow, clientView) });
     else if (['completed', 'cancelled'].includes(status)) endWorkoutActivity(record.session.id);
   }, [record]);
 
