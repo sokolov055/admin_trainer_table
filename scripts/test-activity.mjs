@@ -195,3 +195,12 @@ test('часы тренера: список упражнений с подход
   assert.equal(la.applyActions(r.session, [{ kind: 'move', sessionId: 's1', exerciseId: 'nope', index: 0 }]), r.session, 'чужое — без изменений');
   assert.equal(la.activityPayload(r).coach, false);
 });
+
+test('часы: исправить подход (setEdit) — вес и повторы, сделан он или нет', () => {
+  const r = record({});
+  const s = la.applyActions(r.session, [{ kind: 'setEdit', sessionId: 's1', exerciseId: 'e1', who: '', setIndex: 0, weight: '65', reps: '6' }]);
+  assert.deepEqual([s.exercises[0].sets[0].weight, s.exercises[0].sets[0].reps, s.exercises[0].sets[0].state], ['65', '6', 'done']);
+  const bad = la.applyActions(r.session, [{ kind: 'setEdit', sessionId: 's1', exerciseId: 'e1', who: '', setIndex: 0, weight: 'abc', reps: '' }]);
+  assert.equal(bad.exercises[0].sets[0].weight, '60', 'мусор не пишем');
+  assert.deepEqual(la.activityPayload(r).exercises[0].weights, ['60', '62.5', '60']);
+});

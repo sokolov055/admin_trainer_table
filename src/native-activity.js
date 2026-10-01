@@ -40,6 +40,9 @@ export function exerciseList(s) {
     name: ex.name || 'Упражнение',
     sets: ex.sets.slice(0, 20).map((x) => x.state || 'pending'),
     who: ex.sets.slice(0, 20).map((x) => x.who || ''),
+    // Вес и повторы подходов — правка подхода с часов
+    weights: ex.sets.slice(0, 20).map((x) => String(x.weight || '')),
+    reps: ex.sets.slice(0, 20).map((x) => String(x.reps || '')),
   }));
 }
 
@@ -290,6 +293,21 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
       s = { ...s, status: 'paused', restUntil: 0, elapsedMs: Math.max(0, (s.elapsedMs || 0) - (now - at)) };
     } else if (a.kind === 'resume' && s.status === 'paused') {
       s = { ...s, status: 'active', elapsedMs: (s.elapsedMs || 0) + (now - at) };
+    } else if (a.kind === 'setEdit') {
+      // Исправили подход на часах (вес и повторы), сделан он или нет:
+      // setIndex — какой по счёту подход у человека who
+      const index = Math.floor(Number(a.setIndex));
+      const reps = /^\d{1,3}$/.test(String(a.reps ?? '')) ? String(a.reps) : null;
+      const weight = WEIGHT_RE.test(String(a.weight ?? '')) ? String(a.weight) : null;
+      if (index >= 0 && (reps !== null || weight !== null)) {
+        s = { ...s, exercises: s.exercises.map((ex) => {
+          if (!mine(ex, a)) return ex;
+          const target = ex.sets.filter((set) => whose(set, a))[index];
+          if (!target) return ex;
+          return { ...ex, sets: ex.sets.map((set) => set !== target ? set
+            : { ...set, ...(weight !== null ? { weight } : {}), ...(reps !== null ? { reps } : {}) }) };
+        }) };
+      }
     } else if (a.kind === 'move') {
       // Перетащили упражнение в списке на часах: на место index
       const from = s.exercises.findIndex((ex) => mine(ex, a));
