@@ -347,7 +347,16 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
       const group = String(a.group || '');
       const moving = group ? s.exercises.filter((ex) => ex.supersetGroup === group) : s.exercises.filter((ex) => mine(ex, a));
       const rest = s.exercises.filter((ex) => !moving.includes(ex));
-      const to = Math.max(0, Math.min(rest.length, Math.floor(Number(a.index))));
+      let to = Math.max(0, Math.min(rest.length, Math.floor(Number(a.index))));
+      // Суперсет — одно целое (02.10.2026): его упражнение переставляется
+      // только среди своих, чужое (или другой суперсет) не встаёт в середину
+      const own = !group && moving.length === 1 ? moving[0].supersetGroup || '' : '';
+      if (own) {
+        const at = rest.map((ex, i) => (ex.supersetGroup === own ? i : -1)).filter((i) => i >= 0);
+        if (at.length) to = Math.max(at[0], Math.min(at[at.length - 1] + 1, to));
+      } else {
+        while (to > 0 && to < rest.length && rest[to].supersetGroup && rest[to].supersetGroup === rest[to - 1].supersetGroup) to += 1;
+      }
       if (moving.length && Number.isFinite(to)) {
         const list = [...rest.slice(0, to), ...moving, ...rest.slice(to)];
         if (list.some((ex, i) => ex !== s.exercises[i])) s = { ...s, exercises: list };

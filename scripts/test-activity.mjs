@@ -232,3 +232,25 @@ test('перестановка с часов: суперсет переезжа�
   assert.deepEqual(one.exercises.map((e) => e.id), ['d', 'a', 'b', 'c']);
   assert.equal(la.activityPayload(r).exercises[0].group, 'g1');
 });
+
+test('перестановка внутри суперсета: из него не выйти, чужое не встанет внутрь', () => {
+  const r = record({ exercises: [
+    { id: 'c', name: 'Присед', sets: [set('pending')] },
+    { id: 'a', name: 'Жим', supersetGroup: 'g1', sets: [set('pending'), set('pending')] },
+    { id: 'b', name: 'Тяга', supersetGroup: 'g1', sets: [set('pending'), set('pending')] },
+    { id: 'e', name: 'Отжимания', supersetGroup: 'g1', sets: [set('pending'), set('pending')] },
+    { id: 'd', name: 'Выпады', sets: [set('pending')] },
+  ] });
+  const ids = (s) => s.exercises.map((e) => e.id).join('');
+  const move = (exerciseId, index) => la.applyActions(r.session, [{ kind: 'move', sessionId: 's1', exerciseId, index }]);
+  // Внутри — да: «Тяга» первой, круги в новом порядке
+  const inside = move('b', 1);
+  assert.equal(ids(inside), 'cbaed');
+  assert.deepEqual(la.setQueue(inside).slice(1, 4).map((x) => x.exerciseId), ['b', 'a', 'e']);
+  // Наружу — нет: в начало и в конец списка остаётся с краю суперсета
+  assert.equal(ids(move('a', 0)), 'cabed');
+  assert.equal(ids(move('a', 4)), 'cbead');
+  // Чужое в середину суперсета не встаёт — за ним
+  assert.equal(ids(move('c', 2)), 'abecd');
+  assert.equal(ids(move('d', 2)), 'cabed');
+});

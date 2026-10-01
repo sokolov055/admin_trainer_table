@@ -703,7 +703,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
         <button className="button button--ghost" onClick={split}>Разъединить</button>
       </div>
-      <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.</p>
+      <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.{editable ? ' Порядок внутри — подержите название и перетащите.' : ''}</p>
       {(members[0].ex.prescription || members.some(({ ex }) => ex.prevWeight)) && (
         <p className="small muted">{members.map(({ ex }) => ex.name + (ex.prescription ? ': ' + ex.prescription : '') + (ex.prevWeight ? ' · было ' + ex.prevWeight : '')).join('; ')}</p>
       )}
@@ -711,10 +711,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
-            <div className="workout__round-item" key={ex.id}>
+            <div className="workout__round-item" key={ex.id} data-member={ex.id}>
               {renaming === ex.id + ':' + r
                 ? nameEditor(ex, ei, ex.id + ':' + r)
-                : <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>
+                : <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}
+                  onPointerDown={holdToMove(ex.id, (head) => ({ container: head.closest('.workout__round'), commit: reorderMembers(group) }))}>
                   {/* Название — касанием: из базы или новое прямо здесь */}
                   <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>
                   <span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span>
@@ -774,8 +775,23 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     });
     return out;
   };
-  const holdToMove = (key) => (e) => {
-    if (!editable || picking || reorder || (e.button !== undefined && e.button !== 0)) return;
+  /**
+   * Порядок упражнений внутри суперсета — тем же удержанием, но только
+   * среди своих (02.10.2026): строка ездит в пределах круга, из суперсета не
+   * выходит. Порядок общий для всех кругов. ids — упражнения круга в новом
+   * порядке; у кого в этом круге подхода нет — остаются на своих местах
+   */
+  const reorderMembers = (group) => (ids) => change(v => {
+    const byId = new Map(v.exercises.map(e => [e.id, e]));
+    const slots = v.exercises.map((e, i) => (e.supersetGroup === group && ids.includes(e.id) ? i : -1)).filter(i => i >= 0);
+    const exercises = [...v.exercises];
+    slots.forEach((at, k) => { exercises[at] = byId.get(ids[k]); });
+    return { ...v, exercises };
+  });
+  const holdToMove = (key, inner = null) => (e) => {
+    if (!editable || picking || reorder || drag.current || (e.button !== undefined && e.button !== 0)) return;
+    // Внутри суперсета — не тащить заодно весь суперсет
+    if (inner) e.stopPropagation();
     const x0 = e.clientX, y0 = e.clientY, id = e.pointerId, head = e.currentTarget;
     const off = () => {
       clearTimeout(timer);
@@ -784,25 +800,26 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       window.removeEventListener('pointercancel', off);
     };
     const early = (ev) => { if (ev.pointerId === id && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) off(); };
-    const timer = setTimeout(() => { off(); begin(key, id, y0, head); }, 450);
+    const timer = setTimeout(() => { off(); begin(key, id, y0, head, inner && inner(head)); }, 450);
     window.addEventListener('pointermove', early);
     window.addEventListener('pointerup', off);
     window.addEventListener('pointercancel', off);
   };
-  const begin = (key, pointerId, y0, head) => {
+  const begin = (key, pointerId, y0, head, inner = null) => {
     haptic('medium');
     setRenaming('');
-    flushSync(() => setReorder({ key }));
-    const root = fieldsRef.current;
+    // Внутри суперсета карточки не сворачиваются — двигаются строки круга
+    if (!inner) flushSync(() => setReorder({ key }));
+    const root = inner ? inner.container : fieldsRef.current;
     if (!root) return;
     try { head.setPointerCapture && head.setPointerCapture(pointerId); } catch (_) {}
-    const rows = [...root.querySelectorAll('[data-unit]')];
-    const from = rows.findIndex(r => r.dataset.unit === key);
-    if (from < 0) { setReorder(null); return; }
+    const rows = inner ? [...root.querySelectorAll(':scope > [data-member]')] : [...root.querySelectorAll('[data-unit]')];
+    const from = rows.findIndex(r => (inner ? r.dataset.member : r.dataset.unit) === key);
+    if (from < 0) { if (!inner) setReorder(null); return; }
     // Карточки свернулись — строка уехала из-под пальца: прокрутить так,
     // чтобы она снова была под ним (остаток — сдвигом самой строки)
     const was = rows[from].getBoundingClientRect();
-    window.scrollBy(0, was.top + was.height / 2 - y0);
+    if (!inner) window.scrollBy(0, was.top + was.height / 2 - y0);
     const rects = rows.map(r => r.getBoundingClientRect());
     const centerOf = (r) => r.top + r.height / 2;
     rows[from].style.transform = `translate3d(0, ${y0 - centerOf(rects[from])}px, 0)`;
@@ -815,14 +832,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const move = (ev) => {
       if (ev.pointerId !== pointerId) return;
       // Середина строки — под пальцем
-      const center = ev.clientY;
+      // Внутри суперсета — не дальше первой и последней строки круга
+      const center = inner
+        ? Math.max(centerOf(rects[0]), Math.min(centerOf(rects[rects.length - 1]), ev.clientY))
+        : ev.clientY;
       const dy = center - centerOf(rects[from]);
       // Новое место — за всеми, чью середину строка перешла
       let to = from;
       rects.forEach((r, k) => {
         const mid = r.top + r.height / 2;
-        if (k > from && center > mid) to = Math.max(to, k);
-        if (k < from && center < mid) to = Math.min(to, k);
+        if (k > from && center >= mid) to = Math.max(to, k);
+        if (k < from && center <= mid) to = Math.min(to, k);
       });
       const shift = rects[from].height + gap;
       rows.forEach((row, k) => {
@@ -845,7 +865,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       // Касание после перетаскивания — не «переименовать»
       swallowClick.current = true;
       setTimeout(() => { swallowClick.current = false; }, 350);
-      if (ev.type === 'pointerup' && g.to !== from) {
+      if (ev.type === 'pointerup' && g.to !== from && inner) {
+        const ids = rows.map(r => r.dataset.member);
+        const [moved] = ids.splice(from, 1);
+        ids.splice(g.to, 0, moved);
+        inner.commit(ids);
+      } else if (ev.type === 'pointerup' && g.to !== from) {
         change(v => {
           const list = units(v.exercises);
           const [moved] = list.splice(from, 1);
@@ -853,7 +878,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           return { ...v, exercises: list.flatMap(u => u.items) };
         });
       }
-      setReorder(null);
+      if (!inner) setReorder(null);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', finish);

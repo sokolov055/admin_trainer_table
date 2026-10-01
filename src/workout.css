@@ -594,5 +594,6 @@
 .workout__rename > :first-child { flex: 1; min-width: 0; }
 
 /* Перестановка удержанием: соседи расступаются, взятая строка — над ними */
-.workout__fields [data-unit] { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.workout__round > [data-member].workout__exercise--lifted { background: var(--surface); border-radius: var(--radius-sm); }
+.workout__fields [data-unit], .workout__round > [data-member] { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
 .workout__exercise--lifted { position: relative; z-index: 3; transition: none !important; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); }
