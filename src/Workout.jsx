@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
-import { getInitData } from './telegram.js';
-import { getToken } from './session.js';
+import { storageKey } from './workout-draft.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
@@ -13,7 +12,7 @@ import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
-import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions } from './native-activity.js';
+import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -21,17 +20,6 @@ import { useData } from './useData.js';
 import { SetupText } from './media.jsx';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
-
-// Черновик изолирован по вошедшему пользователю и карточке клиента.
-// Подпись Telegram меняется при запуске, поэтому из неё берём только id.
-async function storageKey(clientRow) {
-  const data = new URLSearchParams(getInitData());
-  let identity = getToken();
-  try { identity = JSON.parse(data.get('user')).id || identity; } catch (_) {}
-  if (import.meta.env.VITE_MOCK === '1') identity = 'demo';
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(identity)));
-  return 'workout_draft_v1:' + Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('') + ':' + (clientRow || 'self');
-}
 
 /**
  * Подпись про суперсет.
@@ -266,11 +254,25 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
   useEffect(() => { if (ready) applyPendingRest(); }, [ready]);
 
+  // Экран открыт — нажатое на плашке забирает он сам, а не досохранение
+  // при запуске (live-settle.js): иначе двое писали бы один черновик
+  useEffect(() => { setWorkoutOpen(true); return () => setWorkoutOpen(false); }, []);
+
+  // Тренировку ведут часы через сервер: их нажатия (подход, отдых, пауза,
+  // «Завершить») — сразу и здесь, а не при следующем открытии экрана.
+  // Несохранённое своё не затираем — его сохранит save, а расхождение
+  // покажет обычный конфликт
+  useEffect(() => onWatchState(({ sessionId }) => {
+    const r = state.current;
+    if (!ready || !sessionId || saving.current || (r && (r.dirty || r.pending))) return;
+    if (!r || r.session.id === sessionId) open(sessionId).catch(() => {});
+  }), [ready]);
+
   // Плашка на экране блокировки iPhone: идёт занятие — показать и
   // обновлять, завершили или отменили — убрать (native-activity.js)
   useEffect(() => {
     const status = record?.session?.status;
-    if (['active', 'paused'].includes(status)) showWorkoutActivity(record);
+    if (['active', 'paused'].includes(status)) showWorkoutActivity(record, clientRow);
     else if (['completed', 'cancelled'].includes(status)) endWorkoutActivity(record.session.id);
   }, [record]);
 

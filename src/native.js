@@ -20,6 +20,7 @@ import { syncSteps, syncWorkouts, reportDevice, noteAppBuild } from './native-st
 import { linkWatch } from './native-watch.js';
 import { localLink } from './open-in-app.js';
 import { ensureBackgroundSync } from './native-sync.js';
+import { settleLive } from './live-settle.js';
 
 export { isNativeApp };
 
@@ -45,6 +46,8 @@ export function startNative() {
       syncSteps().catch(() => {}).then(() => reportDevice());
       syncWorkouts().catch(() => {});
       linkWatch();
+      // Плашка iPhone: «Завершить» с неё — сохранить, забытую — убрать
+      settleLive().catch(() => {});
     });
   }
 
@@ -61,6 +64,8 @@ export function startNative() {
   syncWorkouts(true).catch(() => {});
   // Apple Watch: ключ входа часам, если он им нужен (native-watch.js)
   linkWatch();
+  // Плашка iPhone (live-settle.js) — когда вход уже прочитан
+  setTimeout(() => settleLive().catch(() => {}), 1500);
 
   const bar = plugin('StatusBar');
   if (bar && bar.setBackgroundColor) {

@@ -154,8 +154,18 @@ let last = '';
  *  завершённое занятие не убрало плашку идущего */
 let shown = '';
 
-/** Показать или обновить плашку; повтор того же — без вызова телефона */
-export function showWorkoutActivity(record) {
+/** Чьё занятие на плашке: { sessionId, clientRow } — чтобы при запуске
+ *  приложения досохранить «Завершить» с плашки и узнать забытую плашку
+ *  (live-settle.js), не открывая экран тренировки */
+export const LIVE_KEY = 'fittrack_live_v1';
+
+export function liveOwner() {
+  try { return JSON.parse(localStorage.getItem(LIVE_KEY)) || null; } catch (_) { return null; }
+}
+
+/** Показать или обновить плашку; повтор того же — без вызова телефона.
+ *  clientRow — чьё занятие (у тренера); у клиента — пусто */
+export function showWorkoutActivity(record, clientRow) {
   const la = activity();
   const payload = activityPayload(record);
   if (!la || !payload) return Promise.resolve(false);
@@ -163,6 +173,7 @@ export function showWorkoutActivity(record) {
   if (sig === last) return Promise.resolve(true);
   last = sig;
   shown = payload.sessionId;
+  try { localStorage.setItem(LIVE_KEY, JSON.stringify({ sessionId: shown, clientRow: clientRow || 0 })); } catch (_) {}
   return la.update(payload).then((r) => !!(r && r.shown)).catch(() => { last = ''; return false; });
 }
 
@@ -184,11 +195,11 @@ export async function takePendingRest() {
  * сделан + отдых), вес. Сборка с очередью подходов (takeActions).
  * Забирается один раз; пусто — [].
  */
-export async function takeActions() {
+export async function takeActions(sessionId) {
   const la = activity();
   if (!la || !la.takeActions) return [];
   try {
-    const r = await la.takeActions();
+    const r = await la.takeActions(sessionId ? { sessionId: String(sessionId) } : {});
     return Array.isArray(r && r.actions) ? r.actions.filter((a) => a && a.sessionId && a.kind) : [];
   } catch (_) { return []; }
 }
@@ -263,11 +274,44 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
 }
 
 /** Занятие завершено или отменено — плашку убрать. sessionId — только
- *  если плашка его; без него — любую */
+ *  если плашка его; без него — любую.
+ *
+ *  Чья плашка, помним не только в памяти (shown), но и на диске (LIVE_KEY):
+ *  после перезапуска приложения shown пуст, и до 01.10.2026 завершённое
+ *  занятие плашку не убирало — она висела часами («Идёт занятие» 3,5 ч) */
 export function endWorkoutActivity(sessionId) {
   const la = activity();
-  if (!la || (sessionId && sessionId !== shown)) return Promise.resolve();
+  const owner = shown || (liveOwner() || {}).sessionId || '';
+  if (!la || (sessionId && owner && sessionId !== owner)) return Promise.resolve();
   last = '';
   shown = '';
+  try { localStorage.removeItem(LIVE_KEY); } catch (_) {}
   return la.end().catch(() => {});
+}
+
+/** Что на плашке сейчас и что завершили с неё, пока страница спала:
+ *  { sessionId, clientRow, updatedAt, finished: [id] } или null */
+export async function liveState() {
+  const la = activity();
+  if (!la || !la.live) return null;
+  try { return await la.live(); } catch (_) { return null; }
+}
+
+/** Открыт ли экран тренировки (Workout.jsx): тогда нажатое на плашке
+ *  забирает он сам */
+let workoutOpen = false;
+export function setWorkoutOpen(open) { workoutOpen = !!open; }
+export function isWorkoutOpen() { return workoutOpen; }
+
+/** Часы ведут тренировку через сервер и что-то в ней поменяли:
+ *  cb({ sessionId, clientRow, ended }). Возвращает отписку */
+export function onWatchState(cb) {
+  const la = activity();
+  if (!la || !la.addListener) return () => {};
+  let handle = null;
+  let gone = false;
+  Promise.resolve(la.addListener('watchState', (e) => cb({
+    sessionId: String((e && e.sessionId) || ''), clientRow: Number(e && e.clientRow) || 0, ended: !!(e && e.ended),
+  }))).then((h) => { if (gone && h && h.remove) h.remove(); else handle = h; }).catch(() => {});
+  return () => { gone = true; if (handle && handle.remove) handle.remove(); };
 }
