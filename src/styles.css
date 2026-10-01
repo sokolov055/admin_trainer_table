@@ -4045,7 +4045,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-grid__day--today strong { background: var(--accent-solid); color: #fff; }
 .cal-grid__scroll { max-height: min(62dvh, 620px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .cal-grid__body { position: relative; }
-.cal-grid__scroll > .cal-grid__row { background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px 48px); }
+.cal-grid__scroll > .cal-grid__row { background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px var(--hour, 48px)); }
 .cal-grid__hours { position: relative; }
 .cal-grid__hours span {
   position: absolute; right: 6px; transform: translateY(-50%); font-size: 10.5px;

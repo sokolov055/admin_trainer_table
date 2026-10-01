@@ -28,6 +28,17 @@ const DURATIONS = [45, 60, 75, 90, 120];
 
 /** Высота часа в сетке, px. Час в 48 px — занятие на 60 мин читается в две строки */
 const HOUR = 48;
+/** Щипком (01.10.2026, как в Google Календаре): от «почти сутки на экране»
+ *  до крупных занятий. Выбранная высота запоминается на устройстве */
+const HOUR_MIN = 22;
+const HOUR_MAX = 140;
+const HOUR_KEY = 'schedule_hour_v1';
+const savedHour = () => {
+  try {
+    const v = Number(localStorage.getItem(HOUR_KEY));
+    return v >= HOUR_MIN && v <= HOUR_MAX ? v : HOUR;
+  } catch (_) { return HOUR; }
+};
 /** С какого часа открывается сетка: ночь есть, но её пролистывают */
 const FIRST_HOUR = 7;
 
@@ -317,6 +328,11 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
   const [drag, setDrag] = useState({ x: 0, animate: false });
   const gesture = useRef(null);
   const settling = useRef(null);
+  // Высота часа — щипком. pinch: расстояние между пальцами и время под ними
+  // в начале жеста; после перерисовки сетки это время остаётся под пальцами
+  const [hour, setHour] = useState(savedHour);
+  const pinch = useRef(null);
+  const keepScroll = useRef(null);
 
   // Лента: N дней до, N видимых, N после
   const strip = Array.from({ length: days * 3 }, (_, i) => addDays(start, i - days));
@@ -342,8 +358,18 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
     .reduce((m, e) => { const s = new Date(e.startsAt); return Math.min(m, s.getHours() * 60 + s.getMinutes()); }, FIRST_HOUR * 60);
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = Math.max(0, (earliest - 30) / 60 * HOUR);
+    if (el) el.scrollTop = Math.max(0, (earliest - 30) / 60 * hour);
   }, [start.getTime(), days]);
+
+  // Щипок поменял высоту часа — прокрутка так, чтобы время между пальцами
+  // осталось на том же месте экрана
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const k = keepScroll.current;
+    if (!el || !k) return;
+    keepScroll.current = null;
+    el.scrollTop = Math.max(0, (k.minute / 60) * hour - k.y);
+  }, [hour]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
@@ -353,12 +379,39 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
 
   const width = () => (viewport.current && viewport.current.offsetWidth) || 320;
 
+  const pinchGap = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const pinchMid = (t) => (t[0].clientY + t[1].clientY) / 2;
+
   const onTouchStart = (e) => {
+    // Два пальца — щипок: высота часа, а не листание дней
+    if (e.touches.length === 2 && scroller.current) {
+      gesture.current = null;
+      setDrag({ x: 0, animate: true });
+      const rect = scroller.current.getBoundingClientRect();
+      const y = pinchMid(e.touches) - rect.top;
+      pinch.current = {
+        gap: Math.max(20, pinchGap(e.touches)),
+        hour,
+        y,
+        minute: ((scroller.current.scrollTop + y) / hour) * 60,
+      };
+      return;
+    }
     if (e.touches.length > 1 || settling.current) { gesture.current = null; return; }
     const t = e.touches[0];
     gesture.current = { x: t.clientX, y: t.clientY, t: performance.now(), mode: null, dx: 0, v: 0 };
   };
   const onTouchMove = (e) => {
+    const pz = pinch.current;
+    if (pz) {
+      if (e.touches.length < 2) return;
+      const next = Math.round(Math.max(HOUR_MIN, Math.min(HOUR_MAX, pz.hour * (pinchGap(e.touches) / pz.gap))));
+      if (next !== hour) {
+        keepScroll.current = { minute: pz.minute, y: pz.y };
+        setHour(next);
+      }
+      return;
+    }
     const g = gesture.current;
     if (!g) return;
     const t = e.touches[0];
@@ -375,7 +428,14 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
     g.dx = dx;
     setDrag({ x: dx, animate: false });
   };
-  const onTouchEnd = () => {
+  const onTouchEnd = (e) => {
+    if (pinch.current) {
+      // Подняли оба пальца — масштаб запомнить; один ещё на экране — ждём
+      if (e && e.touches && e.touches.length) return;
+      pinch.current = null;
+      try { localStorage.setItem(HOUR_KEY, String(hour)); } catch (_) {}
+      return;
+    }
     const g = gesture.current;
     gesture.current = null;
     if (!g || g.mode !== 'x') return;
@@ -396,7 +456,7 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
 
   const slot = (d, ev) => {
     const rect = ev.currentTarget.getBoundingClientRect();
-    const minutes = Math.floor(((ev.clientY - rect.top) / HOUR) * 2) * 30;
+    const minutes = Math.floor(((ev.clientY - rect.top) / hour) * 2) * 30;
     onSlot({ date: d, minutes: Math.max(0, Math.min(minutes, 23 * 60 + 30)) });
   };
 
@@ -448,14 +508,14 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
       )}
 
       <div className="cal-grid__scroll" ref={scroller}>
-        <div className="cal-grid__row" style={{ height: 24 * HOUR }}>
+        <div className="cal-grid__row" style={{ height: 24 * hour, '--hour': hour + 'px' }}>
           <div className="cal-grid__gutter cal-grid__hours" aria-hidden="true">
             {Array.from({ length: 24 }, (_, h) => (
-              <span key={h} style={{ top: h * HOUR }}>{h ? pad(h) + ':00' : ''}</span>
+              <span key={h} style={{ top: h * hour }}>{h ? pad(h) + ':00' : ''}</span>
             ))}
           </div>
           <div className="cal-grid__viewport">
-            <div className="cal-grid__track cal-grid__body" style={{ ...track, height: 24 * HOUR }}>
+            <div className="cal-grid__track cal-grid__body" style={{ ...track, height: 24 * hour }}>
               {strip.map((d) => {
                 const ofDay = timed.filter((e) => sameDay(new Date(e.startsAt), d));
                 const today = sameDay(d, now);
@@ -464,8 +524,8 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
                   <div key={d.getTime()} className="cal-grid__col" onClick={(ev) => slot(d, ev)} role="presentation">
                     {layoutDay(ofDay).map(({ e, s, f, col, cols }) => {
                       const from = new Date(s);
-                      const top = (from.getHours() * 60 + from.getMinutes()) / 60 * HOUR;
-                      const height = Math.max(((f - s) / 3600000) * HOUR - 2, 18);
+                      const top = (from.getHours() * 60 + from.getMinutes()) / 60 * hour;
+                      const height = Math.max(((f - s) / 3600000) * hour - 2, 14);
                       return (
                         <button
                           key={e.id}
@@ -479,7 +539,7 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
                       );
                     })}
                     {today && (
-                      <span className="cal-grid__now" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR }} aria-hidden="true" />
+                      <span className="cal-grid__now" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * hour }} aria-hidden="true" />
                     )}
                   </div>
                 );
