@@ -3,6 +3,7 @@ import { useData } from '../useData.js';
 import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
+import WatchHelp from './WatchHelp.jsx';
 import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, reportDevice, openHealthSettings, STEPS_SENT } from '../native-steps.js';
 import { backgroundSyncAvailable, backgroundSyncStatus, ensureBackgroundSync, requestBackgroundAccess } from '../native-sync.js';
 
@@ -207,6 +208,7 @@ export default function Steps({ clientRow, self = false }) {
                   ? 'В «Здоровье»: ваш профиль (вверху справа), затем «Приложения», Fit Track и включите «Шаги». Вернитесь сюда, шаги подтянутся сами.'
                   : 'Шаги в Health Connect пишет приложение: Google Fit, Samsung Health, Mi Fitness или браслет. Включите в нём передачу шагов и разрешите Fit Track их читать.'}
               </p>
+              <WatchHelp />
               <div className="survey__actions">
                 <button className="button button--primary" onClick={() => openHealthSettings().catch(() => setChecked('Не получилось открыть настройки — откройте их вручную.'))} disabled={busy}>
                   {onIphone() ? 'Открыть «Здоровье»' : 'Открыть Health Connect'}
@@ -223,6 +225,7 @@ export default function Steps({ clientRow, self = false }) {
                   ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает шаги — больше ничего.'
                   : 'Шаги берутся из Health Connect на телефоне: туда их пишут Google Fit, Samsung Health, Mi Fitness и браслеты. Приложение только читает шаги — больше ничего.'}
               </p>
+              <WatchHelp />
               <div className="survey__actions">
                 <button className="button button--primary" onClick={connect} disabled={busy}>
                   {busy ? 'Подключаю…' : 'Подключить шаги'}

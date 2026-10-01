@@ -2,11 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { Section, Panel, Badge, formatNumber, formatTime } from '../ui.jsx';
 import { isNativeApp } from '../native-bridge.js';
+import WatchHelp from './WatchHelp.jsx';
 import { ensureBackgroundSync } from '../native-sync.js';
 import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIphone, WORKOUTS_SENT } from '../native-steps.js';
 
 /**
- * Тренировки с часов — в «Моих тренировках» владельца, рядом с шагами.
+ * Тренировки с часов — в прогрессе, рядом с шагами: у клиента (с 02.10.2026,
+ * docs/legal/2026-10-02-client-workouts.md), в «Моих тренировках» тренера и
+ * в карточке клиента у тренера — только посмотреть.
  *
  * Телефон отдаёт тренировки из «Здоровья» или Health Connect
  * (native-steps.js), сервер совмещает их с занятиями в приложении:
@@ -14,8 +17,8 @@ import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealt
  * приложении забыли закрыть занятие — сервер это учитывает и пишет словами
  * (health-workouts.js).
  *
- * Пока только владелец: клиентам — после юридической проверки. Android —
- * с APK versionCode 4.
+ * Подключить можно только свои: клиент в своём профиле, тренер в «Моих
+ * тренировках». Android — с APK versionCode 4.
  */
 const DAYS = 30;
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -57,9 +60,12 @@ function facts(w) {
   return out.join(' · ');
 }
 
-export default function HealthWorkouts({ clientRow }) {
-  const phone = isNativeApp() && workoutsAvailable();
-  const { loading, data, error, reload } = useData('health.workouts.list', { clientRow, days: DAYS }, [clientRow]);
+export default function HealthWorkouts({ clientRow, self = false }) {
+  // Свои — клиент у себя или тренер в «Моих тренировках»; карточка клиента у
+  // тренера — только список, подключать там нечего
+  const own = !clientRow || self;
+  const phone = own && isNativeApp() && workoutsAvailable();
+  const { loading, data, error, reload } = useData('health.workouts.list', clientRow ? { clientRow, days: DAYS } : { days: DAYS }, [clientRow]);
   const [on, setOn] = useState(workoutsOn());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -123,6 +129,7 @@ export default function HealthWorkouts({ clientRow }) {
             </button>
             {on && <button className="button" onClick={() => openHealthSettings().catch(() => {})}>{ios ? 'Открыть «Здоровье»' : 'Открыть Health Connect'}</button>}
           </div>
+          <WatchHelp />
           {message && <p className="small" role="status" style={{ marginBottom: 0 }}>{message}</p>}
         </Panel>
       </Section>

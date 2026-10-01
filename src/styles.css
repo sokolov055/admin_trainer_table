@@ -4409,3 +4409,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan__title-input { font: inherit; box-sizing: border-box; display: block; width: 100%; margin: -4px 0 4px; }
 .section__head > div:has(.plan__title-input) { flex: 1; min-width: 0; }
 .plan__title-error { display: block; color: var(--warning-text); font-weight: 400; margin-top: 4px; }
+
+/* «Как подключить часы» (client/WatchHelp.jsx) */
+.watch-help { margin: var(--space-2) 0; }
+.watch-help summary { cursor: pointer; color: var(--accent); }
+.watch-help__list { margin: var(--space-2) 0 0; padding-left: 1.1em; }
+.watch-help__list li + li { margin-top: 6px; }

@@ -1207,7 +1207,7 @@ export function Progress({ clientRow, familyRow = null, self = false }) {
           }
         />
         {!familyRow && <Steps clientRow={clientRow} self={self} />}
-      {self && <HealthWorkouts clientRow={clientRow} />}
+      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} />}
       </>
     );
   }
@@ -1412,7 +1412,7 @@ export function Progress({ clientRow, familyRow = null, self = false }) {
         )}
 
       {!familyRow && <Steps clientRow={clientRow} self={self} />}
-      {self && <HealthWorkouts clientRow={clientRow} />}
+      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} />}
     </>
   );
 }
