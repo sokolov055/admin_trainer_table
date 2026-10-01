@@ -14,7 +14,7 @@ import { haptic } from '../telegram.js';
 const key = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[«»"'.,()]/g, ' ').replace(/\s+/g, ' ').trim();
 const LIMIT = 8;
 
-export default function ExercisePicker({ value, exerciseId, exercises, disabled, onPick, onAdded }) {
+export default function ExercisePicker({ value, exerciseId, exercises, disabled, onPick, onAdded, autoFocus = false }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [failure, setFailure] = useState('');
@@ -67,6 +67,7 @@ export default function ExercisePicker({ value, exerciseId, exercises, disabled,
         value={value}
         maxLength={160}
         disabled={disabled}
+        autoFocus={autoFocus}
         autoComplete="off"
         onChange={(e) => { onPick({ name: e.target.value, exerciseId: null }); if (!open) lift(); setOpen(true); }}
         onFocus={() => { setOpen(true); if (value) lift(); }}

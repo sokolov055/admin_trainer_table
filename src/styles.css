@@ -4401,3 +4401,11 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* «Глазами клиента» в шапке карточки (01.10.2026: из бокового меню сюда) */
 .client-card__preview { margin-left: auto; min-height: 32px; padding: 4px 8px; gap: 6px; font-size: var(--text-sm); color: var(--accent); }
 .client-card__preview + .client-card__toggle { margin-left: 0; }
+
+/* Название тренировки на листе программы — тапом в поле (02.10.2026) */
+.plan__title-tap { all: unset; cursor: text; -webkit-tap-highlight-color: transparent; }
+.plan__title-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.plan__title-tap:disabled { opacity: 0.6; }
+.plan__title-input { font: inherit; box-sizing: border-box; display: block; width: 100%; margin: -4px 0 4px; }
+.section__head > div:has(.plan__title-input) { flex: 1; min-width: 0; }
+.plan__title-error { display: block; color: var(--warning-text); font-weight: 400; margin-top: 4px; }

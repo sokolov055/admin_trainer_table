@@ -184,12 +184,12 @@ test('суперсет из программы виден в занятии', as
     // Повторов у подтягиваний нет — подсказка под кнопкой, с названием
     const reps = round1().findAll(n => n.type === 'input' && /Подтягивания, подход 1, повторы/.test(n.props['aria-label'] || ''))[0];
     await act(async () => { reps.props.onChange({ target: { value: '' } }); await delay(); });
-    await press('Круг 1 — готово');
+    await press('Круг 1 · отдых');
     assert.match(text(round1().findByProps({ className: 'workout__round-lack' })), /Подтягивания: введите число повторов/);
     // Вписали — подсказка ушла, кнопка отмечает оба упражнения
     await act(async () => { reps.props.onChange({ target: { value: '10' } }); await delay(); });
     assert.equal(round1().findAllByProps({ className: 'workout__round-lack' }).length, 0);
-    await press('Круг 1 — готово');
+    await press('Круг 1 · отдых');
     assert.equal(round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length, 2, 'оба упражнения круга отмечены');
     await press('Круг 1 выполнен');
     assert.equal(round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length, 0, 'второе нажатие снимает отметку');

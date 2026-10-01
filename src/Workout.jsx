@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
+import { haptic } from './telegram.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
@@ -78,6 +79,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const saveAgain = useRef(false);
   // Чего не хватает, чтобы отметить круг суперсета: { key: 'группа:круг', text }
   const [roundLack, setRoundLack] = useState(null);
+  // Переименование касанием по названию (02.10.2026): id упражнения
+  const [renaming, setRenaming] = useState('');
+  // Перестановка удержанием (02.10.2026): { key } — какой блок тащат.
+  // Пока тащат, карточки свёрнуты в строки (как в «Выбрать»): развёрнутая
+  // карточка выше экрана, цель за ней не видна
+  const [reorder, setReorder] = useState(null);
+  const drag = useRef(null);
+  const swallowClick = useRef(false);
   const params = clientRow ? { clientRow } : {};
 
   const store = value => {
@@ -607,7 +616,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return <>
       <button type="button" className={'button button--block workout__round-check' + (done ? ' workout__round-check--done' : current ? ' button--primary' : '')}
         aria-pressed={done} onClick={toggle}>
-        <IconCheck size={18} />{done ? `Круг ${r + 1} выполнен` : `Круг ${r + 1} — готово`}
+        {/* Круг записан — «Отдых»: отмечает все упражнения круга и
+            запускает отдых, как «Отдых» на часах и плашке */}
+        <IconCheck size={18} />{done ? `Круг ${r + 1} выполнен` : `Круг ${r + 1} · отдых`}
       </button>
       {roundLack && roundLack.key === key && <p className="workout__round-lack" role="alert">{roundLack.text}</p>}
     </>;
@@ -687,8 +698,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         : e)),
     }));
     const currentHere = members.some(({ ex }) => ex.id === focus.ex);
-    return <section className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
-      <div className="workout__rounds-head">
+    return <section className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-unit={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
+      <div className="workout__rounds-head" onPointerDown={holdToMove('g' + group)}>
         <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
         <button className="button button--ghost" onClick={split}>Разъединить</button>
       </div>
@@ -701,7 +712,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
             <div className="workout__round-item" key={ex.id}>
-              <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>{ex.name}<span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span></div>
+              {renaming === ex.id + ':' + r
+                ? nameEditor(ex, ei, ex.id + ':' + r)
+                : <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}>
+                  {/* Название — касанием: из базы или новое прямо здесь */}
+                  <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>
+                  <span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span>
+                </div>}
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
             </div>
           ))}
@@ -720,6 +737,128 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         ))}
       </details>
     </section>;
+  };
+
+  /**
+   * Название упражнения — касанием (02.10.2026). Тренер выбирает из базы или
+   * добавляет новое прямо здесь (ExercisePicker); у клиента базы нет —
+   * просто поле. «Готово», Enter или уход с поля — закрыть.
+   */
+  const startRename = (id) => {
+    if (swallowClick.current || !editable) return;
+    setRenaming(id);
+  };
+  const nameEditor = (ex, ei, id) => (
+    <div className="workout__rename" key={'rename-' + id}>
+      {clientRow
+        ? <NameFromBase ex={ex} autoFocus onPick={(patch) => updateExercise(ei, x => ({ ...x, ...patch }))} />
+        : <input className="field__input" aria-label="Название упражнения" autoFocus value={ex.name} maxLength={160}
+          onChange={e => updateExercise(ei, ({ exerciseId, ...x }) => ({ ...x, name: e.target.value }))}
+          onKeyDown={e => { if (e.key === 'Enter') setRenaming(''); }} />}
+      <button type="button" className="button button--ghost" onClick={() => setRenaming('')}>Готово</button>
+    </div>
+  );
+
+  /**
+   * Порядок — удержанием (02.10.2026), без кнопок «Выше/Ниже». Подержали
+   * название ~0,45 с — карточки свернулись в строки, взятая едет за
+   * пальцем, соседи расступаются; отпустили — встала. Суперсет едет целиком.
+   * Сдвинули палец раньше — это прокрутка, перестановки нет.
+   */
+  const units = (list) => {
+    const out = [];
+    list.forEach(e => {
+      const key = e.supersetGroup && list.filter(x => x.supersetGroup === e.supersetGroup).length > 1 ? 'g' + e.supersetGroup : e.id;
+      const found = out.find(u => u.key === key);
+      if (found) found.items.push(e); else out.push({ key, items: [e] });
+    });
+    return out;
+  };
+  const holdToMove = (key) => (e) => {
+    if (!editable || picking || reorder || (e.button !== undefined && e.button !== 0)) return;
+    const x0 = e.clientX, y0 = e.clientY, id = e.pointerId, head = e.currentTarget;
+    const off = () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointermove', early);
+      window.removeEventListener('pointerup', off);
+      window.removeEventListener('pointercancel', off);
+    };
+    const early = (ev) => { if (ev.pointerId === id && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) off(); };
+    const timer = setTimeout(() => { off(); begin(key, id, y0, head); }, 450);
+    window.addEventListener('pointermove', early);
+    window.addEventListener('pointerup', off);
+    window.addEventListener('pointercancel', off);
+  };
+  const begin = (key, pointerId, y0, head) => {
+    haptic('medium');
+    setRenaming('');
+    flushSync(() => setReorder({ key }));
+    const root = fieldsRef.current;
+    if (!root) return;
+    try { head.setPointerCapture && head.setPointerCapture(pointerId); } catch (_) {}
+    const rows = [...root.querySelectorAll('[data-unit]')];
+    const from = rows.findIndex(r => r.dataset.unit === key);
+    if (from < 0) { setReorder(null); return; }
+    // Карточки свернулись — строка уехала из-под пальца: прокрутить так,
+    // чтобы она снова была под ним (остаток — сдвигом самой строки)
+    const was = rows[from].getBoundingClientRect();
+    window.scrollBy(0, was.top + was.height / 2 - y0);
+    const rects = rows.map(r => r.getBoundingClientRect());
+    const centerOf = (r) => r.top + r.height / 2;
+    rows[from].style.transform = `translate3d(0, ${y0 - centerOf(rects[from])}px, 0)`;
+    const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 8;
+    const g = { key, from, to: from, rows, rects, gap, y0, pointerId };
+    drag.current = g;
+    rows[from].classList.add('workout__exercise--lifted');
+    // Пока тащат — страница не листается
+    const stopScroll = (ev) => ev.preventDefault();
+    const move = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      // Середина строки — под пальцем
+      const center = ev.clientY;
+      const dy = center - centerOf(rects[from]);
+      // Новое место — за всеми, чью середину строка перешла
+      let to = from;
+      rects.forEach((r, k) => {
+        const mid = r.top + r.height / 2;
+        if (k > from && center > mid) to = Math.max(to, k);
+        if (k < from && center < mid) to = Math.min(to, k);
+      });
+      const shift = rects[from].height + gap;
+      rows.forEach((row, k) => {
+        if (k === from) { row.style.transform = `translate3d(0, ${dy}px, 0)`; return; }
+        let s = 0;
+        if (from < to && k > from && k <= to) s = -shift;
+        if (from > to && k >= to && k < from) s = shift;
+        row.style.transform = s ? `translate3d(0, ${s}px, 0)` : '';
+      });
+      if (to !== g.to) { g.to = to; haptic('light'); }
+    };
+    const finish = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      document.removeEventListener('touchmove', stopScroll);
+      rows.forEach(row => { row.style.transform = ''; row.classList.remove('workout__exercise--lifted'); });
+      drag.current = null;
+      // Касание после перетаскивания — не «переименовать»
+      swallowClick.current = true;
+      setTimeout(() => { swallowClick.current = false; }, 350);
+      if (ev.type === 'pointerup' && g.to !== from) {
+        change(v => {
+          const list = units(v.exercises);
+          const [moved] = list.splice(from, 1);
+          list.splice(g.to, 0, moved);
+          return { ...v, exercises: list.flatMap(u => u.items) };
+        });
+      }
+      setReorder(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+    document.addEventListener('touchmove', stopScroll, { passive: false });
   };
 
   /**
@@ -932,10 +1071,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           // Круги — для обычного суперсета; у сплита подходы по людям, там по-старому
           if (members.length > 1 && !members.some(m => m.ex.sets.some(x => x.who))) {
             if (members[0].ei !== ei) return null;
-            // В режиме выбора — одной строкой, как остальные упражнения
-            if (picking) {
-              return <section className="workout__exercise workout__exercise--compact" key={'g' + group}>
-                <div className="workout__ex-head"><h3><span className="workout__ex-num">{ei + 1}</span> Суперсет: {members.map(m => m.ex.name).join(' + ')}</h3></div>
+            // В режиме выбора и пока тащат — одной строкой, как остальные
+            // упражнения. Та же разметка шапки, что у развёрнутого: палец
+            // держит её во время перестановки, её нельзя пересоздать
+            if (picking || reorder) {
+              return <section className="workout__exercise workout__exercise--compact" key={'g' + group} data-unit={'g' + group}>
+                <div className="workout__rounds-head" onPointerDown={holdToMove('g' + group)}><h3><span className="workout__ex-num">{ei + 1}</span> Суперсет: {members.map(m => m.ex.name).join(' + ')}</h3></div>
               </section>;
             }
             return <React.Fragment key={'g' + group}>{joinBefore(ei)}{supersetBlock(members)}</React.Fragment>;
@@ -943,18 +1084,23 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
           const finished = doneSets === ex.sets.length;
           const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
-          return <React.Fragment key={ex.id}>{!picking && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (picking ? ' workout__exercise--compact' : '')} key={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
-          <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={picking || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
+          const compact = picking || !!reorder;
+          return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
+          <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
-          <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
+          <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={picking ? undefined : holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}
-            <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {ex.name || 'Новое упражнение'}</h3>
+            <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {compact
+              ? (ex.name || 'Новое упражнение')
+              // Название — касанием: из базы или новое прямо здесь
+              : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id)}>{ex.name || 'Новое упражнение'}</button>}</h3>
             <span className="workout__ex-count" aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{finished ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
           </div>
           </SwipeRow>
           {/* Режим выбора — свёрнутый: одна строка на упражнение, чтобы
               выделять, удалять и собирать суперсет, не листая подходы */}
-          {!picking && <>
+          {!compact && renaming === ex.id && nameEditor(ex, ei, ex.id)}
+          {!compact && <>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {ex.exerciseId && setups[ex.exerciseId] && (
             <details className="workout__setup"><summary>Как настроить тренажёр</summary><SetupText text={setups[ex.exerciseId].setup} /></details>
@@ -971,10 +1117,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               ? <NameFromBase ex={ex} onPick={(patch) => updateExercise(ei, x => ({ ...x, ...patch }))} />
               : <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ({ exerciseId, ...ex }) => ({ ...ex, name: e.target.value }))} /></label>}
             {trackEditor(ex, ei)}
-            <div className="workout__toolbar">
-              <button className="button button--ghost" disabled={ei === 0} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei - 1], exercises[ei]] = [exercises[ei], exercises[ei - 1]]; return { ...s, exercises }; })}>Выше</button>
-              <button className="button button--ghost" disabled={ei === s.exercises.length - 1} onClick={() => change(s => { const exercises = [...s.exercises]; [exercises[ei + 1], exercises[ei]] = [exercises[ei], exercises[ei + 1]]; return { ...s, exercises }; })}>Ниже</button>
-            </div>
+            <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
           </details>
           {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}
           {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}<span>Готово</span></div>}
@@ -1053,11 +1196,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
  * (ExercisePicker): набрал «жим» — выбрал из списка, и занятие получает
  * тип учёта и технику из базы. Только у тренера: база упражнений — его.
  */
-function NameFromBase({ ex, onPick }) {
+function NameFromBase({ ex, onPick, autoFocus = false }) {
   const library = useData('library.exercises', {}, []);
   const exercises = library.data ? library.data.exercises : [];
   return <div className="workout__field">Название
     <ExercisePicker
+      autoFocus={autoFocus}
       value={ex.name}
       exerciseId={ex.exerciseId}
       exercises={exercises}

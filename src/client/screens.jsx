@@ -418,6 +418,25 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     .sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
   const freeWorkout = () => openWorkout({ block: FREE_BLOCK, month: '' });
 
+  // Переименовать тренировку — тапом по названию (02.10.2026), без
+  // редактора программы. Сохраняется тем же снимком месяца, что и редактор:
+  // по id тренировки сервер переименует её и в журнале занятий
+  const canRename = !!(data.canHide && data.month && !familyRow);
+  const renameBlock = async (block, title) => {
+    await apiMutate('plan.save', {
+      clientRow,
+      month: data.month,
+      blocks: blocks.map((b) => ({
+        title: b === block ? title : b.title,
+        ...(b.id ? { id: b.id } : {}),
+        ...(b.sourceId ? { sourceId: b.sourceId } : {}),
+        exercises: b.exercises.filter((e) => String(e.name || '').trim()),
+      })),
+    });
+    reload();
+    setJournalTick((t) => t + 1);
+  };
+
   return (
     <>
       {/* Журнал тренировок — в боковом меню (решение владельца 28.09.2026:
@@ -617,7 +636,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         return (
         <Section
           key={i}
-          title={block.title}
+          title={canRename ? <BlockTitle title={block.title} onRename={(t) => renameBlock(block, t)} /> : block.title}
           note={shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
         >
           <Panel>
@@ -696,6 +715,60 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </p>
       )}
       </>)}
+    </>
+  );
+}
+
+/**
+ * Название тренировки, которое переименовывают тапом: кнопка → поле.
+ * Enter или уход из поля — сохранить, Escape — оставить как было. Пока
+ * сервер отвечает, видно уже новое название
+ */
+function BlockTitle({ title, onRename }) {
+  const [value, setValue] = useState(null); // null — не правится
+  const [saving, setSaving] = useState('');
+  const [failure, setFailure] = useState('');
+  const done = useRef(false);
+  const finish = async (save) => {
+    if (done.current) return;
+    done.current = true;
+    const next = String(value || '').trim();
+    setValue(null);
+    if (!save || !next || next === title) return;
+    setSaving(next);
+    setFailure('');
+    try { await onRename(next); } catch (error) { setFailure(error.message || 'Не сохранилось'); }
+    setSaving('');
+  };
+  if (value !== null) {
+    return (
+      <input
+        className="field__input plan__title-input"
+        autoFocus
+        value={value}
+        maxLength={160}
+        aria-label="Название тренировки"
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => finish(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+          if (e.key === 'Escape') finish(false);
+        }}
+      />
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        className="plan__title-tap"
+        disabled={!!saving}
+        aria-label={'Переименовать: ' + title}
+        onClick={() => { done.current = false; setValue(title); haptic(); }}
+      >
+        {saving || title}
+      </button>
+      {failure && <span className="small plan__title-error">{failure}</span>}
     </>
   );
 }

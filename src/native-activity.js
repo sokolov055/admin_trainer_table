@@ -38,6 +38,8 @@ export function exerciseList(s) {
   return s.exercises.slice(0, 30).map((ex) => ({
     id: ex.id || '',
     name: ex.name || 'Упражнение',
+    // Суперсет — на часах одним блоком с кругами внутри
+    group: ex.supersetGroup || '',
     sets: ex.sets.slice(0, 20).map((x) => x.state || 'pending'),
     who: ex.sets.slice(0, 20).map((x) => x.who || ''),
     // Вес и повторы подходов — правка подхода с часов
@@ -150,27 +152,57 @@ const QUEUE = 12;
  * сделать строкой (amount). Старая сборка очередь не читает.
  */
 export function setQueue(s) {
-  const out = [];
+  // Блоки по порядку: отдельное упражнение или суперсет целиком (02.10.2026).
+  // Суперсет — кругами: круг 1 — первый подход каждого упражнения подряд,
+  // потом круг 2. Так его делают в зале, так ведут и часы, и плашка
+  const units = [];
   s.exercises.forEach((ex, ei) => {
+    const group = ex.supersetGroup || '';
+    const found = group && units.find((u) => u.group === group);
+    if (found) found.members.push({ ex, ei });
+    else units.push({ group, members: [{ ex, ei }] });
+  });
+  const pending = (u) => u.members.some(({ ex }) => ex.sets.some((x) => x.state === 'pending'));
+  const out = [];
+  const item = (ex, set, extra) => {
+    const own = set.who ? ex.sets.filter((x) => x.who === set.who) : ex.sets;
+    const n = own.indexOf(set) + 1;
+    const strength = trackOf(ex).kind === 'strength' && !!ex.id;
+    return {
+      exerciseId: ex.id || '',
+      who: set.who || '',
+      exercise: ex.name,
+      detail: [set.who || '', (trackOf(ex).kind === 'cardio' ? 'Отрезок ' : 'Подход ') + n + ' из ' + own.length
+        + (set.kind === 'warmup' ? ', разминка' : '')].filter(Boolean).join(' · '),
+      ...(strength ? { weight: String(set.weight || '').trim() } : {}),
+      reps: strength ? String(set.reps || '').trim() : '',
+      amount: strength ? '' : setText(set),
+      exerciseDone: n - 1,
+      exerciseTotal: own.length,
+      ...extra,
+    };
+  };
+  units.forEach((u, ui) => {
+    const after = units.slice(ui + 1).find(pending);
+    const next = after ? (after.group ? 'Суперсет: ' + after.members.map(({ ex }) => ex.name).join(' + ') : nextText(after.members[0].ex)) : '';
+    if (u.group && u.members.length > 1) {
+      const rounds = Math.max(...u.members.map(({ ex }) => ex.sets.length));
+      for (let r = 0; r < rounds; r += 1) {
+        u.members.forEach(({ ex }) => {
+          const set = ex.sets[r];
+          if (!set || set.state !== 'pending' || out.length >= QUEUE) return;
+          out.push(item(ex, set, {
+            detail: 'Круг ' + (r + 1) + ' из ' + rounds + (set.kind === 'warmup' ? ', разминка' : ''),
+            group: u.group, round: r, next,
+          }));
+        });
+      }
+      return;
+    }
+    const { ex } = u.members[0];
     ex.sets.forEach((set) => {
       if (set.state !== 'pending' || out.length >= QUEUE) return;
-      const own = set.who ? ex.sets.filter((x) => x.who === set.who) : ex.sets;
-      const n = own.indexOf(set) + 1;
-      const after = s.exercises.slice(ei + 1).find((e) => e.sets.some((x) => x.state === 'pending'));
-      const strength = trackOf(ex).kind === 'strength' && !!ex.id;
-      out.push({
-        exerciseId: ex.id || '',
-        who: set.who || '',
-        exercise: ex.name,
-        detail: [set.who || '', (trackOf(ex).kind === 'cardio' ? 'Отрезок ' : 'Подход ') + n + ' из ' + own.length
-          + (set.kind === 'warmup' ? ', разминка' : '')].filter(Boolean).join(' · '),
-        ...(strength ? { weight: String(set.weight || '').trim() } : {}),
-        reps: strength ? String(set.reps || '').trim() : '',
-        amount: strength ? '' : setText(set),
-        exerciseDone: n - 1,
-        exerciseTotal: own.length,
-        next: after ? nextText(after) : '',
-      });
+      out.push(item(ex, set, { next }));
     });
   });
   return out;
@@ -309,14 +341,16 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         }) };
       }
     } else if (a.kind === 'move') {
-      // Перетащили упражнение в списке на часах: на место index
-      const from = s.exercises.findIndex((ex) => mine(ex, a));
-      const to = Math.max(0, Math.min(s.exercises.length - 1, Math.floor(Number(a.index))));
-      if (from >= 0 && Number.isFinite(to) && from !== to) {
-        const list = s.exercises.slice();
-        const [moved] = list.splice(from, 1);
-        list.splice(to, 0, moved);
-        s = { ...s, exercises: list };
+      // Перетащили в списке на часах. Упражнение — на место index; суперсет
+      // (a.group) — целиком: его упражнения подряд, первое — на место index
+      // (номер в списке без них)
+      const group = String(a.group || '');
+      const moving = group ? s.exercises.filter((ex) => ex.supersetGroup === group) : s.exercises.filter((ex) => mine(ex, a));
+      const rest = s.exercises.filter((ex) => !moving.includes(ex));
+      const to = Math.max(0, Math.min(rest.length, Math.floor(Number(a.index))));
+      if (moving.length && Number.isFinite(to)) {
+        const list = [...rest.slice(0, to), ...moving, ...rest.slice(to)];
+        if (list.some((ex, i) => ex !== s.exercises[i])) s = { ...s, exercises: list };
       }
     } else if (a.kind === 'finish') {
       // Ни одного сделанного подхода — занятия не было: отмена, как в приложении

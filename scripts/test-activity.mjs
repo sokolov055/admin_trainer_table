@@ -204,3 +204,31 @@ test('часы: исправить подход (setEdit) — вес и повт
   assert.equal(bad.exercises[0].sets[0].weight, '60', 'мусор не пишем');
   assert.deepEqual(la.activityPayload(r).exercises[0].weights, ['60', '62.5', '60']);
 });
+
+test('суперсет в очереди — кругами: круг 1 по всем упражнениям, потом круг 2', () => {
+  const r = record({ exercises: [
+    { id: 'a', name: 'Жим', supersetGroup: 'g1', sets: [set('pending', '60'), set('pending', '60')] },
+    { id: 'b', name: 'Тяга', supersetGroup: 'g1', sets: [set('pending', '40'), set('pending', '40')] },
+    { id: 'c', name: 'Присед', sets: [set('pending', '80')] },
+  ] });
+  const q = la.setQueue(r.session);
+  assert.deepEqual(q.map((x) => [x.exercise, x.round, x.group || '']), [
+    ['Жим', 0, 'g1'], ['Тяга', 0, 'g1'], ['Жим', 1, 'g1'], ['Тяга', 1, 'g1'], ['Присед', undefined, ''],
+  ]);
+  assert.equal(q[0].detail, 'Круг 1 из 2');
+  assert.equal(q[0].next, 'Присед · 1 × 8');
+});
+
+test('перестановка с часов: суперсет переезжает целиком', () => {
+  const r = record({ exercises: [
+    { id: 'a', name: 'Жим', supersetGroup: 'g1', sets: [set('pending')] },
+    { id: 'b', name: 'Тяга', supersetGroup: 'g1', sets: [set('pending')] },
+    { id: 'c', name: 'Присед', sets: [set('pending')] },
+    { id: 'd', name: 'Выпады', sets: [set('pending')] },
+  ] });
+  const s = la.applyActions(r.session, [{ kind: 'move', sessionId: 's1', group: 'g1', index: 2 }]);
+  assert.deepEqual(s.exercises.map((e) => e.id), ['c', 'd', 'a', 'b']);
+  const one = la.applyActions(r.session, [{ kind: 'move', sessionId: 's1', exerciseId: 'd', index: 0 }]);
+  assert.deepEqual(one.exercises.map((e) => e.id), ['d', 'a', 'b', 'c']);
+  assert.equal(la.activityPayload(r).exercises[0].group, 'g1');
+});
