@@ -101,7 +101,8 @@ function localDate(d) {
 }
 
 // self — «Мои тренировки» тренера: карточка чужая по номеру, но шаги свои
-export default function Steps({ clientRow, self = false }) {
+// preview — тренер смотрит «глазами клиента»: блок как у клиента, кнопки не нажимаются
+export default function Steps({ clientRow, self = false, preview = false }) {
   const own = !clientRow || self;
   const native = own && isNativeApp();
   const { loading, data, error, reload } = useData('steps.list', clientRow ? { clientRow, days: DAYS } : { days: DAYS }, [clientRow]);
@@ -178,6 +179,30 @@ export default function Steps({ clientRow, self = false }) {
   };
 
   if (!byDate.size) {
+    // «Глазами клиента» — то, что клиент видит в приложении, пока шаги не
+    // подключены (03.10.2026: тренер видел пустоту там, где у клиента кнопка)
+    if (preview) {
+      const ios = data.device && data.device.platform === 'ios';
+      return (
+        <Section title="Шаги">
+          <Panel pad>
+            <p className="steps__lead">Тренер увидит, сколько вы ходите, — без ручного ввода.</p>
+            <p className="small muted">
+              {ios
+                ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает шаги — больше ничего.'
+                : 'Шаги берутся из «Здоровья» на iPhone или Health Connect на Android: туда их пишут часы, браслеты и фитнес-приложения. Приложение только читает шаги — больше ничего.'}
+            </p>
+            <div className="survey__actions">
+              <button className="button button--primary" disabled>Подключить шаги</button>
+            </div>
+            <p className="small muted" style={{ marginBottom: 0 }}>
+              Так это видит клиент в приложении на телефоне. В режиме просмотра кнопка не нажимается.
+              {data.device ? ' ' + deviceLine(data.device) + '.' : ' Клиент ещё не заходил из приложения.'}
+            </p>
+          </Panel>
+        </Section>
+      );
+    }
     if (!own && data.device) {
       return (
         <Section title="Шаги">

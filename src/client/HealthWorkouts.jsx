@@ -60,7 +60,7 @@ function facts(w) {
   return out.join(' · ');
 }
 
-export default function HealthWorkouts({ clientRow, self = false }) {
+export default function HealthWorkouts({ clientRow, self = false, preview = false }) {
   // Свои — клиент у себя или тренер в «Моих тренировках»; карточка клиента у
   // тренера — только список, подключать там нечего
   const own = !clientRow || self;
@@ -105,6 +105,25 @@ export default function HealthWorkouts({ clientRow, self = false }) {
   };
 
   if (!list.length) {
+    // «Глазами клиента» — блок, который клиент видит в приложении на телефоне
+    if (preview) {
+      return (
+        <Section title="Тренировки с часов">
+          <Panel pad>
+            <p className="steps__lead">Тренировки с часов — рядом с занятиями из приложения.</p>
+            <p className="small muted">
+              Приложение читает тренировки, которые часы и фитнес-приложения записали в «Здоровье» или Health Connect: вид, время, калории и дистанцию. Совпала с занятием в приложении — покажем их как одну тренировку.
+            </p>
+            <div className="survey__actions">
+              <button className="button button--primary" disabled>Подключить тренировки</button>
+            </div>
+            <p className="small muted" style={{ marginBottom: 0 }}>
+              Так это видит клиент в приложении на телефоне. В режиме просмотра кнопка не нажимается.
+            </p>
+          </Panel>
+        </Section>
+      );
+    }
     if (!phone) return null;
     const ios = onIphone();
     return (

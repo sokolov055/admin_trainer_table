@@ -96,7 +96,8 @@ export default function ClientApp({ me, clientRow, preview }) {
   const own = !clientRow && !preview && !(me && me.member);
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   const [consented, setConsented] = useState(false);
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...(own ? [TRAINER] : []), ...android];
+  // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -291,7 +292,9 @@ export default function ClientApp({ me, clientRow, preview }) {
 
         {view === 'family' && <Family members={familyMembers} preview={!!preview} />}
 
-        {view === 'trainer' && <MyTrainer />}
+        {view === 'trainer' && (preview
+          ? <PreviewOnly text="Здесь клиент видит свой ID «FT-…», своего тренера и запросы на привязку." />
+          : <MyTrainer />)}
 
         {view === 'settings' && (
           <>
@@ -299,7 +302,11 @@ export default function ClientApp({ me, clientRow, preview }) {
               <ThemeSetting />
             </Section>
             <Section title="Уведомления">
-              <PushSetting clientRow={clientRow} />
+              {/* В режиме просмотра — без кнопки: она подписала бы на
+                  уведомления клиента телефон тренера */}
+              {preview
+                ? <PreviewOnly text="Здесь клиент включает уведомления: напоминания о взвешивании, замерах и конце отдыха." />
+                : <PushSetting clientRow={clientRow} />}
             </Section>
 
             <ScheduleFeed clientRow={clientRow} />
@@ -309,6 +316,14 @@ export default function ClientApp({ me, clientRow, preview }) {
                 выхода быть не должно — он вышел бы из своего. */}
             {!clientRow && <SignOut />}
             {!clientRow && <DeleteAccount unlinked={!!(me && me.unlinked)} />}
+            {/* «Глазами клиента» — те же кнопки, но не действуют: выход и
+                удаление были бы тренерскими */}
+            {preview && (
+              <div className="survey__actions">
+                <button className="button" disabled>Выйти</button>
+                <button className="button" disabled>Удалить аккаунт</button>
+              </div>
+            )}
             <PrivacyLink />
           </>
         )}
@@ -317,6 +332,15 @@ export default function ClientApp({ me, clientRow, preview }) {
 
       <TabBar tabs={TABS} active={view} onSelect={go} />
     </div>
+  );
+}
+
+/** Блок, который в режиме просмотра только описан: действие было бы тренерским */
+function PreviewOnly({ text }) {
+  return (
+    <p className="small muted">
+      {text} В режиме просмотра это не нажимается.
+    </p>
   );
 }
 

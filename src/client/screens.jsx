@@ -1118,7 +1118,7 @@ function useProgressBundle(clientRow, familyRow = null) {
 
 // familyRow — показатели члена семьи: смотреть можно, записывать замер — нет
 // self — «Мои тренировки» тренера: шаги подключаются с его телефона, как у клиента
-export function Progress({ clientRow, familyRow = null, self = false }) {
+export function Progress({ clientRow, clientView = false, familyRow = null, self = false }) {
   const { loading, data, error, reload } = useProgressBundle(clientRow, familyRow);
   const [field, setField] = useState('Вес');
   // Изменение за всё время или с прошлого замера: первое отвечает «куда я
@@ -1208,8 +1208,8 @@ export function Progress({ clientRow, familyRow = null, self = false }) {
                + 'Рабочие веса подтянутся из программы месяца.'
           }
         />
-        {!familyRow && <Steps clientRow={clientRow} self={self} />}
-      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} />}
+        {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
+      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
       </>
     );
   }
@@ -1413,8 +1413,8 @@ export function Progress({ clientRow, familyRow = null, self = false }) {
           </Section>
         )}
 
-      {!familyRow && <Steps clientRow={clientRow} self={self} />}
-      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} />}
+      {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
+      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
     </>
   );
 }
