@@ -1776,7 +1776,7 @@ export function Nutrition({ clientRow, clientView = false }) {
       {saved && !editing && (
         <Section>
           <Note tone="good">
-            Норма посчитана и записана в таблицу
+            Норма посчитана и сохранена
             {saved.clientName ? ' — ' + saved.clientName : ''}.
             {byTrainer ? '' : ' Тренер получил уведомление.'}
           </Note>
