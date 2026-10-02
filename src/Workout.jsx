@@ -136,7 +136,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       if (!alive) return;
       if (draft && draft.session) store(draft);
       try {
-        const sessions = await list();
+        // Начинают тренировку из программы — журнал не ждём дольше 6 с: без
+        // связи (белые списки у оператора, подвал) тренировка идёт на
+        // телефоне и сохранится, когда связь появится (02.10.2026)
+        const sessions = launch && launch.block
+          ? await Promise.race([list(), new Promise((_, no) => setTimeout(() => no(new Error('Сервер не отвечает.')), 6000))])
+          : await list();
         if (!alive) return;
         // Занятие, которое попросили открыть с экрана программы («Посмотреть
         // веса»). Оно важнее незакрытого: человек нажал на конкретную
@@ -164,7 +169,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         }
       } catch (e) {
         if (alive) {
-          setMessage('Нет связи с журналом. ' + e.message);
+          setMessage(launch && launch.block
+            ? 'Нет связи — тренировка идёт на телефоне и сохранится, когда связь появится.'
+            : 'Нет связи с журналом. ' + e.message);
           if (!draft && launch && launch.block) store(freshRecord(fromPlan(launch.block, launch.month, launch.members || [])));
         }
       } finally { if (alive) setReady(true); }

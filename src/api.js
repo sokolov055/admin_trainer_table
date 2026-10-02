@@ -49,6 +49,19 @@ const OFFLINE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
  */
 const REQUEST_TIMEOUT_MS = 20000;
 
+/**
+ * Связи нет — не ждать каждый раз по 20 с (02.10.2026). Под «белыми
+ * списками» мобильного оператора соединение не обрывается, а висит: каждый
+ * запрос выжидал весь предел, и приложение казалось зависшим, хотя
+ * сохранённое уже на экране. Сервер только что не ответил — следующие две
+ * минуты ждём не дольше 6 с; ответил — снова обычный предел. Запись при
+ * этом не теряется: занятие сохраняется повторно с тем же номером запроса.
+ */
+const QUIET_TIMEOUT_MS = 6000;
+const QUIET_FOR_MS = 120000;
+let quietUntil = 0;
+const requestTimeout = () => (Date.now() < quietUntil ? QUIET_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
+
 const STORAGE_PREFIX = 'api_cache_v1:';
 
 export class ApiError extends Error {
@@ -272,7 +285,7 @@ export async function apiPrimary(action, params = {}) {
 
   let body;
   try {
-    body = await postJson(url, payload, PRIMARY_TIMEOUT_MS);
+    body = await postJson(url, payload, Date.now() < quietUntil ? QUIET_TIMEOUT_MS : PRIMARY_TIMEOUT_MS);
   } catch (_) {
     // Частая причина — VPN: через него сервер нередко недоступен, а
     // приложение из кеша при этом открывается и выглядит сломанным.
@@ -337,7 +350,8 @@ async function request(action, params) {
 
   const payload = { action, initData, ...(token ? { token } : {}), ...params };
 
-  let body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS);
+  const timeout = requestTimeout();
+  let body = await tryEndpoint(url, payload, timeout);
 
   // Запасной адрес: основной не соединился — идём на запасной. С
   // 27.09.2026 это тот же сервер под прежним именем (nip.io рядом с
@@ -353,9 +367,11 @@ async function request(action, params) {
   const spareIsScript = /script\.google/.test(spare || '');
   const scriptWouldLie = spareIsScript && (JSON.stringify(params).includes('"familyRow"') || trainingAction(action, params));
   if (body === null && spare && spare !== url && !scriptWouldLie) {
-    body = await tryEndpoint(spare, payload, REQUEST_TIMEOUT_MS);
+    body = await tryEndpoint(spare, payload, timeout);
   }
   if (body === TIMED_OUT) body = null;
+  // Не дозвались — пару минут ждём коротко; дозвались — как обычно
+  quietUntil = body === null ? Date.now() + QUIET_FOR_MS : 0;
 
   if (body === null) {
     throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
@@ -397,7 +413,7 @@ async function tryEndpoint(url, payload, timeoutMs) {
   } catch (error) {
     if (error && error.name === 'AbortError') return TIMED_OUT;
     try {
-      return await getJson(url, payload);
+      return await getJson(url, payload, timeoutMs);
     } catch (_) {
       return null;
     }
@@ -425,7 +441,7 @@ async function postJson(url, payload, timeoutMs) {
   }
 }
 
-async function getJson(url, payload) {
+async function getJson(url, payload, timeoutMs = 0) {
   const qs = Object.keys(payload)
     .filter((k) => payload[k] !== undefined && payload[k] !== null)
     .map((k) => {
@@ -434,8 +450,15 @@ async function getJson(url, payload) {
     })
     .join('&');
 
-  const resp = await fetch(url + '?' + qs, { method: 'GET', redirect: 'follow' });
-  return resp.json();
+  // Тот же предел, что у POST: без него запасной путь висел бесконечно
+  const controller = timeoutMs && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const resp = await fetch(url + '?' + qs, { method: 'GET', redirect: 'follow', ...(controller ? { signal: controller.signal } : {}) });
+    return await resp.json();
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**

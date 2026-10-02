@@ -10,7 +10,10 @@ export function fromPlan(block, month, members = []) {
   const num = (v) => { const x = String(v || '').replace(/^\+\s*/, ''); return /^\d+([.,]\d+)?$/.test(x) ? x.replace(',', '.') : ''; };
   // sourceBlockId — id тренировки программы: по нему занятие видно в её
   // «Выполненных», какое бы название ни носили она и занятие
+  // startedAt — когда начали на телефоне: начатое без связи сервер получит
+  // позже и возьмёт это время, а не время сохранения (02.10.2026)
   return { id: uid(), title: block.title, sourceBlock: block.title, sourceBlockId: block.id || '', month,
+    startedAt: new Date().toISOString(),
     // restSeconds — сколько отдыхать после отмеченного подхода. Ноль
     // значит «не запускать сам»: пока человек не выбрал длительность,
     // таймер ведёт себя как раньше.
