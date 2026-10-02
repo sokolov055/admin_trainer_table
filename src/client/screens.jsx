@@ -375,7 +375,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           {running.done ? ' · ' + running.done + ' ' + plural(running.done, 'подход', 'подхода', 'подходов') : ''}.
           {' '}Новое можно начать, когда это завершено или отменено.
         </p>
-        <button className="button button--primary button--block" onClick={() => openWorkout({})}>
+        {/* Номер идущего — не «какое-нибудь»: иначе открывался черновик
+            последнего завершённого (02.10.2026) */}
+        <button className="button button--primary button--block" onClick={() => openWorkout({ sessionId: running.id })}>
           Вернуться к занятию
         </button>
       </Panel>

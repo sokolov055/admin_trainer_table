@@ -160,6 +160,22 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
         if (draft && finished && starting && !draft.dirty) draft = null;
 
+        // Идёт другое занятие (начали на часах), а в черновике — завершённое:
+        // «Вернуться к занятию» открывало его, и идущее приходилось искать в
+        // журнале (02.10.2026). Недосохранённое завершённое сначала дошлём —
+        // оно не потеряется, — потом откроем идущее
+        const running = sessions.find(s => ['active', 'paused'].includes(s.status));
+        const wantedOther = wanted && draft && wanted !== draft.session.id;
+        if (draft && finished && running && running.id !== draft.session.id && (!wanted || wanted === running.id)) {
+          if (draft.dirty) { try { await save(); } catch (_) {} }
+          if (!alive) return;
+          draft = null;
+        } else if (draft && finished && wantedOther) {
+          if (draft.dirty) { try { await save(); } catch (_) {} }
+          if (!alive) return;
+          draft = null;
+        }
+
         if (draft && !draft.dirty) await open(wanted || draft.session.id);
         if (!draft) {
           const active = sessions.find(s => ['active', 'paused'].includes(s.status));

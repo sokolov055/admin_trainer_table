@@ -432,3 +432,35 @@ test('корзина подхода удаляет с «Вернуть»; выб
     if (local) local.unmount();
   }
 });
+
+test('«Вернуться к занятию»: открывается идущее (начатое на часах), а не черновик завершённого', async () => {
+  // Провели занятие на телефоне до конца — на устройстве остался черновик завершённого
+  data.clear();
+  await mount();
+  const check = tree.root.findAll(n => n.type === 'button'
+    && typeof n.props['aria-label'] === 'string' && n.props['aria-label'].includes('подход 1: выполнен'))[0];
+  await act(async () => { await check.props.onClick(); await delay(); });
+  await click('Завершить тренировку');
+  await click('Подтвердить');
+  if (tree) { tree.unmount(); tree = null; }
+  const draftKey = [...data.keys()].find(k => k.startsWith('workout_draft'));
+  assert.ok(draftKey && JSON.parse(data.get(draftKey)).session.status !== 'active', 'черновик завершённого есть');
+  // Часы начали новое занятие на сервере
+  const { fromPlan } = await import('../src/workout-model.js');
+  const watchSession = fromPlan({ title: 'С часов', exercises: [{ name: 'Тяга', sets: 2, reps: '8', weight: '50' }] }, 'Сентябрь 2026');
+  workoutMock('workout.save', { revision: 0, requestId: 'watch_test_000001', session: watchSession, __role: 'client' });
+
+  for (const launch of [{ sessionId: watchSession.id }, {}]) {
+    let local;
+    try {
+      await act(async () => {
+        local = renderer.create(React.createElement(Workout, { launch, onClose() {} }));
+        await delay(); await delay();
+      });
+      const title = local.root.findAllByType('input').find(n => n.props.value === 'С часов');
+      assert.ok(title, 'открыто идущее занятие: ' + JSON.stringify(launch));
+    } finally {
+      if (local) local.unmount();
+    }
+  }
+});
