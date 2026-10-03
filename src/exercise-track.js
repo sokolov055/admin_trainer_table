@@ -282,6 +282,23 @@ export function volumeOf(set, track = STRENGTH) {
 }
 
 /**
+ * Приём упражнения в программе (03.10.2026): разминочные подходы в начале
+ * и дропсет в последнем — одним полем technique: 'warmup2 dropset',
+ * 'dropset', 'warmup1'. Отдельной колонки нет: поле уже ходит везде —
+ * программа, шаблоны, занятие
+ */
+export function techniqueOf(t) {
+  const s = String(t || '');
+  const m = s.match(/warmup(\d)/);
+  return { dropset: /(^|\s)dropset(\s|$)/.test(s), warmup: m ? Math.min(5, Number(m[1])) : 0 };
+}
+
+export function techniqueText({ dropset = false, warmup = 0 } = {}) {
+  const n = Math.max(0, Math.min(5, Math.floor(Number(warmup) || 0)));
+  return [n ? 'warmup' + n : '', dropset ? 'dropset' : ''].filter(Boolean).join(' ');
+}
+
+/**
  * План упражнения строкой — для программы и подсказки в занятии.
  * У кардио в «повторах» программы — время («20 мин»), в «весе» — режим
  * («8 км/ч, 3%»): колонки те же, смысл по типу.
@@ -298,7 +315,9 @@ export function planScheme(ex, inSuperset = false) {
   const unit = track.kind === 'timed' && /^\d+$/.test(reps) ? ' с' : '';
   const side = track.unilateral && reps ? ' на сторону' : '';
   const base = inSuperset ? (reps && reps + unit + (unit ? '' : ' повт.') + side) : (sets && sets + ' × ' + (reps || '?') + unit + side);
-  return [base, ex.technique === 'dropset' && 'дропсет в последнем'].filter(Boolean).join(' · ');
+  const tech = techniqueOf(ex.technique);
+  // Разминка — перед схемой: «2 разм. + 4 × 12»
+  return [(tech.warmup && base ? tech.warmup + ' разм. + ' : '') + base, tech.dropset && 'дропсет в последнем'].filter(Boolean).join(' · ');
 }
 
 /**

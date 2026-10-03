@@ -34,6 +34,7 @@ const waitingPage = (
   </div>
 );
 import { Gestures } from './gestures.jsx';
+import RestLayer from './RestLayer.jsx';
 
 /**
  * Корень приложения: спрашивает сервер «кто я» и по ответу показывает
@@ -228,6 +229,7 @@ export default function App() {
         {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
       </Deferred>
       <Gestures />
+      <RestLayer />
       {/* Подсказка живёт не только сразу после входа. Ставят приложение
           редко с первого раза: человек заходит посмотреть баланс, закрывает
           вкладку и через неделю снова ищет ссылку в переписке. Поэтому она

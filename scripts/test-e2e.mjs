@@ -176,9 +176,9 @@ test('тренировку можно провести, и блок станов
 
   // Прошлый вес — подсказка рядом с планом: по ней в зале решают,
   // добавлять ли сегодня.
-  await assert.doesNotReject(
-    page.locator('.workout__exercise').first().getByText('было 70').waitFor({ timeout: 5000 }),
-  );
+  // «Было» на всё упражнение убрано (03.10.2026): прошлый раз — у каждого
+  // подхода своей строкой, и только когда есть история клиента
+  assert.equal(await page.locator('.workout__exercise').first().getByText('было 70').count(), 0);
 
 
   // Упражнение меняют прямо в зале. Программа месяца от этого не
@@ -611,8 +611,21 @@ test('мои тренировки: программа, прогресс, пит�
 
     await phone.getByRole('button', { name: 'Меню' }).click();
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
-    await phone.getByRole('button', { name: 'Изменить программу' }).waitFor({ timeout: 10000 });
+    // Правка программы — прямо в тренировках (03.10.2026): «+» нового месяца
+    await phone.getByRole('button', { name: 'Новый месяц' }).waitFor({ timeout: 10000 });
     if (process.env.SHOT_MY) await phone.screenshot({ path: process.env.SHOT_MY });
+
+    // Развернуть первую тренировку: тап по схеме — подходы; «Разминочный в
+    // начало» — схема становится «1 разм. + …»
+    const firstBlock = phone.locator('#root main:not([hidden]) .section', { has: phone.locator('.plan__toggle') }).first();
+    await firstBlock.locator('.plan__toggle').click();
+    const scheme = firstBlock.locator('.plan-inline__scheme').first();
+    await scheme.waitFor({ timeout: 10000 });
+    await scheme.click();
+    await firstBlock.getByRole('button', { name: 'Разминочный в начало' }).click();
+    await assert.doesNotReject(firstBlock.locator('.plan-inline__scheme strong', { hasText: '1 разм. +' }).first().waitFor({ timeout: 5000 }), 'разминка в схеме');
+    if (process.env.SHOT_INLINE) await phone.screenshot({ path: process.env.SHOT_INLINE });
+    await firstBlock.getByRole('button', { name: 'Готово' }).click();
     for (const tab of ['Прогресс', 'Питание']) {
       await phone.getByRole('tab', { name: tab, exact: true }).click();
       await phone.locator(`.card-section[data-view]:not([hidden])`).waitFor({ timeout: 5000 });
@@ -947,4 +960,45 @@ test('протянуть подход далеко влево и отпусти�
 
 test('за весь проход в консоли не было ошибок', () => {
   assert.deepEqual(consoleErrors, []);
+});
+
+/**
+ * Отдых у тренера (03.10.2026): запустил в «Моих тренировках», свернул,
+ * ушёл в другой раздел — экран с тренировкой закрылся, а отдых нет:
+ * внизу плашка с отсчётом, в конце — «Отдых окончен». Закрыл там —
+ * вернулся к тренировке, второй раз не всплывает.
+ */
+test('отдых, свёрнутый у тренера, доживает до конца в другом разделе', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  await phone.clock.install();
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню' }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    const sec = phone.locator('#root main:not([hidden]) .section', { has: phone.getByRole('heading', { name: 'Тренировка 1 — верх' }) });
+    await sec.getByRole('button', { name: 'Начать тренировку' }).click({ timeout: 20000 });
+    const set = phone.locator('.workout__set').first();
+    await set.waitFor({ timeout: 20000 });
+    const reps = set.getByRole('textbox').nth(1);
+    if (!(await reps.inputValue())) await reps.fill('8');
+    await phone.locator('.workout__effort-btn--ok').first().click();
+    await phone.getByRole('button', { name: 'Свернуть таймер' }).click({ timeout: 5000 });
+    // Из «Моих тренировок» — в другой раздел бокового меню: экран тренировки закрывается
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Журнал тренировок/ }).click();
+    await phone.locator('.rest-pill').waitFor({ timeout: 5000 });
+    if (process.env.SHOT_REST_PILL) await phone.screenshot({ path: process.env.SHOT_REST_PILL });
+    await phone.clock.fastForward(200000);
+    const over = phone.locator('.rest-screen--over');
+    await over.waitFor({ timeout: 5000 });
+    if (process.env.SHOT_REST_OVER) await phone.screenshot({ path: process.env.SHOT_REST_OVER });
+    await over.getByRole('button', { name: 'Закрыть' }).click();
+    await over.waitFor({ state: 'detached', timeout: 5000 });
+  } finally {
+    await context.close();
+  }
 });

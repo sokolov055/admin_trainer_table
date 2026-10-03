@@ -1,4 +1,4 @@
-import { trackOf, byTime, planScheme, planSet, volumeOf } from './exercise-track.js';
+import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf } from './exercise-track.js';
 
 export const uid = () => crypto.randomUUID();
 export const blankSet = () => ({ weight: '', reps: '', rpe: '', state: 'pending', kind: 'work' });
@@ -8,9 +8,6 @@ export function fromPlan(block, month, members = []) {
   const split = members.length > 1;
   // «+5» у подтягиваний — добавка к своему весу: в поле идёт 5
   const num = (v) => { const x = String(v || '').replace(/^\+\s*/, ''); return /^\d+([.,]\d+)?$/.test(x) ? x.replace(',', '.') : ''; };
-  // «Было 6» или «6 кг» в программе — тоже вес, если другого нет: в зале
-  // поля были пустыми при «было 6» на экране (03.10.2026)
-  const was = (v) => num(String(v || '').replace(/\s*кг\.?\s*$/i, ''));
   // sourceBlockId — id тренировки программы: по нему занятие видно в её
   // «Выполненных», какое бы название ни носили она и занятие
   // startedAt — когда начали на телефоне: начатое без связи сервер получит
@@ -63,7 +60,7 @@ export function fromPlan(block, month, members = []) {
           ...blankSet(),
           // Начальный вес (решение владельца 28.09.2026): прошлый рабочий
           // вес клиента в упражнении, нет — из программы, нет и там — пусто
-          weight: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight) || was(e.lastWeight) || was(e.prevWeight),
+          weight: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight),
           ...planSet(e, trackOf(e)),
         })),
     })) };
@@ -127,8 +124,19 @@ function extrasOf(e, split) {
 }
 
 function withTechnique(e, ex) {
-  if (e.technique !== 'dropset' || !ex.sets.length || ex.sets.some(x => x.who)) return ex;
-  const sets = ex.sets.slice();
-  sets[sets.length - 1] = { ...sets[sets.length - 1], drops: [{ weight: '', reps: '' }] };
+  const tech = techniqueOf(e.technique);
+  if (!ex.sets.length || ex.sets.some(x => x.who)) return ex;
+  let sets = ex.sets.slice();
+  // Разминочные из программы — в начало, если подходы не взяты с прошлого
+  // раза (там разминка своя): половина рабочего веса, кратно 2,5
+  const kind = trackOf(e).kind;
+  const fromHistory = Array.isArray(e.startSets) && e.startSets.length > 0;
+  if (tech.warmup && !fromHistory && !sets.some(x => x.kind === 'warmup') && (kind === 'strength' || kind === 'bodyweight')) {
+    const first = sets[0];
+    const w = Number(String(first.weight || '').replace(',', '.'));
+    const half = w > 0 ? String(Math.floor(w / 2 / 2.5) * 2.5) : '';
+    sets = [...Array.from({ length: tech.warmup }, () => ({ ...first, weight: half && half !== '0' ? half : first.weight, kind: 'warmup' })), ...sets];
+  }
+  if (tech.dropset) sets[sets.length - 1] = { ...sets[sets.length - 1], drops: [{ weight: '', reps: '' }] };
   return { ...ex, sets };
 }

@@ -114,6 +114,31 @@ export function isDumbbell(ex) {
   return has(equipment, DUMBBELL) || has(String(ex.name || '').toLowerCase(), DUMBBELL);
 }
 
+/**
+ * Вес на другое число повторов — по Эпли, вниз до 2,5 (гантели — до 1).
+ * Копия server/src/lib/effort.js scaleTo
+ */
+export function scaleTo(ex, w, from, to) {
+  if (!(w > 0) || !(from > 0) || !(to > 0) || from === to) return w;
+  const one = w * (1 + Math.min(30, from) / 30);
+  const raw = one / (1 + Math.min(30, to) / 30);
+  const unit = isDumbbell(ex) ? 1 : 2.5;
+  return Math.max(unit, Math.floor(raw / unit + 1e-9) * unit);
+}
+
+/**
+ * Тот же по счёту подход в прошлый раз (lastRun с сервера): { weight, reps }
+ * или null. У пары истории по подходам нет
+ */
+export function wasSet(ex, si) {
+  const last = ex && ex.lastRun;
+  const set = ex && ex.sets && ex.sets[si];
+  if (!last || !set || set.who || !Array.isArray(last.weights)) return null;
+  const weight = String(last.weights[si] || '');
+  if (!weight || weight === '—') return null;
+  return { weight, reps: String((last.reps || [])[si] || '') };
+}
+
 /** Повторов по плану: «8», «8–12» → нижняя граница; нет плана — 0 */
 export function targetOf(ex) {
   const m = String(ex.target || '').match(/^(\d{1,3})/);

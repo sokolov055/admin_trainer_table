@@ -474,3 +474,22 @@ test('«Вернуться к занятию»: открывается идущ�
     }
   }
 });
+
+test('«было» у каждого подхода: тот же подход прошлого раза, повторы поменяли — вес пересчитан; вписали вес — дальше тот же', async () => {
+  data.clear();
+  const ex = { name: 'Махи гантелей', sets: 3, reps: '5',
+    startSets: [{ weight: '6', reps: '5', kind: 'work' }, { weight: '8', reps: '5', kind: 'work' }, { weight: '8', reps: '5', kind: 'work' }],
+    lastRun: { date: '2026-10-01', weights: ['6', '8'], reps: ['10', '8'], planReps: '5', effort: 'ok', streak: 0, action: 'scaled', step: 0 } };
+  if (tree) tree.unmount();
+  await act(async () => { tree = renderer.create(React.createElement(Workout, { launch: { block: { title: 'Было', exercises: [ex] }, month: 'Октябрь 2026' }, onClose() {} })); await delay(); });
+  const hints = tree.root.findAll(n => n.props && n.props.className === 'workout__was').map(text);
+  assert.deepEqual(hints, ['было 6 кг × 10', 'было 8 кг × 8'], 'у третьего прошлого раза нет');
+  const input = (si, what) => tree.root.findAllByType('input').find(n => new RegExp('подход ' + (si + 1) + ', ' + what).test(n.props['aria-label'] || ''));
+  // Сегодня в первом подходе 10 повторов, как тогда, — вес тот же, 6
+  await act(async () => input(0, 'повторы').props.onChange({ target: { value: '10' } }));
+  assert.equal(input(0, 'вес').props.value, '6');
+  // Вписали вес во второй — третьему (без прошлого раза) тот же
+  await act(async () => input(1, 'вес').props.onChange({ target: { value: '9' } }));
+  assert.equal(input(2, 'вес').props.value, '9');
+  await act(async () => tree.unmount()); tree = null;
+});

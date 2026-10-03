@@ -12,15 +12,17 @@ import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
-import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmRings, alarmClosed } from './native-rest.js';
+import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, isCoaching } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { useData } from './useData.js';
 import { SetupText } from './media.jsx';
-import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText } from './effort.js';
-import { unlockAlarm, ringOnce, stopVibration } from './rest-alarm.js';
+import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, wasSet, scaleTo } from './effort.js';
+import { unlockAlarm } from './rest-alarm.js';
+import { RestScreen, RestPill } from './RestScreen.jsx';
+import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
 
@@ -31,22 +33,6 @@ const labels = { active: 'Идёт', paused: 'На паузе', completed: 'За
 /** «1 подход», «3 подхода», «5 подходов» */
 const setsWord = (n) => n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? 'подход' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'подхода' : 'подходов');
 const planText = (p) => String(p || '').split(' · ').filter(x => x && !/^RPE\b/i.test(x)).join(' · ');
-
-/**
- * Отдых, запущенный с этого телефона, — помним и после перезапуска
- * страницы: окно «Отдых окончен» в чужом разделе всплывает только у него
- */
-const REST_HERE_KEY = 'rest_here_v1';
-function restHereSaved() {
-  try {
-    const v = JSON.parse(localStorage.getItem(REST_HERE_KEY));
-    if (v && v.until > Date.now() - 30 * 60 * 1000) return { until: Number(v.until) || 0, total: Number(v.total) || 0 };
-  } catch (_) { /* приватный режим */ }
-  return { until: 0, total: 0 };
-}
-function saveRestHere(v) {
-  try { localStorage.setItem(REST_HERE_KEY, JSON.stringify(v)); } catch (_) { /* приватный режим */ }
-}
 
 /**
  * Подпись про суперсет.
@@ -98,9 +84,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Отметка подхода — с оценкой «легко / норм / тяжело» (03.10.2026):
   // галочка раскрывает выбор под подходом (ключ подхода или круга)
   const [effortFor, setEffortFor] = useState('');
-  // Отдых, запущенный с этого телефона: окно «Отдых окончен» всплывает в
-  // любом разделе только у того, кто его запустил (03.10.2026)
-  const restSpan = useRef(restHereSaved());
+  // Отдых, запущенный с этого телефона (rest-here.js): окно «Отдых
+  // окончен» всплывает в любом разделе только у того, кто его запустил
   // «Свернуть таймер»: until свёрнутого отдыха — плашка вместо экрана
   const [collapsedUntil, setCollapsedUntil] = useState(0);
   // Пока экран отдыха развёрнут — страница под ним не листается
@@ -301,8 +286,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const restUntil = record?.session?.restUntil || 0;
   const restStatus = record?.session?.status;
   useEffect(() => {
-    if (!restUntil || restStatus !== 'active') cancelRestEnd();
+    if (!restUntil || restStatus !== 'active') {
+      cancelRestEnd();
+      const here = restHere();
+      if (here && here.sessionId === record?.session?.id) setRestHere(null);
+    } else if (restClosed(restUntil)) {
+      // Этот отдых уже закрыли в другом разделе — второй раз не звенит
+      change(v => (v.restUntil === restUntil ? { ...v, restUntil: 0 } : v));
+    }
   }, [restUntil, restStatus]);
+
+  // Экран тренировки открыт — общий слой отдыха (RestLayer) молчит
+  useEffect(() => workoutScreenOpen(), []);
 
   // Отдых, начатый кнопкой на плашке, пока приложение спало: в занятие —
   // и на сервер. Уведомление о конце уже поставил телефон (restLocal)
@@ -448,10 +443,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    */
   const restAt = (until) => {
     // Длина отдыха — для кольца на экране отдыха
-    restSpan.current = { until, total: Math.max(1000, until - Date.now()) };
-    saveRestHere(restSpan.current);
     setCollapsedUntil(0);
     change(v => ({ ...v, restUntil: until, restLocal: '' }));
+    const cur = state.current && state.current.session;
+    setRestHere({ until, total: Math.max(1000, until - Date.now()), next: cur ? nextInfo(cur, focusOf(cur)) : null, sessionId: cur ? cur.id : '' });
     save();
     // Что дальше — в уведомление о конце отдыха и в шторку (Android)
     scheduleRestEnd(until, nextText(state.current && state.current.session)).then((ok) => {
@@ -506,7 +501,34 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const fields = rowFields(track);
     // Свой вес — подсказка «подобрано» больше не нужна, и оценки этот
     // подход больше не двигают (own)
-    const edit = (key, value) => updateSet(ei, si, ({ suggest, ...s }) => ({ ...s, [key]: value, ...(key !== 'weight' && suggest ? { suggest } : {}), ...(key === 'weight' ? { own: true } : {}) }));
+    const edit = (key, value) => updateExercise(ei, x => {
+      const sets = x.sets.map((s, k) => {
+        if (k !== si) return s;
+        const { suggest, ...rest } = s;
+        const next = { ...rest, [key]: value, ...(key !== 'weight' && suggest ? { suggest } : {}), ...(key === 'weight' ? { own: true } : {}) };
+        // Повторы поменяли — вес этого подхода пересчитать от прошлого раза
+        // (тот же подход, его вес и повторы), если вес не вписан руками
+        const was = key === 'reps' && !s.own && wasSet(x, si);
+        if (was && Number(value) > 0 && Number(was.reps) > 0) {
+          const w = scaleTo(x, Number(String(was.weight).replace(',', '.')), Number(was.reps), Number(value));
+          if (w > 0) next.weight = String(Math.round(w * 100) / 100);
+        }
+        return next;
+      });
+      // Вписали вес — следующим подходам без прошлого раза тот же вес
+      // (владелец, 03.10.2026): у них нет своей истории
+      if (key === 'weight') {
+        const old = x.sets[si].weight || '';
+        for (let k = si + 1; k < sets.length; k += 1) {
+          const s = sets[k];
+          if ((s.who || '') !== (x.sets[si].who || '') || s.state !== 'pending' || s.own || wasSet(x, k)) continue;
+          if (s.weight && s.weight !== old) break;
+          sets[k] = { ...s, weight: value };
+        }
+      }
+      return { ...x, sets };
+    });
+    const was = set.state === 'pending' && wasSet(ex, si);
     const drops = set.drops || [];
     const editDrop = (di, key, value) => updateSet(ei, si, s => ({ ...s, drops: s.drops.map((d, i) => (i === di ? { ...d, [key]: value } : d)) }));
     // Стороны разошлись: пишем обе, а в «повторы» — меньшее, по нему
@@ -535,6 +557,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
               ))}
             </div>
+            {/* Тот же подход в прошлый раз — у каждого подхода свой
+                (владелец, 03.10.2026: «было» на всё упражнение бесполезно) */}
+            {was && <p className="workout__was">было {was.weight} кг{was.reps ? ' × ' + was.reps : ''}</p>}
             {/* Галочки нет (03.10.2026): под ближайшим подходом упражнения —
                 «Легко / Норм / Тяжело», каждая отмечает подход и запускает
                 отдых. Снять отметку — номер подхода → «Снять отметку» */}
@@ -874,8 +899,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button className="button button--ghost" onClick={split}>Разъединить</button>
       </div>
       <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.{editable ? ' Порядок внутри — подержите название и перетащите.' : ''}</p>
-      {members.some(({ ex }) => planText(ex.prescription) || ex.prevWeight) && (
-        <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '') + (ex.prevWeight && !ex.lastRun ? ' · было ' + ex.prevWeight : '')).join('; ')}</p>
+      {members.some(({ ex }) => planText(ex.prescription)) && (
+        <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '')).join('; ')}</p>
       )}
       {members.filter(({ ex }) => lastRunText(ex.lastRun)).map(({ ex }) => (
         <p className="workout__last" key={'last' + ex.id}>{ex.name}: {lastRunText(ex.lastRun).replace(/^Последний раз/, 'последний раз')}</p>
@@ -1230,11 +1255,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // тренировки на виду — показываем и отдых, запущенный тренером или часами
   const restOn = !!s && !!s.restUntil && s.status === 'active';
   const restOver = restOn && s.restUntil - now <= 0;
-  const restHere = restOn && restSpan.current.until === s.restUntil;
+  const here = restHere();
+  const startedHere = restOn && !!here && here.until === s.restUntil;
   // Без настоящей страницы (проверки компонента) — рисуем на месте
   const dom = typeof document !== 'undefined' && !!document.body && document.body.nodeType === 1;
   const onScreen = !dom || !!(fieldsRef.current && fieldsRef.current.offsetParent);
-  const restShown = restOn && (onScreen || restHere);
+  const restShown = restOn && (onScreen || startedHere);
   const restFolded = restShown && !restOver && collapsedUntil === s.restUntil;
   lockScroll.current = restShown && !restFolded;
   const stopRest = () => change(v => ({ ...v, restUntil: 0 }));
@@ -1242,7 +1268,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     ? <RestPill left={s.restUntil - now} onOpen={() => setCollapsedUntil(0)} />
     : <RestScreen
       until={s.restUntil}
-      total={restSpan.current.until === s.restUntil ? restSpan.current.total : (s.restSeconds || 90) * 1000}
+      total={startedHere ? here.total : (s.restSeconds || 90) * 1000}
       now={now}
       next={nextInfo(s, focus)}
       onMore={extendRest}
@@ -1358,11 +1384,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {ex.exerciseId && setups[ex.exerciseId] && (
             <details className="workout__setup"><summary>Как настроить тренажёр</summary><SetupText text={setups[ex.exerciseId].setup} /></details>
           )}
-          {(main || ex.prevWeight) && (
+          {main && (
             <p className="workout__target">
-              {main && <strong>{main}</strong>}
+              <strong>{main}</strong>
               {rest.map((r, i) => <span key={i}>{r}</span>)}
-              {ex.prevWeight && !ex.lastRun && <span className="workout__prev">было {ex.prevWeight}</span>}
             </p>
           )}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
@@ -1439,109 +1464,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {erase.bar}
     </>}
   </div>;
-}
-
-/**
- * Отдых на весь экран (03.10.2026, владелец): крупный таймер, касание по
- * экрану ничего не делает — выключить можно только кнопкой. Под таймером —
- * что дальше. В конце — «Отдых окончен», звук и вибрация каждые 2 с, пока
- * не нажмут «Закрыть» (не дольше двух минут). Свёрнутое приложение
- * сигналит уведомлением (native-rest.js) и плашкой (Live Activity).
- */
-function RestScreen({ until, total, now, next, onMore, onStop, onCollapse }) {
-  const left = until - now;
-  const over = left <= 0;
-  const stopRef = useRef(onStop);
-  stopRef.current = onStop;
-  // Будильник iPhone закрыли крестиком вне приложения — закрыть и этот
-  // экран, второй раз «Закрыть» нажимать не нужно (03.10.2026)
-  useEffect(() => {
-    if (!over || !alarmRings(until)) return undefined;
-    let alive = true;
-    const check = () => alarmClosed(until).then((gone) => { if (alive && gone) stopRef.current(); });
-    const timer = setInterval(check, 1500);
-    document.addEventListener('visibilitychange', check);
-    check();
-    return () => { alive = false; clearInterval(timer); document.removeEventListener('visibilitychange', check); };
-  }, [over, until]);
-  useEffect(() => {
-    if (!over) return undefined;
-    // iPhone с будильником (iOS 26+) звенит сам — второй звук не нужен
-    if (alarmRings(until)) return undefined;
-    let n = 0;
-    ringOnce();
-    const timer = setInterval(() => { n += 1; if (n >= 60) { clearInterval(timer); return; } ringOnce(); }, 2000);
-    return () => { clearInterval(timer); stopVibration(); };
-  }, [over, until]);
-  const share = over ? 1 : Math.max(0, Math.min(1, left / Math.max(1, total)));
-  const R = 120;
-  const C = 2 * Math.PI * R;
-  return (
-    <div className={'rest-screen' + (over ? ' rest-screen--over' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}>
-      <div className="rest-screen__label">{over ? 'Отдых окончен' : 'Отдых'}</div>
-      <div className="rest-screen__dial">
-        <svg className="rest-screen__ring" viewBox="0 0 280 280" aria-hidden="true">
-          <circle cx="140" cy="140" r={R} className="rest-screen__track" />
-          <circle cx="140" cy="140" r={R} className="rest-screen__bar" strokeDasharray={`${C * share} ${C}`} transform="rotate(-90 140 140)" />
-        </svg>
-        <div className="rest-screen__time" role="timer" aria-live="off">{over ? '0:00' : clock(left)}</div>
-      </div>
-      {next && (
-        <div className="rest-screen__next">
-          {/* «Дальше» — по просьбе владельца (03.10.2026): карточку читают
-              с расстояния, между подходами, и подпись снимает вопрос, что это */}
-          <p className="rest-screen__next-label">Дальше</p>
-          <p className="rest-screen__next-name">{next.name}</p>
-          <p className="rest-screen__next-part">{next.part.charAt(0).toUpperCase() + next.part.slice(1)}</p>
-          {next.items
-            // Дальше суперсет — весь круг: каждое упражнение со своим весом
-            ? <ol className="rest-screen__round">
-              {next.items.map((it, i) => (
-                <li key={i} className={it.done ? 'is-done' : ''}>
-                  <span className="rest-screen__round-name">{it.name}</span>
-                  <span className="rest-screen__round-load">{it.load || '—'}</span>
-                  {it.change && (it.change.kind === 'up' || it.change.kind === 'down') && <span className={'rest-screen__next-change rest-screen__next-change--' + it.change.kind}>
-                    <IconDelta value={it.change.kind === 'up' ? 1 : -1} />{it.change.text}
-                  </span>}
-                </li>
-              ))}
-            </ol>
-            : <>
-              {next.load && <p className="rest-screen__next-load">{next.load}</p>}
-              {next.change && <div className={'rest-screen__next-change rest-screen__next-change--' + next.change.kind}>
-                {(next.change.kind === 'up' || next.change.kind === 'down') && <IconDelta value={next.change.kind === 'up' ? 1 : -1} />}
-                {next.change.text}
-              </div>}
-            </>}
-        </div>
-      )}
-      <div className="rest-screen__actions">
-        {over
-          ? <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закрыть</button>
-          : <>
-            <button type="button" className="button rest-screen__more" onClick={onMore}>+30 с</button>
-            <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закончить отдых</button>
-          </>}
-      </div>
-      {/* Свернуть — таймер уходит в плашку внизу, приложение свободно:
-          другие разделы, прокрутка (владелец, 03.10.2026) */}
-      {!over && onCollapse && <button type="button" className="rest-screen__fold" onClick={onCollapse}>
-        <IconChevron size={18} aria-hidden="true" />Свернуть таймер
-      </button>}
-    </div>
-  );
-}
-
-/** Свёрнутый отдых: плашка над нижним меню, касание разворачивает */
-function RestPill({ left, onOpen }) {
-  return (
-    <button type="button" className="rest-pill" onClick={onOpen} aria-label={'Отдых, осталось ' + clock(left) + '. Развернуть'}>
-      <span className="rest-pill__dot" aria-hidden="true" />
-      <span>Отдых</span>
-      <strong role="timer" aria-live="off">{clock(left)}</strong>
-      <IconChevron size={16} className="rest-pill__up" aria-hidden="true" />
-    </button>
-  );
 }
 
 /** Ближайший подход занятия; в суперсете — следующее упражнение того же круга */

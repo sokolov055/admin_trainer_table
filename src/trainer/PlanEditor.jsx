@@ -6,7 +6,7 @@ import { haptic } from '../telegram.js';
 import { createPortal } from 'react-dom';
 import { useTabLock } from '../gestures.jsx';
 import { apiMutate } from '../api.js';
-import { trackOf, cardioFrom } from '../exercise-track.js';
+import { trackOf, cardioFrom, techniqueOf, techniqueText } from '../exercise-track.js';
 import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
 import { useData } from '../useData.js';
 import { Note } from '../ui.jsx';
@@ -536,10 +536,10 @@ export default function PlanEditor({
                   {(track.kind === 'strength' || track.kind === 'bodyweight') && (
                     <button
                       type="button"
-                      className={'button button--ghost plan-edit__pair' + (exercise.technique === 'dropset' ? ' plan-edit__pair--on' : '')}
-                      aria-pressed={exercise.technique === 'dropset'}
+                      className={'button button--ghost plan-edit__pair' + (techniqueOf(exercise.technique).dropset ? ' plan-edit__pair--on' : '')}
+                      aria-pressed={techniqueOf(exercise.technique).dropset}
                       disabled={busy}
-                      onClick={() => setExercise(bi, ei, 'technique', exercise.technique === 'dropset' ? '' : 'dropset')}
+                      onClick={() => { const t = techniqueOf(exercise.technique); setExercise(bi, ei, 'technique', techniqueText({ ...t, dropset: !t.dropset })); }}
                     >Дропсет</button>
                   )}
                 </div>

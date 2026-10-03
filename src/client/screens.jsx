@@ -11,7 +11,7 @@ import {
   Chips, Segmented, Options, Field, Note, Delta,
   formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron } from '../icons.jsx';
+import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
@@ -27,6 +27,9 @@ export const Ration = lazyPage(() => import('../nutrition/Ration.jsx'));
 export const PlanEditor = lazyPage(() => import('../trainer/PlanEditor.jsx'));
 const TemplateApply = lazyPage(() => import('../trainer/Library.jsx'), 'TemplateApply');
 const SaveAsTemplate = lazyPage(() => import('../trainer/Library.jsx'), 'SaveAsTemplate');
+// Правка программы прямо на экране (03.10.2026) — только у тренера
+const BlockEdit = lazyPage(() => import('../trainer/PlanInline.jsx'), 'BlockEdit');
+const AddBlock = lazyPage(() => import('../trainer/PlanInline.jsx'), 'AddBlock');
 const waiting = <Loading lead={false} rows={3} />;
 
 /* ==================================================================
@@ -317,8 +320,18 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
 
   // Правка программы доступна только тренеру и только из карточки
   // клиента: в режиме «смотрю как клиент» кнопок быть не должно.
-  const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Переименование месяца — тапом по выбранному месяцу
+  const [renamingMonth, setRenamingMonth] = useState(null); // null | строка
+  const [monthFailure, setMonthFailure] = useState('');
+
+  // Правка программы прямо в тренировках (03.10.2026): пока правки уходят
+  // на сервер, экран показывает свой снимок месяца; сервер ответил и новых
+  // правок не было — снова его данные (с id новых тренировок)
+  const [draft, setDraft] = useState(null); // { month, blocks }
+  const [saveState, setSaveState] = useState(''); // '' | 'saving' | 'error'
+  const editSeq = useRef(0);
+  const saveTimer = useRef(null);
 
   // Шаблоны: взять готовую программу из библиотеки или сохранить эту как
   // шаблон. Только тренер, как и правка.
@@ -360,6 +373,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
 
   const months = data.available || [];
   const blocks = data.blocks || [];
+  const shownBlocks = draft && draft.month === data.month ? draft.blocks : blocks;
   const running = sessions.find((x) => x.status === 'active' || x.status === 'paused') || null;
 
   // Пока занятие не закрыто, новое начать нельзя: журнал всё равно откроет
@@ -389,11 +403,11 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const hiddenMonths = data.hidden || [];
   const isHidden = hiddenMonths.indexOf(data.month) !== -1;
 
-  const totalExercises = blocks.reduce((s, b) => s + b.exercises.length, 0);
+  const totalExercises = shownBlocks.reduce((s, b) => s + b.exercises.length, 0);
 
   // Проведённой считается тренировка, у которой есть завершённое занятие
   // этого месяца. Порядок в «Очереди» — тот же, что в программе.
-  const queueBlocks = blocks.filter((b) => !blockSessions(sessions, b, data.month).length);
+  const queueBlocks = shownBlocks.filter((b) => !blockSessions(sessions, b, data.month).length);
   // «Выполненные» (01.10.2026) — все завершённые занятия месяца по дате
   // занятия, свежие сверху: тренировки программы (и повторы), свободные.
   // Какого месяца: открыли лист программы сами — того месяца; иначе —
@@ -424,19 +438,115 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // редактора программы. Сохраняется тем же снимком месяца, что и редактор:
   // по id тренировки сервер переименует её и в журнале занятий
   const canRename = !!(data.canHide && data.month && !familyRow);
+  const canEdit = canRename && !clientView;
+
+  const unnamed = (list) => list.some((b) => !b.exercises.length || b.exercises.some((e) => !String(e.name || '').trim()));
+  const push = async (list, seq) => {
+    setSaveState('saving');
+    try {
+      await apiMutate('plan.save', {
+        clientRow,
+        month: data.month,
+        blocks: list
+          .map((b) => ({
+            title: b.title,
+            ...(b.id ? { id: b.id } : {}),
+            ...(b.sourceId ? { sourceId: b.sourceId } : {}),
+            exercises: b.exercises.filter((e) => String(e.name || '').trim()),
+          }))
+          .filter((b) => b.exercises.length),
+      });
+      if (editSeq.current !== seq) return;
+      setSaveState('');
+      await reload();
+      // Пока есть упражнение без названия, держим свой снимок: сервер его
+      // не хранит, и строка пропала бы из-под пальца
+      if (editSeq.current === seq && !unnamed(list)) setDraft(null);
+      setJournalTick((t) => t + 1);
+    } catch (error) {
+      if (editSeq.current === seq) setSaveState('error:' + (error.message || 'не сохранилось'));
+    }
+  };
+  /** Новый снимок месяца: сразу на экран, на сервер — через ~0,7 с тишины */
+  const commit = (list) => {
+    editSeq.current += 1;
+    const seq = editSeq.current;
+    setDraft({ month: data.month, blocks: list });
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => push(list, seq), 700);
+  };
   const renameBlock = async (block, title) => {
-    await apiMutate('plan.save', {
-      clientRow,
-      month: data.month,
-      blocks: blocks.map((b) => ({
-        title: b === block ? title : b.title,
-        ...(b.id ? { id: b.id } : {}),
-        ...(b.sourceId ? { sourceId: b.sourceId } : {}),
-        exercises: b.exercises.filter((e) => String(e.name || '').trim()),
-      })),
-    });
-    reload();
-    setJournalTick((t) => t + 1);
+    commit(shownBlocks.map((b) => (b === block ? { ...b, title } : b)));
+  };
+  const newBlock = (made) => {
+    const list = [...shownBlocks, made || {
+      title: 'Тренировка № ' + (shownBlocks.length + 1),
+      exercises: [{ name: '', sets: '3', reps: '', weight: '', prevWeight: '', rpe: '', supersetGroup: '', performers: [], splitWeights: {}, splitPrev: {}, exerciseId: null, technique: '', cardio: null }],
+    }];
+    commit(list);
+    const tab = planTab === 'done' ? 'queue' : planTab;
+    if (tab !== planTab) setPlanTab(tab);
+    setOpenBlocks((prev) => ({ ...prev, [tab + ':' + (list.length - 1)]: true }));
+  };
+
+  // Новый месяц — следующий за самым поздним, пустой: «Из шаблона» или
+  // копия прошлого — в нём самом (решение владельца 03.10.2026)
+  const addMonth = async () => {
+    const name = monthAfter(months[0]) || nextMonthLabel();
+    setCreating(true);
+    setMonthFailure('');
+    try {
+      await apiMutate('plan.month.create', { clientRow, month: name });
+      setMonth(name);
+      reload();
+    } catch (error) {
+      setMonthFailure(error.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+  const renameMonth = async () => {
+    const to = String(renamingMonth || '').trim();
+    if (!to || to === data.month) { setRenamingMonth(null); return; }
+    setCreating(true);
+    setMonthFailure('');
+    try {
+      await apiMutate('plan.month.rename', { clientRow, from: data.month, to });
+      setRenamingMonth(null);
+      setMonth(to);
+      reload();
+      setJournalTick((t) => t + 1);
+    } catch (error) {
+      setMonthFailure(error.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+  // Пустой месяц — скопировать программу другого: веса становятся «было»
+  const copyMonth = async (from) => {
+    setCreating(true);
+    setMonthFailure('');
+    try {
+      const src = await apiPublic('client.plan', { clientRow, month: from });
+      await apiMutate('plan.save', {
+        clientRow,
+        month: data.month,
+        blocks: (src.blocks || []).map((b) => ({
+          title: b.title,
+          ...(b.sourceId ? { sourceId: b.sourceId } : {}),
+          exercises: b.exercises.map((e) => ({
+            name: e.name, sets: e.sets, reps: e.reps, rpe: e.rpe, supersetGroup: e.supersetGroup,
+            performers: e.performers || [], exerciseId: e.exerciseId || null, technique: e.technique || '', cardio: e.cardio || null,
+            weight: '', prevWeight: e.weight || e.prevWeight || '', splitWeights: {}, splitPrev: e.splitWeights || {},
+          })),
+        })),
+      });
+      reload();
+    } catch (error) {
+      setMonthFailure(error.message);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -446,13 +556,33 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           первое, что человек должен узнать на этом экране. */}
       {runningLine}
 
-      {monthChips.length > 1 && (
-        <Chips
-          items={monthChips}
-          value={chipValue}
-          onChange={setMonth}
-        />
+      {/* Месяцы: «+» слева — новый месяц; тап по выбранному — переименовать
+          (владелец, 03.10.2026: вместо меню «Изменить программу») */}
+      {(monthChips.length > 1 || canEdit) && renamingMonth === null && (
+        <div className="plan__months">
+          {canEdit && (
+            <button type="button" className="plan__month-add" aria-label="Новый месяц" disabled={creating} onClick={addMonth}>
+              <IconPlus size={18} />
+            </button>
+          )}
+          <Chips
+            items={monthChips}
+            value={chipValue}
+            onChange={(v) => {
+              if (canEdit && v === chipValue && data.month && v === data.month) { setRenamingMonth(data.month); return; }
+              setMonth(v);
+            }}
+          />
+        </div>
       )}
+      {renamingMonth !== null && (
+        <form className="plan__month-rename" onSubmit={(e) => { e.preventDefault(); renameMonth(); }}>
+          <input className="field__input" aria-label="Название месяца" autoFocus value={renamingMonth} maxLength={40} onChange={(e) => setRenamingMonth(e.target.value)} />
+          <button type="submit" className="button button--primary" disabled={creating}>Готово</button>
+          <button type="button" className="button button--ghost" onClick={() => { setRenamingMonth(null); setMonthFailure(''); }}>Отмена</button>
+        </form>
+      )}
+      {monthFailure && <p className="small plan__failure" role="alert">{monthFailure}</p>}
 
       {/* Своя программа тренера («Мои тренировки») — прятать не от кого */}
       {data.canHide && !data.self && data.month && (
@@ -467,7 +597,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {/* Сначала — какой месяц и видит ли его клиент, потом — что с этим
           месяцем делать: кнопки правки относятся к выбранному месяцу и
           стоят под ним, а не над переключателем месяцев. */}
-      {data.canHide && !editing && templateTool === 'apply' && (
+      {data.canHide && templateTool === 'apply' && (
         <Section title="Программа из шаблона">
           <Deferred fallback={waiting}>
             <TemplateApply
@@ -480,7 +610,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </Section>
       )}
 
-      {data.canHide && !editing && templateTool === 'save' && (
+      {data.canHide && templateTool === 'save' && (
         <Section title="Сохранить как шаблон">
           <Deferred fallback={waiting}>
             <SaveAsTemplate
@@ -493,86 +623,35 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </Section>
       )}
 
-      {data.canHide && !templateTool && (editing
-        ? (
-          <Section title={'Правлю: ' + data.month}>
-            <Deferred fallback={waiting}>
-              <PlanEditor
-                clientRow={clientRow}
-                month={data.month}
-                blocks={blocks}
-                members={data.members || []}
-                onSaved={() => { setEditing(false); reload(); setJournalTick((t) => t + 1); }}
-                onCancel={() => setEditing(false)}
-              />
-            </Deferred>
-          </Section>
-        )
-        : (
-          <Section>
-            <Panel pad>
-              <div className="plan__tools">
-                {data.month && (
-                  <button className="button" onClick={() => setEditing(true)}>Изменить программу</button>
-                )}
-                <button className="button" onClick={() => { setTemplateTool('apply'); setSavedTemplate(false); }}>Из шаблона</button>
-                {data.month && blocks.length > 0 && (
-                  <button className="button" onClick={() => { setTemplateTool('save'); setSavedTemplate(false); }}>Сохранить как шаблон</button>
-                )}
-                <button className="button" disabled={creating} onClick={async () => {
-                  const month = window.prompt('Название месяца:', nextMonthLabel());
-                  if (!month) return;
-
-                  setCreating(true);
-                  try {
-                    // Копируем с текущего: с этого программа начинается
-                    // почти всегда — меняются веса и пара упражнений.
-                    await apiMutate('plan.month.create', {
-                      clientRow, month, ...(data.month ? { copyFrom: data.month } : {}),
-                    });
-                    setMonth(month);
-                    reload();
-                  } catch (error) {
-                    window.alert(error.message);
-                  } finally {
-                    setCreating(false);
-                  }
-                }}>
-                  {creating ? 'Создаю…' : 'Новый месяц'}
-                </button>
-                {data.month && (
-                  <button className="button" disabled={creating} onClick={async () => {
-                    // Ошиблись при заведении: «Октябрь 2026» вместо «Сентябрь 2026»
-                    const to = window.prompt('Новое название месяца:', data.month);
-                    if (!to || to.trim() === data.month) return;
-                    setCreating(true);
-                    try {
-                      await apiMutate('plan.month.rename', { clientRow, from: data.month, to: to.trim() });
-                      setMonth(to.trim());
-                      reload();
-                      setJournalTick((t) => t + 1);
-                    } catch (error) {
-                      window.alert(error.message);
-                    } finally {
-                      setCreating(false);
-                    }
-                  }}>Переименовать месяц</button>
-                )}
-              </div>
-              {savedTemplate && (
-                <p className="small muted" style={{ marginBottom: 0 }}>
-                  Шаблон сохранён — он в разделе «Шаблоны» нижнего меню.
-                </p>
-              )}
-            </Panel>
-          </Section>
-        ))}
+      {savedTemplate && (
+        <p className="small muted">Шаблон сохранён — он в разделе «Шаблоны» нижнего меню.</p>
+      )}
+      {saveState === 'saving' && <p className="small muted plan__save-state" role="status">Сохраняю…</p>}
+      {saveState.startsWith('error:') && (
+        <p className="small plan__failure" role="alert">
+          Не сохранилось: {saveState.slice(6)}{' '}
+          <button type="button" className="button button--ghost" onClick={() => draft && push(draft.blocks, editSeq.current)}>Повторить</button>
+        </p>
+      )}
 
 
       {/* Пока программа правится, текущие тренировки под редактором не
           показываем: они мешали и путали, что правится, а что нет */}
-      {!editing && (<>
-      {blocks.length === 0 && (
+      <>
+      {shownBlocks.length === 0 && canEdit && !templateTool && (
+        <Section title={'Месяц «' + data.month + '» пуст'}>
+          <Panel pad>
+            <div className="plan__tools">
+              <button className="button" onClick={() => { setTemplateTool('apply'); setSavedTemplate(false); }}>Из шаблона</button>
+              {months.filter((m) => m !== data.month).slice(0, 1).map((m) => (
+                <button className="button" key={m} disabled={creating} onClick={() => copyMonth(m)}>Скопировать «{m}»</button>
+              ))}
+              <button className="button button--primary" onClick={() => newBlock(null)}>Новая тренировка</button>
+            </div>
+          </Panel>
+        </Section>
+      )}
+      {shownBlocks.length === 0 && !canEdit && (
         <Empty
           icon={IconPlan}
           title="Программы пока нет"
@@ -582,11 +661,13 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {(blocks.length > 0 || doneSessions.length > 0) && (
+      {(shownBlocks.length > 0 || doneSessions.length > 0) && (
         <Chips
           items={[
             { value: 'queue', label: 'Очередь · ' + queueBlocks.length },
             { value: 'done', label: 'Выполненные · ' + doneSessions.length },
+            // Вся программа месяца: проведённые отмечены зелёным
+            ...(shownBlocks.length ? [{ value: 'all', label: 'Вся программа · ' + shownBlocks.length }] : []),
           ]}
           value={planTab}
           onChange={setPlanTab}
@@ -611,7 +692,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <DoneSession key={s.id} session={s} canOpen={!familyRow} onOpen={() => openWorkout({ sessionId: s.id })} />
       ))}
 
-      {planTab === 'queue' && queueBlocks.length === 0 && blocks.length > 0 && (
+      {planTab === 'queue' && queueBlocks.length === 0 && shownBlocks.length > 0 && (
         <Empty
           icon={IconPlan}
           title="Все тренировки месяца проведены"
@@ -619,8 +700,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {planTab === 'queue' && queueBlocks.map((block, i) => {
+      {(planTab === 'queue' || planTab === 'all') && (planTab === 'all' ? shownBlocks : queueBlocks).map((block, i) => {
         const past = blockSessions(sessions, block, data.month);
+        const bi = shownBlocks.indexOf(block);
+        const editHere = canEdit && !made0(planTab);
 
         // Во «Выполненных» — то, что сделано на последнем занятии, а не
         // план: в зале упражнение могли заменить или добавить, а программа
@@ -630,15 +713,22 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           ? past[0].exercises
           : null;
         const shownExercises = made || block.exercises;
-        const blockKey = planTab + ':' + i + ':' + block.title;
+        // Ключ — по месту в месяце: переименование не сворачивает тренировку
+        const blockKey = planTab + ':' + bi;
         const open = !!openBlocks[blockKey];
         const names = shownExercises.map((ex) => ex.name).filter(Boolean);
         const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
 
         return (
         <Section
-          key={i}
-          title={canRename ? <BlockTitle title={block.title} onRename={(t) => renameBlock(block, t)} /> : block.title}
+          key={block.id || 'new' + bi}
+          title={(() => {
+            const t = canRename ? <BlockTitle title={block.title} onRename={(v) => renameBlock(block, v)} /> : block.title;
+            // Во «Всей программе» проведённая — зелёной галочкой
+            return planTab === 'all' && past.length
+              ? <span className="plan__title-done"><IconCheck size={18} aria-label="Проведена" />{t}</span>
+              : t;
+          })()}
           note={shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
         >
           <Panel>
@@ -697,7 +787,18 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
               const rounds = Math.max(...group.items.map((ex) => Math.round(ex.sets.length / people(ex))));
               return <Superset rounds={rounds} key={'m' + j}>{rows}</Superset>;
             })}
-            {open && !made && supersets(block.exercises).map((group, j) => (
+            {open && editHere && (
+              <Deferred fallback={<p className="small muted">Открываю правку…</p>}>
+                <BlockEdit
+                  block={block}
+                  members={data.members || []}
+                  canRemove={shownBlocks.length > 1}
+                  onChange={(exercises) => commit(shownBlocks.map((b, k) => (k === bi ? { ...b, exercises } : b)))}
+                  onRemove={() => commit(shownBlocks.filter((_, k) => k !== bi))}
+                />
+              </Deferred>
+            )}
+            {open && !editHere && !made && supersets(block.exercises).map((group, j) => (
               group.superset
                 ? (
                   <Superset rounds={Number(group.sets) || 0} key={j}>
@@ -711,14 +812,39 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         );
       })}
 
+      {/* «+» под последней тренировкой: из шаблонов тренировок или новая */}
+      {canEdit && (planTab === 'queue' || planTab === 'all') && shownBlocks.length > 0 && (
+        <Deferred fallback={null}>
+          <AddBlock onAdd={newBlock} busy={saveState === 'saving'} />
+        </Deferred>
+      )}
+      {canEdit && planTab === 'all' && shownBlocks.length > 0 && !templateTool && (
+        <button className="button button--block plan__as-template" onClick={() => { setTemplateTool('save'); setSavedTemplate(false); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { /* старый браузер */ } }}>
+          Сохранить как шаблон
+        </button>
+      )}
+
       {totalExercises > 0 && !familyRow && (
         <p className="small muted" style={{ marginTop: 22, textAlign: 'center' }}>
           Откройте тренировку, чтобы записывать подходы и рабочие веса
         </p>
       )}
-      </>)}
+      </>
     </>
   );
+}
+
+/** Правка в развёрнутой тренировке — во «Очереди» и во «Всей программе» */
+function made0(tab) { return tab === 'done'; }
+
+/** «Октябрь 2026» → «Ноябрь 2026»; не разобрали — '' */
+function monthAfter(label) {
+  const names = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+  const m = String(label || '').match(/^(\S+)\s+(\d{4})$/);
+  const k = m ? names.indexOf(m[1]) : -1;
+  if (k < 0) return '';
+  return k === 11 ? names[0] + ' ' + (Number(m[2]) + 1) : names[k + 1] + ' ' + m[2];
 }
 
 /**
