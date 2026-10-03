@@ -72,6 +72,9 @@ for (let k = 0; k < 2; k += 1) {
 await page.locator('.rest-screen').waitFor({ timeout: 5000 });
 await shot('4-rest-superset');
 await page.getByRole('button', { name: 'Закончить отдых' }).click();
+await page.locator('.workout__round').first().scrollIntoViewIfNeeded();
+await page.waitForTimeout(300);
+await shot('4b-round-done');
 for (let i = 0; i < 0; i += 1) {
   const first = page.locator('.workout__exercise').first();
   const btn = first.locator('.workout__effort-btn--ok');

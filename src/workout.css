@@ -650,3 +650,7 @@
 
 /* «было 6 кг × 10» — тот же подход в прошлый раз, под строкой подхода */
 .workout__was { margin: -2px 0 6px; padding-left: 64px; font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Оценка у сделанного упражнения в круге суперсета */
+.workout__round-effort { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); }
+.workout__round-effort .workout__effort-dot { margin-left: 0; }

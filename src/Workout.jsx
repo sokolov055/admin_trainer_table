@@ -917,6 +917,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   {/* Название — касанием: из базы или новое прямо здесь */}
                   <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>
                   <span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span>
+                  {/* Сделано — с оценкой, как у обычных подходов (03.10.2026) */}
+                  {ex.sets[r].state === 'done' && ex.sets[r].effort && <span className={'workout__round-effort workout__round-effort--' + ex.sets[r].effort}>
+                    <span className={'workout__effort-dot workout__effort-dot--' + ex.sets[r].effort} aria-hidden="true" />{EFFORT_WORD[ex.sets[r].effort]}
+                  </span>}
                 </div>}
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
               {memberEffort(members, k, r)}
