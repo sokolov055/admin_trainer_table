@@ -4,7 +4,7 @@ import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import WatchHelp from './WatchHelp.jsx';
-import { connectSteps, stepsConnected, stepsOn, onIphone, syncSteps, reportDevice, openHealthSettings, STEPS_SENT } from '../native-steps.js';
+import { connectSteps, stepsConnected, stepsOn, onIphone, onHuawei, syncSteps, reportDevice, openHealthSettings, STEPS_SENT } from '../native-steps.js';
 import { backgroundSyncAvailable, backgroundSyncStatus, ensureBackgroundSync, requestBackgroundAccess } from '../native-sync.js';
 
 /**
@@ -124,7 +124,7 @@ export default function Steps({ clientRow, self = false, preview = false }) {
       else if (res.reason === 'empty') {
         setChecked(onIphone()
           ? 'Шагов по-прежнему нет: доступ в «Здоровье» не включён.'
-          : 'Шагов по-прежнему нет: Health Connect их не получает.');
+          : onHuawei() ? 'Шагов по-прежнему нет: Huawei Health их пока не отдаёт.' : 'Шагов по-прежнему нет: Health Connect их не получает.');
       } else if (res.reason === 'denied') setChecked('Доступ к шагам не выдан — нажмите «Подключить шаги» ещё раз.');
       else setChecked('Телефону пока нечего передать.');
     } catch (e) {
@@ -226,17 +226,19 @@ export default function Steps({ clientRow, self = false, preview = false }) {
               <p className="steps__lead">
                 {onIphone()
                   ? 'Шаги не приходят: похоже, в «Здоровье» не включён доступ для Fit Track.'
-                  : 'Шаги не приходят: похоже, Health Connect их не получает.'}
+                  : onHuawei() ? 'Шаги не приходят: похоже, Huawei Health их пока не отдаёт.' : 'Шаги не приходят: похоже, Health Connect их не получает.'}
               </p>
               <p className="small muted">
                 {onIphone()
                   ? 'В «Здоровье»: ваш профиль (вверху справа), затем «Приложения», Fit Track и включите «Шаги». Вернитесь сюда, шаги подтянутся сами.'
-                  : 'Шаги в Health Connect пишет приложение: Google Fit, Samsung Health, Mi Fitness или браслет. Включите в нём передачу шагов и разрешите Fit Track их читать.'}
+                  : onHuawei()
+                    ? 'Шаги считает Huawei Health: откройте его и проверьте, что подсчёт шагов включён, а часы Huawei синхронизированы. Вернитесь сюда, шаги подтянутся сами.'
+                    : 'Шаги в Health Connect пишет приложение: Google Fit, Samsung Health, Mi Fitness или браслет. Включите в нём передачу шагов и разрешите Fit Track их читать.'}
               </p>
-              <WatchHelp />
+              {!onHuawei() && <WatchHelp />}
               <div className="survey__actions">
                 <button className="button button--primary" onClick={() => openHealthSettings().catch(() => setChecked('Не получилось открыть настройки — откройте их вручную.'))} disabled={busy}>
-                  {onIphone() ? 'Открыть «Здоровье»' : 'Открыть Health Connect'}
+                  {onIphone() ? 'Открыть «Здоровье»' : onHuawei() ? 'Открыть Huawei Health' : 'Открыть Health Connect'}
                 </button>
                 <button className="button" onClick={recheck} disabled={busy}>{busy ? 'Проверяем…' : 'Проверить ещё раз'}</button>
               </div>
@@ -248,9 +250,11 @@ export default function Steps({ clientRow, self = false, preview = false }) {
               <p className="small muted">
                 {onIphone()
                   ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает шаги — больше ничего.'
-                  : 'Шаги берутся из Health Connect на телефоне: туда их пишут Google Fit, Samsung Health, Mi Fitness и браслеты. Приложение только читает шаги — больше ничего.'}
+                  : onHuawei()
+                    ? 'Шаги берутся из Huawei Health: туда их пишут телефон и часы Huawei. Приложение только читает шаги — больше ничего.'
+                    : 'Шаги берутся из Health Connect на телефоне: туда их пишут Google Fit, Samsung Health, Mi Fitness и браслеты. Приложение только читает шаги — больше ничего.'}
               </p>
-              <WatchHelp />
+              {!onHuawei() && <WatchHelp />}
               <div className="survey__actions">
                 <button className="button button--primary" onClick={connect} disabled={busy}>
                   {busy ? 'Подключаю…' : 'Подключить шаги'}

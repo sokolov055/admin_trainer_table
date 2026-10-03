@@ -34,7 +34,40 @@ const EVERY_MS = 3 * 60 * 1000;
 /** Событие «шаги ушли на сервер» — «Прогресс» перечитывает график */
 export const STEPS_SENT = 'fittrack:steps-sent';
 
-function health() { return plugin('Health'); }
+/*
+ * Huawei без Google (03.10.2026): Health Connect там не ставится, шаги и
+ * тренировки читаем из Huawei Health — модуль HuaweiHealth в APK 1.4 (7)
+ * (mobile/android-native/HuaweiHealth.kt). Методы у него те же, что у
+ * модуля Health Connect, поэтому дальше всё одинаково: меняется только
+ * источник. Выбор — один раз за запуск: Health Connect есть — он, иначе
+ * Huawei, если на телефоне есть сервисы Huawei.
+ */
+let huawei = false;
+let picked = null;
+
+function pickSource() {
+  if (!picked) {
+    picked = (async () => {
+      const hw = plugin('HuaweiHealth');
+      if (onIphone() || !hw) return;
+      const hc = plugin('Health');
+      try { if (hc && (await hc.isAvailable()).available) return; } catch (_) {}
+      try { huawei = !!(await hw.isAvailable()).available; } catch (_) {}
+    })();
+  }
+  return picked;
+}
+
+/** Шаги и тренировки берутся из Huawei Health (после pickSource) */
+export function onHuawei() { return huawei; }
+
+/** Как называть источник на экране: «Здоровье», Huawei Health или Health Connect */
+export function healthHub() {
+  if (onIphone()) return '«Здоровье»';
+  return huawei ? 'Huawei Health' : 'Health Connect';
+}
+
+function health() { return huawei ? plugin('HuaweiHealth') : plugin('Health'); }
 
 function localDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -42,6 +75,7 @@ function localDate(d) {
 
 /** Есть ли вообще шаги на этом устройстве: приложение и Health Connect */
 export async function stepsAvailability() {
+  await pickSource();
   const h = health();
   if (!h) return { available: false, reason: 'app' };
   try {
@@ -53,6 +87,7 @@ export async function stepsAvailability() {
 }
 
 export async function stepsConnected() {
+  await pickSource();
   const h = health();
   if (!h) return false;
   if (onIphone()) return stepsOn();
@@ -66,6 +101,7 @@ export async function stepsConnected() {
 
 /** По нажатию «Подключить шаги»: системное окно Health Connect */
 export async function connectSteps() {
+  await pickSource();
   const h = health();
   if (!h) return { ok: false, reason: 'Обновите приложение — в этой версии шагов ещё нет.' };
   const avail = await stepsAvailability();
@@ -79,7 +115,12 @@ export async function connectSteps() {
   }
   const res = await h.requestAuthorization({ read: ['steps'] });
   if (!onIphone() && !(res.readAuthorized || []).includes('steps')) {
-    return { ok: false, reason: 'Доступ к шагам не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track.' };
+    return {
+      ok: false,
+      reason: huawei
+        ? 'Доступ к шагам не выдан. Нажмите «Подключить шаги» ещё раз и разрешите Fit Track читать шаги в окне Huawei Health.'
+        : 'Доступ к шагам не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track.',
+    };
   }
   try { localStorage.setItem(ON_KEY, '1'); } catch (_) {}
   // Итог первой отправки — тому, кто нажал: «Проверить ещё раз» показывает его
@@ -95,6 +136,7 @@ export async function connectSteps() {
  * телефону просто нечего отдать (28.09.2026).
  */
 export async function syncSteps(force = false) {
+  await pickSource();
   const h = health();
   if (!h) return { sent: 0, reason: 'app' };
   try { if (!localStorage.getItem(ON_KEY)) return { sent: 0, reason: 'off' }; } catch (_) { return { sent: 0, reason: 'off' }; }
@@ -109,7 +151,8 @@ export async function syncSteps(force = false) {
   const end = new Date();
   const start = new Date(end);
   start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - (DAYS - 1));
+  // Huawei: история только за неделю (заявка Health Kit)
+  start.setDate(start.getDate() - ((huawei ? 7 : DAYS) - 1));
   const res = await h.queryAggregated({
     dataType: 'steps', startDate: start.toISOString(), endDate: end.toISOString(), bucket: 'day', aggregation: 'sum',
   });
@@ -122,7 +165,7 @@ export async function syncSteps(force = false) {
   // отдаёт пустые дни и не говорит, что чтение запрещено. Нули в прогресс
   // не шлём — там они выглядели бы как месяц без движения
   if (!days.length || !had) return { sent: 0, reason: 'empty' };
-  await apiMutate('steps.sync', { days, source: onIphone() ? 'healthkit' : 'health-connect' });
+  await apiMutate('steps.sync', { days, source: onIphone() ? 'healthkit' : huawei ? 'huawei-health' : 'health-connect' });
   try { localStorage.setItem(SENT_KEY, String(Date.now())); } catch (_) {}
   // Экран «Прогресс» мог загрузиться раньше, чем шаги ушли, — пусть перечитает
   try { window.dispatchEvent(new Event(STEPS_SENT)); } catch (_) {}
@@ -141,6 +184,7 @@ export async function openHealthSettings() {
     window.location.href = 'x-apple-health://';
     return true;
   }
+  await pickSource();
   const h = health();
   if (!h || !h.openHealthConnectSettings) return false;
   await h.openHealthConnectSettings();
@@ -206,6 +250,7 @@ async function androidWorkoutsAllowed() {
 
 /** По нажатию «Подключить тренировки»: окно «Здоровья», затем первая отправка */
 export async function connectWorkouts() {
+  await pickSource();
   if (!workoutsAvailable()) return { ok: false, reason: 'Обновите приложение — в этой версии тренировок из Health Connect ещё нет.' };
   if (onIphone()) {
     await health().requestAuthorization({ read: ['steps', 'workouts'] });
@@ -216,7 +261,12 @@ export async function connectWorkouts() {
     }
     const res = await health().requestAuthorization({ read: ANDROID_WORKOUT_READS });
     if (!(res.readAuthorized || []).includes('workouts')) {
-      return { ok: false, reason: 'Доступ к тренировкам не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track → «Тренировки».' };
+      return {
+        ok: false,
+        reason: huawei
+          ? 'Доступ к тренировкам не выдан. Нажмите «Подключить тренировки» ещё раз и разрешите Fit Track читать записи тренировок в окне Huawei Health.'
+          : 'Доступ к тренировкам не выдан. Его можно включить в Health Connect: Разрешения приложений → Fit Track → «Тренировки».',
+      };
     }
   }
   try { localStorage.setItem(WORKOUTS_ON_KEY, '1'); } catch (_) {}
@@ -229,6 +279,7 @@ export async function connectWorkouts() {
  * говорит, что чтение запрещено: запрет выглядит как «тренировок нет».
  */
 export async function syncWorkouts(force = false) {
+  await pickSource();
   if (!workoutsAvailable()) return { sent: 0, reason: 'app' };
   if (!workoutsOn()) return { sent: 0, reason: 'off' };
   if (!force) {
@@ -239,7 +290,8 @@ export async function syncWorkouts(force = false) {
   }
   if (!onIphone() && !(await androidWorkoutsAllowed())) return { sent: 0, reason: 'denied' };
   const end = new Date();
-  const start = new Date(end.getTime() - DAYS * 86400000);
+  // Huawei даёт историю только за неделю — так подана заявка
+  const start = new Date(end.getTime() - (huawei ? 7 : DAYS) * 86400000);
   const res = await health().queryWorkouts({ startDate: start.toISOString(), endDate: end.toISOString(), limit: 200 });
   const workouts = (res.workouts || []).map((w) => ({
     platformId: w.platformId, workoutType: w.workoutType, startDate: w.startDate, endDate: w.endDate,
@@ -288,6 +340,7 @@ export function disconnectSteps() {
 
 /** Что с шагами на этом телефоне — словами, понятными тренеру */
 async function stepsState() {
+  await pickSource();
   if (!health()) return 'unavailable';
   if (!(await stepsAvailability()).available) return 'unavailable';
   if (!stepsOn() || !(await stepsConnected())) return 'off';

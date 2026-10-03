@@ -4,7 +4,7 @@ import { Section, Panel, Badge, formatNumber, formatTime } from '../ui.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import WatchHelp from './WatchHelp.jsx';
 import { ensureBackgroundSync } from '../native-sync.js';
-import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIphone, WORKOUTS_SENT } from '../native-steps.js';
+import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIphone, onHuawei, WORKOUTS_SENT } from '../native-steps.js';
 
 /**
  * Тренировки с часов — в прогрессе, рядом с шагами: у клиента (с 02.10.2026,
@@ -93,8 +93,10 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
         if (res.sent) { setMessage('Готово: телефон передал тренировок — ' + res.sent + '.'); reload(); }
         else if (res.reason === 'empty') setMessage(onIphone()
           ? 'За месяц тренировок нет — или в «Здоровье» не включён доступ к тренировкам для Fit Track.'
-          : 'За месяц в Health Connect тренировок нет.');
-        else if (res.reason === 'denied') setMessage('Доступ к тренировкам выключен. Включите его в Health Connect: Разрешения приложений → Fit Track.');
+          : onHuawei() ? 'За неделю в Huawei Health тренировок нет.' : 'За месяц в Health Connect тренировок нет.');
+        else if (res.reason === 'denied') setMessage(onHuawei()
+          ? 'Доступ к тренировкам выключен. Нажмите «Подключить тренировки» ещё раз и разрешите его в окне Huawei Health.'
+          : 'Доступ к тренировкам выключен. Включите его в Health Connect: Разрешения приложений → Fit Track.');
         else setMessage('Телефону пока нечего передать.');
       }
     } catch (e) {
@@ -126,29 +128,34 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
     }
     if (!phone) return null;
     const ios = onIphone();
+    const huawei = onHuawei();
     return (
       <Section title="Тренировки с часов">
         <Panel pad>
           <p className="steps__lead">
-            {on ? 'Тренировки пока не пришли.' : (ios ? 'Тренировки из «Здоровья»' : 'Тренировки из Health Connect') + ' — рядом с занятиями из приложения.'}
+            {on ? 'Тренировки пока не пришли.' : (ios ? 'Тренировки из «Здоровья»' : huawei ? 'Тренировки из Huawei Health' : 'Тренировки из Health Connect') + ' — рядом с занятиями из приложения.'}
           </p>
           <p className="small muted">
             {on
               ? (ios
                 ? 'Если на часах тренировки были, включите доступ: «Здоровье» → ваш профиль → «Приложения» → Fit Track → «Тренировки».'
-                : 'Если тренировки были, проверьте, что часы или Samsung Health, Google Fit, Mi Fitness передают их в Health Connect, и что у Fit Track есть доступ к «Тренировкам».')
+                : huawei
+                  ? 'Если тренировки были, проверьте, что часы Huawei синхронизированы с Huawei Health. Приходят тренировки за последнюю неделю.'
+                  : 'Если тренировки были, проверьте, что часы или Samsung Health, Google Fit, Mi Fitness передают их в Health Connect, и что у Fit Track есть доступ к «Тренировкам».')
               : (ios
                 ? 'Приложение читает тренировки с Apple Watch и iPhone: вид, время, калории и дистанцию.'
-                : 'Приложение читает тренировки, которые часы и фитнес-приложения записали в Health Connect: вид, время, калории и дистанцию.')
+                : huawei
+                  ? 'Приложение читает тренировки из Huawei Health: вид, время, калории и дистанцию.'
+                  : 'Приложение читает тренировки, которые часы и фитнес-приложения записали в Health Connect: вид, время, калории и дистанцию.')
                 + ' Совпала с занятием в приложении — покажем их как одну тренировку.'}
           </p>
           <div className="survey__actions">
             <button className="button button--primary" onClick={connect} disabled={busy}>
               {busy ? 'Проверяем…' : on ? 'Проверить ещё раз' : 'Подключить тренировки'}
             </button>
-            {on && <button className="button" onClick={() => openHealthSettings().catch(() => {})}>{ios ? 'Открыть «Здоровье»' : 'Открыть Health Connect'}</button>}
+            {on && <button className="button" onClick={() => openHealthSettings().catch(() => {})}>{ios ? 'Открыть «Здоровье»' : huawei ? 'Открыть Huawei Health' : 'Открыть Health Connect'}</button>}
           </div>
-          <WatchHelp />
+          {!huawei && <WatchHelp />}
           {message && <p className="small" role="status" style={{ marginBottom: 0 }}>{message}</p>}
         </Panel>
       </Section>
