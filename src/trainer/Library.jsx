@@ -259,7 +259,7 @@ function exerciseLine(e) {
   // Кардио — целями, режимом и интервалами, а не «подходы × повторы»
   if (e.cardio) return `${e.name} — ${cardioLine(e.cardio, trackOf(e))}`;
   const volume = [e.sets, e.reps].filter(Boolean).join('×');
-  const extra = [volume, e.weight && e.weight + (/\d$/.test(e.weight) ? ' кг' : ''), e.rpe && 'RPE ' + e.rpe].filter(Boolean).join(', ');
+  const extra = [volume, e.weight && e.weight + (/\d$/.test(e.weight) ? ' кг' : '')].filter(Boolean).join(', ');
   return extra ? `${e.name} — ${extra}` : e.name;
 }
 

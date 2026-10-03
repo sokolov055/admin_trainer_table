@@ -59,12 +59,12 @@ function columns(exercise, t) {
   const sets = exercise.supersetGroup ? 'Круги' : 'Подходы';
   if (t.kind === 'cardio') {
     const mode = t.machine === 'treadmill' ? 'км/ч, %' : t.machine === 'other' ? 'режим' : 'уровень';
-    return { heads: ['Отрезки', 'Время', 'Режим', 'RPE'], ph: ['Отр.', 'мин', mode, 'RPE'] };
+    return { heads: ['Отрезки', 'Время', 'Режим'], ph: ['Отр.', 'мин', mode] };
   }
-  if (t.kind === 'timed') return { heads: [sets, 'Время, с', 'Доп. вес', 'RPE'], ph: ['Подх.', 'сек', 'свой', 'RPE'] };
+  if (t.kind === 'timed') return { heads: [sets, 'Время, с', 'Доп. вес'], ph: ['Подх.', 'сек', 'свой'] };
   const reps = t.unilateral ? 'Повт./стор.' : 'Повторы';
-  if (t.kind === 'bodyweight') return { heads: [sets, reps, 'Доп. вес', 'RPE'], ph: ['Подх.', 'Повт.', 'свой', 'RPE'] };
-  return { heads: [sets, reps, t.perSide ? 'Кг/стор.' : 'Вес', 'RPE'], ph: ['Подх.', 'Повт.', 'Вес', 'RPE'] };
+  if (t.kind === 'bodyweight') return { heads: [sets, reps, 'Доп. вес'], ph: ['Подх.', 'Повт.', 'свой'] };
+  return { heads: [sets, reps, t.perSide ? 'Кг/стор.' : 'Вес'], ph: ['Подх.', 'Повт.', 'Вес'] };
 }
 
 /**
@@ -479,13 +479,12 @@ export default function PlanEditor({
                 ) : (
                 <>
                 <div className={'plan-edit__numbers plan-edit__labels' + (split ? ' plan-edit__numbers--split' : '')} aria-hidden="true">
-                  <span>{cols.heads[0]}</span><span>{cols.heads[1]}</span>{!split && <span>{cols.heads[2]}</span>}<span>RPE</span>
+                  <span>{cols.heads[0]}</span><span>{cols.heads[1]}</span>{!split && <span>{cols.heads[2]}</span>}
                 </div>
                 <div className={'plan-edit__numbers' + (split ? ' plan-edit__numbers--split' : '')}>
                   <input className="field__input" aria-label={cols.heads[0]} placeholder={cols.ph[0]} inputMode="numeric" value={exercise.sets} maxLength={40} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
                   <input className="field__input" aria-label={cols.heads[1]} placeholder={cols.ph[1]} inputMode="text" value={exercise.reps} maxLength={80} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
                   {!split && <input className="field__input" aria-label={cols.heads[2]} placeholder={cols.ph[2]} inputMode={'decimal'} value={exercise.weight} maxLength={80} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
-                  <input className="field__input" aria-label="RPE" placeholder="RPE" inputMode="decimal" value={exercise.rpe} maxLength={40} disabled={busy} onChange={(e) => setExercise(bi, ei, 'rpe', e.target.value)} />
                 </div>
                 </>
                 )}

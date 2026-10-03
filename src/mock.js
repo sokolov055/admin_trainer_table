@@ -76,10 +76,18 @@ const PLAN_BLOCKS = [
       { name: 'Беговая дорожка', weight: '', prevWeight: '', sets: '1', reps: '', rpe: '', track: { kind: 'cardio', machine: 'treadmill', unilateral: false, perSide: false },
         cardio: { machine: 'treadmill', metrics: ['time', 'distance'], targets: { time: '10', distance: '1.2', kcal: '', pulse: '' }, settings: { speed: '6', incline: '5', level: '' }, intervals: null } },
       // Из базы: карточка с техникой и проверенной инструкцией «Как настроить»
-      { name: 'Присед со штангой', weight: '95', prevWeight: '90', sets: '5', reps: '5', rpe: '8', exerciseId: 3,
+      // startSets/lastRun — как посчитал бы сервер (lib/effort.js): в
+      // последний раз лесенка 60 · 80 · 95 · 95 · 95 на 5 и «легко» —
+      // сегодня рабочим +10
+      { name: 'Присед со штангой', weight: '95', prevWeight: '90', lastWeight: '95', sets: '5', reps: '5', rpe: '8', exerciseId: 3,
+        startSets: [['70', 'work'], ['90', 'work'], ['105', 'work'], ['105', 'work'], ['105', 'work']].map(([weight, kind]) => ({ weight, reps: '5', kind })),
+        lastRun: { date: '2026-09-29', weights: ['60', '80', '95', '95', '95'], reps: ['5', '5', '5', '5', '5'], planReps: '5', effort: 'easy', streak: 0, action: 'up', step: 10 },
         exercise: { name: 'Приседания со штангой', muscle: 'Ноги', equipment: 'Штанга', notes: '', media: { kind: 'animation', url: 'Barbell_Squat' },
           setup: 'Стойки — крюки на уровне середины груди.\nСтраховочные упоры — чуть ниже нижней точки приседа.\nОшибка: упоры выше нижней точки — штанга на них ляжет.' } },
-      { name: 'Румынская тяга', weight: '85', prevWeight: '80', sets: '4', reps: '10', rpe: '7' },
+      // Повторы другие: в последний раз 100 × 3, сегодня 10 — пересчёт
+      { name: 'Румынская тяга', weight: '85', prevWeight: '80', sets: '4', reps: '10', rpe: '7',
+        startSets: ['82.5', '82.5', '82.5', '82.5'].map((weight) => ({ weight, reps: '10', kind: 'work' })),
+        lastRun: { date: '2026-09-26', weights: ['100', '100', '100'], reps: ['3', '3', '3'], planReps: '10', effort: 'ok', streak: 1, action: 'scaled', step: 0, scaled: '82.5' } },
       // Суперсет: в таблице это объединённая ячейка «Подходы», здесь —
       // общая группа. Демо должно показывать и его, иначе увидеть эту
       // часть экрана можно только на живом клиенте.

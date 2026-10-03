@@ -158,10 +158,21 @@ test('тренировку можно провести, и блок станов
   await section('Тренировка 1 — верх').getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('heading', { name: 'Тренировка 1 — верх' }).first().waitFor({ timeout: 20000 });
 
-  // Отмечаем первый подход первого упражнения
+  // Отмечаем первый подход первого упражнения оценкой (галочки нет с 03.10.2026)
+  await page.getByLabel('Таймер отдыха').selectOption('60');
+  // Отдых, оставшийся от прошлых шагов, — закрыть: экран отдыха на весь экран
+  const left = page.getByRole('button', { name: 'Закончить отдых' });
+  if (await left.isVisible().catch(() => false)) await left.click();
   const first = page.locator('.workout__set').first();
   await first.getByRole('textbox').nth(1).fill('8');
-  await first.locator('.workout__check').click();
+  await page.locator('.workout__effort-btn--ok').first().click();
+
+  // Отдых — на весь экран; закрыть можно только кнопкой
+  const rest = page.locator('.rest-screen');
+  await rest.waitFor({ timeout: 5000 });
+  assert.ok(await rest.isVisible(), 'отдых на весь экран');
+  await page.getByRole('button', { name: 'Закончить отдых' }).click();
+  await rest.waitFor({ state: 'detached', timeout: 5000 });
 
   // Прошлый вес — подсказка рядом с планом: по ней в зале решают,
   // добавлять ли сегодня.
@@ -169,11 +180,6 @@ test('тренировку можно провести, и блок станов
     page.locator('.workout__exercise').first().getByText('было 70').waitFor({ timeout: 5000 }),
   );
 
-  // Таймер отдыха должен быть виден на любом упражнении, а не только в шапке
-  await page.getByLabel('Таймер отдыха').selectOption('60');
-  const rest = page.locator('.workout__rest--float');
-  await rest.waitFor({ timeout: 5000 });
-  assert.ok(await rest.isVisible(), 'полоса отдыха прижата к низу экрана');
 
   // Упражнение меняют прямо в зале. Программа месяца от этого не
   // меняется, но во «Выполненных» должно стоять сделанное, а не план.

@@ -59,7 +59,8 @@ test('интерфейс: запись подхода, пауза, продол�
   await click('Сохранить сейчас');
   const weight = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));
   await act(async () => weight.props.onChange({ target: { value: '45,5' } }));
-  const done = tree.root.findAllByType('button').find(n => /подход 1: выполнен/.test(n.props['aria-label'] || ''));
+  // Галочки нет (03.10.2026): подход отмечает оценка
+  const done = tree.root.findAllByType('button').find(n => text(n) === 'Норм');
   await act(async () => done.props.onClick());
   await click('Пауза'); await click('Продолжить');
   await click('Завершить тренировку'); await click('Подтвердить');
@@ -178,19 +179,26 @@ test('суперсет из программы виден в занятии', as
     assert.equal(summaries().filter(t => t === 'Круг пропущен · изменить').length, 1);
     await press('Вернуть круг');
 
-    // Отметка — одна на круг, а не у каждого упражнения (27.09.2026)
+    // Оценка — у каждого упражнения круга (03.10.2026): не последнее —
+    // «без отдыха» к следующему, последнее — отдых
     const round1 = () => local.root.findAllByProps({ className: 'workout__round' })[0];
-    assert.equal(round1().findAll(n => n.type === 'button' && String(n.props.className || '').includes('workout__check')).length, 0, 'своих галочек у упражнений круга нет');
-    // Повторов у подтягиваний нет — подсказка под кнопкой, с названием
+    const norm = () => round1().findAll(n => n.type === 'button' && text(n) === 'Норм');
+    assert.equal(norm().length, 2, 'кнопки под каждым упражнением круга');
+    assert.ok(round1().findAll(n => n.type === 'p' && /^Без отдыха/.test(text(n))).length === 1, 'первое — без отдыха');
+    // Повторов у подтягиваний нет — подсказка под кругом, с названием
     const reps = round1().findAll(n => n.type === 'input' && /Подтягивания, подход 1, повторы/.test(n.props['aria-label'] || ''))[0];
     await act(async () => { reps.props.onChange({ target: { value: '' } }); await delay(); });
-    await press('Круг 1 · отдых');
+    await act(async () => { norm()[0].props.onClick(); await delay(); });
     assert.match(text(round1().findByProps({ className: 'workout__round-lack' })), /Подтягивания: введите число повторов/);
-    // Вписали — подсказка ушла, кнопка отмечает оба упражнения
+    // Вписали — подсказка ушла, оценки отмечают оба упражнения
     await act(async () => { reps.props.onChange({ target: { value: '10' } }); await delay(); });
+    await act(async () => { norm()[0].props.onClick(); await delay(); });
     assert.equal(round1().findAllByProps({ className: 'workout__round-lack' }).length, 0);
-    await press('Круг 1 · отдых');
+    await act(async () => { norm()[0].props.onClick(); await delay(); });
     assert.equal(round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length, 2, 'оба упражнения круга отмечены');
+    // Отдых пошёл после последнего упражнения — закрыть его, чтобы не мешал
+    const stop = local.root.findAllByType('button').find(b => text(b) === 'Закончить отдых');
+    if (stop) await act(async () => { stop.props.onClick(); await delay(); });
     await press('Круг 1 выполнен');
     assert.equal(round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length, 0, 'второе нажатие снимает отметку');
 
@@ -252,14 +260,15 @@ test('отмеченный подход запускает отдых, если 
   data.clear();
   await mount();
 
-  const rest = () => tree.root.findAll(n => n.props && n.props.className === 'workout__rest workout__rest--float');
+  // Отдых — на весь экран (RestScreen, 03.10.2026)
+  const rest = () => tree.root.findAll(n => n.props && n.props.role === 'dialog' && /^rest-screen/.test(n.props.className || ''));
   assert.equal(rest().length, 0, 'до выбора длительности полосы нет');
 
   const select = tree.root.findAll(n => n.type === 'select' && n.props['aria-label'] === 'Таймер отдыха')[0];
   await act(async () => { await select.props.onChange({ target: { value: '90' } }); await delay(); });
 
   await act(async () => {
-    const stop = tree.root.findAll(n => n.type === 'button' && /Сбросить/.test(text(n)))[0];
+    const stop = tree.root.findAll(n => n.type === 'button' && /Закончить отдых/.test(text(n)))[0];
     await stop.props.onClick();
     await delay();
   });
@@ -271,9 +280,8 @@ test('отмеченный подход запускает отдых, если 
 
   await act(async () => { await set.props.onChange({ target: { value: '10' } }); await delay(); });
 
-  const check = tree.root.findAll(n => n.type === 'button'
-    && typeof n.props['aria-label'] === 'string'
-    && n.props['aria-label'].includes('подход 1: выполнен'))[0];
+  // Галочки нет (03.10.2026): подход отмечает оценка — «Норм» под ним
+  const check = tree.root.findAll(n => n.type === 'button' && text(n) === 'Норм')[0];
 
   await act(async () => { await check.props.onClick(); await delay(); });
 
@@ -298,9 +306,8 @@ test('после завершённой тренировки запускает�
 
   await act(async () => { await set.props.onChange({ target: { value: '10' } }); await delay(); });
 
-  const check = tree.root.findAll(n => n.type === 'button'
-    && typeof n.props['aria-label'] === 'string'
-    && n.props['aria-label'].includes('подход 1: выполнен'))[0];
+  // Галочки нет (03.10.2026): подход отмечает оценка — «Норм» под ним
+  const check = tree.root.findAll(n => n.type === 'button' && text(n) === 'Норм')[0];
 
   await act(async () => { await check.props.onClick(); await delay(); });
 
@@ -377,7 +384,7 @@ test('кардио в занятии: режим, метрики, «+ метри
     assert.ok(button('Запустить интервалы'), 'таймер интервалов на месте');
 
     // Отметить без итога нельзя: скорость — не результат
-    const check = () => local.root.findAllByType('button').find(n => /отрезок 1: выполнен/.test(n.props['aria-label'] || ''));
+    const check = () => local.root.findAllByType('button').find(n => text(n) === 'Норм');
     await act(async () => { check().props.onClick(); await delay(); });
     assert.ok(local.root.findAllByType('p').some(p => /время, расстояние или калории/.test(text(p))));
 
@@ -386,7 +393,7 @@ test('кардио в занятии: режим, метрики, «+ метри
     const kcal = local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Беговая дорожка, отрезок 1, калории');
     await act(async () => { kcal.props.onChange({ target: { value: '280' } }); await delay(); });
     await act(async () => { check().props.onClick(); await delay(); });
-    assert.ok(local.root.findAllByType('button').some(n => /отрезок 1: снять отметку/.test(n.props['aria-label'] || '')));
+    assert.ok(local.root.findAll(n => String(n.props.className || '') === 'workout__cardio-done').length === 1, 'отрезок отмечен');
   } finally {
     if (local) local.unmount();
   }
@@ -437,8 +444,7 @@ test('«Вернуться к занятию»: открывается идущ�
   // Провели занятие на телефоне до конца — на устройстве остался черновик завершённого
   data.clear();
   await mount();
-  const check = tree.root.findAll(n => n.type === 'button'
-    && typeof n.props['aria-label'] === 'string' && n.props['aria-label'].includes('подход 1: выполнен'))[0];
+  const check = tree.root.findAll(n => n.type === 'button' && text(n) === 'Норм')[0];
   await act(async () => { await check.props.onClick(); await delay(); });
   await click('Завершить тренировку');
   await click('Подтвердить');

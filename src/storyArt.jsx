@@ -472,8 +472,133 @@ export function CoverRelease() {
   );
 }
 
+/**
+ * Оценка подхода: строка подхода и под ней три кнопки, нажата «Легко».
+ * Цвета — те же, что у кнопок на экране тренировки.
+ */
+export function ArtEffort() {
+  const buttons = [
+    { x: 40, label: 'Легко', fill: '#1a7f37', on: true },
+    { x: 124, label: 'Норм', fill: '#3a86e0' },
+    { x: 208, label: 'Тяжело', fill: '#b35600' },
+  ];
+  return (
+    <Art label="Подход и три кнопки: легко, норм, тяжело">
+      <rect x={40} y={30} width={240} height={44} rx={12} opacity={0.35} />
+      <text x={64} y={58} fill="currentColor" stroke="none" fontSize={15} opacity={0.6}>1</text>
+      <text x={150} y={59} textAnchor="middle" fill="currentColor" stroke="none" fontSize={18} fontWeight={700}>100</text>
+      <text x={238} y={59} textAnchor="middle" fill="currentColor" stroke="none" fontSize={18} fontWeight={700}>12</text>
+      {buttons.map((b) => (
+        <g key={b.label}>
+          <rect x={b.x} y={92} width={72} height={36} rx={10} fill={b.fill} fillOpacity={b.on ? 1 : 0.55} stroke="none" />
+          <text x={b.x + 36} y={115} textAnchor="middle" fill="#fff" stroke="none" fontSize={13} fontWeight={700}>{b.label}</text>
+        </g>
+      ))}
+      {/* палец на «Легко» */}
+      <circle cx={76} cy={146} r={9} stroke="var(--tint)" strokeWidth={2.2} />
+    </Art>
+  );
+}
+
+/** Отдых на весь экран: кольцо с таймером и карточка следующего подхода */
+export function ArtRest() {
+  const r = 46;
+  const c = 2 * Math.PI * r;
+  return (
+    <Art label="Таймер отдыха и следующий подход">
+      <circle cx={100} cy={90} r={r} opacity={0.25} strokeWidth={8} />
+      <circle cx={100} cy={90} r={r} stroke="var(--tint)" strokeWidth={8}
+        strokeDasharray={`${c * 0.62} ${c}`} transform="rotate(-90 100 90)" />
+      <text x={100} y={98} textAnchor="middle" fill="currentColor" stroke="none" fontSize={24} fontWeight={700}>1:12</text>
+      <rect x={170} y={52} width={120} height={76} rx={12} opacity={0.35} />
+      <rect x={184} y={64} width={60} height={6} rx={3} fill="currentColor" fillOpacity={0.2} stroke="none" />
+      <text x={184} y={94} fill="currentColor" stroke="none" fontSize={16} fontWeight={700}>110 × 12</text>
+      <rect x={184} y={104} width={78} height={16} rx={8} fill="#7fd97f" fillOpacity={0.2} stroke="none" />
+      <text x={223} y={116} textAnchor="middle" fill="#7fd97f" stroke="none" fontSize={10} fontWeight={700}>+10 кг</text>
+    </Art>
+  );
+}
+
+/** Лесенка весов: подходы растут, рабочие сдвинуты на шаг вверх */
+export function ArtLadder() {
+  const bars = [
+    { x: 60, h: 40, w: '60' },
+    { x: 116, h: 64, w: '80' },
+    { x: 172, h: 92, w: '105' },
+    { x: 228, h: 92, w: '105' },
+  ];
+  return (
+    <Art label="Подходы лесенкой, рабочие на шаг тяжелее">
+      <path d="M44 150h232" opacity={0.35} />
+      {bars.map((b, i) => (
+        <g key={b.x}>
+          <rect x={b.x} y={150 - b.h} width={36} height={b.h} rx={8}
+            fill={i > 1 ? 'var(--tint)' : 'currentColor'} fillOpacity={i > 1 ? 0.85 : 0.18} stroke="none" />
+          <text x={b.x + 18} y={142 - b.h} textAnchor="middle" fill="currentColor" stroke="none" fontSize={12} fontWeight={700}>{b.w}</text>
+        </g>
+      ))}
+      {/* прошлый раз — пунктир на 95 */}
+      <path d="M166 70h104" strokeDasharray="4 5" opacity={0.6} />
+      <path d="M282 72v-12m-5 5 5-5 5 5" stroke="var(--tint)" strokeWidth={2.2} />
+    </Art>
+  );
+}
+
+/** Часы: экран с весом на барабане и тремя кнопками */
+export function ArtWatch() {
+  return (
+    <Art label="Часы с весом на барабане и тремя кнопками">
+      <rect x={118} y={12} width={84} height={18} rx={6} opacity={0.3} />
+      <rect x={118} y={150} width={84} height={18} rx={6} opacity={0.3} />
+      <rect x={104} y={26} width={112} height={128} rx={30} strokeWidth={2.2} />
+      <rect x={216} y={68} width={7} height={22} rx={3} />
+      <text x={160} y={66} textAnchor="middle" fill="currentColor" stroke="none" fontSize={11} opacity={0.35}>98,75</text>
+      <text x={160} y={90} textAnchor="middle" fill="currentColor" stroke="none" fontSize={22} fontWeight={700}>100</text>
+      <text x={160} y={106} textAnchor="middle" fill="currentColor" stroke="none" fontSize={11} opacity={0.35}>101,25</text>
+      {[['#1a7f37', 120], ['#3a86e0', 148], ['#b35600', 176]].map(([fill, x]) => (
+        <rect key={x} x={x} y={118} width={24} height={16} rx={6} fill={fill} stroke="none" />
+      ))}
+    </Art>
+  );
+}
+
+/**
+ * Обложка «Как пользоваться»: раскрытая страница инструкции и шаги на ней.
+ * Зелёная — отличается от синей «Что нового», чтобы две плитки рядом не
+ * читались одной темой.
+ */
+export function CoverGuide() {
+  return (
+    <svg className="stories__art" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="cover-guide" x1="0" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor="#3cc479" />
+          <stop offset="1" stopColor="#1f8a6a" />
+        </linearGradient>
+      </defs>
+      <rect width="200" height="200" fill="url(#cover-guide)" />
+      <g transform="rotate(-7 110 96)">
+        <rect x="70" y="30" width="92" height="118" rx="16" fill="#0b2a20" fillOpacity="0.2" transform="translate(3 5)" />
+        <rect x="70" y="30" width="92" height="118" rx="16" fill="#ffffff" />
+        {[52, 80, 108].map((y, i) => (
+          <g key={y}>
+            <circle cx="88" cy={y} r="8" fill="#1f8a6a" />
+            <text x="88" y={y + 4} textAnchor="middle" fill="#fff" fontSize="10" fontWeight="700">{i + 1}</text>
+            <rect x="102" y={y - 4} width={i === 1 ? 40 : 48} height="8" rx="4" fill="#0b2a20" fillOpacity="0.16" />
+          </g>
+        ))}
+      </g>
+      <g fill="#ffffff">
+        <circle cx="40" cy="52" r="5" fillOpacity="0.55" />
+        <circle cx="168" cy="166" r="4" fillOpacity="0.4" />
+      </g>
+    </svg>
+  );
+}
+
 export const COVERS = {
   release: CoverRelease,
+  guide: CoverGuide,
 };
 
 /**
@@ -713,6 +838,10 @@ export const ART = {
   guide: ArtGuide,
   pace: ArtPace,
   journal: ArtJournal,
+  effort: ArtEffort,
+  rest: ArtRest,
+  ladder: ArtLadder,
+  watch: ArtWatch,
   draft: ArtDraft,
   pantry: ArtPantry,
   swipe: ArtSwipe,

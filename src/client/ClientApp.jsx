@@ -18,6 +18,7 @@ import PushSetting from '../PushSetting.jsx';
 import DeleteAccount from '../DeleteAccount.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
+import RestSignalSetting from '../RestSignalSetting.jsx';
 import Family from './Family.jsx';
 import { PhoneCalendar } from '../trainer/Schedule.jsx';
 import { apiPublic } from '../api.js';
@@ -307,6 +308,7 @@ export default function ClientApp({ me, clientRow, preview }) {
               {preview
                 ? <PreviewOnly text="Здесь клиент включает уведомления: напоминания о взвешивании, замерах и конце отдыха." />
                 : <PushSetting clientRow={clientRow} />}
+              <RestSignalSetting />
             </Section>
 
             <ScheduleFeed clientRow={clientRow} />

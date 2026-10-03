@@ -1933,7 +1933,8 @@ th.sticky, td.sticky {
 
 .plan-edit__numbers {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Подходы, повторы, вес; RPE убран 03.10.2026 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
@@ -3990,9 +3991,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .family__name { margin: 0 0 var(--space-3); font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .client-family { margin-top: var(--space-3); }
 
-/* Сплит в редакторе программы: без общего веса — три колонки; ниже строка
+/* Сплит в редакторе программы: без общего веса — две колонки; ниже строка
    на человека: имя-переключатель «делает», его вес, прошлый вес */
-.plan-edit__numbers--split { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.plan-edit__numbers--split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .plan-edit__split { display: grid; gap: var(--space-2); }
 .plan-edit__person { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; }
 .plan-edit__person .chip { justify-content: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -13,6 +13,15 @@
  */
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
 import { trackOf, volumeOf } from './exercise-track.js';
+import { rateSet, isDumbbell, stepOf, suggestText } from './effort.js';
+
+const isEffort = (e) => ['easy', 'ok', 'hard'].includes(e);
+/** Подход перед этим у того же человека — для подписи подобранного веса */
+function prevOf(ex, set) {
+  const own = ex.sets.filter((x) => (x.who || '') === (set.who || ''));
+  const prev = own[own.indexOf(set) - 1];
+  return prev && prev.state === 'done' ? prev : null;
+}
 
 function activity() {
   if (!isNativeApp()) return null;
@@ -45,6 +54,8 @@ export function exerciseList(s) {
     // Вес и повторы подходов — правка подхода с часов
     weights: ex.sets.slice(0, 20).map((x) => String(x.weight || '')),
     reps: ex.sets.slice(0, 20).map((x) => String(x.reps || '')),
+    // Гантели — шаг колёсика 1 кг, остальное — 1,25 (03.10.2026)
+    dumbbell: isDumbbell(ex),
   }));
 }
 
@@ -175,6 +186,10 @@ export function setQueue(s) {
       detail: [set.who || '', (trackOf(ex).kind === 'cardio' ? 'Отрезок ' : 'Подход ') + n + ' из ' + own.length
         + (set.kind === 'warmup' ? ', разминка' : '')].filter(Boolean).join(' · '),
       ...(strength ? { weight: String(set.weight || '').trim() } : {}),
+      // Для оценки на часах: шаг колёсика (гантели — 1 кг), шаг прибавки и
+      // почему у подхода такой вес
+      ...(strength ? { dumbbell: isDumbbell(ex), step: stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}),
+      ...(strength && suggestText(set, prevOf(ex, set)) ? { suggest: suggestText(set, prevOf(ex, set)) } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
       amount: strength ? '' : setText(set),
       exerciseDone: n - 1,
@@ -291,8 +306,16 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
     if (String(a.sessionId) !== s.id || !['active', 'paused'].includes(s.status)) continue;
     const at = Math.min(now, Number(a.at) || now);
     if (a.kind === 'weight' && WEIGHT_RE.test(String(a.value))) {
-      s = { ...s, exercises: s.exercises.map((ex) => !mine(ex, a) ? ex : {
-        ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) ? { ...set, weight: String(a.value) } : set),
+      // Лесенка (03.10.2026): вес текущего подхода и следующих с тем же
+      // весом — 100 · 120 · 140 не сливаются в одно число. Вес с часов —
+      // свой (own): оценки его больше не двигают
+      s = { ...s, exercises: s.exercises.map((ex) => {
+        if (!mine(ex, a)) return ex;
+        const first = ex.sets.find((set) => set.state === 'pending' && whose(set, a));
+        if (!first) return ex;
+        const was = String(first.weight || '');
+        return { ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) && (set === first || String(set.weight || '') === was)
+          ? { ...set, weight: String(a.value), own: true } : set) };
       }) };
     } else if (a.kind === 'done') {
       // setIndex — какой по счёту подход (у пары — у своего человека): его и
@@ -307,8 +330,10 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         const target = index >= 0 ? own[index] : own.find((set) => set.state === 'pending');
         if (!target || target.state !== 'pending') return ex;
         marked = true;
-        return { ...ex, sets: ex.sets.map((set) => set !== target ? set
+        const next = { ...ex, sets: ex.sets.map((set) => set !== target ? set
           : { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { weight: String(a.weight) } : {}) }) };
+        // Оценка с часов (03.10.2026): вес следующих подходов — по effort.js
+        return isEffort(a.effort) ? rateSet(next, ex.sets.indexOf(target), a.effort).ex : next;
       }) };
     } else if (a.kind === 'rest' && Number(a.restUntil) > (s.restUntil || 0) && s.status === 'active') {
       s = { ...s, restUntil: Math.round(Number(a.restUntil)), restLocal: platform };

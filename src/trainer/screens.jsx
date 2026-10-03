@@ -15,6 +15,7 @@ import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, 
 import PushSetting from '../PushSetting.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
+import RestSignalSetting from '../RestSignalSetting.jsx';
 
 /* ==================================================================
  * Клиенты
@@ -1370,6 +1371,7 @@ export function Settings() {
           занятие открыл. */}
       <Section title="Уведомления">
         <PushSetting />
+        <RestSignalSetting />
       </Section>
 
       {/* Выход стоит последним и сам прячется внутри Telegram: там выходить

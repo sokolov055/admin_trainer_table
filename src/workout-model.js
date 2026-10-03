@@ -38,6 +38,9 @@ export function fromPlan(block, month, members = []) {
       // упражнение делается сразу, а не после отдыха.
       supersetGroup: e.supersetGroup || '',
       prescription: prescription(e),
+      // Для оценки подхода (effort.js): группа и снаряд дают шаг веса,
+      // план повторов — «не добил», lastRun — «последний раз вы делали…»
+      ...extrasOf(e, split),
       sets: split
         // Круг — каждый из делающих по подходу, по очереди: так пара и
         // работает в зале, пока один отдыхает, другой делает
@@ -51,7 +54,9 @@ export function fromPlan(block, month, members = []) {
             ...planSet(e, trackOf(e)),
           })))
         // Кардио по умолчанию — один отрезок, а не три подхода
-        : Array.from({ length: Math.min(20, Math.max(1, parseInt(e.sets) || (trackOf(e).kind === 'cardio' ? 1 : 3))) }, () => ({
+        // Как в последний раз у клиента: лесенкой, с разминкой, сдвинуто
+        // по оценкам (сервер, lib/effort.js). Нет истории — из программы
+        : startSets(e) || Array.from({ length: Math.min(20, Math.max(1, parseInt(e.sets) || (trackOf(e).kind === 'cardio' ? 1 : 3))) }, () => ({
           ...blankSet(),
           // Начальный вес (решение владельца 28.09.2026): прошлый рабочий
           // вес клиента в упражнении, нет — из программы, нет и там — пусто
@@ -91,17 +96,33 @@ function rounds(exercise, people) {
   return Math.max(1, Math.min(parseInt(exercise.sets) || 3, Math.floor(20 / Math.max(1, people))));
 }
 
-/** План строкой: «3 × 12 на сторону · 20 кг · RPE 8», у кардио — «20 мин · 8 км/ч» */
+/** План строкой: «3 × 12 на сторону · 20 кг», у кардио — «20 мин · 8 км/ч». RPE убран 03.10.2026 */
 function prescription(e) {
   const track = trackOf(e);
   const weight = track.kind === 'cardio' ? '' : e.weight && (/^[+-]?\d/.test(String(e.weight)) ? e.weight + (track.perSide ? ' кг/стор.' : ' кг') : e.weight);
-  return [planScheme(e), weight, e.rpe && 'RPE ' + e.rpe].filter(Boolean).join(' · ');
+  return [planScheme(e), weight].filter(Boolean).join(' · ');
 }
 
 /**
  * Дропсет в программе — у последнего подхода: там уже заготовлен первый
  * сброс, чтобы в зале не искать, куда его вписать.
  */
+/** Подходы как в последний раз у клиента (startSets с сервера); нет — null */
+function startSets(e) {
+  if (!Array.isArray(e.startSets) || !e.startSets.length || trackOf(e).kind === 'cardio') return null;
+  return e.startSets.slice(0, 20).map(s => ({ ...blankSet(), weight: String(s.weight || ''), reps: String(s.reps || ''), kind: s.kind === 'warmup' ? 'warmup' : 'work' }));
+}
+
+/** Для оценок подходов: шаг веса (группа, снаряд), план повторов, прошлый раз */
+function extrasOf(e, split) {
+  return {
+    ...(e.exercise && (e.exercise.muscle || e.exercise.equipment)
+      ? { load: { muscle: e.exercise.muscle || '', equipment: e.exercise.equipment || '' } } : {}),
+    ...(/^\d{1,3}/.test(String(e.reps || '')) ? { target: String(e.reps).match(/^\d{1,3}/)[0] } : {}),
+    ...(!split && e.lastRun ? { lastRun: e.lastRun } : {}),
+  };
+}
+
 function withTechnique(e, ex) {
   if (e.technique !== 'dropset' || !ex.sets.length || ex.sets.some(x => x.who)) return ex;
   const sets = ex.sets.slice();

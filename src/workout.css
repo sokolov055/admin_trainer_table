@@ -245,7 +245,7 @@
 .workout__set-row,
 .workout__set-head {
   display: grid;
-  grid-template-columns: 44px repeat(var(--cols, 2), minmax(0, 1fr)) 48px;
+  grid-template-columns: 44px repeat(var(--cols, 2), minmax(0, 1fr));
   align-items: center;
   gap: var(--space-2);
 }
@@ -420,7 +420,7 @@
 /* Сплит: у подхода имя («Екатерина · 2») — оно не помещается в узкую
    колонку номера, поэтому стоит строкой над весом и повторами */
 .workout__set-row--who,
-.workout__set-head--who { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)) 48px; }
+.workout__set-head--who { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); }
 .workout__set-row--who > span:first-child { grid-column: 1 / -1; font-weight: 600; color: var(--text); }
 .workout__set-head--who > span:first-child { display: none; }
 
@@ -597,3 +597,57 @@
 .workout__round > [data-member].workout__exercise--lifted { background: var(--surface); border-radius: var(--radius-sm); }
 .workout__fields [data-unit], .workout__round > [data-member] { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
 .workout__exercise--lifted { position: relative; z-index: 3; transition: none !important; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); }
+
+/* «Легко / Норм / Тяжело» вместо галочки (effort.js, 03.10.2026) */
+.workout__check--asking { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Оценка подхода (03.10.2026). Заливки темнее фирменных зелёного и
+   оранжевого: белый текст на них — не ниже 4,5:1 (craft-floor). Тихие —
+   ближайший подход не текущего упражнения: обводкой, а не полупрозрачностью,
+   чтобы текст оставался читаемым */
+.workout__effort { --easy: #1a7f37; --hard: #b35600; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: var(--space-2) 0 var(--space-1); }
+.workout__effort-btn { --c: var(--accent); min-height: 48px; border: 0; border-radius: var(--radius-sm, 10px); background: var(--c); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 140ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), background-color 160ms var(--ease-out, ease); }
+.workout__effort-btn:active { transform: scale(0.97); }
+.workout__effort-btn:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.workout__effort-btn--easy { --c: var(--easy); }
+.workout__effort-btn--hard { --c: var(--hard); }
+.workout__effort--quiet .workout__effort-btn { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--c); }
+.workout__effort-hint { margin: 0 0 var(--space-2); font-size: 13px; line-height: 1.35; color: var(--text-muted); }
+.workout__effort-next { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-muted); }
+.workout__effort-dot { --c: var(--accent); width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px; background: var(--c); }
+.workout__effort-dot--easy { --c: #1a7f37; }
+.workout__effort-dot--hard { --c: #b35600; }
+.workout__member-done { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin: var(--space-1) 0 var(--space-2); padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font: inherit; font-size: 13px; cursor: pointer; }
+.workout__member-done:active { transform: scale(0.97); }
+.workout__cardio-done { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--good-text); }
+
+/* Почему у подхода такой вес — значок и причина, цвет из темы */
+.workout__suggest { display: flex; align-items: center; gap: 4px; margin: 2px 0 var(--space-1); font-size: 13px; font-weight: 600; }
+.workout__suggest--easy { color: var(--good-text); }
+.workout__suggest--hard, .workout__suggest--short { color: var(--warning-text); }
+.workout__last { margin: var(--space-1) 0 var(--space-2); font-size: 13px; line-height: 1.4; color: var(--text-muted); max-width: 60ch; }
+
+/* Отдых на весь экран (RestScreen): касание мимо кнопок ничего не делает.
+   Появляется коротко, без «прыжка»: прозрачность и масштаб с 0,98 */
+.rest-screen { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); background: var(--bg, #111); color: var(--text); animation: rest-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+@keyframes rest-in { from { opacity: 0; transform: scale(0.98); } }
+.rest-screen__label { margin: 0; font-size: 22px; font-weight: 700; color: var(--accent); }
+.rest-screen--over .rest-screen__label { color: var(--warning-text); }
+.rest-screen__dial { position: relative; width: min(64vw, 300px, 40vh); aspect-ratio: 1; }
+.rest-screen__ring { width: 100%; height: 100%; }
+.rest-screen__track { fill: none; stroke: var(--border); stroke-width: 14; }
+.rest-screen__bar { fill: none; stroke: var(--accent); stroke-width: 14; stroke-linecap: round; transition: stroke-dasharray 1s linear; }
+.rest-screen--over .rest-screen__bar { stroke: #f08c00; transition: none; }
+.rest-screen__time { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: min(20vw, 88px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.rest-screen__next { width: min(100%, 420px); padding: 16px; border-radius: var(--radius, 16px); background: var(--surface); text-align: center; }
+.rest-screen__next-name { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.25; text-wrap: balance; }
+.rest-screen__next-part { margin: 2px 0 0; font-size: 14px; color: var(--text-muted); }
+.rest-screen__next-load { margin: 10px 0 0; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.rest-screen__next-change { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 700; }
+.rest-screen__next-change--up { background: var(--good-fill); color: var(--good-text); }
+.rest-screen__next-change--down { background: var(--warning-fill); color: var(--warning-text); }
+.rest-screen__next-change--same, .rest-screen__next-change--new { background: var(--border); color: var(--text-muted); }
+.rest-screen__actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; width: min(100%, 420px); }
+.rest-screen--over .rest-screen__actions { grid-template-columns: 1fr; }
+.rest-screen__actions .button { min-height: 56px; font-size: 17px; }
+@media (prefers-reduced-motion: reduce) { .rest-screen { animation: none; } .rest-screen__bar { transition: none; } }

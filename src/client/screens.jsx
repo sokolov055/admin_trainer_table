@@ -921,7 +921,6 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
   const scheme = [
     // По типу: «3 × 12 на сторону», «20 мин · 8 км/ч», «4 × 60 с»
     planScheme(ex, inSuperset),
-    ex.rpe && 'RPE ' + ex.rpe,
   ].filter(Boolean).join('   ·   ');
 
   // Сплит: кто делает и с каким весом. Упражнение не для всех — помечено

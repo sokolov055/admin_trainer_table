@@ -4,7 +4,7 @@ import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
@@ -12,13 +12,15 @@ import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
-import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
+import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmRings } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, isCoaching } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { useData } from './useData.js';
 import { SetupText } from './media.jsx';
+import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText } from './effort.js';
+import { unlockAlarm, ringOnce, stopVibration } from './rest-alarm.js';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
 
@@ -69,6 +71,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // строкой «Настройки подхода» под каждым: их читают редко, а место они
   // занимали у цифр, ради которых экран и открыт
   const [openSet, setOpenSet] = useState('');
+  // Отметка подхода — с оценкой «легко / норм / тяжело» (03.10.2026):
+  // галочка раскрывает выбор под подходом (ключ подхода или круга)
+  const [effortFor, setEffortFor] = useState('');
+  const restSpan = useRef({ until: 0, total: 0 });
   // Разъединили или соединили суперсет — подходы перелетают на новые места
   const fieldsRef = useRef(null);
   const flip = useFlip(fieldsRef);
@@ -404,9 +410,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * нет, и уведомление придёт с сервера, как раньше.
    */
   const restAt = (until) => {
+    // Длина отдыха — для кольца на экране отдыха
+    restSpan.current = { until, total: Math.max(1000, until - Date.now()) };
     change(v => ({ ...v, restUntil: until, restLocal: '' }));
     save();
-    scheduleRestEnd(until).then((ok) => {
+    // Что дальше — в уведомление о конце отдыха и в шторку (Android)
+    scheduleRestEnd(until, nextText(state.current && state.current.session)).then((ok) => {
       if (!ok || state.current?.session.restUntil !== until) return;
       change(v => (v.restUntil === until ? { ...v, restLocal: localRestPlatform() } : v));
       save();
@@ -447,7 +456,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const set = ex.sets[si];
     const track = trackOf(ex);
     const fields = rowFields(track);
-    const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
+    // Свой вес — подсказка «подобрано» больше не нужна, и оценки этот
+    // подход больше не двигают (own)
+    const edit = (key, value) => updateSet(ei, si, ({ suggest, ...s }) => ({ ...s, [key]: value, ...(key !== 'weight' && suggest ? { suggest } : {}), ...(key === 'weight' ? { own: true } : {}) }));
     const drops = set.drops || [];
     const editDrop = (di, key, value) => updateSet(ei, si, s => ({ ...s, drops: s.drops.map((d, i) => (i === di ? { ...d, [key]: value } : d)) }));
     // Стороны разошлись: пишем обе, а в «повторы» — меньшее, по нему
@@ -467,21 +478,34 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               {inRound
                 ? <span>{label}</span>
                 : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, подход ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
-                  <span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span><IconSliders size={12} aria-hidden="true" />
+                  <span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span>
+                  {set.state === 'done' && set.effort
+                    ? <span className={'workout__effort-dot workout__effort-dot--' + set.effort} title={EFFORT_WORD[set.effort]} aria-label={EFFORT_WORD[set.effort]} />
+                    : <IconSliders size={12} aria-hidden="true" />}
                 </button>}
               {fields.map(f => (
                 <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
               ))}
-              {!inRound && <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, подход ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
-                const lack = set.state !== 'done' && missing(set, track);
-                if (lack) { setMessage(lack); return; }
-                const starting = set.state !== 'done';
-                updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
-                // Отдых начинается там, где человек нажал, а не там, где
-                // стоит переключатель: подход отмечен — время пошло.
-                if (starting && restAfter) startRest();
-              }}><IconCheck size={20} /></button>}
             </div>
+            {/* Галочки нет (03.10.2026): под ближайшим подходом упражнения —
+                «Легко / Норм / Тяжело», каждая отмечает подход и запускает
+                отдых. Снять отметку — номер подхода → «Снять отметку» */}
+            {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
+              const lack = missing(set, track);
+              if (lack) { setMessage(lack); return; }
+              updateExercise(ei, x => rateSet(x, si, effort).ex);
+              // Отдых начинается там, где человек нажал: подход отмечен —
+              // время пошло. Длительность — по оценке и по тому, прибавили
+              // ли вес (effort.js)
+              if (restAfter) startRest(restFor(effort, state.current && state.current.session.restSeconds, rateSet(ex, si, effort).raised));
+            }, current)}
+            {set.state === 'pending' && set.suggest && (() => {
+              // Только у ближайшего: сразу за отмеченным подходом того же человека
+              const prev = ex.sets.slice(0, si).filter(x => (x.who || '') === (set.who || '')).pop();
+              if (!prev || prev.state !== 'done') return null;
+              const t = suggestText(set, prev);
+              return t ? <p className={'workout__suggest workout__suggest--' + set.suggest}><IconDelta value={t.startsWith('+') ? 1 : -1} />{t}</p> : null;
+            })()}
             {/* Дропсет: сбросы идут сразу за подходом, без отдыха, — поэтому
                 они на виду, а не в настройках */}
             {drops.map((d, di) => (
@@ -510,12 +534,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               {setExtras(ex, ei, si)}
               <div className="workout__toolbar">
                 <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
-                <label>RPE<input aria-label={`${ex.name}, подход ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
                 {setTools(ex, ei, si)}
-                <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
+                {set.state === 'done'
+                  ? <button className="button" onClick={() => { setOpenSet(''); updateSet(ei, si, unrate); }}>Снять отметку</button>
+                  : <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>}
               </div>
             </div>}
           </SwipeRow>;
+  };
+
+  /** Ближайший неотмеченный подход упражнения (у пары — своего человека) */
+  const nextOf = (ex, si) => {
+    const who = ex.sets[si].who || '';
+    return ex.sets.findIndex(x => (x.who || '') === who && x.state === 'pending') === si;
   };
 
   /**
@@ -539,28 +570,50 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, отрезок ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
             <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}{set.kind === 'warmup' ? ' · разминка' : ''}</span><IconSliders size={12} aria-hidden="true" />
           </button>}
-        {!inRound && <button className={'workout__check' + (current ? ' workout__check--next' : '')} aria-label={`${ex.name}, отрезок ${si + 1}: ${set.state === 'done' ? 'снять отметку' : 'выполнен'}`} aria-pressed={set.state === 'done'} onClick={() => {
-          const lack = set.state !== 'done' && missing(set, track);
-          if (lack) { setMessage(lack); return; }
-          const starting = set.state !== 'done';
-          updateSet(ei, si, s => ({ ...s, state: s.state === 'done' ? 'pending' : 'done' }));
-          if (starting && restAfter) startRest();
-        }}><IconCheck size={20} /></button>}
+        {!inRound && set.state === 'done' && <span className="workout__cardio-done"><IconCheck size={16} /> сделан</span>}
       </div>
       <div className="workout__cardio-grid">
         {fields.map(f => (
           <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
         ))}
       </div>
+      {/* Как у силовых: отрезок отмечается оценкой, она же запускает отдых */}
+      {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
+        const lack = missing(set, track);
+        if (lack) { setMessage(lack); return; }
+        updateSet(ei, si, s => ({ ...s, state: 'done', effort }));
+        if (restAfter) startRest(restFor(effort, state.current && state.current.session.restSeconds));
+      }, current)}
       {!inRound && openSet === key && <div className="workout__set-options">
         <div className="workout__toolbar">
           <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
-          <label>RPE<input aria-label={`${ex.name}, отрезок ${si + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={set.rpe} onChange={e => updateSet(ei, si, s => ({ ...s, rpe: e.target.value }))} /></label>
-          <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>
+          {set.state === 'done'
+            ? <button className="button" onClick={() => { setOpenSet(''); updateSet(ei, si, unrate); }}>Снять отметку</button>
+            : <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>}
         </div>
       </div>}
     </SwipeRow>;
   };
+
+  /** В занятии уже есть оценка — подсказку под кнопками больше не показываем */
+  const rated = () => !!(state.current && state.current.session.exercises.some(e => e.sets.some(x => x.effort)));
+
+  /**
+   * Выбор оценки подхода (круга): три кнопки, каждая отмечает и запускает
+   * отдых — короче после «Легко», дольше после «Тяжело» (effort.js)
+   */
+  const effortChooser = (onPick, current = true) => (
+    <>
+      <div className={'workout__effort' + (current ? '' : ' workout__effort--quiet')} role="group" aria-label="Подход сделан — как прошло?">
+        {EFFORTS.map(e => (
+          <button type="button" key={e.key} className={'workout__effort-btn workout__effort-btn--' + e.key}
+            onClick={() => { haptic(); unlockAlarm(); onPick(e.key); }}>{e.label}</button>
+        ))}
+      </div>
+      {/* Что значат кнопки — под текущими, пока в занятии нет ни одной оценки */}
+      {current && !rated() && <p className="workout__effort-hint">{EFFORT_HINT}</p>}
+    </>
+  );
 
   /** Кардио: добавить метрику, которой нет в плане, — калории с экрана тренажёра, пульс с часов */
   const metricAdd = (ex, ei) => {
@@ -601,55 +654,82 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
 
   /**
-   * Круг суперсета — одной кнопкой. Упражнения идут подряд без отдыха, и
-   * отмечать каждое своей галочкой в зале неудобно: в круге их делают
-   * вместе и отмечают вместе (27.09.2026, просьба владельца). Кнопка
-   * отмечает все упражнения круга и запускает отдых; второе нажатие —
-   * снимает. Чего не хватает (повторов, времени) — пишем прямо под
-   * кнопкой с названием упражнения: подсказка вверху экрана не видна за
-   * клавиатурой, и казалось, что кнопка не нажимается.
+   * Оценка упражнения в круге суперсета (03.10.2026, владелец): у каждого
+   * упражнения свои «Легко / Норм / Тяжело», вес правится у каждого своим
+   * шагом. Не последнее в круге — это «дальше»: отмечает и ведёт к
+   * следующему без отдыха. Последнее — запускает отдых по всему кругу
+   * (roundRest). Сделанное в незаконченном круге — плашкой с оценкой,
+   * касание снимает отметку.
+   */
+  const memberEffort = (members, k, r) => {
+    if (!editable) return null;
+    const { ex, ei } = members[k];
+    const set = ex.sets[r];
+    const group = ex.supersetGroup;
+    const live = members.filter(({ ex: e }) => e.sets[r] && e.sets[r].state !== 'skipped');
+    if (set.state === 'done') {
+      if (live.every(({ ex: e }) => e.sets[r].state === 'done')) return null;
+      return <button type="button" className="workout__member-done" onClick={() => updateSet(ei, r, unrate)}>
+        <span className={'workout__effort-dot workout__effort-dot--' + (set.effort || 'ok')} aria-hidden="true" />
+        {(set.effort ? EFFORT_WORD[set.effort] : 'сделано')} · снять
+      </button>;
+    }
+    if (set.state !== 'pending') return null;
+    // Только в ближайшем незаконченном круге
+    const open = (i) => members.some(({ ex: e }) => e.sets[i] && e.sets[i].state === 'pending');
+    if (Array.from({ length: r }, (_, i) => i).some(open)) return null;
+    const waiting = live.filter(({ ex: e }) => e.sets[r].state === 'pending');
+    const last = waiting.length === 1;
+    const after = members.slice(k + 1).find(({ ex: e }) => e.sets[r] && e.sets[r].state === 'pending');
+    const key = group + ':' + r;
+    const pick = (effort) => {
+      const why = missing(set, trackOf(ex));
+      if (why) { setRoundLack({ key, text: ex.name + ': ' + why.replace(/ перед отметкой.*$/, '').toLowerCase() }); return; }
+      setRoundLack(null);
+      const rated = rateSet(ex, r, effort);
+      updateExercise(ei, x => rateSet(x, r, effort).ex);
+      if (!last) return;
+      // Круг закончен — отдых по всем оценкам круга
+      const others = live.filter(m => m.ex.id !== ex.id).map(m => m.ex.sets[r]);
+      const efforts = [...others.map(x => x.effort || 'ok'), effort];
+      const raised = rated.raised || others.some(x => x.raised);
+      startRest(roundRest(efforts, state.current && state.current.session.restSeconds, raised));
+    };
+    return <>
+      {effortChooser(pick, waiting[0] && waiting[0].ex.id === ex.id)}
+      {/* Подпись — по порядку круга: последнее упражнение запускает отдых */}
+      <p className="workout__effort-next">{last || !after ? 'Последнее в круге — запустит отдых' : 'Без отдыха → ' + after.ex.name}</p>
+    </>;
+  };
+
+  /**
+   * Круг суперсета сделан — кнопка «Круг N выполнен», касание снимает
+   * отметки со всего круга. Отмечают круг оценками у каждого упражнения
+   * (memberEffort); чего не хватает — пишем под кругом с названием
+   * упражнения: подсказка вверху экрана не видна за клавиатурой.
    */
   const roundCheck = (members, r) => {
     const group = members[0].ex.supersetGroup;
     const inRound = members.filter(({ ex }) => ex.sets[r] && ex.sets[r].state !== 'skipped');
     if (!inRound.length) return null;
     const done = inRound.every(({ ex }) => ex.sets[r].state === 'done');
-    // Ближайший невыполненный круг — кнопка яркая, как «следующая» галочка
-    const open = (i) => members.some(({ ex }) => ex.sets[i] && ex.sets[i].state === 'pending');
-    const current = !done && open(r) && !Array.from({ length: r }, (_, i) => i).some(open);
     const key = group + ':' + r;
     const toggle = () => {
-      if (done) {
-        setRoundLack(null);
-        change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] && e.sets[r].state === 'done'
-          ? { ...e, sets: e.sets.map((x, i) => (i === r ? { ...x, state: 'pending' } : x)) } : e)) }));
-        return;
-      }
-      const lack = inRound
-        .filter(({ ex }) => ex.sets[r].state !== 'done')
-        .map(({ ex }) => { const why = missing(ex.sets[r], trackOf(ex)); return why ? ex.name + ': ' + why.replace(/ перед отметкой.*$/, '').toLowerCase() : ''; })
-        .filter(Boolean);
-      if (lack.length) { setRoundLack({ key, text: lack.join('; ') }); return; }
       setRoundLack(null);
-      change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] && e.sets[r].state !== 'skipped'
-        ? { ...e, sets: e.sets.map((x, i) => (i === r ? { ...x, state: 'done' } : x)) } : e)) }));
-      // Отдых — после круга
-      startRest();
+      change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] && e.sets[r].state === 'done'
+        ? { ...e, sets: e.sets.map((x, i) => (i === r ? unrate(x) : x)) } : e)) }));
     };
     return <>
-      <button type="button" className={'button button--block workout__round-check' + (done ? ' workout__round-check--done' : current ? ' button--primary' : '')}
-        aria-pressed={done} onClick={toggle}>
-        {/* Круг записан — «Отдых»: отмечает все упражнения круга и
-            запускает отдых, как «Отдых» на часах и плашке */}
-        <IconCheck size={18} />{done ? `Круг ${r + 1} выполнен` : `Круг ${r + 1} · отдых`}
-      </button>
+      {done && <button type="button" className="button button--block workout__round-check workout__round-check--done" aria-pressed onClick={toggle}>
+        <IconCheck size={18} />{`Круг ${r + 1} выполнен`}
+      </button>}
       {roundLack && roundLack.key === key && <p className="workout__round-lack" role="alert">{roundLack.text}</p>}
     </>;
   };
 
   /**
    * Настройки круга суперсета — одни на круг, а не у каждого упражнения:
-   * разминочный круг, пропустить или убрать круг целиком. RPE, поддержка,
+   * разминочный круг, пропустить или убрать круг целиком. Поддержка,
    * дропсет — у каждого упражнения внутри.
    */
   const roundOptions = (members, r) => {
@@ -667,7 +747,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <div className="workout__round-set-name">{ex.name}</div>
           {setExtras(ex, ei, r)}
           <div className="workout__toolbar">
-            <label>RPE<input aria-label={`${ex.name}, круг ${r + 1}, RPE`} inputMode="decimal" placeholder="1–10" maxLength={4} value={ex.sets[r].rpe} onChange={e => updateSet(ei, r, s => ({ ...s, rpe: e.target.value }))} /></label>
             {setTools(ex, ei, r)}
           </div>
         </div>
@@ -728,8 +807,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       </div>
       <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.{editable ? ' Порядок внутри — подержите название и перетащите.' : ''}</p>
       {(members[0].ex.prescription || members.some(({ ex }) => ex.prevWeight)) && (
-        <p className="small muted">{members.map(({ ex }) => ex.name + (ex.prescription ? ': ' + ex.prescription : '') + (ex.prevWeight ? ' · было ' + ex.prevWeight : '')).join('; ')}</p>
+        <p className="small muted">{members.map(({ ex }) => ex.name + (ex.prescription ? ': ' + ex.prescription : '') + (ex.prevWeight && !ex.lastRun ? ' · было ' + ex.prevWeight : '')).join('; ')}</p>
       )}
+      {members.filter(({ ex }) => lastRunText(ex.lastRun)).map(({ ex }) => (
+        <p className="workout__last" key={'last' + ex.id}>{ex.name}: {lastRunText(ex.lastRun).replace(/^Последний раз/, 'последний раз')}</p>
+      ))}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
@@ -744,6 +826,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   <span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span>
                 </div>}
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
+              {memberEffort(members, k, r)}
             </div>
           ))}
           {roundCheck(members, r)}
@@ -1051,14 +1134,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Куда смотреть: первое упражнение с неотмеченным подходом и этот
   // подход. Оно обведено, подход подсвечен, его «готово» — залито; всё
   // остальное тише. Иначе в зале глаза разбегаются по одинаковым строкам.
-  const focus = (() => {
-    const list = (s && s.exercises) || [];
-    for (let i = 0; i < list.length; i += 1) {
-      const si = list[i].sets.findIndex(x => x.state === 'pending');
-      if (si !== -1) return { ex: list[i].id, set: si };
-    }
-    return { ex: '', set: -1 };
-  })();
+  const focus = focusOf(s);
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
@@ -1106,13 +1182,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
             оставшийся наверху, приходилось искать прокруткой. */}
-        {!!s.restUntil && <div className="workout__rest workout__rest--float" role="status">
-          <span>{now < s.restUntil ? 'Отдых ' + clock(s.restUntil - now) : 'Отдых закончен — следующий подход'}</span>
-          <span className="workout__rest-actions">
-            <button className="button" onClick={extendRest}>+30 с</button>
-            <button className="button" onClick={() => change(v => ({ ...v, restUntil: 0 }))}>Сбросить</button>
-          </span>
-        </div>}
+        {!!s.restUntil && s.status === 'active' && <RestScreen
+          until={s.restUntil}
+          total={restSpan.current.until === s.restUntil ? restSpan.current.total : (s.restSeconds || 90) * 1000}
+          now={now}
+          next={nextInfo(s, focus)}
+          onMore={extendRest}
+          onStop={() => change(v => ({ ...v, restUntil: 0 }))}
+        />}
         {s.exercises.map((ex, ei) => {
           const group = ex.supersetGroup;
           const members = group ? s.exercises.map((e, i) => ({ ex: e, ei: i })).filter(m => m.ex.supersetGroup === group) : [];
@@ -1157,9 +1234,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <p className="workout__target">
               {main && <strong>{main}</strong>}
               {rest.map((r, i) => <span key={i}>{r}</span>)}
-              {ex.prevWeight && <span className="workout__prev">было {ex.prevWeight}</span>}
+              {ex.prevWeight && !ex.lastRun && <span className="workout__prev">было {ex.prevWeight}</span>}
             </p>
           )}
+          {/* Последнее выполнение клиентом — с повторами и оценкой */}
+          {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
           <details><summary>Изменить упражнение</summary>
             {clientRow
               ? <NameFromBase ex={ex} onPick={(patch) => updateExercise(ei, x => ({ ...x, ...patch }))} />
@@ -1168,7 +1247,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
           </details>
           {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}
-          {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}<span>Готово</span></div>}
+          {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}</div>}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
           {trackOf(ex).kind === 'cardio' && metricAdd(ex, ei)}
           {/* У пары подход добавляется кругом — по одному каждому, кто
@@ -1237,6 +1316,114 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {erase.bar}
     </>}
   </div>;
+}
+
+/**
+ * Отдых на весь экран (03.10.2026, владелец): крупный таймер, касание по
+ * экрану ничего не делает — выключить можно только кнопкой. Под таймером —
+ * что дальше. В конце — «Отдых окончен», звук и вибрация каждые 2 с, пока
+ * не нажмут «Закрыть» (не дольше двух минут). Свёрнутое приложение
+ * сигналит уведомлением (native-rest.js) и плашкой (Live Activity).
+ */
+function RestScreen({ until, total, now, next, onMore, onStop }) {
+  const left = until - now;
+  const over = left <= 0;
+  useEffect(() => {
+    if (!over) return undefined;
+    // iPhone с будильником (iOS 26+) звенит сам — второй звук не нужен
+    if (alarmRings(until)) return undefined;
+    let n = 0;
+    ringOnce();
+    const timer = setInterval(() => { n += 1; if (n >= 60) { clearInterval(timer); return; } ringOnce(); }, 2000);
+    return () => { clearInterval(timer); stopVibration(); };
+  }, [over, until]);
+  const share = over ? 1 : Math.max(0, Math.min(1, left / Math.max(1, total)));
+  const R = 120;
+  const C = 2 * Math.PI * R;
+  return (
+    <div className={'rest-screen' + (over ? ' rest-screen--over' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}>
+      <div className="rest-screen__label">{over ? 'Отдых окончен' : 'Отдых'}</div>
+      <div className="rest-screen__dial">
+        <svg className="rest-screen__ring" viewBox="0 0 280 280" aria-hidden="true">
+          <circle cx="140" cy="140" r={R} className="rest-screen__track" />
+          <circle cx="140" cy="140" r={R} className="rest-screen__bar" strokeDasharray={`${C * share} ${C}`} transform="rotate(-90 140 140)" />
+        </svg>
+        <div className="rest-screen__time" role="timer" aria-live="off">{over ? '0:00' : clock(left)}</div>
+      </div>
+      {next && (
+        <div className="rest-screen__next">
+          {/* Название — заголовок карточки, подход — под ним: без надписи
+              капслоком сверху (craft-floor). «Дальше» и так ясно из экрана */}
+          <p className="rest-screen__next-name">{next.name}</p>
+          <p className="rest-screen__next-part">{next.part.charAt(0).toUpperCase() + next.part.slice(1)}</p>
+          {next.load && <p className="rest-screen__next-load">{next.load}</p>}
+          {next.change && <div className={'rest-screen__next-change rest-screen__next-change--' + next.change.kind}>
+            {(next.change.kind === 'up' || next.change.kind === 'down') && <IconDelta value={next.change.kind === 'up' ? 1 : -1} />}
+            {next.change.text}
+          </div>}
+        </div>
+      )}
+      <div className="rest-screen__actions">
+        {over
+          ? <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закрыть</button>
+          : <>
+            <button type="button" className="button rest-screen__more" onClick={onMore}>+30 с</button>
+            <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закончить отдых</button>
+          </>}
+      </div>
+    </div>
+  );
+}
+
+/** Ближайший подход занятия; в суперсете — следующее упражнение того же круга */
+function focusOf(s) {
+  const list = (s && s.exercises) || [];
+  for (let i = 0; i < list.length; i += 1) {
+    const si = list[i].sets.findIndex(x => x.state === 'pending');
+    if (si === -1) continue;
+    const group = list[i].supersetGroup;
+    if (group) {
+      const mates = list.filter(e => e.supersetGroup === group);
+      const r = Math.min(...mates.map(e => { const j = e.sets.findIndex(x => x.state === 'pending'); return j === -1 ? Infinity : j; }));
+      const who = mates.find(e => e.sets[r] && e.sets[r].state === 'pending');
+      if (who) return { ex: who.id, set: r };
+    }
+    return { ex: list[i].id, set: si };
+  }
+  return { ex: '', set: -1 };
+}
+
+/** «Присед со штангой · подход 2 из 5 · 90 кг × 5» — для уведомлений */
+function nextText(s) {
+  const n = s ? nextInfo(s, focusOf(s)) : null;
+  return n ? [n.name, n.part, n.load].filter(Boolean).join(' · ') : '';
+}
+
+/**
+ * Что дальше — для экрана отдыха (владелец, 03.10.2026): куда идти и что
+ * накинуть или снять. Тот же человек и то же упражнение — разница с
+ * прошлым подходом; другое упражнение — «новое» и вес с прошлого раза
+ */
+function nextInfo(s, focus) {
+  const ex = s.exercises.find(e => e.id === focus.ex);
+  const set = ex && ex.sets[focus.set];
+  if (!set) return null;
+  const num = (v) => Number(String(v || '').replace(',', '.'));
+  const kg = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
+  const own = ex.sets.filter(x => (x.who || '') === (set.who || ''));
+  const part = (set.who ? set.who + ' · ' : '') + 'подход ' + (own.indexOf(set) + 1) + ' из ' + own.length;
+  const load = [set.weight ? kg(num(set.weight)) + ' кг' : '', set.reps ? '× ' + set.reps : ''].filter(Boolean).join(' ');
+  const prev = own.slice(0, own.indexOf(set)).filter(x => x.state === 'done').pop();
+  let change = null;
+  if (prev && set.weight && prev.weight) {
+    const d = num(set.weight) - num(prev.weight);
+    change = d > 0 ? { kind: 'up', text: 'накинуть ' + kg(d) + ' кг' }
+      : d < 0 ? { kind: 'down', text: 'снять ' + kg(-d) + ' кг' }
+        : { kind: 'same', text: 'вес тот же' };
+  } else if (!prev) {
+    change = { kind: 'new', text: 'новое упражнение' + (ex.prevWeight ? ' · в прошлый раз ' + String(ex.prevWeight).replace('.', ',') : '') };
+  }
+  return { name: ex.name, part, load, change };
 }
 
 /**
