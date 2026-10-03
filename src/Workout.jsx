@@ -391,11 +391,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * приходил с опозданием в минуту, а то и позже.
    */
   const startRest = (seconds) => {
-    const length = seconds || (state.current && state.current.session.restSeconds);
+    const length = seconds || restBase();
     if (!length) return;
 
     restAt(Date.now() + length * 1000);
   };
+
+  /**
+   * Длительность отдыха занятия. Не выбрана — 1:30, как на часах: с
+   * оценками подхода (03.10.2026) отдых запускается всегда, а «Вручную»
+   * (ноль) оставлял человека без таймера — так было на живой тренировке
+   */
+  const restBase = () => (state.current && state.current.session.restSeconds) || 90;
 
   /** +30 секунд к отдыху — и уведомление переставить */
   const extendRest = () => {
@@ -497,7 +504,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               // Отдых начинается там, где человек нажал: подход отмечен —
               // время пошло. Длительность — по оценке и по тому, прибавили
               // ли вес (effort.js)
-              if (restAfter) startRest(restFor(effort, state.current && state.current.session.restSeconds, rateSet(ex, si, effort).raised));
+              if (restAfter) startRest(restFor(effort, restBase(), rateSet(ex, si, effort).raised));
             }, current)}
             {set.state === 'pending' && set.suggest && (() => {
               // Только у ближайшего: сразу за отмеченным подходом того же человека
@@ -582,7 +589,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         const lack = missing(set, track);
         if (lack) { setMessage(lack); return; }
         updateSet(ei, si, s => ({ ...s, state: 'done', effort }));
-        if (restAfter) startRest(restFor(effort, state.current && state.current.session.restSeconds));
+        if (restAfter) startRest(restFor(effort, restBase()));
       }, current)}
       {!inRound && openSet === key && <div className="workout__set-options">
         <div className="workout__toolbar">
@@ -693,7 +700,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       const others = live.filter(m => m.ex.id !== ex.id).map(m => m.ex.sets[r]);
       const efforts = [...others.map(x => x.effort || 'ok'), effort];
       const raised = rated.raised || others.some(x => x.raised);
-      startRest(roundRest(efforts, state.current && state.current.session.restSeconds, raised));
+      startRest(roundRest(efforts, restBase(), raised));
     };
     return <>
       {effortChooser(pick, waiting[0] && waiting[0].ex.id === ex.id)}
@@ -1177,7 +1184,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               дальше он стартует сам после каждого отмеченного подхода.
               Раньше за ним приходилось возвращаться в шапку экрана
               после каждого подхода — то есть листать вверх весь список. */}
-          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 0)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds })); if (seconds) startRest(seconds); else change(v => ({ ...v, restUntil: 0 })); }}><option value="0">Вручную</option><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
+          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds })); startRest(seconds); }}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
         </div>}
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
