@@ -4468,3 +4468,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__plus:active { transform: scale(0.95); }
 .plan-inline__add-menu { display: grid; gap: var(--space-2); margin: var(--space-3) 0; }
 @media (prefers-reduced-motion: reduce) { .plan-inline__unit { transition: none; } }
+
+/* Тренировка в программе — удержанием вверх или вниз (hold-reorder.js) */
+.plan__block { position: relative; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.plan__block .section__head { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.plan__block.is-lifted { z-index: 6; transition: none; filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.25)); }
+@media (prefers-reduced-motion: reduce) { .plan__block { transition: none; } }

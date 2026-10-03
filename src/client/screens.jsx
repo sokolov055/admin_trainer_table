@@ -16,6 +16,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
+import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
 import { Media, SetupText } from '../media.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
@@ -332,6 +333,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [saveState, setSaveState] = useState(''); // '' | 'saving' | 'error'
   const editSeq = useRef(0);
   const saveTimer = useRef(null);
+  const blocksRef = useRef(null);
 
   // Шаблоны: взять готовую программу из библиотеки или сохранить эту как
   // шаблон. Только тренер, как и правка.
@@ -700,7 +702,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {(planTab === 'queue' || planTab === 'all') && (planTab === 'all' ? shownBlocks : queueBlocks).map((block, i) => {
+      {(planTab === 'queue' || planTab === 'all') && <div className="plan__blocks" ref={blocksRef}>{(planTab === 'all' ? shownBlocks : queueBlocks).map((block, i, shownList) => {
         const past = blockSessions(sessions, block, data.month);
         const bi = shownBlocks.indexOf(block);
         const editHere = canEdit && !made0(planTab);
@@ -720,8 +722,35 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
 
         return (
-        <Section
+        // Тренировку — удержанием вверх или вниз (владелец, 03.10.2026).
+        // Не из правки упражнений внутри: там своё перетаскивание
+        <div
+          className="plan__block"
           key={block.id || 'new' + bi}
+          data-block={bi}
+          // Проведённые стоят на месте: их не тащат и между ними не ставят —
+          // переставляются только оставшиеся, на свои же места
+          data-done={past.length ? '' : undefined}
+          onPointerDown={canEdit && !past.length ? (e) => {
+            if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select')) return;
+            const movable = shownList.filter((b) => !blockSessions(sessions, b, data.month).length);
+            holdToReorder(e, {
+              rows: () => (blocksRef.current ? [...blocksRef.current.querySelectorAll(':scope > [data-block]:not([data-done])')] : []),
+              onDrop: (from, to) => {
+                // Переставили среди оставшихся — в месяце они занимают те же места
+                const order = [...movable];
+                const [moved] = order.splice(from, 1);
+                order.splice(to, 0, moved);
+                const slots = shownBlocks.map((b, k) => (movable.includes(b) ? k : -1)).filter((k) => k >= 0);
+                const next = [...shownBlocks];
+                slots.forEach((at, k) => { next[at] = order[k]; });
+                commit(next);
+                setOpenBlocks({});
+              },
+            });
+          } : undefined}
+        >
+        <Section
           title={(() => {
             const t = canRename ? <BlockTitle title={block.title} onRename={(v) => renameBlock(block, v)} /> : block.title;
             // Во «Всей программе» проведённая — зелёной галочкой
@@ -809,8 +838,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             ))}
           </Panel>
         </Section>
+        </div>
         );
-      })}
+      })}</div>}
 
       {/* «+» под последней тренировкой: из шаблонов тренировок или новая */}
       {canEdit && (planTab === 'queue' || planTab === 'all') && shownBlocks.length > 0 && (

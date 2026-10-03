@@ -1002,3 +1002,34 @@ test('отдых, свёрнутый у тренера, доживает до к
     await context.close();
   }
 });
+
+/** Тренировку программы — удержанием вниз (03.10.2026): порядок меняется и сохраняется */
+test('тренировка в программе переносится удержанием', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню' }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    const titles = () => phone.locator('#root main:not([hidden]) .plan__block .section__title').allInnerTexts();
+    await phone.locator('#root main:not([hidden]) .plan__block').nth(1).waitFor({ timeout: 10000 });
+    const before = await titles();
+    const head = phone.locator('#root main:not([hidden]) .plan__block .section__head').first();
+    const second = await phone.locator('#root main:not([hidden]) .plan__block').nth(1).boundingBox();
+    const b = await head.boundingBox();
+    await phone.mouse.move(b.x + 20, b.y + b.height / 2);
+    await phone.mouse.down();
+    await phone.waitForTimeout(600);
+    await phone.mouse.move(b.x + 20, second.y + second.height * 0.8, { steps: 12 });
+    await phone.mouse.up();
+    await phone.waitForTimeout(400);
+    const after = await titles();
+    assert.equal(after[0], before[1], 'вторая стала первой');
+    assert.equal(after[1], before[0], 'первая — второй');
+  } finally {
+    await context.close();
+  }
+});
