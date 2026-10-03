@@ -651,3 +651,50 @@
 .rest-screen--over .rest-screen__actions { grid-template-columns: 1fr; }
 .rest-screen__actions .button { min-height: 56px; font-size: 17px; }
 @media (prefers-reduced-motion: reduce) { .rest-screen { animation: none; } .rest-screen__bar { transition: none; } }
+
+/* --- 03.10.2026: правки по проверке на iPhone ---------------------------- */
+
+/* Удержание для перестановки: iPhone не должен выделять текст и
+   показывать меню «Скопировать» вместо того, чтобы поднять карточку */
+.workout__ex-head, .workout__rounds-head, .workout__round-name { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+
+/* Завершить и отменить — в шапке, справа от времени и подходов */
+.workout__head-actions { display: flex; gap: var(--space-2); margin-left: auto; align-self: center; }
+.workout__head-actions .button { min-height: 40px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+.workout__confirm { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); animation: rest-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.workout__confirm p { margin: 0 0 var(--space-3); color: var(--text); font-size: var(--text-sm); }
+.workout__confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.workout__confirm-actions .button { min-height: 44px; }
+
+/* Экран отдыха — поверх всего (портал в body): под ним ничего не листается */
+.rest-screen { touch-action: none; overscroll-behavior: contain; z-index: 90; }
+/* «Дальше» — карточка, которую видно с расстояния: обводка акцентом,
+   крупное название и вес */
+.rest-screen__next { border: 2px solid var(--accent); background: var(--surface); padding: 14px 16px 16px; }
+.rest-screen__next-label { margin: 0 0 4px; font-size: 15px; font-weight: 700; color: var(--accent); }
+.rest-screen__next-name { font-size: 24px; }
+.rest-screen__next-part { font-size: 15px; color: var(--text-secondary); }
+.rest-screen__next-load { font-size: 34px; color: var(--text); }
+.rest-screen__round { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; text-align: left; }
+.rest-screen__round li { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-sunken); }
+.rest-screen__round li.is-done { opacity: 0.5; }
+.rest-screen__round-name { font-size: 17px; font-weight: 650; line-height: 1.25; }
+.rest-screen__round-load { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rest-screen__round .rest-screen__next-change { grid-column: 1 / -1; justify-self: start; margin-top: 4px; font-size: 13px; padding: 2px 10px; }
+.rest-screen__fold { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 0; background: none; color: var(--text-secondary); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.rest-screen__fold svg { transform: rotate(0deg); }
+@media (max-height: 700px) {
+  .rest-screen { gap: 12px; }
+  .rest-screen__dial { width: min(52vw, 220px, 32vh); }
+  .rest-screen__next-name { font-size: 20px; }
+  .rest-screen__next-load { font-size: 28px; margin-top: 6px; }
+}
+
+/* Свёрнутый отдых — плашка над нижним меню, в любом разделе */
+.rest-pill { position: fixed; left: 50%; bottom: var(--float-bottom); z-index: 40; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); cursor: pointer; animation: rest-pill-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.rest-pill strong { font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--accent); }
+.rest-pill__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.rest-pill__up { transform: rotate(180deg); color: var(--text-secondary); }
+.rest-pill:active { transform: translateX(-50%) scale(0.97); }
+@keyframes rest-pill-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+@media (prefers-reduced-motion: reduce) { .rest-pill, .workout__confirm { animation: none; } }

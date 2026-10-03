@@ -60,6 +60,21 @@ export function alarmRings(until) {
   return !!until && alarmUntil === until;
 }
 
+/**
+ * Будильник этого отдыха закрыли вне приложения — крестиком в «острове»,
+ * на экране блокировки или на часах (03.10.2026): тогда и экран «Отдых
+ * окончен» на странице закрыть. Старая сборка без restAlarmState — false
+ */
+export async function alarmClosed(until) {
+  if (!alarmRings(until)) return false;
+  try {
+    const p = plugin('WorkoutActivity');
+    if (!p || !p.restAlarmState) return false;
+    const { state } = await p.restAlarmState();
+    return state === 'none';
+  } catch (_) { return false; }
+}
+
 function shade() {
   return isNativeApp() && platformName() === 'android' ? plugin('RestTimer') : null;
 }

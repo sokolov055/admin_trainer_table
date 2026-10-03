@@ -356,13 +356,16 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
       const index = Math.floor(Number(a.setIndex));
       const reps = /^\d{1,3}$/.test(String(a.reps ?? '')) ? String(a.reps) : null;
       const weight = WEIGHT_RE.test(String(a.weight ?? '')) ? String(a.weight) : null;
-      if (index >= 0 && (reps !== null || weight !== null)) {
+      // effort — отметили подход из списка с оценкой (03.10.2026)
+      const effort = isEffort(a.effort) ? a.effort : '';
+      if (index >= 0 && (reps !== null || weight !== null || effort)) {
         s = { ...s, exercises: s.exercises.map((ex) => {
           if (!mine(ex, a)) return ex;
           const target = ex.sets.filter((set) => whose(set, a))[index];
           if (!target) return ex;
-          return { ...ex, sets: ex.sets.map((set) => set !== target ? set
-            : { ...set, ...(weight !== null ? { weight } : {}), ...(reps !== null ? { reps } : {}) }) };
+          const next = { ...ex, sets: ex.sets.map((set) => set !== target ? set
+            : { ...set, ...(weight !== null ? { weight, own: true } : {}), ...(reps !== null ? { reps } : {}) }) };
+          return effort && target.state === 'pending' ? rateSet(next, ex.sets.indexOf(target), effort).ex : next;
         }) };
       }
     } else if (a.kind === 'move') {

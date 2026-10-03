@@ -187,8 +187,8 @@ test('тренировку можно провести, и блок станов
   await firstExercise.getByText('Изменить упражнение').click();
   await firstExercise.getByLabel('Название').fill('Жим на наклонной скамье');
 
-  await page.getByRole('button', { name: 'Завершить тренировку' }).click();
-  await page.getByRole('button', { name: 'Подтвердить' }).click();
+  await page.getByRole('button', { name: 'Завершить', exact: true }).click();
+  await page.locator('.workout__confirm').getByRole('button', { name: 'Завершить', exact: true }).click();
 
   // Журнал открыт ВНУТРИ экрана программы, поэтому назад ведёт «К
   // программе», а не вкладка внизу: вкладка уже выбрана, и нажатие на неё

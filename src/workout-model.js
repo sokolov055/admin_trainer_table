@@ -8,6 +8,9 @@ export function fromPlan(block, month, members = []) {
   const split = members.length > 1;
   // «+5» у подтягиваний — добавка к своему весу: в поле идёт 5
   const num = (v) => { const x = String(v || '').replace(/^\+\s*/, ''); return /^\d+([.,]\d+)?$/.test(x) ? x.replace(',', '.') : ''; };
+  // «Было 6» или «6 кг» в программе — тоже вес, если другого нет: в зале
+  // поля были пустыми при «было 6» на экране (03.10.2026)
+  const was = (v) => num(String(v || '').replace(/\s*кг\.?\s*$/i, ''));
   // sourceBlockId — id тренировки программы: по нему занятие видно в её
   // «Выполненных», какое бы название ни носили она и занятие
   // startedAt — когда начали на телефоне: начатое без связи сервер получит
@@ -60,7 +63,7 @@ export function fromPlan(block, month, members = []) {
           ...blankSet(),
           // Начальный вес (решение владельца 28.09.2026): прошлый рабочий
           // вес клиента в упражнении, нет — из программы, нет и там — пусто
-          weight: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight),
+          weight: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight) || was(e.lastWeight) || was(e.prevWeight),
           ...planSet(e, trackOf(e)),
         })),
     })) };

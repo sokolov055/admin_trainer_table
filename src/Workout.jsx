@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
@@ -12,7 +12,7 @@ import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
-import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmRings } from './native-rest.js';
+import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmRings, alarmClosed } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, isCoaching } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
@@ -23,6 +23,30 @@ import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate,
 import { unlockAlarm, ringOnce, stopVibration } from './rest-alarm.js';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
+
+/**
+ * План упражнения без RPE: его убрали из приложения 03.10.2026, но в
+ * занятиях, начатых раньше, «RPE 8-9» осталось в снимке плана
+ */
+/** «1 подход», «3 подхода», «5 подходов» */
+const setsWord = (n) => n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? 'подход' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'подхода' : 'подходов');
+const planText = (p) => String(p || '').split(' · ').filter(x => x && !/^RPE\b/i.test(x)).join(' · ');
+
+/**
+ * Отдых, запущенный с этого телефона, — помним и после перезапуска
+ * страницы: окно «Отдых окончен» в чужом разделе всплывает только у него
+ */
+const REST_HERE_KEY = 'rest_here_v1';
+function restHereSaved() {
+  try {
+    const v = JSON.parse(localStorage.getItem(REST_HERE_KEY));
+    if (v && v.until > Date.now() - 30 * 60 * 1000) return { until: Number(v.until) || 0, total: Number(v.total) || 0 };
+  } catch (_) { /* приватный режим */ }
+  return { until: 0, total: 0 };
+}
+function saveRestHere(v) {
+  try { localStorage.setItem(REST_HERE_KEY, JSON.stringify(v)); } catch (_) { /* приватный режим */ }
+}
 
 /**
  * Подпись про суперсет.
@@ -74,7 +98,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Отметка подхода — с оценкой «легко / норм / тяжело» (03.10.2026):
   // галочка раскрывает выбор под подходом (ключ подхода или круга)
   const [effortFor, setEffortFor] = useState('');
-  const restSpan = useRef({ until: 0, total: 0 });
+  // Отдых, запущенный с этого телефона: окно «Отдых окончен» всплывает в
+  // любом разделе только у того, кто его запустил (03.10.2026)
+  const restSpan = useRef(restHereSaved());
+  // «Свернуть таймер»: until свёрнутого отдыха — плашка вместо экрана
+  const [collapsedUntil, setCollapsedUntil] = useState(0);
+  // Пока экран отдыха развёрнут — страница под ним не листается
+  const lockScroll = useRef(false);
   // Разъединили или соединили суперсет — подходы перелетают на новые места
   const fieldsRef = useRef(null);
   const flip = useFlip(fieldsRef);
@@ -326,7 +356,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const unload = e => { if (state.current?.dirty) { e.preventDefault(); e.returnValue = ''; } };
     // Свернули приложение или заблокировали экран — несохранённое уходит
     // сразу: на iPhone у страницы после этого мгновения, не секунды
-    const hide = () => { if (document.hidden) save(); else applyPendingRest(); };
+    const hide = () => (document.hidden ? save() : applyPendingRest());
     window.addEventListener('online', online);
     window.addEventListener('beforeunload', unload);
     document.addEventListener('visibilitychange', hide);
@@ -419,6 +449,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const restAt = (until) => {
     // Длина отдыха — для кольца на экране отдыха
     restSpan.current = { until, total: Math.max(1000, until - Date.now()) };
+    saveRestHere(restSpan.current);
+    setCollapsedUntil(0);
     change(v => ({ ...v, restUntil: until, restLocal: '' }));
     save();
     // Что дальше — в уведомление о конце отдыха и в шторку (Android)
@@ -438,6 +470,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Идущая тренировка — не раздел: смахнуть влево в «Прогресс» посреди
   // подхода нельзя, выход только «назад» (смахнуть вправо)
   useTabLock(true);
+  // Один постоянный слушатель с preventDefault: iPhone решает, можно ли
+  // отменить прокрутку, в момент касания, и слушатель, добавленный уже
+  // посреди удержания, страницу не останавливал — перестановка не
+  // работала (03.10.2026). Им же страница стоит под экраном отдыха
+  useEffect(() => {
+    const stop = (ev) => { if (drag.current || lockScroll.current) ev.preventDefault(); };
+    document.addEventListener('touchmove', stop, { passive: false });
+    return () => document.removeEventListener('touchmove', stop);
+  }, []);
   const exportDraft = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(state.current, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'тренировка.json'; a.click(); URL.revokeObjectURL(url);
@@ -501,6 +542,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               const lack = missing(set, track);
               if (lack) { setMessage(lack); return; }
               updateExercise(ei, x => rateSet(x, si, effort).ex);
+              // Последний подход занятия — без отдыха, сразу «Завершить?»
+              if (allDone()) { afterLast(); return; }
               // Отдых начинается там, где человек нажал: подход отмечен —
               // время пошло. Длительность — по оценке и по тому, прибавили
               // ли вес (effort.js)
@@ -589,6 +632,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         const lack = missing(set, track);
         if (lack) { setMessage(lack); return; }
         updateSet(ei, si, s => ({ ...s, state: 'done', effort }));
+        if (allDone()) { afterLast(); return; }
         if (restAfter) startRest(restFor(effort, restBase()));
       }, current)}
       {!inRound && openSet === key && <div className="workout__set-options">
@@ -600,6 +644,22 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         </div>
       </div>}
     </SwipeRow>;
+  };
+
+  /**
+   * Все подходы отмечены — это был последний: отдых не нужен, тренировка
+   * закончилась (владелец, 03.10.2026). Вверху сразу «Завершить?»
+   */
+  const allDone = () => !!state.current && !state.current.session.exercises.some(e => e.sets.some(x => x.state === 'pending'));
+  const afterLast = () => {
+    setConfirm('complete');
+    haptic('medium');
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { /* старый браузер */ }
+  };
+  const finishAs = (kind) => {
+    change(v => ({ ...v, status: kind === 'complete' ? 'completed' : 'cancelled', restUntil: 0, exercises: v.exercises.map(e => ({ ...e, sets: e.sets.map(x => (x.state === 'pending' ? { ...x, state: 'skipped' } : x)) })) }));
+    setConfirm('');
+    save();
   };
 
   /** В занятии уже есть оценка — подсказку под кнопками больше не показываем */
@@ -696,6 +756,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       const rated = rateSet(ex, r, effort);
       updateExercise(ei, x => rateSet(x, r, effort).ex);
       if (!last) return;
+      if (allDone()) { afterLast(); return; }
       // Круг закончен — отдых по всем оценкам круга
       const others = live.filter(m => m.ex.id !== ex.id).map(m => m.ex.sets[r]);
       const efforts = [...others.map(x => x.effort || 'ok'), effort];
@@ -813,8 +874,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button className="button button--ghost" onClick={split}>Разъединить</button>
       </div>
       <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.{editable ? ' Порядок внутри — подержите название и перетащите.' : ''}</p>
-      {(members[0].ex.prescription || members.some(({ ex }) => ex.prevWeight)) && (
-        <p className="small muted">{members.map(({ ex }) => ex.name + (ex.prescription ? ': ' + ex.prescription : '') + (ex.prevWeight && !ex.lastRun ? ' · было ' + ex.prevWeight : '')).join('; ')}</p>
+      {members.some(({ ex }) => planText(ex.prescription) || ex.prevWeight) && (
+        <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '') + (ex.prevWeight && !ex.lastRun ? ' · было ' + ex.prevWeight : '')).join('; ')}</p>
       )}
       {members.filter(({ ex }) => lastRunText(ex.lastRun)).map(({ ex }) => (
         <p className="workout__last" key={'last' + ex.id}>{ex.name}: {lastRunText(ex.lastRun).replace(/^Последний раз/, 'последний раз')}</p>
@@ -902,7 +963,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return { ...v, exercises };
   });
   const holdToMove = (key, inner = null) => (e) => {
-    if (!editable || picking || reorder || drag.current || (e.button !== undefined && e.button !== 0)) return;
+    if (!editable || reorder || drag.current || (e.button !== undefined && e.button !== 0)) return;
     // Внутри суперсета — не тащить заодно весь суперсет
     if (inner) e.stopPropagation();
     const x0 = e.clientX, y0 = e.clientY, id = e.pointerId, head = e.currentTarget;
@@ -940,8 +1001,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const g = { key, from, to: from, rows, rects, gap, y0, pointerId };
     drag.current = g;
     rows[from].classList.add('workout__exercise--lifted');
-    // Пока тащат — страница не листается
-    const stopScroll = (ev) => ev.preventDefault();
+    // Пока тащат — страница не листается (постоянный слушатель выше)
     const move = (ev) => {
       if (ev.pointerId !== pointerId) return;
       // Середина строки — под пальцем
@@ -972,7 +1032,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
-      document.removeEventListener('touchmove', stopScroll);
       rows.forEach(row => { row.style.transform = ''; row.classList.remove('workout__exercise--lifted'); });
       drag.current = null;
       // Касание после перетаскивания — не «переименовать»
@@ -996,7 +1055,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
-    document.addEventListener('touchmove', stopScroll, { passive: false });
   };
 
   /**
@@ -1033,7 +1091,20 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     );
   };
 
-  const togglePick = (id) => setPicked(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  // Суперсет выбирается целиком — всеми упражнениями (03.10.2026: кружка
+  // у суперсета не было). Касание сразу после перетаскивания — не выбор
+  const togglePick = (ids) => {
+    if (swallowClick.current) return;
+    const list = [].concat(ids);
+    setPicked(prev => {
+      const next = new Set(prev);
+      const on = list.every(id => next.has(id));
+      list.forEach(id => (on ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+  /** Сколько выбрано блоков: суперсет — один */
+  const pickedUnits = () => units((record && record.session && record.session.exercises) || []).filter(u => u.items.every(e => picked.has(e.id))).length;
   const endPick = () => { setPicking(false); setPicked(new Set()); };
   // Кнопкой «Выбрать» — к началу короткого списка; щипок держит место сам
   const pickFromButton = () => {
@@ -1064,7 +1135,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // Выйти из выбора до рассыпания: полоски между карточками в выборе
     // спрятаны, и узнать, какие из них уйдут, можно только когда они есть
     flushSync(endPick);
-    const cards = [...ids].map(id => fieldsRef.current && fieldsRef.current.querySelector(`[data-flip-scope="sec:${id}"]`)).filter(Boolean);
+    const cards = units(snapshot).filter(u => u.items.every(e => ids.has(e.id)))
+      .map(u => fieldsRef.current && fieldsRef.current.querySelector(`[data-unit="${u.key}"]`)).filter(Boolean);
     vanish(cards, () => {
       setUndo(snapshot, ids.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + ids.size);
       change(v => ({ ...v, exercises: v.exercises.filter(e => !ids.has(e.id)) }));
@@ -1097,13 +1169,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return bars;
   };
   // Копия — сразу за своим упражнением, с неотмеченными подходами
+  // Суперсет копируется целиком — новым суперсетом сразу за ним
   const pickCopy = () => {
-    change(v => ({
-      ...v,
-      exercises: v.exercises.flatMap(e => (picked.has(e.id)
-        ? [e, { ...e, id: uid(), supersetGroup: '', note: '', sets: e.sets.map(x => ({ ...x, state: 'pending' })) }]
-        : [e])).slice(0, 30),
-    }));
+    change(v => {
+      const out = [];
+      units(v.exercises).forEach(u => {
+        out.push(...u.items);
+        const chosen = u.items.filter(e => picked.has(e.id));
+        if (!chosen.length) return;
+        const group = u.items.length > 1 && chosen.length === u.items.length ? 'superset-' + uid() : '';
+        out.push(...chosen.map(e => ({ ...e, id: uid(), supersetGroup: group, note: '', sets: e.sets.map(({ effort, raised, ...x }) => ({ ...x, state: 'pending' })) })));
+      });
+      return { ...v, exercises: out.slice(0, 30) };
+    });
     endPick();
   };
   // Выбранные — в один суперсет; вместе с их прежними группами
@@ -1145,6 +1223,36 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
+
+  // Отдых — поверх всего приложения (портал), а не внутри экрана: так
+  // «Свернуть» открывает нижнее меню и другие разделы, а «Отдых окончен»
+  // всплывает в любом из них — у телефона, который отдых запустил. Экран
+  // тренировки на виду — показываем и отдых, запущенный тренером или часами
+  const restOn = !!s && !!s.restUntil && s.status === 'active';
+  const restOver = restOn && s.restUntil - now <= 0;
+  const restHere = restOn && restSpan.current.until === s.restUntil;
+  // Без настоящей страницы (проверки компонента) — рисуем на месте
+  const dom = typeof document !== 'undefined' && !!document.body && document.body.nodeType === 1;
+  const onScreen = !dom || !!(fieldsRef.current && fieldsRef.current.offsetParent);
+  const restShown = restOn && (onScreen || restHere);
+  const restFolded = restShown && !restOver && collapsedUntil === s.restUntil;
+  lockScroll.current = restShown && !restFolded;
+  const stopRest = () => change(v => ({ ...v, restUntil: 0 }));
+  const restLayer = restShown && (dom ? (node) => createPortal(node, document.body) : (node) => node)(restFolded
+    ? <RestPill left={s.restUntil - now} onOpen={() => setCollapsedUntil(0)} />
+    : <RestScreen
+      until={s.restUntil}
+      total={restSpan.current.until === s.restUntil ? restSpan.current.total : (s.restSeconds || 90) * 1000}
+      now={now}
+      next={nextInfo(s, focus)}
+      onMore={extendRest}
+      onStop={stopRest}
+      onCollapse={() => setCollapsedUntil(s.restUntil)}
+    />);
+
+  const confirmText = confirm === 'complete'
+    ? (stats && !stats.pending ? 'Все подходы сделаны. Завершить тренировку?' : `Выполнено ${setsWord(stats ? stats.done : 0)}. ${stats && stats.pending === 1 ? 'Оставшийся будет отмечен пропущенным' : 'Оставшиеся ' + (stats ? stats.pending : 0) + ' будут отмечены пропущенными'}.`)
+    : 'Занятие останется в журнале с отметкой «Отменена».';
   return <div className="workout">
     <button className="button" onClick={close}>{backLabel}</button>
     {!ready && <p role="status">Открываем журнал тренировок…</p>}
@@ -1159,7 +1267,21 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     {s && <>
       <header className="workout__header">
         <h2>{s.title}</h2><p>{s.month || 'Свободная тренировка'} · {labels[s.status]}</p>
-        <div className="workout__metrics"><span>Время <strong>{clock(elapsed)}</strong></span><span>Подходы <strong>{stats.done} / {stats.total}</strong></span></div>
+        <div className="workout__metrics"><span>Время <strong>{clock(elapsed)}</strong></span><span>Подходы <strong>{stats.done} / {stats.total}</strong></span>
+          {/* Завершить и отменить — здесь, у времени, а не внизу под всеми
+              упражнениями (владелец, 03.10.2026) */}
+          {editable && !confirm && <span className="workout__head-actions">
+            <button type="button" className="button button--primary" onClick={() => setConfirm('complete')}>Завершить</button>
+            <button type="button" className="button button--ghost" onClick={() => setConfirm('cancel')}>Отменить</button>
+          </span>}
+        </div>
+        {editable && confirm && <div className="workout__confirm" role="alertdialog" aria-label={confirm === 'complete' ? 'Завершить тренировку' : 'Отменить занятие'}>
+          <p>{confirmText}</p>
+          <div className="workout__confirm-actions">
+            <button type="button" className={'button ' + (confirm === 'complete' ? 'button--primary' : 'button--critical')} disabled={busy || !!conflict || (confirm === 'complete' && !stats.done)} onClick={() => finishAs(confirm)}>{confirm === 'complete' ? 'Завершить' : 'Отменить'}</button>
+            <button type="button" className="button button--ghost" onClick={() => setConfirm('')}>{confirm === 'complete' && !stats.pending ? 'Ещё не всё' : 'Продолжить'}</button>
+          </div>
+        </div>}
         {/* Полоса своя, а не браузерный progress: системный выглядит
             по-разному в каждом движке и ни в одной теме не совпадает с
             палитрой приложения. Значение дублируется для чтения вслух. */}
@@ -1189,14 +1311,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
             оставшийся наверху, приходилось искать прокруткой. */}
-        {!!s.restUntil && s.status === 'active' && <RestScreen
-          until={s.restUntil}
-          total={restSpan.current.until === s.restUntil ? restSpan.current.total : (s.restSeconds || 90) * 1000}
-          now={now}
-          next={nextInfo(s, focus)}
-          onMore={extendRest}
-          onStop={() => change(v => ({ ...v, restUntil: 0 }))}
-        />}
+        {restLayer}
         {s.exercises.map((ex, ei) => {
           const group = ex.supersetGroup;
           const members = group ? s.exercises.map((e, i) => ({ ex: e, ei: i })).filter(m => m.ex.supersetGroup === group) : [];
@@ -1207,20 +1322,26 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             // упражнения. Та же разметка шапки, что у развёрнутого: палец
             // держит её во время перестановки, её нельзя пересоздать
             if (picking || reorder) {
-              return <section className="workout__exercise workout__exercise--compact" key={'g' + group} data-unit={'g' + group}>
-                <div className="workout__rounds-head" onPointerDown={holdToMove('g' + group)}><h3><span className="workout__ex-num">{ei + 1}</span> Суперсет: {members.map(m => m.ex.name).join(' + ')}</h3></div>
+              const ids = members.map(m => m.ex.id);
+              const on = ids.every(id => picked.has(id));
+              return <section className={'workout__exercise workout__exercise--compact' + (picking && on ? ' workout__exercise--picked' : '')} key={'g' + group} data-unit={'g' + group}>
+                <div className={'workout__rounds-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove('g' + group)}
+                  {...(picking ? { role: 'checkbox', 'aria-checked': on, tabIndex: 0, onClick: () => togglePick(ids), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ids); } } } : {})}>
+                  {picking && <span className={'workout__pick' + (on ? ' is-on' : '')} aria-hidden="true">{on && <IconCheck size={14} />}</span>}
+                  <h3><span className="workout__ex-num">{ei + 1}</span> Суперсет: {members.map(m => m.ex.name).join(' + ')}</h3>
+                </div>
               </section>;
             }
             return <React.Fragment key={'g' + group}>{joinBefore(ei)}{supersetBlock(members)}</React.Fragment>;
           }
           const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
           const finished = doneSets === ex.sets.length;
-          const [main, ...rest] = String(ex.prescription || '').split(' · ').filter(Boolean);
+          const [main, ...rest] = planText(ex.prescription).split(' · ').filter(Boolean);
           const compact = picking || !!reorder;
           return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
-          <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={picking ? undefined : holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
+          <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}
             <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {compact
               ? (ex.name || 'Новое упражнение')
@@ -1287,8 +1408,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         )}
         {picking && (
           <div className="workout__pick-bar" role="toolbar" aria-label="Действия с выбранными упражнениями">
-            <span className="workout__pick-count">{picked.size ? 'Выбрано ' + picked.size : 'Отметьте упражнения'}</span>
-            <button type="button" className="button" disabled={picked.size < 2 || s.exercises.some(e => picked.has(e.id) && e.sets.some(x => x.who))} onClick={pickSuperset}>
+            <span className="workout__pick-count">{picked.size ? 'Выбрано ' + pickedUnits() : 'Отметьте упражнения'}</span>
+            <button type="button" className="button" disabled={pickedUnits() < 2 || s.exercises.some(e => picked.has(e.id) && e.sets.some(x => x.who))} onClick={pickSuperset}>
               <IconLinkPair size={16} />Суперсет
             </button>
             <button type="button" className="button" disabled={!picked.size} onClick={pickCopy}>Дублировать</button>
@@ -1298,15 +1419,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>
-      {editable && <div className="workout__finish">
-        {!confirm ? <><button className="button button--primary button--block" onClick={() => setConfirm('complete')}>Завершить тренировку</button><button className="button" onClick={() => setConfirm('cancel')}>Отменить занятие</button></> : <>
-          <p>{confirm === 'complete' ? `Выполнено ${stats.done} подходов. Оставшиеся ${stats.pending} будут отмечены пропущенными.` : 'Занятие останется в журнале с отметкой «Отменена».'}</p>
-          <button className="button" disabled={busy || !!conflict || (confirm === 'complete' && !stats.done)} onClick={() => { change(s => ({ ...s, status: confirm === 'complete' ? 'completed' : 'cancelled', restUntil: 0, exercises: s.exercises.map(e => ({ ...e, sets: e.sets.map(s => s.state === 'pending' ? { ...s, state: 'skipped' } : s) })) })); setConfirm(''); save(); }}>Подтвердить</button><button className="button" onClick={() => setConfirm('')}>Продолжить занятие</button>
-        </>}
-      </div>}
       {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={record.dirty || busy} onClick={() => { store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}
-      <button className="button" disabled={busy || !!conflict || !record.dirty} onClick={save}>Сохранить сейчас</button>
-      <button className="button" onClick={exportDraft}>Скачать результат</button>
+      {/* «Сохранить сейчас» и «Скачать результат» убраны (03.10.2026):
+          сохраняется само. Не сохранилось — «Повторить» в сообщении об
+          ошибке вверху; конфликт версий — «Скачать мой черновик» там же */}
     </>}
     {!s && ready && <>
       <h2>Журнал тренировок</h2><p className="muted">Начните занятие из программы или соберите свободную тренировку.</p>
@@ -1332,9 +1448,22 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
  * не нажмут «Закрыть» (не дольше двух минут). Свёрнутое приложение
  * сигналит уведомлением (native-rest.js) и плашкой (Live Activity).
  */
-function RestScreen({ until, total, now, next, onMore, onStop }) {
+function RestScreen({ until, total, now, next, onMore, onStop, onCollapse }) {
   const left = until - now;
   const over = left <= 0;
+  const stopRef = useRef(onStop);
+  stopRef.current = onStop;
+  // Будильник iPhone закрыли крестиком вне приложения — закрыть и этот
+  // экран, второй раз «Закрыть» нажимать не нужно (03.10.2026)
+  useEffect(() => {
+    if (!over || !alarmRings(until)) return undefined;
+    let alive = true;
+    const check = () => alarmClosed(until).then((gone) => { if (alive && gone) stopRef.current(); });
+    const timer = setInterval(check, 1500);
+    document.addEventListener('visibilitychange', check);
+    check();
+    return () => { alive = false; clearInterval(timer); document.removeEventListener('visibilitychange', check); };
+  }, [over, until]);
   useEffect(() => {
     if (!over) return undefined;
     // iPhone с будильником (iOS 26+) звенит сам — второй звук не нужен
@@ -1359,15 +1488,31 @@ function RestScreen({ until, total, now, next, onMore, onStop }) {
       </div>
       {next && (
         <div className="rest-screen__next">
-          {/* Название — заголовок карточки, подход — под ним: без надписи
-              капслоком сверху (craft-floor). «Дальше» и так ясно из экрана */}
+          {/* «Дальше» — по просьбе владельца (03.10.2026): карточку читают
+              с расстояния, между подходами, и подпись снимает вопрос, что это */}
+          <p className="rest-screen__next-label">Дальше</p>
           <p className="rest-screen__next-name">{next.name}</p>
           <p className="rest-screen__next-part">{next.part.charAt(0).toUpperCase() + next.part.slice(1)}</p>
-          {next.load && <p className="rest-screen__next-load">{next.load}</p>}
-          {next.change && <div className={'rest-screen__next-change rest-screen__next-change--' + next.change.kind}>
-            {(next.change.kind === 'up' || next.change.kind === 'down') && <IconDelta value={next.change.kind === 'up' ? 1 : -1} />}
-            {next.change.text}
-          </div>}
+          {next.items
+            // Дальше суперсет — весь круг: каждое упражнение со своим весом
+            ? <ol className="rest-screen__round">
+              {next.items.map((it, i) => (
+                <li key={i} className={it.done ? 'is-done' : ''}>
+                  <span className="rest-screen__round-name">{it.name}</span>
+                  <span className="rest-screen__round-load">{it.load || '—'}</span>
+                  {it.change && (it.change.kind === 'up' || it.change.kind === 'down') && <span className={'rest-screen__next-change rest-screen__next-change--' + it.change.kind}>
+                    <IconDelta value={it.change.kind === 'up' ? 1 : -1} />{it.change.text}
+                  </span>}
+                </li>
+              ))}
+            </ol>
+            : <>
+              {next.load && <p className="rest-screen__next-load">{next.load}</p>}
+              {next.change && <div className={'rest-screen__next-change rest-screen__next-change--' + next.change.kind}>
+                {(next.change.kind === 'up' || next.change.kind === 'down') && <IconDelta value={next.change.kind === 'up' ? 1 : -1} />}
+                {next.change.text}
+              </div>}
+            </>}
         </div>
       )}
       <div className="rest-screen__actions">
@@ -1378,7 +1523,24 @@ function RestScreen({ until, total, now, next, onMore, onStop }) {
             <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закончить отдых</button>
           </>}
       </div>
+      {/* Свернуть — таймер уходит в плашку внизу, приложение свободно:
+          другие разделы, прокрутка (владелец, 03.10.2026) */}
+      {!over && onCollapse && <button type="button" className="rest-screen__fold" onClick={onCollapse}>
+        <IconChevron size={18} aria-hidden="true" />Свернуть таймер
+      </button>}
     </div>
+  );
+}
+
+/** Свёрнутый отдых: плашка над нижним меню, касание разворачивает */
+function RestPill({ left, onOpen }) {
+  return (
+    <button type="button" className="rest-pill" onClick={onOpen} aria-label={'Отдых, осталось ' + clock(left) + '. Развернуть'}>
+      <span className="rest-pill__dot" aria-hidden="true" />
+      <span>Отдых</span>
+      <strong role="timer" aria-live="off">{clock(left)}</strong>
+      <IconChevron size={16} className="rest-pill__up" aria-hidden="true" />
+    </button>
   );
 }
 
@@ -1403,6 +1565,7 @@ function focusOf(s) {
 /** «Присед со штангой · подход 2 из 5 · 90 кг × 5» — для уведомлений */
 function nextText(s) {
   const n = s ? nextInfo(s, focusOf(s)) : null;
+  if (n && n.items) return [n.part, n.items.map(it => [it.name, it.load].filter(Boolean).join(' ')).join(' + ')].join(' · ');
   return n ? [n.name, n.part, n.load].filter(Boolean).join(' · ') : '';
 }
 
@@ -1420,17 +1583,28 @@ function nextInfo(s, focus) {
   const own = ex.sets.filter(x => (x.who || '') === (set.who || ''));
   const part = (set.who ? set.who + ' · ' : '') + 'подход ' + (own.indexOf(set) + 1) + ' из ' + own.length;
   const load = [set.weight ? kg(num(set.weight)) + ' кг' : '', set.reps ? '× ' + set.reps : ''].filter(Boolean).join(' ');
-  const prev = own.slice(0, own.indexOf(set)).filter(x => x.state === 'done').pop();
-  let change = null;
-  if (prev && set.weight && prev.weight) {
-    const d = num(set.weight) - num(prev.weight);
-    change = d > 0 ? { kind: 'up', text: 'накинуть ' + kg(d) + ' кг' }
-      : d < 0 ? { kind: 'down', text: 'снять ' + kg(-d) + ' кг' }
-        : { kind: 'same', text: 'вес тот же' };
-  } else if (!prev) {
-    change = { kind: 'new', text: 'новое упражнение' + (ex.prevWeight ? ' · в прошлый раз ' + String(ex.prevWeight).replace('.', ',') : '') };
+  const loadOf = (x) => [x.weight ? kg(num(x.weight)) + ' кг' : '', x.reps ? '× ' + x.reps : ''].filter(Boolean).join(' ');
+  const changeOf = (e, x, list) => {
+    const before = list.slice(0, list.indexOf(x)).filter(y => y.state === 'done').pop();
+    if (before && x.weight && before.weight) {
+      const d = num(x.weight) - num(before.weight);
+      return d > 0 ? { kind: 'up', text: 'накинуть ' + kg(d) + ' кг' }
+        : d < 0 ? { kind: 'down', text: 'снять ' + kg(-d) + ' кг' }
+          : { kind: 'same', text: 'вес тот же' };
+    }
+    if (!before) return { kind: 'new', text: 'новое упражнение' + (e.prevWeight ? ' · в прошлый раз ' + String(e.prevWeight).replace('.', ',') : '') };
+    return null;
+  };
+  // Дальше суперсет — весь круг, а не одно упражнение (03.10.2026)
+  const mates = ex.supersetGroup && !set.who ? s.exercises.filter(e => e.supersetGroup === ex.supersetGroup) : [];
+  if (mates.length > 1) {
+    const r = focus.set;
+    const rounds = Math.max(...mates.map(e => e.sets.length));
+    const items = mates.filter(e => e.sets[r] && e.sets[r].state !== 'skipped')
+      .map(e => ({ name: e.name, load: loadOf(e.sets[r]), change: changeOf(e, e.sets[r], e.sets), done: e.sets[r].state === 'done' }));
+    return { name: 'Суперсет', part: 'круг ' + (r + 1) + ' из ' + rounds, items };
   }
-  return { name: ex.name, part, load, change };
+  return { name: ex.name, part, load, change: changeOf(ex, set, own) };
 }
 
 /**

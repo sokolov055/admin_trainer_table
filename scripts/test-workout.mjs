@@ -25,6 +25,10 @@ globalThis.document = {
   removeEventListener(event, fn) { docListeners.set(event, (docListeners.get(event) || []).filter(x => x !== fn)); },
 };
 const wake = async () => { for (const fn of docListeners.get('visibilitychange') || []) await fn(); };
+// «Сохранить сейчас» убран с экрана (03.10.2026): сохраняет уход приложения
+// в фон — так и проверяем
+const hideOnce = () => { document.hidden = true; const r = (docListeners.get('visibilitychange') || []).map(fn => fn()); document.hidden = false; return Promise.all(r); };
+async function saveNow() { await act(async () => { await hideOnce(); await delay(); }); }
 let offline = false;
 let holdSave = null;
 globalThis.__workoutApi = async (action, params) => {
@@ -56,14 +60,14 @@ after(() => { if (tree) tree.unmount(); });
 
 test('интерфейс: запись подхода, пауза, продолжение, завершение и история', async () => {
   data.clear(); await mount();
-  await click('Сохранить сейчас');
+  await saveNow();
   const weight = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));
   await act(async () => weight.props.onChange({ target: { value: '45,5' } }));
   // Галочки нет (03.10.2026): подход отмечает оценка
   const done = tree.root.findAllByType('button').find(n => text(n) === 'Норм');
   await act(async () => done.props.onClick());
   await click('Пауза'); await click('Продолжить');
-  await click('Завершить тренировку'); await click('Подтвердить');
+  await click('Завершить'); await click('Завершить');
   const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
   assert.equal(saved.status, 'completed');
   assert.equal(saved.exercises[0].sets[0].weight, '45,5');
@@ -79,7 +83,7 @@ test('черновик восстанавливается после отклю�
   await act(async () => tree.unmount());
   await mount(false);
   assert.equal(tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || '')).props.value, '77.5');
-  offline = false; await click('Сохранить сейчас');
+  offline = false; await saveNow();
   assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].exercises[0].sets[0].weight, '77.5');
   await act(async () => tree.unmount()); tree = null;
 });
@@ -87,21 +91,21 @@ test('после отказа валидации исправленный сни
   data.clear(); await mount();
   const findWeight = () => tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));
   await act(async () => findWeight().props.onChange({ target: { value: '-7' } }));
-  await click('Сохранить сейчас');
+  await saveNow();
   assert.ok(tree.root.findAll(n => n.props.role === 'alert').length);
   await act(async () => findWeight().props.onChange({ target: { value: '70' } }));
-  await click('Сохранить сейчас');
+  await saveNow();
   assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].exercises[0].sets[0].weight, '70');
   await act(async () => tree.unmount()); tree = null;
 });
 test('интерфейс конфликта сохраняет чужую версию и резервную копию своей', async () => {
-  data.clear(); await mount(); await click('Сохранить сейчас');
+  data.clear(); await mount(); await saveNow();
   const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
   saved.title = 'Изменено тренером'; saved.revision++;
   data.set('workout_demo_server:3', JSON.stringify([saved]));
   const input = tree.root.findAllByType('input')[0];
   await act(async () => input.props.onChange({ target: { value: 'Локальная правка' } }));
-  await click('Сохранить сейчас');
+  await saveNow();
   assert.ok(button('Открыть актуальное занятие'));
   await click('Открыть актуальное занятие');
   assert.equal(tree.root.findAllByType('input')[0].props.value, 'Изменено тренером');
@@ -113,7 +117,7 @@ test('ответ старого экрана не затирает новый в
   let release;
   holdSave = new Promise(resolve => { release = resolve; });
   let pending;
-  await act(async () => { pending = button('Сохранить сейчас').props.onClick(); await delay(); });
+  await act(async () => { pending = hideOnce(); await delay(); });
   await act(async () => tree.unmount());
   await mount(false);
   const input = tree.root.findAllByType('input')[0];
@@ -121,9 +125,9 @@ test('ответ старого экрана не затирает новый в
   await act(async () => { release(); await pending; await delay(); });
   const draftKey = [...data.keys()].find(k => k.startsWith('workout_draft_v1:'));
   assert.equal(JSON.parse(data.get(draftKey)).session.title, 'Правка после возвращения');
-  await click('Сохранить сейчас');
+  await saveNow();
   // Сначала подтверждается исходный снимок, затем отправляется новый.
-  if (!button('Сохранить сейчас').props.disabled) await click('Сохранить сейчас');
+  await saveNow();
   assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].title, 'Правка после возвращения');
   await act(async () => tree.unmount()); tree = null;
 });
@@ -226,7 +230,7 @@ test('суперсет из программы виден в занятии', as
 test('чужие правки занятия подхватываются при возврате к приложению', async () => {
   data.clear();
   await mount();
-  await click('Сохранить сейчас');
+  await saveNow();
 
   const key = 'workout_demo_server:3';
   const stored = JSON.parse(data.get(key));
@@ -311,8 +315,8 @@ test('после завершённой тренировки запускает�
 
   await act(async () => { await check.props.onClick(); await delay(); });
 
-  await click('Завершить тренировку');
-  await click('Подтвердить');
+  await click('Завершить');
+  await click('Завершить');
 
   assert.ok(JSON.parse(data.get([...data.keys()].find(k => k.startsWith('workout_draft'))) || '{}').session,
     'черновик завершённого занятия остался на устройстве');
@@ -446,8 +450,8 @@ test('«Вернуться к занятию»: открывается идущ�
   await mount();
   const check = tree.root.findAll(n => n.type === 'button' && text(n) === 'Норм')[0];
   await act(async () => { await check.props.onClick(); await delay(); });
-  await click('Завершить тренировку');
-  await click('Подтвердить');
+  await click('Завершить');
+  await click('Завершить');
   if (tree) { tree.unmount(); tree = null; }
   const draftKey = [...data.keys()].find(k => k.startsWith('workout_draft'));
   assert.ok(draftKey && JSON.parse(data.get(draftKey)).session.status !== 'active', 'черновик завершённого есть');
