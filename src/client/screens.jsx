@@ -446,7 +446,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const push = async (list, seq) => {
     setSaveState('saving');
     try {
-      await apiMutate('plan.save', {
+      const saved = await apiMutate('plan.save', {
         clientRow,
         month: data.month,
         blocks: list
@@ -460,6 +460,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       });
       if (editSeq.current !== seq) return;
       setSaveState('');
+      // plan.save возвращает тот же снимок истории, что client.plan.
+      // Показываем его до фонового перечитывания, чтобы новое упражнение
+      // сразу получило свои lastWeight/startSets, а не старые из draft.
+      if (!unnamed(list) && saved && Array.isArray(saved.blocks)) {
+        setDraft({ month: saved.month || data.month, blocks: saved.blocks });
+      }
       await reload();
       // Пока есть упражнение без названия, держим свой снимок: сервер его
       // не хранит, и строка пропала бы из-под пальца

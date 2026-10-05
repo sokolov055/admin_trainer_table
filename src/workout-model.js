@@ -65,6 +65,60 @@ export function fromPlan(block, month, members = []) {
         })),
     })) };
 }
+
+/** Схема текущего упражнения, которую сохраняем при замене его названия */
+export function replacementPlan(exercise) {
+  const work = (exercise.sets || []).filter((s) => s.kind !== 'warmup').length;
+  const withReps = (exercise.sets || []).find((s) => String(s.reps || '').trim());
+  return {
+    sets: String(Math.max(1, work || (exercise.sets || []).length || 3)),
+    reps: String(exercise.target || (withReps && withReps.reps) || ''),
+  };
+}
+
+/**
+ * Заменить упражнение в идущем занятии снимком истории нового упражнения.
+ * Старые подходы намеренно не смешиваются с новыми: если истории нет,
+ * веса пустые; если есть — fromPlan применяет обычные startSets/lastRun.
+ */
+export function replaceWorkoutExercise(current, picked, history = null) {
+  const plan = replacementPlan(current);
+  const source = {
+    ...(history || {}),
+    ...picked,
+    name: picked.name,
+    exerciseId: picked.exerciseId || null,
+    sets: plan.sets,
+    reps: plan.reps,
+    weight: '',
+    prevWeight: '',
+  };
+
+  // У сплита история общих весов не применяется: сохраняем очередь людей,
+  // но очищаем веса прежнего упражнения.
+  if ((current.sets || []).some((s) => s.who)) {
+    return {
+      id: current.id,
+      name: source.name,
+      ...(source.exerciseId ? { exerciseId: source.exerciseId } : {}),
+      ...(source.track ? { track: source.track } : {}),
+      note: current.note || '',
+      supersetGroup: current.supersetGroup || '',
+      prescription: planScheme(source),
+      sets: current.sets.map((s) => ({
+        ...blankSet(), who: s.who, reps: plan.reps || String(s.reps || ''), kind: s.kind === 'warmup' ? 'warmup' : 'work',
+      })),
+    };
+  }
+
+  const made = fromPlan({ title: '', exercises: [source] }, '', []).exercises[0];
+  return {
+    ...made,
+    id: current.id,
+    note: current.note || '',
+    supersetGroup: current.supersetGroup || '',
+  };
+}
 export function summary(session) {
   const sets = session.exercises.flatMap(e => e.sets);
   const done = sets.filter(s => s.state === 'done');

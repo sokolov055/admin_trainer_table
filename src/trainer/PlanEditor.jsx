@@ -449,11 +449,15 @@ export default function PlanEditor({
                     if ((exerciseId || null) !== (e0.exerciseId || null) || name !== e0.name) {
                       e0.prevWeight = '';
                       e0.lastWeight = '';
+                      e0.startSets = undefined;
+                      e0.lastRun = undefined;
+                      e0.exercise = null;
                     }
                     next[bi].exercises[ei].name = name;
                     next[bi].exercises[ei].exerciseId = exerciseId;
                     const base = exerciseId && exercises.find((x) => x.id === exerciseId);
-                    if (base && base.track) next[bi].exercises[ei].track = base.track;
+                    next[bi].exercises[ei].track = base && base.track ? base.track : undefined;
+                    next[bi].exercises[ei].exercise = base || null;
                     return next;
                   })}
                   onAdded={(saved) => setExtra((prev) => [...prev, saved])}

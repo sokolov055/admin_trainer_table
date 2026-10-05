@@ -363,6 +363,36 @@ test('сплит: подходы кругами по людям, у каждог
   assert.equal(setLabel(solo.exercises[0].sets, 1), '2');
 });
 
+test('замена упражнения берёт подходы нового из истории и не оставляет старые', async () => {
+  const { fromPlan, replaceWorkoutExercise } = await import('../src/workout-model.js');
+  const old = fromPlan({ title: 'Ноги', exercises: [{
+    name: 'Жим ногами', exerciseId: 10, sets: '3', reps: '10',
+    startSets: ['160', '180', '180'].map((weight) => ({ weight, reps: '10', kind: 'work' })),
+    lastRun: { date: '2026-09-20', weights: ['160', '180', '180'], reps: ['10', '10', '10'] },
+  }] }, '', []).exercises[0];
+
+  const squatHistory = {
+    name: 'Присед', exerciseId: 20, lastWeight: '100',
+    startSets: ['80', '100', '100'].map((weight) => ({ weight, reps: '10', kind: 'work' })),
+    lastRun: { date: '2026-09-28', weights: ['80', '100', '100'], reps: ['10', '10', '10'] },
+    track: { kind: 'strength', machine: '', unilateral: false, perSide: false },
+  };
+  const squat = replaceWorkoutExercise(old, { name: 'Присед', exerciseId: 20, track: squatHistory.track }, squatHistory);
+  assert.equal(squat.exerciseId, 20);
+  assert.deepEqual(squat.sets.map((s) => s.weight), ['80', '100', '100']);
+  assert.deepEqual(squat.lastRun, squatHistory.lastRun);
+  assert.ok(squat.sets.every((s) => s.weight !== '160' && s.weight !== '180'));
+
+  const fresh = replaceWorkoutExercise(squat, {
+    name: 'Новое упражнение', exerciseId: 30,
+    track: { kind: 'strength', machine: '', unilateral: false, perSide: false },
+  });
+  assert.equal(fresh.exerciseId, 30);
+  assert.ok(fresh.sets.every((s) => s.weight === ''), 'нет истории — веса пустые');
+  assert.equal(fresh.lastRun, undefined);
+  assert.equal(fresh.prevWeight, '');
+});
+
 /**
  * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
  * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.

@@ -14,6 +14,35 @@ export function workoutMock(action, params) {
         sets: e.sets.filter(x => x.state === 'done' && x.kind !== 'warmup').map(({ state, kind, rpe, ...x }) => ({ ...x, weight: x.weight || '', reps: x.reps || '' })) }))
         .filter(e => e.sets.length)
       : undefined })).reverse() };
+
+  if (action === 'workout.exercise.history') {
+    const exerciseId = Number(params.exerciseId) || null;
+    const wantedName = String(params.name || '').trim().toLowerCase();
+    const completed = [...sessions].reverse().find((session) => session.status === 'completed'
+      && session.exercises?.some((exercise) => (exerciseId && Number(exercise.exerciseId) === exerciseId)
+        || (!exerciseId && String(exercise.name || '').trim().toLowerCase() === wantedName)));
+    const previousExercise = completed?.exercises?.find((exercise) => (exerciseId && Number(exercise.exerciseId) === exerciseId)
+      || (!exerciseId && String(exercise.name || '').trim().toLowerCase() === wantedName));
+    const workingSets = previousExercise?.sets?.filter((set) => set.state === 'done' && set.kind !== 'warmup') || [];
+    const lastWeight = [...workingSets].reverse().find((set) => set.weight)?.weight || '';
+
+    return {
+      name: params.name,
+      exerciseId,
+      sets: params.sets,
+      reps: params.reps,
+      track: params.track,
+      ...(lastWeight ? { lastWeight } : {}),
+      ...(workingSets.length ? {
+        startSets: workingSets.map((set) => ({ weight: set.weight || '', reps: params.reps || set.reps || '', kind: 'work' })),
+        lastRun: {
+          date: String(completed?.completedAt || completed?.updatedAt || '').slice(0, 10),
+          weights: workingSets.map((set) => set.weight || ''),
+          reps: workingSets.map((set) => set.reps || ''),
+        },
+      } : {}),
+    };
+  }
   const previous = sessions.find(s => s.id === (params.id || params.session?.id));
 
   // Удаление: запись пропадает целиком, как и в таблице. Право тренера —

@@ -3,7 +3,7 @@ import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { blankSet, clock, fromPlan, summary, uid, setLabel } from './workout-model.js';
+import { blankSet, clock, fromPlan, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -458,6 +458,33 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   const updateExercise = (index, fn) => change(s => ({ ...s, exercises: s.exercises.map((e, i) => i === index ? fn(e) : e) }));
   const updateSet = (ei, si, fn) => updateExercise(ei, e => ({ ...e, sets: e.sets.map((s, i) => i === si ? fn(s) : s) }));
+  const replaceExercise = async (ei, picked) => {
+    const current = state.current && state.current.session.exercises[ei];
+    if (!current) return;
+
+    // Сразу убираем снимок прежнего упражнения. Даже если сеть пропадёт,
+    // жим ногами не должен остаться весами у приседа.
+    updateExercise(ei, (ex) => replaceWorkoutExercise(ex, picked));
+    if (!picked.exerciseId) return;
+
+    try {
+      const plan = replacementPlan(current);
+      const history = await apiPublic('workout.exercise.history', {
+        ...params,
+        name: picked.name,
+        exerciseId: picked.exerciseId,
+        sets: plan.sets,
+        reps: plan.reps,
+      });
+      updateExercise(ei, (ex) => {
+        // Ответ старого выбора не должен затереть следующий выбор.
+        if (ex.name !== picked.name || Number(ex.exerciseId || 0) !== Number(picked.exerciseId || 0)) return ex;
+        return replaceWorkoutExercise(ex, picked, history);
+      });
+    } catch (error) {
+      setMessage('Историю нового упражнения не удалось загрузить: ' + error.message);
+    }
+  };
   const close = () => { if (state.current?.dirty) save(); onClose(); };
 
   // Смахнуть вправо — то же, что «Назад»: с сохранением незаписанного
@@ -955,7 +982,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const nameEditor = (ex, ei, id) => (
     <div className="workout__rename" key={'rename-' + id}>
       {clientRow
-        ? <NameFromBase ex={ex} autoFocus onPick={(patch) => updateExercise(ei, x => ({ ...x, ...patch }))} />
+        ? <NameFromBase ex={ex} autoFocus onPick={(patch) => replaceExercise(ei, patch)} />
         : <input className="field__input" aria-label="Название упражнения" autoFocus value={ex.name} maxLength={160}
           onChange={e => updateExercise(ei, ({ exerciseId, ...x }) => ({ ...x, name: e.target.value }))}
           onKeyDown={e => { if (e.key === 'Enter') setRenaming(''); }} />}
@@ -1398,7 +1425,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
           <details><summary>Изменить упражнение</summary>
             {clientRow
-              ? <NameFromBase ex={ex} onPick={(patch) => updateExercise(ei, x => ({ ...x, ...patch }))} />
+              ? <NameFromBase ex={ex} onPick={(patch) => replaceExercise(ei, patch)} />
               : <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ({ exerciseId, ...ex }) => ({ ...ex, name: e.target.value }))} /></label>}
             {trackEditor(ex, ei)}
             <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
@@ -1549,7 +1576,12 @@ function NameFromBase({ ex, onPick, autoFocus = false }) {
       exercises={exercises}
       onPick={({ name, exerciseId }) => {
         const base = exerciseId && exercises.find((x) => x.id === exerciseId);
-        onPick({ name, exerciseId: exerciseId || null, ...(base && base.track ? { track: base.track } : {}) });
+        onPick({
+          name,
+          exerciseId: exerciseId || null,
+          ...(base && base.track ? { track: base.track } : {}),
+          exercise: base || null,
+        });
       }}
       onAdded={() => library.reload()}
     />

@@ -209,9 +209,12 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                   const changed = (exerciseId || null) !== (ex.exerciseId || null) || name !== ex.name;
                   patch(i, {
                     name, exerciseId: exerciseId || null,
-                    ...(pick && pick.track ? { track: pick.track } : {}),
+                    track: pick && pick.track ? pick.track : undefined,
                     // Другое упражнение — «было» прежнего ему не подходит
-                    ...(changed ? { prevWeight: '', lastWeight: '' } : {}),
+                    ...(changed ? {
+                      prevWeight: '', lastWeight: '', startSets: undefined,
+                      lastRun: undefined, exercise: pick || null,
+                    } : {}),
                   });
                 }}
                 onAdded={(saved) => setExtra((prev) => [...prev, saved])}
