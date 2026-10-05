@@ -1,8 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { supersets, blockSessions } from '../src/plan-model.js';
 import { copyPlanBlocks, patchPlanExercise, workoutRenameParams } from '../src/plan-block-actions.js';
+
+const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+
+test('заголовок тренировки имеет системный внутренний отступ', () => {
+  assert.match(
+    styles,
+    /\.plan__block > \.section > \.section__head\s*\{[^}]*padding:\s*var\(--space-4\) var\(--space-4\) var\(--space-3\)/s,
+  );
+  assert.match(styles, /\.plan__block-swipe\s*\{[^}]*margin-bottom:\s*0/s);
+});
 
 /* ==========================================================================
  * Суперсеты
