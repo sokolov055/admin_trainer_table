@@ -624,8 +624,23 @@ test('мои тренировки: программа, прогресс, пит�
     await scheme.click();
     await firstBlock.getByRole('button', { name: 'Разминочный в начало' }).click();
     await assert.doesNotReject(firstBlock.locator('.plan-inline__scheme strong', { hasText: '1 разм. +' }).first().waitFor({ timeout: 5000 }), 'разминка в схеме');
+    await firstBlock.locator('.plan-inline__set').first().click();
+    await firstBlock.getByRole('button', { name: 'Удалить выбранный подход' }).waitFor({ timeout: 5000 });
     if (process.env.SHOT_INLINE) await phone.screenshot({ path: process.env.SHOT_INLINE });
     await firstBlock.getByRole('button', { name: 'Готово' }).click();
+
+    // У суперсета круги общие: добавили в одном упражнении — число
+    // одновременно изменилось у обоих.
+    const secondBlock = phone.locator('#root main:not([hidden]) .section', { has: phone.locator('.plan__toggle') }).nth(1);
+    await secondBlock.locator('.plan__toggle').click();
+    const supersetSchemes = secondBlock.locator('.plan-inline__unit--superset .plan-inline__scheme');
+    await supersetSchemes.first().click();
+    await secondBlock.getByRole('button', { name: 'Круг в конец' }).click();
+    assert.equal(await secondBlock.locator('.plan-inline__set').count(), 4, 'четыре круга у первого упражнения');
+    if (process.env.SHOT_SUPERSET) await phone.screenshot({ path: process.env.SHOT_SUPERSET, fullPage: true });
+    await supersetSchemes.nth(1).click();
+    assert.equal(await secondBlock.locator('.plan-inline__set').count(), 4, 'четыре круга у второго упражнения');
+    await secondBlock.getByRole('button', { name: 'Готово' }).click();
     for (const tab of ['Прогресс', 'Питание']) {
       await phone.getByRole('tab', { name: tab, exact: true }).click();
       await phone.locator(`.card-section[data-view]:not([hidden])`).waitFor({ timeout: 5000 });
@@ -1032,6 +1047,64 @@ test('тренировка в программе переносится удер
     const after = await titles();
     assert.equal(after[0], before[1], 'вторая стала первой');
     assert.equal(after[1], before[0], 'первая — второй');
+  } finally {
+    await context.close();
+  }
+});
+
+test('в карточке клиента тренировки выбираются, копируются, удаляются и переименовываются', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => {
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      localStorage.setItem('workout_demo_server:99', JSON.stringify([{
+        id: 'completed-for-rename',
+        title: 'Завершённая тренировка',
+        sourceBlock: 'Тренировка 1 — верх',
+        month: 'Сентябрь 2026',
+        status: 'completed',
+        revision: 0,
+        requestId: '',
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        exercises: [{ id: 'exercise-1', name: 'Жим лёжа', sets: [{ id: 'set-1', state: 'done', kind: 'work', weight: '70', reps: '8', rpe: '' }] }],
+      }]));
+    });
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню' }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+
+    const blocks = phone.locator('#root main:not([hidden]) .plan__block');
+    await blocks.nth(1).waitFor({ timeout: 10000 });
+    const before = await blocks.count();
+    await phone.getByRole('button', { name: 'Выбрать', exact: true }).click();
+    await blocks.nth(0).click();
+    await blocks.nth(1).click();
+    if (process.env.SHOT_PLAN_ACTIONS) await phone.screenshot({ path: process.env.SHOT_PLAN_ACTIONS, fullPage: true });
+    await phone.getByRole('button', { name: 'Копировать', exact: true }).click();
+    await phone.waitForFunction((count) => document.querySelectorAll('#root main:not([hidden]) .plan__block').length === count + 2, before);
+
+    // Полное смахивание одной копии удаляет её и оставляет восстановление.
+    const copy = blocks.nth(1);
+    const box = await copy.boundingBox();
+    await phone.mouse.move(box.x + box.width - 20, box.y + box.height / 2);
+    await phone.mouse.down();
+    await phone.mouse.move(box.x + 20, box.y + box.height / 2, { steps: 8 });
+    await phone.mouse.up();
+    await phone.getByRole('button', { name: 'Вернуть', exact: true }).waitFor({ timeout: 5000 });
+
+    await phone.getByRole('tab', { name: /^Выполненные/ }).click();
+    const rename = phone.getByRole('button', { name: /^Переименовать:/ }).first();
+    await rename.waitFor({ timeout: 10000 });
+    const original = (await rename.innerText()).trim();
+    await rename.click();
+    const input = phone.getByRole('textbox', { name: 'Название тренировки' });
+    await input.fill(original + ' · исправлено');
+    await input.press('Enter');
+    await phone.getByRole('button', { name: 'Переименовать: ' + original + ' · исправлено' }).waitFor({ timeout: 5000 });
   } finally {
     await context.close();
   }

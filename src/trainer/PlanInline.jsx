@@ -7,7 +7,8 @@ import { haptic } from '../telegram.js';
 import { apiPublic } from '../api.js';
 import { useData } from '../useData.js';
 import { trackOf, cardioFrom, planScheme, techniqueOf, techniqueText } from '../exercise-track.js';
-import { IconPlus, IconLinkPair, IconCheck } from '../icons.jsx';
+import { IconPlus, IconLinkPair, IconCheck, IconTrash } from '../icons.jsx';
+import { patchPlanExercise } from '../plan-block-actions.js';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -71,12 +72,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     fn(next);
     onChange(next);
   };
-  const patch = (i, values) => set((next) => {
-    Object.assign(next[i], values);
-    // Суперсет делают кругами: подходов у всех упражнений группы поровну
-    const g = next[i].supersetGroup;
-    if (g && 'sets' in values) next.forEach((e) => { if (e.supersetGroup === g) e.sets = values.sets; });
-  });
+  const patch = (i, values) => onChange(patchPlanExercise(list, i, values));
 
   const toggle = (kind, i) => {
     if (swallow.current) return;
@@ -325,6 +321,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                   >{p === 'warmup' ? 'Р' : p === 'drop' ? 'Д' : k - tech.warmup + 1}</button>
                 ))}
               </div>
+              <p className="plan-inline__sets-help">Нажмите подход, чтобы изменить или удалить его.</p>
               {pickedSet >= 0 && pickedSet < pills.length && (
                 <div className="plan-inline__set-kind">
                   <div className="chips chips--flush" role="radiogroup" aria-label="Тип подхода">
@@ -332,12 +329,12 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                       <button type="button" key={k} role="radio" aria-checked={kindOf(pickedSet) === k} className={'chip' + (kindOf(pickedSet) === k ? ' chip--active' : '')} onClick={() => choose(k)}>{label}</button>
                     ))}
                   </div>
-                  <button type="button" className="button button--ghost" disabled={pills.length <= 1 || (kindOf(pickedSet) !== 'warmup' && work <= 1)} onClick={removePicked}>Убрать подход</button>
+                  <button type="button" className="button button--ghost" disabled={pills.length <= 1 || (kindOf(pickedSet) !== 'warmup' && work <= 1)} onClick={removePicked}><IconTrash size={16} />Удалить выбранный подход</button>
                 </div>
               )}
               <div className="plan-inline__set-add">
                 {strength && <button type="button" className="button" disabled={tech.warmup >= 5} onClick={() => setTech({ warmup: tech.warmup + 1 })}><IconPlus size={16} />Разминочный в начало</button>}
-                <button type="button" className="button" disabled={work >= 20} onClick={() => patch(i, { sets: String(work + 1) })}><IconPlus size={16} />Подход в конец</button>
+                <button type="button" className="button" disabled={work >= 20} onClick={() => patch(i, { sets: String(work + 1) })}><IconPlus size={16} />{inGroup ? 'Круг в конец' : 'Подход в конец'}</button>
               </div>
             </>
           )}
@@ -362,11 +359,13 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
           </div>
         )}
 
-        <div className="plan-inline__panel-actions">
+        <div className="plan-inline__group-actions">
           {next && !(ex.supersetGroup && next.supersetGroup === ex.supersetGroup) && !split && (
             <button type="button" className="button" onClick={() => { joinNext(i); haptic(); }}><IconLinkPair size={16} />В суперсет со следующим</button>
           )}
           {inGroup && <button type="button" className="button" onClick={() => { leave(i); haptic(); }}>Выйти из суперсета</button>}
+        </div>
+        <div className="plan-inline__panel-actions">
           <button type="button" className="button button--ghost plan-inline__danger" onClick={() => remove(i)}>Удалить</button>
           <button type="button" className="button button--primary" onClick={() => setOpen(null)}>Готово</button>
         </div>

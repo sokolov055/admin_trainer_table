@@ -18,9 +18,9 @@ if (typeof document !== 'undefined' && document.addEventListener) {
  * to) — куда переставили. Нажатие сразу после перетаскивания гасится —
  * иначе отпущенный палец «нажимал» кнопку под собой
  */
-export function holdToReorder(e, { rows, onDrop, onStart }) {
+export function holdToReorder(e, { rows, onDrop, onStart, row: targetRow = null }) {
   if (dragging || (e.button !== undefined && e.button !== 0)) return;
-  const row = e.currentTarget;
+  const row = targetRow || e.currentTarget;
   const x0 = e.clientX;
   const y0 = e.clientY;
   const id = e.pointerId;

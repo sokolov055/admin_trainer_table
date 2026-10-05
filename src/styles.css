@@ -4460,13 +4460,18 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__field { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
 .plan-inline__sets-head { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-muted); }
 .plan-inline__sets { display: flex; flex-wrap: wrap; gap: 6px; }
+.plan-inline__sets-help { margin: -4px 0 0; color: var(--text-muted); font-size: var(--text-xs); }
 .plan-inline__set { min-width: 40px; height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 650; font-variant-numeric: tabular-nums; cursor: pointer; }
 .plan-inline__set--warmup { color: var(--warning-text); background: var(--warning-fill); border-color: transparent; }
 .plan-inline__set--drop { color: var(--accent); border-color: var(--accent); }
 .plan-inline__set.is-on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan-inline__set-kind { display: grid; gap: var(--space-2); }
+.plan-inline__set-kind .button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .plan-inline__set-add { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .plan-inline__set-add .button, .plan-inline__add .button { display: inline-flex; align-items: center; gap: 6px; }
+.plan-inline__group-actions { display: grid; gap: var(--space-2); }
+.plan-inline__group-actions:empty { display: none; }
+.plan-inline__group-actions .button { width: 100%; justify-content: center; }
 .plan-inline__split { display: grid; gap: var(--space-2); }
 .plan-inline__person { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2); align-items: center; }
 .plan-inline__hint { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--text-muted); }
@@ -4476,6 +4481,18 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__plus { display: grid; place-items: center; width: 52px; height: 52px; margin: var(--space-3) auto; border-radius: 50%; border: 1px dashed var(--accent); background: var(--accent-wash); color: var(--accent); cursor: pointer; }
 .plan-inline__plus:active { transform: scale(0.95); }
 .plan-inline__add-menu { display: grid; gap: var(--space-2); margin: var(--space-3) 0; }
+.plan__manage-bar { display: flex; justify-content: flex-end; gap: var(--space-2); margin: var(--space-2) 0; }
+.plan__manage-bar .button { display: inline-flex; align-items: center; gap: 6px; }
+.plan__block-swipe { --swipe-bg: var(--surface); border-radius: var(--radius); margin-bottom: var(--space-3); }
+.plan__block-swipe .plan__block { margin-bottom: 0; }
+.plan__blocks--selecting .plan__block { position: relative; cursor: pointer; }
+.plan__blocks--selecting .plan__block button, .plan__blocks--selecting .plan__block input, .plan__blocks--selecting .plan__block textarea, .plan__blocks--selecting .plan__block select { pointer-events: none; }
+.plan__blocks--selecting .plan__block[data-picked] { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius); }
+.plan__block-pick { position: absolute; top: var(--space-3); right: var(--space-3); z-index: 3; width: 28px; height: 28px; display: grid; place-items: center; border: 2px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--accent-text); }
+.plan__block-pick.is-on { border-color: var(--accent); background: var(--accent); }
+.plan__block-actions { position: sticky; bottom: var(--float-bottom); z-index: 20; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-lg); }
+.plan__block-actions > span { flex: 1; min-width: 10ch; font-weight: 600; }
+.plan__block-undo { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: var(--space-2) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border-radius: var(--radius); background: var(--surface-sunken); }
 @media (prefers-reduced-motion: reduce) { .plan-inline__unit { transition: none; } }
 
 /* Тренировка в программе — удержанием вверх или вниз (hold-reorder.js) */

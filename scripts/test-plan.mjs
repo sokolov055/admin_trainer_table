@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { supersets, blockSessions } from '../src/plan-model.js';
+import { copyPlanBlocks, patchPlanExercise, workoutRenameParams } from '../src/plan-block-actions.js';
 
 /* ==========================================================================
  * Суперсеты
@@ -40,6 +41,50 @@ test('одинаковые группы через разрыв не склеи�
 
   assert.equal(groups.length, 3, 'суперсет — это соседство, а не совпадение имени');
   assert.equal(groups.every((g) => !g.superset), true);
+});
+
+test('добавление круга и разминки синхронизирует весь суперсет', () => {
+  const exercises = [
+    { name: 'Жим', sets: '3', technique: 'warmup1 dropset', supersetGroup: 'g1' },
+    { name: 'Тяга', sets: '3', technique: '', supersetGroup: 'g1' },
+    { name: 'Планка', sets: '2', technique: '', supersetGroup: '' },
+  ];
+
+  const withRound = patchPlanExercise(exercises, 0, { sets: '4' });
+  assert.deepEqual(withRound.map((exercise) => exercise.sets), ['4', '4', '2']);
+
+  const withWarmup = patchPlanExercise(withRound, 0, { technique: 'warmup2 dropset' });
+  assert.equal(withWarmup[0].technique, 'warmup2 dropset');
+  assert.equal(withWarmup[1].technique, 'warmup2');
+  assert.equal(withWarmup[2].technique, '');
+});
+
+test('копия тренировки получает новые связи суперсетов и не наследует id', () => {
+  const source = [{
+    id: 'block-1',
+    title: 'Верх',
+    exercises: [
+      { name: 'Жим', supersetGroup: 'g1' },
+      { name: 'Тяга', supersetGroup: 'g1' },
+    ],
+  }];
+  const copied = copyPlanBlocks(source, [0], 123);
+
+  assert.equal(copied.length, 2);
+  assert.equal(copied[1].id, '');
+  assert.equal(copied[1].title, 'Верх (копия)');
+  assert.notEqual(copied[1].exercises[0].supersetGroup, 'g1');
+  assert.equal(copied[1].exercises[0].supersetGroup, copied[1].exercises[1].supersetGroup);
+});
+
+test('переименование завершённого занятия сохраняет ревизию и исходное название', () => {
+  const session = { id: 'done-1', title: 'Ноги', status: 'completed', revision: 7 };
+  assert.deepEqual(workoutRenameParams(session, 'Ноги и корпус', 'request-1'), {
+    session: { ...session, title: 'Ноги и корпус' },
+    revision: 7,
+    requestId: 'request-1',
+    baseTitle: 'Ноги',
+  });
 });
 
 /* ==========================================================================

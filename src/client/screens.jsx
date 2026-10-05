@@ -11,7 +11,7 @@ import {
   Chips, Segmented, Options, Field, Note, Delta,
   formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus } from '../icons.jsx';
+import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
@@ -20,6 +20,9 @@ import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
 import { Media, SetupText } from '../media.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
+import SwipeRow from '../SwipeRow.jsx';
+import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
+import { uid } from '../workout-model.js';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
@@ -348,6 +351,15 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // это лента в несколько экранов, где нужная теряется. Свёрнутая
   // показывает, что в ней, и сразу даёт начать; развернуть — по нажатию.
   const [openBlocks, setOpenBlocks] = useState({});
+  const [selectingBlocks, setSelectingBlocks] = useState(false);
+  const [selectedBlocks, setSelectedBlocks] = useState(() => new Set());
+  const [blockUndo, setBlockUndo] = useState(null);
+  useEffect(() => {
+    setSelectingBlocks(false);
+    setSelectedBlocks(new Set());
+    setBlockUndo(null);
+    setOpenBlocks({});
+  }, [planTab, month]);
 
   // Журнал может ответить не сразу, поэтому экран его не
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
@@ -410,6 +422,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // Проведённой считается тренировка, у которой есть завершённое занятие
   // этого месяца. Порядок в «Очереди» — тот же, что в программе.
   const queueBlocks = shownBlocks.filter((b) => !blockSessions(sessions, b, data.month).length);
+  const visibleBlocks = planTab === 'all' ? shownBlocks : queueBlocks;
   // «Выполненные» (01.10.2026) — все завершённые занятия месяца по дате
   // занятия, свежие сверху: тренировки программы (и повторы), свободные.
   // Какого месяца: открыли лист программы сами — того месяца; иначе —
@@ -476,7 +489,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     }
   };
   /** Новый снимок месяца: сразу на экран, на сервер — через ~0,7 с тишины */
-  const commit = (list) => {
+  const commit = (list, { keepUndo = false } = {}) => {
+    if (!keepUndo) setBlockUndo(null);
     editSeq.current += 1;
     const seq = editSeq.current;
     setDraft({ month: data.month, blocks: list });
@@ -495,6 +509,33 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     const tab = planTab === 'done' ? 'queue' : planTab;
     if (tab !== planTab) setPlanTab(tab);
     setOpenBlocks((prev) => ({ ...prev, [tab + ':' + (list.length - 1)]: true }));
+  };
+  const copyBlocks = (indices) => {
+    commit(copyPlanBlocks(shownBlocks, indices));
+    setSelectedBlocks(new Set());
+    setSelectingBlocks(false);
+    haptic('success');
+  };
+  const removeBlocks = (indices) => {
+    if (!indices.length || shownBlocks.length - indices.length < 1) return;
+    setBlockUndo({ blocks: shownBlocks, count: indices.length });
+    commit(shownBlocks.filter((_, index) => !indices.includes(index)), { keepUndo: true });
+    setSelectedBlocks(new Set());
+    setSelectingBlocks(false);
+    haptic('success');
+  };
+  const renameSession = async (session, title) => {
+    const current = await apiPublic('workout.get', {
+      ...(clientRow ? { clientRow } : {}),
+      id: session.id,
+    });
+    const result = await apiMutate('workout.save', {
+      ...(clientRow ? { clientRow } : {}),
+      ...workoutRenameParams(current.session, title, uid()),
+    });
+    setSessions((current) => current.map((item) => (item.id === session.id ? result.session : item)));
+    await reload();
+    return result.session;
   };
 
   // Новый месяц — следующий за самым поздним, пустой: «Из шаблона» или
@@ -697,7 +738,13 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       )}
 
       {planTab === 'done' && doneSessions.map((s) => (
-        <DoneSession key={s.id} session={s} canOpen={!familyRow} onOpen={() => openWorkout({ sessionId: s.id })} />
+        <DoneSession
+          key={s.id}
+          session={s}
+          canOpen={!familyRow}
+          onRename={canEdit ? (title) => renameSession(s, title) : null}
+          onOpen={() => openWorkout({ sessionId: s.id })}
+        />
       ))}
 
       {planTab === 'queue' && queueBlocks.length === 0 && shownBlocks.length > 0 && (
@@ -708,7 +755,37 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {(planTab === 'queue' || planTab === 'all') && <div className="plan__blocks" ref={blocksRef}>{(planTab === 'all' ? shownBlocks : queueBlocks).map((block, i, shownList) => {
+      {canEdit && (planTab === 'queue' || planTab === 'all') && visibleBlocks.length > 0 && (
+        <div className="plan__manage-bar">
+          {selectingBlocks ? (
+            <>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={() => setSelectedBlocks(selectedBlocks.size === visibleBlocks.length
+                  ? new Set()
+                  : new Set(visibleBlocks.map((block) => shownBlocks.indexOf(block))))}
+              >
+                {selectedBlocks.size === visibleBlocks.length ? 'Снять все' : 'Выбрать все'}
+              </button>
+              <button type="button" className="button" onClick={() => { setSelectingBlocks(false); setSelectedBlocks(new Set()); }}>Отмена</button>
+            </>
+          ) : (
+            <button type="button" className="button" onClick={() => { setSelectingBlocks(true); setOpenBlocks({}); }}>
+              <IconCheck size={16} />Выбрать
+            </button>
+          )}
+        </div>
+      )}
+
+      {blockUndo && (
+        <div className="plan__block-undo" role="status">
+          <span>{blockUndo.count === 1 ? 'Тренировка удалена' : 'Тренировки удалены'}</span>
+          <button type="button" className="button button--ghost" onClick={() => { commit(blockUndo.blocks); setBlockUndo(null); }}>Вернуть</button>
+        </div>
+      )}
+
+      {(planTab === 'queue' || planTab === 'all') && <div className={'plan__blocks' + (selectingBlocks ? ' plan__blocks--selecting' : '')} ref={blocksRef}>{visibleBlocks.map((block, i, shownList) => {
         const past = blockSessions(sessions, block, data.month);
         const bi = shownBlocks.indexOf(block);
         const editHere = canEdit && !made0(planTab);
@@ -724,23 +801,45 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         // Ключ — по месту в месяце: переименование не сворачивает тренировку
         const blockKey = planTab + ':' + bi;
         const open = !!openBlocks[blockKey];
+        const picked = selectedBlocks.has(bi);
         const names = shownExercises.map((ex) => ex.name).filter(Boolean);
         const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
 
         return (
         // Тренировку — удержанием вверх или вниз (владелец, 03.10.2026).
         // Не из правки упражнений внутри: там своё перетаскивание
+        <PlanBlockSwipe
+          key={block.id || 'new' + bi}
+          enabled={canEdit && !selectingBlocks && shownBlocks.length > 1}
+          block={block}
+          index={bi}
+          done={past.length > 0}
+          onDelete={() => removeBlocks([bi])}
+        >
         <div
           className="plan__block"
-          key={block.id || 'new' + bi}
-          data-block={bi}
+          data-picked={picked ? '' : undefined}
+          role={selectingBlocks ? 'checkbox' : undefined}
+          aria-checked={selectingBlocks ? picked : undefined}
+          tabIndex={selectingBlocks ? 0 : undefined}
+          onClick={selectingBlocks ? () => setSelectedBlocks((current) => {
+            const next = new Set(current);
+            if (next.has(bi)) next.delete(bi); else next.add(bi);
+            return next;
+          }) : undefined}
+          onKeyDown={selectingBlocks ? (event) => {
+            if (event.key !== ' ' && event.key !== 'Enter') return;
+            event.preventDefault();
+            event.currentTarget.click();
+          } : undefined}
           // Проведённые стоят на месте: их не тащат и между ними не ставят —
           // переставляются только оставшиеся, на свои же места
           data-done={past.length ? '' : undefined}
-          onPointerDown={canEdit && !past.length ? (e) => {
+          onPointerDown={canEdit && !selectingBlocks && !past.length ? (e) => {
             if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select')) return;
             const movable = shownList.filter((b) => !blockSessions(sessions, b, data.month).length);
             holdToReorder(e, {
+              row: e.currentTarget.closest('.plan__block-swipe') || e.currentTarget,
               rows: () => (blocksRef.current ? [...blocksRef.current.querySelectorAll(':scope > [data-block]:not([data-done])')] : []),
               onDrop: (from, to) => {
                 // Переставили среди оставшихся — в месяце они занимают те же места
@@ -756,6 +855,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             });
           } : undefined}
         >
+        {selectingBlocks && <span className={'plan__block-pick' + (picked ? ' is-on' : '')} aria-hidden="true">{picked && <IconCheck size={17} />}</span>}
         <Section
           title={(() => {
             const t = canRename ? <BlockTitle title={block.title} onRename={(v) => renameBlock(block, v)} /> : block.title;
@@ -845,8 +945,17 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           </Panel>
         </Section>
         </div>
+        </PlanBlockSwipe>
         );
       })}</div>}
+
+      {selectingBlocks && selectedBlocks.size > 0 && (
+        <div className="plan__block-actions" role="toolbar" aria-label="Действия с выбранными тренировками">
+          <span>Выбрано: {selectedBlocks.size}</span>
+          <button type="button" className="button" onClick={() => copyBlocks([...selectedBlocks])}><IconCopy size={16} />Копировать</button>
+          <button type="button" className="button button--danger" disabled={shownBlocks.length - selectedBlocks.size < 1} onClick={() => removeBlocks([...selectedBlocks])}><IconTrash size={16} />Удалить</button>
+        </div>
+      )}
 
       {/* «+» под последней тренировкой: из шаблонов тренировок или новая */}
       {canEdit && (planTab === 'queue' || planTab === 'all') && shownBlocks.length > 0 && (
@@ -966,18 +1075,34 @@ function inMonthLabel(iso, label) {
   return idx === d.getMonth() && Number(m[2]) === d.getFullYear();
 }
 
+/** Свайп живёт вокруг карточки, а удержание переставляет эту же обёртку. */
+function PlanBlockSwipe({ enabled, block, index, done, onDelete, children }) {
+  if (!enabled) return children;
+  return (
+    <SwipeRow
+      className="plan__block-swipe"
+      data-block={index}
+      data-done={done ? '' : undefined}
+      label={'Удалить тренировку «' + block.title + '»'}
+      onDelete={onDelete}
+    >
+      {children}
+    </SwipeRow>
+  );
+}
+
 /**
  * Проведённое занятие во «Выполненных»: название, когда, сколько подходов,
  * «Посмотреть веса» и по нажатию — что сделано. Свободная тренировка и
  * повтор той же тренировки программы — такие же строки.
  */
-function DoneSession({ session: s, canOpen, onOpen }) {
+function DoneSession({ session: s, canOpen, onRename, onOpen }) {
   const [open, setOpen] = useState(false);
   const exercises = Array.isArray(s.exercises) ? s.exercises : [];
   const names = exercises.map((ex) => ex.name).filter(Boolean);
   const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
   return (
-    <Section title={s.title} note={formatDate(s.startedAt || s.updatedAt)}>
+    <Section title={onRename ? <BlockTitle title={s.title} onRename={onRename} /> : s.title} note={formatDate(s.startedAt || s.updatedAt)}>
       <Panel>
         <div className="plan__done">
           <div>
