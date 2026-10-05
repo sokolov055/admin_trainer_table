@@ -1015,10 +1015,13 @@ test('тренировка в программе переносится удер
     await phone.getByRole('button', { name: 'Меню' }).click({ timeout: 20000 });
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
     const titles = () => phone.locator('#root main:not([hidden]) .plan__block .section__title').allInnerTexts();
-    await phone.locator('#root main:not([hidden]) .plan__block').nth(1).waitFor({ timeout: 10000 });
+    const blocks = phone.locator('#root main:not([hidden]) .plan__block');
+    await blocks.nth(1).waitFor({ timeout: 10000 });
     const before = await titles();
     const head = phone.locator('#root main:not([hidden]) .plan__block .section__head').first();
-    const second = await phone.locator('#root main:not([hidden]) .plan__block').nth(1).boundingBox();
+    const first = await blocks.first().boundingBox();
+    const second = await blocks.nth(1).boundingBox();
+    assert.ok(second.y - first.y - first.height >= 28, 'тренировки разделены межблочным интервалом');
     const b = await head.boundingBox();
     await phone.mouse.move(b.x + 20, b.y + b.height / 2);
     await phone.mouse.down();
