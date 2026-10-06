@@ -70,22 +70,27 @@ test('добавление круга и разминки синхронизир
   assert.equal(withWarmup[2].technique, '');
 });
 
-test('копия тренировки получает новые связи суперсетов и не наследует id', () => {
-  const source = [{
-    id: 'block-1',
-    title: 'Верх',
-    exercises: [
-      { name: 'Жим', supersetGroup: 'g1' },
-      { name: 'Тяга', supersetGroup: 'g1' },
-    ],
-  }];
-  const copied = copyPlanBlocks(source, [0], 123);
+test('копии тренировок идут после оригиналов в их порядке и сохраняют названия', () => {
+  const source = [
+    {
+      id: 'block-1',
+      title: 'Верх',
+      exercises: [
+        { name: 'Жим', supersetGroup: 'g1' },
+        { name: 'Тяга', supersetGroup: 'g1' },
+      ],
+    },
+    { id: 'block-2', title: 'Низ', exercises: [{ name: 'Присед', supersetGroup: '' }] },
+    { id: 'block-3', title: 'Кардио', exercises: [{ name: 'Дорожка', supersetGroup: '' }] },
+  ];
+  const copied = copyPlanBlocks(source, [2, 0], 123);
 
-  assert.equal(copied.length, 2);
-  assert.equal(copied[1].id, '');
-  assert.equal(copied[1].title, 'Верх (копия)');
-  assert.notEqual(copied[1].exercises[0].supersetGroup, 'g1');
-  assert.equal(copied[1].exercises[0].supersetGroup, copied[1].exercises[1].supersetGroup);
+  assert.equal(copied.length, 5);
+  assert.deepEqual(copied.map((block) => block.title), ['Верх', 'Низ', 'Кардио', 'Верх', 'Кардио']);
+  assert.deepEqual(copied.slice(3).map((block) => block.id), ['', '']);
+  assert.notEqual(copied[3].exercises[0].supersetGroup, 'g1');
+  assert.equal(copied[3].exercises[0].supersetGroup, copied[3].exercises[1].supersetGroup);
+  assert.equal(source[0].exercises[0].supersetGroup, 'g1', 'исходные данные не меняются');
 });
 
 test('переименование завершённого занятия сохраняет ревизию и исходное название', () => {

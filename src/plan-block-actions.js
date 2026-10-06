@@ -3,14 +3,15 @@ import { techniqueOf, techniqueText } from './exercise-track.js';
 /** Копия тренировки не наследует связь с проведёнными занятиями. */
 export function copyPlanBlocks(blocks, indices, stamp = Date.now()) {
   const next = blocks.map((block) => ({ ...block, exercises: block.exercises.map((exercise) => ({ ...exercise })) }));
-  [...indices].sort((a, b) => b - a).forEach((index) => {
+  const selected = [...new Set(indices)]
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < next.length)
+    .sort((a, b) => a - b);
+  const copies = selected.map((index) => {
     const source = next[index];
-    if (!source) return;
     const copiedGroups = new Map();
-    next.splice(index + 1, 0, {
+    return {
       ...source,
       id: '',
-      title: source.title + ' (копия)',
       exercises: source.exercises.map((exercise) => ({
         ...exercise,
         supersetGroup: exercise.supersetGroup
@@ -22,9 +23,9 @@ export function copyPlanBlocks(blocks, indices, stamp = Date.now()) {
             })()
           : '',
       })),
-    });
+    };
   });
-  return next;
+  return next.concat(copies);
 }
 
 /**

@@ -13,6 +13,7 @@ import { Note } from '../ui.jsx';
 import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconPlus } from '../icons.jsx';
 import BlockOrder from './BlockOrder.jsx';
 import { usePinch } from '../pinch.js';
+import { copyPlanBlocks } from '../plan-block-actions.js';
 
 /**
  * Редактор программы месяца.
@@ -355,24 +356,7 @@ export default function PlanEditor({
             next.splice(to, 0, moved);
             return next;
           })}
-          onCopy={(indices) => change((next) => {
-            // С конца: копия встаёт сразу за своей тренировкой, и номера
-            // ещё не скопированных от этого не сдвигаются
-            [...indices].sort((a, b) => b - a).forEach((i) => {
-              const copy = {
-                ...next[i],
-                title: next[i].title + ' (копия)',
-                // Копия — новая тренировка: журнала оригинала у неё нет
-                id: '',
-                // Суперсеты копии — свои группы, чтобы не склеиться с оригиналом
-                exercises: next[i].exercises.map((e) => ({
-                  ...e, supersetGroup: e.supersetGroup ? e.supersetGroup + '-c' + Date.now() + '-' + i : '',
-                })),
-              };
-              next.splice(i + 1, 0, copy);
-            });
-            return next;
-          })}
+          onCopy={(indices) => change((next) => copyPlanBlocks(next, indices))}
           onRemove={(indices) => {
             if (draft.length - indices.length < 1) return;
             const names = indices.map((i) => '«' + (draft[i].title || 'Без названия') + '»');

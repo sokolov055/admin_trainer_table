@@ -879,9 +879,15 @@ test('тренировки программы переставляются пе�
     await rows.nth(0).click();
     await rows.nth(1).click();
     await assert.doesNotReject(tab.getByText('Выбрано 2').waitFor({ timeout: 3000 }));
+    const originalTitles = await rows.locator('.block-order__title').evaluateAll((titles) => titles.map((title) => title.textContent));
+    const selectedTitles = originalTitles.slice(0, 2);
     await tab.locator('.block-order__actions').getByRole('button', { name: 'Копировать' }).click();
     assert.equal(await rows.count(), before + 2, 'скопированы обе');
-    assert.equal(await tab.locator('.block-order__title').nth(1).textContent(), 'Тренировка 2 — низ (копия)', 'копия — сразу за своей');
+    assert.deepEqual(
+      await rows.locator('.block-order__title').evaluateAll((titles) => titles.map((title) => title.textContent)),
+      originalTitles.concat(selectedTitles),
+      'копии без подписи идут после всех оригиналов в их порядке',
+    );
 
     await tab.locator('.plan-edit__order-bar').getByRole('button', { name: 'Развернуть' }).click();
     const firstTitle = await tab.locator('.plan-edit__title').first().inputValue();
