@@ -6,6 +6,7 @@ import { reloadWidgets } from '../native-widget.js';
 import { haptic } from '../telegram.js';
 import { Section, Panel, Loading, ErrorState, Note, Field, Options, Chips } from '../ui.jsx';
 import { IconAlert, IconBack, IconCopy, IconPlus } from '../icons.jsx';
+import { gridDropStart, monthDropStart, moveRequest } from './calendar-move.js';
 
 /**
  * Расписание тренера — занятия из его Google Календаря.
@@ -98,6 +99,8 @@ export default function Schedule() {
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [editing, setEditing] = useState(null); // null | {} — новое | событие
   const [preset, setPreset] = useState(null); // время нового занятия из сетки
+  const [movedEvents, setMovedEvents] = useState({});
+  const [moveFailure, setMoveFailure] = useState(null);
   useReturnScroll(!!editing);
 
   const setView = (v) => {
@@ -118,6 +121,7 @@ export default function Schedule() {
   // Виджеты iPhone «Занятия сегодня»: расписание перечитали (в том числе
   // после правки) — пусть и они перечитают сейчас, а не через полчаса
   useEffect(() => { if (data) reloadWidgets(); }, [data]);
+  useEffect(() => { if (data && data.events) setMovedEvents({}); }, [data]);
   // Пока грузится новый период, показываем уже известное — а не пустую
   // сетку: после пролистывания большинство занятий уже загружено
   const known = useRef([]);
@@ -136,6 +140,7 @@ export default function Schedule() {
           const s0 = new Date(e.startsAt);
           setPreset({ date: startOfDay(s0), minutes: s0.getHours() * 60 + s0.getMinutes() });
           setEditing({ copyKey: 'copy-' + e.id + '-' + Date.now(), clientRow: e.clientRow || '',
+            personal: !!e.personal, title: e.personal ? e.title : '',
             duration: Math.round((new Date(e.endsAt) - s0) / 60000), copyOf: e.clientName || e.title || '' });
           haptic();
         }}
@@ -147,9 +152,27 @@ export default function Schedule() {
     );
   }
 
-  const events = (data && data.events) || known.current;
+  const events = ((data && data.events) || known.current).map((e) => movedEvents[e.id]
+    ? { ...e, startsAt: movedEvents[e.id].startsAt, endsAt: movedEvents[e.id].endsAt }
+    : e);
   const create = (when) => { setPreset(when || { date: startOfDay(anchor), minutes: 10 * 60 }); setEditing({}); haptic(); };
   const openDay = (d) => { setAnchor(startOfDay(d)); setView('day'); };
+  const moveEvent = async (event, nextStart) => {
+    if (event.cancelledCharged) return;
+    const request = moveRequest(event, nextStart);
+    const duration = request.minutes;
+    const nextEnd = new Date(nextStart.getTime() + duration * 60000);
+    setMoveFailure(null);
+    setMovedEvents((old) => ({ ...old, [event.id]: { startsAt: nextStart.toISOString(), endsAt: nextEnd.toISOString() } }));
+    try {
+      await apiMutate('trainer.schedule.save', request);
+      haptic('success');
+      reload();
+    } catch (err) {
+      setMovedEvents((old) => { const next = { ...old }; delete next[event.id]; return next; });
+      setMoveFailure(err);
+    }
+  };
 
   return (
     <>
@@ -166,11 +189,12 @@ export default function Schedule() {
         <Chips variant="nav" items={VIEWS.map((v) => ({ value: v.value, label: v.label }))} value={view} onChange={setView} />
       </div>
 
-      {/* Новое занятие — плавающей кнопкой, как в Google: сетка занимает
+      {/* Новое событие — плавающей кнопкой, как в Google: сетка занимает
           экран, а кнопка всегда под пальцем над нижним меню */}
-      <button className="cal-fab" aria-label="Добавить занятие" onClick={() => create()}><IconPlus size={24} /></button>
+      <button className="cal-fab" aria-label="Добавить событие" onClick={() => create()}><IconPlus size={24} /></button>
 
       {error && <ErrorState error={error} onRetry={reload} />}
+      {moveFailure && <Note tone="critical" icon={IconAlert}>Не удалось перенести событие: {moveFailure.message || 'повторите ещё раз'}</Note>}
 
       {/* Google Календарь — только у владельца сервиса; у других тренеров
           расписание живёт в приложении, и предупреждать не о чем */}
@@ -180,15 +204,15 @@ export default function Schedule() {
 
       {!error && (loading && !data && !known.current.length ? <Loading lead={false} rows={4} /> : view === 'month' ? (
         <SwipePager onShift={(dir) => { setAnchor(shifted(view, anchor, dir)); haptic(); }}>
-          <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} />
+          <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} onMove={moveEvent} />
         </SwipePager>
       ) : (
-        <TimeGrid start={start} days={days} events={events} onDay={openDay} onEvent={setEditing} onSlot={create}
+        <TimeGrid start={start} days={days} events={events} onDay={openDay} onEvent={setEditing} onSlot={create} onMove={moveEvent}
           onShift={(n) => { setAnchor(addDays(anchor, n)); haptic(); }} />
       ))}
 
       {data && data.feedUrl && (
-        <PhoneCalendar url={data.feedUrl} text="Все занятия — в календаре телефона: подпишитесь один раз, дальше он обновляется сам." />
+        <PhoneCalendar url={data.feedUrl} text="Все занятия и личные события — в календаре телефона: подпишитесь один раз, дальше он обновляется сам." />
       )}
     </>
   );
@@ -270,8 +294,122 @@ const shortLabelOf = (e) => labelOf(e).split(/\s+/)[0];
 function eventClass(e) {
   return 'cal-event'
     + (e.cancelledCharged ? ' cal-event--cancelled' : '')
-    + (!e.clientRow ? ' cal-event--unknown' : '')
+    + (e.personal ? ' cal-event--personal' : '')
     + (e.done && !e.cancelledCharged ? ' cal-event--done' : '');
+}
+
+// iPhone позволяет отменить прокрутку только слушателю touchmove, который уже
+// существовал в момент начала касания. Поэтому он зарегистрирован заранее, а
+// блокировка включается лишь после удержания события.
+let calendarTouchDragging = false;
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('touchmove', (event) => {
+    if (calendarTouchDragging) event.preventDefault();
+  }, { passive: false });
+}
+
+/**
+ * Событие можно перенести указателем без промежуточной формы. Координаты
+ * меняются прямо у DOM-элемента, чтобы движение не перерисовывало всю сетку.
+ * Короткое касание остаётся обычным открытием карточки.
+ */
+function CalendarEventButton({ event, className, style, onOpen, onMove, resolveDrop, children, ariaLabel }) {
+  const button = useRef(null);
+  const drag = useRef(null);
+  const suppressClick = useRef(false);
+  const disabled = !!event.cancelledCharged || (!event.personal && !event.clientRow);
+
+  useEffect(() => () => {
+    const current = drag.current;
+    if (!current) return;
+    clearTimeout(current.timer);
+    if (current.ready && current.touch) calendarTouchDragging = false;
+  }, []);
+
+  const reset = () => {
+    const el = button.current;
+    if (!el) return;
+    el.classList.remove('is-dragging');
+    el.style.removeProperty('transform');
+    el.style.removeProperty('transition');
+  };
+
+  const down = (e) => {
+    if (disabled || (e.button !== undefined && e.button !== 0)) return;
+    const touch = e.pointerType === 'touch' || e.pointerType === 'pen';
+    const state = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0, active: false, ready: !touch, touch, timer: null };
+    if (touch) state.timer = setTimeout(() => {
+      if (drag.current === state) {
+        state.ready = true;
+        calendarTouchDragging = true;
+      }
+    }, 260);
+    drag.current = state;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* старый WebView */ }
+  };
+  const move = (e) => {
+    const g = drag.current;
+    if (!g || g.id !== e.pointerId) return;
+    g.dx = e.clientX - g.x;
+    g.dy = e.clientY - g.y;
+    if (!g.ready) {
+      // На телефоне перенос начинается после короткого удержания: обычное
+      // касание и начатая прокрутка не должны случайно сдвигать событие.
+      if (Math.hypot(g.dx, g.dy) >= 7) {
+        clearTimeout(g.timer);
+        drag.current = null;
+        suppressClick.current = true;
+        setTimeout(() => { suppressClick.current = false; }, 0);
+      }
+      return;
+    }
+    if (!g.active && Math.hypot(g.dx, g.dy) < 7) return;
+    g.active = true;
+    suppressClick.current = true;
+    const el = button.current;
+    if (!el) return;
+    el.classList.add('is-dragging');
+    el.style.transition = 'none';
+    el.style.transform = `translate3d(${g.dx}px, ${g.dy}px, 0)`;
+  };
+  const finish = (e) => {
+    const g = drag.current;
+    if (!g || g.id !== e.pointerId) return;
+    clearTimeout(g.timer);
+    drag.current = null;
+    if (g.ready && g.touch) calendarTouchDragging = false;
+    reset();
+    if (!g.active || e.type === 'pointercancel') {
+      if (e.type === 'pointercancel') suppressClick.current = false;
+      return;
+    }
+    const next = resolveDrop(g.dx, g.dy);
+    if (next && next.getTime() !== new Date(event.startsAt).getTime()) onMove(event, next);
+    setTimeout(() => { suppressClick.current = false; }, 0);
+  };
+  const touchMove = (e) => {
+    const g = drag.current;
+    // До срабатывания удержания браузер и сетка получают обычный жест
+    // прокрутки. После — движение принадлежит переносу события.
+    if (!g || !g.ready) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  return (
+    <button ref={button} className={className} style={style} aria-label={ariaLabel}
+      onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}
+      onTouchMove={touchMove}
+      onTouchEnd={(e) => { if (drag.current?.ready) e.stopPropagation(); }}
+      onTouchCancel={(e) => { if (drag.current?.ready) e.stopPropagation(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (suppressClick.current) { suppressClick.current = false; return; }
+        onOpen(event);
+      }}>
+      {children}
+    </button>
+  );
 }
 
 /**
@@ -325,7 +463,7 @@ const FLICK = 0.35; // px/мс — быстрый взмах листает, д�
  * тогда меняется опорная дата: onShift(на сколько дней). Вертикальная
  * прокрутка решается по первым 10 px движения и сетку вбок не трогает.
  */
-function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
+function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove }) {
   const scroller = useRef(null);
   const viewport = useRef(null);
   const [now, setNow] = useState(() => new Date());
@@ -337,6 +475,9 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
   const [hour, setHour] = useState(savedHour);
   const pinch = useRef(null);
   const keepScroll = useRef(null);
+  const reduce = typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const settleMs = reduce ? 0 : 220;
 
   // Лента: N дней до, N видимых, N после
   const strip = Array.from({ length: days * 3 }, (_, i) => addDays(start, i - days));
@@ -455,7 +596,7 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
       settling.current = null;
       if (shift) onShift(shift);
       setDrag({ x: 0, animate: false });
-    }, 220);
+    }, settleMs);
   };
 
   const slot = (d, ev) => {
@@ -468,7 +609,7 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
   const track = {
     width: '300%',
     transform: `translate3d(calc(-100% / 3 + ${drag.x}px), 0, 0)`,
-    transition: drag.animate ? 'transform 220ms cubic-bezier(0.23, 1, 0.32, 1)' : 'none',
+    transition: drag.animate && !reduce ? 'transform 220ms cubic-bezier(0.23, 1, 0.32, 1)' : 'none',
     gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))`,
   };
 
@@ -502,7 +643,10 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
               {strip.map((d) => (
                 <div key={d.getTime()} className="cal-grid__allcell">
                   {allDayOf(d).map((e) => (
-                    <button key={e.id} className={eventClass(e) + ' cal-event--chip'} onClick={() => onEvent(e)}>{labelOf(e)}</button>
+                    <CalendarEventButton key={e.id} event={e} className={eventClass(e) + ' cal-event--chip'} onOpen={onEvent} onMove={onMove}
+                      resolveDrop={(dx) => new Date(new Date(e.startsAt).getTime() + Math.round(dx / (width() / days)) * DAY)}>
+                      {labelOf(e)}
+                    </CalendarEventButton>
                   ))}
                 </div>
               ))}
@@ -531,15 +675,18 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
                       const top = (from.getHours() * 60 + from.getMinutes()) / 60 * hour;
                       const height = Math.max(((f - s) / 3600000) * hour - 2, 14);
                       return (
-                        <button
+                        <CalendarEventButton
                           key={e.id}
+                          event={e}
                           className={eventClass(e)}
                           style={{ top, height, left: `calc(${(col / cols) * 100}% + 1px)`, width: `calc(${100 / cols}% - 3px)` }}
-                          onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}
+                          onOpen={onEvent}
+                          onMove={onMove}
+                          resolveDrop={(dx, dy) => gridDropStart(s, dx, dy, width() / days, hour)}
                         >
                           <span className="cal-event__name">{days === 7 ? shortLabelOf(e) : labelOf(e)}</span>
                           {days < 7 && height >= 34 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
-                        </button>
+                        </CalendarEventButton>
                       );
                     })}
                     {today && (
@@ -557,7 +704,7 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift }) {
 }
 
 /** Сетка месяца: 6 недель, в дне — до трёх занятий, остальное «ещё N» */
-function MonthGrid({ start, anchor, events, onDay, onEvent }) {
+function MonthGrid({ start, anchor, events, onDay, onEvent, onMove }) {
   const now = new Date();
   const cells = Array.from({ length: 42 }, (_, i) => addDays(start, i));
   return (
@@ -582,9 +729,16 @@ function MonthGrid({ start, anchor, events, onDay, onEvent }) {
             >
               <span className="cal-month__date">{d.getDate()}</span>
               {ofDay.slice(0, 3).map((e) => (
-                <button key={e.id} className={eventClass(e) + ' cal-event--chip'} aria-label={hm(e.startsAt) + ' ' + labelOf(e)} onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
+                <CalendarEventButton key={e.id} event={e} className={eventClass(e) + ' cal-event--chip'} ariaLabel={hm(e.startsAt) + ' ' + labelOf(e)}
+                  onOpen={onEvent} onMove={onMove}
+                  resolveDrop={(dx, dy) => {
+                    const grid = document.querySelector('.cal-month__grid');
+                    const cell = grid && grid.querySelector('.cal-month__cell');
+                    if (!grid || !cell) return new Date(e.startsAt);
+                    return monthDropStart(e.startsAt, dx, dy, grid.clientWidth / 7, cell.getBoundingClientRect().height);
+                  }}>
                   {shortLabelOf(e)}
-                </button>
+                </CalendarEventButton>
               ))}
               {ofDay.length > 3 && <span className="cal-month__more">ещё {ofDay.length - 3}</span>}
             </div>
@@ -595,7 +749,7 @@ function MonthGrid({ start, anchor, events, onDay, onEvent }) {
   );
 }
 
-/** Создать, перенести или отменить занятие */
+/** Создать, перенести или удалить занятие либо личное событие */
 function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onCopy }) {
   // Новое — на время, куда нажали в сетке (или 10:00 опорного дня)
   const base = (preset && preset.date) || startOfDay(new Date());
@@ -606,6 +760,8 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
   const initialMinutes = event.startsAt ? Math.round((new Date(event.endsAt) - new Date(event.startsAt)) / 60000) : (event.duration || 60);
 
   const [clientRow, setClientRow] = useState(event.clientRow || '');
+  const [kind, setKind] = useState(event.personal ? 'personal' : 'client');
+  const [title, setTitle] = useState(event.title || '');
   const [date, setDate] = useState(dateValue(start));
   const [time, setTime] = useState(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
   const [minutes, setMinutes] = useState(String(initialMinutes));
@@ -622,6 +778,7 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
   const startsAt = new Date(`${date}T${time}`);
   // Время поменялось — перенос или исправление: спросим, какое из двух
   const moved = !!event.id && startsAt.getTime() !== start.getTime();
+  const personal = kind === 'personal';
   // Поздняя отмена — меньше чем за сутки до начала
   const late = !!event.id && start.getTime() - Date.now() < LATE_HOURS * 3600000;
   const charged = who === 'client' && (charge === null ? late : charge);
@@ -642,14 +799,15 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
 
   const save = () => run(() => apiMutate('trainer.schedule.save', {
     ...(event.id ? { id: event.id } : {}),
-    clientRow: Number(clientRow),
+    personal,
+    ...(personal ? { title: title.trim() } : { clientRow: Number(clientRow) }),
     startsAt: startsAt.toISOString(),
     minutes: Number(minutes),
-    ...(moved ? { change, reason } : {}),
+    ...(moved && !personal ? { change, reason } : {}),
   }));
 
   const remove = () => run(() => apiMutate('trainer.schedule.delete', {
-    id: event.id, who, reason, ...(charged ? { charge: true } : {}),
+    id: event.id, who: personal ? 'error' : who, reason, ...(charged ? { charge: true } : {}),
   }));
 
   // Отменено со списанием: событие в календаре ради денег, править нечего
@@ -675,22 +833,28 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
       <button className="button button--ghost library__back" onClick={onCancel}><IconBack size={16} />Расписание</button>
       <Panel pad>
         <div className="library__form">
-          <strong>{event.id ? 'Занятие' : event.copyOf ? 'Копия занятия' : 'Новое занятие'}</strong>
+          <strong>{event.id ? (personal ? 'Личное событие' : 'Занятие') : event.copyOf ? 'Копия события' : 'Новое событие'}</strong>
           {event.copyOf && (
-            <p className="small muted" style={{ margin: 0 }}>Тот же клиент, дата, время и длительность. Поменяйте дату и время и нажмите «Добавить».</p>
+            <p className="small muted" style={{ margin: 0 }}>Скопированы название или клиент, дата, время и длительность. Проверьте их и нажмите «Добавить».</p>
           )}
-          {event.id && !event.clientRow && (
-            <p className="small muted" style={{ margin: 0 }}>
-              «{event.title}» — клиент не узнан. Выберите его — занятие привяжется к нему, а в Google Календаре останутся только инициалы и номер.
-            </p>
+          {!event.id && (
+            <Options items={[{ value: 'client', label: 'Занятие с клиентом' }, { value: 'personal', label: 'Личное событие' }]}
+              value={kind} onChange={setKind} label="Тип события" disabled={busy || !!step} />
           )}
-          <label className="field">
-            <span className="field__label">Клиент</span>
-            <select className="field__input" value={clientRow} disabled={busy || !!step} onChange={(e) => setClientRow(e.target.value)}>
-              <option value="">Выберите клиента</option>
-              {active.map((c) => <option key={c.row} value={c.row}>{c.name}</option>)}
-            </select>
-          </label>
+          {personal ? (
+            <>
+              <Field label="Название события" value={title} onChange={setTitle} placeholder="Например, обед или личная встреча" inputMode="text" />
+              <p className="form-hint">Не указывайте данные клиентов, сведения о здоровье и другую чувствительную информацию.</p>
+            </>
+          ) : (
+            <label className="field">
+              <span className="field__label">Клиент</span>
+              <select className="field__input" value={clientRow} disabled={busy || !!step} onChange={(e) => setClientRow(e.target.value)}>
+                <option value="">Выберите клиента</option>
+                {active.map((c) => <option key={c.row} value={c.row}>{c.name}</option>)}
+              </select>
+            </label>
+          )}
           <div className="field-row schedule__when">
             <Field label="Дата" type="date" value={date} onChange={(v) => { setDate(v); setStep(null); }} />
             <Field label="Время" type="time" value={time} onChange={(v) => { setTime(v); setStep(null); }} />
@@ -705,7 +869,7 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
 
           {/* Перенос — не всегда перенос: бывает, просто записали не туда.
               В статистику идёт только настоящий перенос. */}
-          {step === 'move' && (
+          {step === 'move' && !personal && (
             <div className="schedule__ask">
               <span className="field__label">Что это?</span>
               <Options
@@ -769,8 +933,8 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
             <div className="library__actions">
               <button
                 className="button button--primary"
-                disabled={busy || !clientRow || !date || !time || (step === 'move' && !change)}
-                onClick={() => (moved && step !== 'move' ? setStep('move') : save())}
+                disabled={busy || (personal ? !title.trim() : !clientRow) || !date || !time || (step === 'move' && !change)}
+                onClick={() => (moved && !personal && step !== 'move' ? setStep('move') : save())}
               >
                 {busy ? 'Сохраняю…' : event.id ? (moved && step !== 'move' ? 'Перенести…' : 'Сохранить') : 'Добавить'}
               </button>
@@ -783,7 +947,9 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
               <button className="button button--ghost" disabled={busy} onClick={() => onCopy && onCopy(event)}>
                 <IconCopy size={16} />Копировать
               </button>
-              <button className="button button--ghost" disabled={busy} onClick={() => setStep('cancel')}>Отменить занятие</button>
+              <button className="button button--ghost" disabled={busy} onClick={() => personal ? remove() : setStep('cancel')}>
+                {personal ? 'Удалить событие' : 'Отменить занятие'}
+              </button>
             </div>
           )}
           {serviceEmail && (

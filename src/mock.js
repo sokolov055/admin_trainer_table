@@ -30,6 +30,10 @@ const daysAhead = (n, time) => {
   return d.toISOString().slice(0, 10) + 'T' + time + ':00';
 };
 
+// Правки расписания в демо живут до перезагрузки страницы. Этого хватает,
+// чтобы проверить создание и перетаскивание тем же путём, что в приложении.
+const DEMO_SCHEDULE_CHANGES = new Map();
+
 /** Профиль демо-клиента: пустой, чтобы экран показывал именно заполнение */
 const demoProfile = {
   birthAt: '', sex: '', height: '', phone: '', email: '', telegram: '', telegramUrl: '',
@@ -803,16 +807,43 @@ const MOCK = {
         });
       });
     }
+    const known = new Set(events.map((e) => e.id));
+    const changed = events
+      .map((e) => DEMO_SCHEDULE_CHANGES.has(e.id) ? DEMO_SCHEDULE_CHANGES.get(e.id) : e)
+      .filter(Boolean);
+    DEMO_SCHEDULE_CHANGES.forEach((e, id) => {
+      if (!e || known.has(id)) return;
+      const start = new Date(e.startsAt);
+      if (start >= from && start < to) changed.push(e);
+    });
     return {
-      events,
+      events: changed,
       calendar: true,
       serviceEmail: 'demo@example.iam.gserviceaccount.com',
       feedUrl: 'https://example.invalid/ics/t-demo.ics',
     };
   },
-  'trainer.schedule.save': () => ({ id: 'demo-ev-new' }),
+  'trainer.schedule.save': (params) => {
+    const id = params.id || 'demo-custom-' + Date.now();
+    const client = params.personal ? null : CLIENTS.find((x) => x.row === Number(params.clientRow));
+    const startsAt = new Date(params.startsAt).toISOString();
+    const event = {
+      id,
+      clientRow: client ? client.row : null,
+      clientName: client ? client.name : '',
+      personal: !client,
+      title: client ? client.name : params.title,
+      startsAt,
+      endsAt: new Date(new Date(startsAt).getTime() + Number(params.minutes || 60) * 60000).toISOString(),
+      done: false,
+      cancelledCharged: false,
+    };
+    DEMO_SCHEDULE_CHANGES.set(id, event);
+    return { id };
+  },
   'trainer.schedule.delete': (params) => {
     if (!['client', 'trainer', 'error'].includes(params.who)) throw new Error('Отметьте, кто отменил занятие.');
+    DEMO_SCHEDULE_CHANGES.set(params.id, null);
     return params.charge ? { cancelled: params.id, charged: true } : { deleted: params.id };
   },
   'trainer.schedule.stats': () => ({

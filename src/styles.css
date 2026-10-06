@@ -4070,18 +4070,25 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   padding: 3px 5px; border-radius: 6px; border: 0; background: var(--accent-solid); color: #fff;
   font: inherit; font-size: var(--text-xs); line-height: 1.25; cursor: pointer; z-index: 1;
   box-shadow: 0 0 0 1px var(--surface);
+  touch-action: pan-y; user-select: none; -webkit-user-select: none;
 }
 .cal-event:active { filter: brightness(0.92); }
+.cal-event.is-dragging {
+  z-index: 8; cursor: grabbing; opacity: .88; filter: none;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .24), 0 0 0 2px var(--surface);
+  will-change: transform;
+}
 .cal-event__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-event__time { opacity: .85; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
 .cal-grid--7 .cal-event { padding: 2px 3px; font-size: 10.5px; }
 .cal-grid--7 .cal-event { padding-inline: 2px; }
-/* Прошло — чуть тише; клиент не узнан — рамкой без заливки; отменено со
+/* Прошло — чуть тише; личное событие — рамкой без заливки; отменено со
    списанием — серым и зачёркнуто: по нему считаются деньги */
 .cal-event--done { opacity: .72; }
-.cal-event--unknown { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--accent-solid); }
+.cal-event--personal { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--accent-solid); }
 .cal-event--cancelled { background: var(--surface-sunken); color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
 .cal-event--cancelled .cal-event__name { text-decoration: line-through; }
+.form-hint { margin: calc(-1 * var(--space-2)) 0 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.4; }
 
 .cal-month { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: var(--space-4); }
 .cal-month__head { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--border); }
@@ -4103,6 +4110,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-month__more { font-size: 10px; color: var(--text-muted); padding-left: 3px; }
 @media (prefers-reduced-motion: no-preference) {
   .cal-event, .cal-grid__day strong { transition: filter .12s ease, background-color .2s ease; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cal-event.is-dragging { opacity: 1; }
 }
 .schedule__unknown { color: var(--critical-text, var(--text-muted)); }
 .schedule__when { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
