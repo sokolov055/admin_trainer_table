@@ -1007,6 +1007,15 @@ test('отдых, свёрнутый у тренера, доживает до к
     const reps = set.getByRole('textbox').nth(1);
     if (!(await reps.inputValue())) await reps.fill('8');
     await phone.locator('.workout__effort-btn--ok').first().click();
+    const restScreen = phone.locator('.rest-screen');
+    const restBox = await restScreen.boundingBox();
+    assert.ok(restBox, 'полноэкранный таймер виден');
+    await swipe(phone,
+      { x: restBox.x + restBox.width / 2, y: restBox.y + restBox.height * 0.3 },
+      { x: restBox.x + restBox.width / 2, y: restBox.y + restBox.height * 0.55 });
+    await phone.locator('.rest-pill').waitFor({ timeout: 5000 });
+    // Кнопка остаётся вторым способом свернуть таймер.
+    await phone.locator('.rest-pill').click();
     await phone.getByRole('button', { name: 'Свернуть таймер' }).click({ timeout: 5000 });
     // Из «Моих тренировок» — в другой раздел бокового меню: экран тренировки закрывается
     await phone.getByRole('button', { name: 'Меню' }).click();

@@ -290,6 +290,14 @@ test('отмеченный подход запускает отдых, если 
   await act(async () => { await check.props.onClick(); await delay(); });
 
   assert.equal(rest().length, 1, 'отдых пошёл сам, без похода в шапку');
+  const target = { closest: () => null };
+  await act(async () => {
+    rest()[0].props.onTouchStart({ touches: [{ clientX: 190, clientY: 180 }], target });
+    rest()[0].props.onTouchEnd({ changedTouches: [{ clientX: 196, clientY: 280 }] });
+    await delay();
+  });
+  assert.equal(rest().length, 0, 'свайп вниз сворачивает полноэкранный таймер');
+  assert.equal(tree.root.findAllByProps({ className: 'rest-pill' }).length, 1, 'отдых продолжает идти в плашке');
 });
 
 /**

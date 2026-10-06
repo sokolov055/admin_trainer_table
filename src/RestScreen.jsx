@@ -8,7 +8,8 @@ import './rest.css';
 
 /**
  * Отдых на весь экран (03.10.2026, владелец): крупный таймер, касание по
- * экрану ничего не делает — выключить можно только кнопкой. Под таймером —
+ * экрану ничего не выключает: свайп вниз сворачивает его, кнопки управляют
+ * отдыхом. Под таймером —
  * что дальше. В конце — «Отдых окончен», звук и вибрация каждые 2 с, пока
  * не нажмут «Закрыть» (не дольше двух минут). Свёрнутое приложение
  * сигналит уведомлением (native-rest.js) и плашкой (Live Activity).
@@ -17,7 +18,25 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const left = until - now;
   const over = left <= 0;
   const stopRef = useRef(onStop);
+  const swipe = useRef(null);
   stopRef.current = onStop;
+  const touchStart = (event) => {
+    const touch = event.touches && event.touches[0];
+    if (!touch || over || !onCollapse || (event.target.closest && event.target.closest('button'))) {
+      swipe.current = null;
+      return;
+    }
+    swipe.current = { x: touch.clientX, y: touch.clientY };
+  };
+  const touchEnd = (event) => {
+    const start = swipe.current;
+    swipe.current = null;
+    const touch = event.changedTouches && event.changedTouches[0];
+    if (!start || !touch || over || !onCollapse) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (dy >= 64 && dy > Math.abs(dx) * 1.25) onCollapse();
+  };
   // Будильник iPhone закрыли крестиком вне приложения — закрыть и этот
   // экран, второй раз «Закрыть» нажимать не нужно (03.10.2026)
   useEffect(() => {
@@ -42,7 +61,8 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const R = 120;
   const C = 2 * Math.PI * R;
   return (
-    <div className={'rest-screen' + (over ? ' rest-screen--over' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}>
+    <div className={'rest-screen' + (over ? ' rest-screen--over' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}
+      onTouchStart={touchStart} onTouchEnd={touchEnd} onTouchCancel={() => { swipe.current = null; }}>
       <div className="rest-screen__label">{over ? 'Отдых окончен' : 'Отдых'}</div>
       <div className="rest-screen__dial">
         <svg className="rest-screen__ring" viewBox="0 0 280 280" aria-hidden="true">

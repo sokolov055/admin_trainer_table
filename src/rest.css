@@ -24,6 +24,9 @@
 @media (prefers-reduced-motion: reduce) { .rest-screen { animation: none; } .rest-screen__bar { transition: none; } }
 /* Экран отдыха — поверх всего (портал в body): под ним ничего не листается */
 .rest-screen { touch-action: none; overscroll-behavior: contain; z-index: 90; }
+/* Вниз — свернуть, как шторку. Горизонтальный и короткий жесты не мешают
+   кнопкам и не срабатывают случайно. */
+.rest-screen:not(.rest-screen--over) { cursor: ns-resize; }
 /* «Дальше» — карточка, которую видно с расстояния: обводка акцентом,
    крупное название и вес */
 .rest-screen__next { border: 2px solid var(--accent); background: var(--surface); padding: 14px 16px 16px; }

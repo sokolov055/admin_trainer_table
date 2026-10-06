@@ -14,17 +14,22 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
-const fake = { platform: 'ios', scheduled: [] };
+const fake = { platform: 'ios', scheduled: [], cancelled: 0, hidden: 0, alarmCancelled: 0, permissionGate: null };
 globalThis.__rest = fake;
 globalThis.window = { Capacitor: { getPlatform: () => fake.platform } };
 
 const stub = `
   const f = () => globalThis.__rest;
   export const isNativeApp = () => true;
-  export const plugin = (name) => name !== 'LocalNotifications' ? null : ({
-    checkPermissions: async () => ({ display: 'granted' }),
+  export const plugin = (name) => name === 'RestTimer' ? ({
+    show: async () => {}, hide: async () => { f().hidden += 1; },
+  }) : name === 'WorkoutActivity' ? ({
+    restAlarm: async () => ({ ok: false }),
+    cancelRestAlarm: async () => { f().alarmCancelled += 1; },
+  }) : name !== 'LocalNotifications' ? null : ({
+    checkPermissions: async () => { if (f().permissionGate) await f().permissionGate; return { display: 'granted' }; },
     requestPermissions: async () => ({ display: 'granted' }),
-    cancel: async () => {},
+    cancel: async () => { f().cancelled += 1; },
     schedule: async (o) => { f().scheduled.push(...o.notifications); },
   });`;
 
@@ -51,4 +56,19 @@ test('Android: звук берётся из канала, лишнего не п
   fake.platform = 'android';
   assert.equal(await rest.scheduleRestEnd(Date.now() + 90000), true);
   assert.equal(fake.scheduled.at(-1).sound, undefined);
+});
+
+test('выключенный во время постановки таймер не оставляет позднее уведомление', async () => {
+  fake.platform = 'android';
+  fake.scheduled.length = 0;
+  let release;
+  fake.permissionGate = new Promise(resolve => { release = resolve; });
+  const pending = rest.scheduleRestEnd(Date.now() + 90000);
+  await new Promise(resolve => setImmediate(resolve));
+  await rest.cancelRestEnd();
+  release();
+  assert.equal(await pending, false);
+  assert.equal(fake.scheduled.length, 0, 'отменённая постановка не доходит до schedule');
+  assert.ok(fake.hidden > 0, 'отсчёт Android в шторке скрыт');
+  fake.permissionGate = null;
 });

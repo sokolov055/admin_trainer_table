@@ -43,6 +43,12 @@ async function alarmChannel(notes) {
  * сборка 1.4+). true — поставлен, уведомление не нужно
  */
 let alarmUntil = 0;
+// Постановка нативного сигнала асинхронна (разрешения, AlarmKit, канал
+// Android). Если за это время отдых выключили, старый запрос не должен
+// поставить будильник уже после cancelRestEnd. Очередь не даёт старому
+// запросу отменить более новый отдых при позднем завершении.
+let scheduleGeneration = 0;
+let scheduleQueue = Promise.resolve();
 
 async function iosAlarm(until) {
   if (platformName() !== 'ios') return false;
@@ -97,9 +103,16 @@ export function localRestPlatform() {
  * Поставить уведомление на время окончания отдыха. true — поставлено;
  * false — нечем или не разрешено (тогда пришлёт сервер).
  */
-export async function scheduleRestEnd(until, next = '') {
+export function scheduleRestEnd(until, next = '') {
+  const generation = ++scheduleGeneration;
+  const task = scheduleQueue.catch(() => {}).then(() => scheduleRestEndNow(until, next, generation));
+  scheduleQueue = task.catch(() => {});
+  return task;
+}
+
+async function scheduleRestEndNow(until, next, generation) {
   const notes = local();
-  if (!notes || !until || until <= Date.now()) return false;
+  if (!notes || !until || until <= Date.now() || generation !== scheduleGeneration) return false;
   try {
     const timer = shade();
     if (timer && timer.show) timer.show({ until, title: 'Отдых', text: next ? 'Дальше: ' + next : '' }).catch(() => {});
@@ -107,11 +120,17 @@ export async function scheduleRestEnd(until, next = '') {
   try {
     let { display } = await notes.checkPermissions();
     if (display === 'prompt' || display === 'prompt-with-rationale') ({ display } = await notes.requestPermissions());
-    if (display !== 'granted') return false;
+    if (display !== 'granted' || generation !== scheduleGeneration) return false;
     await notes.cancel({ notifications: [{ id: REST_ID }] }).catch(() => {});
     // Будильник поставлен — второе уведомление со звуком не нужно
-    if (await iosAlarm(until)) return true;
+    if (await iosAlarm(until)) {
+      if (generation === scheduleGeneration) return true;
+      await cancelRestEndNow();
+      return false;
+    }
+    if (generation !== scheduleGeneration) return false;
     await alarmChannel(notes);
+    if (generation !== scheduleGeneration) return false;
     await notes.schedule({
       notifications: [{
         id: REST_ID,
@@ -129,7 +148,9 @@ export async function scheduleRestEnd(until, next = '') {
         ...(platformName() === 'ios' ? { sound: 'default', interruptionLevel: 'timeSensitive' } : {}),
       }],
     });
-    return true;
+    if (generation === scheduleGeneration) return true;
+    await notes.cancel({ notifications: [{ id: REST_ID }] }).catch(() => {});
+    return false;
   } catch (_) {
     return false;
   }
@@ -137,6 +158,11 @@ export async function scheduleRestEnd(until, next = '') {
 
 /** Отдых сбросили, поставили на паузу или закончили занятие */
 export async function cancelRestEnd() {
+  scheduleGeneration += 1;
+  return cancelRestEndNow();
+}
+
+async function cancelRestEndNow() {
   try {
     const timer = shade();
     if (timer && timer.hide) timer.hide().catch(() => {});
