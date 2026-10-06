@@ -165,10 +165,10 @@ export async function cancelRestEnd() {
 async function cancelRestEndNow() {
   try {
     const timer = shade();
-    if (timer && timer.hide) timer.hide().catch(() => {});
+    if (timer && timer.hide) await timer.hide().catch(() => {});
     const p = platformName() === 'ios' ? plugin('WorkoutActivity') : null;
     alarmUntil = 0;
-    if (p && p.cancelRestAlarm) p.cancelRestAlarm().catch(() => {});
+    if (p && p.cancelRestAlarm) await p.cancelRestAlarm().catch(() => {});
   } catch (_) { /* старый APK или сборка без будильника */ }
   const notes = local();
   if (!notes) return;
