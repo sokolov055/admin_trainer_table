@@ -48,8 +48,9 @@ export function trackOf(ex) {
   };
   if (out.kind === 'cardio') {
     const list = (t.metrics && t.metrics.length ? t.metrics : plan && plan.metrics) || [];
-    out.metrics = METRICS.filter((m) => list.includes(m));
-    if (!out.metrics.length) out.metrics = ['time'];
+    out.goal = cardioGoal({ goal: t.goal || (plan && plan.goal), metrics: list, intervals: plan && plan.intervals });
+    out.metrics = goalFirst(list, out.goal);
+    if ((t.speedUnit || (plan && plan.speedUnit)) === 'rpm' && SPEED_UNIT_MACHINES.includes(out.machine)) out.speedUnit = 'rpm';
   }
   return out;
 }
@@ -58,6 +59,45 @@ export function trackOf(ex) {
 
 /** Что можно записывать у кардио; тренер выбирает любые, по умолчанию время */
 export const METRICS = ['time', 'distance', 'kcal', 'pulse'];
+
+/**
+ * Главная цель кардио (FT-475, 07.10.2026): время, расстояние, калории или
+ * интервалы — с неё начинаются план, отрезок в занятии и строка на часах.
+ * Пульс — зона, а не итог, главной не бывает. Интервалы — цель «пройти
+ * круги»: отдельной цели-числа у них нет. Нет отметки (старые планы) —
+ * интервалы, если они есть, иначе время, если его записывают, иначе первое
+ * из записываемого.
+ */
+export const GOALS = ['time', 'distance', 'kcal', 'intervals'];
+const METRIC_GOALS = ['time', 'distance', 'kcal'];
+
+export function cardioGoal(c) {
+  // Пока тренер вписывает число кругов, их может не быть — цель та же
+  if (c && c.goal === 'intervals' && c.intervals) return 'intervals';
+  if (c && METRIC_GOALS.includes(c.goal)) return c.goal;
+  if (c && !c.goal && c.intervals && Number(c.intervals.rounds) > 0) return 'intervals';
+  const list = (c && c.metrics) || [];
+  return METRIC_GOALS.find((m) => list.includes(m)) || 'time';
+}
+
+/**
+ * Что записывать, по порядку: главная — первой (и всегда в списке). У
+ * интервалов — выбранное тренером, ничего не выбрано — время
+ */
+export function goalFirst(list, goal) {
+  if (!METRICS.includes(goal)) {
+    const rest = METRICS.filter((m) => (list || []).includes(m));
+    return rest.length ? rest : ['time'];
+  }
+  return [goal, ...METRICS.filter((m) => m !== goal && (list || []).includes(m))];
+}
+
+/**
+ * Скорость у велотренажёра и прочих — в км/ч или в оборотах (об/мин): так
+ * показывают разные тренажёры (владелец, 07.10.2026). У дорожки — км/ч.
+ */
+export const SPEED_UNIT_MACHINES = ['bike', 'other'];
+const speedUnit = (track) => (track.speedUnit === 'rpm' && SPEED_UNIT_MACHINES.includes(track.machine) ? 'об/мин' : 'км/ч');
 
 export function metricField(key, track) {
   return {
@@ -68,23 +108,27 @@ export function metricField(key, track) {
   }[key];
 }
 
-/** Основной режим тренажёра: дорожка — скорость и наклон, эллипс — уровень, гребля — нагрузка */
+/**
+ * Режим тренажёра: дорожка — скорость и наклон, велотренажёр и «другое»
+ * (аэробайк) — скорость (км/ч или об/мин) и уровень, эллипс и степпер —
+ * уровень, гребля и SkillMill — нагрузка
+ */
 export function settingsFields(track) {
-  if (track.machine === 'treadmill') {
-    return [
-      { key: 'speed', head: 'Скорость, км/ч', unit: 'км/ч', mode: 'decimal', max: 5 },
-      { key: 'incline', head: 'Наклон, %', unit: '%', mode: 'decimal', max: 5 },
-    ];
-  }
-  if (track.machine === 'other') return [];
-  return [{ key: 'level', head: levelWord(track), unit: levelWord(track) === 'Уровень' ? 'ур.' : 'нагр.', mode: 'decimal', max: 5 }];
+  const speed = { key: 'speed', head: 'Скорость, ' + speedUnit(track), unit: speedUnit(track), mode: 'decimal', max: 5 };
+  const level = { key: 'level', head: levelWord(track), unit: levelWord(track) === 'Уровень' ? 'ур.' : 'нагр.', mode: 'decimal', max: 5 };
+  if (track.machine === 'treadmill') return [speed, { key: 'incline', head: 'Наклон, %', unit: '%', mode: 'decimal', max: 5 }];
+  if (SPEED_UNIT_MACHINES.includes(track.machine)) return [speed, level];
+  return [level];
 }
 
-/** Режим строкой: «8 км/ч, 3%», «уровень 8» */
+/** Режим строкой: «8 км/ч, 3%», «уровень 8», «90 об/мин, уровень 5» */
 function modeText(p, track) {
   if (!p) return '';
-  if (track.machine === 'treadmill') return [p.speed && p.speed + ' км/ч', p.incline && p.incline + '%'].filter(Boolean).join(', ');
-  return p.level ? levelWord(track).toLowerCase() + ' ' + p.level : '';
+  return [
+    p.speed && p.speed + ' ' + speedUnit(track),
+    p.incline && p.incline + '%',
+    p.level && levelWord(track).toLowerCase() + ' ' + p.level,
+  ].filter(Boolean).join(', ');
 }
 
 /** «1:30» → 90, «45» → 45 секунд */
@@ -129,13 +173,16 @@ export function intervalsText(intervals, track) {
 /** План кардио строкой: цели, режим, интервалы */
 export function cardioLine(plan, track) {
   const t = plan.targets || {};
-  const targets = (plan.metrics || ['time']).map((m) => {
+  const goal = cardioGoal(plan);
+  const targets = goalFirst(plan.metrics || ['time'], goal).map((m) => {
     if (!t[m]) return '';
     if (m === 'time') return timeText(t.time, track);
     if (m === 'pulse') return 'пульс ' + t.pulse;
     return t[m] + ' ' + metricField(m, track).unit;
   });
-  return [...targets, modeText(plan.settings, track), plan.intervals && 'интервалы ' + intervalsText(plan.intervals, track)]
+  // Интервалы главной целью — первыми
+  const iv = plan.intervals && 'интервалы ' + intervalsText(plan.intervals, track);
+  return [goal === 'intervals' && iv, ...targets, modeText(plan.settings, track), goal !== 'intervals' && iv]
     .filter(Boolean).join(' · ');
 }
 
@@ -174,13 +221,13 @@ export function rowFields(track) {
   const time = (unit) => ({ key: 'time', head: 'Время, ' + unit, unit, mode: 'text', max: 8, placeholder: unit === 'с' ? '60' : '20' });
 
   if (track.kind === 'cardio') {
-    const list = [time('мин')];
-    if (track.machine === 'treadmill') {
-      list.push({ key: 'speed', head: 'Км/ч', unit: 'км/ч', mode: 'decimal', max: 5 });
-      list.push({ key: 'incline', head: 'Наклон, %', unit: '%', mode: 'decimal', max: 5 });
-    } else if (track.machine !== 'other') {
-      list.push({ key: 'level', head: levelWord(track), unit: 'ур.', mode: 'decimal', max: 5 });
-    }
+    // Первая колонка — главная цель: время, расстояние или калории
+    const first = (track.metrics && track.metrics[0]) || 'time';
+    const goal = first !== 'time' ? metricField(first, track) : null;
+    const list = [goal ? { ...goal, head: goal.short } : time('мин')];
+    settingsFields(track).forEach((f) => list.push(f.key === 'speed'
+      ? { ...f, head: speedUnit(track) === 'км/ч' ? 'Км/ч' : 'Об/мин' }
+      : f.key === 'level' ? { ...f, unit: 'ур.' } : f));
     return list;
   }
   if (track.kind === 'timed') return [{ ...weight, head: 'Доп. вес', placeholder: 'свой' }, time('с')];
@@ -247,15 +294,19 @@ const dropsText = (set) => (set.drops || [])
 /** Один подход строкой: «40 кг × 8 → 30 × 6», «20 мин · 8 км/ч · 3%» */
 export function setText(set, track = STRENGTH) {
   if (track.kind === 'cardio') {
-    return [
-      timeText(set.time, track),
-      set.speed && set.speed + ' км/ч',
-      set.incline && set.incline + '%',
-      set.level && levelWord(track).toLowerCase() + ' ' + set.level,
-      set.distance && set.distance + ' ' + distanceUnit(track),
-      set.kcal && set.kcal + ' ккал',
-      set.pulse && 'пульс ' + set.pulse,
-    ].filter(Boolean).join(' · ') || '?';
+    const parts = [
+      ['time', timeText(set.time, track)],
+      ['speed', set.speed && set.speed + ' ' + speedUnit(track)],
+      ['incline', set.incline && set.incline + '%'],
+      ['level', set.level && levelWord(track).toLowerCase() + ' ' + set.level],
+      ['distance', set.distance && set.distance + ' ' + distanceUnit(track)],
+      ['kcal', set.kcal && set.kcal + ' ккал'],
+      ['pulse', set.pulse && 'пульс ' + set.pulse],
+    ];
+    // Главная цель — первой: «3000 м · 8 км/ч · 18 мин»
+    const goal = track.goal || 'time';
+    return [...parts.filter(([k]) => k === goal), ...parts.filter(([k]) => k !== goal)]
+      .map(([, v]) => v).filter(Boolean).join(' · ') || '?';
   }
   if (track.kind === 'timed') return [timeText(set.time, track) || '?', weightText(set, track)].filter(Boolean).join(' · ');
   const w = weightText(set, track);
@@ -360,9 +411,19 @@ export function planSet(ex, track) {
     const st = c.settings || {};
     const out = {};
     ['speed', 'incline', 'level'].forEach((k) => { if (st[k]) out[k] = String(st[k]).replace(',', '.'); });
-    // Время-цель — как повторы у силового: чаще всего так и сделают
-    const time = String((c.targets && c.targets.time) || '');
-    if ((c.metrics || ['time']).includes('time') && /^\d{1,3}(:[0-5]\d){0,2}$/.test(time)) out.time = time;
+    // Цель — как повторы у силового: чаще всего так и сделают. Время — если
+    // его записывают, главная цель — всегда: по ней отрезок и отмечают
+    const t = c.targets || {};
+    const goal = cardioGoal(c);
+    const time = String(t.time || '');
+    if (((c.metrics || ['time']).includes('time') || goal === 'time') && /^\d{1,3}(:[0-5]\d){0,2}$/.test(time)) out.time = time;
+    const amount = String(t[goal] || '').trim();
+    if (goal !== 'time' && /^\d+([.,]\d+)?$/.test(amount)) out[goal] = amount.replace(',', '.');
+    // Интервалы: время отрезка — все круги подряд, «6 × (1:00 + 2:00)» → 18:00
+    if (goal === 'intervals' && !out.time && (c.metrics || ['time']).includes('time')) {
+      const total = intervalPhases(c.intervals, track).reduce((n, p) => n + p.seconds, 0);
+      if (total > 0 && total < 1000 * 60) out.time = clockText(total);
+    }
     return out;
   }
   const reps = String(ex.reps || '');

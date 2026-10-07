@@ -688,7 +688,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const cardioSet = (ex, ei, si, label, restAfter, inRound) => {
     const set = ex.sets[si];
     const track = trackOf(ex);
-    const fields = [...settingsFields(track), ...track.metrics.map(m => metricField(m, track))];
+    // Главная цель (первая в metrics) — первым полем, до режима тренажёра (FT-475)
+    const [goal, ...rest] = track.metrics;
+    const fields = [metricField(goal, track), ...settingsFields(track), ...rest.map(m => metricField(m, track))];
     const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
     const key = ex.id + ':' + si;
     const current = focus.ex === ex.id && focus.set === si;

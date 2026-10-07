@@ -417,10 +417,11 @@ test('кардио в занятии: режим, метрики, «+ метри
       await delay();
     });
     const labels = () => local.root.findAllByType('input').map(n => n.props['aria-label'] || '').filter(l => /отрезок 1/.test(l));
+    // Главная цель — интервалы; первым — то, что записывают (FT-475)
     assert.deepEqual(labels(), [
+      'Беговая дорожка, отрезок 1, расстояние, м',
       'Беговая дорожка, отрезок 1, скорость, км/ч',
       'Беговая дорожка, отрезок 1, наклон, %',
-      'Беговая дорожка, отрезок 1, расстояние, м',
     ]);
     const button = label => local.root.findAllByType('button').find(b => text(b) === label);
     assert.ok(button('Запустить интервалы'), 'таймер интервалов на месте');

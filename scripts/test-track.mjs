@@ -113,7 +113,10 @@ test('кардио-план: строка, фазы интервалов, отм
   const t = trackOf({ cardio: plan });
   assert.equal(t.machine, 'elliptical');
   assert.deepEqual(t.metrics, ['time', 'kcal', 'pulse']);
-  assert.equal(cardioLine(plan, t), '30 мин · 300 ккал · пульс 130–150 · уровень 6 · интервалы 2 × ускорение 1:00 (уровень 12) / замедление 1:30 (уровень 5)');
+  // Старый план без отметки цели: интервалы есть — они главная цель, первыми (FT-475)
+  assert.equal(t.goal, 'intervals');
+  assert.equal(cardioLine(plan, t), 'интервалы 2 × ускорение 1:00 (уровень 12) / замедление 1:30 (уровень 5) · 30 мин · 300 ккал · пульс 130–150 · уровень 6');
+  assert.equal(cardioLine({ ...plan, goal: 'time' }, t), '30 мин · 300 ккал · пульс 130–150 · уровень 6 · интервалы 2 × ускорение 1:00 (уровень 12) / замедление 1:30 (уровень 5)');
   assert.equal(seconds('1:30'), 90);
   assert.deepEqual(intervalPhases(plan.intervals, t).map((p) => p.label + ' ' + p.round + ' ' + p.seconds), [
     'Ускорение 1 60', 'Замедление 1 90', 'Ускорение 2 60', 'Замедление 2 90',
@@ -127,7 +130,7 @@ test('кардио-план: строка, фазы интервалов, отм
 });
 
 test('занятие из кардио-плана: режим и время-цель в отрезке, план — в снимке', () => {
-  const plan = { machine: 'treadmill', metrics: ['time', 'distance'], targets: { time: '30', distance: '5000' }, settings: { speed: '8', incline: '3' },
+  const plan = { machine: 'treadmill', goal: 'time', metrics: ['time', 'distance'], targets: { time: '30', distance: '5000' }, settings: { speed: '8', incline: '3' },
     intervals: { rounds: 4, fast: { time: '1:00', speed: '12' }, slow: { time: '2:00', speed: '6' } } };
   const s = fromPlan({ title: 'Кардио', exercises: [{ name: 'Беговая дорожка', cardio: plan }] }, 'Сентябрь 2026');
   const run = s.exercises[0];
@@ -150,4 +153,57 @@ test('вес на одну сторону: из программы — в каж
   const next = patchPlanExercise(pair, 0, { technique: 'warmup1 side1' });
   assert.equal(techniqueOf(next[1].technique).warmup, 1, 'разминка — у всего суперсета');
   assert.equal(techniqueOf(next[1].technique).side, '', 'вес на сторону — у каждого упражнения свой');
+});
+
+test('кардио: главная цель — первой в плане, отрезке и строке подхода (FT-475)', async () => {
+  const { cardioLine, cardioGoal } = await import('../src/exercise-track.js');
+  const plan = { machine: 'treadmill', goal: 'distance', metrics: ['time', 'distance'], targets: { time: '30', distance: '5000' }, settings: { speed: '8', incline: '' } };
+  const t = trackOf({ cardio: plan });
+  assert.equal(t.goal, 'distance');
+  assert.deepEqual(t.metrics, ['distance', 'time']);
+  assert.equal(cardioLine(plan, t), '5000 м · 30 мин · 8 км/ч');
+  assert.deepEqual(rowFields(t).map((f) => f.key), ['distance', 'speed', 'incline']);
+  assert.equal(setText({ time: '28', speed: '8', distance: '5000' }, t), '5000 м · 28 мин · 8 км/ч');
+  // Цель вписана в отрезок — его можно отметить сразу, как повторы у силового
+  assert.deepEqual(planSet({ cardio: plan }, t), { speed: '8', time: '30', distance: '5000' });
+  const s = fromPlan({ title: 'Кардио', exercises: [{ name: 'Беговая дорожка', cardio: plan }] }, 'Октябрь 2026');
+  assert.match(s.exercises[0].prescription, /^5000 м · 30 мин/);
+  assert.equal(missing(s.exercises[0].sets[0], s.exercises[0].track), '');
+
+  // Калории главной: время не записывают — в отрезке только калории и уровень
+  const kcal = { machine: 'elliptical', goal: 'kcal', metrics: ['kcal', 'pulse'], targets: { kcal: '300', pulse: '130–150' }, settings: { level: '6' } };
+  assert.deepEqual(planSet({ cardio: kcal }, trackOf({ cardio: kcal })), { level: '6', kcal: '300' });
+  assert.equal(cardioLine(kcal, trackOf({ cardio: kcal })), '300 ккал · пульс 130–150 · уровень 6');
+
+  // Старый план без отметки — время, если его записывают; иначе первое из записываемого
+  assert.equal(cardioGoal({ metrics: ['time', 'distance'] }), 'time');
+  assert.equal(cardioGoal({ metrics: ['distance', 'pulse'] }), 'distance');
+  assert.equal(cardioGoal({ metrics: ['pulse'] }), 'time');
+  assert.equal(cardioGoal({ goal: 'pulse', metrics: ['pulse'] }), 'time', 'пульс главной не бывает');
+  assert.deepEqual(trackOf({ cardio: { machine: 'bike', metrics: ['pulse'] } }).metrics, ['time', 'pulse']);
+});
+
+test('кардио: интервалы главной целью, скорость в об/мин у аэробайка (FT-475)', async () => {
+  const { cardioLine, settingsFields } = await import('../src/exercise-track.js');
+  const plan = { machine: 'other', goal: 'intervals', speedUnit: 'rpm', metrics: ['kcal'], targets: { kcal: '' },
+    intervals: { rounds: 6, fast: { time: '1:00', speed: '90' }, slow: { time: '2:00', speed: '60' } } };
+  const t = trackOf({ cardio: plan });
+  assert.equal(t.goal, 'intervals');
+  assert.equal(t.speedUnit, 'rpm');
+  assert.deepEqual(settingsFields(t).map((f) => f.head), ['Скорость, об/мин', 'Уровень'], 'у «другого» есть скорость и уровень');
+  assert.equal(cardioLine(plan, t), 'интервалы 6 × ускорение 1:00 (90 об/мин) / замедление 2:00 (60 об/мин)');
+  // Время не записывают — калории вписывают руками
+  assert.deepEqual(planSet({ cardio: plan }, t), {});
+  assert.deepEqual(t.metrics, ['kcal']);
+
+  // Записывают время — в отрезок сразу все круги подряд: 6 × (1:00 + 2:00)
+  const timed = { ...plan, metrics: ['time', 'kcal'] };
+  assert.deepEqual(planSet({ cardio: timed }, trackOf({ cardio: timed })), { time: '18:00' });
+  assert.equal(setText({ time: '18:00', speed: '75', kcal: '120' }, trackOf({ cardio: timed })), '18:00 · 75 об/мин · 120 ккал');
+
+  // Дорожка — всегда км/ч; об/мин только у велотренажёра и «другого»
+  assert.equal(trackOf({ cardio: { ...plan, machine: 'treadmill' } }).speedUnit, undefined);
+  assert.equal(settingsFields(trackOf({ cardio: { ...plan, speedUnit: '' } }))[0].head, 'Скорость, км/ч');
+  // Цель «интервалы», а сами интервалы убрали — главная снова число
+  assert.equal(trackOf({ cardio: { ...plan, intervals: null } }).goal, 'kcal');
 });

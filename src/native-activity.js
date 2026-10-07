@@ -12,7 +12,7 @@
  * старой сборке, на Android и в браузере всё здесь молча ничего не делает.
  */
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
-import { trackOf, volumeOf } from './exercise-track.js';
+import { trackOf, volumeOf, setText as trackSetText } from './exercise-track.js';
 import { rateSet, isDumbbell, stepOf, suggestText } from './effort.js';
 
 const isEffort = (e) => ['easy', 'ok', 'hard'].includes(e);
@@ -31,7 +31,9 @@ function activity() {
 }
 
 /** «60 кг × 8», «12 повт.», «время 20» — что сделать в подходе */
-function setText(set) {
+function setText(set, ex) {
+  // Кардио — целиком, главная цель первой: «3000 м · 8 км/ч» (FT-475)
+  if (ex && trackOf(ex).kind === 'cardio') return trackSetText(set, trackOf(ex)).replace(/^\?$/, '');
   const out = [];
   const weight = String(set.weight || '').trim();
   const reps = String(set.reps || '').trim();
@@ -102,7 +104,7 @@ export function activityPayload(record, { coach = false } = {}) {
     detail = [
       set.who || '',
       (trackOf(ex).kind === 'cardio' ? 'Отрезок ' : 'Подход ') + n + ' из ' + own.length + (set.kind === 'warmup' ? ', разминка' : ''),
-      setText(set),
+      setText(set, ex),
     ].filter(Boolean).join(' · ');
   }
   const paused = s.status !== 'active';
@@ -191,7 +193,7 @@ export function setQueue(s) {
       ...(strength ? { dumbbell: isDumbbell(ex), step: stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}),
       ...(strength && suggestText(set, prevOf(ex, set)) ? { suggest: suggestText(set, prevOf(ex, set)) } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
-      amount: strength ? '' : setText(set),
+      amount: strength ? '' : setText(set, ex),
       exerciseDone: n - 1,
       exerciseTotal: own.length,
       ...extra,
