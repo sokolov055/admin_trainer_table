@@ -963,13 +963,16 @@ button { font-family: inherit; }
    картинке, и читать её будут одним взглядом, а не построчно. */
 .stories__label {
   position: absolute;
-  left: 9px;
-  right: 9px;
+  /* 6, а не 9: «Инструкция» жирным SF Pro шире 74 px и на iPhone ломалась
+     посреди слова (FT-462). Самое длинное слово подписи должно влезать целиком:
+     80 px при 12,5 px — с запасом на ширину SF Pro. */
+  left: 6px;
+  right: 6px;
   bottom: 8px;
-  font-size: var(--text-sm);
+  font-size: 12.5px;
   font-weight: 640;
   line-height: 1.18;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.02em;
   color: var(--story-fg);
   text-align: left;
   text-wrap: balance;
