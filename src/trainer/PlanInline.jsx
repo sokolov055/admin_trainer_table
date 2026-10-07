@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import ExercisePicker from './ExercisePicker.jsx';
+import ClientSetup from './ClientSetup.jsx';
 import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { haptic } from '../telegram.js';
@@ -47,7 +48,7 @@ const count = (v, fallback = 3) => {
   return n > 0 ? Math.min(20, n) : fallback;
 };
 
-export function BlockEdit({ block, members = [], onChange, onRemove, canRemove = true }) {
+export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemove, canRemove = true }) {
   const library = useData('library.exercises', {}, []);
   const [extra, setExtra] = useState([]);
   const base = (library.data ? library.data.exercises : []).concat(extra);
@@ -250,6 +251,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                 onAdded={(saved) => setExtra((prev) => [...prev, saved])}
               />
               {/* Вид упражнения — как в идущем занятии; пишется в базу */}
+              {clientRow && ex.exerciseId ? <ClientSetup exerciseId={ex.exerciseId} clientRow={clientRow} /> : null}
               {ex.name && <ExerciseKind track={trackOf(ex)} onChange={(t) => changeTrack(i, t)} note={kindNote && kindNote.i === i ? kindNote : null} />}
               <div className="plan-inline__panel-actions">
                 <button type="button" className="button button--primary" onClick={() => setOpen(ex.name ? null : { kind: 'name', i })}>Готово</button>

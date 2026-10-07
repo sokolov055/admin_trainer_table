@@ -926,6 +926,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 <BlockEdit
                   block={block}
                   members={data.members || []}
+                  clientRow={clientRow && !clientView ? clientRow : 0}
                   canRemove={shownBlocks.length > 1}
                   onChange={(exercises) => commit(shownBlocks.map((b, k) => (k === bi ? { ...b, exercises } : b)))}
                   onRemove={() => commit(shownBlocks.filter((_, k) => k !== bi))}

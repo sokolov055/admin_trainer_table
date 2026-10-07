@@ -15,6 +15,7 @@ import BlockOrder from './BlockOrder.jsx';
 import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
+import ClientSetup from './ClientSetup.jsx';
 
 /**
  * Редактор программы месяца.
@@ -485,6 +486,8 @@ export default function PlanEditor({
                   })}
                   onAdded={(saved) => setExtra((prev) => [...prev, saved])}
                 />
+
+                {clientRow && exercise.exerciseId && <ClientSetup exerciseId={exercise.exerciseId} clientRow={clientRow} />}
 
                 {track.kind === 'cardio' ? (
                   <CardioPlan

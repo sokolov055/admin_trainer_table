@@ -4638,3 +4638,5 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .machine__note { display: grid; gap: 2px; background: var(--info-fill); border-radius: 10px; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); white-space: pre-wrap; }
 .machine__note strong { font-size: var(--text-xs); color: var(--accent); }
 .machines__mine { margin-left: auto; font-size: var(--text-xs); font-weight: 500; color: var(--accent); }
+
+.plan-edit__setups { display: grid; gap: var(--space-1); margin: var(--space-1) 0; }
