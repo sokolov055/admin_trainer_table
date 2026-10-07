@@ -142,7 +142,7 @@ test('ответ старого экрана не затирает новый в
  */
 test('суперсет из программы виден в занятии', async () => {
   const superset = { title: 'Тренировка с суперсетом', exercises: [
-    { name: 'Подтягивания', sets: '3', reps: '10', weight: '', supersetGroup: 'superset-4-5' },
+    { name: 'Подтягивания', sets: '3', reps: '10', weight: '', track: { kind: 'bodyweight', machine: '', unilateral: false, perSide: false }, supersetGroup: 'superset-4-5' },
     { name: 'Тяга блока', sets: '3', reps: '12', weight: '35', supersetGroup: 'superset-4-5' },
     { name: 'Планка', sets: '3', reps: '60', weight: '' },
   ] };

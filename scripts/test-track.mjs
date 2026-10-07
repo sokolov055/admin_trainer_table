@@ -34,6 +34,19 @@ test('отметить подход: кардио — по времени, си�
   assert.equal(missing({ reps: '8' }, bw), '');
 });
 
+test('силовое: без веса подход не отмечается, 0 и больше — можно', () => {
+  const press = trackOf({});
+  assert.match(missing({ weight: '', reps: '8' }, press), /вес/);
+  assert.match(missing({ reps: '8' }, press), /вес/);
+  assert.match(missing({ weight: 'abc', reps: '8' }, press), /вес/);
+  assert.match(missing({ weight: '-5', reps: '8' }, press), /вес/);
+  assert.equal(missing({ weight: '0', reps: '8' }, press), '');
+  assert.equal(missing({ weight: '52,5', reps: '8' }, press), '');
+  assert.equal(missing({ weight: '40', reps: '8' }, lunge), '');
+  assert.match(missing({ weight: '40', reps: '' }, press), /повторов/);
+  assert.equal(missing({ weight: '', reps: '8' }, bw), '', 'свой вес — добавка, пустая можно');
+});
+
 test('подход строкой', () => {
   assert.equal(setText({ time: '20', speed: '8', incline: '3', pulse: '140' }, cardio), '20 мин · 8 км/ч · 3% · пульс 140');
   assert.equal(setText({ time: '7:30', level: '6', distance: '2000' }, { ...cardio, machine: 'rower' }), '7:30 · нагрузка 6 · 2000 м');
