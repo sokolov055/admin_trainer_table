@@ -101,3 +101,73 @@ export function SetupText({ text }) {
     </div>
   );
 }
+
+/**
+ * Фото тренажёра: превью по ширине, касание — целиком (снимок вертикальный,
+ * а настройка видна по деталям — сиденью, валику)
+ */
+export function MachinePhoto({ machine }) {
+  const [full, setFull] = useState(false);
+  if (!machine.photo) return null;
+  return (
+    <button type="button" className={'machine__photo' + (full ? ' machine__photo--full' : '')}
+      aria-label={full ? 'Уменьшить фото' : 'Фото целиком'} onClick={() => { setFull(!full); haptic(); }}>
+      <img src={mediaUrl(machine.photo)} alt={'Тренажёр «' + machine.name + '»'} loading="lazy" draggable="false" />
+    </button>
+  );
+}
+
+/**
+ * Личная настройка клиента на тренажёре (07.10.2026): «спинка 3, сиденье
+ * 5» — у каждого клиента своя, поэтому живёт не у тренажёра, а у клиента.
+ * Видна первой: ради неё в зале и открывают
+ */
+export function PersonalNote({ text, trainer = false, by = '' }) {
+  if (!text) return null;
+  return (
+    <div className="machine__note">
+      <strong>{trainer ? 'Настройка клиента' : 'Ваша настройка' + (by === 'trainer' ? ' · записал тренер' : '')}</strong>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+/**
+ * Тренажёр (07.10.2026, FT-478): фото, личная настройка клиента (цифры —
+ * у каждого свои), где у этого тренажёра регулировки (без цифр) и общий
+ * принцип упражнения (principle)
+ */
+export function MachineInfo({ machine, principle = '', note = '', trainer = false }) {
+  return (
+    <div className="machine">
+      <MachinePhoto machine={machine} />
+      <PersonalNote text={note} trainer={trainer} />
+      {machine.setup && <><h5 className="machine__h">Где регулировки</h5><SetupText text={machine.setup} /></>}
+      {principle && <><h5 className="machine__h">Как настроить</h5><SetupText text={principle} /></>}
+    </div>
+  );
+}
+
+/**
+ * Тренажёры упражнения в карточке программы: каждый раскрывается фото,
+ * личной настройкой и регулировками; общий принцип — под списком один раз.
+ * notes — личные настройки клиента { 'm:<uid>': текст }
+ */
+export function MachineList({ machines, notes = {} }) {
+  if (!machines || !machines.length) return null;
+  return (
+    <div className="machines">
+      <h4 className="setup__title">{machines.length > 1 ? 'Тренажёры' : 'Тренажёр'}</h4>
+      {machines.map((m) => (
+        <details key={m.uid} className="machines__item">
+          <summary>
+            {m.photo && <img className="machines__thumb" src={mediaUrl(m.photo)} alt="" loading="lazy" draggable="false" />}
+            <span>{m.name}</span>
+            {notes['m:' + m.uid] && <span className="machines__mine">ваша настройка</span>}
+          </summary>
+          <MachineInfo machine={m} note={notes['m:' + m.uid]} />
+        </details>
+      ))}
+    </div>
+  );
+}

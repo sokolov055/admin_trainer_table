@@ -7,13 +7,13 @@ import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
 import Dishes from './Dishes.jsx';
-import { uploadVideo, monthName } from '../library.js';
+import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
 import {
   Section, Panel, Loading, ErrorState, Empty, Badge, Chips, Search, Segmented, Field, Note, plural,
 } from '../ui.jsx';
 import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
-import { Media, SetupText } from '../media.jsx';
+import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 
 /**
@@ -736,7 +736,9 @@ function Exercises() {
       <ExerciseView
         exercise={current}
         owner={!!data.owner}
+        all={all}
         onSetup={reload}
+        onChanged={(saved) => { setOpen(saved.id); reload(); }}
         onBack={() => setOpen(null)}
         onEdit={() => setEditing(current)}
         onDeleted={() => { setOpen(null); reload(); }}
@@ -800,6 +802,7 @@ function Exercises() {
             {[e.muscle, e.equipment].filter(Boolean).length > 0 && <span>{[e.muscle, e.equipment].filter(Boolean).join(' · ')}</span>}
             {e.media && <Badge>{e.media.kind === 'animation' ? 'анимация' : 'видео'}</Badge>}
             {e.setup && (e.setupOk ? <Badge>настройка</Badge> : data.owner && <Badge kind="warn">настройка на проверке</Badge>)}
+            {e.machines && e.machines.length > 0 && <Badge>{e.machines.length + ' ' + plural(e.machines.length, 'тренажёр', 'тренажёра', 'тренажёров')}</Badge>}
           </div>
         </Row>
       ))}
@@ -991,7 +994,7 @@ function HiddenExercises({ onBack }) {
   );
 }
 
-function ExerciseView({ exercise, owner, onSetup, onBack, onEdit, onDeleted, onRemove }) {
+function ExerciseView({ exercise, owner, all, onSetup, onChanged, onBack, onEdit, onDeleted, onRemove }) {
   const [failure, setFailure] = useState(null);
   const e = exercise;
 
@@ -1019,6 +1022,8 @@ function ExerciseView({ exercise, owner, onSetup, onBack, onEdit, onDeleted, onR
         {e.notes && <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{e.notes}</p>}
 
         <SetupEditor exercise={e} canEdit={e.mine || (e.common && owner)} onSaved={onSetup} />
+        <MachinesEditor exercise={e} owner={owner} onChanged={onChanged} />
+        <AlternativesEditor exercise={e} owner={owner} all={all} onChanged={onChanged} />
 
         <div className="library__actions">
           <button className="button" onClick={onEdit}>{e.mine ? 'Изменить' : 'Сделать свою версию'}</button>
@@ -1103,6 +1108,243 @@ function SetupEditor({ exercise, canEdit, onSaved }) {
       {changed && (
         <button className="button" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить инструкцию'}</button>
       )}
+    </div>
+  );
+}
+
+/** Кто увидит правку тренажёров и замен — и не станет ли она своей версией */
+function extrasHint(e, owner) {
+  if (e.mine) return 'Видите вы и ваши клиенты.';
+  if (owner) return 'Общая база: видят все тренеры и их клиенты. Тренер может сделать свою версию под свой клуб.';
+  return 'Первая правка создаст вашу версию упражнения — с этими тренажёрами и заменами. Общая не изменится.';
+}
+
+/**
+ * Тренажёры упражнения (07.10.2026, FT-478): в разных залах жим ногами
+ * стоит разный — у каждого название, фото и где регулировки (без цифр:
+ * цифры у каждого клиента свои — сервер, lib/machine-notes.js). Клиент в
+ * занятии выбирает, на каком делает, и вес у каждого тренажёра свой.
+ * Общее упражнение правит владелец сервиса прямо в базе; другой тренер —
+ * в своей версии (сервер создаёт её при первой правке).
+ */
+function MachinesEditor({ exercise, owner, onChanged }) {
+  const e = exercise;
+  const machines = e.machines || [];
+  const [editing, setEditing] = useState(null);
+  const [failure, setFailure] = useState(null);
+  useEffect(() => { setEditing(null); setFailure(null); }, [e.id]);
+
+  const done = (saved) => { setEditing(null); if (saved) onChanged(saved); };
+  const first = async (m) => {
+    setFailure(null);
+    try {
+      const r = await apiMutate('library.exercise.machine.move', { exerciseId: e.id, uids: [m.uid] });
+      haptic('success');
+      onChanged(r.exercise);
+    } catch (err) {
+      setFailure(err);
+    }
+  };
+
+  return (
+    <div className="library__extras">
+      <h3 className="setup__title">Тренажёры</h3>
+      <p className="small muted">
+        {machines.length ? extrasHint(e, owner) : 'Если в залах стоят разные тренажёры для этого упражнения — добавьте каждый: фото и где у него регулировки. Вес и настройка (спинка, сиденье) у каждого клиента на каждом тренажёре свои — их записывают в занятии.'}
+      </p>
+      {machines.map((m, i) => (editing === m.uid
+        ? <MachineForm key={m.uid} exercise={e} machine={m} onDone={done} />
+        : (
+          <div key={m.uid} className="library__machine">
+            {m.photo ? <img className="machines__thumb" src={mediaUrl(m.photo)} alt="" loading="lazy" /> : <span className="machines__thumb machines__thumb--empty" aria-hidden="true" />}
+            <div className="library__machine-text">
+              <strong>{m.name}</strong>
+              <span className="small muted">{m.setup ? m.setup.split('\n')[0] : 'Регулировки не описаны — клиент увидит общий принцип.'}</span>
+            </div>
+            <div className="library__machine-actions">
+              {i > 0 && <button type="button" className="button button--ghost" onClick={() => first(m)}>Первым</button>}
+              <button type="button" className="button button--ghost" onClick={() => setEditing(m.uid)}>Изменить</button>
+            </div>
+          </div>
+        )))}
+      {editing === 'new'
+        ? <MachineForm exercise={e} machine={null} onDone={done} />
+        : machines.length < 8 && !editing && (
+          <button type="button" className="button button--ghost" onClick={() => setEditing('new')}>+ Тренажёр</button>
+        )}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+    </div>
+  );
+}
+
+/**
+ * Один тренажёр: название, фото, где регулировки. Тренажёр сохраняется
+ * первым — сервер решает, своё это упражнение или новая своя версия, — и
+ * фото кладётся уже к нему. Не загрузилось фото — тренажёр остаётся, форма
+ * открыта: повторное «Сохранить» правит его, а не заводит второй.
+ */
+function MachineForm({ exercise, machine, onDone }) {
+  const [name, setName] = useState(machine ? machine.name : '');
+  const [setup, setSetup] = useState(machine ? machine.setup : '');
+  const [photo, setPhoto] = useState(null);
+  const [preview, setPreview] = useState('');
+  const [dropPhoto, setDropPhoto] = useState(false);
+  const [saved, setSaved] = useState({ exerciseId: exercise.id, uid: machine ? machine.uid : '' });
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+
+  const pick = async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    setFailure(null);
+    try {
+      const blob = await shrinkPhoto(file);
+      setPhoto(blob);
+      setPreview(URL.createObjectURL(blob));
+      setDropPhoto(false);
+    } catch (err) {
+      setFailure(err);
+    }
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setFailure(null);
+    let result = null;
+    try {
+      const r = await apiMutate('library.exercise.machine.save', {
+        exerciseId: saved.exerciseId, uid: saved.uid || undefined, name, setup, removePhoto: dropPhoto && !photo,
+      });
+      result = r.exercise;
+      setSaved({ exerciseId: r.exercise.id, uid: r.uid });
+      if (photo) await uploadMachinePhoto(r.exercise.id, r.uid, photo);
+      haptic('success');
+      onDone(result);
+    } catch (err) {
+      setFailure(result ? new Error('Тренажёр сохранён, а фото не загрузилось: ' + err.message) : err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!saved.uid || !window.confirm(`Убрать тренажёр «${name || machine.name}»?`)) return;
+    setBusy(true);
+    try {
+      const r = await apiMutate('library.exercise.machine.delete', { exerciseId: saved.exerciseId, uid: saved.uid });
+      haptic('success');
+      onDone(r.exercise);
+    } catch (err) {
+      setFailure(err);
+      setBusy(false);
+    }
+  };
+
+  const current = preview || (!dropPhoto && machine && machine.photo ? machine.photo : '');
+  return (
+    <div className="library__form library__machine-form">
+      <label className="field">
+        <span className="field__label">Название</span>
+        <input className="field__input" value={name} maxLength={80} autoFocus={!machine}
+          onChange={(ev) => setName(ev.target.value)} placeholder="Hammer у окна, Technogym…" />
+      </label>
+      <div className="field">
+        <span className="field__label">Фото</span>
+        {current && <MachinePhoto machine={{ name: name || 'тренажёр', photo: current }} />}
+        <div className="library__machine-actions">
+          <label className="button button--ghost">
+            {current ? 'Другое фото' : 'Сфотографировать или выбрать'}
+            <input type="file" accept="image/*" hidden onChange={pick} />
+          </label>
+          {current && <button type="button" className="button button--ghost" onClick={() => { setPhoto(null); setPreview(''); setDropPhoto(true); }}>Убрать фото</button>}
+        </div>
+        <span className="field__hint">Снимайте тренажёр без людей в кадре — фото увидят клиенты.</span>
+      </div>
+      <label className="field">
+        <span className="field__label">Где регулировки</span>
+        <textarea className="field__input library__textarea" value={setup} maxLength={1500} rows={4}
+          onChange={(ev) => setSetup(ev.target.value)}
+          placeholder={'Спинка — рычаг справа под сиденьем.\nВалик — кнопка слева, тянуть на себя.'} />
+        <span className="field__hint">Без цифр: настройка у каждого клиента своя — её записывают в занятии. Шаг — строка.</span>
+      </label>
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+      <div className="library__actions">
+        <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+        <button type="button" className="button button--ghost" disabled={busy} onClick={() => onDone(null)}>Отмена</button>
+        {saved.uid && <button type="button" className="button button--ghost danger" disabled={busy} onClick={remove}>Убрать</button>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Замены упражнения (07.10.2026, FT-479): тренажёр занят — клиент в
+ * занятии одним касанием меняет упражнение на одно из этих. У общего
+ * упражнения в общей базе — замены тоже из общей базы
+ */
+function AlternativesEditor({ exercise, owner, all, onChanged }) {
+  const e = exercise;
+  const alts = e.alternatives || [];
+  const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  useEffect(() => { setAdding(false); setQ(''); setFailure(null); }, [e.id]);
+
+  const save = async (ids) => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      const r = await apiMutate('library.exercise.alternatives', { exerciseId: e.id, ids });
+      haptic('success');
+      setQ('');
+      onChanged(r.exercise);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const key = (t) => String(t || '').toLowerCase().replace(/ё/g, 'е');
+  const commonOnly = e.common && owner;
+  const found = q.trim().length < 2 ? [] : (all || [])
+    .filter((x) => x.id !== e.id && !alts.some((a) => a.id === x.id) && (!commonOnly || x.common))
+    .filter((x) => key(x.name).includes(key(q.trim())))
+    .slice(0, 8);
+
+  return (
+    <div className="library__extras">
+      <h3 className="setup__title">Замены</h3>
+      <p className="small muted">
+        {alts.length ? extrasHint(e, owner) : 'Чем заменить, если тренажёр занят: клиент поменяет упражнение в занятии одним касанием.'}
+      </p>
+      {alts.length > 0 && (
+        <div className="chips chips--flush chips--wrap">
+          {alts.map((a) => (
+            <button key={a.id} type="button" className="chip" disabled={busy} aria-label={`Убрать замену «${a.name}»`}
+              onClick={() => save(alts.filter((x) => x.id !== a.id).map((x) => x.id))}>
+              {a.name} ×
+            </button>
+          ))}
+        </div>
+      )}
+      {adding ? (
+        <div className="library__form">
+          <Search value={q} onChange={setQ} placeholder="Найти упражнение" />
+          {found.map((x) => (
+            <button key={x.id} type="button" className="button button--ghost library__alt-pick" disabled={busy}
+              onClick={() => save([...alts.map((a) => a.id), x.id])}>{x.name}</button>
+          ))}
+          {q.trim().length >= 2 && !found.length && <p className="small muted">Не нашлось.{commonOnly ? ' В общей базе — только общие упражнения.' : ''}</p>}
+          <button type="button" className="button button--ghost" onClick={() => { setAdding(false); setQ(''); }}>Готово</button>
+        </div>
+      ) : alts.length < 6 && (
+        <button type="button" className="button button--ghost" onClick={() => setAdding(true)}>+ Замена</button>
+      )}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
     </div>
   );
 }

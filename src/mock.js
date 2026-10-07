@@ -86,7 +86,16 @@ const PLAN_BLOCKS = [
       { name: 'Присед со штангой', weight: '95', prevWeight: '90', lastWeight: '95', sets: '5', reps: '5', rpe: '8', exerciseId: 3,
         startSets: [['70', 'work'], ['90', 'work'], ['105', 'work'], ['105', 'work'], ['105', 'work']].map(([weight, kind]) => ({ weight, reps: '5', kind })),
         lastRun: { date: '2026-09-29', weights: ['60', '80', '95', '95', '95'], reps: ['5', '5', '5', '5', '5'], planReps: '5', effort: 'easy', streak: 0, action: 'up', step: 10 },
+        // Тренажёры и замены (FT-478, FT-479): прошлый раз — на раме у окна
+        machine: { uid: 'rack01', name: 'Силовая рама у окна' },
+        notes: { 'm:rack01': 'Крюки на 4-й, упоры на 2-й' },
         exercise: { name: 'Приседания со штангой', muscle: 'Ноги', equipment: 'Штанга', notes: '', media: { kind: 'animation', url: 'Barbell_Squat' },
+          machines: [
+            { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' },
+            { uid: 'smith1', name: 'Стойка у зеркала', photo: '', setup: '' },
+          ],
+          alternatives: [{ id: 10, name: 'Жим ногами' }],
+          noteKey: 'e:приседания со штангой',
           setup: 'Стойки — крюки на уровне середины груди.\nСтраховочные упоры — чуть ниже нижней точки приседа.\nОшибка: упоры выше нижней точки — штанга на них ляжет.' } },
       // Повторы другие: в последний раз 100 × 3, сегодня 10 — пересчёт
       { name: 'Румынская тяга', weight: '85', prevWeight: '80', sets: '4', reps: '10', rpe: '7',
@@ -490,15 +499,39 @@ let demoExercises = [
   ['Планка', 'Пресс', 'Собственный вес', 'Plank'],
   ['Румынская тяга', 'Ноги', 'Штанга', 'Romanian_Deadlift'],
   ['Бёрпи', 'Всё тело', 'Собственный вес', null],
+  ['Жим ногами', 'Ноги', 'Тренажёр', null],
 ].map(([name, muscle, equipment, anim], i) => ({
   id: i + 1, name, muscle, equipment, notes: '', mine: false, common: true,
   media: anim ? { kind: 'animation', url: anim } : null,
-  setup: '', setupOk: false,
+  setup: '', setupOk: false, machines: [], alternatives: [],
 }));
 Object.assign(demoExercises[7], { setup: 'Стойки — крюки чуть выше колена.\nОшибка: спина круглится внизу.' });
 // «Как настроить тренажёр»: одна проверенная инструкция и один черновик
 Object.assign(demoExercises[1], { setupOk: true, setup: 'Валик — плотно прижимает бёдра, стопы стоят на полу.\nСиденье — руки вверх дотягиваются до рукояти, чуть согнуты.\nХват — шире плеч, большой палец сверху.\nОшибка: раскачка корпусом назад.\nОшибка: тянуть за голову.' });
 Object.assign(demoExercises[2], { setupOk: true, setup: 'Стойки — крюки на уровне середины груди.\nСтраховочные упоры — чуть ниже нижней точки приседа.\nОшибка: упоры выше нижней точки — штанга на них ляжет.' });
+
+// Тренажёры (FT-478) и замены (FT-479): у приседа — две стойки в разных
+// залах, занято — жим ногами
+const DEMO_RACK = { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' };
+const DEMO_SMITH = { uid: 'smith1', name: 'Стойка у зеркала', photo: '', setup: '' };
+Object.assign(demoExercises[2], { machines: [DEMO_RACK, DEMO_SMITH], alternatives: [{ id: 10, name: 'Жим ногами' }] });
+let demoMachineSeq = 0;
+// Своя настройка Анны на раме — записал тренер
+let demoNotes = { 'm:rack01': { text: 'Крюки на 4-й, упоры на 2-й', by: 'trainer', updatedAt: '2026-10-01T10:00:00.000Z' } };
+
+/** Фото тренажёра в демо — data-URL сразу в каталог (library.js, uploadMachinePhoto) */
+export function mockMachinePhoto(exerciseId, uid, url) {
+  const e = demoExercises.find((x) => x.id === Number(exerciseId));
+  const m = e && (e.machines || []).find((x) => x.uid === uid);
+  if (m) m.photo = url;
+}
+
+/** Правка тренажёров и замен общего — своя версия (как на сервере), своё — на месте */
+function demoEditable(id) {
+  const e = demoExercises.find((x) => x.id === Number(id));
+  if (!e) throw new Error('Упражнение не найдено.');
+  return e;
+}
 
 let demoHidden = new Set();
 // Похожие упражнения объединены (демо): группа больше не показывается
@@ -1249,8 +1282,49 @@ const MOCK = {
   'exercise.setup': (params = {}) => {
     const ids = String(params.ids || '').split(',').map(Number);
     const setups = {};
-    demoExercises.filter((e) => ids.includes(e.id) && e.setupOk && e.setup).forEach((e) => { setups[e.id] = { name: e.name, setup: e.setup }; });
-    return { setups };
+    demoExercises
+      .filter((e) => ids.includes(e.id))
+      .forEach((e) => { setups[e.id] = { name: e.name, setup: e.setupOk ? e.setup : '', machines: e.machines || [], alternatives: e.alternatives || [], noteKey: 'e:' + e.name.toLowerCase() }; });
+    return { setups, notes: { ...demoNotes } };
+  },
+  // Своя настройка тренажёра у клиента — у каждого своя (07.10.2026)
+  'client.machine.note.save': (params) => {
+    const text = String(params.text || '').trim().slice(0, 300);
+    if (!text) { delete demoNotes[params.target]; return { target: params.target, note: null }; }
+    demoNotes[params.target] = { text, by: params.__role === 'trainer' ? 'trainer' : 'client', updatedAt: new Date().toISOString() };
+    return { target: params.target, note: demoNotes[params.target] };
+  },
+  'library.exercise.machine.save': (params) => {
+    const e = demoEditable(params.exerciseId);
+    const machines = e.machines || (e.machines = []);
+    const name = String(params.name || '').trim();
+    if (name.length < 2) throw new Error('Назовите тренажёр — например, «Hammer у окна».');
+    let m = params.uid && machines.find((x) => x.uid === params.uid);
+    if (params.uid && !m) throw new Error('Тренажёр не найден.');
+    if (!m) {
+      if (machines.length >= 8) throw new Error('Тренажёров у упражнения — не больше 8.');
+      m = { uid: 'demo' + (++demoMachineSeq), name, photo: '', setup: '' };
+      machines.push(m);
+    }
+    Object.assign(m, { name, setup: String(params.setup || '').trim(), ...(params.removePhoto ? { photo: '' } : {}) });
+    return { exercise: { ...e }, uid: m.uid };
+  },
+  'library.exercise.machine.delete': (params) => {
+    const e = demoEditable(params.exerciseId);
+    e.machines = (e.machines || []).filter((x) => x.uid !== params.uid);
+    return { exercise: { ...e } };
+  },
+  'library.exercise.machine.move': (params) => {
+    const e = demoEditable(params.exerciseId);
+    const uids = params.uids || [];
+    e.machines = [...(e.machines || [])].sort((a, b) => (uids.includes(b.uid) ? 1 : 0) - (uids.includes(a.uid) ? 1 : 0));
+    return { exercise: { ...e } };
+  },
+  'library.exercise.alternatives': (params) => {
+    const e = demoEditable(params.exerciseId);
+    e.alternatives = (params.ids || []).map(Number).filter((id) => id !== e.id)
+      .map((id) => demoExercises.find((x) => x.id === id)).filter(Boolean).map((x) => ({ id: x.id, name: x.name }));
+    return { exercise: { ...e } };
   },
   'library.exercises': (params = {}) => ({
     exercises: demoExercises.filter((e) => demoHidden.has(e.id) === !!params.hidden),

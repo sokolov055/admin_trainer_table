@@ -4612,3 +4612,29 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-edit__kind { display: grid; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-3); border-radius: var(--radius); background: var(--surface-sunken); }
 /* «на сторону» у веса в программе — по низу полей, размером с чип */
 .plan-inline__side { align-self: flex-end; margin-bottom: 7px; font-size: var(--text-xs); padding: 4px 10px; }
+
+/* Тренажёры упражнения (07.10.2026, FT-478): фото, название, настройка */
+.machines { display: grid; gap: var(--space-1); }
+.machines__item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.machines__item summary { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: 600; cursor: pointer; min-height: 32px; }
+.machines__item[open] summary { margin-bottom: var(--space-2); }
+.machines__thumb { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; flex: none; }
+.machine { display: grid; gap: var(--space-2); }
+.machine__photo { all: unset; display: block; cursor: zoom-in; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-sunken); -webkit-tap-highlight-color: transparent; }
+.machine__photo img { display: block; width: 100%; height: 200px; object-fit: cover; }
+.machine__photo--full { cursor: zoom-out; }
+.machine__photo--full img { height: auto; max-height: 80vh; object-fit: contain; }
+.machine__photo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.machines__thumb--empty { display: block; background: var(--surface-sunken); }
+.library__extras { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.library__extras .small { margin: 0; }
+.library__machine { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-2) var(--space-3); align-items: start; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.library__machine-text { display: grid; gap: 2px; min-width: 0; font-size: var(--text-sm); }
+.library__machine-text .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library__machine-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); grid-column: 1 / -1; }
+.library__machine-form { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-3); gap: var(--space-3); }
+.library__alt-pick { justify-content: flex-start; text-align: left; }
+.machine__h { font-size: var(--text-xs); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin: var(--space-1) 0 0; }
+.machine__note { display: grid; gap: 2px; background: var(--info-fill); border-radius: 10px; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); white-space: pre-wrap; }
+.machine__note strong { font-size: var(--text-xs); color: var(--accent); }
+.machines__mine { margin-left: auto; font-size: var(--text-xs); font-weight: 500; color: var(--accent); }

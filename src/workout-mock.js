@@ -18,11 +18,14 @@ export function workoutMock(action, params) {
   if (action === 'workout.exercise.history') {
     const exerciseId = Number(params.exerciseId) || null;
     const wantedName = String(params.name || '').trim().toLowerCase();
+    // Тренажёр (FT-478): вес — с прошлого раза на нём, как на сервере
+    const machineUid = params.machineUid ? String(params.machineUid) : '';
+    const same = (exercise) => ((exerciseId && Number(exercise.exerciseId) === exerciseId)
+      || (!exerciseId && String(exercise.name || '').trim().toLowerCase() === wantedName))
+      && (!machineUid || (exercise.machine && exercise.machine.uid) === machineUid);
     const completed = [...sessions].reverse().find((session) => session.status === 'completed'
-      && session.exercises?.some((exercise) => (exerciseId && Number(exercise.exerciseId) === exerciseId)
-        || (!exerciseId && String(exercise.name || '').trim().toLowerCase() === wantedName)));
-    const previousExercise = completed?.exercises?.find((exercise) => (exerciseId && Number(exercise.exerciseId) === exerciseId)
-      || (!exerciseId && String(exercise.name || '').trim().toLowerCase() === wantedName));
+      && session.exercises?.some(same));
+    const previousExercise = completed?.exercises?.find(same);
     const workingSets = previousExercise?.sets?.filter((set) => set.state === 'done' && set.kind !== 'warmup') || [];
     const lastWeight = [...workingSets].reverse().find((set) => set.weight)?.weight || '';
 
@@ -33,6 +36,7 @@ export function workoutMock(action, params) {
       reps: params.reps,
       track: params.track,
       ...(lastWeight ? { lastWeight } : {}),
+      ...(machineUid ? { machine: { uid: machineUid, name: '' } } : {}),
       ...(workingSets.length ? {
         startSets: workingSets.map((set) => ({ weight: set.weight || '', reps: params.reps || set.reps || '', kind: 'work' })),
         lastRun: {

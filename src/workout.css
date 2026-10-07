@@ -662,3 +662,14 @@
 .workout__side { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; margin: 0; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
 .workout__side input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .workout__side:has(input:checked) { color: var(--accent); }
+
+/* Тренажёр упражнения (FT-478) и замены (FT-479) — под названием */
+.workout__machines, .workout__alts { display: grid; gap: 2px; margin: var(--space-1) 0; }
+.workout__machines .small, .workout__alts .small { margin: 0; }
+/* Своя настройка тренажёра — у каждого клиента своя */
+.workout__note { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; margin: var(--space-1) 0; }
+.workout__note-edit, .workout__note-add { all: unset; cursor: pointer; color: var(--accent); font-size: var(--text-sm); font-weight: 600; padding: 6px 0; -webkit-tap-highlight-color: transparent; }
+.workout__note-add { display: block; margin: var(--space-1) 0; }
+.workout__note-edit:focus-visible, .workout__note-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.workout__note-form { display: grid; gap: var(--space-2); margin: var(--space-1) 0; }
+.workout__note-actions { display: flex; gap: var(--space-2); }

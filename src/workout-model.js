@@ -22,6 +22,9 @@ export function fromPlan(block, month, members = []) {
       id: uid(), name: e.name, note: '',
       // Упражнение из базы: по нему сервер ведёт историю весов клиента
       ...(e.exerciseId ? { exerciseId: e.exerciseId } : {}),
+      // Тренажёр, на котором делали в прошлый раз (FT-478): вес — по нему.
+      // У пары веса ведутся по людям, тренажёр не выбирается
+      ...(e.machine && !split ? { machine: { uid: e.machine.uid, name: e.machine.name || '' } } : {}),
       // Тип учёта — что записывать в подходе; снимок, в занятии правится
       // только для этого занятия
       ...(e.track || e.cardio ? { track: trackOf(e) } : {}),
@@ -64,6 +67,35 @@ export function fromPlan(block, month, members = []) {
           ...planSet(e, trackOf(e)),
         })),
     })) };
+}
+
+/**
+ * Другой тренажёр в идущем занятии (07.10.2026, FT-478): на разных
+ * тренажёрах веса несравнимы, поэтому неотмеченные рабочие подходы берут
+ * вес с прошлого раза на выбранном (history — ответ workout.exercise.history
+ * с machineUid). Не делали на нём — веса пустые: подход без веса не
+ * отмечается, человек впишет сам. Отмеченное не трогаем. machine = null —
+ * без тренажёра.
+ */
+export function withMachine(ex, machine, history = null) {
+  const out = { ...ex };
+  if (machine) out.machine = { uid: machine.uid, name: machine.name || '' };
+  else delete out.machine;
+  if (!history || (ex.sets || []).some((s) => s.who) || trackOf(ex).kind === 'cardio') return out;
+
+  out.prevWeight = String(history.lastWeight || '');
+  if (history.lastRun) out.lastRun = history.lastRun;
+  else delete out.lastRun;
+  const starts = (history.startSets || []).filter((s) => s.kind !== 'warmup');
+  let work = -1;
+  out.sets = ex.sets.map((s) => {
+    if (s.kind === 'warmup') return s;
+    work += 1;
+    if (s.state !== 'pending') return s;
+    const from = starts[Math.min(work, starts.length - 1)];
+    return { ...s, weight: String((from && from.weight) || history.lastWeight || '') };
+  });
+  return out;
 }
 
 /** Схема текущего упражнения, которую сохраняем при замене его названия */

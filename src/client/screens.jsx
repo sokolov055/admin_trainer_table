@@ -18,7 +18,7 @@ import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js'
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
-import { Media, SetupText } from '../media.jsx';
+import { Media, SetupText, MachineList, PersonalNote } from '../media.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 import SwipeRow from '../SwipeRow.jsx';
 import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
@@ -1227,7 +1227,7 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
           ? (
             <button type="button" className="exercise__name exercise__open" aria-expanded={open} onClick={() => { setOpen(!open); haptic(); }}>
               {ex.name}
-              <span className="exercise__hint">{open ? 'свернуть' : card.setup ? 'техника и настройка' : 'техника'}</span>
+              <span className="exercise__hint">{open ? 'свернуть' : card.setup || (card.machines && card.machines.length) ? 'техника и настройка' : 'техника'}</span>
             </button>
           )
           : <div className="exercise__name">{ex.name}</div>}
@@ -1252,12 +1252,24 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
             <Media media={card.media} />
             {card.notes
               ? <p className="small" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{card.notes}</p>
-              : !card.media && !card.setup && <p className="small muted" style={{ marginBottom: 0 }}>Техника к этому упражнению пока не записана.</p>}
+              : !card.media && !card.setup && !(card.machines && card.machines.length) && <p className="small muted" style={{ marginBottom: 0 }}>Техника к этому упражнению пока не записана.</p>}
+            {/* Тренажёры (FT-478): у каждого фото и своя настройка; общая
+                инструкция — общий принцип под ними */}
+            <MachineList machines={card.machines} notes={ex.notes || {}} />
+            {/* Своя настройка у упражнения без тренажёров — у каждого клиента своя */}
+            {!(card.machines && card.machines.length) && card.noteKey && ex.notes && <PersonalNote text={ex.notes[card.noteKey]} />}
             {card.setup && (
               <>
-                <h4 className="setup__title">Как настроить тренажёр</h4>
+                <h4 className="setup__title">{card.machines && card.machines.length ? 'Общий принцип настройки' : 'Как настроить тренажёр'}</h4>
                 <SetupText text={card.setup} />
               </>
+            )}
+            {/* Замены (FT-479): тренажёр занят — что делать вместо; в
+                занятии меняются одним касанием */}
+            {card.alternatives && card.alternatives.length > 0 && (
+              <p className="small" style={{ marginBottom: 0 }}>
+                <strong>Можно заменить:</strong> {card.alternatives.map((a) => a.name).join(', ')}
+              </p>
             )}
           </div>
         )}

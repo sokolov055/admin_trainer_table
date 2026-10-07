@@ -3,7 +3,7 @@ import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { blankSet, clock, fromPlan, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise } from './workout-model.js';
+import { blankSet, clock, fromPlan, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -23,7 +23,7 @@ import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { useData } from './useData.js';
-import { SetupText } from './media.jsx';
+import { SetupText, MachineInfo, PersonalNote } from './media.jsx';
 import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, wasSet, scaleTo } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
@@ -496,6 +496,30 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       });
     } catch (error) {
       setMessage('Историю нового упражнения не удалось загрузить: ' + error.message);
+    }
+  };
+  // Другой тренажёр (FT-478): сразу отмечаем выбор, веса неотмеченных
+  // подходов — с прошлого раза на нём (сервер, та же история весов)
+  const chooseMachine = async (ei, machine) => {
+    const current = state.current && state.current.session.exercises[ei];
+    if (!current) return;
+    haptic();
+    const uidOf = (m) => (m ? m.uid : '');
+    updateExercise(ei, (ex) => withMachine(ex, machine));
+    try {
+      const plan = replacementPlan(current);
+      const history = await apiPublic('workout.exercise.history', {
+        ...params,
+        name: current.name,
+        exerciseId: current.exerciseId || null,
+        sets: plan.sets,
+        reps: plan.reps,
+        machineUid: uidOf(machine),
+      });
+      // Пока ждали ответ, выбрали другой — этот ответ уже не про него
+      updateExercise(ei, (ex) => (ex.name === current.name && uidOf(ex.machine) === uidOf(machine) ? withMachine(ex, machine, history) : ex));
+    } catch (error) {
+      setMessage('Вес на этом тренажёре не удалось загрузить: ' + error.message);
     }
   };
   const close = () => { if (state.current?.dirty) save(); onClose(); };
@@ -1299,11 +1323,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // часто, а список id при этом почти не меняется.
   const setupIds = s ? [...new Set(s.exercises.map(e => e.exerciseId).filter(Boolean))].sort((a, b) => a - b).join(',') : '';
   const [setups, setSetups] = useState({});
+  // Личные настройки тренажёров этого клиента («спинка 3») — у каждого свои
+  const [notes, setNotes] = useState({});
   useEffect(() => {
     if (!setupIds) return undefined;
     let alive = true;
     apiPublic('exercise.setup', { ...params, ids: setupIds })
-      .then(r => { if (alive && r && r.setups) setSetups(r.setups); })
+      .then(r => { if (alive && r && r.setups) { setSetups(r.setups); setNotes(r.notes || {}); } })
       .catch(() => {});
     return () => { alive = false; };
   }, [setupIds]);
@@ -1315,6 +1341,62 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
+
+  /**
+   * Под названием упражнения из базы (07.10.2026): на каком тренажёре
+   * (FT-478) — вес у каждого свой, — как его настроить, и чем заменить, если
+   * он занят (FT-479). Замена — пока подходы не отмечены: отмеченное при
+   * замене не переносится, а терять его нельзя
+   */
+  const extrasView = (ex, ei, info) => {
+    const machines = info.machines || [];
+    const split = ex.sets.some((x) => x.who);
+    const chosen = (ex.machine && machines.find((m) => m.uid === ex.machine.uid)) || null;
+    const alts = (info.alternatives || []).filter((a) => a.id !== Number(ex.exerciseId));
+    const started = ex.sets.some((x) => x.state === 'done');
+    const noteTarget = chosen ? 'm:' + chosen.uid : (machines.length ? '' : info.noteKey || '');
+    return <>
+      {machines.length > 0 && !split && (
+        <div className="workout__machines">
+          <div className="chips chips--flush chips--wrap" role="radiogroup" aria-label="Тренажёр">
+            {machines.map((m) => (
+              <button type="button" key={m.uid} role="radio" aria-checked={chosen === m}
+                className={'chip' + (chosen === m ? ' chip--active' : '')} disabled={!editable}
+                onClick={() => chooseMachine(ei, chosen === m ? null : m)}>{m.name}</button>
+            ))}
+          </div>
+          {!chosen && editable && <p className="small muted">На каком тренажёре? Вес у каждого свой.</p>}
+          {chosen && editable && !ex.prevWeight && !ex.lastRun && trackOf(ex).kind === 'strength'
+            && ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim()) && (
+            <p className="small muted">На тренажёре «{chosen.name}» ещё не делали — впишите вес, дальше он запомнится.</p>
+          )}
+        </div>
+      )}
+      {/* Своя настройка — у каждого клиента своя, на виду, а не в
+          раскрывашке: ради неё в зале и смотрят. Тренажёров несколько —
+          сначала выбрать, на каком */}
+      {!split && noteTarget && (
+        <MachineNote key={noteTarget} target={noteTarget} note={notes[noteTarget]} trainer={!!clientRow} params={params}
+          onSaved={(n) => setNotes((v) => { const next = { ...v }; if (n) next[noteTarget] = n; else delete next[noteTarget]; return next; })} />
+      )}
+      {(chosen ? chosen.setup || chosen.photo || info.setup : info.setup) && (
+        <details className="workout__setup">
+          <summary>{chosen ? 'Тренажёр «' + chosen.name + '»: фото, регулировки' : 'Как настроить тренажёр'}</summary>
+          {chosen ? <MachineInfo machine={chosen} principle={info.setup} /> : <SetupText text={info.setup} />}
+        </details>
+      )}
+      {alts.length > 0 && editable && !started && (
+        <div className="workout__alts">
+          <span className="small muted">Занято? Заменить на:</span>
+          <div className="chips chips--flush chips--wrap">
+            {alts.map((a) => (
+              <button type="button" key={a.id} className="chip" onClick={() => { haptic(); replaceExercise(ei, { name: a.name, exerciseId: a.id }); }}>{a.name}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>;
+  };
 
   // Отдых — поверх всего приложения (портал), а не внутри экрана: так
   // «Свернуть» открывает нижнее меню и другие разделы, а «Отдых окончен»
@@ -1449,9 +1531,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {!compact && renaming === ex.id && nameEditor(ex, ei, ex.id)}
           {!compact && <>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
-          {ex.exerciseId && setups[ex.exerciseId] && (
-            <details className="workout__setup"><summary>Как настроить тренажёр</summary><SetupText text={setups[ex.exerciseId].setup} /></details>
-          )}
+          {ex.exerciseId && setups[ex.exerciseId] && extrasView(ex, ei, setups[ex.exerciseId])}
           {main && (
             <p className="workout__target">
               <strong>{main}</strong>
@@ -1595,6 +1675,56 @@ function nextInfo(s, focus) {
     return { name: 'Суперсет', part: 'круг ' + (r + 1) + ' из ' + rounds, items };
   }
   return { name: ex.name, part, load, change: changeOf(ex, set, own) };
+}
+
+/**
+ * Своя настройка тренажёра (07.10.2026): «спинка 3, сиденье 5». У каждого
+ * клиента своя, поэтому живёт не у тренажёра, а у клиента; записывает он
+ * сам или тренер в его занятии, и в следующий раз она здесь же — первой.
+ * Пустой текст — стереть
+ */
+function MachineNote({ target, note, trainer, params, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note ? note.text : '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { if (!editing) setText(note ? note.text : ''); }, [note, editing]);
+
+  const save = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await apiMutate('client.machine.note.save', { ...params, target, text });
+      haptic('success');
+      onSaved(r.note);
+      setEditing(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!editing) {
+    return note
+      ? <div className="workout__note">
+        <PersonalNote text={note.text} trainer={trainer} by={note.by} />
+        <button type="button" className="workout__note-edit" onClick={() => setEditing(true)}>Изменить</button>
+      </div>
+      : <button type="button" className="workout__note-add" onClick={() => setEditing(true)}>
+        {trainer ? '+ Записать настройку клиента' : '+ Записать свою настройку'}
+      </button>;
+  }
+  return <div className="workout__note-form">
+    <textarea className="field__input" rows={2} maxLength={300} value={text} autoFocus
+      aria-label={trainer ? 'Настройка клиента' : 'Своя настройка'}
+      placeholder="Спинка 3, сиденье 5, упор на 2-й" onChange={(e) => setText(e.target.value)} />
+    {error && <p className="small danger">{error}</p>}
+    <div className="workout__note-actions">
+      <button type="button" className="button" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+      <button type="button" className="button button--ghost" disabled={busy} onClick={() => setEditing(false)}>Отмена</button>
+    </div>
+  </div>;
 }
 
 /**

@@ -402,6 +402,39 @@ test('замена упражнения берёт подходы нового �
 });
 
 /**
+ * Тренажёры (FT-478): занятие берёт тренажёр прошлого раза из программы;
+ * другой тренажёр — неотмеченные подходы с весами прошлого раза на нём,
+ * отмеченное не трогается; не делали на нём — веса пустые.
+ */
+test('другой тренажёр: веса неотмеченных — с прошлого раза на нём, отмеченные целы', async () => {
+  const { fromPlan, withMachine } = await import('../src/workout-model.js');
+  const press = fromPlan({ title: 'Ноги', exercises: [{
+    name: 'Жим ногами', exerciseId: 10, sets: '3', reps: '10',
+    machine: { uid: 'hammer1', name: 'Hammer' },
+    startSets: ['200', '200', '200'].map((weight) => ({ weight, reps: '10', kind: 'work' })),
+  }] }, '', []).exercises[0];
+  assert.deepEqual(press.machine, { uid: 'hammer1', name: 'Hammer' }, 'тренажёр прошлого раза');
+
+  const first = { ...press, sets: press.sets.map((s, i) => (i === 0 ? { ...s, state: 'done' } : s)) };
+  const techno = withMachine(first, { uid: 'tg2', name: 'Technogym' }, {
+    lastWeight: '120',
+    startSets: ['110', '120', '120'].map((weight) => ({ weight, reps: '10', kind: 'work' })),
+    lastRun: { date: '2026-10-01', weights: ['110', '120', '120'], reps: ['10', '10', '10'] },
+  });
+  assert.deepEqual(techno.machine, { uid: 'tg2', name: 'Technogym' });
+  assert.deepEqual(techno.sets.map((s) => s.weight), ['200', '120', '120'], 'первый отмечен — его вес прежний');
+  assert.equal(techno.prevWeight, '120');
+
+  const fresh = withMachine(press, { uid: 'new3', name: 'Новый' }, {});
+  assert.ok(fresh.sets.every((s) => s.weight === ''), 'на новом не делали — веса пустые');
+  assert.equal(fresh.lastRun, undefined);
+
+  const none = withMachine(press, null);
+  assert.equal(none.machine, undefined, 'без тренажёра');
+  assert.deepEqual(none.sets, press.sets, 'без ответа сервера веса не меняются');
+});
+
+/**
  * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
  * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.
  */
