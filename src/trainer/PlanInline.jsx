@@ -9,6 +9,7 @@ import { useData } from '../useData.js';
 import { trackOf, cardioFrom, planScheme, techniqueOf, techniqueText } from '../exercise-track.js';
 import { IconPlus, IconLinkPair, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
+import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -73,6 +74,35 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     onChange(next);
   };
   const patch = (i, values) => onChange(patchPlanExercise(list, i, values));
+  const latest = useRef(list);
+  latest.current = list;
+
+  /**
+   * Вид упражнения (что записывать, на сторону) — в базу тренера, а не в
+   * программу: программы и шаблоны берут его из базы, так что исправленное
+   * здесь сразу видно везде (07.10.2026). Строки с тем же упражнением в этой
+   * тренировке меняются сразу, не дожидаясь ответа
+   */
+  const [kindNote, setKindNote] = useState(null); // { i, text, error }
+  const keyOf = (v) => String(v || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+  const changeTrack = (i, next) => {
+    const ex = list[i];
+    const same = (e) => (ex.exerciseId ? e.exerciseId === ex.exerciseId : !e.exerciseId && keyOf(e.name) === keyOf(ex.name));
+    // Кардио в программе — со своим планом на тренажёре; ушло из кардио — плана нет
+    const cardioOf = (e) => (next.kind === 'cardio'
+      ? { cardio: e.cardio ? { ...e.cardio, machine: next.machine } : newCardio(next.machine) }
+      : { cardio: null });
+    onChange(list.map((e, k) => (k === i || same(e) ? { ...e, track: { ...next }, ...cardioOf(e) } : e)));
+    setKindNote(null);
+    saveExerciseTrack({ exerciseId: ex.exerciseId, name: ex.name, track: next })
+      .then((saved) => {
+        if (saved && !ex.exerciseId) {
+          onChange(latest.current.map((e) => (!e.exerciseId && keyOf(e.name) === keyOf(ex.name) ? { ...e, exerciseId: saved.id } : e)));
+        }
+        setKindNote({ i, text: 'Сохранено в базе — везде так' });
+      })
+      .catch((error) => setKindNote({ i, text: 'В базу не сохранилось: ' + (error.message || 'нет связи'), error: true }));
+  };
 
   const toggle = (kind, i) => {
     if (swallow.current) return;
@@ -219,6 +249,8 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                 }}
                 onAdded={(saved) => setExtra((prev) => [...prev, saved])}
               />
+              {/* Вид упражнения — как в идущем занятии; пишется в базу */}
+              {ex.name && <ExerciseKind track={trackOf(ex)} onChange={(t) => changeTrack(i, t)} note={kindNote && kindNote.i === i ? kindNote : null} />}
               <div className="plan-inline__panel-actions">
                 <button type="button" className="button button--primary" onClick={() => setOpen(ex.name ? null : { kind: 'name', i })}>Готово</button>
               </div>

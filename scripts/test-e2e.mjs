@@ -629,17 +629,27 @@ test('мои тренировки: программа, прогресс, пит�
     if (process.env.SHOT_INLINE) await phone.screenshot({ path: process.env.SHOT_INLINE });
     await firstBlock.getByRole('button', { name: 'Готово' }).click();
 
-    // У суперсета круги общие: добавили в одном упражнении — число
-    // одновременно изменилось у обоих.
+    // Суперсет (07.10.2026): обычный вид — схемы и число кругов; тап по
+    // любой схеме — правка всего суперсета: поля у каждого упражнения и
+    // общая колонка кругов. Добавленный круг — у всех сразу
     const secondBlock = phone.locator('#root main:not([hidden]) .section', { has: phone.locator('.plan__toggle') }).nth(1);
     await secondBlock.locator('.plan__toggle').click();
-    const supersetSchemes = secondBlock.locator('.plan-inline__unit--superset .plan-inline__scheme');
-    await supersetSchemes.first().click();
-    await secondBlock.getByRole('button', { name: 'Круг в конец' }).click();
-    assert.equal(await secondBlock.locator('.plan-inline__set').count(), 4, 'четыре круга у первого упражнения');
+    const superset = secondBlock.locator('.plan-inline__unit--superset').first();
+    await superset.locator('.plan-inline__scheme').first().click();
+    assert.equal(await superset.locator('.plan-inline__field--reps').count(), await superset.locator('.plan-inline__row').count(), 'поля у каждого упражнения суперсета');
+    const rounds = superset.locator('.plan-inline__rounds-col--edit .plan-inline__set');
+    const before = await rounds.count();
+    await superset.getByRole('button', { name: 'Круг', exact: true }).click();
+    assert.equal(await rounds.count(), before + 1, 'круг добавился');
     if (process.env.SHOT_SUPERSET) await phone.screenshot({ path: process.env.SHOT_SUPERSET, fullPage: true });
-    await supersetSchemes.nth(1).click();
-    assert.equal(await secondBlock.locator('.plan-inline__set').count(), 4, 'четыре круга у второго упражнения');
+    await superset.getByRole('button', { name: 'Готово' }).click();
+    assert.equal(await superset.locator('.plan-inline__rounds-sum strong').innerText(), String(before + 1), 'число кругов в обычном виде');
+
+    // Тап по названию — вид упражнения, как в занятии; уходит в базу
+    await superset.locator('.plan-inline__name').first().click();
+    await secondBlock.getByRole('radio', { name: 'Свой вес' }).click();
+    await secondBlock.getByText('Сохранено в базе').waitFor({ timeout: 5000 });
+    if (process.env.SHOT_KIND) await phone.screenshot({ path: process.env.SHOT_KIND, fullPage: true });
     await secondBlock.getByRole('button', { name: 'Готово' }).click();
     for (const tab of ['Прогресс', 'Питание']) {
       await phone.getByRole('tab', { name: tab, exact: true }).click();

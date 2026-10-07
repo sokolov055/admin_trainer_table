@@ -4488,6 +4488,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__rounds-col[data-cols='3'] .plan-inline__rounds-list { gap: 5px; }
 .plan-inline__rounds-col[data-cols='3'] .plan-inline__set { min-width: 22px; height: 28px; padding: 0 1px; border-radius: 8px; font-size: var(--text-xs); }
 .plan-inline__rounds-col .plan-inline__set-x { top: -5px; right: -5px; width: 14px; height: 14px; }
+.plan-inline__rounds-col[data-cols='3'] .plan-inline__set-x::before { inset: 0; }
 .plan-inline__rounds-col .plan-inline__set { transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
 .plan-inline__rounds-col .plan-inline__set:active { transform: scale(0.96); }
 .plan-inline__round-add { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; min-height: 32px; padding: 0 4px; border: 1px dashed var(--border); border-radius: 10px; background: none; color: var(--accent); font: inherit; font-size: var(--text-xs); font-weight: 650; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
@@ -4500,7 +4501,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__rounds-sum strong { font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; text-decoration: underline dotted var(--text-muted); text-underline-offset: 3px; padding-bottom: 3px; }
 .plan-inline__rounds-sum span { font-size: var(--text-xs); color: var(--text-secondary); }
 .plan-inline__rounds-sum em { margin-top: 2px; font-style: normal; font-size: var(--text-xs); color: var(--warning-text); }
-.plan-inline__round-done { width: 100%; min-height: 36px; padding: 0 8px; }
+/* «Готово» в панелях — по размеру чипов, а не главная кнопка экрана */
+.plan-inline__round-done { width: 100%; }
+.plan-inline__panel-actions .button, .plan-inline__round-done { min-height: 34px; padding: 0 14px; font-size: var(--text-sm); border-radius: 10px; }
 .plan-inline__inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-1) var(--space-3); padding: 2px 0 var(--space-1); }
 .plan-inline__inline .plan-inline__prev { margin: 0 0 12px; }
 .plan-inline__row { padding: var(--space-2) 0; }
@@ -4523,7 +4526,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__set-wrap { position: relative; display: inline-flex; }
 /* Крестик удаления — значок в углу подхода; касание шире самого значка */
 .plan-inline__set-x { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--text-muted); color: var(--surface); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.plan-inline__set-x::before { content: ''; position: absolute; inset: -8px; }
+/* Запас нажатия у крестика — не до середины кружка: нажатие на подход меняет
+   его тип, а не удаляет (e2e, 07.10.2026) */
+.plan-inline__set-x::before { content: ''; position: absolute; inset: -4px; }
 .plan-inline__set-x:active { transform: scale(0.9); }
 .plan-inline__sets-help { margin: -4px 0 0; color: var(--text-muted); font-size: var(--text-xs); }
 .plan-inline__set { min-width: 40px; height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 650; font-variant-numeric: tabular-nums; cursor: pointer; }
@@ -4588,3 +4593,20 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan__block .section__head { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .plan__block.is-lifted { z-index: 6; transition: none; filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.25)); }
 @media (prefers-reduced-motion: reduce) { .plan__block { transition: none; } }
+
+/* Вид упражнения — общее меню программы, шаблона и занятия (ExerciseKind.jsx):
+   подпись как у «Повторы», всё остальное — чипы одного кегля */
+.exercise-kind { display: grid; gap: 6px; }
+.exercise-kind__label { font-size: var(--text-xs); color: var(--text-muted); }
+.exercise-kind__row { padding: 0; gap: 6px; }
+.exercise-kind .chip { font-size: var(--text-sm); padding: 5px 11px; }
+.exercise-kind__toggle { display: inline-flex; align-items: center; gap: 4px; }
+.exercise-kind__toggle.is-on { border-color: var(--accent); color: var(--accent); }
+.exercise-kind__toggle > svg { flex: none; margin-left: -2px; }
+.exercise-kind__note { display: flex; align-items: center; gap: 4px; margin: 2px 0 0; font-size: var(--text-xs); color: var(--text-muted); }
+.exercise-kind__note > svg { flex: none; color: var(--good-text); }
+.exercise-kind__note--error { color: var(--critical-text); }
+/* Название в панели упражнения — по высоте строки, вес как у названий в списке;
+   16 px — меньше iPhone увеличивает страницу при вводе */
+.plan-inline__panel .picker__input { font-size: 16px; font-weight: 560; padding: 7px 10px; }
+.plan-edit__kind { display: grid; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-3); border-radius: var(--radius); background: var(--surface-sunken); }

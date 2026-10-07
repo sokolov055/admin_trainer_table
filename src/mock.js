@@ -1269,6 +1269,18 @@ const MOCK = {
     demoExercises = [...demoExercises.filter((e) => !(existing && e.id === existing.id)), mine];
     return mine;
   },
+  // Вид упражнения — в базу: своё правится, у общего — своя версия, нет в базе — новое своё
+  'library.exercise.track': (params) => {
+    const key = String(params.name || '').trim().toLowerCase();
+    const found = demoExercises.find((e) => e.id === Number(params.exerciseId))
+      || demoExercises.find((e) => e.name.trim().toLowerCase() === key);
+    const mine = (found && found.mine && found)
+      || (found && demoExercises.find((e) => e.mine && e.name === found.name))
+      || { id: ++demoExerciseSeq, name: (found && found.name) || params.name, muscle: (found && found.muscle) || '', equipment: '', notes: '', media: found ? found.media : null, mine: true, common: false };
+    mine.track = { ...params.track, auto: false };
+    demoExercises = [...demoExercises.filter((e) => e !== mine && !(found && found.common && e === found)), mine];
+    return { exercise: mine };
+  },
   'library.exercise.delete': (params) => {
     const e = demoExercises.find((x) => x.id === Number(params.id));
     if (e && e.common) { demoHidden.add(e.id); return { deleted: true, hidden: true }; }

@@ -10,8 +10,9 @@ import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
-import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
+import { METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
+import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
 import './workout.css';
@@ -56,6 +57,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [record, setRecord] = useState(null);
   const [history, setHistory] = useState([]);
   const [ready, setReady] = useState(false);
+  const [trackNote, setTrackNote] = useState(null); // { ei, text, error } — вид упражнения ушёл в базу или нет
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [storageError, setStorageError] = useState(false);
@@ -887,27 +889,32 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
 
   /**
-   * Тип упражнения — для этого занятия: снимок, база не меняется. Нужен,
-   * когда упражнение вписано руками или тип в базе угадан не так.
+   * Вид упражнения — в снимке занятия сразу, а у тренера ещё и в базе
+   * (07.10.2026): заметил ошибку в зале — исправленное видно и в программах,
+   * и в шаблонах. Клиент правит только своё занятие.
    */
   const trackEditor = (ex, ei) => {
     const track = trackOf(ex);
-    const set = patch => updateExercise(ei, x => {
-      const next = { ...x, track: { ...trackOf(x), ...patch } };
-      if (next.track.kind !== 'cardio') delete next.cardio;
-      else if (x.cardio && patch.machine) next.cardio = { ...x.cardio, machine: patch.machine };
-      return next;
-    });
-    return <div className="workout__track">
-      <label className="workout__field">Что записывать<select value={track.kind} onChange={e => set({ kind: e.target.value, machine: e.target.value === 'cardio' ? (track.machine || 'treadmill') : '' })}>
-        {Object.entries(KIND_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-      </select></label>
-      {track.kind === 'cardio' && <label className="workout__field">Тренажёр<select value={track.machine} onChange={e => set({ machine: e.target.value })}>
-        {Object.entries(MACHINE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-      </select></label>}
-      {track.kind !== 'cardio' && <label className="workout__check-line"><input type="checkbox" checked={track.unilateral} onChange={e => set({ unilateral: e.target.checked })} />Повторы на каждую сторону</label>}
-      {track.kind === 'strength' && <label className="workout__check-line"><input type="checkbox" checked={track.perSide} onChange={e => set({ perSide: e.target.checked })} />Вес с одной стороны</label>}
-    </div>;
+    const persist = !!clientRow && !clientView;
+    const set = next => {
+      updateExercise(ei, x => {
+        const out = { ...x, track: { ...trackOf(x), ...next } };
+        if (out.track.kind !== 'cardio') delete out.cardio;
+        else if (x.cardio && next.machine) out.cardio = { ...x.cardio, machine: next.machine };
+        return out;
+      });
+      if (!persist) return;
+      setTrackNote(null);
+      saveExerciseTrack({ exerciseId: ex.exerciseId, name: ex.name, track: { ...track, ...next } })
+        .then(saved => {
+          if (saved && !ex.exerciseId) updateExercise(ei, x => (x.name === ex.name && !x.exerciseId ? { ...x, exerciseId: saved.id } : x));
+          setTrackNote({ ei, text: 'Сохранено в базе — везде так' });
+        })
+        .catch(e => setTrackNote({ ei, text: 'В базу не сохранилось: ' + (e.message || 'нет связи'), error: true }));
+    };
+    return <>
+      <ExerciseKind track={track} onChange={set} className="workout__track" note={trackNote && trackNote.ei === ei ? trackNote : null} />
+    </>;
   };
 
   /**

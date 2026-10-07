@@ -14,6 +14,7 @@ import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconPlus } from '.
 import BlockOrder from './BlockOrder.jsx';
 import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
+import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 
 /**
  * Редактор программы месяца.
@@ -99,12 +100,47 @@ export default function PlanEditor({
   // Тип — по базе, как только название узнано: вписал «Стульчик» — колонки
   // сразу «на время», не дожидаясь сохранения. Переименовали строку — тип
   // идёт за новым названием, а не остаётся от прежнего.
+  // Вид, исправленный здесь, — сразу на экране, не дожидаясь списка базы
+  const [kinds, setKinds] = useState({}); // название → вид
+  const [kindAt, setKindAt] = useState(''); // 'bi:ei' — у какого упражнения открыт «Вид»
+  const [kindNote, setKindNote] = useState(null); // { at, text, error }
   const trackIn = (exercise) => {
     if (exercise.cardio) return trackOf(exercise);
     const key = norm(exercise.name);
+    if (key && kinds[key]) return trackOf({ ...exercise, track: kinds[key] });
     const base = (key && exercises.find((x) => norm(x.name) === key))
       || (exercise.exerciseId && exercises.find((x) => x.id === exercise.exerciseId));
     return trackOf(base && base.track ? { ...exercise, track: base.track } : exercise);
+  };
+
+  /**
+   * Вид упражнения из шаблона — в базу тренера (07.10.2026): шаблоны и
+   * программы берут вид из базы, так что исправленное здесь видно везде
+   */
+  const changeKind = (bi, ei, t) => {
+    const exercise = draft[bi].exercises[ei];
+    const key = norm(exercise.name);
+    const at = bi + ':' + ei;
+    change((next) => {
+      const e = next[bi].exercises[ei];
+      e.track = t;
+      e.cardio = t.kind === 'cardio' ? (e.cardio ? { ...e.cardio, machine: t.machine } : newCardio(t.machine)) : null;
+      return next;
+    });
+    setKinds((prev) => ({ ...prev, [key]: t }));
+    setKindNote(null);
+    saveExerciseTrack({ exerciseId: exercise.exerciseId, name: exercise.name, track: t })
+      .then((saved) => {
+        if (saved && !exercise.exerciseId) {
+          change((next) => {
+            next.forEach((b) => b.exercises.forEach((e) => { if (!e.exerciseId && norm(e.name) === key) e.exerciseId = saved.id; }));
+            return next;
+          });
+        }
+        if (library.reload) library.reload();
+        setKindNote({ at, text: 'Сохранено в базе — везде так' });
+      })
+      .catch((error) => setKindNote({ at, text: 'В базу не сохранилось: ' + (error.message || 'нет связи'), error: true }));
   };
 
   const [ordering, setOrdering] = useState(false);
@@ -530,7 +566,22 @@ export default function PlanEditor({
                       onClick={() => { const t = techniqueOf(exercise.technique); setExercise(bi, ei, 'technique', techniqueText({ ...t, dropset: !t.dropset })); }}
                     >Дропсет</button>
                   )}
+                  {/* Вид упражнения — как в идущем занятии; пишется в базу */}
+                  {exercise.name && (
+                    <button
+                      type="button"
+                      className={'button button--ghost plan-edit__pair' + (kindAt === bi + ':' + ei ? ' plan-edit__pair--on' : '')}
+                      aria-expanded={kindAt === bi + ':' + ei}
+                      disabled={busy}
+                      onClick={() => setKindAt(kindAt === bi + ':' + ei ? '' : bi + ':' + ei)}
+                    >Вид</button>
+                  )}
                 </div>
+                {kindAt === bi + ':' + ei && exercise.name && (
+                  <div className="plan-edit__kind">
+                    <ExerciseKind track={track} disabled={busy} onChange={(t) => changeKind(bi, ei, t)} note={kindNote && kindNote.at === bi + ':' + ei ? kindNote : null} />
+                  </div>
+                )}
               </SwipeRow>
 
               {/* Между упражнениями: вставить ещё одно прямо здесь и
