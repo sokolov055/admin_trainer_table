@@ -251,7 +251,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
                 onAdded={(saved) => setExtra((prev) => [...prev, saved])}
               />
               {/* Вид упражнения — как в идущем занятии; пишется в базу */}
-              {clientRow && ex.exerciseId ? <ClientSetup exerciseId={ex.exerciseId} clientRow={clientRow} /> : null}
+              {clientRow && ex.exerciseId ? <ClientSetup exerciseId={ex.exerciseId} clientRow={clientRow}
+                members={split ? (ex.performers && ex.performers.length ? members.filter((m) => ex.performers.includes(m)) : members) : []} /> : null}
               {ex.name && <ExerciseKind track={trackOf(ex)} onChange={(t) => changeTrack(i, t)} note={kindNote && kindNote.i === i ? kindNote : null} />}
               <div className="plan-inline__panel-actions">
                 <button type="button" className="button button--primary" onClick={() => setOpen(ex.name ? null : { kind: 'name', i })}>Готово</button>

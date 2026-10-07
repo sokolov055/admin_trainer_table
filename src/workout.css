@@ -666,6 +666,9 @@
 /* Тренажёр упражнения (FT-478) и замены (FT-479) — под названием */
 .workout__machines, .workout__alts { display: grid; gap: 2px; margin: var(--space-1) 0; }
 .workout__machines .small, .workout__alts .small { margin: 0; }
+/* Сплит-пара (FT-488): строка на человека — имя, его тренажёр, его настройка */
+.workout__member { display: grid; gap: 2px; margin: var(--space-1) 0; }
+.workout__member-name { font-size: var(--text-sm); font-weight: 600; }
 /* Своя настройка тренажёра — у каждого клиента своя */
 .workout__note { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; margin: var(--space-1) 0; }
 .workout__note-edit, .workout__note-add { all: unset; cursor: pointer; color: var(--accent); font-size: var(--text-sm); font-weight: 600; padding: 6px 0; -webkit-tap-highlight-color: transparent; }

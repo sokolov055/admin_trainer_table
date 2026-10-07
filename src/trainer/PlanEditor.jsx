@@ -487,7 +487,8 @@ export default function PlanEditor({
                   onAdded={(saved) => setExtra((prev) => [...prev, saved])}
                 />
 
-                {clientRow && exercise.exerciseId && <ClientSetup exerciseId={exercise.exerciseId} clientRow={clientRow} />}
+                {clientRow && exercise.exerciseId && <ClientSetup exerciseId={exercise.exerciseId} clientRow={clientRow}
+                  members={split ? (exercise.performers && exercise.performers.length ? members.filter((m) => exercise.performers.includes(m)) : members) : []} />}
 
                 {track.kind === 'cardio' ? (
                   <CardioPlan

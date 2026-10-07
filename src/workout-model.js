@@ -23,8 +23,9 @@ export function fromPlan(block, month, members = []) {
       // Упражнение из базы: по нему сервер ведёт историю весов клиента
       ...(e.exerciseId ? { exerciseId: e.exerciseId } : {}),
       // Тренажёр, на котором делали в прошлый раз (FT-478): вес — по нему.
-      // У пары веса ведутся по людям, тренажёр не выбирается
+      // У пары у каждого свой тренажёр и свой вес на нём (FT-488)
       ...(e.machine && !split ? { machine: { uid: e.machine.uid, name: e.machine.name || '' } } : {}),
+      ...(split && e.splitMachines ? { machines: pairMachines(e.splitMachines, doersOf(e, members)) } : {}),
       // Тип учёта — что записывать в подходе; снимок, в занятии правится
       // только для этого занятия
       ...(e.track || e.cardio ? { track: trackOf(e) } : {}),
@@ -34,7 +35,7 @@ export function fromPlan(block, month, members = []) {
       // добавлять ли сегодня. Из журнала клиента по упражнению (lastWeight,
       // сервер); нет истории — число из программы
       prevWeight: split
-        ? doersOf(e, members).map(d => (e.splitPrev && e.splitPrev[d] ? d + ' ' + e.splitPrev[d] : '')).filter(Boolean).join(' · ')
+        ? doersOf(e, members).map(d => { const w = splitLastOf(e, d); return w ? d + ' ' + w : ''; }).filter(Boolean).join(' · ')
         : String(e.lastWeight || e.prevWeight || '').trim(),
       // Суперсет приезжает из плана и должен дожить до занятия: человек
       // смотрит в экран между подходами и должен видеть, что следующее
@@ -52,8 +53,9 @@ export function fromPlan(block, month, members = []) {
           .flatMap(() => doersOf(e, members).map(d => ({
             ...blankSet(),
             who: d,
-            // Начальный вес — прошлый у этого человека, нет — из программы
-            weight: num(e.splitPrev && e.splitPrev[d]) || num(e.splitWeights && e.splitWeights[d]),
+            // Начальный вес — прошлый у этого человека (на его тренажёре,
+            // FT-488), нет — из программы
+            weight: num(splitLastOf(e, d)) || num(e.splitWeights && e.splitWeights[d]),
             ...planSet(e, trackOf(e)),
           })))
         // Кардио по умолчанию — один отрезок, а не три подхода
@@ -95,6 +97,24 @@ export function withMachine(ex, machine, history = null) {
     const from = starts[Math.min(work, starts.length - 1)];
     return { ...s, weight: String((from && from.weight) || history.lastWeight || '') };
   });
+  return out;
+}
+
+/**
+ * Сплит-пара (FT-488): один из пары выбрал другой тренажёр — его
+ * неотмеченные подходы берут его вес с прошлого раза на этом тренажёре
+ * (history — workout.exercise.history с member). Подходы другого не
+ * трогаем. machine = null — без тренажёра.
+ */
+export function withMemberMachine(ex, who, machine, history = null) {
+  const machines = { ...(ex.machines || {}) };
+  if (machine) machines[who] = { uid: machine.uid, name: machine.name || '' };
+  else delete machines[who];
+  const out = { ...ex, machines };
+  if (!Object.keys(machines).length) delete out.machines;
+  if (!history || trackOf(ex).kind === 'cardio') return out;
+  const w = String(history.lastWeight || '');
+  out.sets = ex.sets.map((s) => (s.who === who && s.state === 'pending' && s.kind !== 'warmup' ? { ...s, weight: w } : s));
   return out;
 }
 
@@ -200,6 +220,17 @@ function startSets(e) {
 }
 
 /** Для оценок подходов: шаг веса (группа, снаряд), план повторов, прошлый раз */
+/** Вес участника пары с прошлого раза: из журнала (FT-488), нет — «было» программы */
+function splitLastOf(e, who) {
+  return (e.splitLast && e.splitLast[who]) || (e.splitPrev && e.splitPrev[who]) || '';
+}
+
+function pairMachines(all, doers) {
+  const out = {};
+  doers.forEach((d) => { if (all[d]) out[d] = { uid: all[d].uid, name: all[d].name || '' }; });
+  return out;
+}
+
 function extrasOf(e, split) {
   return {
     ...(e.exercise && (e.exercise.muscle || e.exercise.equipment)

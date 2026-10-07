@@ -371,6 +371,32 @@ test('сплит: подходы кругами по людям, у каждог
   assert.equal(setLabel(solo.exercises[0].sets, 1), '2');
 });
 
+test('сплит (FT-488): у каждого свой тренажёр и свой вес на нём', async () => {
+  const { fromPlan, withMemberMachine } = await import('../src/workout-model.js');
+  const members = ['Евгений', 'Екатерина'];
+  const s = fromPlan({ title: 'Ноги', exercises: [
+    { name: 'Жим ногами', exerciseId: 7, sets: '2', reps: '10',
+      splitMachines: { Евгений: { uid: 'bbbb22', name: 'Technogym' } },
+      splitLast: { Евгений: '120' }, splitPrev: { Евгений: '90', Екатерина: '40' } },
+  ] }, '', members);
+  const ex = s.exercises[0];
+  assert.deepEqual(ex.machines, { Евгений: { uid: 'bbbb22', name: 'Technogym' } });
+  assert.equal(ex.machine, undefined, 'общего тренажёра у пары нет');
+  assert.deepEqual(ex.sets.slice(0, 2).map((x) => x.weight), ['120', '40'], 'журнал на его тренажёре важнее «было» программы');
+  assert.equal(ex.prevWeight, 'Евгений 120 · Екатерина 40');
+
+  // Екатерина села на Hammer: меняются только её неотмеченные подходы
+  const done = { ...ex, sets: ex.sets.map((x, i) => (i === 1 ? { ...x, state: 'done', reps: '10' } : x)) };
+  const hammer = { uid: 'aaaa11', name: 'Hammer' };
+  const picked = withMemberMachine(done, 'Екатерина', hammer, { lastWeight: '80' });
+  assert.deepEqual(picked.machines['Екатерина'], hammer);
+  assert.deepEqual(picked.machines['Евгений'], { uid: 'bbbb22', name: 'Technogym' });
+  assert.deepEqual(picked.sets.map((x) => [x.who, x.weight]),
+    [['Евгений', '120'], ['Екатерина', '40'], ['Евгений', '120'], ['Екатерина', '80']], 'отмеченное и чужое — как было');
+  const off = withMemberMachine(picked, 'Евгений', null);
+  assert.deepEqual(Object.keys(off.machines), ['Екатерина']);
+});
+
 test('замена упражнения берёт подходы нового из истории и не оставляет старые', async () => {
   const { fromPlan, replaceWorkoutExercise } = await import('../src/workout-model.js');
   const old = fromPlan({ title: 'Ноги', exercises: [{

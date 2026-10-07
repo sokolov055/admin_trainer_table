@@ -3,7 +3,7 @@ import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { blankSet, clock, fromPlan, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine } from './workout-model.js';
+import { blankSet, clock, fromPlan, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -518,6 +518,28 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       });
       // Пока ждали ответ, выбрали другой — этот ответ уже не про него
       updateExercise(ei, (ex) => (ex.name === current.name && uidOf(ex.machine) === uidOf(machine) ? withMachine(ex, machine, history) : ex));
+    } catch (error) {
+      setMessage('Вес на этом тренажёре не удалось загрузить: ' + error.message);
+    }
+  };
+  // Сплит-пара (FT-488): тренажёр выбирает каждый из пары — меняются только
+  // его неотмеченные подходы, вес — его с прошлого раза на этом тренажёре
+  const chooseMemberMachine = async (ei, who, machine) => {
+    const current = state.current && state.current.session.exercises[ei];
+    if (!current) return;
+    haptic();
+    const uidOf = (m) => (m ? m.uid : '');
+    const mine = (ex) => uidOf(ex.machines && ex.machines[who]);
+    updateExercise(ei, (ex) => withMemberMachine(ex, who, machine));
+    try {
+      const history = await apiPublic('workout.exercise.history', {
+        ...params,
+        name: current.name,
+        exerciseId: current.exerciseId || null,
+        member: who,
+        machineUid: uidOf(machine),
+      });
+      updateExercise(ei, (ex) => (ex.name === current.name && mine(ex) === uidOf(machine) ? withMemberMachine(ex, who, machine, history) : ex));
     } catch (error) {
       setMessage('Вес на этом тренажёре не удалось загрузить: ' + error.message);
     }
@@ -1325,11 +1347,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [setups, setSetups] = useState({});
   // Личные настройки тренажёров этого клиента («спинка 3») — у каждого свои
   const [notes, setNotes] = useState({});
+  // У сплит-пары (FT-488) — у каждого своя: { кто: { цель: настройка } }.
+  // Участнику в его кабинете сервер отдаёт только его
+  const [notesBy, setNotesBy] = useState({});
   useEffect(() => {
     if (!setupIds) return undefined;
     let alive = true;
     apiPublic('exercise.setup', { ...params, ids: setupIds })
-      .then(r => { if (alive && r && r.setups) { setSetups(r.setups); setNotes(r.notes || {}); } })
+      .then(r => { if (alive && r && r.setups) { setSetups(r.setups); setNotes(r.notes || {}); setNotesBy(r.notesBy || {}); } })
       .catch(() => {});
     return () => { alive = false; };
   }, [setupIds]);
@@ -1348,6 +1373,56 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * он занят (FT-479). Замена — пока подходы не отмечены: отмеченное при
    * замене не переносится, а терять его нельзя
    */
+  /**
+   * Сплит-пара (FT-488): у каждого свой тренажёр, своя настройка и свой
+   * вес. Строкой на человека — в зале они рядом, и видно, кому что ставить
+   */
+  const splitView = (ex, ei, info) => {
+    const machines = info.machines || [];
+    const whos = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))]
+      // Участник в своём кабинете — только своя строка настройки
+      .filter((w) => clientRow || w in notesBy || !Object.keys(notesBy).length);
+    const chosenOf = (w) => (ex.machines && ex.machines[w] && machines.find((m) => m.uid === ex.machines[w].uid)) || null;
+    const used = [...new Set(whos.map(chosenOf).filter(Boolean))];
+    return <>
+      {whos.map((w) => {
+        const chosen = chosenOf(w);
+        const target = chosen ? 'm:' + chosen.uid : (machines.length ? '' : info.noteKey || '');
+        const own = notesBy[w] || {};
+        const canNote = clientRow || w in notesBy;
+        return (
+          <div className="workout__member" key={w}>
+            <span className="workout__member-name">{w}</span>
+            {machines.length > 0 && (
+              <div className="chips chips--flush chips--wrap" role="radiogroup" aria-label={'Тренажёр: ' + w}>
+                {machines.map((m) => (
+                  <button type="button" key={m.uid} role="radio" aria-checked={chosen === m}
+                    className={'chip' + (chosen === m ? ' chip--active' : '')} disabled={!editable}
+                    onClick={() => chooseMemberMachine(ei, w, chosen === m ? null : m)}>{m.name}</button>
+                ))}
+              </div>
+            )}
+            {target && canNote && (
+              <MachineNote key={w + target} target={target} note={own[target]} trainer={!!clientRow} params={{ ...params, member: w }}
+                onSaved={(n) => setNotesBy((v) => {
+                  const next = { ...(v[w] || {}) };
+                  if (n) next[target] = n; else delete next[target];
+                  return { ...v, [w]: next };
+                })} />
+            )}
+          </div>
+        );
+      })}
+      {machines.length > 0 && editable && whos.some((w) => !chosenOf(w)) && <p className="small muted">На каком тренажёре? Вес у каждого свой.</p>}
+      {(used.length ? used : [null]).map((m) => ((m ? m.setup || m.photo || info.setup : info.setup) && (
+        <details className="workout__setup" key={m ? m.uid : 'all'}>
+          <summary>{m ? 'Тренажёр «' + m.name + '»: фото, регулировки' : 'Как настроить тренажёр'}</summary>
+          {m ? <MachineInfo machine={m} principle={info.setup} /> : <SetupText text={info.setup} />}
+        </details>
+      )))}
+    </>;
+  };
+
   const extrasView = (ex, ei, info) => {
     const machines = info.machines || [];
     const split = ex.sets.some((x) => x.who);
@@ -1379,7 +1454,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <MachineNote key={noteTarget} target={noteTarget} note={notes[noteTarget]} trainer={!!clientRow} params={params}
           onSaved={(n) => setNotes((v) => { const next = { ...v }; if (n) next[noteTarget] = n; else delete next[noteTarget]; return next; })} />
       )}
-      {(chosen ? chosen.setup || chosen.photo || info.setup : info.setup) && (
+      {split && splitView(ex, ei, info)}
+      {!split && (chosen ? chosen.setup || chosen.photo || info.setup : info.setup) && (
         <details className="workout__setup">
           <summary>{chosen ? 'Тренажёр «' + chosen.name + '»: фото, регулировки' : 'Как настроить тренажёр'}</summary>
           {chosen ? <MachineInfo machine={chosen} principle={info.setup} /> : <SetupText text={info.setup} />}
