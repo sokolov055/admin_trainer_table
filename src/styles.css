@@ -4450,7 +4450,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan__month-rename { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-3); }
 .plan__month-rename .field__input { flex: 1; min-width: 0; }
 .plan__failure { color: var(--critical-text); }
-.plan__save-state { margin: 0 0 var(--space-2); }
 .plan__title-done { display: inline-flex; align-items: center; gap: 6px; }
 .plan__title-done > svg { color: var(--good-text); flex: none; }
 .plan__as-template { margin-top: var(--space-3); }

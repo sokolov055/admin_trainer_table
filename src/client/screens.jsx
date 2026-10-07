@@ -675,7 +675,6 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {savedTemplate && (
         <p className="small muted">Шаблон сохранён — он в разделе «Шаблоны» нижнего меню.</p>
       )}
-      {saveState === 'saving' && <p className="small muted plan__save-state" role="status">Сохраняю…</p>}
       {saveState.startsWith('error:') && (
         <p className="small plan__failure" role="alert">
           Не сохранилось: {saveState.slice(6)}{' '}
