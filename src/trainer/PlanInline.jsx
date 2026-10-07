@@ -6,7 +6,7 @@ import SwipeRow from '../SwipeRow.jsx';
 import { haptic } from '../telegram.js';
 import { apiPublic } from '../api.js';
 import { useData } from '../useData.js';
-import { trackOf, cardioFrom, planScheme, techniqueOf, techniqueText } from '../exercise-track.js';
+import { trackOf, cardioFrom, planScheme, techniqueOf, techniqueText, planOneSide } from '../exercise-track.js';
 import { IconPlus, IconLinkPair, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
@@ -211,7 +211,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     const ex = list[i];
     const track = trackOf(ex);
     const scheme = planScheme(ex, inSuperset) || 'подходы не заданы';
-    const weight = track.kind !== 'cardio' && !split && ex.weight ? ' · ' + ex.weight + (/^[+-]?\d/.test(String(ex.weight)) ? ' кг' : '') : '';
+    const weight = track.kind !== 'cardio' && !split && ex.weight ? ' · ' + ex.weight + (/^[+-]?\d/.test(String(ex.weight)) ? (planOneSide(ex) ? ' кг/стор.' : ' кг') : '') : '';
     const isName = open && open.kind === 'name' && open.i === i;
     const isScheme = open && open.kind === 'scheme' && open.i === i;
     // Силовое в суперсете: повторы и вес всегда на виду, круги — справа от скобки
@@ -335,11 +335,22 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     </label>
   );
   const repsWeight = (i) => {
-    const track = trackOf(list[i]);
+    const ex = list[i];
+    const track = trackOf(ex);
+    const one = planOneSide(ex);
     return (
       <>
         {fieldOf(i, 'reps', track.kind === 'timed' ? 'Время, с' : track.unilateral ? 'Повт. / сторона' : 'Повторы', track.kind === 'timed' ? '60' : '12')}
-        {!split && fieldOf(i, 'weight', track.kind === 'strength' ? (track.perSide ? 'Кг / сторона' : 'Вес, кг') : 'Доп. вес', track.kind === 'strength' ? '—' : 'свой', 'decimal')}
+        {!split && fieldOf(i, 'weight', track.kind === 'strength' ? (one ? 'Кг / сторона' : 'Вес, кг') : 'Доп. вес', track.kind === 'strength' ? '—' : 'свой', 'decimal')}
+        {/* Вес на одну сторону — начальная отметка подходов занятия (07.10.2026) */}
+        {!split && track.kind === 'strength' && (
+          <button
+            type="button"
+            className={'chip exercise-kind__toggle plan-inline__side' + (one ? ' is-on' : '')}
+            aria-pressed={one}
+            onClick={() => patch(i, { technique: techniqueText({ ...techniqueOf(ex.technique), side: one ? 'two' : 'one' }) })}
+          >{one && <IconCheck size={13} />}на сторону</button>
+        )}
       </>
     );
   };

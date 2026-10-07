@@ -972,6 +972,17 @@ test('протянуть подход далеко влево и отпусти�
     await rows.nth(1).waitFor({ timeout: 20000 });
     await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await c.waitForTimeout(300);
+    // Вес на одну сторону (07.10.2026): отметка в первом подходе — у всех,
+    // в другом — только у него
+    const sides = c.locator('.workout__exercise').nth(1).locator('.workout__side input');
+    if (await sides.count()) {
+      await sides.first().tap();
+      for (let k = 0; k < await sides.count(); k += 1) assert.equal(await sides.nth(k).isChecked(), true, 'первый подход — отметка у всех');
+      await sides.nth(1).tap();
+      assert.equal(await sides.nth(1).isChecked(), false, 'второй сняли');
+      assert.equal(await sides.nth(2).isChecked(), true, 'третий не тронут');
+      if (process.env.SHOT_SIDE) await c.screenshot({ path: process.env.SHOT_SIDE });
+    }
     const before = await rows.count();
     const b = await rows.nth(1).boundingBox();
     const x0 = b.x + b.width - 20;

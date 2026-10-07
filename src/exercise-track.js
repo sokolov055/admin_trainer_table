@@ -233,7 +233,7 @@ function weightText(set, track) {
     if (set.assist) return 'поддержка: ' + set.assist;
     return track.kind === 'bodyweight' ? 'свой вес' : '';
   }
-  return set.weight ? set.weight + (track.perSide ? ' кг/стор.' : ' кг') : '';
+  return set.weight ? set.weight + (setOneSide(set, track) ? ' кг/стор.' : ' кг') : '';
 }
 
 function repsText(set, track) {
@@ -284,7 +284,7 @@ export function setsLine(sets, track = STRENGTH, rounds = true) {
 /** Объём подхода, кг × повторы: сторона ×2, на сторону ×2, сбросы — тоже */
 export function volumeOf(set, track = STRENGTH) {
   if (byTime(track) || track.kind === 'bodyweight') return 0;
-  const k = (track.perSide ? 2 : 1) * (track.unilateral ? 2 : 1);
+  const k = (setOneSide(set, track) ? 2 : 1) * (track.unilateral ? 2 : 1);
   const one = (w, r) => num(w) * (Number(r) || 0) * k;
   return one(set.weight, set.reps) + (set.drops || []).reduce((n, d) => n + one(d.weight, d.reps), 0);
 }
@@ -298,12 +298,33 @@ export function volumeOf(set, track = STRENGTH) {
 export function techniqueOf(t) {
   const s = String(t || '');
   const m = s.match(/warmup(\d)/);
-  return { dropset: /(^|\s)dropset(\s|$)/.test(s), warmup: m ? Math.min(5, Number(m[1])) : 0 };
+  // side1 / side2 — вес в программе на одну сторону или на обе (07.10.2026);
+  // нет отметки — как у упражнения в базе (perSide)
+  const side = /(^|\s)side1(\s|$)/.test(s) ? 'one' : /(^|\s)side2(\s|$)/.test(s) ? 'two' : '';
+  return { dropset: /(^|\s)dropset(\s|$)/.test(s), warmup: m ? Math.min(5, Number(m[1])) : 0, side };
 }
 
-export function techniqueText({ dropset = false, warmup = 0 } = {}) {
+export function techniqueText({ dropset = false, warmup = 0, side = '' } = {}) {
   const n = Math.max(0, Math.min(5, Math.floor(Number(warmup) || 0)));
-  return [n ? 'warmup' + n : '', dropset ? 'dropset' : ''].filter(Boolean).join(' ');
+  return [n ? 'warmup' + n : '', dropset ? 'dropset' : '', side === 'one' ? 'side1' : side === 'two' ? 'side2' : ''].filter(Boolean).join(' ');
+}
+
+/**
+ * Вес на одну сторону (гантель в руке, блины с одной стороны) — у силового.
+ * В программе — отметка тренера (technique side1/side2), без неё — как в базе;
+ * в занятии — у каждого подхода своя (set.side), у старых занятий — как в базе.
+ * Работа одной стороной (unilateral, «по одной стороне») — это про повторы
+ */
+export function planOneSide(ex) {
+  const track = trackOf(ex);
+  if (track.kind !== 'strength') return false;
+  const side = techniqueOf(ex && ex.technique).side;
+  return side ? side === 'one' : !!track.perSide;
+}
+
+export function setOneSide(set, track = STRENGTH) {
+  if (track.kind !== 'strength') return false;
+  return set && (set.side === 'one' || set.side === 'two') ? set.side === 'one' : !!track.perSide;
 }
 
 /**

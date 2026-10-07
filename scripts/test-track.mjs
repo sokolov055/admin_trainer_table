@@ -138,3 +138,16 @@ test('занятие из кардио-плана: режим и время-це
   assert.deepEqual([run.sets[0].time, run.sets[0].speed, run.sets[0].incline], ['30', '8', '3']);
   assert.match(run.prescription, /^30 мин · 5000 м · 8 км\/ч, 3% · интервалы 4 ×/);
 });
+test('вес на одну сторону: из программы — в каждый подход занятия; в суперсете у каждого своя (07.10.2026)', async () => {
+  const { planOneSide, techniqueOf } = await import('../src/exercise-track.js');
+  const { patchPlanExercise } = await import('../src/plan-block-actions.js');
+  const dumbbell = { name: 'Жим гантелей', track: { kind: 'strength', perSide: false }, sets: '3', reps: '10', weight: '20', technique: 'side1' };
+  assert.equal(planOneSide(dumbbell), true);
+  const s = fromPlan({ title: 'Т', exercises: [dumbbell] }, 'Октябрь 2026');
+  assert.deepEqual(s.exercises[0].sets.map((x) => x.side), ['one', 'one', 'one']);
+
+  const pair = [{ ...dumbbell, supersetGroup: 'g' }, { ...dumbbell, name: 'Разводки', technique: '', supersetGroup: 'g' }];
+  const next = patchPlanExercise(pair, 0, { technique: 'warmup1 side1' });
+  assert.equal(techniqueOf(next[1].technique).warmup, 1, 'разминка — у всего суперсета');
+  assert.equal(techniqueOf(next[1].technique).side, '', 'вес на сторону — у каждого упражнения свой');
+});

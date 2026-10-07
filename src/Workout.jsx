@@ -10,7 +10,11 @@ import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
-import { METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
+import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide } from './exercise-track.js';
+
+// Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
+// в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
+const rowFields = (track) => trackFields({ ...track, perSide: false });
 import IntervalTimer from './IntervalTimer.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
@@ -593,9 +597,25 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
               ))}
             </div>
+            {/* Под строкой, под колонкой веса — одной строкой: вес на одну
+                сторону (у каждого подхода; в первом — переносится на все,
+                дальше любую можно снять, владелец 07.10.2026) и «было» */}
             {/* Тот же подход в прошлый раз — у каждого подхода свой
                 (владелец, 03.10.2026: «было» на всё упражнение бесполезно) */}
-            {was && <p className="workout__was">было {was.weight} кг{was.reps ? ' × ' + was.reps : ''}</p>}
+            {(track.kind === 'strength' || was) && <div className="workout__set-meta">
+              {track.kind === 'strength' && <label className="workout__side">
+                <input type="checkbox" checked={setOneSide(set, track)} disabled={!editable} onChange={e => {
+                  const side = e.target.checked ? 'one' : 'two';
+                  const who = set.who || '';
+                  updateExercise(ei, x => {
+                    const first = x.sets.findIndex(s => (s.who || '') === who);
+                    return { ...x, sets: x.sets.map((s, k) => (k === si || (si === first && (s.who || '') === who) ? { ...s, side } : s)) };
+                  });
+                }} />
+                на сторону
+              </label>}
+              {was && <span className="workout__was">было {was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
+            </div>}
             {/* Галочки нет (03.10.2026): под ближайшим подходом упражнения —
                 «Легко / Норм / Тяжело», каждая отмечает подход и запускает
                 отдых. Снять отметку — номер подхода → «Снять отметку» */}

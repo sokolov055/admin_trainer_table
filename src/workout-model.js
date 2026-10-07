@@ -1,4 +1,4 @@
-import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf } from './exercise-track.js';
+import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf, planOneSide } from './exercise-track.js';
 
 export const uid = () => crypto.randomUUID();
 export const blankSet = () => ({ weight: '', reps: '', rpe: '', state: 'pending', kind: 'work' });
@@ -179,6 +179,12 @@ function extrasOf(e, split) {
 
 function withTechnique(e, ex) {
   const tech = techniqueOf(e.technique);
+  // Вес на одну сторону — у каждого подхода свой, начальный — из программы
+  // (07.10.2026); пришедшие с прошлого раза подходы несут свой
+  if (trackOf(e).kind === 'strength' && ex.sets.length) {
+    const side = planOneSide(e) ? 'one' : 'two';
+    ex = { ...ex, sets: ex.sets.map(s => (s.side ? s : { ...s, side })) };
+  }
   if (!ex.sets.length || ex.sets.some(x => x.who)) return ex;
   let sets = ex.sets.slice();
   // Разминочные из программы — в начало, если подходы не взяты с прошлого

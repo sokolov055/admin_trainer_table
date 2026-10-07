@@ -57,7 +57,7 @@ const norm = (v) => String(v || '').toLowerCase().replace(/ё/g, 'е').replace(/
  * смысл: у кардио «повторы» — время, «вес» — режим тренажёра («8 км/ч,
  * 3%», «уровень 6»); у статики «повторы» — секунды.
  */
-function columns(exercise, t) {
+function columns(exercise, t, one = false) {
   const sets = exercise.supersetGroup ? 'Круги' : 'Подходы';
   if (t.kind === 'cardio') {
     const mode = t.machine === 'treadmill' ? 'км/ч, %' : t.machine === 'other' ? 'режим' : 'уровень';
@@ -66,7 +66,7 @@ function columns(exercise, t) {
   if (t.kind === 'timed') return { heads: [sets, 'Время, с', 'Доп. вес'], ph: ['Подх.', 'сек', 'свой'] };
   const reps = t.unilateral ? 'Повт./стор.' : 'Повторы';
   if (t.kind === 'bodyweight') return { heads: [sets, reps, 'Доп. вес'], ph: ['Подх.', 'Повт.', 'свой'] };
-  return { heads: [sets, reps, t.perSide ? 'Кг/стор.' : 'Вес'], ph: ['Подх.', 'Повт.', 'Вес'] };
+  return { heads: [sets, reps, one ? 'Кг/стор.' : 'Вес'], ph: ['Подх.', 'Повт.', 'Вес'] };
 }
 
 /**
@@ -435,7 +435,10 @@ export default function PlanEditor({
 
           {block.exercises.map((exercise, ei) => {
             const track = trackIn(exercise);
-            const cols = columns(exercise, track);
+            // Вес на одну сторону: отметка в шаблоне, без неё — как в базе
+            const side = techniqueOf(exercise.technique).side;
+            const one = track.kind === 'strength' && (side ? side === 'one' : !!track.perSide);
+            const cols = columns(exercise, track, one);
             const paired = !!exercise.supersetGroup
               && block.exercises[ei + 1]
               && block.exercises[ei + 1].supersetGroup === exercise.supersetGroup;
@@ -565,6 +568,15 @@ export default function PlanEditor({
                       disabled={busy}
                       onClick={() => { const t = techniqueOf(exercise.technique); setExercise(bi, ei, 'technique', techniqueText({ ...t, dropset: !t.dropset })); }}
                     >Дропсет</button>
+                  )}
+                  {track.kind === 'strength' && (
+                    <button
+                      type="button"
+                      className={'button button--ghost plan-edit__pair' + (one ? ' plan-edit__pair--on' : '')}
+                      aria-pressed={one}
+                      disabled={busy}
+                      onClick={() => setExercise(bi, ei, 'technique', techniqueText({ ...techniqueOf(exercise.technique), side: one ? 'two' : 'one' }))}
+                    >Вес на сторону</button>
                   )}
                   {/* Вид упражнения — как в идущем занятии; пишется в базу */}
                   {exercise.name && (
