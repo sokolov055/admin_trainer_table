@@ -107,7 +107,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
   /* ---------- Перестановка удержанием ---------- */
   const hold = (key) => (e) => {
     if (drag.current || (e.button !== undefined && e.button !== 0)) return;
-    if (e.target.closest && e.target.closest('input, textarea, select, .plan-inline__panel')) return;
+    if (e.target.closest && e.target.closest('input, textarea, select, .plan-inline__panel, .plan-inline__rounds-col')) return;
     const x0 = e.clientX; const y0 = e.clientY; const id = e.pointerId; const head = e.currentTarget;
     const off = () => {
       clearTimeout(timer);
@@ -184,6 +184,8 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     const weight = track.kind !== 'cardio' && !split && ex.weight ? ' · ' + ex.weight + (/^[+-]?\d/.test(String(ex.weight)) ? ' кг' : '') : '';
     const isName = open && open.kind === 'name' && open.i === i;
     const isScheme = open && open.kind === 'scheme' && open.i === i;
+    // Силовое в суперсете: повторы и вес всегда на виду, круги — справа от скобки
+    const inline = inSuperset && !split && track.kind !== 'cardio';
     return (
       <SwipeRow
         key={i}
@@ -225,7 +227,13 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
               {ex.name || <span className="muted">Название упражнения</span>}
             </button>
           )}
-        {!isName && (
+        {!isName && inline && (
+          <div className="plan-inline__inline">
+            <div className="plan-inline__fields">{repsWeight(i)}</div>
+            {(ex.lastWeight || ex.prevWeight) && <span className="plan-inline__prev">было {ex.lastWeight || ex.prevWeight}</span>}
+          </div>
+        )}
+        {!isName && !inline && (
           <button type="button" className={'plan-inline__scheme' + (isScheme ? ' is-open' : '')} aria-expanded={!!isScheme} onClick={() => toggle('scheme', i)}>
             <strong>{scheme.split(' · ')[0]}</strong>
             {scheme.split(' · ').slice(1).map((p, k) => <span key={k}> · {p}</span>)}
@@ -233,7 +241,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
             {!split && (ex.lastWeight || ex.prevWeight) && <span className="plan-inline__prev">было {ex.lastWeight || ex.prevWeight}</span>}
           </button>
         )}
-        {isScheme && schemePanel(i)}
+        {isScheme && !inline && schemePanel(i)}
       </SwipeRow>
     );
   };
@@ -242,7 +250,8 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
   const [pickedSet, setPickedSet] = useState(-1);
   useEffect(() => { setPickedSet(-1); }, [open && open.i, open && open.kind]);
 
-  const schemePanel = (i) => {
+  /** Подходы упражнения: разминочные + рабочие, смена типа и удаление */
+  const setsModel = (i) => {
     const ex = list[i];
     const track = trackOf(ex);
     const tech = techniqueOf(ex.technique);
@@ -281,12 +290,28 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     const removePicked = () => removeAt(pickedSet);
     // Последний рабочий не удаляется: упражнение без подходов — это удаление
     const removable = (p) => pills.length > 1 && (kindOf(p) === 'warmup' || work > 1);
-    const field = (key, label, placeholder, mode = 'text') => (
-      <label className={'plan-inline__field plan-inline__field--' + key}>
-        <span>{label}</span>
-        <input className="field__input" inputMode={mode} placeholder={placeholder} maxLength={80} value={ex[key] || ''} onChange={(e) => patch(i, { [key]: e.target.value })} />
-      </label>
+    return { ex, track, tech, work, strength, pills, setTech, kindOf, choose, removeAt, removePicked, removable };
+  };
+
+  /** Повторы и вес — узкие поля по ширине цифр */
+  const fieldOf = (i, key, label, placeholder, mode = 'text') => (
+    <label className={'plan-inline__field plan-inline__field--' + key}>
+      <span>{label}</span>
+      <input className="field__input" inputMode={mode} placeholder={placeholder} maxLength={80} value={list[i][key] || ''} onChange={(e) => patch(i, { [key]: e.target.value })} />
+    </label>
+  );
+  const repsWeight = (i) => {
+    const track = trackOf(list[i]);
+    return (
+      <>
+        {fieldOf(i, 'reps', track.kind === 'timed' ? 'Время, с' : track.unilateral ? 'Повт. / сторона' : 'Повторы', track.kind === 'timed' ? '60' : '12')}
+        {!split && fieldOf(i, 'weight', track.kind === 'strength' ? (track.perSide ? 'Кг / сторона' : 'Вес, кг') : 'Доп. вес', track.kind === 'strength' ? '—' : 'свой', 'decimal')}
+      </>
     );
+  };
+
+  const schemePanel = (i) => {
+    const { ex, track, tech, work, strength, pills, setTech, kindOf, choose, removeAt, removePicked, removable } = setsModel(i);
     const next = list[i + 1];
     const inGroup = !!ex.supersetGroup && list.filter((e) => e.supersetGroup === ex.supersetGroup).length > 1;
     return (
@@ -304,10 +329,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
           )
           : (
             <>
-              <div className="plan-inline__fields">
-                {field('reps', track.kind === 'timed' ? 'Время, с' : track.unilateral ? 'Повт. / сторона' : 'Повторы', track.kind === 'timed' ? '60' : '12')}
-                {!split && field('weight', track.kind === 'strength' ? (track.perSide ? 'Кг / сторона' : 'Вес, кг') : 'Доп. вес', track.kind === 'strength' ? '—' : 'свой', 'decimal')}
-              </div>
+              <div className="plan-inline__fields">{repsWeight(i)}</div>
               <div className="plan-inline__sets-head">
                 <span>{inGroup ? 'Круги' : 'Подходы'}</span>
                 <span className="muted">{tech.warmup ? tech.warmup + ' разм. + ' : ''}{work} раб.</span>
@@ -390,6 +412,61 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     );
   };
 
+  /**
+   * Колонок кругов не больше трёх: 1, 2 или 3 — по высоте упражнений (кружки 50/40/33 px
+   * на строку). Кругов ещё больше — суперсет растёт вниз, упражнения и скобка тянутся
+   * на всю высоту колонки (CSS)
+   */
+  const roundsLayout = (count, exercises) => {
+    const room = exercises * 108 - 116; // ~108 px на упражнение минус ~116 px заголовка и кнопок
+    return { cols: [[1, 50], [2, 40]].find(([c, h]) => Math.ceil(count / c) * h <= room)?.[0] || 3 };
+  };
+
+  /** Круги суперсета — колонкой справа от скобки; считаются по первому упражнению, остальные подтягиваются */
+  const roundsColumn = (first, exercises) => {
+    const { tech, work, strength, pills, setTech, kindOf, choose, removeAt, removable } = setsModel(first);
+    const { cols } = roundsLayout(pills.length, exercises);
+    const picked = pickedSet >= 0 && pickedSet < pills.length;
+    return (
+      <div className="plan-inline__rounds-col" data-cols={cols}>
+        <span className="plan-inline__rounds-title">Круги</span>
+        {strength && (
+          <button type="button" className="plan-inline__round-add" disabled={tech.warmup >= 5} onClick={() => { setTech({ warmup: tech.warmup + 1 }); haptic(); }}>
+            <IconPlus size={12} />Разминка
+          </button>
+        )}
+        <div className="plan-inline__rounds-list" role="listbox" aria-label="Круги" style={{ '--rows': Math.ceil(pills.length / cols) }}>
+          {pills.map((p, k) => (
+            <span className="plan-inline__set-wrap" key={k}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={pickedSet === k}
+                className={'plan-inline__set plan-inline__set--' + p + (pickedSet === k ? ' is-on' : '')}
+                onClick={() => setPickedSet(pickedSet === k ? -1 : k)}
+              >{p === 'warmup' ? 'Р' : p === 'drop' ? 'Д' : k - tech.warmup + 1}</button>
+              {removable(k) && (cols < 3 || pickedSet === k) && (
+                <button type="button" className="plan-inline__set-x" aria-label={'Удалить круг ' + (p === 'warmup' ? 'разминочный' : k - tech.warmup + 1)} onClick={() => { removeAt(k); haptic(); }}>
+                  <IconClose size={10} />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+        <button type="button" className="plan-inline__round-add" disabled={work >= 20} onClick={() => { patch(first, { sets: String(work + 1) }); haptic(); }}>
+          <IconPlus size={12} />Круг
+        </button>
+        {picked && strength && (
+          <div className="plan-inline__round-kind" role="radiogroup" aria-label="Тип круга">
+            {[['work', 'Рабочий'], ['warmup', 'Разминка']].map(([k, label]) => (
+              <button type="button" key={k} role="radio" aria-checked={kindOf(pickedSet) === k} className={'chip' + (kindOf(pickedSet) === k ? ' chip--active' : '')} onClick={() => choose(k)}>{label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const units = unitsOf(list);
   return (
     <div className="plan-inline">
@@ -399,17 +476,13 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
           if (!u.group) {
             return <div className="plan-inline__unit" data-unit={key} key={key} onPointerDown={hold(key)}>{row(u.idx[0], false)}</div>;
           }
-          const rounds = count(list[u.idx[0]].sets, 0);
-          const roundWord = rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов';
           return (
             <div className="plan-inline__unit plan-inline__unit--superset" data-unit={key} key={key} onPointerDown={hold(key)}>
-              {/* Скобка слева объединяет упражнения, число кругов — справа */}
+              {/* Скобка объединяет упражнения; от неё — колонка кругов */}
               <div className="plan-inline__bracket">
                 {u.idx.map((i) => row(i, true))}
               </div>
-              <div className="plan-inline__rounds" aria-label={rounds > 0 ? 'Суперсет, ' + rounds + ' ' + roundWord : 'Суперсет'}>
-                {rounds > 0 && <><strong>{rounds}</strong><span>{roundWord}</span></>}
-              </div>
+              {roundsColumn(u.idx[0], u.idx.length)}
             </div>
           );
         })}

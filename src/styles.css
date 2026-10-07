@@ -4458,17 +4458,46 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__list { display: grid; gap: 0; }
 .plan-inline__unit { position: relative; background: var(--surface); border-bottom: 1px solid var(--border); touch-action: pan-y; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms; }
 .plan-inline__unit--lifted { z-index: 5; transition: none; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22); border-radius: var(--radius); }
-/* Суперсет: скобка «[» вокруг упражнений, число кругов справа (07.10.2026) */
-.plan-inline__unit--superset { display: grid; grid-template-columns: minmax(0, 1fr) 2.9rem; align-items: stretch; column-gap: var(--space-1); }
-.plan-inline__rounds { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; color: var(--accent); font-variant-numeric: tabular-nums; }
-.plan-inline__rounds strong { font-size: var(--text-lg); font-weight: 700; }
-.plan-inline__rounds span { font-size: var(--text-xs); font-weight: 600; }
-.plan-inline__bracket { position: relative; min-width: 0; margin: var(--space-2) 0; padding-left: var(--space-2); border-left: 3px solid var(--accent); }
-.plan-inline__bracket::before, .plan-inline__bracket::after { content: ''; position: absolute; left: -3px; width: 10px; height: 3px; background: var(--accent); }
-.plan-inline__bracket::before { top: 0; }
-.plan-inline__bracket::after { bottom: 0; }
+/* Суперсет (07.10.2026): упражнения с повторами и весом, скобка «]» и колонка
+   кругов справа. Колонка выше упражнений — они и скобка растягиваются на её
+   высоту: первое сверху, последнее снизу, остальные ровно между ними.
+   Скобку рисуют сами строки: у карточки — её отрезок (первая: от середины
+   карточки вниз, последняя: сверху до середины), в промежутках между
+   карточками — отрезки-заполнители ::before/::after */
+.plan-inline__unit--superset { --bracket: 2px; display: grid; grid-template-columns: minmax(0, 1fr) 5.6rem; align-items: stretch; margin: var(--space-2) 0; }
+.plan-inline__bracket { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.plan-inline__bracket > .plan-inline__row { flex: 1 1 auto; display: flex; flex-direction: column; padding: 0; }
+.plan-inline__bracket > .plan-inline__row > .swipe__content { flex: none; margin-right: 20px; padding: var(--space-2) 0; }
+.plan-inline__bracket > .plan-inline__row::before,
+.plan-inline__bracket > .plan-inline__row::after { content: ''; flex: 1 1 0; align-self: flex-end; width: 12px; border-right: var(--bracket) solid var(--accent); pointer-events: none; }
+.plan-inline__bracket > .plan-inline__row:first-child::before,
+.plan-inline__bracket > .plan-inline__row:last-child::after { display: none; }
+.plan-inline__bracket > .plan-inline__row > .swipe__content::after { content: ''; position: absolute; right: -20px; top: 0; bottom: 0; width: 12px; border-right: var(--bracket) solid var(--accent); pointer-events: none; }
+.plan-inline__bracket > .plan-inline__row:first-child > .swipe__content::after { top: 50%; border-top: var(--bracket) solid var(--accent); border-top-right-radius: 8px; }
+.plan-inline__bracket > .plan-inline__row:last-child > .swipe__content::after { bottom: 50%; border-bottom: var(--bracket) solid var(--accent); border-bottom-right-radius: 8px; }
+/* Отросток от скобки к колонке кругов — на середине линии */
+.plan-inline__bracket::after { content: ''; position: absolute; right: -10px; top: 50%; width: 10px; height: var(--bracket); margin-top: calc(var(--bracket) / -2); background: var(--accent); }
+.plan-inline__rounds-col { align-self: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) 0 var(--space-1) 14px; }
+.plan-inline__rounds-title { font-size: var(--text-xs); font-weight: 650; letter-spacing: 0.02em; color: var(--text-muted); }
+.plan-inline__rounds-list { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 1), auto); justify-content: center; gap: 10px; padding-top: 4px; }
+.plan-inline__rounds-col[data-cols='1'] { --cols: 1; }
+.plan-inline__rounds-col[data-cols='2'] { --cols: 2; }
+.plan-inline__rounds-col[data-cols='2'] .plan-inline__rounds-list { gap: 8px; }
+.plan-inline__rounds-col[data-cols='2'] .plan-inline__set { min-width: 32px; height: 32px; padding: 0 4px; border-radius: 10px; font-size: var(--text-sm); }
+.plan-inline__rounds-col[data-cols='3'] { --cols: 3; padding-left: 12px; }
+.plan-inline__rounds-col[data-cols='3'] .plan-inline__rounds-list { gap: 5px; }
+.plan-inline__rounds-col[data-cols='3'] .plan-inline__set { min-width: 22px; height: 28px; padding: 0 1px; border-radius: 8px; font-size: var(--text-xs); }
+.plan-inline__rounds-col .plan-inline__set-x { top: -5px; right: -5px; width: 14px; height: 14px; }
+.plan-inline__rounds-col .plan-inline__set { transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
+.plan-inline__rounds-col .plan-inline__set:active { transform: scale(0.96); }
+.plan-inline__round-add { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; min-height: 32px; padding: 0 4px; border: 1px dashed var(--border); border-radius: 10px; background: none; color: var(--accent); font: inherit; font-size: var(--text-xs); font-weight: 650; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
+.plan-inline__round-add:active { transform: scale(0.97); }
+.plan-inline__round-add:disabled { opacity: 0.4; cursor: default; }
+.plan-inline__round-kind { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.plan-inline__inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-1) var(--space-3); padding: 2px 0 var(--space-1); }
+.plan-inline__inline .plan-inline__prev { margin: 0 0 12px; }
 .plan-inline__row { padding: var(--space-2) 0; }
-.plan-inline__bracket > .plan-inline__row + .plan-inline__row { border-top: 1px dashed var(--border); }
+.plan-inline__bracket > .plan-inline__row + .plan-inline__row { background: repeating-linear-gradient(90deg, var(--border) 0 4px, transparent 4px 8px) top left / calc(100% - 20px) 1px no-repeat; }
 .plan-inline__name { display: block; width: 100%; padding: 4px 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 560; text-align: left; cursor: pointer; }
 .plan-inline__scheme { display: block; width: 100%; padding: 2px 0 4px; border: 0; background: none; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; }
 .plan-inline__scheme strong { color: var(--text); font-weight: 650; text-decoration: underline dotted var(--text-muted); text-underline-offset: 3px; }
