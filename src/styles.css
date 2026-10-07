@@ -4458,11 +4458,17 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__list { display: grid; gap: 0; }
 .plan-inline__unit { position: relative; background: var(--surface); border-bottom: 1px solid var(--border); touch-action: pan-y; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms; }
 .plan-inline__unit--lifted { z-index: 5; transition: none; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22); border-radius: var(--radius); }
-.plan-inline__unit--superset { border-left: 3px solid var(--accent); padding-left: var(--space-2); }
-.plan-inline__superset-head { display: flex; justify-content: space-between; align-items: baseline; padding-top: var(--space-2); font-size: var(--text-xs); font-weight: 650; color: var(--accent); }
-.plan-inline__rounds { font-variant-numeric: tabular-nums; }
+/* Суперсет: скобка «[» вокруг упражнений, число кругов справа (07.10.2026) */
+.plan-inline__unit--superset { display: grid; grid-template-columns: minmax(0, 1fr) 2.9rem; align-items: stretch; column-gap: var(--space-1); }
+.plan-inline__rounds { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.plan-inline__rounds strong { font-size: var(--text-lg); font-weight: 700; }
+.plan-inline__rounds span { font-size: var(--text-xs); font-weight: 600; }
+.plan-inline__bracket { position: relative; min-width: 0; margin: var(--space-2) 0; padding-left: var(--space-2); border-left: 3px solid var(--accent); }
+.plan-inline__bracket::before, .plan-inline__bracket::after { content: ''; position: absolute; left: -3px; width: 10px; height: 3px; background: var(--accent); }
+.plan-inline__bracket::before { top: 0; }
+.plan-inline__bracket::after { bottom: 0; }
 .plan-inline__row { padding: var(--space-2) 0; }
-.plan-inline__unit--superset .plan-inline__row + .plan-inline__row { border-top: 1px dashed var(--border); }
+.plan-inline__bracket > .plan-inline__row + .plan-inline__row { border-top: 1px dashed var(--border); }
 .plan-inline__name { display: block; width: 100%; padding: 4px 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 560; text-align: left; cursor: pointer; }
 .plan-inline__scheme { display: block; width: 100%; padding: 2px 0 4px; border: 0; background: none; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; }
 .plan-inline__scheme strong { color: var(--text); font-weight: 650; text-decoration: underline dotted var(--text-muted); text-underline-offset: 3px; }
@@ -4471,7 +4477,10 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__panel { display: grid; gap: var(--space-3); margin: var(--space-2) 0; padding: var(--space-3); border-radius: var(--radius); background: var(--surface-sunken); user-select: text; -webkit-user-select: text; }
 .plan-inline__panel-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
 .plan-inline__danger { color: var(--critical-text); margin-right: auto; }
-.plan-inline__fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+/* Поля по ширине цифр: повторы — две, вес — три и десятая (62,5) */
+.plan-inline__fields { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-4); }
+.plan-inline__field--reps .field__input { width: calc(3ch + 28px); padding-left: 10px; padding-right: 10px; text-align: center; }
+.plan-inline__field--weight .field__input { width: calc(5ch + 28px); padding-left: 10px; padding-right: 10px; text-align: center; }
 .plan-inline__field { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
 .plan-inline__sets-head { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-muted); }
 .plan-inline__sets { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 6px; }
@@ -4488,6 +4497,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__set-kind { display: grid; gap: var(--space-2); }
 .plan-inline__set-kind .button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .plan-inline__set-add { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.plan-inline__set-add--top { margin: calc(var(--space-2) * -1) 0 calc(var(--space-1) * -1); }
 .plan-inline__set-add .button, .plan-inline__add .button { display: inline-flex; align-items: center; gap: 6px; }
 .plan-inline__group-actions { display: grid; gap: var(--space-2); }
 .plan-inline__group-actions:empty { display: none; }

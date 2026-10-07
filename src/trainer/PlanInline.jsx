@@ -282,7 +282,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     // Последний рабочий не удаляется: упражнение без подходов — это удаление
     const removable = (p) => pills.length > 1 && (kindOf(p) === 'warmup' || work > 1);
     const field = (key, label, placeholder, mode = 'text') => (
-      <label className="plan-inline__field">
+      <label className={'plan-inline__field plan-inline__field--' + key}>
         <span>{label}</span>
         <input className="field__input" inputMode={mode} placeholder={placeholder} maxLength={80} value={ex[key] || ''} onChange={(e) => patch(i, { [key]: e.target.value })} />
       </label>
@@ -312,6 +312,13 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                 <span>{inGroup ? 'Круги' : 'Подходы'}</span>
                 <span className="muted">{tech.warmup ? tech.warmup + ' разм. + ' : ''}{work} раб.</span>
               </div>
+              {/* Разминочный — вверху, рядом с началом списка; «в конец» — внизу
+                  (владелец, 07.10.2026) */}
+              {strength && (
+                <div className="plan-inline__set-add plan-inline__set-add--top">
+                  <button type="button" className="button" disabled={tech.warmup >= 5} onClick={() => setTech({ warmup: tech.warmup + 1 })}><IconPlus size={16} />Разминочный в начало</button>
+                </div>
+              )}
               <div className="plan-inline__sets" role="listbox" aria-label="Подходы">
                 {/* Крестик у каждого подхода (владелец, 07.10.2026): удалить
                     одним касанием, а не «выбрать → Удалить выбранный» */}
@@ -344,7 +351,6 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                 </div>
               )}
               <div className="plan-inline__set-add">
-                {strength && <button type="button" className="button" disabled={tech.warmup >= 5} onClick={() => setTech({ warmup: tech.warmup + 1 })}><IconPlus size={16} />Разминочный в начало</button>}
                 <button type="button" className="button" disabled={work >= 20} onClick={() => patch(i, { sets: String(work + 1) })}><IconPlus size={16} />{inGroup ? 'Круг в конец' : 'Подход в конец'}</button>
               </div>
             </>
@@ -394,13 +400,16 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
             return <div className="plan-inline__unit" data-unit={key} key={key} onPointerDown={hold(key)}>{row(u.idx[0], false)}</div>;
           }
           const rounds = count(list[u.idx[0]].sets, 0);
+          const roundWord = rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов';
           return (
             <div className="plan-inline__unit plan-inline__unit--superset" data-unit={key} key={key} onPointerDown={hold(key)}>
-              <div className="plan-inline__superset-head">
-                <span>Суперсет</span>
-                {rounds > 0 && <span className="plan-inline__rounds">{rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</span>}
+              {/* Скобка слева объединяет упражнения, число кругов — справа */}
+              <div className="plan-inline__bracket">
+                {u.idx.map((i) => row(i, true))}
               </div>
-              {u.idx.map((i) => row(i, true))}
+              <div className="plan-inline__rounds" aria-label={rounds > 0 ? 'Суперсет, ' + rounds + ' ' + roundWord : 'Суперсет'}>
+                {rounds > 0 && <><strong>{rounds}</strong><span>{roundWord}</span></>}
+              </div>
             </div>
           );
         })}
