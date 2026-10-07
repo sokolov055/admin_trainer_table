@@ -641,6 +641,8 @@ test('мои тренировки: программа, прогресс, пит�
     const before = await rounds.count();
     await superset.getByRole('button', { name: 'Круг', exact: true }).click();
     assert.equal(await rounds.count(), before + 1, 'круг добавился');
+    // Выйти из суперсета — у каждого упражнения (FT-473, FT-486)
+    assert.equal(await superset.getByRole('button', { name: 'Выйти из суперсета' }).count(), await superset.locator('.plan-inline__row').count(), 'выход из суперсета у каждого упражнения');
     if (process.env.SHOT_SUPERSET) await phone.screenshot({ path: process.env.SHOT_SUPERSET, fullPage: true });
     await superset.getByRole('button', { name: 'Готово' }).click();
     assert.equal(await superset.locator('.plan-inline__rounds-sum strong').innerText(), String(before + 1), 'число кругов в обычном виде');

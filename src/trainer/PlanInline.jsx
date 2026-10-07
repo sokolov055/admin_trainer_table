@@ -267,6 +267,15 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
             {(ex.lastWeight || ex.prevWeight) && <span className="plan-inline__prev">было {ex.lastWeight || ex.prevWeight}</span>}
           </div>
         )}
+        {/* Правка суперсета: выйти из него — у каждого упражнения, присоединить следующее — у нижнего (FT-473, FT-486) */}
+        {!isName && inline && groupOpen && (
+          <div className="plan-inline__group-actions">
+            <button type="button" className="button" onClick={() => { leave(i); haptic(); }}>Выйти из суперсета</button>
+            {list[i + 1] && list[i + 1].supersetGroup !== ex.supersetGroup && i === list.map((e) => e.supersetGroup).lastIndexOf(ex.supersetGroup) && (
+              <button type="button" className="button" onClick={() => { joinNext(i); haptic(); }}><IconLinkPair size={16} />В суперсет со следующим</button>
+            )}
+          </div>
+        )}
         {!isName && !(inline && groupOpen) && (
           <button type="button" className={'plan-inline__scheme' + (isScheme ? ' is-open' : '')} aria-expanded={!!isScheme} onClick={() => (inline ? toggle('group', groupFirst) : toggle('scheme', i))}>
             <strong>{scheme.split(' · ')[0]}</strong>
