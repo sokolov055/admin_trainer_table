@@ -6,6 +6,7 @@ import { apiBatch, apiMutate, apiPublic } from '../api.js';
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
+import Goals from './Goals.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta,
@@ -1495,6 +1496,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
     return (
       <>
         {addMeasure}
+        {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
         <Empty
           icon={IconProgress}
           title="Прогресс пока не из чего собрать"
@@ -1553,6 +1555,10 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   return (
     <>
       {addMeasure}
+
+      {/* Цели, серии и награды — сразу под записью замера: ответ на
+          «иду ли я по плану» нужен раньше динамики (FT-490) */}
+      {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
 
       {/* Период изменений — над итогом, который он меняет, и над таблицей */}
       {hasRows && series.some((s) => s.rows.length > 1) && (

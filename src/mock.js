@@ -228,6 +228,55 @@ function mockPace(goal, id) {
  *  пустым: обе стороны сценария должны быть видны без перезагрузки. */
 let nutrition = null;
 
+let mockGoal = { week: 2, steps: 8000, setBy: null, updatedAt: null };
+
+function mockAwards(params = {}) {
+  const now = new Date();
+  const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const g = mockGoal;
+  const thisWeek = Math.min(1, g.week);
+  // Клиент 5 в демо — тот, у кого серия прервалась: тренеру видно, кому написать
+  const lastMonday = new Date(now);
+  lastMonday.setDate(lastMonday.getDate() - ((lastMonday.getDay() + 6) % 7) - 7);
+  const broke = Number(params.clientRow) === 5;
+  const awards = [
+    { id: 'train-1', title: 'Первая тренировка', note: 'С тренером, по программе в приложении или с часов', got: '2026-02-03' },
+    { id: 'train-10', title: '10 тренировок', note: 'Дней с тренировкой за всё время', got: '2026-03-02' },
+    { id: 'train-25', title: '25 тренировок', note: 'Дней с тренировкой за всё время', got: '2026-04-20' },
+    { id: 'train-50', title: '50 тренировок', note: 'Дней с тренировкой за всё время', got: '2026-07-01' },
+    { id: 'train-100', title: '100 тренировок', note: 'Дней с тренировкой за всё время', got: null, done: 87, need: 100 },
+    { id: 'train-250', title: '250 тренировок', note: 'Дней с тренировкой за всё время', got: null, done: 87, need: 250 },
+    { id: 'weeks-4', title: 'Месяц без пропусков', note: '4 недели подряд с выполненной целью недели', got: '2026-03-08' },
+    { id: 'weeks-12', title: 'Три месяца подряд', note: '12 недель подряд с выполненной целью недели', got: null, done: 9, need: 12 },
+    { id: 'weeks-26', title: 'Полгода подряд', note: '26 недель подряд с выполненной целью недели', got: null, done: 9, need: 26 },
+    { id: 'record-1', title: 'Первый рекорд', note: 'Рабочий вес в упражнении больше, чем когда-либо раньше', got: '2026-02-17' },
+    { id: 'record-10', title: '10 рекордов', note: 'Десять раз побить свой лучший вес', got: null, done: 7, need: 10 },
+    { id: 'measure-1', title: 'Первый замер', note: 'Вес или обхваты в «Прогрессе»', got: '2026-02-03' },
+    { id: 'measure-4', title: 'Замеры месяц подряд', note: 'Хотя бы один замер каждую неделю четыре недели подряд', got: null, done: 2, need: 4 },
+    { id: 'steps-1', title: 'Норма шагов', note: 'Первый день с нормой шагов', got: '2026-09-27' },
+    { id: 'steps-7', title: 'Неделя шагов', note: 'Норма шагов семь дней подряд', got: '2026-10-03' },
+    { id: 'steps-20k', title: '20 000 шагов', note: 'За один день', got: null, done: 0, need: 1 },
+  ];
+  return {
+    today: day(now),
+    goal: g,
+    rings: [
+      { id: 'week', label: 'Неделя', done: thisWeek, target: g.week },
+      { id: 'month', label: 'Месяц', done: Math.min(now.getDate() <= 7 ? 2 : 5, daysInMonth), target: Math.max(1, Math.round((g.week * daysInMonth) / 7)) },
+      { id: 'year', label: String(now.getFullYear()), done: 61, target: g.week * 52 },
+    ],
+    trainings: { total: 87, last: day(now) },
+    streak: broke
+      ? { weeks: 0, best: 6, thisWeek, broke: { week: day(lastMonday), done: 0, after: 6 } }
+      : { weeks: 5, best: 9, thisWeek, broke: null },
+    steps: { goal: g.steps, today: 5300, days: 4, best: 12, frozen: true },
+    records: 7,
+    awards,
+    got: awards.filter((a) => a.got).length,
+  };
+}
+
 function mockFail(message) {
   const err = new Error(message);
   err.code = 400;
@@ -1232,6 +1281,18 @@ const MOCK = {
     return { from: days[0].date, days, syncedAt: daysAgo(0), ...(params.clientRow ? { device } : {}) };
   },
   'steps.sync': (params) => ({ saved: (params.days || []).length }),
+  // Цели и награды (FT-490): сервер считает их из журнала, календаря, часов,
+  // шагов и замеров (server/src/lib/awards.js); здесь — правдоподобный снимок
+  // с целью, которую можно поменять
+  'client.awards': (params = {}) => mockAwards(params),
+  'client.goals.save': (params = {}) => {
+    const week = Math.round(Number(params.week));
+    const steps = Math.round(Number(params.steps) / 500) * 500;
+    if (!(week >= 1 && week <= 7)) mockFail('Тренировок в неделю — от 1 до 7.');
+    if (!(steps >= 1000 && steps <= 50000)) mockFail('Шагов в день — от 1000 до 50000.');
+    mockGoal = { week, steps, setBy: params.clientRow ? 'trainer' : 'client', updatedAt: new Date().toISOString() };
+    return mockAwards(params);
+  },
   // Тренировки с часов в «Моих тренировках»: одна совмещена с занятием
   'health.workouts.list': () => {
     const at = (dAgo, h, m) => { const d = new Date(); d.setDate(d.getDate() - dAgo); d.setHours(h, m, 0, 0); return d.toISOString(); };

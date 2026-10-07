@@ -4640,3 +4640,198 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .machines__mine { margin-left: auto; font-size: var(--text-xs); font-weight: 500; color: var(--accent); }
 
 .plan-edit__setups { display: grid; gap: var(--space-1); margin: var(--space-1) 0; }
+
+/* ==========================================================================
+   Цели, серии и награды — первым блоком «Прогресса» (FT-490, client/Goals.jsx)
+   Кольца не заполняются при каждом открытии: экран смотрят ежедневно.
+   Переход — только когда число меняется на глазах (правка цели).
+   ========================================================================== */
+
+.goals__rings {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.goal-ring {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+}
+
+.goal-ring svg { display: block; }
+
+.goal-ring__track {
+  fill: none;
+  stroke: var(--surface-sunken);
+  stroke-width: 6;
+}
+
+.goal-ring__fill {
+  fill: none;
+  stroke: var(--chart-up);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 420ms var(--ease-out);
+}
+
+.goal-ring--done .goal-ring__fill { stroke: var(--chart-up-strong); }
+
+.goal-ring__value {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  line-height: 1.05;
+}
+
+.goal-ring__done {
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-ring--done .goal-ring__done { color: var(--good-text); }
+
+.goal-ring__target {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-ring__label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: 550;
+}
+
+.goals__lines {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.goals__main {
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.goals__hint {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.goals__line--warn .goals__main { color: var(--warning-text); }
+
+.goals__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: calc(100% + 2 * var(--space-4));
+  margin: var(--space-3) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4);
+  min-height: 48px;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--border);
+  font: inherit;
+  font-weight: 620;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.goals__toggle:active { background: var(--surface-active); }
+
+.goals__count {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+.goals__chevron {
+  color: var(--text-muted);
+  transition: transform 200ms var(--ease-out);
+}
+
+.goals__chevron--open { transform: rotate(180deg); }
+
+.awards {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.award {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.award__mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--border-strong);
+  display: grid;
+  place-items: center;
+}
+
+.award--got .award__mark {
+  border: 0;
+  background: var(--good-fill);
+  color: var(--good-text);
+}
+
+.award__body { display: grid; min-width: 0; }
+
+.award__title { font-weight: 620; }
+
+.award:not(.award--got) .award__title { color: var(--text-secondary); }
+
+.award__note {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.award__state {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+}
+
+.award--got .award__state { color: var(--good-text); }
+
+.goal-form { display: grid; gap: var(--space-4); }
+
+.goal-form__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.goal-form__problem { color: var(--critical-text); }
+
+.goal-form__actions { display: flex; gap: var(--space-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-ring__fill,
+  .goals__chevron { transition: none; }
+}
