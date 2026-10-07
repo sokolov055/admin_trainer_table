@@ -185,6 +185,21 @@ test('«Отдых» с двух часов на одном подходе (setI
   assert.deepEqual(out.exercises[0].sets.map((x) => x.state), ['done', 'done', 'pending']);
 });
 
+test('«Отдых» с номером через один (часы до 1.4 (16)) — подходы всё равно по порядку (07.10.2026)', () => {
+  const s = record({ exercises: [
+    { id: 'e1', name: 'Тяга', sets: [set('pending', '20'), set('pending', '40'), set('pending', '30'), set('pending', '40')] },
+  ] }).session;
+  // Старые часы при спящей странице слали 0, 2, 4, 6 вместо 0, 1, 2, 3
+  const press = (i) => ({ kind: 'done', sessionId: 's1', exerciseId: 'e1', who: '', weight: '', setIndex: i });
+  const states = (x) => x.exercises[0].sets.map((y) => y.state);
+  let out = la.applyActions(s, [press(0), press(2)]);
+  assert.deepEqual(states(out), ['done', 'done', 'pending', 'pending'], 'второй, а не третий');
+  out = la.applyActions(out, [press(4), press(6)]);
+  assert.deepEqual(states(out), ['done', 'done', 'done', 'done'], 'номер за концом — первый неотмеченный');
+  // Отмеченный уже подход второй раз не отмечает следующий
+  assert.deepEqual(states(la.applyActions(s, [press(0), press(0)])), ['done', 'pending', 'pending', 'pending']);
+});
+
 test('часы тренера: список упражнений с подходами и перестановка (move)', () => {
   const r = record({});
   const p = la.activityPayload(r, { coach: true });

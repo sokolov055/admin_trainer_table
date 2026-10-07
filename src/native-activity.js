@@ -327,7 +327,14 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
       s = { ...s, exercises: s.exercises.map((ex) => {
         if (!mine(ex, a) || marked) return ex;
         const own = ex.sets.filter((set) => whose(set, a));
-        const target = index >= 0 ? own[index] : own.find((set) => set.state === 'pending');
+        // «Отдых» отмечает текущий подход — первый неотмеченный. Часы и
+        // iPhone до 1.4 (16) после «Отдыха» сдвигали номер следующих подходов
+        // на лишний (07.10.2026): второй подход приходил номером третьего —
+        // отмечались 1-й и 3-й. Номер за первым неотмеченным или за концом —
+        // значит, первый неотмеченный
+        const first = own.find((set) => set.state === 'pending');
+        let target = index >= 0 ? own[index] : first;
+        if (index >= 0 && (!target || (target.state === 'pending' && own.indexOf(first) < index))) target = first;
         if (!target || target.state !== 'pending') return ex;
         marked = true;
         const next = { ...ex, sets: ex.sets.map((set) => set !== target ? set
