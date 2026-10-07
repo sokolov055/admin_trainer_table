@@ -177,7 +177,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
   };
 
   /* ---------- Строка упражнения ---------- */
-  const row = (i, inSuperset) => {
+  const row = (i, inSuperset, groupFirst = -1) => {
     const ex = list[i];
     const track = trackOf(ex);
     const scheme = planScheme(ex, inSuperset) || 'подходы не заданы';
@@ -186,6 +186,8 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
     const isScheme = open && open.kind === 'scheme' && open.i === i;
     // Силовое в суперсете: повторы и вес всегда на виду, круги — справа от скобки
     const inline = inSuperset && !split && track.kind !== 'cardio';
+    // Тап по повторам, весу или кругам открывает правку всего суперсета сразу
+    const groupOpen = !!(open && open.kind === 'group' && open.i === groupFirst);
     return (
       <SwipeRow
         key={i}
@@ -227,15 +229,14 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
               {ex.name || <span className="muted">Название упражнения</span>}
             </button>
           )}
-        {!isName && inline && isScheme && (
+        {!isName && inline && groupOpen && (
           <div className="plan-inline__inline">
             <div className="plan-inline__fields">{repsWeight(i)}</div>
             {(ex.lastWeight || ex.prevWeight) && <span className="plan-inline__prev">было {ex.lastWeight || ex.prevWeight}</span>}
-            <button type="button" className="button button--primary plan-inline__inline-done" onClick={() => setOpen(null)}>Готово</button>
           </div>
         )}
-        {!isName && !(inline && isScheme) && (
-          <button type="button" className={'plan-inline__scheme' + (isScheme ? ' is-open' : '')} aria-expanded={!!isScheme} onClick={() => toggle('scheme', i)}>
+        {!isName && !(inline && groupOpen) && (
+          <button type="button" className={'plan-inline__scheme' + (isScheme ? ' is-open' : '')} aria-expanded={!!isScheme} onClick={() => (inline ? toggle('group', groupFirst) : toggle('scheme', i))}>
             <strong>{scheme.split(' · ')[0]}</strong>
             {scheme.split(' · ').slice(1).map((p, k) => <span key={k}> · {p}</span>)}
             {weight && <span>{weight}</span>}
@@ -419,21 +420,21 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
    * на всю высоту колонки (CSS)
    */
   const roundsLayout = (count, exercises) => {
-    const room = exercises * 108 - 116; // ~108 px на упражнение минус ~116 px заголовка и кнопок
+    const room = exercises * 170 - 116; // в правке ~170 px на упражнение минус ~116 px заголовка и кнопок
     return { cols: [[1, 50], [2, 40]].find(([c, h]) => Math.ceil(count / c) * h <= room)?.[0] || 3 };
   };
 
   /** Круги суперсета — колонкой справа от скобки; считаются по первому упражнению, остальные подтягиваются */
   const roundsColumn = (first, exercises) => {
     const { tech, work, strength, pills, setTech, kindOf, choose, removeAt, removable } = setsModel(first);
-    const editing = !!(open && open.kind === 'rounds' && open.i === first);
+    const editing = !!(open && open.kind === 'group' && open.i === first);
     if (!editing) {
       // Обычный вид — как у остальных упражнений: число кругов, тап — правка
       const word = work % 10 === 1 && work % 100 !== 11 ? 'круг' : [2, 3, 4].includes(work % 10) && ![12, 13, 14].includes(work % 100) ? 'круга' : 'кругов';
       const warm = tech.warmup ? '+ ' + (tech.warmup > 1 ? tech.warmup + ' ' : '') + (tech.warmup === 1 ? 'разминка' : tech.warmup < 5 ? 'разминки' : 'разминок') : '';
       return (
         <div className="plan-inline__rounds-col">
-          <button type="button" className="plan-inline__rounds-sum" aria-label={'Круги: ' + work + (warm ? ', ' + warm : '') + '. Изменить'} onClick={() => toggle('rounds', first)}>
+          <button type="button" className="plan-inline__rounds-sum" aria-label={'Круги: ' + work + (warm ? ', ' + warm : '') + '. Изменить'} onClick={() => toggle('group', first)}>
             <strong>{work}</strong>
             <span>{word}</span>
             {warm && <em>{warm}</em>}
@@ -498,7 +499,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
             <div className="plan-inline__unit plan-inline__unit--superset" data-unit={key} key={key} onPointerDown={hold(key)}>
               {/* Скобка объединяет упражнения; от неё — колонка кругов */}
               <div className="plan-inline__bracket">
-                {u.idx.map((i) => row(i, true))}
+                {u.idx.map((i) => row(i, true, u.idx[0]))}
               </div>
               {roundsColumn(u.idx[0], u.idx.length)}
             </div>
