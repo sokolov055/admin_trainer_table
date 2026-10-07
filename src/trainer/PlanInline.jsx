@@ -107,7 +107,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
   /* ---------- Перестановка удержанием ---------- */
   const hold = (key) => (e) => {
     if (drag.current || (e.button !== undefined && e.button !== 0)) return;
-    if (e.target.closest && e.target.closest('input, textarea, select, .plan-inline__panel, .plan-inline__rounds-col')) return;
+    if (e.target.closest && e.target.closest('input, textarea, select, .plan-inline__panel, .plan-inline__rounds-col--edit')) return;
     const x0 = e.clientX; const y0 = e.clientY; const id = e.pointerId; const head = e.currentTarget;
     const off = () => {
       clearTimeout(timer);
@@ -227,13 +227,14 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
               {ex.name || <span className="muted">Название упражнения</span>}
             </button>
           )}
-        {!isName && inline && (
+        {!isName && inline && isScheme && (
           <div className="plan-inline__inline">
             <div className="plan-inline__fields">{repsWeight(i)}</div>
             {(ex.lastWeight || ex.prevWeight) && <span className="plan-inline__prev">было {ex.lastWeight || ex.prevWeight}</span>}
+            <button type="button" className="button button--primary plan-inline__inline-done" onClick={() => setOpen(null)}>Готово</button>
           </div>
         )}
-        {!isName && !inline && (
+        {!isName && !(inline && isScheme) && (
           <button type="button" className={'plan-inline__scheme' + (isScheme ? ' is-open' : '')} aria-expanded={!!isScheme} onClick={() => toggle('scheme', i)}>
             <strong>{scheme.split(' · ')[0]}</strong>
             {scheme.split(' · ').slice(1).map((p, k) => <span key={k}> · {p}</span>)}
@@ -425,10 +426,26 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
   /** Круги суперсета — колонкой справа от скобки; считаются по первому упражнению, остальные подтягиваются */
   const roundsColumn = (first, exercises) => {
     const { tech, work, strength, pills, setTech, kindOf, choose, removeAt, removable } = setsModel(first);
+    const editing = !!(open && open.kind === 'rounds' && open.i === first);
+    if (!editing) {
+      // Обычный вид — как у остальных упражнений: число кругов, тап — правка
+      const word = work % 10 === 1 && work % 100 !== 11 ? 'круг' : [2, 3, 4].includes(work % 10) && ![12, 13, 14].includes(work % 100) ? 'круга' : 'кругов';
+      const warm = tech.warmup ? '+ ' + (tech.warmup > 1 ? tech.warmup + ' ' : '') + (tech.warmup === 1 ? 'разминка' : tech.warmup < 5 ? 'разминки' : 'разминок') : '';
+      return (
+        <div className="plan-inline__rounds-col">
+          <button type="button" className="plan-inline__rounds-sum" aria-label={'Круги: ' + work + (warm ? ', ' + warm : '') + '. Изменить'} onClick={() => toggle('rounds', first)}>
+            <strong>{work}</strong>
+            <span>{word}</span>
+            {warm && <em>{warm}</em>}
+          </button>
+        </div>
+      );
+    }
+    // Колонок кругов не больше трёх, число — по высоте упражнений
     const { cols } = roundsLayout(pills.length, exercises);
     const picked = pickedSet >= 0 && pickedSet < pills.length;
     return (
-      <div className="plan-inline__rounds-col" data-cols={cols}>
+      <div className="plan-inline__rounds-col plan-inline__rounds-col--edit" data-cols={cols}>
         <span className="plan-inline__rounds-title">Круги</span>
         {strength && (
           <button type="button" className="plan-inline__round-add" disabled={tech.warmup >= 5} onClick={() => { setTech({ warmup: tech.warmup + 1 }); haptic(); }}>
@@ -463,6 +480,7 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
             ))}
           </div>
         )}
+        <button type="button" className="button button--primary plan-inline__round-done" onClick={() => setOpen(null)}>Готово</button>
       </div>
     );
   };
