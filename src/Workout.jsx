@@ -12,8 +12,8 @@ import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { KIND_LABELS, MACHINE_LABELS, METRICS, trackOf, rowFields, missing, metricField, settingsFields } from './exercise-track.js';
 import IntervalTimer from './IntervalTimer.jsx';
-import { localRestPlatform, scheduleRestEnd, cancelRestEnd } from './native-rest.js';
-import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, isCoaching } from './native-activity.js';
+import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
+import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -316,6 +316,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     save();
   };
   useEffect(() => { if (ready) applyPendingRest(); }, [ready]);
+  // «+30 с» / «Закрыть» на будильнике отдыха (iPhone, часы) — сразу в
+  // занятие, а не при следующем открытии экрана
+  useEffect(() => onLiveAction(({ kind, restUntil }) => {
+    if (!ready) return;
+    if (kind === 'extend') alarmMovedTo(restUntil);
+    applyPendingRest();
+  }), [ready]);
 
   // Экран открыт — нажатое на плашке забирает он сам, а не досохранение
   // при запуске (live-settle.js): иначе двое писали бы один черновик
@@ -1355,7 +1362,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <p className="workout__status" role="status">{busy ? 'Сохраняем…' : record.dirty ? 'Есть несохранённые изменения' : 'Сохранено в облаке'}</p>
       </header>
       <fieldset disabled={!editable || !!conflict} className="workout__fields" ref={fieldsRef}>
-        <label className="workout__field">Название занятия<input value={s.title} maxLength={160} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
+        {/* Переименовывает только тренер (07.10.2026), сервер это же проверяет */}
+        <label className="workout__field">Название занятия<input value={s.title} maxLength={160} readOnly={!clientRow || clientView} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
         {editable && <div className="workout__toolbar">
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
           <button className="button button--ghost workout__pick-toggle" onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>

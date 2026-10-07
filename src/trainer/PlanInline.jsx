@@ -7,7 +7,7 @@ import { haptic } from '../telegram.js';
 import { apiPublic } from '../api.js';
 import { useData } from '../useData.js';
 import { trackOf, cardioFrom, planScheme, techniqueOf, techniqueText } from '../exercise-track.js';
-import { IconPlus, IconLinkPair, IconCheck, IconTrash } from '../icons.jsx';
+import { IconPlus, IconLinkPair, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
 
 /**
@@ -272,12 +272,15 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
         if (kind === 'drop') setPickedSet(pills.length - 1);
       }
     };
-    const removePicked = () => {
-      const now = kindOf(pickedSet);
+    const removeAt = (p) => {
+      const now = kindOf(p);
       if (now === 'warmup') setTech({ warmup: tech.warmup - 1 });
       else if (work > 1) patch(i, { sets: String(work - 1), ...(now === 'drop' ? { technique: techniqueText({ ...tech, dropset: false }) } : {}) });
       setPickedSet(-1);
     };
+    const removePicked = () => removeAt(pickedSet);
+    // Последний рабочий не удаляется: упражнение без подходов — это удаление
+    const removable = (p) => pills.length > 1 && (kindOf(p) === 'warmup' || work > 1);
     const field = (key, label, placeholder, mode = 'text') => (
       <label className="plan-inline__field">
         <span>{label}</span>
@@ -310,18 +313,26 @@ export function BlockEdit({ block, members = [], onChange, onRemove, canRemove =
                 <span className="muted">{tech.warmup ? tech.warmup + ' разм. + ' : ''}{work} раб.</span>
               </div>
               <div className="plan-inline__sets" role="listbox" aria-label="Подходы">
+                {/* Крестик у каждого подхода (владелец, 07.10.2026): удалить
+                    одним касанием, а не «выбрать → Удалить выбранный» */}
                 {pills.map((p, k) => (
-                  <button
-                    type="button"
-                    key={k}
-                    role="option"
-                    aria-selected={pickedSet === k}
-                    className={'plan-inline__set plan-inline__set--' + p + (pickedSet === k ? ' is-on' : '')}
-                    onClick={() => setPickedSet(pickedSet === k ? -1 : k)}
-                  >{p === 'warmup' ? 'Р' : p === 'drop' ? 'Д' : k - tech.warmup + 1}</button>
+                  <span className="plan-inline__set-wrap" key={k}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={pickedSet === k}
+                      className={'plan-inline__set plan-inline__set--' + p + (pickedSet === k ? ' is-on' : '')}
+                      onClick={() => setPickedSet(pickedSet === k ? -1 : k)}
+                    >{p === 'warmup' ? 'Р' : p === 'drop' ? 'Д' : k - tech.warmup + 1}</button>
+                    {removable(k) && (
+                      <button type="button" className="plan-inline__set-x" aria-label={'Удалить подход ' + (p === 'warmup' ? 'разминочный' : k - tech.warmup + 1)} onClick={() => { removeAt(k); haptic(); }}>
+                        <IconClose size={11} />
+                      </button>
+                    )}
+                  </span>
                 ))}
               </div>
-              <p className="plan-inline__sets-help">Нажмите подход, чтобы изменить или удалить его.</p>
+              <p className="plan-inline__sets-help">Нажмите подход, чтобы сменить тип; крестик — удалить.</p>
               {pickedSet >= 0 && pickedSet < pills.length && (
                 <div className="plan-inline__set-kind">
                   <div className="chips chips--flush" role="radiogroup" aria-label="Тип подхода">

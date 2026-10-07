@@ -4472,7 +4472,12 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .plan-inline__field { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
 .plan-inline__sets-head { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-muted); }
-.plan-inline__sets { display: flex; flex-wrap: wrap; gap: 6px; }
+.plan-inline__sets { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 6px; }
+.plan-inline__set-wrap { position: relative; display: inline-flex; }
+/* Крестик удаления — значок в углу подхода; касание шире самого значка */
+.plan-inline__set-x { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--text-muted); color: var(--surface); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.plan-inline__set-x::before { content: ''; position: absolute; inset: -8px; }
+.plan-inline__set-x:active { transform: scale(0.9); }
 .plan-inline__sets-help { margin: -4px 0 0; color: var(--text-muted); font-size: var(--text-xs); }
 .plan-inline__set { min-width: 40px; height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 650; font-variant-numeric: tabular-nums; cursor: pointer; }
 .plan-inline__set--warmup { color: var(--warning-text); background: var(--warning-fill); border-color: transparent; }

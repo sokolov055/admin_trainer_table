@@ -429,6 +429,24 @@ let workoutOpen = false;
 export function setWorkoutOpen(open) { workoutOpen = !!open; }
 export function isWorkoutOpen() { return workoutOpen; }
 
+/**
+ * Нажали кнопку будильника отдыха — «+30 с» или «Закрыть» (iPhone и часы,
+ * сборка 1.4 (16)+): cb({ sessionId, kind: 'extend' | 'stop', restUntil }).
+ * Нажатое уже в журнале (takeActions) — экран тренировки забирает его сразу.
+ * Возвращает отписку
+ */
+export function onLiveAction(cb) {
+  const la = activity();
+  if (!la || !la.addListener) return () => {};
+  let handle = null;
+  let gone = false;
+  Promise.resolve(la.addListener('liveAction', (e) => cb({
+    sessionId: String((e && e.sessionId) || ''), kind: e && e.kind === 'extend' ? 'extend' : 'stop',
+    restUntil: Math.round(Number(e && e.restUntil) || 0),
+  }))).then((h) => { if (gone && h && h.remove) h.remove(); else handle = h; }).catch(() => {});
+  return () => { gone = true; if (handle && handle.remove) handle.remove(); };
+}
+
 /** Часы ведут тренировку через сервер и что-то в ней поменяли:
  *  cb({ sessionId, clientRow, ended }). Возвращает отписку */
 export function onWatchState(cb) {

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RestScreen, RestPill } from './RestScreen.jsx';
-import { restHere, onRestHere, workoutScreens, closeRestHere } from './rest-here.js';
-import { cancelRestEnd } from './native-rest.js';
+import { restHere, onRestHere, workoutScreens, closeRestHere, setRestHere } from './rest-here.js';
+import { cancelRestEnd, alarmMovedTo } from './native-rest.js';
+import { onLiveAction } from './native-activity.js';
 
 /**
  * Отдых поверх всего приложения, когда экрана тренировки нет (03.10.2026).
@@ -17,6 +18,14 @@ import { cancelRestEnd } from './native-rest.js';
 export default function RestLayer() {
   const [, redraw] = useState(0);
   useEffect(() => onRestHere(() => redraw((n) => n + 1)), []);
+  // Кнопки будильника вне экрана тренировки: «+30 с» — отдых идёт дальше,
+  // «Закрыть» — закончен. В занятие нажатое попадёт из журнала при открытии
+  useEffect(() => onLiveAction(({ sessionId, kind, restUntil }) => {
+    const r = restHere();
+    if (!r || workoutScreens() > 0 || (r.sessionId && sessionId && String(r.sessionId) !== sessionId)) return;
+    if (kind === 'extend' && restUntil > 0) { alarmMovedTo(restUntil); setRestHere({ ...r, until: restUntil }); }
+    if (kind === 'stop') closeRestHere(r.until);
+  }), []);
   const rest = restHere();
   const active = !!rest && workoutScreens() === 0;
 

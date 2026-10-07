@@ -159,7 +159,9 @@ export function cardioFrom(ex, track) {
 export const byTime = (track) => track.kind === 'cardio' || track.kind === 'timed';
 
 /** У гребли дистанция в метрах — так её показывает тренажёр; у остальных км */
-const distanceUnit = (track) => (track.machine === 'rower' ? 'м' : 'км');
+// Расстояние — в метрах у всех тренажёров (владелец, 07.10.2026: и раньше
+// вписывал метры, а не километры)
+const distanceUnit = () => 'м';
 const levelWord = (track) => (track.machine === 'rower' || track.machine === 'skillmill' ? 'Нагрузка' : 'Уровень');
 
 /**

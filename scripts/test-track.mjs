@@ -127,7 +127,7 @@ test('кардио-план: строка, фазы интервалов, отм
 });
 
 test('занятие из кардио-плана: режим и время-цель в отрезке, план — в снимке', () => {
-  const plan = { machine: 'treadmill', metrics: ['time', 'distance'], targets: { time: '30', distance: '5' }, settings: { speed: '8', incline: '3' },
+  const plan = { machine: 'treadmill', metrics: ['time', 'distance'], targets: { time: '30', distance: '5000' }, settings: { speed: '8', incline: '3' },
     intervals: { rounds: 4, fast: { time: '1:00', speed: '12' }, slow: { time: '2:00', speed: '6' } } };
   const s = fromPlan({ title: 'Кардио', exercises: [{ name: 'Беговая дорожка', cardio: plan }] }, 'Сентябрь 2026');
   const run = s.exercises[0];
@@ -136,5 +136,5 @@ test('занятие из кардио-плана: режим и время-це
   assert.equal(run.cardio.intervals.rounds, 4);
   assert.equal(run.sets.length, 1);
   assert.deepEqual([run.sets[0].time, run.sets[0].speed, run.sets[0].incline], ['30', '8', '3']);
-  assert.match(run.prescription, /^30 мин · 5 км · 8 км\/ч, 3% · интервалы 4 ×/);
+  assert.match(run.prescription, /^30 мин · 5000 м · 8 км\/ч, 3% · интервалы 4 ×/);
 });

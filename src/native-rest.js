@@ -61,6 +61,12 @@ async function iosAlarm(until) {
   } catch (_) { return false; }
 }
 
+/** Будильник переставило само приложение («+30 с» на будильнике) — страница
+ *  знает, что конец этого отдыха тоже звенит он */
+export function alarmMovedTo(until) {
+  if (alarmUntil && until > 0) alarmUntil = until;
+}
+
 /** Конец этого отдыха звенит будильник iPhone — странице свой звук не нужен */
 export function alarmRings(until) {
   return !!until && alarmUntil === until;
