@@ -228,6 +228,7 @@ function mockPace(goal, id) {
  *  пустым: обе стороны сценария должны быть видны без перезагрузки. */
 let nutrition = null;
 
+let mockWishes = [{ id: 1, text: 'Колено побаливает при выпадах — можно заменить на что-то полегче?', status: 'read', createdAt: daysAgo(2), reply: '', repliedAt: null }];
 let mockPhoneLogin = '';
 let mockPhoneCheck = null;
 
@@ -812,6 +813,23 @@ const MOCK = {
     return { phone: mockPhoneLogin };
   },
   'account.phone.remove': () => { mockPhoneLogin = ''; return { phone: '' }; },
+  // Пожелания к программе (FT-498): одно уже есть, тренер его прочитал
+  'wish.list': () => ({ wishes: mockWishes.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }),
+  'wish.create': (p) => {
+    const text = String(p.text || '').trim();
+    if (text.length < 3) mockFail('Напишите пожелание — хотя бы несколько слов.');
+    const wish = { id: Date.now(), text, status: 'new', createdAt: new Date().toISOString(), reply: '', repliedAt: null };
+    mockWishes.push(wish);
+    return wish;
+  },
+  'wish.delete': (p) => { mockWishes = mockWishes.filter((w) => w.id !== Number(p.id)); return { deleted: true }; },
+  'wish.answer': (p) => {
+    const w = mockWishes.find((x) => x.id === Number(p.id));
+    if (!w) mockFail('Пожелание не найдено.');
+    if (p.reply !== undefined) { w.reply = String(p.reply).trim(); w.repliedAt = new Date().toISOString(); }
+    w.status = p.done === true ? 'done' : p.done === false ? 'read' : (w.status === 'new' ? 'read' : w.status);
+    return w;
+  },
   // Копия своих данных (FT-496): в демо — заглушка вместо файла с сервера
   'account.export': () => ({ url: 'data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><meta charset="utf-8"><h1>Мои данные в Fit Track</h1><p>Демо: здесь будет выгрузка.</p>'), expiresAt: new Date(Date.now() + 600000).toISOString() }),
   'account.get': () => (new URLSearchParams(window.location.search).get('mockUnlinked') === '1'

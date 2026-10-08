@@ -5036,3 +5036,21 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .phone-setting__number { font-weight: 650; font-variant-numeric: tabular-nums; margin-right: auto; }
 .data-export { margin-top: var(--space-3); display: grid; gap: var(--space-3); }
 .data-export .button { text-decoration: none; text-align: center; }
+
+/* --- пожелания к программе (FT-498, client/Wishes.jsx) --- */
+.wishes { display: grid; gap: var(--space-4); }
+.wishes__form { display: grid; gap: var(--space-2); }
+.wishes__form .button { justify-self: start; }
+.wishes__input { min-height: 84px; resize: vertical; font: inherit; line-height: 1.45; }
+.wishes__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.wish { display: grid; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.wishes__list .wish:first-child { border-top: 0; padding-top: 0; }
+.wish__head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.wish__status { font-weight: 620; color: var(--text-secondary); }
+.wish--done .wish__status { color: var(--good-text); }
+.wish--new .wish__status { color: var(--accent-solid); }
+.wish__date { color: var(--text-muted); margin-left: auto; }
+.wish__delete { color: var(--text-muted); }
+.wish__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wish__reply { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); white-space: pre-wrap; }
+.wish__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-1); }

@@ -7,6 +7,7 @@ import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
 import Goals from './Goals.jsx';
+import Wishes from './Wishes.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta,
@@ -606,6 +607,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           первое, что человек должен узнать на этом экране. */}
       {runningLine}
 
+      {/* Пожелания клиента (FT-498) — тренеру до того, как он возьмётся
+          править программу: их ради этого и пишут */}
+      {clientRow && !clientView && !familyRow && !data.self && <Wishes clientRow={clientRow} trainer />}
+
       {/* Месяцы: «+» слева — новый месяц; тап по выбранному — переименовать
           (владелец, 03.10.2026: вместо меню «Изменить программу») */}
       {(monthChips.length > 1 || canEdit) && renamingMonth === null && (
@@ -975,6 +980,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           Откройте тренировку, чтобы записывать подходы и рабочие веса
         </p>
       )}
+
+      {/* Пожелание тренеру своими словами (FT-498) — клиенту, в конце
+          программы: прочитал, что предстоит, — тут же можно попросить
+          поменять. В «глазами клиента» и у семьи — нет: писать за другого
+          нельзя */}
+      {!clientRow && !familyRow && !data.self && <Wishes />}
       </>
     </>
   );
