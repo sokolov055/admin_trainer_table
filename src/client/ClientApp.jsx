@@ -96,20 +96,21 @@ export default function ClientApp({ me, clientRow, preview }) {
   const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
   const own = !clientRow && !preview && !(me && me.member);
 
-  // Личные истории «Моя неделя» и «Итоги месяца» (FT-493) — только в своём
-  // кабинете клиента: тренеру «глазами клиента» показывать нечьи цифры
-  // незачем. Ряд кружков ждёт ответа (null — ещё едет), чтобы свои не
-  // вставали перед уже открытой новостью и не сдвигали её номер.
-  const mine = !clientRow && !preview;
+  // Личные истории «Моя неделя» и «Итоги месяца» (FT-493) — в кабинете
+  // клиента и у тренера «глазами клиента»: режим для того и есть, чтобы
+  // видеть ровно то, что видит клиент. В карточке клиента их нет — там
+  // тренер работает, а не смотрит ленту. Ряд кружков ждёт ответа (null —
+  // ещё едет), чтобы свои не вставали перед уже открытой новостью.
+  const mine = !clientRow || !!preview;
   const [personal, setPersonal] = useState(mine ? null : []);
   useEffect(() => {
     if (!mine) return undefined;
     let alive = true;
-    apiPublic('client.summary.stories', {})
+    apiPublic('client.summary.stories', clientRow ? { clientRow } : {})
       .then((r) => { if (alive) setPersonal(summaryTopics(r && r.stories)); })
       .catch(() => { if (alive) setPersonal([]); });
     return () => { alive = false; };
-  }, [mine]);
+  }, [mine, clientRow]);
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   const [consented, setConsented] = useState(false);
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
