@@ -117,10 +117,10 @@ export const TOPICS = [
         art: 'progress',
         tint: '#ffa24c',
         heading: 'Итоги недели и месяца',
-        body: 'В «Прогрессе» под целями — «Итоги»: тренировки, время, тоннаж, '
+        body: 'В «Прогрессе» под целями — «Итоги»: тренировки, время, поднятый вес, '
           + 'рекорды и шаги со стрелкой к прошлому разу. «Неделя» или «Месяц» — '
-          + 'период, стрелки листают назад. По понедельникам здесь же, в кружках, '
-          + 'появится «Моя неделя», а 1-го числа — «Итоги месяца».',
+          + 'период; стрелки или свайп вбок листают назад. По понедельникам здесь '
+          + 'же, в кружках, появится «Моя неделя», а 1-го числа — «Итоги месяца».',
       },
     ],
   },
@@ -222,6 +222,9 @@ TOPICS.forEach((topic) => {
    «просмотрено» прошлой недели его не гасит.
    ========================================================================== */
 
+// Больше в кадр не помещается на телефоне; остальные — «и ещё N»
+const RECORDS_SHOWN = 6;
+
 export function summaryTopics(stories) {
   return (stories || []).map((st) => {
     const week = st.period === 'week';
@@ -233,13 +236,15 @@ export function summaryTopics(stories) {
         tint: week ? '#ffa24c' : '#c9a4f0',
         heading: week ? 'Неделя в цифрах' : 'Месяц в цифрах',
         stats: metricRows(st),
+        goal: { ...st.goal, label: week ? 'Цель недели' : 'Цель месяца' },
         statsNote: week ? 'Стрелки — к прошлой неделе' : 'Стрелки — к прошлому месяцу',
       },
       ...(st.records.length ? [{
         id: st.id + ':records',
         tint: '#7fd97f',
         heading: st.records.length === 1 ? 'Новый рекорд' : 'Рекорды: ' + st.records.length,
-        records: st.records.slice(0, 6),
+        records: st.records.slice(0, RECORDS_SHOWN),
+        more: Math.max(0, st.records.length - RECORDS_SHOWN),
       }] : []),
       {
         id: st.id + ':verdict',
@@ -555,8 +560,9 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
         )}
         {frame.date && <p className="story__date">{frame.date}</p>}
         <h2 className="story__heading">{frame.heading}</h2>
+        {frame.goal && <StoryGoal goal={frame.goal} />}
         {frame.stats && <StoryStats rows={frame.stats} note={frame.statsNote} />}
-        {frame.records && <StoryRecords records={frame.records} />}
+        {frame.records && <StoryRecords records={frame.records} more={frame.more} />}
         {frame.body && <p className="story__body">{frame.body}</p>}
       </div>
 
@@ -592,16 +598,41 @@ function StoryStats({ rows, note }) {
   );
 }
 
-function StoryRecords({ records }) {
+/**
+ * Цель периода маленьким кольцом — тем же, что на обложке кружка: обложка
+ * и кадр говорят одним языком
+ */
+function StoryGoal({ goal }) {
+  const r = 13;
+  const length = 2 * Math.PI * r;
+  const share = goal.target > 0 ? Math.min(goal.done / goal.target, 1) : 0;
   return (
-    <ul className="story__records">
-      {records.map((r, i) => (
-        <li key={i} className="story__record">
-          <span className="story__record-name">{r.name}</span>
-          <span className="story__record-value">{recordText(r)}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="story__goal">
+      <svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">
+        <circle className="story__goal-track" cx="16" cy="16" r={r} />
+        <circle
+          className="story__goal-fill" cx="16" cy="16" r={r}
+          strokeDasharray={length} strokeDashoffset={length * (1 - share)} transform="rotate(-90 16 16)"
+        />
+      </svg>
+      <span>{goal.label}: {goal.done} из {goal.target}</span>
+    </div>
+  );
+}
+
+function StoryRecords({ records, more }) {
+  return (
+    <>
+      <ul className="story__records">
+        {records.map((r, i) => (
+          <li key={i} className="story__record">
+            <span className="story__record-name">{r.name}</span>
+            <span className="story__record-value">{recordText(r)}</span>
+          </li>
+        ))}
+      </ul>
+      {more > 0 && <p className="story__more">и ещё {more} в «Прогрессе» → «Итоги»</p>}
+    </>
   );
 }
 

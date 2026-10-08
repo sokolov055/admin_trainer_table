@@ -55,6 +55,18 @@ for (const scheme of ['light', 'dark']) {
   await page.getByRole('button', { name: 'Неделей раньше' }).click();
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${DEST}-lastweek-${scheme}.png` });
+  // Свайп вправо — ещё неделей раньше
+  const bb = await page.locator('.summary__swipe').boundingBox();
+  await page.evaluate(({ x, y }) => {
+    const el = document.querySelector('.summary__swipe');
+    const t = (cx) => new Touch({ identifier: 1, target: el, clientX: cx, clientY: y });
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: [t(x)], changedTouches: [t(x)], bubbles: true }));
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [t(x + 120)], bubbles: true }));
+  }, { x: bb.x + 60, y: bb.y + 120 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${DEST}-swiped-${scheme}.png` });
+  await page.locator('.summary__title--back').click();
+  await page.waitForTimeout(400);
   await page.getByRole('radio', { name: 'Месяц' }).click();
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${DEST}-month-${scheme}.png` });

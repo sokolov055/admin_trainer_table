@@ -359,6 +359,7 @@ function mockSummary(params = {}) {
     before: current ? cut(before) : before,
     records,
     empty: false,
+    target: kind === 'week' ? mockGoal.week : Math.round((mockGoal.week * 30) / 7),
     older: offset < (kind === 'week' ? 26 : 6),
   };
 }

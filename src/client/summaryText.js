@@ -33,12 +33,50 @@ export function monthText(from, today) {
   return today && parts(today).y !== a.y ? name + ' ' + a.y : name;
 }
 
-/** Заголовок периода в блоке: «Эта неделя», «Прошлая неделя», «21–27 сентября», «Октябрь» */
+const isoDay = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+/**
+ * Границы периода на устройстве — чтобы название менялось в момент
+ * нажатия стрелки, а не когда ответит сервер. Те же правила, что
+ * periodRange в server/src/lib/summary.js.
+ */
+export function localPeriod(period, offset, now = new Date()) {
+  const today = isoDay(now);
+  if (period === 'week') {
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7) - 7 * offset);
+    const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6);
+    return { period, offset, from: isoDay(from), to: isoDay(to), until: today };
+  }
+  const from = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+  const to = new Date(now.getFullYear(), now.getMonth() - offset + 1, 0);
+  return { period, offset, from: isoDay(from), to: isoDay(to), until: today };
+}
+
+/** Куда вернуться: «к этой неделе», «к этому месяцу» */
+export function backText(period) {
+  return period === 'week' ? 'к этой неделе' : 'к этому месяцу';
+}
+
+// Короткие месяцы — для строки со стрелками и переключателем: полное
+// «29 сентября – 5 октября» туда не помещается на телефоне
+const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн',
+  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+/** «21–27 сен», «29 сен – 5 окт» */
+export function shortRangeText(from, to) {
+  const a = parts(from);
+  const b = parts(to);
+  return a.m === b.m
+    ? a.d + '–' + b.d + ' ' + MONTHS_SHORT[b.m - 1]
+    : a.d + ' ' + MONTHS_SHORT[a.m - 1] + ' – ' + b.d + ' ' + MONTHS_SHORT[b.m - 1];
+}
+
+/** Заголовок периода в блоке: «Эта неделя», «Прошлая неделя», «21–27 сен», «Октябрь» */
 export function periodTitle(s) {
   if (s.period === 'week') {
     if (s.offset === 0) return 'Эта неделя';
     if (s.offset === 1) return 'Прошлая неделя';
-    return rangeText(s.from, s.to);
+    return shortRangeText(s.from, s.to);
   }
   return monthText(s.from, s.until);
 }
@@ -79,7 +117,8 @@ export function metricRows(s) {
       diff: s.now.minutes - s.before.minutes, diffText: minutesText,
     },
     {
-      id: 'tonnage', label: 'Тоннаж',
+      // «Поднятый вес», а не «тоннаж»: тренерское слово клиенту непонятно
+      id: 'tonnage', label: 'Поднятый вес',
       value: kg(s.now.tonnage), unit: '',
       diff: s.now.tonnage - s.before.tonnage, diffText: (d) => kg(Math.abs(d)),
     },
