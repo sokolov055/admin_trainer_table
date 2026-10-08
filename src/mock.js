@@ -119,6 +119,40 @@ const PLAN_BLOCKS = [
   },
 ];
 
+/**
+ * Карта мышц в демо (FT-491) — как угадал бы сервер (lib/muscle-map.js):
+ * [основные, синергисты]. Правки тренера — в demoMuscleEdits по названию.
+ */
+const DEMO_MUSCLE_MAP = {
+  'жим лёжа': [['chest'], ['triceps', 'front-deltoids']],
+  'жим гантелей лёжа': [['chest'], ['triceps', 'front-deltoids']],
+  'тяга штанги в наклоне': [['lats', 'trapezius'], ['back-deltoids', 'biceps']],
+  'тяга верхнего блока к груди': [['lats'], ['biceps', 'back-deltoids']],
+  'жим гантелей сидя': [['front-deltoids'], ['triceps', 'trapezius']],
+  'подтягивания': [['lats'], ['biceps', 'back-deltoids']],
+  'беговая дорожка': [[], ['quadriceps', 'hamstrings', 'calves']],
+  'присед со штангой': [['quadriceps', 'glutes'], ['hamstrings', 'adductors', 'calves']],
+  'приседания со штангой': [['quadriceps', 'glutes'], ['hamstrings', 'adductors', 'calves']],
+  'румынская тяга': [['hamstrings', 'glutes'], ['lower-back']],
+  'выпады с гантелями': [['quadriceps', 'glutes'], ['hamstrings', 'adductors', 'calves']],
+  'подъём на носки': [['calves'], []],
+  'эллипс': [[], ['quadriceps', 'glutes']],
+  'ягодичный мост со штангой': [['glutes'], ['hamstrings']],
+  'махи гантелями в стороны': [['front-deltoids', 'back-deltoids'], ['trapezius']],
+  'подъём гантелей на бицепс': [['biceps'], ['forearms']],
+  'планка': [['abs'], ['obliques', 'front-deltoids']],
+  'бёрпи': [['quadriceps', 'glutes', 'front-deltoids'], ['chest', 'lats', 'abs', 'hamstrings', 'triceps']],
+  'жим ногами': [['quadriceps', 'glutes'], ['hamstrings', 'adductors', 'calves']],
+};
+const demoMuscleEdits = new Map();
+function demoMuscles(name) {
+  const key = String(name || '').trim().toLowerCase();
+  if (demoMuscleEdits.has(key)) return { muscles: demoMuscleEdits.get(key), musclesCustom: true };
+  const [primary, secondary] = DEMO_MUSCLE_MAP[key] || [[], []];
+  return { muscles: { primary, secondary } };
+}
+const withDemoMuscles = (blocks) => blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e, ...demoMuscles(e.name) })) }));
+
 const MONTHS = ['Сентябрь 2026', 'Август 2026', 'Июль 2026', 'Июнь 2026'];
 
 const CLIENTS = [
@@ -361,6 +395,13 @@ function mockSummary(params = {}) {
     empty: false,
     target: kind === 'week' ? mockGoal.week : Math.round((mockGoal.week * 30) / 7),
     older: offset < (kind === 'week' ? 26 : 6),
+    // Мышцы периода (FT-491): подходы основной и синергистом; ноги в демо
+    // пропущены, чтобы был виден «пробел»
+    muscles: offset % 2 === 0
+      ? { chest: { primary: 8, secondary: 0 }, lats: { primary: 8, secondary: 0 }, trapezius: { primary: 4, secondary: 0 },
+        triceps: { primary: 0, secondary: 8 }, 'front-deltoids': { primary: 3, secondary: 8 }, biceps: { primary: 0, secondary: 8 },
+        'back-deltoids': { primary: 0, secondary: 8 }, abs: { primary: 3, secondary: 0 } }
+      : { quadriceps: { primary: 10, secondary: 0 }, glutes: { primary: 10, secondary: 0 }, hamstrings: { primary: 4, secondary: 6 }, calves: { primary: 3, secondary: 5 } },
   };
 }
 
@@ -1193,7 +1234,7 @@ const MOCK = {
       // Сплит в демо — «Евгений и Екатерина» (строка 4)
       members: Number(params.clientRow) === 4 ? ['Евгений', 'Екатерина'] : [],
       blocks: month
-        ? (Number(params.clientRow) === 4
+        ? withDemoMuscles(Number(params.clientRow) === 4
           ? PLAN_BLOCKS.map((b) => ({ ...b, exercises: b.exercises.map((e, i) => ({
             ...e,
             performers: i === 1 ? ['Екатерина'] : [],
@@ -1534,7 +1575,7 @@ const MOCK = {
     return { exercise: { ...e } };
   },
   'library.exercises': (params = {}) => ({
-    exercises: demoExercises.filter((e) => demoHidden.has(e.id) === !!params.hidden),
+    exercises: demoExercises.filter((e) => demoHidden.has(e.id) === !!params.hidden).map((e) => ({ ...e, ...demoMuscles(e.name) })),
     muscles: DEMO_MUSCLES,
     hiddenCount: demoHidden.size,
     owner: true,
@@ -1561,6 +1602,17 @@ const MOCK = {
     mine.track = { ...params.track, auto: false };
     demoExercises = [...demoExercises.filter((e) => e !== mine && !(found && found.common && e === found)), mine];
     return { exercise: mine };
+  },
+  // Карта мышц упражнения (FT-491): null — снова как угадано
+  'library.exercise.muscles': (params) => {
+    const found = demoExercises.find((e) => e.id === Number(params.exerciseId));
+    const name = (found && found.name) || params.name;
+    const key = String(name || '').trim().toLowerCase();
+    if (params.muscles) demoMuscleEdits.set(key, { primary: params.muscles.primary || [], secondary: params.muscles.secondary || [] });
+    else demoMuscleEdits.delete(key);
+    const mine = found || { id: ++demoExerciseSeq, name, muscle: '', equipment: '', notes: '', media: null, mine: true, common: false };
+    if (!found) demoExercises = [...demoExercises, mine];
+    return { exercise: { ...mine, ...demoMuscles(name) } };
   },
   'library.exercise.delete': (params) => {
     const e = demoExercises.find((x) => x.id === Number(params.id));

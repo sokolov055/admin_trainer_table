@@ -674,6 +674,56 @@ test('мои тренировки: программа, прогресс, пит�
 });
 
 /**
+ * Карта мышц (FT-491): у тренировки — основная группа и синергисты, у всей
+ * программы — карта с пробелами, в итогах — мышцы периода. Тренер правит
+ * мышцы упражнения тапами: основная → синергист → снять, правка — в базу.
+ */
+test('карта мышц: тренировка, программа, итоги и правка тренером', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+
+    const firstBlock = phone.locator('#root main:not([hidden]) .plan__block').first();
+    await firstBlock.locator('.muscles--block').waitFor({ timeout: 10000 });
+    await assert.doesNotReject(firstBlock.getByText('Основная группа').waitFor({ timeout: 5000 }));
+    await assert.doesNotReject(firstBlock.getByText('Синергисты').waitFor({ timeout: 5000 }));
+
+    await phone.getByRole('tab', { name: /^Вся программа/ }).click();
+    await assert.doesNotReject(phone.getByRole('heading', { name: 'Мышцы программы' }).waitFor({ timeout: 5000 }));
+    await assert.doesNotReject(phone.getByText('Без основной нагрузки:').first().waitFor({ timeout: 5000 }));
+
+    // Правка: «Жим лёжа» — грудь основная, трицепс синергист; тап по
+    // трицепсу дважды — снят
+    const block = phone.locator('#root main:not([hidden]) .plan__block').first();
+    await block.locator('.plan__toggle').click();
+    await block.locator('.plan-inline__name').first().click();
+    const edit = block.locator('.muscle-edit').first();
+    await edit.getByRole('button', { name: 'Изменить' }).click();
+    const triceps = () => edit.getByRole('button', { name: /^Трицепс:/ });
+    assert.match(await triceps().getAttribute('aria-label'), /синергист/);
+    await triceps().click();
+    assert.match(await triceps().getAttribute('aria-label'), /не задействована/);
+    await triceps().click();
+    assert.match(await triceps().getAttribute('aria-label'), /основная/);
+    await assert.doesNotReject(edit.getByText('Сохранено в базе').waitFor({ timeout: 5000 }));
+    await assert.doesNotReject(edit.getByRole('button', { name: 'Как было' }).waitFor({ timeout: 5000 }));
+    await edit.getByRole('button', { name: 'Готово' }).click();
+    await assert.doesNotReject(edit.getByText(/Грудь, трицепс/).waitFor({ timeout: 5000 }), 'в свёрнутой строке — новая основная группа');
+
+    await phone.getByRole('tab', { name: 'Прогресс', exact: true }).click();
+    await assert.doesNotReject(phone.locator('.summary__muscles').waitFor({ timeout: 10000 }));
+  } finally {
+    await context.close();
+  }
+});
+
+/**
  * Похожие упражнения (28.09.2026): группа копий — оставить одно, остальные
  * влить; после объединения группа пропадает.
  */

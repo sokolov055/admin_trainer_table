@@ -1,4 +1,5 @@
 import React from 'react';
+import { FRONT, BACK } from './muscles/figure.js';
 
 /**
  * ==========================================================================
@@ -893,7 +894,37 @@ export function ArtGoalPush() {
   );
 }
 
+/**
+ * Карта мышц (FT-491): та же фигура, что в приложении, — спереди и сзади;
+ * верх тела в работе: грудь и спина ярко, синергисты бледнее
+ */
+export function ArtMuscles() {
+  const MAIN = new Set(['chest', 'lats', 'trapezius']);
+  const HELP = new Set(['triceps', 'biceps', 'front-deltoids', 'back-deltoids']);
+  const side = (shapes, x) => (
+    <g transform={'translate(' + x + ' 6) scale(0.84)'} strokeWidth={STROKE / 0.84}>
+      {shapes.map(([m, polys]) => polys.map((pts, i) => (
+        <polygon
+          key={m + i}
+          points={pts}
+          fill={MAIN.has(m) || HELP.has(m) ? 'var(--tint)' : 'none'}
+          fillOpacity={MAIN.has(m) ? 0.95 : HELP.has(m) ? 0.4 : 0}
+          stroke="currentColor"
+          strokeOpacity={MAIN.has(m) ? 0 : 0.35}
+        />
+      )))}
+    </g>
+  );
+  return (
+    <Art label="Фигура спереди и сзади: грудь и спина в работе, руки и плечи помогают">
+      {side(FRONT, 76)}
+      {side(BACK, 160)}
+    </Art>
+  );
+}
+
 export const ART = {
+  muscles: ArtMuscles,
   goalMet: ArtGoalMet,
   goalPush: ArtGoalPush,
   android: ArtAndroid,

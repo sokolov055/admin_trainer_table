@@ -26,6 +26,7 @@ import { lazyPage, Deferred } from '../lazy.js';
 import SwipeRow from '../SwipeRow.jsx';
 import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
 import { uid } from '../workout-model.js';
+import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
@@ -791,6 +792,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </div>
       )}
 
+      {/* Карта мышц всей программы месяца (FT-491): что нагружено и где
+          пробел — тренеру при составлении, клиенту — понять замысел */}
+      {planTab === 'all' && shownBlocks.length > 0 && (
+        <MuscleSummary tally={tallyExercises(shownBlocks.flatMap((b) => b.exercises))} section="Мышцы программы" />
+      )}
+
       {(planTab === 'queue' || planTab === 'all') && <div className={'plan__blocks' + (selectingBlocks ? ' plan__blocks--selecting' : '')} ref={blocksRef}>{visibleBlocks.map((block, i, shownList) => {
         const past = blockSessions(sessions, block, data.month);
         const bi = shownBlocks.indexOf(block);
@@ -873,6 +880,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           note={shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
         >
           <Panel>
+            {/* Какие мышцы в работе (FT-491) — по программе тренировки:
+                с первого взгляда ясно, что за день */}
+            <BlockMuscles exercises={block.exercises} />
             {/* Веса живут в журнале, а не в программе: лист месяца — это
                 план, и занятие его не переписывает. Поэтому здесь не
                 «сколько ты поднял», а «эту тренировку ты уже провёл» и

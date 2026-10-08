@@ -11,6 +11,7 @@ import { trackOf, cardioFrom, planScheme, techniqueOf, techniqueText, planOneSid
 import { IconPlus, IconLinkPair, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
+import MuscleEdit from '../muscles/MuscleEdit.jsx';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -103,6 +104,16 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
         setKindNote({ i, text: 'Сохранено в базе — везде так' });
       })
       .catch((error) => setKindNote({ i, text: 'В базу не сохранилось: ' + (error.message || 'нет связи'), error: true }));
+  };
+
+  /** Мышцы сохранены в базе — у всех строк этой тренировки с тем же упражнением */
+  const changeMuscles = (i, saved) => {
+    const ex = latest.current[i];
+    if (!ex) return;
+    const same = (e) => (ex.exerciseId ? e.exerciseId === ex.exerciseId : !e.exerciseId && keyOf(e.name) === keyOf(ex.name));
+    onChange(latest.current.map((e, k) => (k === i || same(e)
+      ? { ...e, exerciseId: e.exerciseId || saved.id, muscles: saved.muscles, musclesCustom: !!saved.musclesCustom }
+      : e)));
   };
 
   const toggle = (kind, i) => {
@@ -245,6 +256,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
                     ...(changed ? {
                       prevWeight: '', lastWeight: '', startSets: undefined,
                       lastRun: undefined, exercise: pick || null,
+                      muscles: pick ? pick.muscles : undefined,
+                      musclesCustom: pick ? !!pick.musclesCustom : false,
                     } : {}),
                   });
                 }}
@@ -254,6 +267,19 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
               {clientRow && ex.exerciseId ? <ClientSetup exerciseId={ex.exerciseId} clientRow={clientRow}
                 members={split ? (ex.performers && ex.performers.length ? members.filter((m) => ex.performers.includes(m)) : members) : []} /> : null}
               {ex.name && <ExerciseKind track={trackOf(ex)} onChange={(t) => changeTrack(i, t)} note={kindNote && kindNote.i === i ? kindNote : null} />}
+              {/* Карта мышц (FT-491): основная группа и синергисты — в базу тренера */}
+              {ex.name && (
+                <MuscleEdit
+                  // По названию, не по id: первое сохранение заводит упражнение
+                  // в базе, и id появляется — правка не должна от этого схлопнуться
+                  key={keyOf(ex.name)}
+                  exerciseId={ex.exerciseId}
+                  name={ex.name}
+                  muscles={ex.muscles}
+                  custom={!!ex.musclesCustom}
+                  onSaved={(saved) => changeMuscles(i, saved)}
+                />
+              )}
               <div className="plan-inline__panel-actions">
                 <button type="button" className="button button--primary" onClick={() => setOpen(ex.name ? null : { kind: 'name', i })}>Готово</button>
               </div>

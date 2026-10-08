@@ -3,6 +3,7 @@ import { useData } from '../useData.js';
 import { Section, Panel, Segmented, plural } from '../ui.jsx';
 import { IconChevron, IconDelta } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import { MuscleSummary } from '../muscles/MuscleMap.jsx';
 import { periodTitle, compareText, metricRows, recordText, localPeriod, backText } from './summaryText.js';
 
 /**
@@ -181,6 +182,14 @@ export default function Summary({ clientRow }) {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {/* Мышцы периода (FT-491): по выполненным рабочим подходам */}
+                {s.muscles && Object.keys(s.muscles).length > 0 && (
+                  <div className="summary__muscles">
+                    <div className="summary__muscles-title">Мышцы</div>
+                    <MuscleSummary tally={s.muscles} />
                   </div>
                 )}
               </>
