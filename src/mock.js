@@ -228,6 +228,31 @@ function mockPace(goal, id) {
  *  пустым: обе стороны сценария должны быть видны без перезагрузки. */
 let nutrition = null;
 
+let mockPhoneLogin = '';
+let mockPhoneCheck = null;
+
+function mockPhoneRequest(p = {}) {
+  const phone = String(p.phone || '').replace(/\D/g, '');
+  if (!/^7\d{10}$/.test(phone)) mockFail('Проверьте номер: нужен российский, +7 и десять цифр.');
+  mockPhoneCheck = { key: 'demo-' + Date.now(), phone, method: p.method === 'sms' ? 'sms' : 'call', polls: 0 };
+  return mockPhoneCheck.method === 'sms'
+    ? { key: mockPhoneCheck.key, method: 'sms', ttlMin: 10 }
+    : { key: mockPhoneCheck.key, method: 'call', callPhone: '+78005008275', callPhonePretty: '+7 (800) 500-8275', ttlMin: 5 };
+}
+
+function mockPhoneConfirm(p = {}) {
+  if (!mockPhoneCheck || p.key !== mockPhoneCheck.key) mockFail('Проверка устарела. Начните заново.');
+  if (mockPhoneCheck.method === 'call') {
+    mockPhoneCheck.polls += 1;
+    if (mockPhoneCheck.polls < 3 && !mockPhoneCheck.ok) return { waiting: true };
+    mockPhoneCheck.ok = true;
+    return {};
+  }
+  if (!mockPhoneCheck.ok && String(p.code || '') !== '123456') mockFail('Код не подошёл.');
+  mockPhoneCheck.ok = true;
+  return {};
+}
+
 let mockGoal = { week: 2, steps: 8000, setBy: null, updatedAt: null };
 
 function mockAwards(params = {}) {
@@ -768,6 +793,25 @@ const MOCK = {
   'auth.client.request': () => ({ sent: true, ttlMin: 15 }),
   'auth.client.confirm': (p) => (p.name ? { token: 'demo-session', created: true } : { needName: true }),
   'auth.trainer.link.inspect': () => ({ trainerName: 'Константин Соколов' }),
+  // Вход по телефону (FT-489): звонок «проходит» на третьем опросе, код
+  // из СМС в демо — 123456; ?mockPhone=0 — способа нет, как без ключа SMS.ru
+  'auth.phone.options': () => (new URLSearchParams(window.location.search).get('mockPhone') === '0'
+    ? { call: false, sms: false } : { call: true, sms: true }),
+  'auth.phone.request': (p) => mockPhoneRequest(p),
+  'auth.phone.confirm': (p) => {
+    const r = mockPhoneConfirm(p);
+    if (r.waiting) return r;
+    return p.name ? { token: 'demo-session', created: true } : { needName: true };
+  },
+  'account.phone.get': () => ({ phone: mockPhoneLogin, options: { call: true, sms: true } }),
+  'account.phone.request': (p) => mockPhoneRequest(p),
+  'account.phone.confirm': (p) => {
+    const r = mockPhoneConfirm(p);
+    if (r.waiting) return r;
+    mockPhoneLogin = '+7 ' + mockPhoneCheck.phone.slice(1, 4) + ' ' + mockPhoneCheck.phone.slice(4, 7) + '-' + mockPhoneCheck.phone.slice(7, 9) + '-' + mockPhoneCheck.phone.slice(9);
+    return { phone: mockPhoneLogin };
+  },
+  'account.phone.remove': () => { mockPhoneLogin = ''; return { phone: '' }; },
   'account.get': () => (new URLSearchParams(window.location.search).get('mockUnlinked') === '1'
     ? { publicId: 'FT-7K2QM4', trainer: null, requests: [{ id: 1, trainerName: 'Константин Соколов', createdAt: daysAgo(0) }] }
     : { publicId: 'FT-A3B9CD', trainer: { name: 'Константин Соколов' }, requests: [] }),

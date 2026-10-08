@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api, apiMutate } from '../api.js';
 import { Field, Segmented, Note, Loading, ErrorState, Panel } from '../ui.jsx';
 import { IconAlert, IconCheck } from '../icons.jsx';
+import PhoneSetting from './PhoneSetting.jsx';
 
 /**
  * Мои данные.
@@ -71,6 +72,10 @@ export default function Profile({ clientRow }) {
   if (state.error) return <ErrorState error={state.error} onRetry={load} />;
 
   return (
+    <>
+    {/* Номер для входа — только у самого клиента: тренер в карточке его не
+        подключает, вход подтверждает звонком владелец номера */}
+    {!clientRow && <PhoneSetting />}
     <Panel pad>
       <div className="survey">
         <div className="survey__group">
@@ -152,5 +157,6 @@ export default function Profile({ clientRow }) {
         <button className="button" onClick={load} disabled={busy}>Отменить правки</button>
       </div>
     </Panel>
+    </>
   );
 }

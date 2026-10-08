@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiPublic } from './api.js';
+import PhoneLogin from './PhoneLogin.jsx';
+import { Segmented } from './ui.jsx';
 import { setToken, describeDevice } from './session.js';
 import { IconKey } from './icons.jsx';
 import PasteLink from './PasteLink.jsx';
@@ -26,12 +28,7 @@ export default function LoginScreen({ details }) {
         <div className="login__inner">
           <div className="login__mark"><IconKey size={28} /></div>
           <h1 className="login__title">Вход в кабинет</h1>
-          <p className="login__text">
-            Войдите по почте — если кабинета ещё нет, он заведётся. Пароль
-            не нужен: придёт код.
-          </p>
-
-          <ClientEmailLogin />
+          <ClientLogin />
 
           <p className="login__text login__text--second">
             Есть ссылка от тренера? Откройте её — кабинет запустится сразу.
@@ -55,6 +52,45 @@ export default function LoginScreen({ details }) {
         </div>
       </main>
     </div>
+  );
+}
+
+/**
+ * Почта или телефон (FT-489). Вкладка «Телефон» — только если сервер
+ * сказал, что вход по телефону включён (есть ключ SMS.ru): иначе человек
+ * ввёл бы номер и упёрся в «не настроено».
+ */
+function ClientLogin() {
+  const [options, setOptions] = useState(null);
+  const [way, setWay] = useState('email');
+
+  useEffect(() => {
+    let alive = true;
+    apiPublic('auth.phone.options', {})
+      .then((o) => { if (alive && o && o.call) setOptions(o); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <>
+      <p className="login__text">
+        {way === 'phone'
+          ? 'Войдите по номеру телефона — если кабинета ещё нет, он заведётся.'
+          : 'Войдите по почте — если кабинета ещё нет, он заведётся. Пароль не нужен: придёт код.'}
+      </p>
+      {options && (
+        <div className="login__ways">
+          <Segmented
+            label="Способ входа"
+            items={[{ value: 'email', label: 'Почта' }, { value: 'phone', label: 'Телефон' }]}
+            value={way}
+            onChange={setWay}
+          />
+        </div>
+      )}
+      {way === 'phone' && options ? <PhoneLogin mode="login" options={options} /> : <ClientEmailLogin />}
+    </>
   );
 }
 

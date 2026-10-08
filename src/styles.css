@@ -4835,3 +4835,202 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   .goal-ring__fill,
   .goals__chevron { transition: none; }
 }
+
+/* ==========================================================================
+   Ввод кода и проверка номера (FT-489, OtpStage.jsx) — по ролику владельца:
+   ряд → круг и кружение (проверка) → зелёные → точка → галочка в кольце.
+   Ячейки стоят абсолютно в центре сцены и двигаются transform'ом, поэтому
+   переход между рядом и кругом — один и тот же transition.
+   ========================================================================== */
+
+.otp {
+  position: relative;
+  height: 156px;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.otp__orbit {
+  position: absolute;
+  inset: 0;
+  transition: transform 460ms var(--ease-out);
+}
+
+.otp__orbit--spin { animation: otp-spin 1500ms linear infinite; }
+
+@keyframes otp-spin { to { transform: rotate(360deg); } }
+
+.otp__cell {
+  position: absolute;
+  left: calc(50% - var(--otp-cell) / 2);
+  top: calc(50% - 26px);
+  width: var(--otp-cell);
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  transition:
+    transform 520ms var(--ease-out),
+    border-color 200ms ease,
+    background-color 260ms ease,
+    color 260ms ease,
+    opacity 300ms ease,
+    scale 300ms var(--ease-out);
+}
+
+.otp__cell--filled { border-color: color-mix(in srgb, var(--text) 45%, transparent); }
+
+.otp__cell--active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+.otp__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+/* В круге ячейки чуть меньше — круг не должен быть шире ряда */
+.otp--checking .otp__cell,
+.otp--success .otp__cell { scale: 0.9; }
+
+.otp--success .otp__cell {
+  background: var(--good-fill);
+  border-color: var(--good-line);
+  color: var(--good-text);
+}
+
+.otp--success .otp__dot { background: var(--good-text); }
+
+/* Сжатие в точку: ячейки уходят в центр, на их месте — зелёная точка */
+.otp--collapse .otp__cell,
+.otp--done .otp__cell {
+  transform: translate(0, 0) !important;
+  scale: 0.2;
+  opacity: 0;
+  transition-delay: 0ms !important;
+  transition-duration: 340ms;
+}
+
+.otp__core {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--chart-up-strong);
+  scale: 0;
+  transition: scale 260ms var(--ease-out);
+}
+
+.otp--collapse .otp__core { scale: 1; transition-delay: 180ms; }
+.otp--done .otp__core { scale: 0; }
+
+.otp__done {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.otp__badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--good-fill);
+  color: var(--good-text);
+  border: 1.5px solid var(--good-line);
+  scale: 0.4;
+  opacity: 0;
+  transition: scale 420ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease;
+}
+
+.otp__halo {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.otp__halo circle {
+  fill: none;
+  stroke: var(--chart-up);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 208;
+  stroke-dashoffset: 208;
+  transform: rotate(-90deg);
+  transform-origin: 36px 36px;
+  transition: stroke-dashoffset 600ms var(--ease-out) 120ms;
+}
+
+.otp--done .otp__badge { scale: 1; opacity: 1; }
+.otp--done .otp__halo circle { stroke-dashoffset: 0; }
+
+/* Не подошёл — назад в ряд и «нет» головой */
+.otp--error .otp__orbit { animation: otp-shake 420ms var(--ease-out); }
+.otp--error .otp__cell { border-color: var(--critical-line); color: var(--critical-text); }
+
+@keyframes otp-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+/* Поле ввода — невидимое поверх сцены: клавиатура, вставка и подсказка
+   кода из СМС работают как у обычного поля */
+.otp__input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  font-size: 16px;
+  caret-color: transparent;
+  border: 0;
+  background: transparent;
+  color: transparent;
+}
+
+.sr-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otp__orbit--spin,
+  .otp--error .otp__orbit { animation: none; }
+  .otp__orbit,
+  .otp__cell,
+  .otp__core,
+  .otp__badge,
+  .otp__halo circle { transition-duration: 1ms !important; transition-delay: 0ms !important; }
+}
+
+/* --- вход по телефону (FT-489, PhoneLogin.jsx) --- */
+.login__ways { margin-bottom: var(--space-3); }
+.login__ways .chips { justify-content: center; }
+.phone { display: grid; gap: var(--space-3); }
+.phone__lead { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.45; }
+.phone__call { text-decoration: none; font-variant-numeric: tabular-nums; }
+.phone__wait { margin: calc(-1 * var(--space-2)) 0 0; text-align: center; }
+.phone__verified { margin: 0; font-weight: 620; color: var(--good-text); }
+.phone-setting { margin-bottom: var(--space-3); display: grid; gap: var(--space-3); }
+.phone-setting__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.phone-setting__number { font-weight: 650; font-variant-numeric: tabular-nums; margin-right: auto; }
