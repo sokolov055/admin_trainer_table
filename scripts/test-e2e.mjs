@@ -323,6 +323,21 @@ test('клиент: журнала в меню нет, свободная тре
 });
 
 /**
+ * «Как пользоваться» (FT-495): инструкция открывается из меню, а не только
+ * кружком на «Обзоре»; закрывается крестиком.
+ */
+test('клиент: «Как пользоваться» открывается из меню', async () => {
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Меню' }).click();
+  await page.getByRole('button', { name: /Как пользоваться/ }).click();
+  const viewer = page.locator('.story');
+  await assert.doesNotReject(viewer.getByText('Как пользоваться Fit Track').waitFor({ timeout: 10000 }));
+  await assert.doesNotReject(viewer.getByRole('heading', { name: 'Вход' }).waitFor({ timeout: 5000 }), 'первый кадр — «Вход»');
+  await viewer.getByRole('button', { name: 'Закрыть' }).click();
+  await viewer.waitFor({ state: 'detached', timeout: 5000 });
+});
+
+/**
  * Вход по персональной ссылке — так клиенты попадают в кабинет.
  *
  * Здесь жили две поломки, которые видел только человек с телефоном.

@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Overview, Plan, Progress, Nutrition, WorkoutJournal } from './screens.jsx';
 import { Deferred } from '../lazy.js';
-import { Stories, summaryTopics } from '../stories.jsx';
+import { Stories, GuideViewer, guideNote, summaryTopics } from '../stories.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion } from '../viewMotion.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink, IconGuide } from '../icons.jsx';
 import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
 import { Drawer, Section, SignOut } from '../ui.jsx';
@@ -95,6 +95,9 @@ export default function ClientApp({ me, clientRow, preview }) {
   // «Установить / Открыть в приложении» (AppHint.jsx)
   const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
   const own = !clientRow && !preview && !(me && me.member);
+  // «Как пользоваться» (FT-495) — инструкция из меню, а не только кружком на «Обзоре»
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guide = { id: 'guide', label: 'Как пользоваться', note: guideNote(), Icon: IconGuide, action: () => setGuideOpen(true) };
 
   // Личные истории «Моя неделя» и «Итоги месяца» (FT-493) — в кабинете
   // клиента и у тренера «глазами клиента»: режим для того и есть, чтобы
@@ -114,7 +117,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   const [consented, setConsented] = useState(false);
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, guide, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -261,6 +264,8 @@ export default function ClientApp({ me, clientRow, preview }) {
 
         <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
+
+      {guideOpen && <GuideViewer onClose={() => setGuideOpen(false)} />}
 
       {/* key на контейнере перезапускает появление при смене вкладки:
           экран собирается той же короткой лесенкой, что и при первой

@@ -16,7 +16,7 @@ import { rangeText, monthText, metricRows, recordText, verdict } from './client/
  * Слить их в одно число не выйдет: тренерские правки выходят чаще, и общее
  * число обещало бы клиенту новости, которых для него не было.
  */
-const NEWS_VERSION = '3.8';
+const NEWS_VERSION = '3.9';
 
 /**
  * ==========================================================================
@@ -111,6 +111,16 @@ export const TOPICS = [
     cover: 'release',
     caption: 'Что нового в версии ' + NEWS_VERSION,
     frames: [
+      {
+        id: 'guide-menu',
+        date: '8 октября',
+        art: 'guide',
+        tint: '#f5c65c',
+        heading: 'Как пользоваться — в меню',
+        body: 'Откройте «Ещё» → «Как пользоваться»: короткая инструкция по '
+          + 'разделам приложения, её можно перечитать когда угодно. А пустой '
+          + 'экран теперь сразу предлагает действие — например, «Записать первый замер».',
+      },
       {
         id: 'muscle-map',
         date: '8 октября',
@@ -331,6 +341,27 @@ export function Stories({ personal = [] }) {
       )}
     </>
   );
+}
+
+/**
+ * Инструкция «Как пользоваться» из меню (FT-495): та же тема, что в ряду
+ * кружков на «Обзоре», но открывается когда угодно — прокрутил кружки раз и
+ * потерял, а вернуться было некуда.
+ */
+export function GuideViewer({ onClose }) {
+  const topics = TOPICS.filter((t) => t.id === 'guide');
+  const [at, setAt] = useState({ topic: 0, frame: 0 });
+  const markSeen = useCallback((id) => {
+    const seen = readSeen();
+    if (seen.indexOf(id) === -1) writeSeen(seen.concat(id));
+  }, []);
+  return <StoryViewer topics={topics} at={at} onAt={setAt} onSeen={markSeen} onClose={onClose} />;
+}
+
+/** Подпись пункта меню: часы — только там, где в инструкции есть кадр про них */
+export function guideNote() {
+  const guide = TOPICS.find((t) => t.id === 'guide');
+  return guide && guide.frames.some((f) => f.id === 'guide-watch') ? 'Приложение и Apple Watch' : 'Что где находится';
 }
 
 /* ==========================================================================

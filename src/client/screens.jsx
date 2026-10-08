@@ -741,6 +741,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           icon={IconPlan}
           title="Пока ничего не выполнено"
           text={'В ' + monthIn(doneLabel) + ' ещё нет проведённых тренировок.'}
+          action={!running && !familyRow ? (
+            <button className="button button--primary" onClick={freeWorkout}>Начать свободную тренировку</button>
+          ) : null}
         />
       )}
 
@@ -1517,7 +1520,10 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   if (!hasRows && lifts.length === 0) {
     return (
       <>
-        {addMeasure}
+        {/* Пустой экран — одно действие (FT-495): кнопка «Записать первый
+            замер» стоит в самом пустом состоянии, а не отдельно над ним.
+            Пока форма открыта, на её месте — она */}
+        {adding && addMeasure}
         {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
         {!familyRow && <Summary clientRow={clientRow} />}
         <Empty
@@ -1530,6 +1536,11 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
             || 'Запишите первый замер — и здесь появятся динамика, изменения и таблица замеров. '
                + 'Рабочие веса подтянутся из программы месяца.'
           }
+          action={!familyRow && !adding ? (
+            <button className="button button--primary" onClick={() => { setAdded(null); setAdding(true); }}>
+              Записать первый замер
+            </button>
+          ) : null}
         />
         {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
       {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
@@ -1738,7 +1749,9 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
               <Empty
                 icon={IconRuler}
                 text={(measurements && measurements.note)
-                  || 'Замеров пока нет. Появятся, как только тренер внесёт первый.'}
+                  || (familyRow
+                    ? 'Замеров пока нет.'
+                    : 'Замеров пока нет. Запишите первый — кнопка «Записать замер» вверху.')}
               />
             </Panel>
           </Section>

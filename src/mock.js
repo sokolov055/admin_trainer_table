@@ -7,6 +7,7 @@
  * переход, а также чтобы показать приложение до того, как настроен бэкенд.
  *
  * Роль переключается параметром в адресе: ?mockRole=trainer
+ * Пустой «Прогресс» (нет замеров и весов) — ?mockEmpty=1: смотреть пустое состояние
  *
  * Вход по коду здесь тоже настоящий — с экраном, кодом и ожиданием. Не
  * хватает только человека с телефоном, поэтому демо-сервер подтверждает
@@ -60,6 +61,8 @@ let mockTrainers = [
   { id: 2, email: 'maria@fittrack.demo', name: 'Мария Ковалёва', status: 'pending', owner: false, clients: 0, appliedAt: daysAgo(0) },
   { id: 3, email: 'igor@fittrack.demo', name: 'Игорь Власов', status: 'active', owner: false, clients: 6, appliedAt: daysAgo(12) },
 ];
+
+const mockEmpty = () => new URLSearchParams(window.location.search).has('mockEmpty');
 
 const PLAN_BLOCKS = [
   {
@@ -1136,7 +1139,7 @@ const MOCK = {
   }),
 
   'client.measurements': () => ({
-    series: [{ label: '', sheetName: 'Показатели', rows: MEASURE_ROWS }],
+    series: [{ label: '', sheetName: 'Показатели', rows: mockEmpty() ? [] : MEASURE_ROWS }],
     fields: FIELDS,
   }),
 
@@ -1261,7 +1264,7 @@ const MOCK = {
   'client.progress': () => ({
     series: [{
       label: '',
-      rows: MEASURE_ROWS,
+      rows: mockEmpty() ? [] : MEASURE_ROWS,
       deltas: {
         'Вес': { first: 82.4, firstDate: daysAgo(150), last: 76.9, lastDate: daysAgo(4), delta: -5.5, points: 6 },
         'Талия': { first: 94, firstDate: daysAgo(150), last: 85.5, lastDate: daysAgo(4), delta: -8.5, points: 6 },
@@ -1269,7 +1272,7 @@ const MOCK = {
         'Рука': { first: 34, firstDate: daysAgo(150), last: 36.5, lastDate: daysAgo(4), delta: 2.5, points: 6 },
       },
     }],
-    lifts: [
+    lifts: mockEmpty() ? [] : [
       { name: 'Присед со штангой', block: 'Тренировка 2 — низ', weight: 95, prevWeight: 90, delta: 5, deltaPct: 5.6 },
       { name: 'Румынская тяга', block: 'Тренировка 2 — низ', weight: 85, prevWeight: 80, delta: 5, deltaPct: 6.3 },
       { name: 'Жим лёжа', block: 'Тренировка 1 — верх', weight: 72.5, prevWeight: 70, delta: 2.5, deltaPct: 3.6 },
