@@ -615,7 +615,9 @@ function StoryGoal({ goal }) {
           strokeDasharray={length} strokeDashoffset={length * (1 - share)} transform="rotate(-90 16 16)"
         />
       </svg>
-      <span>{goal.label}: {goal.done} из {goal.target}</span>
+      {/* «Цель — 2, сделано 3», а не «3 из 2»: перевыполненная цель
+          дробью читается как бессмыслица */}
+      <span>{goal.label} — {goal.target}, сделано {goal.done}</span>
     </div>
   );
 }
