@@ -1243,6 +1243,7 @@ function MachineForm({ exercise, machine, onDone }) {
   };
 
   const current = preview || (!dropPhoto && machine && machine.photo ? machine.photo : '');
+  const touch = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   return (
     <div className="library__form library__machine-form">
       <label className="field">
@@ -1254,8 +1255,17 @@ function MachineForm({ exercise, machine, onDone }) {
         <span className="field__label">Фото</span>
         {current && <MachinePhoto machine={{ name: name || 'тренажёр', photo: current }} />}
         <div className="library__machine-actions">
+          {/* Камера — отдельной кнопкой (08.10.2026): без capture Android
+              открывал только галерею, снять тренажёр было нечем. На
+              компьютере камеры у выбора файла нет — кнопка одна */}
+          {touch && (
+            <label className="button button--ghost">
+              {current ? 'Переснять' : 'Сфотографировать'}
+              <input type="file" accept="image/*" capture="environment" hidden onChange={pick} />
+            </label>
+          )}
           <label className="button button--ghost">
-            {current ? 'Другое фото' : 'Сфотографировать или выбрать'}
+            {touch ? 'Выбрать из галереи' : current ? 'Другое фото' : 'Выбрать фото'}
             <input type="file" accept="image/*" hidden onChange={pick} />
           </label>
           {current && <button type="button" className="button button--ghost" onClick={() => { setPhoto(null); setPreview(''); setDropPhoto(true); }}>Убрать фото</button>}
