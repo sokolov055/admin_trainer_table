@@ -62,6 +62,16 @@ const QUIET_FOR_MS = 120000;
 let quietUntil = 0;
 const requestTimeout = () => (Date.now() < quietUntil ? QUIET_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
 
+/**
+ * Чтение — две попытки вместо одной долгой (FT-507, 08.10.2026). Под
+ * «белыми списками» часть соединений проходит сразу, а часть висит до
+ * конца предела: приложение с мобильного интернета открывалось ровно за
+ * 20 с. Брошенный запрос закрывает своё соединение, и повтор идёт новым —
+ * у него хороший шанс пройти. Общее ожидание то же: 6 + 14 с. Запись так
+ * не повторяем: неизвестно, дошла ли она (см. apiMutate).
+ */
+const READ_FIRST_TIMEOUT_MS = 6000;
+
 const STORAGE_PREFIX = 'api_cache_v1:';
 
 export class ApiError extends Error {
@@ -149,7 +159,7 @@ export async function api(action, params = {}, options = {}) {
   const pending = inFlight.get(key);
   if (pending) return pending;
 
-  const promise = request(action, params)
+  const promise = request(action, params, { read: true })
     .then((data) => {
       memory.set(key, data);
       writeStored(key, data);
@@ -187,7 +197,11 @@ export function apiStale(action, params = {}) {
   if (memory.has(key)) {
     cached = memory.get(key);
   } else {
-    const stored = readStored(key);
+    // Любой давности, как без связи (FT-507): прежние 12 часов значили, что
+    // утром экран стоял скелетом, пока сервер не ответит или не выйдет
+    // предел, — и лишь потом показывал те же сохранённые данные. Свежие всё
+    // равно тут же запрашиваются, показанное помечено устаревшим.
+    const stored = readStored(key, true);
     if (stored) {
       cached = stored.data;
       stale = true;
@@ -208,7 +222,7 @@ export async function apiBatch(requests) {
   try {
     body = await request('batch', {
       requests: requests.map((r) => ({ action: r.action, params: r.params || {} })),
-    });
+    }, { read: true });
   } catch (error) {
     // Нет связи — собираем пакет из того, что знали (как api() без сети):
     // «Прогресс» раньше без сети был пустым, хотя замеры лежали на телефоне
@@ -324,7 +338,8 @@ export async function logout() {
   import('./native-widget.js').then((m) => m.forgetWidgets()).catch(() => {});
 }
 
-async function request(action, params) {
+/** read — только чтение: его можно повторить, не боясь задвоить (READ_FIRST_TIMEOUT_MS) */
+async function request(action, params, { read = false } = {}) {
   if (import.meta.env.VITE_MOCK === '1') {
     const { mockApi } = await import('./mock.js');
     return mockApi(action, params);
@@ -351,7 +366,12 @@ async function request(action, params) {
   const payload = { action, initData, ...(token ? { token } : {}), ...params };
 
   const timeout = requestTimeout();
-  let body = await tryEndpoint(url, payload, timeout);
+  // Тихий режим (сервер только что молчал) — одна короткая попытка, как раньше
+  const retry = read && Date.now() >= quietUntil;
+  let body = await tryEndpoint(url, payload, retry ? READ_FIRST_TIMEOUT_MS : timeout);
+  if (body === TIMED_OUT && retry) {
+    body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS - READ_FIRST_TIMEOUT_MS);
+  }
 
   // Запасной адрес: основной не соединился — идём на запасной. С
   // 27.09.2026 это тот же сервер под прежним именем (nip.io рядом с
