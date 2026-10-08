@@ -812,6 +812,8 @@ const MOCK = {
     return { phone: mockPhoneLogin };
   },
   'account.phone.remove': () => { mockPhoneLogin = ''; return { phone: '' }; },
+  // Копия своих данных (FT-496): в демо — заглушка вместо файла с сервера
+  'account.export': () => ({ url: 'data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><meta charset="utf-8"><h1>Мои данные в Fit Track</h1><p>Демо: здесь будет выгрузка.</p>'), expiresAt: new Date(Date.now() + 600000).toISOString() }),
   'account.get': () => (new URLSearchParams(window.location.search).get('mockUnlinked') === '1'
     ? { publicId: 'FT-7K2QM4', trainer: null, requests: [{ id: 1, trainerName: 'Константин Соколов', createdAt: daysAgo(0) }] }
     : { publicId: 'FT-A3B9CD', trainer: { name: 'Константин Соколов' }, requests: [] }),

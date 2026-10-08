@@ -5034,3 +5034,5 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .phone-setting { margin-bottom: var(--space-3); display: grid; gap: var(--space-3); }
 .phone-setting__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .phone-setting__number { font-weight: 650; font-variant-numeric: tabular-nums; margin-right: auto; }
+.data-export { margin-top: var(--space-3); display: grid; gap: var(--space-3); }
+.data-export .button { text-decoration: none; text-align: center; }

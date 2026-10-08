@@ -3,6 +3,7 @@ import { api, apiMutate } from '../api.js';
 import { Field, Segmented, Note, Loading, ErrorState, Panel } from '../ui.jsx';
 import { IconAlert, IconCheck } from '../icons.jsx';
 import PhoneSetting from './PhoneSetting.jsx';
+import DataExport from './DataExport.jsx';
 
 /**
  * Мои данные.
@@ -157,6 +158,8 @@ export default function Profile({ clientRow }) {
         <button className="button" onClick={load} disabled={busy}>Отменить правки</button>
       </div>
     </Panel>
+    {/* Копия своих данных (ст. 14 152-ФЗ) — тоже только у самого клиента */}
+    {!clientRow && <DataExport />}
     </>
   );
 }
