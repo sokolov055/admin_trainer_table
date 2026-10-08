@@ -303,6 +303,85 @@ function mockAwards(params = {}) {
   };
 }
 
+/**
+ * Итоги недели и месяца (FT-493): правдоподобные цифры, разные для каждого
+ * периода, чтобы в демо стрелки листания что-то меняли. Самое раннее —
+ * полгода назад: дальше левая стрелка гаснет.
+ */
+function mockDay(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function mockPeriod(kind, offset) {
+  const now = new Date();
+  if (kind === 'week') {
+    const from = new Date(now);
+    from.setDate(from.getDate() - ((from.getDay() + 6) % 7) - 7 * offset);
+    const to = new Date(from);
+    to.setDate(to.getDate() + 6);
+    return { from: mockDay(from), to: mockDay(to) };
+  }
+  const from = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+  const to = new Date(now.getFullYear(), now.getMonth() - offset + 1, 0);
+  return { from: mockDay(from), to: mockDay(to) };
+}
+
+function mockMetrics(kind, offset) {
+  const k = kind === 'week' ? 1 : 4.3;
+  const wave = [3, 2, 3, 1, 2, 3, 2][offset % 7];
+  const trainings = Math.round(wave * k);
+  return {
+    trainings,
+    minutes: trainings * (55 + (offset % 3) * 5),
+    tonnage: trainings * (3800 + (offset % 4) * 350),
+    steps: 7200 + ((offset * 937) % 2600),
+  };
+}
+
+function mockSummary(params = {}) {
+  const kind = params.period === 'month' ? 'month' : 'week';
+  const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
+  const range = mockPeriod(kind, offset);
+  const today = mockDay(new Date());
+  const current = range.to >= today;
+  const prev = mockPeriod(kind, offset + 1);
+  const scale = current ? 0.6 : 1;
+  const now = mockMetrics(kind, offset);
+  const before = mockMetrics(kind, offset + 1);
+  const cut = (m) => ({ ...m, trainings: Math.round(m.trainings * scale), minutes: Math.round(m.minutes * scale), tonnage: Math.round(m.tonnage * scale) });
+  const records = offset % 2 === 0
+    ? [{ name: 'Жим лёжа', machine: null, before: 60, after: 62.5 }, { name: 'Тяга верхнего блока', machine: 'Блок у окна', before: 50, after: 55 }]
+    : offset % 3 === 1 ? [{ name: 'Присед', machine: null, before: 80, after: 85 }] : [];
+  return {
+    period: kind, offset, ...range, current, until: current ? today : range.to,
+    prev: { from: prev.from, to: prev.to },
+    now: current ? cut(now) : now,
+    before: current ? cut(before) : before,
+    records,
+    empty: false,
+    older: offset < (kind === 'week' ? 26 : 6),
+  };
+}
+
+function mockSummaryStories() {
+  const today = new Date();
+  const week = { ...mockSummary({ period: 'week', offset: 1 }), current: false };
+  const stories = [{
+    id: 'week-' + week.from, ...week,
+    goal: { target: mockGoal.week, done: week.now.trainings, met: week.now.trainings >= mockGoal.week, left: Math.max(0, mockGoal.week - week.now.trainings) },
+    streak: 5,
+  }];
+  // В демо «Итоги месяца» видны всегда — иначе их не показать половину месяца
+  const month = mockSummary({ period: 'month', offset: 1 });
+  const target = Math.round((mockGoal.week * 30) / 7);
+  stories.push({
+    id: 'month-' + month.from, ...month,
+    goal: { target, done: month.now.trainings, met: month.now.trainings >= target, left: Math.max(0, target - month.now.trainings) },
+    streak: 5,
+  });
+  return { today: mockDay(today), stories };
+}
+
 function mockFail(message) {
   const err = new Error(message);
   err.code = 400;
@@ -1349,6 +1428,8 @@ const MOCK = {
   // шагов и замеров (server/src/lib/awards.js); здесь — правдоподобный снимок
   // с целью, которую можно поменять
   'client.awards': (params = {}) => mockAwards(params),
+  'client.summary': (params = {}) => mockSummary(params),
+  'client.summary.stories': () => mockSummaryStories(),
   'client.goals.save': (params = {}) => {
     const week = Math.round(Number(params.week));
     const steps = Math.round(Number(params.steps) / 500) * 500;

@@ -7,6 +7,7 @@ import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
 import Goals from './Goals.jsx';
+import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
@@ -1508,6 +1509,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       <>
         {addMeasure}
         {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
+        {!familyRow && <Summary clientRow={clientRow} />}
         <Empty
           icon={IconProgress}
           title="Прогресс пока не из чего собрать"
@@ -1570,6 +1572,10 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {/* Цели, серии и награды — сразу под записью замера: ответ на
           «иду ли я по плану» нужен раньше динамики (FT-490) */}
       {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
+
+      {/* Итоги недели и месяца — под целями: цели отвечают «иду ли я по
+          плану», итоги — «что я сделал» (FT-493) */}
+      {!familyRow && <Summary clientRow={clientRow} />}
 
       {/* Период изменений — над итогом, который он меняет, и над таблицей */}
       {hasRows && series.some((s) => s.rows.length > 1) && (

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { haptic } from './telegram.js';
 import { ART, COVERS } from './storyArt.jsx';
-import { IconClose } from './icons.jsx';
+import { IconClose, IconDelta } from './icons.jsx';
 import { detectBrowser } from './browser.js';
+import { rangeText, monthText, metricRows, recordText, verdict } from './client/summaryText.js';
 
 /**
  * Версия, в которой вышли эти новости.
@@ -15,7 +16,7 @@ import { detectBrowser } from './browser.js';
  * Слить их в одно число не выйдет: тренерские правки выходят чаще, и общее
  * число обещало бы клиенту новости, которых для него не было.
  */
-const NEWS_VERSION = '3.3';
+const NEWS_VERSION = '3.7';
 
 /**
  * ==========================================================================
@@ -111,15 +112,15 @@ export const TOPICS = [
     caption: 'Что нового в версии ' + NEWS_VERSION,
     frames: [
       {
-        id: 'goals-awards',
-        date: '7 октября',
+        id: 'summary-week-month',
+        date: '8 октября',
         art: 'progress',
-        tint: '#7fd97f',
-        heading: 'Цели, серии и награды',
-        body: 'Откройте «Прогресс»: сверху три кольца — сколько тренировок на этой '
-          + 'неделе, в месяце и в году против цели. Ниже — серия: недели подряд с '
-          + 'выполненной целью и дни подряд с нормой шагов. «Награды» раскрывают '
-          + 'список вех. «Изменить» — своя цель: тренировок в неделю и шагов в день.',
+        tint: '#ffa24c',
+        heading: 'Итоги недели и месяца',
+        body: 'В «Прогрессе» под целями — «Итоги»: тренировки, время, тоннаж, '
+          + 'рекорды и шаги со стрелкой к прошлому разу. «Неделя» или «Месяц» — '
+          + 'период, стрелки листают назад. По понедельникам здесь же, в кружках, '
+          + 'появится «Моя неделя», а 1-го числа — «Итоги месяца».',
       },
     ],
   },
@@ -169,11 +170,11 @@ export const TOPICS = [
         body: 'Во вкладке «Прогресс» — замеры с графиком: «Записать замер» '
           + 'добавляет новый, хоть один показатель. Там же «Подключить шаги» — '
           + 'шаги из телефона и браслета придут сами, и тренировки с часов. '
-          + 'Сверху — цели и серии, под ними «Награды».',
+          + 'Сверху — цели и серии, под ними «Награды» и итоги недели и месяца.',
         bodyIos: 'Во вкладке «Прогресс» — замеры с графиком: «Записать замер» '
           + 'добавляет новый, хоть один показатель. Там же «Подключить шаги» — '
           + 'шаги и тренировки из «Здоровья» с iPhone и Apple Watch придут сами. '
-          + 'Сверху — цели и серии, под ними «Награды».',
+          + 'Сверху — цели и серии, под ними «Награды» и итоги недели и месяца.',
       },
       {
         id: 'guide-nutrition',
@@ -213,10 +214,59 @@ TOPICS.forEach((topic) => {
 });
 
 /* ==========================================================================
+   Личные истории: «Моя неделя» и «Итоги месяца» (FT-493)
+
+   Не новости, а свои цифры: у каждого клиента свои, считает сервер
+   (client.summary.stories). Стоят первыми — свежее и про самого человека.
+   id кадров содержат начало периода: новая неделя — новый кружок, и
+   «просмотрено» прошлой недели его не гасит.
+   ========================================================================== */
+
+export function summaryTopics(stories) {
+  return (stories || []).map((st) => {
+    const week = st.period === 'week';
+    const range = week ? rangeText(st.from, st.to) : monthText(st.from, st.to);
+    const v = verdict(st);
+    const frames = [
+      {
+        id: st.id + ':numbers',
+        tint: week ? '#ffa24c' : '#c9a4f0',
+        heading: week ? 'Неделя в цифрах' : 'Месяц в цифрах',
+        stats: metricRows(st),
+        statsNote: week ? 'Стрелки — к прошлой неделе' : 'Стрелки — к прошлому месяцу',
+      },
+      ...(st.records.length ? [{
+        id: st.id + ':records',
+        tint: '#7fd97f',
+        heading: st.records.length === 1 ? 'Новый рекорд' : 'Рекорды: ' + st.records.length,
+        records: st.records.slice(0, 6),
+      }] : []),
+      {
+        id: st.id + ':verdict',
+        art: st.goal.met ? 'goalMet' : 'goalPush',
+        tint: st.goal.met ? '#7fd97f' : '#f5c65c',
+        heading: v.heading,
+        body: v.body,
+      },
+    ];
+    return {
+      id: st.id,
+      label: week ? 'Моя неделя' : 'Итоги месяца',
+      cover: week ? 'week' : 'month',
+      coverProps: { done: st.goal.done, target: st.goal.target },
+      caption: (week ? 'Моя неделя · ' : 'Итоги месяца · ') + range,
+      frames,
+    };
+  });
+}
+
+/* ==========================================================================
    Ряд кружков
    ========================================================================== */
 
-export function Stories() {
+// personal — личные темы (summaryTopics), первыми в ряду
+export function Stories({ personal = [] }) {
+  const topics = personal.length ? personal.concat(TOPICS) : TOPICS;
   const [seen, setSeen] = useState(readSeen);
   const [at, setAt] = useState(null);
 
@@ -228,14 +278,14 @@ export function Stories() {
     setSeen((prev) => (prev.indexOf(id) === -1 ? prev.concat(id) : prev));
   }, []);
 
-  if (TOPICS.length === 0) return null;
+  if (topics.length === 0) return null;
 
   return (
     <>
       {/* Ряд прокручивается вбок и выходит за поля экрана: обрезанный кружок
           у края — единственное, что честно сообщает, что там есть ещё. */}
       <div className="stories" role="group" aria-label="Истории приложения">
-        {TOPICS.map((topic, i) => {
+        {topics.map((topic, i) => {
           const Cover = COVERS[topic.cover];
 
           // Тема прочитана, когда прочитаны все её кадры. Достаточно одного
@@ -252,7 +302,7 @@ export function Stories() {
               aria-label={topic.caption + ', экранов: ' + topic.frames.length}
             >
               <span className="stories__tile">
-                {Cover ? <Cover /> : null}
+                {Cover ? <Cover {...(topic.coverProps || {})} /> : null}
 
                 {/* Затемнение снизу — не украшение: подпись лежит поверх
                     картинки, и без него белый текст на светлом участке
@@ -267,6 +317,7 @@ export function Stories() {
 
       {at && (
         <StoryViewer
+          topics={topics}
           at={at}
           onAt={setAt}
           onSeen={markSeen}
@@ -281,7 +332,7 @@ export function Stories() {
    Полноэкранный просмотр
    ========================================================================== */
 
-function StoryViewer({ at, onAt, onSeen, onClose }) {
+function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
   const rootRef = useRef(null);
   const gestureRef = useRef(null);
   const holdRef = useRef(null);
@@ -290,7 +341,7 @@ function StoryViewer({ at, onAt, onSeen, onClose }) {
   const [dragY, setDragY] = useState(0);
   const [shown, setShown] = useState(false);
 
-  const topic = TOPICS[at.topic];
+  const topic = topics[at.topic];
   const frame = topic.frames[at.frame];
 
   // Свежие значения в обработчиках, которые вешаются один раз
@@ -298,6 +349,10 @@ function StoryViewer({ at, onAt, onSeen, onClose }) {
   closeRef.current = onClose;
   const atRef = useRef(at);
   atRef.current = at;
+  // Через ref, а не в зависимостях go: новый массив тем на каждой
+  // отрисовке перевешивал бы клавиатуру и фокус (эффект ниже)
+  const topicsRef = useRef(topics);
+  topicsRef.current = topics;
 
   /**
    * Шаг вперёд или назад — сквозь границы тем.
@@ -308,7 +363,8 @@ function StoryViewer({ at, onAt, onSeen, onClose }) {
    */
   const go = useCallback((delta) => {
     const cur = atRef.current;
-    const frames = TOPICS[cur.topic].frames.length;
+    const list = topicsRef.current;
+    const frames = list[cur.topic].frames.length;
     const next = cur.frame + delta;
 
     if (next >= 0 && next < frames) {
@@ -318,7 +374,7 @@ function StoryViewer({ at, onAt, onSeen, onClose }) {
     }
 
     if (delta > 0) {
-      if (cur.topic + 1 >= TOPICS.length) { closeRef.current(); return; }
+      if (cur.topic + 1 >= list.length) { closeRef.current(); return; }
       onAt({ topic: cur.topic + 1, frame: 0 });
       haptic();
       return;
@@ -327,7 +383,7 @@ function StoryViewer({ at, onAt, onSeen, onClose }) {
     // Назад с первого кадра первой темы — некуда, остаёмся на месте
     if (cur.topic === 0) return;
     const prev = cur.topic - 1;
-    onAt({ topic: prev, frame: TOPICS[prev].frames.length - 1 });
+    onAt({ topic: prev, frame: list[prev].frames.length - 1 });
     haptic();
   }, [onAt]);
 
@@ -492,18 +548,60 @@ function StoryViewer({ at, onAt, onSeen, onClose }) {
           иначе смена текста на месте читается как опечатка, а не как
           следующая новость */}
       <div className="story__frame" key={topic.id + ':' + frame.id}>
-        <div className="story__art-box">
-          {Picture ? <Picture /> : null}
-        </div>
+        {Picture && (
+          <div className="story__art-box">
+            <Picture />
+          </div>
+        )}
         {frame.date && <p className="story__date">{frame.date}</p>}
         <h2 className="story__heading">{frame.heading}</h2>
-        <p className="story__body">{frame.body}</p>
+        {frame.stats && <StoryStats rows={frame.stats} note={frame.statsNote} />}
+        {frame.records && <StoryRecords records={frame.records} />}
+        {frame.body && <p className="story__body">{frame.body}</p>}
       </div>
 
       <p className="story__hint">
         {reduced ? 'Касанием — вперёд' : 'Придержите, чтобы дочитать'}
       </p>
     </div>
+  );
+}
+
+/** Кадр «в цифрах»: показатель, число, стрелка к прошлому периоду */
+function StoryStats({ rows, note }) {
+  return (
+    <>
+      <dl className="story__stats">
+        {rows.map((r) => (
+          <div key={r.id} className="story__stat">
+            <dt className="story__stat-label">{r.label}</dt>
+            <dd className="story__stat-value">
+              {r.value}{r.unit ? <span className="story__stat-unit"> {r.unit}</span> : null}
+            </dd>
+            {!r.noCompare && (
+              <dd className={'story__stat-change' + (r.diff > 0 ? ' story__stat-change--up' : r.diff < 0 ? ' story__stat-change--down' : '')}>
+                <IconDelta value={r.diff} size={14} />
+                {r.diff ? r.diffText(r.diff) : 'так же'}
+              </dd>
+            )}
+          </div>
+        ))}
+      </dl>
+      {note && <p className="story__stats-note">{note}</p>}
+    </>
+  );
+}
+
+function StoryRecords({ records }) {
+  return (
+    <ul className="story__records">
+      {records.map((r, i) => (
+        <li key={i} className="story__record">
+          <span className="story__record-name">{r.name}</span>
+          <span className="story__record-value">{recordText(r)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

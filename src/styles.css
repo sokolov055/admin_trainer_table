@@ -5054,3 +5054,205 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .wish__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .wish__reply { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); white-space: pre-wrap; }
 .wish__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-1); }
+
+/* ==========================================================================
+   Итоги недели и месяца — в «Прогрессе» под «Целями» (FT-493, client/Summary.jsx)
+   Показатели сеткой два на два: число крупно, под ним стрелка к прошлому
+   периоду. Стрелки листания — по краям названия периода, цель 44 px.
+   ========================================================================== */
+
+.summary__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-3) calc(-1 * var(--space-2)) 0;
+}
+
+.summary__arrow {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.summary__arrow:active:not(:disabled) { transform: scale(0.94); background: var(--surface-active); }
+.summary__arrow:disabled { color: var(--text-muted); opacity: 0.35; cursor: default; }
+
+.summary__chevron--back { transform: rotate(90deg); }
+.summary__chevron--next { transform: rotate(-90deg); }
+
+.summary__title {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary__empty {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.summary__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-3);
+  margin: var(--space-3) 0 0;
+}
+
+.summary__metric { min-width: 0; }
+
+.summary__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.summary__value {
+  margin: 2px 0 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.summary__unit {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.summary__change {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+}
+
+.summary__records {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.summary__records-title {
+  font-weight: 620;
+  margin-bottom: var(--space-2);
+}
+
+.summary__records ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.summary__record {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.summary__record-name { min-width: 0; }
+
+.summary__record-value {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--good-text);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summary__arrow:active:not(:disabled) { transform: none; }
+}
+
+/* Кадры личных историй «Моя неделя» / «Итоги месяца»: цифры сеткой два на
+   два и рекорды списком. Цвет стрелки — на тёмном фоне просмотра, поэтому
+   свои оттенки, а не --good-text светлой темы. */
+.story__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-4);
+  margin: var(--space-3) 0 0;
+}
+
+.story__stat { min-width: 0; }
+
+.story__stat-label {
+  font-size: var(--text-sm);
+  color: color-mix(in srgb, var(--story-fg) 62%, transparent);
+}
+
+.story__stat-value {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 720;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.story__stat-unit {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: color-mix(in srgb, var(--story-fg) 70%, transparent);
+}
+
+.story__stat-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--story-fg) 62%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.story__stat-change--up { color: #7fd97f; }
+.story__stat-change--down { color: #f5a77f; }
+
+.story__stats-note {
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-sm);
+  color: color-mix(in srgb, var(--story-fg) 60%, transparent);
+}
+
+.story__records {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.story__record {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid color-mix(in srgb, var(--story-fg) 12%, transparent);
+  font-size: var(--text-md);
+}
+
+.story__record:last-child { border-bottom: 0; padding-bottom: 0; }
+
+.story__record-value {
+  flex: 0 0 auto;
+  font-weight: 650;
+  color: #7fd97f;
+  font-variant-numeric: tabular-nums;
+}

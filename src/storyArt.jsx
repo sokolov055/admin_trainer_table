@@ -596,9 +596,43 @@ export function CoverGuide() {
   );
 }
 
+/**
+ * Обложки личных историй «Моя неделя» и «Итоги месяца» (FT-493): кольцо
+ * цели периода и число тренировок в нём — то же кольцо, что в «Целях»,
+ * чтобы плитку узнавали без подписи. Неделя — тёплая, месяц — сиреневый:
+ * два своих кружка рядом не должны читаться одной темой.
+ */
+function CoverSummary({ id, colors, done = 0, target = 1 }) {
+  const r = 46;
+  const length = 2 * Math.PI * r;
+  const share = target > 0 ? Math.min(done / target, 1) : 0;
+  return (
+    <svg className="stories__art" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor={colors[0]} />
+          <stop offset="1" stopColor={colors[1]} />
+        </linearGradient>
+      </defs>
+      <rect width="200" height="200" fill={'url(#' + id + ')'} />
+      <circle cx="100" cy="84" r={r} fill="none" stroke="#ffffff" strokeOpacity="0.28" strokeWidth="12" />
+      <circle
+        cx="100" cy="84" r={r} fill="none" stroke="#ffffff" strokeWidth="12" strokeLinecap="round"
+        strokeDasharray={length} strokeDashoffset={length * (1 - share)} transform="rotate(-90 100 84)"
+      />
+      <text x="100" y="98" textAnchor="middle" fill="#ffffff" fontSize="40" fontWeight="750">{done}</text>
+    </svg>
+  );
+}
+
+export const CoverWeek = (p) => <CoverSummary id="cover-week" colors={['#ffa24c', '#e0552f']} {...p} />;
+export const CoverMonth = (p) => <CoverSummary id="cover-month" colors={['#b07cf0', '#6a3fd0']} {...p} />;
+
 export const COVERS = {
   release: CoverRelease,
   guide: CoverGuide,
+  week: CoverWeek,
+  month: CoverMonth,
 };
 
 /**
@@ -828,7 +862,40 @@ export function ArtSteps() {
   );
 }
 
+/**
+ * Итог недели или месяца (FT-493): кольцо цели. Выполнена — кольцо
+ * замкнуто и в нём галочка; нет — кольцо на две трети и стрелка вверх.
+ * Не вес и не «минус килограммы»: итоги — про тренировки.
+ */
+export function ArtGoalMet() {
+  return (
+    <Art label="Кольцо цели замкнуто, внутри галочка">
+      <circle cx={160} cy={90} r={58} opacity={0.18} strokeWidth={14} />
+      <circle cx={160} cy={90} r={58} stroke="var(--tint)" strokeWidth={14} />
+      <path d="M136 92l16 16 32-34" stroke="var(--tint)" strokeWidth={8} />
+      <circle cx={60} cy={48} r={5} fill="var(--tint)" stroke="none" opacity={0.7} />
+      <circle cx={262} cy={132} r={4} fill="var(--tint)" stroke="none" opacity={0.6} />
+      <circle cx={250} cy={44} r={3} fill="currentColor" stroke="none" opacity={0.4} />
+    </Art>
+  );
+}
+
+export function ArtGoalPush() {
+  const r = 58;
+  const length = 2 * Math.PI * r;
+  return (
+    <Art label="Кольцо цели заполнено на две трети, стрелка вверх">
+      <circle cx={160} cy={90} r={r} opacity={0.18} strokeWidth={14} />
+      <circle cx={160} cy={90} r={r} stroke="var(--tint)" strokeWidth={14}
+        strokeDasharray={length} strokeDashoffset={length / 3} transform="rotate(-90 160 90)" />
+      <path d="M160 116V66m-18 18 18-18 18 18" stroke="var(--tint)" strokeWidth={8} />
+    </Art>
+  );
+}
+
 export const ART = {
+  goalMet: ArtGoalMet,
+  goalPush: ArtGoalPush,
   android: ArtAndroid,
   steps: ArtSteps,
   schedule: ArtSchedule,

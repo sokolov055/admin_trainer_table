@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Overview, Plan, Progress, Nutrition, WorkoutJournal } from './screens.jsx';
 import { Deferred } from '../lazy.js';
-import { Stories } from '../stories.jsx';
+import { Stories, summaryTopics } from '../stories.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
@@ -95,6 +95,21 @@ export default function ClientApp({ me, clientRow, preview }) {
   // «Установить / Открыть в приложении» (AppHint.jsx)
   const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
   const own = !clientRow && !preview && !(me && me.member);
+
+  // Личные истории «Моя неделя» и «Итоги месяца» (FT-493) — только в своём
+  // кабинете клиента: тренеру «глазами клиента» показывать нечьи цифры
+  // незачем. Ряд кружков ждёт ответа (null — ещё едет), чтобы свои не
+  // вставали перед уже открытой новостью и не сдвигали её номер.
+  const mine = !clientRow && !preview;
+  const [personal, setPersonal] = useState(mine ? null : []);
+  useEffect(() => {
+    if (!mine) return undefined;
+    let alive = true;
+    apiPublic('client.summary.stories', {})
+      .then((r) => { if (alive) setPersonal(summaryTopics(r && r.stories)); })
+      .catch(() => { if (alive) setPersonal([]); });
+    return () => { alive = false; };
+  }, [mine]);
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   const [consented, setConsented] = useState(false);
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
@@ -267,7 +282,7 @@ export default function ClientApp({ me, clientRow, preview }) {
               карточки клиента, и сторис оттуда читались бы как что-то,
               относящееся к этому клиенту. */}
           {t.id === 'overview' && own && ((me && me.unlinked) || pendingTrainerLink()) && <OverviewOffers />}
-          {t.id === 'overview' && <Stories />}
+          {t.id === 'overview' && personal && <Stories personal={personal} />}
           <t.Screen clientRow={clientRow} clientView={!!preview} />
         </main>
       ))}

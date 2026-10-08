@@ -39,7 +39,7 @@ const output = await build({
             export const Overview = Screen; export const Plan = Screen;
             export const Progress = Screen; export const Nutrition = Screen; export const WorkoutJournal = Screen;`,
         };
-        if (args.path === 'stories') return { loader: 'jsx', contents: `import React from 'react'; export const Stories=()=> <div>stories</div>;` };
+        if (args.path === 'stories') return { loader: 'jsx', contents: `import React from 'react'; export const Stories=()=> <div>stories</div>; export const summaryTopics=()=>[];` };
         if (args.path === 'transfer') return { loader: 'jsx', contents: `import React from 'react'; export const TelegramTransferCard=()=> <div>transfer-card</div>;` };
         // Заглушка собирается из имён настоящего модуля, а не из списка
         // руками: ui.jsx импортирует оттуда то одно, то другое, и список
