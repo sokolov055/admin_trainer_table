@@ -9,8 +9,7 @@ import { build } from 'esbuild';
  * приложение стояло скелетом ровно 20 с. Часть соединений до сервера
  * проходит сразу, часть висит до конца предела. Отсюда два правила:
  * сохранённое показываем сразу любой давности, а чтение после короткого
- * ожидания повторяем новым соединением на запасной адрес. Запись не
- * повторяем никогда.
+ * ожидания повторяем новым соединением. Запись не повторяем никогда.
  */
 
 const store = new Map();
@@ -25,16 +24,14 @@ globalThis.localStorage = new Proxy({
 globalThis.window = globalThis.window || { location: { search: '', href: 'https://x/' }, addEventListener() {} };
 globalThis.document = globalThis.document || { baseURI: 'https://x/' };
 
-// hang — сколько следующих запросов к основному адресу «повиснут»
+// hang — сколько следующих запросов «повиснут» (ответа нет до обрыва)
 let hang = 0;
 const posts = [];
 globalThis.fetch = (url, init = {}) => {
-  if (String(url).includes('config.json')) {
-    return Promise.resolve({ ok: true, json: async () => ({ apiUrl: 'https://api.primary.test', fallbackUrl: 'https://spare.test' }) });
-  }
+  if (String(url).includes('config.json')) return Promise.resolve({ ok: false, json: async () => null });
   const body = init.body ? JSON.parse(init.body) : {};
-  posts.push(new URL(url).host + ' ' + body.action);
-  if (hang > 0 && String(url).includes('primary')) {
+  posts.push(body.action);
+  if (hang > 0) {
     hang -= 1;
     return new Promise((_, reject) => init.signal && init.signal.addEventListener('abort', () => { const e = new Error('aborted'); e.name = 'AbortError'; reject(e); }));
   }
@@ -59,17 +56,17 @@ test('сохранённое вчера и после записи показы�
   assert.deepEqual(await promise, { fresh: 'client.summary' });
 });
 
-test('чтение повисло — через 5 с повтор на запасной адрес, а не ожидание 20 с', async (t) => {
+test('чтение повисло — через 6 с повтор новым соединением, а не ожидание 20 с', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   hang = 1; posts.length = 0;
   let result = null;
   const pending = api('client.plan', {}, { fresh: true }).then((d) => { result = d; });
-  await drive(t, 4000);
-  assert.equal(result, null, 'первые 4 с ещё ждём основной');
+  await drive(t, 5000);
+  assert.equal(result, null, 'первые 5 с ещё ждём');
   await drive(t, 2000);
   await pending;
   assert.deepEqual(result, { fresh: 'client.plan' });
-  assert.deepEqual(posts, ['api.primary.test client.plan', 'spare.test client.plan']);
+  assert.deepEqual(posts, ['client.plan', 'client.plan']);
 });
 
 test('запись повисла — не повторяется, отказ через 20 с', async (t) => {
@@ -79,6 +76,6 @@ test('запись повисла — не повторяется, отказ ч
   await drive(t, 21000);
   const error = await pending;
   assert.match(String(error && error.message), /не отвечает/);
-  assert.deepEqual(posts, ['api.primary.test payment.create'], 'оплата ушла один раз и не на запасной');
+  assert.deepEqual(posts, ['payment.create'], 'оплата ушла один раз');
   hang = 0;
 });

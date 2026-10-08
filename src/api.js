@@ -67,12 +67,10 @@ const requestTimeout = () => (Date.now() < quietUntil ? QUIET_TIMEOUT_MS : REQUE
  * «белыми списками» часть соединений проходит сразу, а часть висит до
  * конца предела: приложение с мобильного интернета открывалось ровно за
  * 20 с. Брошенный запрос закрывает своё соединение, и повтор идёт новым —
- * у него хороший шанс пройти. Повтор — на запасной адрес, если он есть
- * (опыт владельца 08.10.2026: вдруг старое имя пропускают, хотя сервер
- * тот же; не помогло — вернуть повтор на основной). Общее ожидание то же:
- * 5 + 15 с. Запись так не повторяем: неизвестно, дошла ли она (apiMutate).
+ * у него хороший шанс пройти. Общее ожидание то же: 6 + 14 с. Запись так
+ * не повторяем: неизвестно, дошла ли она (см. apiMutate).
  */
-const READ_FIRST_TIMEOUT_MS = 5000;
+const READ_FIRST_TIMEOUT_MS = 6000;
 
 const STORAGE_PREFIX = 'api_cache_v1:';
 
@@ -368,6 +366,12 @@ async function request(action, params, { read = false } = {}) {
   const payload = { action, initData, ...(token ? { token } : {}), ...params };
 
   const timeout = requestTimeout();
+  // Тихий режим (сервер только что молчал) — одна короткая попытка, как раньше
+  const retry = read && Date.now() >= quietUntil;
+  let body = await tryEndpoint(url, payload, retry ? READ_FIRST_TIMEOUT_MS : timeout);
+  if (body === TIMED_OUT && retry) {
+    body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS - READ_FIRST_TIMEOUT_MS);
+  }
 
   // Запасной адрес: основной не соединился — идём на запасной. С
   // 27.09.2026 это тот же сервер под прежним именем (nip.io рядом с
@@ -378,21 +382,11 @@ async function request(action, params, { read = false } = {}) {
   // остаются, если запасной адрес снова окажется скриптом.
   //
   // Не дождались ответа (TIMED_OUT) — на запасной не идём: запрос мог дойти
-  // до сервера, и повтор записи задвоил бы её. Чтение — можно (ниже).
+  // до сервера, и повтор записи задвоил бы её.
   const spare = fallbackApiUrl();
   const spareIsScript = /script\.google/.test(spare || '');
   const scriptWouldLie = spareIsScript && (JSON.stringify(params).includes('"familyRow"') || trainingAction(action, params));
-  const spareOk = !!spare && spare !== url && !scriptWouldLie;
-
-  // Тихий режим (сервер только что молчал) — одна короткая попытка, как раньше
-  const retry = read && Date.now() >= quietUntil;
-  let body = await tryEndpoint(url, payload, retry ? READ_FIRST_TIMEOUT_MS : timeout);
-  let spareTried = false;
-  if (body === TIMED_OUT && retry) {
-    spareTried = spareOk;
-    body = await tryEndpoint(spareOk ? spare : url, payload, REQUEST_TIMEOUT_MS - READ_FIRST_TIMEOUT_MS);
-  }
-  if (body === null && spareOk && !spareTried) {
+  if (body === null && spare && spare !== url && !scriptWouldLie) {
     body = await tryEndpoint(spare, payload, timeout);
   }
   if (body === TIMED_OUT) body = null;
