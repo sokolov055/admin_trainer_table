@@ -39,6 +39,8 @@ for (const scheme of ['light', 'dark']) {
   await page.waitForTimeout(300);
   await page.locator('.awards').scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${DEST}-awards-${scheme}.png`, fullPage: false });
+  // С 08.10.2026 цели ставит только тренер: у клиента «Изменить» нет
+  if (await page.getByRole('button', { name: 'Изменить' }).count() === 0) { await page.close(); continue; }
   await page.getByRole('button', { name: 'Изменить' }).first().click();
   await page.waitForTimeout(300);
   await page.locator('.goal-form').scrollIntoViewIfNeeded();

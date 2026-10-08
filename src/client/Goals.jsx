@@ -22,8 +22,10 @@ import { haptic } from '../telegram.js';
  * десятков вех на каждом заходе отодвигал бы замеры, ради которых экран
  * открывают. Раскрыть — одно нажатие, на месте, без отдельного окна.
  *
- * Цель ставят и клиент, и тренер: кто поставил последним, подписано под
- * заголовком — иначе клиент не поймёт, почему «его» цель вдруг стала 3.
+ * Цель — и тренировок в неделю, и шагов в день — ставит только тренер
+ * (владелец, 08.10.2026); у клиента «Изменить» нет. Новая цель действует с
+ * недели, в которую поставлена: прошлые недели сервер меряет прежней
+ * (client_goal_history), выполненные не проваливаются задним числом.
  */
 
 const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
@@ -120,10 +122,10 @@ function stepsLine(steps) {
   return { main: 'Норма — ' + norm + ' в день', hint: 'Сегодня ' + formatNumber(steps.today) };
 }
 
+// Цели ставит только тренер (владелец, 08.10.2026)
 function whoSet(goal, viewer) {
-  if (!goal.setBy) return viewer === 'trainer' ? 'цель по умолчанию' : 'цель по умолчанию — поменяйте под себя';
-  if (goal.setBy === viewer) return 'цель поставили вы';
-  return goal.setBy === 'trainer' ? 'цель поставил тренер' : 'цель поставил клиент';
+  if (viewer === 'trainer') return goal.setBy === 'trainer' ? 'цель поставили вы' : 'цель по умолчанию — поставьте клиенту';
+  return goal.setBy === 'trainer' ? 'цель поставил тренер' : 'цель по умолчанию — её поставит тренер';
 }
 
 function GoalForm({ goal, clientRow, onDone }) {
@@ -170,8 +172,9 @@ function GoalForm({ goal, clientRow, onDone }) {
         />
       </div>
       <p className="small muted">
-        Цель месяца и года считается из недельной. Тренировка — день, когда было занятие с тренером,
-        по программе в приложении или с часов от 20 минут.
+        Новая цель действует с этой недели, прошлые недели считаются по прежней — выполненные
+        остаются выполненными. Цель месяца и года считается из недельной. Тренировка — день, когда
+        было занятие с тренером, по программе в приложении или с часов от 20 минут.
       </p>
       {problem && <p className="small goal-form__problem" role="alert">{problem}</p>}
       <div className="goal-form__actions">
@@ -231,7 +234,7 @@ export default function Goals({ clientRow, preview = false }) {
     <Section
       title="Цели"
       note={whoSet(data.goal, viewer)}
-      action={!editing && !preview && (
+      action={!editing && viewer === 'trainer' && (
         <button className="button button--ghost button--small" onClick={() => setEditing(true)}>Изменить</button>
       )}
     >
