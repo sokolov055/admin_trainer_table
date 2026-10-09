@@ -1072,7 +1072,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
-            <div className="workout__round-item" key={ex.id} data-member={ex.id}>
+            <div className="workout__round-item" key={ex.id} data-member={ex.id} data-anchor={ex.id + ':' + r}>
               {renaming === ex.id + ':' + r
                 ? nameEditor(ex, ei, ex.id + ':' + r)
                 : <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}
@@ -1080,7 +1080,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   {/* Название — касанием: из базы или новое прямо здесь */}
                   <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>
                   {/* Единицы — касанием: вес, повторы, время, у кардио — интервалы (FT-513) */}
-                  <button type="button" className="workout__round-units" aria-expanded={tuning === ex.id + ':' + r} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id + ':' + r)}> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</button>
+                  <button type="button" className="workout__round-units" aria-expanded={tuning === ex.id + ':' + r} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id + ':' + r)}> · {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</button>
                   {/* Сделано — с оценкой, как у обычных подходов (03.10.2026) */}
                   {ex.sets[r].state === 'done' && ex.sets[r].effort && <span className={'workout__round-effort workout__round-effort--' + ex.sets[r].effort}>
                     <span className={'workout__effort-dot workout__effort-dot--' + ex.sets[r].effort} aria-hidden="true" />{EFFORT_WORD[ex.sets[r].effort]}
@@ -1105,6 +1105,21 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * просто поле. Там же вид упражнения, у кардио — аэробное или
    * функциональное (FT-513): отдельного меню «Изменить упражнение» нет.
    */
+  /**
+   * Закрыть панель и вернуть экран к строке, которая её открыла (владелец,
+   * 09.10.2026): «Готово» — внизу высокой панели, и после её схлопывания на
+   * том же месте прокрутки оказывался следующий круг. Строка ушла под шапку —
+   * ставим её сразу под шапку; видна — экран не двигаем
+   */
+  const closePanel = (id) => {
+    flushSync(() => { setRenaming(''); setTuning(''); });
+    const row = document.querySelector && document.querySelector('[data-anchor="' + id + '"]');
+    if (!row || !row.getBoundingClientRect) return;
+    const head = document.querySelector('.workout__header');
+    const top = head ? head.getBoundingClientRect().bottom : 0;
+    const y = row.getBoundingClientRect().top;
+    if (y < top + 8) window.scrollBy({ top: y - top - 12 });
+  };
   const startRename = (id) => {
     if (swallowClick.current || !editable) return;
     setTuning('');
@@ -1116,11 +1131,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         ? <NameFromBase ex={ex} autoFocus onPick={(patch) => replaceExercise(ei, patch)} />
         : <input className="field__input" aria-label="Название упражнения" autoFocus value={ex.name} maxLength={160}
           onChange={e => updateExercise(ei, ({ exerciseId, ...x }) => ({ ...x, name: e.target.value }))}
-          onKeyDown={e => { if (e.key === 'Enter') setRenaming(''); }} />}
+          onKeyDown={e => { if (e.key === 'Enter') closePanel(id); }} />}
       {trackEditor(ex, ei)}
       {trackOf(ex).kind === 'cardio' && <CardioKind value={cardioOf(ex)} onChange={c => editCardio(ei, c)} />}
       <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
-      <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => setRenaming('')}>Готово</button></div>
+      <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>
     </div>
   );
 
@@ -1138,7 +1153,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const tuneEditor = (ex, ei, id, inRound = false) => {
     const track = trackOf(ex);
     const note = inRound && <label className="workout__field">Заметка<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, x => ({ ...x, note: e.target.value }))} /></label>;
-    const done = <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => setTuning('')}>Готово</button></div>;
+    const done = <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>;
     if (track.kind === 'cardio') {
       const c = cardioOf(ex);
       return <div className="workout__panel" key={'tune-' + id}>
@@ -1704,7 +1719,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const finished = doneSets === ex.sets.length;
           const [main, ...rest] = planText(ex.prescription).split(' · ').filter(Boolean);
           const compact = picking || !!reorder;
-          return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
+          return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
