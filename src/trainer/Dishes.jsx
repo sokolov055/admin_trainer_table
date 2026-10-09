@@ -4,7 +4,7 @@ import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import {
-  Section, Panel, Chips, Loading, ErrorState, Empty, Note, Field, Badge, Search, formatNumber, plural,
+  Panel, Chips, Segmented, Loading, ErrorState, Empty, Note, Field, Tag, Search, formatNumber, plural,
 } from '../ui.jsx';
 import { IconAlert, IconBack, IconNutrition } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
@@ -66,24 +66,36 @@ export default function Dishes() {
 
   return (
     <>
+      {/* Порядок тот же, что в остальных вкладках «Шаблонов» (Library.jsx) */}
       <div className="library__bar">
         <button className="button button--primary" onClick={() => setEditing({ new: true })}>Своё блюдо</button>
       </div>
-      <Chips items={STATUS.map((s) => ({ value: s.value, label: s.label + ' · ' + count(s.value) }))} value={status} onChange={setStatus} />
+      <Segmented
+        items={STATUS.map((s) => ({ value: s.value, label: s.label + ' · ' + count(s.value) }))}
+        value={status}
+        onChange={(v) => { setStatus(v); haptic(); }}
+        label="Какие блюда"
+        track
+      />
       <Search value={q} onChange={setQ} placeholder="Поиск блюда" />
-      <Chips items={[{ value: '', label: 'Все' }, ...MEALS.map((m) => ({ value: m, label: m }))]} value={meal} onChange={setMeal} />
+      <Chips className="library__filters" items={[{ value: '', label: 'Все' }, ...MEALS.map((m) => ({ value: m, label: m }))]} value={meal} onChange={setMeal} />
 
       {status === 'draft' && count('draft') > 0 && (
-        <p className="small muted" style={{ marginTop: 0 }}>
+        <p className="library__hint library__hint--lead">
           Черновики клиенты не видят. Откройте блюдо, проверьте состав и рецепт — и опубликуйте.
         </p>
+      )}
+      {shown.length > 0 && (
+        <div className="library__count">
+          <p>{shown.length} {plural(shown.length, 'блюдо', 'блюда', 'блюд')}</p>
+        </div>
       )}
 
       {shown.length === 0 && (
         <Empty icon={IconNutrition} title="Здесь пусто" text={status === 'draft' ? 'Все черновики разобраны.' : 'Блюд с таким отбором нет.'} />
       )}
 
-      <Section>
+      <div>
         {shown.map((d) => (
           <button className="item" key={d.id} onClick={() => { setOpen(d.id); haptic(); }}>
             <div className="item__top">
@@ -91,13 +103,12 @@ export default function Dishes() {
               <span className="item__amount">{d.per.kcal} ккал</span>
             </div>
             <div className="item__meta">
-              <span>{d.meal}</span>
-              <span>Б {formatNumber(d.per.protein)} · Ж {formatNumber(d.per.fat)} · У {formatNumber(d.per.carbs)}</span>
-              <span>{d.minutes} мин</span>
+              <span>{d.meal} · {d.minutes} мин</span>
+              <span className="item__macros">Б {formatNumber(d.per.protein)} · Ж {formatNumber(d.per.fat)} · У {formatNumber(d.per.carbs)}</span>
             </div>
           </button>
         ))}
-      </Section>
+      </div>
     </>
   );
 }
@@ -125,13 +136,11 @@ function DishView({ dish, onBack, onEdit, onChanged }) {
       <button className="button button--ghost library__back" onClick={onBack}><IconBack size={16} />Блюда</button>
       <Panel pad>
         <h2 className="library__title">{dish.name}</h2>
-        <div className="item__meta" style={{ marginBottom: 'var(--space-3)' }}>
-          <Badge kind={dish.status === 'published' ? 'good' : undefined}>
+        <div className="item__meta library__meta">
+          <Tag tone={dish.status === 'published' ? 'good' : undefined}>
             {dish.status === 'published' ? 'у клиентов' : dish.status === 'hidden' ? 'скрыто' : 'черновик'}
-          </Badge>
-          <span>{dish.meal}</span>
-          <span>{dish.minutes} мин</span>
-          <span>{dish.portions} {plural(dish.portions, 'порция', 'порции', 'порций')}</span>
+          </Tag>
+          <span>{dish.meal} · {dish.minutes} мин · {dish.portions} {plural(dish.portions, 'порция', 'порции', 'порций')}</span>
         </div>
 
         <p className="dish__per">

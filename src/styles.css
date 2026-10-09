@@ -423,7 +423,7 @@ button { font-family: inherit; }
 
 /* Подразделы раздела — в шапке, рядом с его названием. В теле экрана
    ниже живут фильтры, и два ряда кнопок подряд слились бы в один. */
-.app__subnav { margin-top: var(--space-3); }
+.app__subnav { margin-top: var(--space-3); } /* до края экрана — в конце файла (FT-524) */
 .app__subnav .chips { margin-bottom: 0; }
 
 /**
@@ -5387,3 +5387,192 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .library__photo { position: relative; width: 88px; height: 88px; border-radius: 10px; overflow: hidden; background: var(--surface-sunken); }
 .library__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .library__photo-x { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; }
+
+/* ==========================================================================
+   «Шаблоны» — единая система (владелец, 09.10.2026, FT-524)
+   Во всех вкладках один порядок: действия → чьи/какие → поиск → фильтры →
+   сколько найдено → список. Три уровня действий, как в карточке упражнения
+   (workout.css): главное — заливка; второе — рамка той же высоты; третье —
+   синий текст 14/600. Свойства записи — тихие метки 12 px без рамки.
+   ========================================================================== */
+
+/* Вкладки в шапке шире экрана (в «Шаблонах» их пять): ряд едет целиком,
+   вместе со своей дорожкой, и обрезается краем экрана, а не скруглённой
+   рамкой посреди страницы — иначе кажется, что вся страница съехала вбок. */
+.app__subnav {
+  display: flex;
+  margin-inline: calc(-1 * var(--space-4));
+  padding: 2px 0 2px var(--space-4);
+  margin-top: calc(var(--space-3) - 2px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.app__subnav::-webkit-scrollbar { display: none; }
+/* Отступ справа — отдельным элементом: padding в конце прокрутки
+   Safari теряет */
+.app__subnav::after { content: ''; flex: 0 0 var(--space-4); }
+.app__subnav .chips--nav { flex: 0 0 auto; max-width: none; overflow: visible; }
+
+/* Фильтры — тоже до края экрана: последний чип уходит за край, а не
+   упирается в невидимую стену в 16 px от него */
+.chips.library__filters {
+  margin-inline: calc(-1 * var(--space-4));
+  padding-inline: var(--space-4) 0;
+  scroll-padding-inline: var(--space-4);
+}
+.chips.library__filters::after { content: ''; flex: 0 0 calc(var(--space-4) - 6px); }
+
+/* Действия раздела: главное и второе — одной высоты и кегля */
+.library__bar { margin: 0 0 var(--space-3); }
+.library__bar .button { min-height: 44px; font-size: 15px; letter-spacing: -0.005em; }
+.library__bar .button:not(.button--primary) { flex: 0 0 auto; padding-inline: var(--space-4); }
+
+/* «Мои / Общие», «Черновики / У клиентов / Скрытые» — равные доли в
+   утопленной дорожке. Синяя заливка остаётся у фильтров: два одинаковых
+   синих ряда подряд читались бы как один длинный набор кнопок. */
+.chips.chips--track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: visible;
+}
+.chips--track .chip {
+  min-height: 34px;
+  padding: 0 var(--space-2);
+  border-radius: 9px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chips--track .chip--active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Сколько найдено — слева; действия третьего плана — справа синим текстом */
+.library__count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--space-3);
+  min-height: 36px;
+  margin: 0 0 var(--space-1);
+}
+.library__count p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.library__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 var(--space-4);
+  margin-left: auto;
+}
+.library__link {
+  appearance: none;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.library__link:active { opacity: 0.55; }
+.library__link[aria-pressed='true'] { color: var(--text); }
+.library__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.library__hint--lead {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* Метка свойства записи */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.tag--good { background: var(--good-fill); color: var(--good-text); }
+.tag--warn { background: var(--warning-fill); color: var(--warning-text); }
+.item__top > .tag { align-self: center; }
+.item__meta > .tag { align-self: center; }
+/* Текст и метки в одной строке: между метками ближе, чем до текста */
+.item__meta:has(> .tag) { column-gap: 6px; }
+.item__meta:has(> .tag) > span:not(.tag) { margin-right: 4px; }
+.item__macros { font-variant-numeric: tabular-nums; }
+.chips.library__filters { margin-bottom: var(--space-1); }
+
+/* Карточки внутри «Шаблонов»: «Назад» и действия третьего плана — синим
+   текстом от левого края, без серой кнопки посреди строки */
+.library__back,
+.library__extras > .button--ghost,
+.library__machine-actions > .button--ghost,
+.library__save-block {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+.library__back { gap: 4px; margin: 0 0 var(--space-2); }
+.library__back svg { margin-left: -4px; }
+.library__extras > .button--ghost { justify-self: start; }
+.library__machine-actions { gap: 0 var(--space-4); }
+.library__back:active,
+.library__extras > .button--ghost:active,
+.library__machine-actions > .button--ghost:active,
+.library__save-block:active { transform: none; opacity: 0.55; }
+@media (hover: hover) and (pointer: fine) {
+  .library__back:hover,
+  .library__extras > .button--ghost:hover,
+  .library__machine-actions > .button--ghost:hover,
+  .library__save-block:hover { background: none; border-color: transparent; opacity: 0.8; }
+}
+
+.library__title { font-size: 20px; line-height: 1.25; letter-spacing: -0.015em; margin-bottom: 6px; }
+.library__meta { margin: 0 0 var(--space-3); }
+.library__sub { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--text-muted); }
+
+/* Действия карточки — та же высота и кегль, что у действий списка */
+.library__actions .button { min-height: 44px; font-size: 15px; letter-spacing: -0.005em; }
+.library__extras .setup__title { margin-top: 0; font-size: 15px; }
+/* Главное действие карточки — во всю ширину, остальные поровну под ним:
+   три кнопки 15-го кегля в строку телефона не помещаются */
+.library__actions .button { flex: 1 1 0; }
+.library__actions .button--primary { flex: 1 1 100%; }

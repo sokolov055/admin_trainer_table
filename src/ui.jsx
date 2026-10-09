@@ -216,6 +216,16 @@ export function Badge({ kind, children }) {
 }
 
 /**
+ * Метка в строке списка: тихая плашка без рамки, 12 px. Свойства записи
+ * («анимация», «настройка», «2 тренажёра») — не статусы, и рамка с жирным
+ * кеглем делала их громче названия. Цвет — только у того, что требует
+ * внимания (good / warn).
+ */
+export function Tag({ tone, children }) {
+  return <span className={'tag' + (tone ? ' tag--' + tone : '')}>{children}</span>;
+}
+
+/**
  * Статусы из таблицы приходят строками вида «✅ 08.09.2026» — их пишет
  * 90_ClientStats.js. Символ разбираем и заменяем значком приложения:
  * чужая эмодзи-графика внутри своего интерфейса выглядит заплаткой.
@@ -262,9 +272,39 @@ export function Delta({ value, suffix = '', digits, aim = 1 }) {
  * Управление
  * ========================================================================== */
 
-export function Chips({ items, value, onChange, variant }) {
+/**
+ * Ряд шире экрана прокручивается сам так, чтобы выбранный был виден: раздел
+ * сменили жестом или снаружи — палец не должен искать его за краем.
+ * Прокручивается сам ряд или, у вкладок в шапке, обёртка вокруг него
+ * (.app__subnav): там ряд едет целиком, вместе со своей рамкой.
+ */
+function useActiveInView(rowRef, value) {
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const active = row && row.querySelector('.chip--active');
+    const wide = (el) => el && el.scrollWidth > el.clientWidth + 1;
+    const scroller = wide(row) ? row : wide(row && row.parentElement) ? row.parentElement : null;
+    const instant = first.current;
+    first.current = false;
+    if (!active || !scroller) return;
+    const box = active.getBoundingClientRect();
+    const view = scroller.getBoundingClientRect();
+    const pad = 24;
+    let delta = 0;
+    if (box.left - pad < view.left) delta = box.left - pad - view.left;
+    else if (box.right + pad > view.right) delta = box.right + pad - view.right;
+    if (Math.abs(delta) < 1) return;
+    const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scroller.scrollBy({ left: delta, behavior: instant || reduce ? 'auto' : 'smooth' });
+  }, [value]);
+}
+
+export function Chips({ items, value, onChange, variant, className }) {
+  const rowRef = useRef(null);
+  useActiveInView(rowRef, value);
   return (
-    <div className={'chips' + (variant ? ' chips--' + variant : '')} role="tablist">
+    <div ref={rowRef} className={'chips' + (variant ? ' chips--' + variant : '') + (className ? ' ' + className : '')} role="tablist">
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const label = typeof item === 'string' ? item : item.label;
@@ -289,9 +329,11 @@ export function Chips({ items, value, onChange, variant }) {
  * но это не вкладки: здесь не переключают вид, а меняют настройку. Поэтому
  * роль другая (radiogroup), и с клавиатуры он ведёт себя как переключатель.
  */
-export function Segmented({ items, value, onChange, label, disabled, wrap }) {
+export function Segmented({ items, value, onChange, label, disabled, wrap, track }) {
+  // track — равные доли в утопленной дорожке: «чьи / какие» над списком,
+  // чтобы не спорить с синими фильтрами ниже (раздел «Шаблоны»)
   return (
-    <div className={'chips chips--flush' + (wrap ? ' chips--wrap' : '')} role="radiogroup" aria-label={label}>
+    <div className={'chips chips--flush' + (wrap ? ' chips--wrap' : '') + (track ? ' chips--track' : '')} role="radiogroup" aria-label={label}>
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const text = typeof item === 'string' ? item : item.label;

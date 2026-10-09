@@ -9,7 +9,7 @@ import PlanEditor from './PlanEditor.jsx';
 import Dishes from './Dishes.jsx';
 import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
 import {
-  Section, Panel, Loading, ErrorState, Empty, Badge, Chips, Search, Segmented, Field, Note, plural,
+  Section, Panel, Loading, ErrorState, Empty, Badge, Tag, Chips, Search, Segmented, Field, Note, plural,
 } from '../ui.jsx';
 import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
@@ -163,27 +163,32 @@ function Templates({ kind }) {
     .filter((t) => !q || (t.title + ' ' + t.goal).toLowerCase().includes(q.toLowerCase()));
   const goals = list.data ? list.data.goals : [];
 
+  // Один порядок во всех вкладках «Шаблонов»: действия → чьи → поиск →
+  // фильтры → сколько найдено → список. Новый шаблон сохраняется в «Мои»,
+  // поэтому кнопка есть и в «Общих» — ряд не прыгает при переключении.
   return (
     <>
-      <Segmented items={SCOPES} value={scope} onChange={(v) => { setScope(v); setPruning(false); haptic(); }} label="Чьи шаблоны" />
-
-      {scope === 'mine' && (
-        <div className="library__bar">
-          <button className="button button--primary" disabled={pruning} onClick={() => setEditing({ new: true })}>
-            {kind === 'program' ? 'Новый шаблон программы' : 'Новый шаблон тренировки'}
+      <div className="library__bar">
+        <button className="button button--primary" disabled={pruning} onClick={() => setEditing({ new: true })}>
+          {kind === 'program' ? 'Новый шаблон программы' : 'Новый шаблон тренировки'}
+        </button>
+        {scope === 'mine' && all.length > 0 && (
+          <button className="button" aria-pressed={pruning} onClick={() => { setPruning(!pruning); haptic(); }}>
+            {pruning ? 'Готово' : 'Править'}
           </button>
-          {all.length > 0 && (
-            <button className="button" aria-pressed={pruning} onClick={() => { setPruning(!pruning); haptic(); }}>
-              {pruning ? 'Готово' : 'Править'}
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
+      <Segmented items={SCOPES} value={scope} onChange={(v) => { setScope(v); setPruning(false); haptic(); }} label="Чьи шаблоны" track />
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
 
       <Search value={q} onChange={setQ} placeholder="Поиск по названию и цели" />
       {goals.length > 1 && (
-        <Chips items={[{ value: '', label: 'Все цели' }, ...goals.map((g) => ({ value: g, label: g }))]} value={goal} onChange={setGoal} />
+        <Chips className="library__filters" items={[{ value: '', label: 'Все цели' }, ...goals.map((g) => ({ value: g, label: g }))]} value={goal} onChange={setGoal} />
+      )}
+      {!list.loading && !list.error && shown.length > 0 && (
+        <div className="library__count">
+          <p>{shown.length} {plural(shown.length, 'шаблон', 'шаблона', 'шаблонов')}</p>
+        </div>
       )}
 
       {list.loading && <Loading lead={false} rows={3} />}
@@ -210,16 +215,18 @@ function Templates({ kind }) {
         >
           <div className="item__top">
             <span className="item__name">{t.title}</span>
-            {t.goal && <Badge>{t.goal}</Badge>}
+            {t.goal && <Tag>{t.goal}</Tag>}
           </div>
           <div className="item__meta">
             <span>
-              {kind === 'program' ? t.workouts + ' ' + plural(t.workouts, 'тренировка', 'тренировки', 'тренировок') + ' · ' : ''}
-              {t.exercises + ' ' + plural(t.exercises, 'упражнение', 'упражнения', 'упражнений')}
+              {[
+                kind === 'program' && t.workouts + ' ' + plural(t.workouts, 'тренировка', 'тренировки', 'тренировок'),
+                t.exercises + ' ' + plural(t.exercises, 'упражнение', 'упражнения', 'упражнений'),
+                t.level,
+                !t.mine && 'автор: ' + t.author,
+              ].filter(Boolean).join(' · ')}
             </span>
-            {t.level && <span>{t.level}</span>}
-            {!t.mine && <span>автор: {t.author}</span>}
-            {t.mine && t.isPublic && <Badge kind="good">поделились</Badge>}
+            {t.mine && t.isPublic && <Tag tone="good">поделились</Tag>}
           </div>
         </Row>
       ))}
@@ -309,10 +316,9 @@ function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSav
 
       <Panel pad>
         <h2 className="library__title">{t.title}</h2>
-        <div className="item__meta" style={{ marginBottom: 'var(--space-3)' }}>
-          {t.goal && <Badge>{t.goal}</Badge>}
-          {t.level && <span>{t.level}</span>}
-          <span>{t.mine ? (t.isPublic ? 'ваш · в общем доступе' : 'ваш') : 'автор: ' + t.author}</span>
+        <div className="item__meta library__meta">
+          {t.goal && <Tag>{t.goal}</Tag>}
+          <span>{[t.level, t.mine ? (t.isPublic ? 'ваш · в общем доступе' : 'ваш') : 'автор: ' + t.author].filter(Boolean).join(' · ')}</span>
         </div>
         {t.description && <p className="small" style={{ marginTop: 0 }}>{t.description}</p>}
 
@@ -774,23 +780,25 @@ function Exercises() {
         </button>
       </div>
       <Search value={q} onChange={setQ} placeholder="Поиск упражнения" />
-      <Chips items={muscles} value={muscle} onChange={setMuscle} />
+      <Chips className="library__filters" items={muscles} value={muscle} onChange={setMuscle} />
 
       <div className="library__count">
-        <p className="small muted">{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
-        <button className="button button--ghost" onClick={() => { setShowSimilar(true); setPruning(false); }}>
-          Похожие
-        </button>
-        {(drafts > 0 || reviewing) && (
-          <button className="button button--ghost" aria-pressed={reviewing} onClick={() => { setReviewing(!reviewing); haptic(); }}>
-            {reviewing ? 'Все упражнения' : 'Настройка на проверке · ' + drafts}
+        <p>{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
+        <div className="library__links">
+          <button className="library__link" onClick={() => { setShowSimilar(true); setPruning(false); }}>
+            Похожие
           </button>
-        )}
-        {data.hiddenCount > 0 && (
-          <button className="button button--ghost" onClick={() => { setShowHidden(true); setPruning(false); }}>
-            Убранные · {data.hiddenCount}
-          </button>
-        )}
+          {(drafts > 0 || reviewing) && (
+            <button className="library__link" aria-pressed={reviewing} onClick={() => { setReviewing(!reviewing); haptic(); }}>
+              {reviewing ? 'Все упражнения' : 'На проверке · ' + drafts}
+            </button>
+          )}
+          {data.hiddenCount > 0 && (
+            <button className="library__link" onClick={() => { setShowHidden(true); setPruning(false); }}>
+              Убранные · {data.hiddenCount}
+            </button>
+          )}
+        </div>
       </div>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
 
@@ -805,13 +813,13 @@ function Exercises() {
         >
           <div className="item__top">
             <span className="item__name">{e.name}</span>
-            {e.mine && <Badge kind="good">своё</Badge>}
+            {e.mine && <Tag tone="good">своё</Tag>}
           </div>
           <div className="item__meta">
             {[e.muscle, e.equipment].filter(Boolean).length > 0 && <span>{[e.muscle, e.equipment].filter(Boolean).join(' · ')}</span>}
-            {e.media && <Badge>{e.media.kind === 'animation' ? 'анимация' : 'видео'}</Badge>}
-            {e.setup && (e.setupOk ? <Badge>настройка</Badge> : data.owner && <Badge kind="warn">настройка на проверке</Badge>)}
-            {e.machines && e.machines.length > 0 && <Badge>{e.machines.length + ' ' + plural(e.machines.length, 'тренажёр', 'тренажёра', 'тренажёров')}</Badge>}
+            {e.media && <Tag>{e.media.kind === 'animation' ? 'анимация' : 'видео'}</Tag>}
+            {e.setup && (e.setupOk ? <Tag>настройка</Tag> : data.owner && <Tag tone="warn">настройка на проверке</Tag>)}
+            {e.machines && e.machines.length > 0 && <Tag>{e.machines.length + ' ' + plural(e.machines.length, 'тренажёр', 'тренажёра', 'тренажёров')}</Tag>}
           </div>
         </Row>
       ))}
@@ -890,7 +898,7 @@ function Machines() {
       <>
         <Back onClick={() => setOpen('')}>Тренажёры и оборудование</Back>
         <h2 className="library__title">{machine.name}</h2>
-        <p className="small muted">{machine.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{machine.photos.length > 1 ? ' · ' + machine.photos.length + ' фото' : ''}</p>
+        <p className="library__sub">{machine.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{machine.photos.length > 1 ? ' · ' + machine.photos.length + ' фото' : ''}</p>
         <MachinePhoto machine={machine} />
         {machine.setup
           ? <><h4 className="setup__title">{machine.kind === 'equipment' ? 'Настройка' : 'Где регулировки'}</h4><SetupText text={machine.setup} /></>
@@ -898,7 +906,7 @@ function Machines() {
         <h4 className="setup__title">Упражнения</h4>
         {machine.uses.map((e) => (
           <button key={e.id} className="item" onClick={() => { setExercise(e.id); haptic(); }}>
-            <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Badge kind="good">своё</Badge>}</div>
+            <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Tag tone="good">своё</Tag>}</div>
             {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
           </button>
         ))}
@@ -914,18 +922,22 @@ function Machines() {
   return (
     <>
       <Search value={q} onChange={setQ} placeholder="Поиск тренажёра или оборудования" />
-      <Chips items={kinds} value={kindOf} onChange={setKindOf} />
-      <p className="small muted library__count">{shown.length} {plural(shown.length, 'объект', 'объекта', 'объектов')}</p>
+      <Chips className="library__filters" items={kinds} value={kindOf} onChange={setKindOf} />
+      {list.length > 0 && (
+        <div className="library__count">
+          <p>{shown.length} {plural(shown.length, 'объект', 'объекта', 'объектов')}</p>
+        </div>
+      )}
       {!list.length && (
         <Empty title="Пока пусто" text="Тренажёр или оборудование добавляется в карточке упражнения: «Упражнения» → упражнение → «Тренажёры и оборудование»." />
       )}
       {shown.map((g) => (
         <button key={g.key} className="item" onClick={() => { setOpen(g.key); haptic(); }}>
-          <div className="item__top"><span className="item__name">{g.name}</span><Badge>{g.kind === 'equipment' ? 'оборудование' : 'тренажёр'}</Badge></div>
+          <div className="item__top"><span className="item__name">{g.name}</span></div>
           <div className="item__meta">
-            <span>{g.uses.map((e) => e.name).join(', ')}</span>
-            {g.photos.length > 0 && <Badge>{g.photos.length > 1 ? g.photos.length + ' фото' : 'фото'}</Badge>}
-            {g.setup && <Badge>настройка</Badge>}
+            <span>{(g.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + g.uses.map((e) => e.name).join(', ')}</span>
+            {g.photos.length > 0 && <Tag>{g.photos.length > 1 ? g.photos.length + ' фото' : 'фото'}</Tag>}
+            {g.setup && <Tag>настройка</Tag>}
           </div>
         </button>
       ))}
@@ -1124,10 +1136,9 @@ function ExerciseView({ exercise, owner, all, onSetup, onChanged, onBack, onEdit
       <Back onClick={onBack} />
       <Panel pad>
         <h2 className="library__title">{e.name}</h2>
-        <div className="item__meta" style={{ marginBottom: 'var(--space-3)' }}>
-          {e.muscle && <Badge>{e.muscle}</Badge>}
-          {e.equipment && <span>{e.equipment}</span>}
-          <span>{e.mine ? 'своё' : 'общее'}</span>
+        <div className="item__meta library__meta">
+          {e.muscle && <Tag>{e.muscle}</Tag>}
+          <span>{[e.equipment, e.mine ? 'своё' : 'общее'].filter(Boolean).join(' · ')}</span>
         </div>
 
         {e.media
