@@ -516,14 +516,13 @@ test('функциональное кардио: в отрезке круги и
     assert.equal(input('Беговая дорожка, отрезок 1, замедление, скорость, км/ч').props.value, '6');
     assert.equal(input('Беговая дорожка, отрезок 1, скорость, км/ч'), undefined, 'общей скорости нет');
     assert.equal(button('+ Калории'), undefined, 'метрик сверху нет — цели у интервалов');
-    assert.ok(button('Запустить интервалы'), 'таймер интервалов на месте');
+    assert.equal(button('Запустить интервалы'), undefined, 'таймера нет — интервалы запускают на тренажёре');
 
     // В первом отрезке 4 круга — второй остаётся с тремя
     await act(async () => { input('Беговая дорожка, отрезок 1, кругов').props.onChange({ target: { value: '4' } }); await delay(); });
     await act(async () => { input('Беговая дорожка, отрезок 1, ускорение, скорость, км/ч').props.onChange({ target: { value: '13' } }); await delay(); });
     assert.equal(input('Беговая дорожка, отрезок 2, кругов').props.value, '3');
     assert.equal(input('Беговая дорожка, отрезок 2, ускорение, скорость, км/ч').props.value, '12');
-    assert.ok(local.root.findAllByProps({ className: 'intervals__plan small muted' }).some(n => /^Интервалы: 4 × ускорение 1:00 \(13 км\/ч\)/.test(text(n))), 'таймер — по текущему отрезку');
 
     // Отметили — в отрезке его интервалы и итог: 4 × (1:00 + 2:00)
     await act(async () => { button('Норм').props.onClick(); await delay(); });
@@ -643,14 +642,12 @@ test('кардио без интервалов в плане — интерва�
     });
     const button = label => local.root.findAllByType('button').find(b => text(b) === label);
     const press = async b => { assert.ok(b); await act(async () => { b.props.onClick(); await delay(); }); };
-    assert.equal(button('Запустить интервалы'), undefined);
     // Меню «Упражнения суперсета» нет (FT-513): правка — касанием в круге
     assert.ok(!local.root.findAllByType('summary').some(n => text(n) === 'Упражнения суперсета'));
     // Касание названия — название, вид, у кардио — аэробное или функциональное
     await press(button('Аэробайк'));
     assert.ok(local.root.findAllByType('input').some(n => n.props['aria-label'] === 'Название упражнения'));
     await press(button('Функциональное кардио'));
-    assert.ok(button('Запустить интервалы'), 'таймер интервалов — у упражнения суперсета');
     assert.ok(local.root.findAllByType('p').some(p => /Аэробайк: интервалы 6 × ускорение 1:00/.test(text(p))), 'план — по интервалам');
     // В круге — круги и интервалы аэробайка вместо времени и скорости
     assert.equal(local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Аэробайк, отрезок 1, кругов').props.value, '6');

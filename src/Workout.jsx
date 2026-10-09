@@ -15,7 +15,6 @@ import { METRICS, trackOf, rowFields as trackFields, missing, metricField, setti
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
 const rowFields = (track) => trackFields({ ...track, perSide: false });
-import IntervalTimer from './IntervalTimer.jsx';
 import CardioPlan, { CardioKind, IntervalsRow } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
@@ -1066,10 +1065,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {members.filter(({ ex }) => lastRunText(ex.lastRun)).map(({ ex }) => (
         <p className="workout__last" key={'last' + ex.id}>{ex.name}: {lastRunText(ex.lastRun).replace(/^Последний раз/, 'последний раз')}</p>
       ))}
-      {/* Кардио интервалами и в суперсете — со своим таймером (FT-511) */}
-      {members.filter(({ ex }) => trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals).map(({ ex }) => (
-        <div key={'iv' + ex.id}><p className="small muted">{ex.name}</p><IntervalTimer intervals={setIntervals(ex.sets.find(x => x.state === 'pending'), ex)} track={trackOf(ex)} /></div>
-      ))}
+      {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
@@ -1751,7 +1747,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
-          {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={setIntervals(ex.sets.find(x => x.state === 'pending'), ex)} track={trackOf(ex)} />}
           {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}</div>}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
           {trackOf(ex).kind === 'cardio' && !isFunctional(ex) && metricAdd(ex, ei)}

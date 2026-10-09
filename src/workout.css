@@ -479,15 +479,6 @@
 .workout__metric-add { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--space-2) 0; }
 
 /* Таймер интервалов: фаза и остаток крупно — на дорожке в телефон смотрят мельком */
-.intervals { margin: var(--space-3) 0; padding: var(--space-3); border-radius: var(--radius-md, 12px); background: var(--surface-2, var(--surface)); border: 1px solid var(--border); }
-.intervals__now { text-align: center; margin: var(--space-2) 0; }
-.intervals__phase { font-weight: 700; font-size: var(--text-lg, 18px); }
-.intervals--fast .intervals__phase { color: var(--accent); }
-.intervals__left { font-size: 48px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.intervals__round { color: var(--text-muted); }
-.intervals__bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: var(--space-2); }
-.intervals__bar span { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform 250ms linear; }
-@media (prefers-reduced-motion: reduce) { .intervals__bar span { transition: none; } }
 
 /* ==========================================================================
  * Фокус (26.09.2026): куда смотреть в зале
