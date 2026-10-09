@@ -1,15 +1,15 @@
 import React from 'react';
-import { METRICS, GOALS, SPEED_UNIT_MACHINES, cardioGoal, goalFirst, metricField, settingsFields, phaseFields } from '../exercise-track.js';
+import { METRICS, MODES, PHASE_KEYS, MAX_PHASES, cardioGoal, goalFirst, metricField, settingsFields, phaseField, phaseName, phaseKeys, phasesOf, intervalsUse } from '../exercise-track.js';
 
 /**
- * Кардио в программе — свои поля вместо «подходы · повторы · вес»:
- * тренажёр, основной режим (дорожка — скорость и наклон, эллипс — уровень,
- * велотренажёр и «другое» — скорость в км/ч или об/мин и уровень, гребля —
- * нагрузка), главную цель (время, расстояние, калории или интервалы — с неё
- * начинаются план и отрезок в занятии) и что ещё записывать (пульс тоже).
- * Интервалы — ускорение и замедление, каждое со своим временем, режимом и
- * целью: расстояние, калории, пульс — то, что выбрано записывать
- * (09.10.2026). Общей цели-числа у интервалов нет: цель — пройти круги.
+ * Кардио в программе (09.10.2026, владелец) — свои поля вместо «подходы ·
+ * повторы · вес». Сверху вид:
+ *   аэробная тренировка — настройки (уровень, скорость, наклон — любые
+ *     вместе) и цели (время, расстояние, калории, пульс — тоже любые);
+ *   функциональное кардио — интервалы: круги, у ускорения и замедления своё
+ *     время, настройки и цель — расстояние, калории, пульс. Общей цели-числа
+ *     нет: цель — пройти круги.
+ * Тренажёр не выбирается: настройки задаёт тренер (modes в плане).
  */
 
 /** Название упражнения по тренажёру: по нему сервер свяжет его с базой */
@@ -36,46 +36,66 @@ export function newCardio(machine = 'treadmill') {
 
 const PULSE_HINT = '130–150';
 
-/** Коротко — чтобы тренажёры помещались в две строки на телефоне */
-const MACHINE_CHIPS = {
-  treadmill: 'Дорожка',
-  skillmill: 'SkillMill',
-  rower: 'Гребля',
-  elliptical: 'Эллипс',
-  bike: 'Велотренажёр',
-  stepper: 'Степпер',
-  other: 'Другое',
+/** Настройки — в порядке, в каком о них думают в зале */
+const MODE_CHIPS = [['level', 'Уровень сложности'], ['speed', 'Скорость'], ['incline', 'Угол наклона']];
+const KINDS = [[false, 'Аэробная тренировка'], [true, 'Функциональное кардио']];
+
+const NEW_INTERVALS = {
+  rounds: 6,
+  phases: [{ fields: ['time', 'speed'], time: '1:00', speed: '' }, { fields: ['time', 'speed'], time: '2:00', speed: '' }],
 };
 
-const NEW_INTERVALS = { rounds: 6, fast: { time: '1:00', speed: '', incline: '', level: '' }, slow: { time: '2:00', speed: '', incline: '', level: '' } };
+/**
+ * Интервалы в плане: круги, фазы и то, что из них следует, — что записывать
+ * в отрезке и какие настройки у него (intervalsUse): у функционального
+ * кардио их отдельно не выбирают
+ */
+export function withIntervals(cardio, intervals) {
+  return { ...cardio, intervals, ...intervalsUse(intervals) };
+}
 
 /**
  * Круги и фазы интервалов — в шаблоне, программе клиента и в самом занятии
- * (активном и выполненном, «Исправить результат»). metrics — что записывают:
- * по ним у фазы поля расстояния, калорий и пульса.
+ * (активном и выполненном, «Исправить результат»). Фаз в круге сколько
+ * угодно (до 10), у каждой название и свой набор целей и настроек.
  */
-export function IntervalsEdit({ intervals, track, metrics, disabled, onChange }) {
+export function IntervalsEdit({ intervals, track, disabled, onChange }) {
   const iv = intervals || NEW_INTERVALS;
-  const fields = phaseFields(track, metrics);
-  const phase = (key, label) => {
-    const p = iv[key] || {};
-    const edit = (field, v) => onChange({ ...iv, [key]: { ...p, [field]: v } });
+  const phases = phasesOf(iv);
+  // Старый вид (fast/slow) при первой правке становится списком фаз
+  const save = (list) => { const { fast, slow, ...rest } = iv; onChange({ ...rest, phases: list }); };
+  const editPhase = (i, patch) => save(phases.map((p, k) => (k === i ? { ...p, fields: phaseKeys(p), ...patch } : p)));
+  const phase = (p, i) => {
+    const name = phaseName(p, i);
+    const keys = phaseKeys(p);
+    const toggle = (k) => editPhase(i, { fields: PHASE_KEYS.filter((x) => (x === k ? !keys.includes(k) : keys.includes(x))) });
     return (
-      <div className="cardio-plan__phase">
-        <span className="field__label">{label}</span>
-        <div className="cardio-plan__grid">
-          {fields.map((f) => (
-            <label key={f.key}><span>{f.head}</span><input className="field__input" aria-label={label + ': ' + f.head} placeholder={f.placeholder || ''} inputMode={f.mode} maxLength={f.max} value={p[f.key] || ''} disabled={disabled} onChange={(e) => edit(f.key, e.target.value)} /></label>
+      <div className="cardio-plan__phase" key={i}>
+        <div className="cardio-plan__phase-head">
+          <input className="field__input" aria-label={'Интервал ' + (i + 1) + ': название'} placeholder={phaseName({}, i)} maxLength={30} value={p.name || ''} disabled={disabled} onChange={(e) => editPhase(i, { name: e.target.value })} />
+          {phases.length > 1 && <button type="button" className="button button--ghost" aria-label={'Убрать: ' + name} disabled={disabled} onClick={() => save(phases.filter((_, k) => k !== i))}>Убрать</button>}
+        </div>
+        <div className="chips" role="group" aria-label={name + ': что задать'}>
+          {PHASE_KEYS.map((k) => (
+            <button key={k} type="button" aria-pressed={keys.includes(k)} className={'chip' + (keys.includes(k) ? ' chip--active' : '')} disabled={disabled} onClick={() => toggle(k)}>{phaseField(k, track).short}</button>
           ))}
         </div>
+        {keys.length > 0 && (
+          <div className="cardio-plan__grid">
+            {keys.map((k) => {
+              const f = phaseField(k, track);
+              return <label key={k}><span>{f.head}</span><input className="field__input" aria-label={name + ': ' + f.head} placeholder={f.placeholder || ''} inputMode={f.mode} maxLength={f.max} value={p[k] || ''} disabled={disabled} onChange={(e) => editPhase(i, { [k]: e.target.value })} /></label>;
+            })}
+          </div>
+        )}
       </div>
     );
   };
   return (
     <>
       <label className="cardio-plan__rounds"><span className="field__label">Кругов</span><input className="field__input" aria-label="Кругов" inputMode="numeric" maxLength={2} value={iv.rounds || ''} disabled={disabled} onChange={(e) => onChange({ ...iv, rounds: e.target.value.replace(/\D/g, '') })} /></label>
-      {phase('fast', 'Ускорение')}
-      {phase('slow', 'Замедление')}
+      {phases.map(phase)}
+      <button type="button" className="button button--ghost" disabled={disabled || phases.length >= MAX_PHASES} onClick={() => save([...phases, { fields: ['time'], time: '' }])}>+ Интервал</button>
     </>
   );
 }
@@ -85,28 +105,36 @@ export default function CardioPlan({ value, track, disabled, onChange }) {
   const set = (patch) => onChange({ ...c, ...patch });
   const setIn = (key, field, v) => set({ [key]: { ...(c[key] || {}), [field]: v } });
   const goal = cardioGoal(c);
-  const intervals = goal === 'intervals';
-  // Главная цель-число всегда среди записываемого — в зале есть что записать
+  const functional = goal === 'intervals';
   const metrics = goalFirst(c.metrics, goal);
   const sorted = (list) => METRICS.filter((x) => list.includes(x));
-  // Прежняя главная остаётся записываемой: время обычно смотрят и так.
-  // Интервалы — цель «пройти круги»; ушли с них — интервалов нет
-  const pickGoal = (m) => set(m === 'intervals'
-    ? { goal: m, intervals: c.intervals || NEW_INTERVALS }
-    : { goal: m, metrics: sorted([...metrics, m]), intervals: null });
+  // Главная — первая из выбранных целей-итогов: с неё начинаются план и
+  // отрезок в занятии. Пульс — зона, а не итог, главной не бывает
+  const mainOf = (list) => list.find((m) => m !== 'pulse') || 'time';
+  const pickKind = (f) => set(f
+    // Что записывать — по фазам; ушли в аэробную — интервалов нет
+    ? { ...withIntervals(c, c.intervals || NEW_INTERVALS), goal: 'intervals' }
+    : { goal: mainOf(metrics), intervals: null });
   const toggle = (m) => {
-    const next = metrics.includes(m) ? metrics.filter((x) => x !== m) : [...metrics, m];
-    // У интервалов хоть что-то записывать надо: по нему отрезок и отмечают
-    if (next.length) set({ metrics: sorted(next) });
+    const next = sorted(metrics.includes(m) ? metrics.filter((x) => x !== m) : [...metrics, m]);
+    // Отрезок отмечают по итогу — время, расстояние или калории
+    if (next.some((x) => x !== 'pulse')) set({ metrics: next, goal: mainOf(next) });
   };
   const fields = settingsFields(track);
-  // У интервалов — до фаз: выбранное становится полем ускорения и замедления
-  const record = (
+  const modes = fields.map((f) => f.key);
+  // Выбор сохраняется списком: старый план «по тренажёру» становится явным
+  const toggleMode = (k) => set({ modes: MODES.filter((m) => (modes.includes(k) ? m !== k && modes.includes(m) : m === k || modes.includes(m))) });
+
+  const chip = (key, label, on, onClick) => (
+    <button key={key} type="button" aria-pressed={on} className={'chip' + (on ? ' chip--active' : '')} disabled={disabled} onClick={onClick}>{label}</button>
+  );
+  // Скорость — по тому, что показывает экран тренажёра
+  const speedUnit = modes.includes('speed') && (
     <div>
-      <span className="field__label">{intervals ? 'Задать в фазах и записывать' : 'Ещё записывать'}</span>
-      <div className="chips">
-        {METRICS.filter((m) => m !== goal).map((m) => (
-          <button key={m} type="button" aria-pressed={metrics.includes(m)} className={'chip' + (metrics.includes(m) ? ' chip--active' : '')} disabled={disabled} onClick={() => toggle(m)}>{metricField(m, track).short}</button>
+      <span className="field__label">Скорость</span>
+      <div className="chips" role="radiogroup" aria-label="Скорость в">
+        {[['', 'км/ч'], ['rpm', 'об/мин']].map(([k, label]) => (
+          <button key={label} type="button" role="radio" aria-checked={(track.speedUnit || '') === k} className={'chip' + ((track.speedUnit || '') === k ? ' chip--active' : '')} disabled={disabled} onClick={() => set({ speedUnit: k, modes })}>{label}</button>
         ))}
       </div>
     </div>
@@ -114,56 +142,50 @@ export default function CardioPlan({ value, track, disabled, onChange }) {
 
   return (
     <div className="cardio-plan">
-      <div className="chips cardio-plan__machines" role="radiogroup" aria-label="Тренажёр">
-        {Object.entries(MACHINE_CHIPS).map(([k, label]) => (
-          <button key={k} type="button" role="radio" aria-checked={track.machine === k} className={'chip' + (track.machine === k ? ' chip--active' : '')} disabled={disabled} onClick={() => set({ machine: k })}>{label}</button>
+      <div className="chips" role="radiogroup" aria-label="Вид кардио">
+        {KINDS.map(([f, label]) => (
+          <button key={label} type="button" role="radio" aria-checked={functional === f} className={'chip' + (functional === f ? ' chip--active' : '')} disabled={disabled} onClick={() => functional !== f && pickKind(f)}>{label}</button>
         ))}
       </div>
 
-      {/* Скорость велотренажёра и аэробайка — по тому, что показывает экран тренажёра */}
-      {SPEED_UNIT_MACHINES.includes(track.machine) && (
-        <div>
-          <span className="field__label">Скорость</span>
-          <div className="chips" role="radiogroup" aria-label="Скорость в">
-            {[['', 'км/ч'], ['rpm', 'об/мин']].map(([k, label]) => (
-              <button key={label} type="button" role="radio" aria-checked={(c.speedUnit || '') === k} className={'chip' + ((c.speedUnit || '') === k ? ' chip--active' : '')} disabled={disabled} onClick={() => set({ speedUnit: k })}>{label}</button>
-            ))}
+      {/* У каждого вида — только свои настройки (владелец, 09.10.2026) */}
+      {functional ? (
+        <>
+          {speedUnit}
+          {c.intervals && <IntervalsEdit intervals={c.intervals} track={track} disabled={disabled} onChange={(iv) => onChange(withIntervals(c, iv))} />}
+        </>
+      ) : (
+        <>
+          <div>
+            <span className="field__label">Настройки</span>
+            <div className="chips" role="group" aria-label="Настройки">
+              {MODE_CHIPS.map(([k, label]) => chip(k, label, modes.includes(k), () => toggleMode(k)))}
+            </div>
           </div>
-        </div>
+          {speedUnit}
+          {fields.length > 0 && (
+            <div className="cardio-plan__grid">
+              {fields.map((f) => (
+                <label key={f.key}><span>{f.head}</span><input className="field__input" aria-label={f.head} inputMode={f.mode} maxLength={f.max} value={(c.settings && c.settings[f.key]) || ''} disabled={disabled} onChange={(e) => setIn('settings', f.key, e.target.value)} /></label>
+              ))}
+            </div>
+          )}
+          <div>
+            <span className="field__label">Цель</span>
+            <div className="chips" role="group" aria-label="Цель">
+              {METRICS.map((m) => chip(m, metricField(m, track).short, metrics.includes(m), () => toggle(m)))}
+            </div>
+          </div>
+          <div className="cardio-plan__grid">
+            {metrics.map((m) => {
+              const f = metricField(m, track);
+              return (
+                <label key={m}><span>Цель: {f.head.toLowerCase()}</span><input className="field__input" aria-label={'Цель: ' + f.head} placeholder={m === 'pulse' ? PULSE_HINT : ''} inputMode={m === 'pulse' ? 'text' : f.mode} maxLength={m === 'pulse' ? 9 : f.max} value={(c.targets && c.targets[m]) || ''} disabled={disabled} onChange={(e) => setIn('targets', m, e.target.value)} /></label>
+              );
+            })}
+          </div>
+        </>
       )}
-
-      <div>
-        <span className="field__label">Главная цель</span>
-        <div className="chips" role="radiogroup" aria-label="Главная цель">
-          {GOALS.map((m) => (
-            <button key={m} type="button" role="radio" aria-checked={goal === m} className={'chip' + (goal === m ? ' chip--active' : '')} disabled={disabled} onClick={() => pickGoal(m)}>{m === 'intervals' ? 'Интервалы' : metricField(m, track).short}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Интервалы: круги и есть цель; режим и цель — у ускорения и замедления свои */}
-      {intervals && record}
-      {intervals && c.intervals ? (
-        <IntervalsEdit intervals={c.intervals} track={track} metrics={metrics} disabled={disabled} onChange={(iv) => set({ intervals: iv })} />
-      ) : fields.length > 0 && (
-        <div className="cardio-plan__grid">
-          {fields.map((f) => (
-            <label key={f.key}><span>{f.head}</span><input className="field__input" aria-label={f.head} inputMode={f.mode} maxLength={f.max} value={(c.settings && c.settings[f.key]) || ''} disabled={disabled} onChange={(e) => setIn('settings', f.key, e.target.value)} /></label>
-          ))}
-        </div>
-      )}
-
-      {!intervals && record}
-      {/* Цели-числа. У интервалов их нет (09.10.2026): цель — у каждой фазы
-          своя, время отрезка — сумма кругов */}
-      {!intervals && <div className="cardio-plan__grid">
-        {metrics.map((m) => {
-          const f = metricField(m, track);
-          return (
-            <label key={m}><span>Цель: {f.head.toLowerCase()}</span><input className="field__input" aria-label={'Цель: ' + f.head} placeholder={m === 'pulse' ? PULSE_HINT : ''} inputMode={m === 'pulse' ? 'text' : f.mode} maxLength={m === 'pulse' ? 9 : f.max} value={(c.targets && c.targets[m]) || ''} disabled={disabled} onChange={(e) => setIn('targets', m, e.target.value)} /></label>
-          );
-        })}
-      </div>}
     </div>
   );
 }

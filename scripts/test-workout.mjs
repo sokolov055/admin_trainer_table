@@ -487,11 +487,15 @@ test('кардио в занятии: режим, метрики, «+ метри
 
     // Интервалы правятся в занятии (09.10.2026): круги, режим и цель фазы
     const input = label => local.root.findAllByType('input').find(n => n.props['aria-label'] === label);
-    assert.ok(input('Ускорение: Расстояние, м'), 'цель фазы — по записываемому');
+    assert.equal(input('Ускорение: Расстояние, м'), undefined, 'у фазы только выбранное');
+    const chipIn = (label, group) => local.root.findAllByType('button').find(b => text(b) === label && b.parent.props['aria-label'] === group);
+    await act(async () => { chipIn('Расстояние', 'Ускорение: что задать').props.onClick(); await delay(); });
     await act(async () => { input('Кругов').props.onChange({ target: { value: '5' } }); await delay(); });
     await act(async () => { input('Ускорение: Скорость, км/ч').props.onChange({ target: { value: '13' } }); await delay(); });
     await act(async () => { input('Ускорение: Расстояние, м').props.onChange({ target: { value: '250' } }); await delay(); });
     assert.ok(local.root.findAllByType('strong').some(n => /^интервалы 5 × ускорение 1:00 \(13 км\/ч, 250 м\)/.test(text(n))), 'строка плана — по новым интервалам');
+    // Расстояние у фазы — и в отрезке его записывают
+    assert.ok(local.root.findAllByType('input').some(n => n.props['aria-label'] === 'Беговая дорожка, отрезок 1, расстояние, м'));
     assert.ok(local.root.findAllByProps({ className: 'intervals__plan small muted' }).some(n => /^Интервалы: 5 × ускорение 1:00 \(13 км\/ч, 250 м\)/.test(text(n))), 'таймер — по новым интервалам');
 
     // Отметить без итога нельзя: скорость — не результат

@@ -208,15 +208,31 @@ test('кардио: интервалы главной целью, скорост
   assert.equal(trackOf({ cardio: { ...plan, intervals: null } }).goal, 'kcal');
 });
 
-test('кардио: у фаз интервалов своя цель — расстояние, калории, пульс (09.10.2026)', async () => {
-  const { cardioLine, intervalPhases, phaseFields } = await import('../src/exercise-track.js');
-  const plan = { machine: 'treadmill', goal: 'intervals', metrics: ['time', 'distance', 'pulse'], targets: {},
+test('кардио: фазы интервалов — сколько угодно, у каждой свой набор (09.10.2026)', async () => {
+  const { cardioLine, intervalPhases, phasesOf, intervalsUse } = await import('../src/exercise-track.js');
+  // Старый план — ускорение и замедление: время и то, что вписано
+  const old = { machine: 'treadmill', goal: 'intervals', metrics: ['time', 'distance', 'pulse'], targets: {},
     intervals: { rounds: 6, fast: { time: '1:00', speed: '12', distance: '200', pulse: '150–160' }, slow: { time: '2:00', speed: '6', distance: '200' } } };
-  const t = trackOf({ cardio: plan });
-  assert.deepEqual(phaseFields(t, t.metrics).map((f) => f.key), ['time', 'speed', 'incline', 'distance', 'pulse']);
-  assert.deepEqual(phaseFields(t, ['time']).map((f) => f.key), ['time', 'speed', 'incline'], 'не записывают — полей нет');
-  assert.equal(cardioLine(plan, t), 'интервалы 6 × ускорение 1:00 (12 км/ч, 200 м, пульс 150–160) / замедление 2:00 (6 км/ч, 200 м)');
-  assert.equal(intervalPhases(plan.intervals, t)[0].mode, '12 км/ч, 200 м, пульс 150–160', 'таймер показывает цель фазы');
+  const t = trackOf({ cardio: old });
+  assert.deepEqual(phasesOf(old.intervals).map((p) => p.fields), [['time', 'distance', 'pulse', 'speed'], ['time', 'distance', 'speed']]);
+  assert.equal(cardioLine(old, t), 'интервалы 6 × ускорение 1:00 (12 км/ч, 200 м, пульс 150–160) / замедление 2:00 (6 км/ч, 200 м)');
+  assert.equal(intervalPhases(old.intervals, t)[0].mode, '12 км/ч, 200 м, пульс 150–160', 'таймер показывает цель фазы');
   // Отрезок — все круги: 6 × (1:00 + 2:00) и 6 × (200 + 200) м
-  assert.deepEqual(planSet({ cardio: plan }, t), { time: '18:00', distance: '2400' });
+  assert.deepEqual(planSet({ cardio: old }, t), { time: '18:00', distance: '2400' });
+
+  // Новый: ускорение — на калории, замедление — на скорость, третья — горка
+  const iv = { rounds: 4, phases: [
+    { fields: ['kcal'], kcal: '20', speed: '15' },
+    { fields: ['time', 'speed'], time: '2:00', speed: '6' },
+    { name: 'Горка', fields: ['time', 'incline'], time: '0:30', incline: '8' },
+  ] };
+  const plan = { machine: 'treadmill', goal: 'intervals', intervals: iv, ...intervalsUse(iv) };
+  assert.deepEqual(intervalsUse(iv), { metrics: ['time', 'kcal'], modes: ['speed', 'incline'] });
+  const tt = trackOf({ cardio: plan });
+  assert.equal(cardioLine(plan, tt), 'интервалы 4 × ускорение (20 ккал) / замедление 2:00 (6 км/ч) / горка 0:30 (8%)', 'не выбранное (скорость ускорения) не показывается');
+  const phases = intervalPhases(iv, tt);
+  assert.equal(phases.length, 12);
+  assert.deepEqual([phases[0].seconds, phases[2].label], [0, 'Горка'], 'фаза без времени ждёт «Дальше»');
+  // Время не у всех фаз — итог времени не сосчитать; калории — 4 × 20
+  assert.deepEqual(planSet({ cardio: plan }, tt), { kcal: '80' });
 });

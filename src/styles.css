@@ -4204,10 +4204,12 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cardio-plan__grid label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); min-width: 0; }
 .cardio-plan__grid input, .cardio-plan__rounds input { text-align: center; font-variant-numeric: tabular-nums; }
 .cardio-plan__rounds { display: grid; grid-template-columns: auto 88px; align-items: center; gap: var(--space-2); justify-content: start; }
-.cardio-plan__phase { display: grid; gap: 6px; }
+.cardio-plan__phase { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: 14px; }
 .cardio-plan .chips { flex-wrap: wrap; overflow: visible; }
 /* Интервалы в занятии — под видом упражнения, в «Изменить упражнение» */
 .workout__intervals-edit { margin-top: var(--space-3); }
+.cardio-plan__phase-head { display: flex; gap: var(--space-2); align-items: center; }
+.cardio-plan__phase-head input { flex: 1; min-width: 0; font-weight: 600; }
 
 /* Расписание: поле времени на iOS шире колонки — поджимаем; шаг «перенос или ошибка»
    и «кто отменил»; отменённое со списанием — приглушено и зачёркнуто */

@@ -50,7 +50,10 @@ export function trackOf(ex) {
     const list = (t.metrics && t.metrics.length ? t.metrics : plan && plan.metrics) || [];
     out.goal = cardioGoal({ goal: t.goal || (plan && plan.goal), metrics: list, intervals: plan && plan.intervals });
     out.metrics = goalFirst(list, out.goal);
-    if ((t.speedUnit || (plan && plan.speedUnit)) === 'rpm' && SPEED_UNIT_MACHINES.includes(out.machine)) out.speedUnit = 'rpm';
+    // Настройки выбраны тренером (09.10.2026) — важнее тренажёра
+    const modes = (plan && Array.isArray(plan.modes) && plan.modes) || (Array.isArray(t.modes) && t.modes);
+    if (modes) out.modes = MODES.filter((m) => modes.includes(m));
+    if ((t.speedUnit || (plan && plan.speedUnit)) === 'rpm' && (SPEED_UNIT_MACHINES.includes(out.machine) || out.modes)) out.speedUnit = 'rpm';
   }
   return out;
 }
@@ -97,7 +100,8 @@ export function goalFirst(list, goal) {
  * показывают разные тренажёры (владелец, 07.10.2026). У дорожки — км/ч.
  */
 export const SPEED_UNIT_MACHINES = ['bike', 'other'];
-const speedUnit = (track) => (track.speedUnit === 'rpm' && SPEED_UNIT_MACHINES.includes(track.machine) ? 'об/мин' : 'км/ч');
+// Об/мин разрешает trackOf: у тренажёра из списка или при настройках, выбранных тренером
+const speedUnit = (track) => (track.speedUnit === 'rpm' && (SPEED_UNIT_MACHINES.includes(track.machine) || track.modes) ? 'об/мин' : 'км/ч');
 
 export function metricField(key, track) {
   return {
@@ -109,16 +113,32 @@ export function metricField(key, track) {
 }
 
 /**
- * Режим тренажёра: дорожка — скорость и наклон, велотренажёр и «другое»
- * (аэробайк) — скорость (км/ч или об/мин) и уровень, эллипс и степпер —
- * уровень, гребля и SkillMill — нагрузка
+ * Настройки кардио (09.10.2026, владелец): тренер сам выбирает любые из
+ * скорости, наклона и уровня — modes в плане. Нет выбора (старые планы) —
+ * по тренажёру: дорожка — скорость и наклон, велотренажёр и «другое» —
+ * скорость (км/ч или об/мин) и уровень, остальные — уровень или нагрузка.
  */
+export const MODES = ['speed', 'incline', 'level'];
+
+export function machineModes(track) {
+  if (track.machine === 'treadmill') return ['speed', 'incline'];
+  if (SPEED_UNIT_MACHINES.includes(track.machine)) return ['speed', 'level'];
+  return ['level'];
+}
+
+/** Все настройки с подписями — и для фаз интервалов, где их выбирают у каждой */
+function settingDefs(track) {
+  return {
+    speed: { key: 'speed', head: 'Скорость, ' + speedUnit(track), unit: speedUnit(track), mode: 'decimal', max: 5 },
+    incline: { key: 'incline', head: 'Наклон, %', unit: '%', mode: 'decimal', max: 5 },
+    level: { key: 'level', head: levelWord(track), unit: levelWord(track) === 'Уровень' ? 'ур.' : 'нагр.', mode: 'decimal', max: 5 },
+  };
+}
+
 export function settingsFields(track) {
-  const speed = { key: 'speed', head: 'Скорость, ' + speedUnit(track), unit: speedUnit(track), mode: 'decimal', max: 5 };
-  const level = { key: 'level', head: levelWord(track), unit: levelWord(track) === 'Уровень' ? 'ур.' : 'нагр.', mode: 'decimal', max: 5 };
-  if (track.machine === 'treadmill') return [speed, { key: 'incline', head: 'Наклон, %', unit: '%', mode: 'decimal', max: 5 }];
-  if (SPEED_UNIT_MACHINES.includes(track.machine)) return [speed, level];
-  return [level];
+  const all = settingDefs(track);
+  const keys = track.modes || machineModes(track);
+  return MODES.filter((k) => keys.includes(k)).map((k) => all[k]);
 }
 
 /** Режим строкой: «8 км/ч, 3%», «уровень 8», «90 об/мин, уровень 5» */
@@ -146,56 +166,87 @@ export function clockText(total) {
 }
 
 /**
- * Поля фазы интервала (09.10.2026, владелец): время — всегда, режим
- * тренажёра и то, что тренер выбрал записывать, — расстояние, калории,
- * пульс. Цель интервалов — пройти все круги, и у каждой фазы она своя:
- * ускорение — 200 м на 12 км/ч при пульсе 160, замедление — пешком.
+ * Интервалы (09.10.2026, владелец): в круге сколько угодно фаз, у каждой
+ * своё название и свой набор — время, расстояние, калории, пульс, скорость,
+ * наклон, уровень (fields), например ускорение — 20 ккал, замедление —
+ * 6 км/ч. Старые планы — ускорение и замедление (fast/slow) с временем и
+ * режимом — читаются как две фазы.
  */
-export function phaseFields(track, metrics) {
-  const list = metrics || [];
-  return [
-    { key: 'time', head: 'Время, мм:сс', mode: 'text', max: 8, placeholder: '1:00' },
-    ...settingsFields(track),
-    ...['distance', 'kcal', 'pulse'].filter((m) => list.includes(m)).map((m) => (m === 'pulse'
-      ? { ...metricField(m, track), mode: 'text', max: 9, placeholder: '130–150' }
-      : metricField(m, track))),
-  ];
+export const PHASE_KEYS = ['time', 'distance', 'kcal', 'pulse', 'speed', 'incline', 'level'];
+const PHASE_NAMES = ['Ускорение', 'Замедление'];
+export const MAX_PHASES = 10;
+
+export const phaseName = (p, i) => String((p && p.name) || '').trim() || PHASE_NAMES[i] || 'Интервал ' + (i + 1);
+
+/** Что задано у фазы; у старой — время и то, что вписано */
+export const phaseKeys = (p) => (p && Array.isArray(p.fields)
+  ? PHASE_KEYS.filter((k) => p.fields.includes(k))
+  : PHASE_KEYS.filter((k) => k === 'time' || (p && String(p[k] || '').trim())));
+
+export function phasesOf(intervals) {
+  if (!intervals) return [];
+  if (Array.isArray(intervals.phases)) return intervals.phases;
+  return [intervals.fast, intervals.slow].filter(Boolean).map((p) => ({ ...p, fields: phaseKeys(p) }));
+}
+
+/** Поле фазы по ключу: подпись, клавиатура, длина */
+export function phaseField(key, track) {
+  if (key === 'time') return { key, head: 'Время, мм:сс', short: 'Время', mode: 'text', max: 8, placeholder: '1:00' };
+  if (key === 'pulse') return { ...metricField(key, track), mode: 'text', max: 9, placeholder: '130–150' };
+  if (METRICS.includes(key)) return metricField(key, track);
+  const f = settingDefs(track)[key];
+  return { ...f, short: key === 'speed' ? 'Скорость' : key === 'incline' ? 'Наклон' : levelWord(track) };
 }
 
 /** Фаза строкой без времени: «12 км/ч, 3%, 200 м, пульс 150–160» */
 function phaseText(p, track) {
   if (!p) return '';
+  const keys = phaseKeys(p);
+  const v = (k) => keys.includes(k) && String(p[k] || '').trim();
   return [
-    modeText(p, track),
-    p.distance && p.distance + ' ' + distanceUnit(track),
-    p.kcal && p.kcal + ' ккал',
-    p.pulse && 'пульс ' + p.pulse,
+    modeText({ speed: v('speed'), incline: v('incline'), level: v('level') }, track),
+    v('distance') && v('distance') + ' ' + distanceUnit(track),
+    v('kcal') && v('kcal') + ' ккал',
+    v('pulse') && 'пульс ' + v('pulse'),
   ].filter(Boolean).join(', ');
 }
 
-/** Фазы интервалов по порядку: ускорение, замедление — rounds раз */
+const phaseSeconds = (p) => (phaseKeys(p).includes('time') ? seconds(p.time) : 0);
+
+/**
+ * Фазы интервалов по порядку, rounds раз. seconds: 0 — фаза без времени
+ * («до 20 ккал»): таймер ждёт «Дальше»
+ */
 export function intervalPhases(intervals, track) {
   if (!intervals || !intervals.rounds) return [];
+  const phases = phasesOf(intervals);
   const list = [];
   for (let r = 1; r <= intervals.rounds; r += 1) {
-    [['fast', 'Ускорение'], ['slow', 'Замедление']].forEach(([k, label]) => {
-      const p = intervals[k] || {};
-      const secs = seconds(p.time);
-      if (secs > 0) list.push({ kind: k, label, round: r, seconds: secs, mode: phaseText(p, track) });
+    phases.forEach((p, i) => {
+      const secs = phaseSeconds(p);
+      const mode = phaseText(p, track);
+      if (secs > 0 || mode) list.push({ kind: i === 0 ? 'fast' : i === 1 ? 'slow' : 'p' + i, index: i, label: phaseName(p, i), round: r, seconds: secs, mode });
     });
   }
   return list;
 }
 
-/** Интервалы строкой: «8 × ускорение 1:00 (12 км/ч, пульс 160) / замедление 2:00 (6 км/ч)» */
+/** Что записывать и какие настройки у отрезка — по фазам: время всегда */
+export function intervalsUse(intervals) {
+  const keys = new Set(phasesOf(intervals).flatMap(phaseKeys));
+  return { metrics: METRICS.filter((m) => m === 'time' || keys.has(m)), modes: MODES.filter((m) => keys.has(m)) };
+}
+
+/** Интервалы строкой: «8 × ускорение 1:00 (12 км/ч, пульс 160) / замедление (20 ккал)» */
 export function intervalsText(intervals, track) {
   if (!intervals || !intervals.rounds) return '';
-  const part = (p, label) => {
-    const secs = seconds(p && p.time);
+  const part = (p, i) => {
+    const secs = phaseSeconds(p);
     const mode = phaseText(p, track);
-    return secs ? label + ' ' + clockText(secs) + (mode ? ' (' + mode + ')' : '') : '';
+    if (!secs && !mode) return '';
+    return phaseName(p, i).toLowerCase() + (secs ? ' ' + clockText(secs) : '') + (mode ? ' (' + mode + ')' : '');
   };
-  return intervals.rounds + ' × ' + [part(intervals.fast, 'ускорение'), part(intervals.slow, 'замедление')].filter(Boolean).join(' / ');
+  return intervals.rounds + ' × ' + phasesOf(intervals).map(part).filter(Boolean).join(' / ');
 }
 
 /** План кардио строкой: цели, режим, интервалы */
@@ -448,7 +499,9 @@ export function planSet(ex, track) {
     const amount = String(t[goal] || '').trim();
     if (goal !== 'time' && /^\d+([.,]\d+)?$/.test(amount)) out[goal] = amount.replace(',', '.');
     // Интервалы: время отрезка — все круги подряд, «6 × (1:00 + 2:00)» → 18:00
-    if (goal === 'intervals' && !out.time && (c.metrics || ['time']).includes('time')) {
+    // Время — только если оно есть у каждой фазы: иначе итог не сосчитать
+    const phases = phasesOf(c.intervals);
+    if (goal === 'intervals' && !out.time && (c.metrics || ['time']).includes('time') && phases.every((p) => phaseSeconds(p) > 0)) {
       const total = intervalPhases(c.intervals, track).reduce((n, p) => n + p.seconds, 0);
       if (total > 0 && total < 1000 * 60) out.time = clockText(total);
     }
@@ -456,7 +509,7 @@ export function planSet(ex, track) {
     if (goal === 'intervals' && c.intervals) {
       ['distance', 'kcal'].forEach((m) => {
         if (out[m] || !(c.metrics || []).includes(m)) return;
-        const one = ['fast', 'slow'].reduce((n, k) => n + num((c.intervals[k] || {})[m]), 0);
+        const one = phases.reduce((n, p) => n + (phaseKeys(p).includes(m) ? num(p[m]) : 0), 0);
         const total = Math.round(one * (Number(c.intervals.rounds) || 0) * 100) / 100;
         if (total > 0) out[m] = String(total);
       });

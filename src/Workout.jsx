@@ -16,7 +16,7 @@ import { METRICS, trackOf, rowFields as trackFields, missing, metricField, setti
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
 const rowFields = (track) => trackFields({ ...track, perSide: false });
 import IntervalTimer from './IntervalTimer.jsx';
-import { IntervalsEdit } from './trainer/CardioPlan.jsx';
+import { IntervalsEdit, withIntervals } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
@@ -995,13 +995,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const intervalsEditor = (ex, ei) => {
     const track = trackOf(ex);
     if (track.kind !== 'cardio' || !ex.cardio || !ex.cardio.intervals) return null;
+    // Что записывать в отрезке — по фазам: добавили калории — появилось поле
     const edit = (iv) => updateExercise(ei, x => {
-      const cardio = { ...x.cardio, intervals: iv };
-      return { ...x, cardio, prescription: planScheme({ ...x, cardio }) };
+      const cardio = withIntervals(x.cardio, iv);
+      const next = { ...x, cardio, track: { ...trackOf(x), metrics: cardio.metrics, modes: cardio.modes } };
+      return { ...next, prescription: planScheme(next) };
     });
     return <div className="cardio-plan workout__intervals-edit">
       <span className="field__label">Интервалы</span>
-      <IntervalsEdit intervals={ex.cardio.intervals} track={track} metrics={track.metrics} disabled={!editable} onChange={edit} />
+      <IntervalsEdit intervals={ex.cardio.intervals} track={track} disabled={!editable} onChange={edit} />
     </div>;
   };
 
