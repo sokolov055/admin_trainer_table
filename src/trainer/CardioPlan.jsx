@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { METRICS, MODES, PHASE_KEYS, MAX_PHASES, cardioGoal, goalFirst, metricField, settingsFields, phaseField, phaseName, phaseKeys, phasesOf, intervalsUse } from '../exercise-track.js';
 
 /**
@@ -62,6 +62,16 @@ export function withIntervals(cardio, intervals) {
 export function IntervalsEdit({ intervals, track, disabled, onChange }) {
   const iv = intervals || NEW_INTERVALS;
   const phases = phasesOf(iv);
+  // Круги — своим полем: пока число стирают, в план уходит прежнее. Пустые
+  // круги сервер не принимает, и занятие, сохранившись посреди ввода,
+  // теряло интервалы — форма пропадала из-под пальцев (FT-511)
+  const [rounds, setRounds] = useState(String(iv.rounds || ''));
+  useEffect(() => { setRounds(String(iv.rounds || '')); }, [iv.rounds]);
+  const editRounds = (text) => {
+    const v = text.replace(/\D/g, '');
+    setRounds(v);
+    if (Number(v) >= 1 && Number(v) <= 50) onChange({ ...iv, rounds: Number(v) });
+  };
   // Старый вид (fast/slow) при первой правке становится списком фаз
   const save = (list) => { const { fast, slow, ...rest } = iv; onChange({ ...rest, phases: list }); };
   const editPhase = (i, patch) => save(phases.map((p, k) => (k === i ? { ...p, fields: phaseKeys(p), ...patch } : p)));
@@ -93,7 +103,7 @@ export function IntervalsEdit({ intervals, track, disabled, onChange }) {
   };
   return (
     <>
-      <label className="cardio-plan__rounds"><span className="field__label">Кругов</span><input className="field__input" aria-label="Кругов" inputMode="numeric" maxLength={2} value={iv.rounds || ''} disabled={disabled} onChange={(e) => onChange({ ...iv, rounds: e.target.value.replace(/\D/g, '') })} /></label>
+      <label className="cardio-plan__rounds"><span className="field__label">Кругов</span><input className="field__input" aria-label="Кругов" inputMode="numeric" maxLength={2} value={rounds} disabled={disabled} onChange={(e) => editRounds(e.target.value)} onBlur={() => setRounds(String(iv.rounds || ''))} /></label>
       {phases.map(phase)}
       <button type="button" className="button button--ghost" disabled={disabled || phases.length >= MAX_PHASES} onClick={() => save([...phases, { fields: ['time'], time: '' }])}>+ Интервал</button>
     </>

@@ -101,7 +101,6 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
         if (saved && !ex.exerciseId) {
           onChange(latest.current.map((e) => (!e.exerciseId && keyOf(e.name) === keyOf(ex.name) ? { ...e, exerciseId: saved.id } : e)));
         }
-        setKindNote({ i, text: 'Сохранено в базе — везде так' });
       })
       .catch((error) => setKindNote({ i, text: 'В базу не сохранилось: ' + (error.message || 'нет связи'), error: true }));
   };

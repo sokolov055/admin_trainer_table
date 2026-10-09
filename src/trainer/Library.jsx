@@ -1379,7 +1379,7 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
   // выбор тренера, когда угадано не так
   const known = exercise && exercise.track;
   const [kind, setKind] = useState(known && !known.auto ? known.kind : 'auto');
-  const [machine, setMachine] = useState((known && known.machine) || 'treadmill');
+  const [machine] = useState((known && known.machine) || 'treadmill');
   const [unilateral, setUnilateral] = useState(!!(known && known.unilateral));
   const [perSide, setPerSide] = useState(!!(known && known.perSide));
   const [file, setFile] = useState(null);
@@ -1445,12 +1445,7 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
               onChange={setKind}
             />
           </div>
-          {kind === 'cardio' && (
-            <div>
-              <span className="field__label">Тренажёр</span>
-              <Chips items={Object.entries(MACHINE_LABELS).map(([value, label]) => ({ value, label }))} value={machine} onChange={setMachine} />
-            </div>
-          )}
+          {/* Тренажёр у кардио не выбирают (09.10.2026): настройки — в программе */}
           {kind !== 'auto' && kind !== 'cardio' && (
             <label className="library__check"><input type="checkbox" checked={unilateral} onChange={(e) => setUnilateral(e.target.checked)} />Повторы на каждую сторону (выпады, тяга одной рукой)</label>
           )}

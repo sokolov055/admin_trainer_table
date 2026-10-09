@@ -664,8 +664,8 @@ test('мои тренировки: программа, прогресс, пит�
 
     // Тап по названию — вид упражнения, как в занятии; уходит в базу
     await superset.locator('.plan-inline__name').first().click();
-    await secondBlock.getByRole('radio', { name: 'Свой вес' }).click();
-    await secondBlock.getByText('Сохранено в базе').waitFor({ timeout: 5000 });
+    await secondBlock.getByRole('radio', { name: 'Собственный вес' }).click();
+    await secondBlock.getByRole('radio', { name: 'Собственный вес', checked: true }).waitFor({ timeout: 5000 });
     if (process.env.SHOT_KIND) await phone.screenshot({ path: process.env.SHOT_KIND, fullPage: true });
     await secondBlock.getByRole('button', { name: 'Готово' }).click();
     for (const tab of ['Прогресс', 'Питание']) {
@@ -726,7 +726,6 @@ test('карта мышц: тренировка, программа, итоги 
     assert.match(await triceps().getAttribute('aria-label'), /не задействована/);
     await triceps().click();
     assert.match(await triceps().getAttribute('aria-label'), /основная/);
-    await assert.doesNotReject(edit.getByText('Сохранено в базе').waitFor({ timeout: 5000 }));
     await assert.doesNotReject(edit.getByRole('button', { name: 'Как было' }).waitFor({ timeout: 5000 }));
     await edit.getByRole('button', { name: 'Готово' }).click();
     await assert.doesNotReject(edit.getByText(/Грудь, трицепс/).waitFor({ timeout: 5000 }), 'в свёрнутой строке — новая основная группа');

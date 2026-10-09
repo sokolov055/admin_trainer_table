@@ -139,7 +139,6 @@ export default function PlanEditor({
           });
         }
         if (library.reload) library.reload();
-        setKindNote({ at, text: 'Сохранено в базе — везде так' });
       })
       .catch((error) => setKindNote({ at, text: 'В базу не сохранилось: ' + (error.message || 'нет связи'), error: true }));
   };

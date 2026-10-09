@@ -57,7 +57,8 @@ export default function MuscleEdit({ exerciseId, name, muscles, custom = false, 
             if (next === null && saved.muscles) setValue(saved.muscles);
             if (onSaved) onSaved(saved);
           }
-          setNote({ text: 'Сохранено в базе — везде так' });
+          // Удачное сохранение — молча: строка «Сохранено» сдвигала экран (09.10.2026)
+          setNote(null);
         })
         .catch((error) => setNote({ text: 'В базу не сохранилось: ' + (error.message || 'нет связи'), error: true }));
     }, next === null ? 0 : 700);

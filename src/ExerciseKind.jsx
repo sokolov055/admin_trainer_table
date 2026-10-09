@@ -1,6 +1,6 @@
 import React from 'react';
 import { apiMutate } from './api.js';
-import { KIND_LABELS, MACHINE_LABELS } from './exercise-track.js';
+import { KIND_LABELS } from './exercise-track.js';
 import { IconCheck } from './icons.jsx';
 
 /**
@@ -16,9 +16,8 @@ import { IconCheck } from './icons.jsx';
  * громоздко и не складывались с полями (владелец, 07.10.2026).
  */
 
-// Короткие подписи: чипы встают в ряд даже в узкой колонке суперсета
-const KIND_SHORT = { ...KIND_LABELS, bodyweight: 'Свой вес' };
-const MACHINE_SHORT = { ...MACHINE_LABELS, skillmill: 'SkillMill', rower: 'Гребля' };
+// Тренажёр у кардио больше не выбирают (владелец, 09.10.2026): настройки —
+// скорость, наклон, уровень — тренер задаёт в карточке кардио (CardioPlan)
 
 export default function ExerciseKind({ track, onChange, disabled = false, className = '', note = null }) {
   const set = (patch) => onChange({ ...track, ...patch });
@@ -38,7 +37,7 @@ export default function ExerciseKind({ track, onChange, disabled = false, classN
     <div className={'exercise-kind' + (className ? ' ' + className : '')}>
       <span className="exercise-kind__label">Вид</span>
       <div className="chips chips--flush chips--wrap exercise-kind__row" role="radiogroup" aria-label="Что записывать">
-        {Object.entries(KIND_SHORT).map(([k, v]) => (
+        {Object.entries(KIND_LABELS).map(([k, v]) => (
           <button
             type="button"
             key={k}
@@ -50,21 +49,7 @@ export default function ExerciseKind({ track, onChange, disabled = false, classN
           >{v}</button>
         ))}
       </div>
-      {track.kind === 'cardio' ? (
-        <div className="chips chips--flush chips--wrap exercise-kind__row" role="radiogroup" aria-label="Тренажёр">
-          {Object.entries(MACHINE_SHORT).map(([k, v]) => (
-            <button
-              type="button"
-              key={k}
-              role="radio"
-              aria-checked={track.machine === k}
-              className={'chip exercise-kind__toggle' + (track.machine === k ? ' is-on' : '')}
-              disabled={disabled}
-              onClick={() => set({ machine: k })}
-            >{v}</button>
-          ))}
-        </div>
-      ) : (
+      {track.kind !== 'cardio' && (
         <div className="chips chips--flush chips--wrap exercise-kind__row">
           {/* Работа: включено — одной стороной (рука, нога по очереди), выключено —
               двумя сразу, так по умолчанию. Вес на сторону — у веса, не здесь */}

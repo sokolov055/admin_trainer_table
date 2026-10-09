@@ -94,6 +94,13 @@ test('вид кардио: функциональное — интервалы �
   assert.deepEqual(ui.value.metrics, ['time', 'kcal', 'pulse']);
   assert.deepEqual(ui.value.modes, ['speed']);
 
+  // Круги стирают и вписывают заново — в план пустое не уходит (FT-511)
+  act(() => ui.input('Кругов').props.onChange({ target: { value: '' } }));
+  assert.equal(ui.input('Кругов').props.value, '');
+  assert.equal(ui.value.intervals.rounds, 6, 'пока пусто — прежнее число');
+  act(() => ui.input('Кругов').props.onChange({ target: { value: '8' } }));
+  assert.equal(ui.value.intervals.rounds, 8);
+
   // Интервалов в круге — сколько нужно; лишний убирается
   act(() => ui.button('+ Интервал').props.onClick());
   assert.equal(ui.value.intervals.phases.length, 3);

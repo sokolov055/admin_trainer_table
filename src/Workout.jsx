@@ -977,7 +977,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       saveExerciseTrack({ exerciseId: ex.exerciseId, name: ex.name, track: { ...track, ...next } })
         .then(saved => {
           if (saved && !ex.exerciseId) updateExercise(ei, x => (x.name === ex.name && !x.exerciseId ? { ...x, exerciseId: saved.id } : x));
-          setTrackNote({ ei, text: 'Сохранено в базе — везде так' });
         })
         .catch(e => setTrackNote({ ei, text: 'В базу не сохранилось: ' + (e.message || 'нет связи'), error: true }));
     };
@@ -1577,7 +1576,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         >
           <span style={{ transform: `scaleX(${stats.done / (stats.total || 1)})` }} />
         </div>
-        <p className="workout__status" role="status">{busy ? 'Сохраняем…' : record.dirty ? 'Есть несохранённые изменения' : 'Сохранено в облаке'}</p>
+        {/* «Сохранено в облаке» убрано (владелец, 09.10.2026): строка
+            менялась на каждую правку, и экран прыгал. Не сохранилось —
+            сообщение об ошибке вверху */}
       </header>
       <fieldset disabled={!editable || !!conflict} className="workout__fields" ref={fieldsRef}>
         {/* Переименовывает только тренер (07.10.2026), сервер это же проверяет */}
