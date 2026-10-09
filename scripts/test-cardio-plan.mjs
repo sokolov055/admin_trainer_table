@@ -60,6 +60,14 @@ test('главная цель: интервалы — круги вместо ц
   assert.equal(ui.value.speedUnit, 'rpm');
   assert.ok(ui.labels().includes('Ускорение: Скорость, об/мин'));
 
+  // Цель — у каждой фазы своя по записываемому (09.10.2026); общей «Цель: …» нет
+  assert.ok(labels.includes('Ускорение: Калории') && labels.includes('Замедление: Калории'));
+  assert.ok(!labels.some((l) => l.startsWith('Цель:')), 'у интервалов нет общей цели-числа');
+  act(() => ui.button('Пульс').props.onClick());
+  assert.ok(ui.labels().includes('Ускорение: Пульс') && ui.labels().includes('Замедление: Пульс'));
+  act(() => ui.button('Пульс').props.onClick());
+  assert.ok(!ui.labels().includes('Ускорение: Пульс'), 'сняли — поля пульса у фаз нет');
+
   // Записываемое при интервалах можно менять, но не убрать всё
   act(() => ui.button('Калории').props.onClick());
   assert.deepEqual(ui.value.metrics, ['kcal'], 'последнее не снимается');

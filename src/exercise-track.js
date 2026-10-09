@@ -145,6 +145,34 @@ export function clockText(total) {
   return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
 }
 
+/**
+ * Поля фазы интервала (09.10.2026, владелец): время — всегда, режим
+ * тренажёра и то, что тренер выбрал записывать, — расстояние, калории,
+ * пульс. Цель интервалов — пройти все круги, и у каждой фазы она своя:
+ * ускорение — 200 м на 12 км/ч при пульсе 160, замедление — пешком.
+ */
+export function phaseFields(track, metrics) {
+  const list = metrics || [];
+  return [
+    { key: 'time', head: 'Время, мм:сс', mode: 'text', max: 8, placeholder: '1:00' },
+    ...settingsFields(track),
+    ...['distance', 'kcal', 'pulse'].filter((m) => list.includes(m)).map((m) => (m === 'pulse'
+      ? { ...metricField(m, track), mode: 'text', max: 9, placeholder: '130–150' }
+      : metricField(m, track))),
+  ];
+}
+
+/** Фаза строкой без времени: «12 км/ч, 3%, 200 м, пульс 150–160» */
+function phaseText(p, track) {
+  if (!p) return '';
+  return [
+    modeText(p, track),
+    p.distance && p.distance + ' ' + distanceUnit(track),
+    p.kcal && p.kcal + ' ккал',
+    p.pulse && 'пульс ' + p.pulse,
+  ].filter(Boolean).join(', ');
+}
+
 /** Фазы интервалов по порядку: ускорение, замедление — rounds раз */
 export function intervalPhases(intervals, track) {
   if (!intervals || !intervals.rounds) return [];
@@ -153,18 +181,18 @@ export function intervalPhases(intervals, track) {
     [['fast', 'Ускорение'], ['slow', 'Замедление']].forEach(([k, label]) => {
       const p = intervals[k] || {};
       const secs = seconds(p.time);
-      if (secs > 0) list.push({ kind: k, label, round: r, seconds: secs, mode: modeText(p, track) });
+      if (secs > 0) list.push({ kind: k, label, round: r, seconds: secs, mode: phaseText(p, track) });
     });
   }
   return list;
 }
 
-/** Интервалы строкой: «8 × ускорение 1:00 (12 км/ч) / замедление 2:00 (6 км/ч)» */
+/** Интервалы строкой: «8 × ускорение 1:00 (12 км/ч, пульс 160) / замедление 2:00 (6 км/ч)» */
 export function intervalsText(intervals, track) {
   if (!intervals || !intervals.rounds) return '';
   const part = (p, label) => {
     const secs = seconds(p && p.time);
-    const mode = modeText(p, track);
+    const mode = phaseText(p, track);
     return secs ? label + ' ' + clockText(secs) + (mode ? ' (' + mode + ')' : '') : '';
   };
   return intervals.rounds + ' × ' + [part(intervals.fast, 'ускорение'), part(intervals.slow, 'замедление')].filter(Boolean).join(' / ');
@@ -423,6 +451,15 @@ export function planSet(ex, track) {
     if (goal === 'intervals' && !out.time && (c.metrics || ['time']).includes('time')) {
       const total = intervalPhases(c.intervals, track).reduce((n, p) => n + p.seconds, 0);
       if (total > 0 && total < 1000 * 60) out.time = clockText(total);
+    }
+    // Расстояние и калории фаз — тоже за все круги: 6 × (200 + 300) → 3000 м
+    if (goal === 'intervals' && c.intervals) {
+      ['distance', 'kcal'].forEach((m) => {
+        if (out[m] || !(c.metrics || []).includes(m)) return;
+        const one = ['fast', 'slow'].reduce((n, k) => n + num((c.intervals[k] || {})[m]), 0);
+        const total = Math.round(one * (Number(c.intervals.rounds) || 0) * 100) / 100;
+        if (total > 0) out[m] = String(total);
+      });
     }
     return out;
   }

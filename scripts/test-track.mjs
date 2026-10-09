@@ -207,3 +207,16 @@ test('кардио: интервалы главной целью, скорост
   // Цель «интервалы», а сами интервалы убрали — главная снова число
   assert.equal(trackOf({ cardio: { ...plan, intervals: null } }).goal, 'kcal');
 });
+
+test('кардио: у фаз интервалов своя цель — расстояние, калории, пульс (09.10.2026)', async () => {
+  const { cardioLine, intervalPhases, phaseFields } = await import('../src/exercise-track.js');
+  const plan = { machine: 'treadmill', goal: 'intervals', metrics: ['time', 'distance', 'pulse'], targets: {},
+    intervals: { rounds: 6, fast: { time: '1:00', speed: '12', distance: '200', pulse: '150–160' }, slow: { time: '2:00', speed: '6', distance: '200' } } };
+  const t = trackOf({ cardio: plan });
+  assert.deepEqual(phaseFields(t, t.metrics).map((f) => f.key), ['time', 'speed', 'incline', 'distance', 'pulse']);
+  assert.deepEqual(phaseFields(t, ['time']).map((f) => f.key), ['time', 'speed', 'incline'], 'не записывают — полей нет');
+  assert.equal(cardioLine(plan, t), 'интервалы 6 × ускорение 1:00 (12 км/ч, 200 м, пульс 150–160) / замедление 2:00 (6 км/ч, 200 м)');
+  assert.equal(intervalPhases(plan.intervals, t)[0].mode, '12 км/ч, 200 м, пульс 150–160', 'таймер показывает цель фазы');
+  // Отрезок — все круги: 6 × (1:00 + 2:00) и 6 × (200 + 200) м
+  assert.deepEqual(planSet({ cardio: plan }, t), { time: '18:00', distance: '2400' });
+});

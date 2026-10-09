@@ -10,12 +10,13 @@ import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
-import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide } from './exercise-track.js';
+import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme } from './exercise-track.js';
 
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
 const rowFields = (track) => trackFields({ ...track, perSide: false });
 import IntervalTimer from './IntervalTimer.jsx';
+import { IntervalsEdit } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
@@ -986,6 +987,25 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
 
   /**
+   * Интервалы кардио — правятся в самом занятии (09.10.2026, владелец):
+   * в зале поменяли круги или скорость, после — записали, как было на деле
+   * («Исправить результат» у выполненного). Только этого занятия: программа
+   * не переписывается. Строка плана над отрезками — по новым интервалам.
+   */
+  const intervalsEditor = (ex, ei) => {
+    const track = trackOf(ex);
+    if (track.kind !== 'cardio' || !ex.cardio || !ex.cardio.intervals) return null;
+    const edit = (iv) => updateExercise(ei, x => {
+      const cardio = { ...x.cardio, intervals: iv };
+      return { ...x, cardio, prescription: planScheme({ ...x, cardio }) };
+    });
+    return <div className="cardio-plan workout__intervals-edit">
+      <span className="field__label">Интервалы</span>
+      <IntervalsEdit intervals={ex.cardio.intervals} track={track} metrics={track.metrics} disabled={!editable} onChange={edit} />
+    </div>;
+  };
+
+  /**
    * Суперсет — кругами: «Круг 1» — все упражнения группы подряд, каждое со
    * своим весом и повторами, потом «Круг 2». Так его и делают в зале.
    * «Разъединить» делает упражнения отдельными; подходов у каждого остаётся
@@ -1621,6 +1641,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               ? <NameFromBase ex={ex} onPick={(patch) => replaceExercise(ei, patch)} />
               : <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ({ exerciseId, ...ex }) => ({ ...ex, name: e.target.value }))} /></label>}
             {trackEditor(ex, ei)}
+            {intervalsEditor(ex, ei)}
             <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
           </details>
           {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}
