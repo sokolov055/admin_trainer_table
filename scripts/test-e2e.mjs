@@ -184,7 +184,8 @@ test('тренировку можно провести, и блок станов
   // Упражнение меняют прямо в зале. Программа месяца от этого не
   // меняется, но во «Выполненных» должно стоять сделанное, а не план.
   const firstExercise = page.locator('.workout__exercise').first();
-  await firstExercise.getByText('Изменить упражнение').click();
+  // Касание названия — название и вид (FT-513), меню «Изменить упражнение» нет
+  await firstExercise.locator('.workout__name-tap').first().click();
   await firstExercise.getByLabel('Название').fill('Жим на наклонной скамье');
 
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();

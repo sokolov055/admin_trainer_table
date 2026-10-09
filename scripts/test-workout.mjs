@@ -489,6 +489,8 @@ test('кардио в занятии: режим, метрики, «+ метри
     const input = label => local.root.findAllByType('input').find(n => n.props['aria-label'] === label);
     assert.equal(input('Ускорение: Расстояние, м'), undefined, 'у фазы только выбранное');
     const chipIn = (label, group) => local.root.findAllByType('button').find(b => text(b) === label && b.parent.props['aria-label'] === group);
+    // Правка — касанием по плану (FT-513)
+    await act(async () => { local.root.findAllByType('button').find(b => b.props['aria-label'] === 'Беговая дорожка: настройки').props.onClick(); await delay(); });
     await act(async () => { chipIn('Расстояние', 'Ускорение: что задать').props.onClick(); await delay(); });
     await act(async () => { input('Кругов').props.onChange({ target: { value: '5' } }); await delay(); });
     await act(async () => { input('Ускорение: Скорость, км/ч').props.onChange({ target: { value: '13' } }); await delay(); });
@@ -618,11 +620,61 @@ test('кардио без интервалов в плане — интерва�
       await delay();
     });
     const button = label => local.root.findAllByType('button').find(b => text(b) === label);
+    const press = async b => { assert.ok(b); await act(async () => { b.props.onClick(); await delay(); }); };
     assert.equal(button('Запустить интервалы'), undefined);
-    await act(async () => { button('Задать интервалы').props.onClick(); await delay(); });
+    // Меню «Упражнения суперсета» нет (FT-513): правка — касанием в круге
+    assert.ok(!local.root.findAllByType('summary').some(n => text(n) === 'Упражнения суперсета'));
+    // Касание названия — название, вид, у кардио — аэробное или функциональное
+    await press(button('Аэробайк'));
+    assert.ok(local.root.findAllByType('input').some(n => n.props['aria-label'] === 'Название упражнения'));
+    await press(button('Функциональное кардио'));
     assert.ok(button('Запустить интервалы'), 'таймер интервалов — у упражнения суперсета');
-    assert.ok(button('+ Интервал'), 'редактор интервалов открыт');
     assert.ok(local.root.findAllByType('p').some(p => /Аэробайк: интервалы 6 × ускорение 1:00/.test(text(p))), 'план — по интервалам');
+    await press(button('Готово'));
+    // Касание единиц — настройки: у кардио — интервалы
+    await press(local.root.findAllByType('button').find(b => b.props['aria-label'] === 'Аэробайк: настройки'));
+    assert.ok(button('+ Интервал'), 'редактор интервалов открыт');
+    assert.equal(button('Функциональное кардио'), undefined, 'вид — у названия, не здесь');
+    // У силового в круге — вес и повторы сразу всем кругам, и заметка
+    await press(local.root.findAllByType('button').find(b => b.props['aria-label'] === 'Присед: настройки'));
+    assert.equal(button('+ Интервал'), undefined, 'открыта одна панель');
+    const all = local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Присед: вес, кг, всем подходам');
+    await act(async () => { all.props.onChange({ target: { value: '45' } }); await delay(); });
+    const weights = local.root.findAllByType('input').filter(n => /^Присед, подход \d, вес в кг$/.test(n.props['aria-label'] || '')).map(n => n.props.value);
+    assert.deepEqual(weights, ['45', '45', '45']);
+    assert.ok(local.root.findAllByType('textarea').length > 0, 'заметка — в настройках упражнения суперсета');
+  } finally {
+    if (local) local.unmount();
+  }
+});
+
+test('обычное упражнение: касание плана — подходы и вес всем, касание названия — вид (FT-513)', async () => {
+  data.clear();
+  const block = { title: 'Ноги', exercises: [{ name: 'Жим ногами', sets: '3', reps: '12', weight: '100' }] };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const byLabel = label => local.root.findAllByType('button').find(b => b.props['aria-label'] === label);
+    const button = label => local.root.findAllByType('button').find(b => text(b) === label);
+    const press = async b => { assert.ok(b); await act(async () => { b.props.onClick(); await delay(); }); };
+    const sets = () => local.root.findAllByType('input').filter(n => /^Жим ногами, подход \d, повторы$/.test(n.props['aria-label'] || ''));
+    assert.ok(!local.root.findAllByType('summary').some(n => text(n) === 'Изменить упражнение'), 'меню нет');
+    await press(byLabel('Жим ногами: настройки'));
+    await press(byLabel('Добавить подход'));
+    assert.equal(sets().length, 4);
+    const reps = local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Жим ногами: повторы, всем подходам');
+    await act(async () => { reps.props.onChange({ target: { value: '10' } }); await delay(); });
+    assert.deepEqual(sets().map(n => n.props.value), ['10', '10', '10', '10']);
+    await press(byLabel('Убрать подход'));
+    assert.equal(sets().length, 3);
+    // Название — название и вид; панель настроек при этом закрывается
+    await press(button('Жим ногами'));
+    assert.equal(byLabel('Добавить подход'), undefined);
+    await press(button('Кардио'));
+    assert.ok(button('Аэробная тренировка'), 'у кардио — аэробное или функциональное');
   } finally {
     if (local) local.unmount();
   }

@@ -191,7 +191,9 @@ export function phasesOf(intervals) {
 
 /** Поле фазы по ключу: подпись, клавиатура, длина */
 export function phaseField(key, track) {
-  if (key === 'time') return { key, head: 'Время, мм:сс', short: 'Время', mode: 'text', max: 8, placeholder: '1:00' };
+  // Время интервала — секундами (владелец, FT-513): «30» — 30 с, «90» — полторы
+  // минуты. Старые «1:00» читаются как раньше (seconds)
+  if (key === 'time') return { key, head: 'Время, с', short: 'Время', mode: 'numeric', max: 4, placeholder: '30' };
   if (key === 'pulse') return { ...metricField(key, track), mode: 'text', max: 9, placeholder: '130–150' };
   if (METRICS.includes(key)) return metricField(key, track);
   const f = settingDefs(track)[key];

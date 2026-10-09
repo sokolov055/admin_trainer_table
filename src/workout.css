@@ -584,8 +584,28 @@
 /* Название упражнения — касанием переименовать (02.10.2026): выглядит как текст */
 .workout__name-tap { all: unset; cursor: text; -webkit-tap-highlight-color: transparent; }
 .workout__name-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-.workout__rename { display: flex; gap: var(--space-2); align-items: flex-start; margin: var(--space-1) 0 var(--space-2); }
-.workout__rename > :first-child { flex: 1; min-width: 0; }
+/* Правка касанием (FT-513): по названию — название и вид, по единицам или
+   плану — подходы, вес, время, у кардио — цели и интервалы. Панель под
+   строкой, как в программе (plan-inline__panel) */
+.workout__panel { display: grid; gap: var(--space-3); margin: var(--space-2) 0; padding: var(--space-3); border-radius: var(--radius); background: var(--surface-sunken); }
+.workout__panel .workout__field, .workout__panel .workout__track, .workout__panel > p { margin: 0; }
+.workout__panel .chips { flex-wrap: wrap; overflow: visible; margin-bottom: 0; }
+.workout__panel-actions { display: flex; justify-content: flex-end; }
+.workout__panel-actions .button { min-height: 34px; padding: 0 14px; font-size: var(--text-sm); border-radius: 10px; }
+.workout__tune-count { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-secondary); }
+.workout__tune-count span { flex: 1; }
+.workout__tune-count .button { min-width: 40px; min-height: 36px; padding: 0; font-size: var(--text-lg, 18px); }
+.workout__tune-count strong { min-width: 2ch; text-align: center; color: var(--text); font-variant-numeric: tabular-nums; }
+.workout__tune-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-2); }
+.workout__tune-fields label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); min-width: 0; }
+.workout__tune-fields input { text-align: center; font-variant-numeric: tabular-nums; }
+/* План и единицы — кнопками, но выглядят текстом; значок — что нажимается */
+.workout__target-tap { all: unset; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: var(--space-2) 0 0; color: var(--text-secondary); font-size: var(--text-sm); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.workout__target-tap svg { align-self: center; color: var(--text-muted); }
+.workout__target--units { color: var(--text-muted); }
+.workout__target-tap:focus-visible, button.workout__round-units:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+button.workout__round-units { all: unset; white-space: pre-wrap; font-weight: 400; color: var(--text-muted); font-size: var(--text-xs); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 
 /* Перестановка удержанием: соседи расступаются, взятая строка — над ними */
 .workout__round > [data-member].workout__exercise--lifted { background: var(--surface); border-radius: var(--radius-sm); }

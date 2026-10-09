@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { METRICS, MODES, PHASE_KEYS, MAX_PHASES, cardioGoal, goalFirst, metricField, settingsFields, phaseField, phaseName, phaseKeys, phasesOf, intervalsUse } from '../exercise-track.js';
+import { METRICS, MODES, PHASE_KEYS, MAX_PHASES, cardioGoal, goalFirst, metricField, settingsFields, phaseField, phaseName, phaseKeys, phasesOf, intervalsUse, seconds } from '../exercise-track.js';
 
 /**
  * Кардио в программе (09.10.2026, владелец) — свои поля вместо «подходы ·
@@ -42,8 +42,11 @@ const KINDS = [[false, 'Аэробная тренировка'], [true, 'Фун�
 
 export const NEW_INTERVALS = {
   rounds: 6,
-  phases: [{ fields: ['time', 'speed'], time: '1:00', speed: '' }, { fields: ['time', 'speed'], time: '2:00', speed: '' }],
+  phases: [{ fields: ['time', 'speed'], time: '60', speed: '' }, { fields: ['time', 'speed'], time: '120', speed: '' }],
 };
+
+/** Время фазы в поле — секундами: старое «1:00» показываем как «60» */
+const phaseValue = (p, k) => (k === 'time' && String(p.time || '').includes(':') ? String(seconds(p.time)) : p[k] || '');
 
 /**
  * Интервалы в плане: круги, фазы и то, что из них следует, — что записывать
@@ -94,7 +97,7 @@ export function IntervalsEdit({ intervals, track, disabled, onChange }) {
           <div className="cardio-plan__grid">
             {keys.map((k) => {
               const f = phaseField(k, track);
-              return <label key={k}><span>{f.head}</span><input className="field__input" aria-label={name + ': ' + f.head} placeholder={f.placeholder || ''} inputMode={f.mode} maxLength={f.max} value={p[k] || ''} disabled={disabled} onChange={(e) => editPhase(i, { [k]: e.target.value })} /></label>;
+              return <label key={k}><span>{f.head}</span><input className="field__input" aria-label={name + ': ' + f.head} placeholder={f.placeholder || ''} inputMode={f.mode} maxLength={f.max} value={phaseValue(p, k)} disabled={disabled} onChange={(e) => editPhase(i, { [k]: k === 'time' ? e.target.value.replace(/\D/g, '') : e.target.value })} /></label>;
             })}
           </div>
         )}
@@ -110,7 +113,34 @@ export function IntervalsEdit({ intervals, track, disabled, onChange }) {
   );
 }
 
-export default function CardioPlan({ value, track, disabled, onChange }) {
+// Главная — первая из выбранных целей-итогов: с неё начинаются план и
+// отрезок в занятии. Пульс — зона, а не итог, главной не бывает
+const mainOf = (list) => list.find((m) => m !== 'pulse') || 'time';
+
+/** Кардио другого вида: функциональное — с интервалами, аэробное — без */
+export function withKind(c, functional) {
+  // Что записывать — по фазам; ушли в аэробную — интервалов нет
+  return functional
+    ? { ...withIntervals(c, c.intervals || NEW_INTERVALS), goal: 'intervals' }
+    : { ...c, goal: mainOf(goalFirst(c.metrics, cardioGoal(c))), intervals: null };
+}
+
+/**
+ * «Аэробная тренировка / Функциональное кардио» — в программе над полями,
+ * в занятии — у названия вместе с видом упражнения (FT-513)
+ */
+export function CardioKind({ value, disabled, onChange }) {
+  const functional = cardioGoal(value) === 'intervals';
+  return (
+    <div className="chips" role="radiogroup" aria-label="Вид кардио">
+      {KINDS.map(([f, label]) => (
+        <button key={label} type="button" role="radio" aria-checked={functional === f} className={'chip' + (functional === f ? ' chip--active' : '')} disabled={disabled} onClick={() => functional !== f && onChange(withKind(value, f))}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+export default function CardioPlan({ value, track, disabled, onChange, kind = true }) {
   const c = value;
   const set = (patch) => onChange({ ...c, ...patch });
   const setIn = (key, field, v) => set({ [key]: { ...(c[key] || {}), [field]: v } });
@@ -118,13 +148,6 @@ export default function CardioPlan({ value, track, disabled, onChange }) {
   const functional = goal === 'intervals';
   const metrics = goalFirst(c.metrics, goal);
   const sorted = (list) => METRICS.filter((x) => list.includes(x));
-  // Главная — первая из выбранных целей-итогов: с неё начинаются план и
-  // отрезок в занятии. Пульс — зона, а не итог, главной не бывает
-  const mainOf = (list) => list.find((m) => m !== 'pulse') || 'time';
-  const pickKind = (f) => set(f
-    // Что записывать — по фазам; ушли в аэробную — интервалов нет
-    ? { ...withIntervals(c, c.intervals || NEW_INTERVALS), goal: 'intervals' }
-    : { goal: mainOf(metrics), intervals: null });
   const toggle = (m) => {
     const next = sorted(metrics.includes(m) ? metrics.filter((x) => x !== m) : [...metrics, m]);
     // Отрезок отмечают по итогу — время, расстояние или калории
@@ -152,11 +175,7 @@ export default function CardioPlan({ value, track, disabled, onChange }) {
 
   return (
     <div className="cardio-plan">
-      <div className="chips" role="radiogroup" aria-label="Вид кардио">
-        {KINDS.map(([f, label]) => (
-          <button key={label} type="button" role="radio" aria-checked={functional === f} className={'chip' + (functional === f ? ' chip--active' : '')} disabled={disabled} onClick={() => functional !== f && pickKind(f)}>{label}</button>
-        ))}
-      </div>
+      {kind && <CardioKind value={c} disabled={disabled} onChange={onChange} />}
 
       {/* У каждого вида — только свои настройки (владелец, 09.10.2026) */}
       {functional ? (

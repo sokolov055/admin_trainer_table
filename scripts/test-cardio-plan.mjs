@@ -77,7 +77,11 @@ test('вид кардио: функциональное — интервалы �
   assert.equal(ui.value.intervals.rounds, 6);
   assert.equal(ui.value.intervals.phases.length, 2);
   assert.ok(ui.labels().includes('Кругов'));
-  assert.ok(ui.labels().includes('Ускорение: Скорость, км/ч') && ui.labels().includes('Замедление: Время, мм:сс'));
+  assert.ok(ui.labels().includes('Ускорение: Скорость, км/ч') && ui.labels().includes('Замедление: Время, с'));
+  // Время интервала — секундами (FT-513): «60» — минута, двоеточие не нужно
+  assert.equal(ui.input('Ускорение: Время, с').props.value, '60');
+  act(() => ui.input('Ускорение: Время, с').props.onChange({ target: { value: '30 с' } }));
+  assert.equal(ui.value.intervals.phases[0].time, '30');
   assert.ok(!ui.labels().some((l) => l.startsWith('Цель:')) && !ui.labels().includes('Скорость, км/ч'), 'общих цели и режима нет — они у фаз');
   assert.equal(ui.button('Скорость', 'Настройки'), undefined, 'только свои настройки');
   assert.equal(ui.button('Время', 'Цель'), undefined);
@@ -104,7 +108,7 @@ test('вид кардио: функциональное — интервалы �
   // Интервалов в круге — сколько нужно; лишний убирается
   act(() => ui.button('+ Интервал').props.onClick());
   assert.equal(ui.value.intervals.phases.length, 3);
-  assert.ok(ui.labels().includes('Интервал 3: Время, мм:сс'));
+  assert.ok(ui.labels().includes('Интервал 3: Время, с'));
   act(() => ui.input('Интервал 3: название').props.onChange({ target: { value: 'Горка' } }));
   act(() => ui.button('Наклон', 'Горка: что задать').props.onClick());
   assert.ok(ui.labels().includes('Горка: Наклон, %'));
@@ -132,4 +136,10 @@ test('об/мин и у дорожки, когда настройки выбра
   act(() => ui.button('об/мин').props.onClick());
   assert.deepEqual(ui.value.modes, ['speed', 'incline'], 'выбор по тренажёру стал явным');
   assert.ok(ui.labels().includes('Скорость, об/мин'));
+});
+
+test('старое время интервала «1:30» в поле — секундами (FT-513)', () => {
+  const ui = mount({ ...newCardio('other'), goal: 'intervals', intervals: { rounds: 4, phases: [{ fields: ['time'], time: '1:30' }] } });
+  assert.equal(ui.input('Ускорение: Время, с').props.value, '90');
+  assert.equal(ui.value.intervals.phases[0].time, '1:30', 'пока не правили — как было');
 });

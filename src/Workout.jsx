@@ -10,13 +10,13 @@ import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
-import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, cardioFrom } from './exercise-track.js';
+import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, cardioFrom, cardioGoal } from './exercise-track.js';
 
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
 const rowFields = (track) => trackFields({ ...track, perSide: false });
 import IntervalTimer from './IntervalTimer.jsx';
-import { IntervalsEdit, withIntervals, NEW_INTERVALS } from './trainer/CardioPlan.jsx';
+import CardioPlan, { CardioKind } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
@@ -109,6 +109,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [roundLack, setRoundLack] = useState(null);
   // Переименование касанием по названию (02.10.2026): id упражнения
   const [renaming, setRenaming] = useState('');
+  // Настройки касанием по единицам (FT-513): id упражнения, в круге — id:круг
+  const [tuning, setTuning] = useState('');
   // Перестановка удержанием (02.10.2026): { key } — какой блок тащат.
   // Пока тащат, карточки свёрнуты в строки (как в «Выбрать»): развёрнутая
   // карточка выше экрана, цель за ней не видна
@@ -986,29 +988,20 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
 
   /**
-   * Интервалы кардио — правятся в самом занятии (09.10.2026, владелец):
-   * в зале поменяли круги или скорость, после — записали, как было на деле
+   * Кардио в занятии (FT-511, FT-513): аэробное или функциональное — у
+   * названия, цели с настройками или интервалы — касанием по единицам. В зале
+   * поменяли круги или скорость, после — записали, как было на деле
    * («Исправить результат» у выполненного). Только этого занятия: программа
-   * не переписывается. Строка плана над отрезками — по новым интервалам.
+   * не переписывается. Что записывать в отрезке — по плану (metrics, modes,
+   * goal), строка плана над отрезками — по новому.
    */
-  const intervalsEditor = (ex, ei) => {
-    const track = trackOf(ex);
-    if (track.kind !== 'cardio') return null;
-    // Что записывать в отрезке — по фазам: добавили калории — появилось поле.
-    // Не было интервалов в плане — задаются прямо в занятии (FT-511)
-    const edit = (iv) => updateExercise(ei, x => {
-      const cardio = { ...withIntervals(x.cardio || cardioFrom(x, trackOf(x)), iv), goal: 'intervals' };
-      const next = { ...x, cardio, track: { ...trackOf(x), metrics: cardio.metrics, modes: cardio.modes, goal: 'intervals' } };
-      return { ...next, prescription: planScheme(next) };
-    });
-    if (!ex.cardio || !ex.cardio.intervals) {
-      return editable ? <button type="button" className="button workout__intervals-edit" onClick={() => edit(NEW_INTERVALS)}>Задать интервалы</button> : null;
-    }
-    return <div className="cardio-plan workout__intervals-edit">
-      <span className="field__label">Интервалы</span>
-      <IntervalsEdit intervals={ex.cardio.intervals} track={track} disabled={!editable} onChange={edit} />
-    </div>;
-  };
+  const cardioOf = ex => ex.cardio || cardioFrom(ex, trackOf(ex));
+  const editCardio = (ei, cardio) => updateExercise(ei, x => {
+    const track = { ...trackOf(x), metrics: cardio.metrics, goal: cardioGoal(cardio), speedUnit: cardio.speedUnit || '' };
+    if (cardio.modes) track.modes = cardio.modes;
+    const next = { ...x, cardio, track };
+    return { ...next, prescription: planScheme(next) };
+  });
 
   /**
    * Суперсет — кругами: «Круг 1» — все упражнения группы подряд, каждое со
@@ -1054,12 +1047,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   onPointerDown={holdToMove(ex.id, (head) => ({ container: head.closest('.workout__round'), commit: reorderMembers(group) }))}>
                   {/* Название — касанием: из базы или новое прямо здесь */}
                   <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>
-                  <span className="workout__round-units"> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</span>
+                  {/* Единицы — касанием: вес, повторы, время, у кардио — интервалы (FT-513) */}
+                  <button type="button" className="workout__round-units" aria-expanded={tuning === ex.id + ':' + r} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id + ':' + r)}> · {rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</button>
                   {/* Сделано — с оценкой, как у обычных подходов (03.10.2026) */}
                   {ex.sets[r].state === 'done' && ex.sets[r].effort && <span className={'workout__round-effort workout__round-effort--' + ex.sets[r].effort}>
                     <span className={'workout__effort-dot workout__effort-dot--' + ex.sets[r].effort} aria-hidden="true" />{EFFORT_WORD[ex.sets[r].effort]}
                   </span>}
                 </div>}
+              {tuning === ex.id + ':' + r && tuneEditor(ex, ei, ex.id + ':' + r, true)}
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
               {memberEffort(members, k, r)}
             </div>
@@ -1069,38 +1064,89 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         </div>
       ))}
       <button className="button button--block" disabled={members.some(({ ex }) => ex.sets.length >= 20)} onClick={addRound}>Добавить круг</button>
-      <details><summary>Упражнения суперсета</summary>
-        {members.map(({ ex, ei }) => (
-          <div key={ex.id} className="workout__round-edit">
-            <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, x => ({ ...x, name: e.target.value }))} /></label>
-            {trackEditor(ex, ei)}
-            {intervalsEditor(ex, ei)}
-            <label className="workout__field">Заметка<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, x => ({ ...x, note: e.target.value }))} /></label>
-          </div>
-        ))}
-      </details>
     </section>;
   };
 
   /**
    * Название упражнения — касанием (02.10.2026). Тренер выбирает из базы или
    * добавляет новое прямо здесь (ExercisePicker); у клиента базы нет —
-   * просто поле. «Готово», Enter или уход с поля — закрыть.
+   * просто поле. Там же вид упражнения, у кардио — аэробное или
+   * функциональное (FT-513): отдельного меню «Изменить упражнение» нет.
    */
   const startRename = (id) => {
     if (swallowClick.current || !editable) return;
-    setRenaming(id);
+    setTuning('');
+    setRenaming(renaming === id ? '' : id);
   };
   const nameEditor = (ex, ei, id) => (
-    <div className="workout__rename" key={'rename-' + id}>
+    <div className="workout__panel" key={'rename-' + id}>
       {clientRow
         ? <NameFromBase ex={ex} autoFocus onPick={(patch) => replaceExercise(ei, patch)} />
         : <input className="field__input" aria-label="Название упражнения" autoFocus value={ex.name} maxLength={160}
           onChange={e => updateExercise(ei, ({ exerciseId, ...x }) => ({ ...x, name: e.target.value }))}
           onKeyDown={e => { if (e.key === 'Enter') setRenaming(''); }} />}
-      <button type="button" className="button button--ghost" onClick={() => setRenaming('')}>Готово</button>
+      {trackEditor(ex, ei)}
+      {trackOf(ex).kind === 'cardio' && <CardioKind value={cardioOf(ex)} onChange={c => editCardio(ei, c)} />}
+      <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
+      <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => setRenaming('')}>Готово</button></div>
     </div>
   );
+
+  /**
+   * Настройки упражнения — касанием по единицам или плану (FT-513): у кардио
+   * цели и настройки или интервалы, у остальных — вес, повторы или время
+   * сразу всем неотмеченным подходам и их число. В суперсете кругов общее
+   * число («Добавить круг» под ним), а заметка — здесь же.
+   */
+  const startTune = (id) => {
+    if (swallowClick.current || !editable) return;
+    setRenaming('');
+    setTuning(tuning === id ? '' : id);
+  };
+  const tuneEditor = (ex, ei, id, inRound = false) => {
+    const track = trackOf(ex);
+    const note = inRound && <label className="workout__field">Заметка<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, x => ({ ...x, note: e.target.value }))} /></label>;
+    const done = <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => setTuning('')}>Готово</button></div>;
+    if (track.kind === 'cardio') {
+      const c = cardioOf(ex);
+      return <div className="workout__panel" key={'tune-' + id}>
+        <CardioPlan kind={false} value={c} track={trackOf({ ...ex, cardio: c })} onChange={next => editCardio(ei, next)} />
+        {note}
+        {done}
+      </div>;
+    }
+    const open = ex.sets.filter(x => x.state === 'pending');
+    const sample = open[0] || ex.sets[ex.sets.length - 1] || {};
+    // Сразу всем неотмеченным: сделанное — это уже результат
+    const editAll = (key, value) => updateExercise(ei, x => ({ ...x, sets: x.sets.map(set => {
+      if (set.state !== 'pending') return set;
+      if (key !== 'weight') return { ...set, [key]: value };
+      const { suggest, ...rest } = set;
+      return { ...rest, weight: value, own: true };
+    }) }));
+    const last = ex.sets[ex.sets.length - 1];
+    const addSet = () => updateExercise(ei, x => {
+      const { effort, suggest, ...prev } = x.sets[x.sets.length - 1];
+      return { ...x, sets: [...x.sets, { ...prev, state: 'pending' }] };
+    });
+    const dropSet = () => { setUndo(s.exercises, 'Подход удалён'); updateExercise(ei, x => ({ ...x, sets: x.sets.slice(0, -1) })); };
+    return <div className="workout__panel" key={'tune-' + id}>
+      {!inRound && <div className="workout__tune-count">
+        <span>Подходов</span>
+        <button type="button" className="button" aria-label="Убрать подход" disabled={ex.sets.length <= 1 || last.state !== 'pending'} onClick={dropSet}>−</button>
+        <strong>{ex.sets.length}</strong>
+        <button type="button" className="button" aria-label="Добавить подход" disabled={ex.sets.length >= 20} onClick={addSet}>+</button>
+      </div>}
+      {open.length > 0 && <div className="workout__tune-fields">
+        {rowFields(track).map(f => (
+          <label key={f.key}><span>{f.head}</span><input className="field__input" aria-label={ex.name + ': ' + f.head.toLowerCase() + ', всем подходам'} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={sample[f.key] || ''} onChange={e => editAll(f.key, e.target.value)} /></label>
+        ))}
+      </div>}
+      {open.length > 0 && <p className="small muted">{open.length === ex.sets.length ? 'Меняется во всех подходах.' : 'Меняется в неотмеченных подходах.'}</p>}
+      {note}
+      {done}
+    </div>;
+  };
 
   /**
    * Порядок — удержанием (02.10.2026), без кнопок «Выше/Ниже». Подержали
@@ -1150,6 +1196,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const begin = (key, pointerId, y0, head, inner = null) => {
     haptic('medium');
     setRenaming('');
+    setTuning('');
     // Внутри суперсета карточки не сворачиваются — двигаются строки круга
     if (!inner) flushSync(() => setReorder({ key }));
     const root = inner ? inner.container : fieldsRef.current;
@@ -1640,22 +1687,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {!compact && <>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {ex.exerciseId && setups[ex.exerciseId] && extrasView(ex, ei, setups[ex.exerciseId])}
-          {main && (
-            <p className="workout__target">
-              <strong>{main}</strong>
-              {rest.map((r, i) => <span key={i}>{r}</span>)}
-            </p>
-          )}
+          {/* План — касанием: подходы, вес, время, у кардио — цели и
+              интервалы (FT-513). Плана нет — единицы, как в круге суперсета.
+              У пары вес у каждого свой — правится в строках подходов */}
+          {ex.sets.some(x => x.who)
+            ? main && <p className="workout__target"><strong>{main}</strong>{rest.map((r, i) => <span key={i}>{r}</span>)}</p>
+            : <button type="button" className={'workout__target workout__target-tap' + (main ? '' : ' workout__target--units')} aria-expanded={tuning === ex.id} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id)}>
+              {main ? <><strong>{main}</strong>{rest.map((r, i) => <span key={i}>{r}</span>)}</> : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}
+              <IconSliders size={13} aria-hidden="true" />
+            </button>}
+          {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
-          <details><summary>Изменить упражнение</summary>
-            {clientRow
-              ? <NameFromBase ex={ex} onPick={(patch) => replaceExercise(ei, patch)} />
-              : <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, ({ exerciseId, ...ex }) => ({ ...ex, name: e.target.value }))} /></label>}
-            {trackEditor(ex, ei)}
-            {intervalsEditor(ex, ei)}
-            <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
-          </details>
           {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}
           {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}</div>}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
