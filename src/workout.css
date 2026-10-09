@@ -712,3 +712,85 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Тренажёр и техника: фото и настройка, техника, мышцы, анимация */
 .workout__about[open] { display: grid; gap: var(--space-3); padding-bottom: var(--space-2); }
 .workout__technique { margin: 0; white-space: pre-wrap; font-size: var(--text-sm); color: var(--text-secondary); }
+
+/* ---------------------------------------------------------------------------
+   Карточка упражнения — единая система (владелец, 09.10.2026, дизайн-проход).
+   Три уровня действий: главное — цветные «Легко / Норм / Тяжело»; второго
+   плана — кнопки с рамкой, как в шапке («Добавить подход», «+ Калории»);
+   третьего — синий текст одного кегля («+ Записать настройку», «Тренажёр и
+   техника», «Добавить заметку»). Поля — одной высоты и скругления, цифры —
+   одним кеглем, подписи столбцов — над центром полей, как и цифры в них.
+   --------------------------------------------------------------------------- */
+.workout__exercise { --field-h: 52px; --field-r: 12px; }
+
+/* Поля подхода и отрезка */
+.workout__set-row input,
+.workout__cardio-grid input,
+.intervals-row input {
+  height: var(--field-h);
+  min-height: 0;
+  box-sizing: border-box;
+  border-radius: var(--field-r);
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.workout__set--current .workout__set-row input,
+.workout__set--current .workout__cardio-grid input,
+.workout__set--current .intervals-row input { border-width: 1.5px; }
+
+/* Подписи — 12 px, приглушённые, над центром поля */
+.workout__set-head { margin: var(--space-3) 0 var(--space-1); font-size: 12px; font-weight: 500; letter-spacing: 0.01em; }
+.workout__set-head > span { text-align: center; }
+.workout__cardio-grid label,
+.intervals-row label { font-size: 12px; font-weight: 500; text-align: center; }
+/* Кардио: до четырёх полей в строку — «Расстояние» не уезжает одно вниз */
+.workout__cardio-grid { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); }
+.intervals-row__fields { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); }
+.intervals-row__rounds { grid-template-columns: 1fr 88px; }
+.intervals-row__name { font-size: 14px; font-weight: 650; }
+
+/* Главное действие — скругление и высота как у полей */
+.workout__effort-btn { min-height: var(--field-h, 52px); border-radius: var(--field-r, 12px); font-size: 17px; letter-spacing: -0.005em; }
+.workout__effort-hint { margin-top: var(--space-1); font-size: 12px; }
+
+/* Второй план — кнопка с рамкой, как «Пауза» и «Выбрать» в шапке */
+.workout__exercise .workout__add,
+.workout__rounds > .button--block {
+  min-height: 44px;
+  margin-top: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--field-r, 12px);
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.workout__metric-add .chip {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Третий план — синий текст: настройка клиента, тренажёр и техника, заметка */
+.workout__exercise .workout__note > summary,
+.workout__about > summary,
+.workout__setup > summary {
+  min-height: 40px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+.workout__note-add, .workout__note-edit { font-size: 14px; font-weight: 600; }
+
+/* Номер подхода и единицы — тихие, но читаемые */
+.workout__set-num { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+.workout__units-tap { font-size: 13px; }
+/* Подпись в две строки («Скорость, км/ч») — поля всё равно в одну линию */
+.workout__cardio-grid, .intervals-row__fields { align-items: end; }
