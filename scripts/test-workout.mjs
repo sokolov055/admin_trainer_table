@@ -703,3 +703,38 @@ test('обычное упражнение: касание плана — под�
     if (local) local.unmount();
   }
 });
+
+test('цель кардио, поправленная в сделанном круге, попадает в его отрезок (FT-513)', async () => {
+  data.clear();
+  const block = { title: 'Круг', exercises: [
+    { name: 'Аэробайк', supersetGroup: 'A', sets: '2', cardio: { machine: 'other', goal: 'distance', metrics: ['distance'], targets: { distance: '' }, modes: ['level'], settings: { level: '8' } } },
+    { name: 'Присед', supersetGroup: 'A', sets: '2', reps: '10', weight: '40' },
+  ] };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const input = label => local.root.findAllByType('input').find(n => n.props['aria-label'] === label);
+    const press = async b => { assert.ok(b); await act(async () => { b.props.onClick(); await delay(); }); };
+    // Первый круг сделан: у аэробайка вписали расстояние, оба отмечены
+    await act(async () => { input('Аэробайк, отрезок 1, расстояние, м').props.onChange({ target: { value: '100' } }); await delay(); });
+    const round1 = () => local.root.findAllByProps({ className: 'workout__round' })[0];
+    await press(round1().findAll(n => n.type === 'button' && text(n) === 'Норм')[0]);
+    await press(round1().findAll(n => n.type === 'button' && text(n) === 'Норм')[0]);
+    assert.ok(local.root.findAllByType('button').some(b => text(b) === 'Круг 1 выполнен'));
+    // Во втором круге отрезок ещё пуст; цель 150 м из настроек второго круга
+    await press(local.root.findAllByType('button').filter(b => b.props['aria-label'] === 'Аэробайк: настройки')[1]);
+    await act(async () => { input('Цель: Расстояние, м').props.onChange({ target: { value: '150' } }); await delay(); });
+    assert.equal(input('Аэробайк, отрезок 2, расстояние, м').props.value, '150');
+    assert.equal(input('Аэробайк, отрезок 1, расстояние, м').props.value, '100', 'вписанное в сделанном круге не тронуто');
+    // Настройки первого (сделанного) круга — цель тоже доходит до отрезка, если там пусто
+    await act(async () => { input('Аэробайк, отрезок 1, расстояние, м').props.onChange({ target: { value: '' } }); await delay(); });
+    await press(local.root.findAllByType('button').filter(b => b.props['aria-label'] === 'Аэробайк: настройки')[0]);
+    await act(async () => { input('Цель: Расстояние, м').props.onChange({ target: { value: '120' } }); await delay(); });
+    assert.equal(input('Аэробайк, отрезок 1, расстояние, м').props.value, '120', 'сделанный круг, из которого открыли настройки');
+  } finally {
+    if (local) local.unmount();
+  }
+});

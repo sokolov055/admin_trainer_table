@@ -1016,7 +1016,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * goal), строка плана над отрезками — по новому.
    */
   const cardioOf = ex => ex.cardio || cardioFrom(ex, trackOf(ex));
-  const editCardio = (ei, cardio) => updateExercise(ei, x => {
+  // only — отрезок круга, из которого открыли настройки: в него числа идут и
+  // после отметки (поправили цель уже сделанного круга)
+  const editCardio = (ei, cardio, only = -1) => updateExercise(ei, x => {
     const track = { ...trackOf(x), metrics: cardio.metrics, goal: cardioGoal(cardio), speedUnit: cardio.speedUnit || '' };
     if (cardio.modes) track.modes = cardio.modes;
     const next = { ...x, cardio, track };
@@ -1024,8 +1026,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // кругов другое. Вписанное руками (не как было в плане) не трогаем
     const was = planSet(x, trackOf(x));
     const now = planSet(next, trackOf(next));
-    const sets = x.sets.map(set => {
-      if (set.state !== 'pending') return set;
+    const sets = x.sets.map((set, i) => {
+      if (set.state !== 'pending' && i !== only) return set;
       const out = { ...set };
       Object.keys({ ...was, ...now }).forEach(k => {
         if (!out[k] || out[k] === was[k]) out[k] = now[k] || '';
@@ -1157,7 +1159,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (track.kind === 'cardio') {
       const c = cardioOf(ex);
       return <div className="workout__panel" key={'tune-' + id}>
-        <CardioPlan kind={false} value={c} track={trackOf({ ...ex, cardio: c })} onChange={next => editCardio(ei, next)} />
+        <CardioPlan kind={false} value={c} track={trackOf({ ...ex, cardio: c })} onChange={next => editCardio(ei, next, inRound ? Number(String(id).split(':').pop()) : -1)} />
         {note}
         {done}
       </div>;
