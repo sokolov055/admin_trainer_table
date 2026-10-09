@@ -168,7 +168,8 @@ export function MachineNote({ target, note, trainer, params, onSaved }) {
         <button type="button" className="workout__note-edit" onClick={() => setEditing(true)}>Изменить</button>
       </div>
       : <button type="button" className="workout__note-add" onClick={() => setEditing(true)}>
-        {trainer ? '+ Записать настройку клиента' : '+ Записать свою настройку'}
+        {/* Короче (владелец, 09.10.2026): клиенту — своя, тренеру — клиента */}
+        {trainer ? '+ Настройка клиента' : '+ Моя настройка'}
       </button>;
   }
   return <div className="workout__note-form">

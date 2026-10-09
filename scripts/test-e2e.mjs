@@ -181,12 +181,10 @@ test('тренировку можно провести, и блок станов
   assert.equal(await page.locator('.workout__exercise').first().getByText('было 70').count(), 0);
 
 
-  // Упражнение меняют прямо в зале. Программа месяца от этого не
-  // меняется, но во «Выполненных» должно стоять сделанное, а не план.
+  // Клиент название и вид упражнения не меняет (владелец, 09.10.2026) —
+  // название текстом, не кнопкой; меняет это тренер
   const firstExercise = page.locator('.workout__exercise').first();
-  // Касание названия — название и вид (FT-513), меню «Изменить упражнение» нет
-  await firstExercise.locator('.workout__name-tap').first().click();
-  await firstExercise.getByLabel('Название').fill('Жим на наклонной скамье');
+  assert.equal(await firstExercise.locator('.workout__name-tap').count(), 0);
 
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();
   await page.locator('.workout__confirm').getByRole('button', { name: 'Завершить', exact: true }).click();
@@ -208,9 +206,8 @@ test('тренировку можно провести, и блок станов
   const block = section('Тренировка 1 — верх');
   // Свёрнута и во «Выполненных»: «Что сделано» разворачивает
   await block.locator('.plan__toggle').click();
-  await assert.doesNotReject(block.getByText('Жим на наклонной скамье').waitFor({ timeout: 5000 }),
-    'во «Выполненных» — упражнение, сделанное на занятии');
-  assert.equal(await block.locator('.exercise__name', { hasText: /^Жим лёжа$/ }).count(), 0, 'а не из плана');
+  await assert.doesNotReject(block.getByText('Жим лёжа').first().waitFor({ timeout: 5000 }),
+    'во «Выполненных» — упражнение занятия');
   await assert.doesNotReject(block.getByText('1 × 8').waitFor({ timeout: 5000 }), 'и сколько сделано');
 
   await done.getByRole('button', { name: 'Посмотреть веса' }).click();

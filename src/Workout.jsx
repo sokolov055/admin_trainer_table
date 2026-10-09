@@ -109,6 +109,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [roundLack, setRoundLack] = useState(null);
   // Переименование касанием по названию (02.10.2026): id упражнения
   const [renaming, setRenaming] = useState('');
+  // Клиент (и тренер в режиме «смотрите как клиент») название и вид не меняет
+  // (владелец, 09.10.2026): это решает тренер; подходы, вес, настройки — может
+  const asClient = !clientRow || clientView;
   // Настройки касанием по единицам (FT-513): id упражнения, в круге — id:круг
   const [tuning, setTuning] = useState('');
   const [renamingTitle, setRenamingTitle] = useState(false);
@@ -1079,7 +1082,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 : <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}
                   onPointerDown={holdToMove(ex.id, (head) => ({ container: head.closest('.workout__round'), commit: reorderMembers(group) }))}>
                   {/* Название — касанием: из базы или новое прямо здесь */}
-                  <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>
+                  {asClient ? ex.name : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>}
                   {/* Единицы — касанием: вес, повторы, время, у кардио — интервалы (FT-513) */}
                   <button type="button" className="workout__round-units" aria-expanded={tuning === ex.id + ':' + r} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id + ':' + r)}> · {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</button>
                   {/* Сделано — с оценкой, как у обычных подходов (03.10.2026) */}
@@ -1122,7 +1125,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (y < top + 8) window.scrollBy({ top: y - top - 12 });
   };
   const startRename = (id) => {
-    if (swallowClick.current || !editable) return;
+    if (swallowClick.current || !editable || asClient) return;
     setTuning('');
     setRenaming(renaming === id ? '' : id);
   };
@@ -1528,7 +1531,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               </div>
             )}
             {target && canNote && (
-              <MachineNote key={w + target} target={target} note={own[target]} trainer={!!clientRow} params={{ ...params, member: w }}
+              <MachineNote key={w + target} target={target} note={own[target]} trainer={!asClient} params={{ ...params, member: w }}
                 onSaved={(n) => setNotesBy((v) => {
                   const next = { ...(v[w] || {}) };
                   if (n) next[target] = n; else delete next[target];
@@ -1598,7 +1601,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           раскрывашке: ради неё в зале и смотрят. Тренажёров несколько —
           сначала выбрать, на каком */}
       {!split && noteTarget && (
-        <MachineNote key={noteTarget} target={noteTarget} note={notes[noteTarget]} trainer={!!clientRow} params={params}
+        <MachineNote key={noteTarget} target={noteTarget} note={notes[noteTarget]} trainer={!asClient} params={params}
           onSaved={(n) => setNotes((v) => { const next = { ...v }; if (n) next[noteTarget] = n; else delete next[noteTarget]; return next; })} />
       )}
       {split && splitView(ex, ei, info)}
@@ -1744,7 +1747,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {compact
               ? (ex.name || 'Новое упражнение')
               // Название — касанием: из базы или новое прямо здесь
-              : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id)}>{ex.name || 'Новое упражнение'}</button>}</h3>
+              : asClient ? (ex.name || 'Новое упражнение')
+                : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id)}>{ex.name || 'Новое упражнение'}</button>}</h3>
             <span className="workout__ex-count" aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{finished ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
           </div>
           </SwipeRow>

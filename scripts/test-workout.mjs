@@ -637,7 +637,7 @@ test('кардио без интервалов в плане — интерва�
   let local;
   try {
     await act(async () => {
-      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
       await delay();
     });
     const button = label => local.root.findAllByType('button').find(b => text(b) === label);
@@ -646,7 +646,7 @@ test('кардио без интервалов в плане — интерва�
     assert.ok(!local.root.findAllByType('summary').some(n => text(n) === 'Упражнения суперсета'));
     // Касание названия — название, вид, у кардио — аэробное или функциональное
     await press(button('Аэробайк'));
-    assert.ok(local.root.findAllByType('input').some(n => n.props['aria-label'] === 'Название упражнения'));
+    assert.ok(button('Кардио'), 'вид — в панели названия');
     await press(button('Функциональное кардио'));
     assert.ok(local.root.findAllByType('p').some(p => /Аэробайк: интервалы 6 × ускорение 1:00/.test(text(p))), 'план — по интервалам');
     // В круге — круги и интервалы аэробайка вместо времени и скорости
@@ -675,7 +675,7 @@ test('обычное упражнение: касание плана — под�
   let local;
   try {
     await act(async () => {
-      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
       await delay();
     });
     const byLabel = label => local.root.findAllByType('button').find(b => b.props['aria-label'] === label);
@@ -731,6 +731,22 @@ test('цель кардио, поправленная в сделанном кр
     await press(local.root.findAllByType('button').filter(b => b.props['aria-label'] === 'Аэробайк: настройки')[0]);
     await act(async () => { input('Цель: Расстояние, м').props.onChange({ target: { value: '120' } }); await delay(); });
     assert.equal(input('Аэробайк, отрезок 1, расстояние, м').props.value, '120', 'сделанный круг, из которого открыли настройки');
+  } finally {
+    if (local) local.unmount();
+  }
+});
+
+test('клиент название и вид упражнения не меняет — только подходы (09.10.2026)', async () => {
+  data.clear();
+  const block = { title: 'Ноги', exercises: [{ name: 'Жим ногами', sets: '3', reps: '12', weight: '100' }] };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    assert.equal(local.root.findAllByType('button').find(b => text(b) === 'Жим ногами'), undefined, 'название — текстом, не кнопкой');
+    assert.ok(local.root.findAllByType('button').find(b => b.props['aria-label'] === 'Жим ногами: настройки'), 'настройки подходов — доступны');
   } finally {
     if (local) local.unmount();
   }
