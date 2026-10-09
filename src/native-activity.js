@@ -13,7 +13,7 @@
  */
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
 import { trackOf, volumeOf, setText as trackSetText } from './exercise-track.js';
-import { closeSets } from './workout-model.js';
+import { closeSets, withSet, withWarmup } from './workout-model.js';
 import { rateSet, isDumbbell, stepOf, suggestText } from './effort.js';
 
 const isEffort = (e) => ['easy', 'ok', 'hard'].includes(e);
@@ -57,6 +57,8 @@ export function exerciseList(s) {
     // Вес и повторы подходов — правка подхода с часов
     weights: ex.sets.slice(0, 20).map((x) => String(x.weight || '')),
     reps: ex.sets.slice(0, 20).map((x) => String(x.reps || '')),
+    // Разминочный подход — «разминка» в списке тренера (FT-533)
+    kinds: ex.sets.slice(0, 20).map((x) => (x.kind === 'warmup' ? 'warmup' : 'work')),
     // Гантели — шаг колёсика 1 кг, остальное — 1,25 (03.10.2026)
     dumbbell: isDumbbell(ex),
   }));
@@ -378,6 +380,11 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
           return effort && target.state === 'pending' ? rateSet(next, ex.sets.indexOf(target), effort).ex : next;
         }) };
       }
+    } else if (a.kind === 'addSet') {
+      // Подход с часов тренера (FT-533): warmup — разминочный перед
+      // рабочими, иначе — в конец, как последний. Суперсет и пара — нет
+      s = { ...s, exercises: s.exercises.map((ex) => (!mine(ex, a) || ex.supersetGroup ? ex
+        : a.warmup ? withWarmup(ex) : withSet(ex))) };
     } else if (a.kind === 'move') {
       // Перетащили в списке на часах. Упражнение — на место index; суперсет
       // (a.group) — целиком: его упражнения подряд, первое — на место index

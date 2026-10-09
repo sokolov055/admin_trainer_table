@@ -211,6 +211,20 @@ test('часы тренера: список упражнений с подход
   assert.equal(la.activityPayload(r).coach, false);
 });
 
+test('часы тренера: разминка в начало и подход в конец (addSet, FT-533)', () => {
+  const r = record({});
+  const s = la.applyActions(r.session, [
+    { kind: 'addSet', sessionId: 's1', exerciseId: 'e1', warmup: true },
+    { kind: 'addSet', sessionId: 's1', exerciseId: 'e1', warmup: false },
+  ]);
+  const list = la.activityPayload({ ...r, session: s }, { coach: true }).exercises[0];
+  assert.deepEqual(list.kinds, ['warmup', 'work', 'work', 'work', 'work']);
+  assert.deepEqual(list.weights, ['30', '60', '62.5', '60', '60']);
+  assert.deepEqual(list.sets, ['pending', 'done', 'pending', 'pending', 'pending']);
+  const sup = record({ exercises: [{ id: 'a', name: 'Жим', supersetGroup: 'g1', sets: [set('pending')] }, { id: 'b', name: 'Тяга', supersetGroup: 'g1', sets: [set('pending')] }] });
+  assert.equal(la.applyActions(sup.session, [{ kind: 'addSet', sessionId: 's1', exerciseId: 'a', warmup: false }]).exercises[0].sets.length, 1, 'суперсет — не с часов');
+});
+
 test('часы: исправить подход (setEdit) — вес и повторы, сделан он или нет', () => {
   const r = record({});
   const s = la.applyActions(r.session, [{ kind: 'setEdit', sessionId: 's1', exerciseId: 'e1', who: '', setIndex: 0, weight: '65', reps: '6' }]);

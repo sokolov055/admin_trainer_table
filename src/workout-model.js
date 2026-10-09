@@ -302,7 +302,14 @@ export function withWarmup(ex) {
   if (ex.sets.length >= 20 || ex.sets.some(x => x.who)) return ex;
   const found = ex.sets.findIndex(x => x.kind !== 'warmup');
   const at = found < 0 ? ex.sets.length : found;
-  const { effort, suggest, raised, own, drops, ...source } = ex.sets[at] || ex.sets[ex.sets.length - 1] || blankSet();
+  const { effort, suggest, raised, own, drops, closed, ...source } = ex.sets[at] || ex.sets[ex.sets.length - 1] || blankSet();
   const set = { ...source, weight: warmupWeight(source.weight), state: 'pending', kind: 'warmup' };
   return { ...ex, sets: [...ex.sets.slice(0, at), set, ...ex.sets.slice(at)] };
+}
+
+/** Подход в конец с часов тренера (FT-533) — как последний, неотмеченный */
+export function withSet(ex) {
+  if (ex.sets.length >= 20 || ex.sets.some(x => x.who)) return ex;
+  const { effort, suggest, raised, closed, ...last } = ex.sets[ex.sets.length - 1] || blankSet();
+  return { ...ex, sets: [...ex.sets, { ...last, state: 'pending', kind: 'work' }] };
 }
