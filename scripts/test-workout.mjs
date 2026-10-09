@@ -103,12 +103,12 @@ test('интерфейс конфликта сохраняет чужую вер
   const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
   saved.title = 'Изменено тренером'; saved.revision++;
   data.set('workout_demo_server:3', JSON.stringify([saved]));
-  const input = tree.root.findAllByType('input')[0];
-  await act(async () => input.props.onChange({ target: { value: 'Локальная правка' } }));
+  const input = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));
+  await act(async () => input.props.onChange({ target: { value: '77' } }));
   await saveNow();
   assert.ok(button('Открыть актуальное занятие'));
   await click('Открыть актуальное занятие');
-  assert.equal(tree.root.findAllByType('input')[0].props.value, 'Изменено тренером');
+  assert.equal(text(tree.root.findAllByType('h2')[0]), 'Изменено тренером');
   assert.ok([...data.keys()].some(k => k.includes(':backup:')));
   await act(async () => tree.unmount()); tree = null;
 });
@@ -120,15 +120,15 @@ test('ответ старого экрана не затирает новый в
   await act(async () => { pending = hideOnce(); await delay(); });
   await act(async () => tree.unmount());
   await mount(false);
-  const input = tree.root.findAllByType('input')[0];
-  await act(async () => input.props.onChange({ target: { value: 'Правка после возвращения' } }));
+  const input = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));
+  await act(async () => input.props.onChange({ target: { value: '91' } }));
   await act(async () => { release(); await pending; await delay(); });
   const draftKey = [...data.keys()].find(k => k.startsWith('workout_draft_v1:'));
-  assert.equal(JSON.parse(data.get(draftKey)).session.title, 'Правка после возвращения');
+  assert.equal(JSON.parse(data.get(draftKey)).session.exercises[0].sets[0].weight, '91');
   await saveNow();
   // Сначала подтверждается исходный снимок, затем отправляется новый.
   await saveNow();
-  assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].title, 'Правка после возвращения');
+  assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].exercises[0].sets[0].weight, '91');
   await act(async () => tree.unmount()); tree = null;
 });
 
@@ -339,7 +339,7 @@ test('после завершённой тренировки запускает�
       await delay();
     });
 
-    const title = local.root.findAllByType('input').find(n => n.props.value === 'Тренировка 2 — низ');
+    const title = local.root.findAllByType('h2').find(n => text(n) === 'Тренировка 2 — низ');
     assert.ok(title, 'открылась именно та тренировка, которую запускали');
   } finally {
     if (local) local.unmount();
@@ -580,7 +580,7 @@ test('«Вернуться к занятию»: открывается идущ�
         local = renderer.create(React.createElement(Workout, { launch, onClose() {} }));
         await delay(); await delay();
       });
-      const title = local.root.findAllByType('input').find(n => n.props.value === 'С часов');
+      const title = local.root.findAllByType('h2').find(n => text(n) === 'С часов');
       assert.ok(title, 'открыто идущее занятие: ' + JSON.stringify(launch));
     } finally {
       if (local) local.unmount();

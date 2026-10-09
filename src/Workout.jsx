@@ -111,6 +111,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [renaming, setRenaming] = useState('');
   // Настройки касанием по единицам (FT-513): id упражнения, в круге — id:круг
   const [tuning, setTuning] = useState('');
+  const [renamingTitle, setRenamingTitle] = useState(false);
   // Перестановка удержанием (02.10.2026): { key } — какой блок тащат.
   // Пока тащат, карточки свёрнуты в строки (как в «Выбрать»): развёрнутая
   // карточка выше экрана, цель за ней не видна
@@ -1582,7 +1583,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     ? (stats && !stats.pending ? 'Все подходы сделаны. Завершить тренировку?' : `Выполнено ${setsWord(stats ? stats.done : 0)}. ${stats && stats.pending === 1 ? 'Оставшийся будет отмечен пропущенным' : 'Оставшиеся ' + (stats ? stats.pending : 0) + ' будут отмечены пропущенными'}.`)
     : 'Занятие останется в журнале с отметкой «Отменена».';
   return <div className="workout">
-    <button className="button" onClick={close}>{backLabel}</button>
+    {/* В занятии «назад» — смахнуть вправо (09.10.2026); в списке журнала кнопка остаётся */}
+    {!s && <button className="button" onClick={close}>{backLabel}</button>}
     {!ready && <p role="status">Открываем журнал тренировок…</p>}
     {storageError && <p role="alert" className="workout__error">Устройство не сохранило черновик. Не закрывайте экран до сохранения в облаке.</p>}
     {message && <div role="alert" className="workout__error"><p>{message}</p><button className="button" disabled={busy} onClick={() => { setMessage(''); record?.dirty ? save() : list().catch(e => setMessage(e.message)); }}>Повторить</button></div>}
@@ -1594,7 +1596,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     </div>}
     {s && <>
       <header className="workout__header">
-        <h2>{s.title}</h2><p>{s.month || 'Свободная тренировка'} · {labels[s.status]}</p>
+        {/* Название — касанием: переименовывает только тренер (07.10.2026), сервер это же проверяет */}
+        {renamingTitle && clientRow && !clientView
+          ? <input className="workout__title-input" aria-label="Название занятия" autoFocus value={s.title} maxLength={160} onChange={e => change(v => ({ ...v, title: e.target.value }))} onBlur={() => setRenamingTitle(false)} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingTitle(false); }} />
+          : <h2>{editable && clientRow && !clientView ? <button type="button" className="workout__title-tap" onClick={() => setRenamingTitle(true)}>{s.title}</button> : s.title}</h2>}
+        <p>{s.month || 'Свободная тренировка'} · {labels[s.status]}</p>
         <div className="workout__metrics"><span>Время <strong>{clock(elapsed)}</strong></span><span>Подходы <strong>{stats.done} / {stats.total}</strong></span>
           {/* Завершить и отменить — здесь, у времени, а не внизу под всеми
               упражнениями (владелец, 03.10.2026) */}
@@ -1609,6 +1615,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <button type="button" className={'button ' + (confirm === 'complete' ? 'button--primary' : 'button--critical')} disabled={busy || !!conflict || (confirm === 'complete' && !stats.done)} onClick={() => finishAs(confirm)}>{confirm === 'complete' ? 'Завершить' : 'Отменить'}</button>
             <button type="button" className="button button--ghost" onClick={() => setConfirm('')}>{confirm === 'complete' && !stats.pending ? 'Ещё не всё' : 'Продолжить'}</button>
           </div>
+        </div>}
+        {/* Пауза и отдых — в шапке, что едет за прокруткой (владелец, 09.10.2026).
+            Назад — смахнуть вправо, кнопки «К программе» нет.
+            Длительность не только запускает отдых, но и запоминается: дальше
+            он стартует сам после каждого отмеченного подхода */}
+        {editable && !confirm && <div className="workout__toolbar workout__toolbar--head">
+          <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
+          <button className={'button workout__pick-toggle' + (picking ? ' is-on' : '')} aria-pressed={picking} onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>
+          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds })); startRest(seconds); }}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
         </div>}
         {/* Полоса своя, а не браузерный progress: системный выглядит
             по-разному в каждом движке и ни в одной теме не совпадает с
@@ -1628,17 +1643,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             сообщение об ошибке вверху */}
       </header>
       <fieldset disabled={!editable || !!conflict} className="workout__fields" ref={fieldsRef}>
-        {/* Переименовывает только тренер (07.10.2026), сервер это же проверяет */}
-        <label className="workout__field">Название занятия<input value={s.title} maxLength={160} readOnly={!clientRow || clientView} onChange={e => change(s => ({ ...s, title: e.target.value }))} /></label>
-        {editable && <div className="workout__toolbar">
-          <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
-          <button className="button button--ghost workout__pick-toggle" onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>
-          {/* Длительность не только запускает отдых, но и запоминается:
-              дальше он стартует сам после каждого отмеченного подхода.
-              Раньше за ним приходилось возвращаться в шапку экрана
-              после каждого подхода — то есть листать вверх весь список. */}
-          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds })); startRest(seconds); }}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
-        </div>}
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
             оставшийся наверху, приходилось искать прокруткой. */}
