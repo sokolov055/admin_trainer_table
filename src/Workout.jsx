@@ -10,13 +10,13 @@ import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
-import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme } from './exercise-track.js';
+import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, cardioFrom } from './exercise-track.js';
 
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
 const rowFields = (track) => trackFields({ ...track, perSide: false });
 import IntervalTimer from './IntervalTimer.jsx';
-import { IntervalsEdit, withIntervals } from './trainer/CardioPlan.jsx';
+import { IntervalsEdit, withIntervals, NEW_INTERVALS } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
@@ -994,13 +994,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    */
   const intervalsEditor = (ex, ei) => {
     const track = trackOf(ex);
-    if (track.kind !== 'cardio' || !ex.cardio || !ex.cardio.intervals) return null;
-    // Что записывать в отрезке — по фазам: добавили калории — появилось поле
+    if (track.kind !== 'cardio') return null;
+    // Что записывать в отрезке — по фазам: добавили калории — появилось поле.
+    // Не было интервалов в плане — задаются прямо в занятии (FT-511)
     const edit = (iv) => updateExercise(ei, x => {
-      const cardio = withIntervals(x.cardio, iv);
-      const next = { ...x, cardio, track: { ...trackOf(x), metrics: cardio.metrics, modes: cardio.modes } };
+      const cardio = { ...withIntervals(x.cardio || cardioFrom(x, trackOf(x)), iv), goal: 'intervals' };
+      const next = { ...x, cardio, track: { ...trackOf(x), metrics: cardio.metrics, modes: cardio.modes, goal: 'intervals' } };
       return { ...next, prescription: planScheme(next) };
     });
+    if (!ex.cardio || !ex.cardio.intervals) {
+      return editable ? <button type="button" className="button workout__intervals-edit" onClick={() => edit(NEW_INTERVALS)}>Задать интервалы</button> : null;
+    }
     return <div className="cardio-plan workout__intervals-edit">
       <span className="field__label">Интервалы</span>
       <IntervalsEdit intervals={ex.cardio.intervals} track={track} disabled={!editable} onChange={edit} />
@@ -1036,6 +1040,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {members.filter(({ ex }) => lastRunText(ex.lastRun)).map(({ ex }) => (
         <p className="workout__last" key={'last' + ex.id}>{ex.name}: {lastRunText(ex.lastRun).replace(/^Последний раз/, 'последний раз')}</p>
       ))}
+      {/* Кардио интервалами и в суперсете — со своим таймером (FT-511) */}
+      {members.filter(({ ex }) => trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals).map(({ ex }) => (
+        <div key={'iv' + ex.id}><p className="small muted">{ex.name}</p><IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} /></div>
+      ))}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
@@ -1067,6 +1075,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <div key={ex.id} className="workout__round-edit">
             <label className="workout__field">Название<input value={ex.name} maxLength={160} onChange={e => updateExercise(ei, x => ({ ...x, name: e.target.value }))} /></label>
             {trackEditor(ex, ei)}
+            {intervalsEditor(ex, ei)}
             <label className="workout__field">Заметка<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, x => ({ ...x, note: e.target.value }))} /></label>
           </div>
         ))}

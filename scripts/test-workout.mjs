@@ -604,3 +604,26 @@ test('«было» у каждого подхода: тот же подход п
   assert.equal(input(2, 'вес').props.value, '9');
   await act(async () => tree.unmount()); tree = null;
 });
+
+test('кардио без интервалов в плане — интервалы задаются в занятии, и в суперсете (FT-511)', async () => {
+  data.clear();
+  const block = { title: 'Круг', exercises: [
+    { name: 'Аэробайк', supersetGroup: 'A', cardio: { machine: 'other', goal: 'time', metrics: ['time'], targets: { time: '10' }, settings: { speed: '', level: '5' } } },
+    { name: 'Присед', supersetGroup: 'A', sets: '3', reps: '10', weight: '40' },
+  ] };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const button = label => local.root.findAllByType('button').find(b => text(b) === label);
+    assert.equal(button('Запустить интервалы'), undefined);
+    await act(async () => { button('Задать интервалы').props.onClick(); await delay(); });
+    assert.ok(button('Запустить интервалы'), 'таймер интервалов — у упражнения суперсета');
+    assert.ok(button('+ Интервал'), 'редактор интервалов открыт');
+    assert.ok(local.root.findAllByType('p').some(p => /Аэробайк: интервалы 6 × ускорение 1:00/.test(text(p))), 'план — по интервалам');
+  } finally {
+    if (local) local.unmount();
+  }
+});

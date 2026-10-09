@@ -40,7 +40,7 @@ const PULSE_HINT = '130–150';
 const MODE_CHIPS = [['level', 'Уровень сложности'], ['speed', 'Скорость'], ['incline', 'Угол наклона']];
 const KINDS = [[false, 'Аэробная тренировка'], [true, 'Функциональное кардио']];
 
-const NEW_INTERVALS = {
+export const NEW_INTERVALS = {
   rounds: 6,
   phases: [{ fields: ['time', 'speed'], time: '1:00', speed: '' }, { fields: ['time', 'speed'], time: '2:00', speed: '' }],
 };
