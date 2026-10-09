@@ -5374,3 +5374,16 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   color: #7fd97f;
   font-variant-numeric: tabular-nums;
 }
+/* Фото тренажёра и оборудования (09.10.2026): целиком, без обрезки —
+   вертикальный снимок помещается по высоте; несколько — лентой */
+.machine__photos { display: grid; gap: var(--space-2); }
+.machine__photos--many { grid-auto-flow: column; grid-auto-columns: 82%; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; margin: 0 calc(var(--space-4) * -1); padding: 0 var(--space-4); }
+.machine__photos--many::-webkit-scrollbar { display: none; }
+.machine__photos--many .machine__photo { scroll-snap-align: start; }
+.machine__photo img { height: auto; max-height: min(56vh, 460px); object-fit: contain; margin: 0 auto; }
+.machine__photo--full img { max-height: 86vh; }
+/* Фото в форме: миниатюры с крестиком */
+.library__photos { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.library__photo { position: relative; width: 88px; height: 88px; border-radius: 10px; overflow: hidden; background: var(--surface-sunken); }
+.library__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.library__photo-x { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; }

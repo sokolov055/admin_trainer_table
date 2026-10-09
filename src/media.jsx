@@ -108,13 +108,22 @@ export function SetupText({ text }) {
  * а настройка видна по деталям — сиденью, валику)
  */
 export function MachinePhoto({ machine }) {
-  const [full, setFull] = useState(false);
-  if (!machine.photo) return null;
+  const [full, setFull] = useState('');
+  // Фото несколько (09.10.2026): лентой, листаются пальцем. Каждое — целиком,
+  // без обрезки: вертикальный снимок тренажёра раньше срезало по высоте
+  const photos = machine.photos && machine.photos.length ? machine.photos : machine.photo ? [machine.photo] : [];
+  if (!photos.length) return null;
+  const many = photos.length > 1;
   return (
-    <button type="button" className={'machine__photo' + (full ? ' machine__photo--full' : '')}
-      aria-label={full ? 'Уменьшить фото' : 'Фото целиком'} onClick={() => { setFull(!full); haptic(); }}>
-      <img src={mediaUrl(machine.photo)} alt={'Тренажёр «' + machine.name + '»'} loading="lazy" draggable="false" />
-    </button>
+    <div className={'machine__photos' + (many ? ' machine__photos--many' : '')}>
+      {photos.map((u, i) => (
+        <button key={u} type="button" className={'machine__photo' + (full === u ? ' machine__photo--full' : '')}
+          aria-label={(full === u ? 'Уменьшить фото' : 'Фото целиком') + (many ? ' ' + (i + 1) + ' из ' + photos.length : '')}
+          onClick={() => { setFull(full === u ? '' : u); haptic(); }}>
+          <img src={mediaUrl(u)} alt={(machine.kind === 'equipment' ? 'Оборудование «' : 'Тренажёр «') + machine.name + '»'} loading="lazy" draggable="false" />
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -194,7 +203,7 @@ export function MachineInfo({ machine, principle = '', note = '', trainer = fals
     <div className="machine">
       <MachinePhoto machine={machine} />
       <PersonalNote text={note} trainer={trainer} />
-      {machine.setup && <><h5 className="machine__h">Где регулировки</h5><SetupText text={machine.setup} /></>}
+      {machine.setup && <><h5 className="machine__h">{machine.kind === 'equipment' ? 'Настройка' : 'Где регулировки'}</h5><SetupText text={machine.setup} /></>}
       {principle && <><h5 className="machine__h">Как настроить</h5><SetupText text={principle} /></>}
     </div>
   );
@@ -209,7 +218,7 @@ export function MachineList({ machines, notes = {} }) {
   if (!machines || !machines.length) return null;
   return (
     <div className="machines">
-      <h4 className="setup__title">{machines.length > 1 ? 'Тренажёры' : 'Тренажёр'}</h4>
+      <h4 className="setup__title">{machines.every((m) => m.kind === 'equipment') ? 'Оборудование' : machines.length > 1 ? 'Тренажёры' : 'Тренажёр'}</h4>
       {machines.map((m) => (
         <details key={m.uid} className="machines__item">
           <summary>

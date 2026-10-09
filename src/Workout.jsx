@@ -1560,11 +1560,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const setup = chosen ? chosen.setup || chosen.photo || info.setup : info.setup;
     const muscles = info.muscles && ((info.muscles.primary || []).length || (info.muscles.secondary || []).length) ? info.muscles : null;
     if (!setup && !info.notes && !info.media && !muscles) return null;
-    const label = setup ? (chosen ? 'Тренажёр «' + chosen.name + '» и техника' : 'Тренажёр и техника') : 'Техника';
+
+    const word = chosen && chosen.kind === 'equipment' ? 'Оборудование' : 'Тренажёр';
+    const label = setup ? (chosen ? word + ' «' + chosen.name + '» и техника' : 'Тренажёр и техника') : 'Техника';
+    // Техника часто записана тем же текстом, что «Как настроить», — второй
+    // раз не показываем (владелец, 09.10.2026: текст повторялся под шагами)
+    const flat = (t) => String(t || '').toLowerCase().replace(/[^a-zа-яё0-9]+/g, ' ').trim();
+    const notes = info.notes && !(info.setup && (flat(info.setup).includes(flat(info.notes)) || flat(info.notes).includes(flat(info.setup)))) ? info.notes : '';
     return <details className="workout__setup workout__about">
       <summary>{title ? title + ': ' + label.toLowerCase() : label}</summary>
       {setup && (chosen ? <MachineInfo machine={chosen} principle={info.setup} /> : <SetupText text={info.setup} />)}
-      {info.notes && <p className="workout__technique">{info.notes}</p>}
+      {notes && <p className="workout__technique">{notes}</p>}
       {muscles && <div className="muscles muscles--block">
         <MuscleFigure primary={muscles.primary || []} secondary={muscles.secondary || []} size="sm" />
         <MuscleNames primary={muscles.primary || []} secondary={muscles.secondary || []} max={4} />

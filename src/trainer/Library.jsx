@@ -11,7 +11,7 @@ import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } fro
 import {
   Section, Panel, Loading, ErrorState, Empty, Badge, Chips, Search, Segmented, Field, Note, plural,
 } from '../ui.jsx';
-import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash } from '../icons.jsx';
+import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
@@ -35,9 +35,14 @@ export const LIBRARY_PANES = [
   { value: 'exercises', label: 'Упражнения' },
   // Тренажёры клуба (владелец, 09.10.2026): все записанные у упражнений —
   // одним списком, с фото и тем, где регулировки
-  { value: 'machines', label: 'Тренажёры' },
+  { value: 'machines', label: 'Тренажёры и оборудование' },
   // Блюда для рациона клиентов: черновики на проверку, публикация, правка
   { value: 'dishes', label: 'Блюда' },
+];
+
+export const MACHINE_KIND_ITEMS = [
+  { value: 'machine', label: 'Тренажёр' },
+  { value: 'equipment', label: 'Оборудование' },
 ];
 
 const SCOPES = [
@@ -825,6 +830,7 @@ function Exercises() {
 function Machines() {
   const { loading, data, error, reload } = useData('library.exercises', {}, []);
   const [q, setQ] = useState('');
+  const [kindOf, setKindOf] = useState('');    // '' — все, machine, equipment
   const [open, setOpen] = useState('');        // ключ тренажёра
   const [exercise, setExercise] = useState(null); // id упражнения из тренажёра
   const [editing, setEditing] = useState(null);
@@ -841,10 +847,12 @@ function Machines() {
   const keyOf = (name) => String(name || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
   const groups = new Map();
   all.forEach((e) => (e.machines || []).forEach((m) => {
-    const k = keyOf(m.name);
-    if (!groups.has(k)) groups.set(k, { key: k, name: m.name, photo: '', setup: '', uses: [] });
+    const kind = m.kind === 'equipment' ? 'equipment' : 'machine';
+    const k = kind + ':' + keyOf(m.name);
+    if (!groups.has(k)) groups.set(k, { key: k, name: m.name, kind, photos: [], setup: '', uses: [] });
     const g = groups.get(k);
-    if (!g.photo && m.photo) g.photo = m.photo;
+    const photos = m.photos && m.photos.length ? m.photos : m.photo ? [m.photo] : [];
+    if (!g.photos.length && photos.length) g.photos = photos;
     if (!g.setup && m.setup) g.setup = m.setup;
     g.uses.push(e);
   }));
@@ -880,13 +888,14 @@ function Machines() {
   if (machine) {
     return (
       <>
-        <Back onClick={() => setOpen('')}>Тренажёры</Back>
+        <Back onClick={() => setOpen('')}>Тренажёры и оборудование</Back>
         <h2 className="library__title">{machine.name}</h2>
+        <p className="small muted">{machine.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{machine.photos.length > 1 ? ' · ' + machine.photos.length + ' фото' : ''}</p>
         <MachinePhoto machine={machine} />
         {machine.setup
-          ? <><h4 className="setup__title">Где регулировки</h4><SetupText text={machine.setup} /></>
-          : <p className="small muted">Как настраивается — не записано. Добавьте в карточке упражнения.</p>}
-        <h4 className="setup__title">Упражнения на нём</h4>
+          ? <><h4 className="setup__title">{machine.kind === 'equipment' ? 'Настройка' : 'Где регулировки'}</h4><SetupText text={machine.setup} /></>
+          : <p className="small muted">Настройка не записана. Добавьте в карточке упражнения ниже.</p>}
+        <h4 className="setup__title">Упражнения</h4>
         {machine.uses.map((e) => (
           <button key={e.id} className="item" onClick={() => { setExercise(e.id); haptic(); }}>
             <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Badge kind="good">своё</Badge>}</div>
@@ -898,20 +907,24 @@ function Machines() {
   }
 
   const nq = keyOf(q);
-  const shown = list.filter((g) => !nq || g.key.includes(nq) || g.uses.some((e) => keyOf(e.name).includes(nq)));
+  const shown = list
+    .filter((g) => !kindOf || g.kind === kindOf)
+    .filter((g) => !nq || keyOf(g.name).includes(nq) || g.uses.some((e) => keyOf(e.name).includes(nq)));
+  const kinds = [{ value: '', label: 'Все' }, { value: 'machine', label: 'Тренажёры' }, { value: 'equipment', label: 'Оборудование' }];
   return (
     <>
-      <Search value={q} onChange={setQ} placeholder="Поиск тренажёра" />
-      <p className="small muted library__count">{shown.length} {plural(shown.length, 'тренажёр', 'тренажёра', 'тренажёров')}</p>
+      <Search value={q} onChange={setQ} placeholder="Поиск тренажёра или оборудования" />
+      <Chips items={kinds} value={kindOf} onChange={setKindOf} />
+      <p className="small muted library__count">{shown.length} {plural(shown.length, 'объект', 'объекта', 'объектов')}</p>
       {!list.length && (
-        <Empty title="Тренажёров пока нет" text="Тренажёр добавляется в карточке упражнения: «Упражнения» → упражнение → «Тренажёры»." />
+        <Empty title="Пока пусто" text="Тренажёр или оборудование добавляется в карточке упражнения: «Упражнения» → упражнение → «Тренажёры и оборудование»." />
       )}
       {shown.map((g) => (
         <button key={g.key} className="item" onClick={() => { setOpen(g.key); haptic(); }}>
-          <div className="item__top"><span className="item__name">{g.name}</span></div>
+          <div className="item__top"><span className="item__name">{g.name}</span><Badge>{g.kind === 'equipment' ? 'оборудование' : 'тренажёр'}</Badge></div>
           <div className="item__meta">
             <span>{g.uses.map((e) => e.name).join(', ')}</span>
-            {g.photo && <Badge>фото</Badge>}
+            {g.photos.length > 0 && <Badge>{g.photos.length > 1 ? g.photos.length + ' фото' : 'фото'}</Badge>}
             {g.setup && <Badge>настройка</Badge>}
           </div>
         </button>
@@ -1256,7 +1269,7 @@ function MachinesEditor({ exercise, owner, onChanged }) {
 
   return (
     <div className="library__extras">
-      <h3 className="setup__title">Тренажёры</h3>
+      <h3 className="setup__title">Тренажёры и оборудование</h3>
       <p className="small muted">
         {machines.length ? extrasHint(e, owner) : 'Если в залах стоят разные тренажёры для этого упражнения — добавьте каждый: фото и где у него регулировки. Вес и настройка (спинка, сиденье) у каждого клиента на каждом тренажёре свои — их записывают в занятии.'}
       </p>
@@ -1267,6 +1280,7 @@ function MachinesEditor({ exercise, owner, onChanged }) {
             {m.photo ? <img className="machines__thumb" src={mediaUrl(m.photo)} alt="" loading="lazy" /> : <span className="machines__thumb machines__thumb--empty" aria-hidden="true" />}
             <div className="library__machine-text">
               <strong>{m.name}</strong>
+              <span className="small muted">{m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{(m.photos || []).length > 1 ? ' · ' + m.photos.length + ' фото' : ''}</span>
               <span className="small muted">{m.setup ? m.setup.split('\n')[0] : 'Регулировки не описаны — клиент увидит общий принцип.'}</span>
             </div>
             <div className="library__machine-actions">
@@ -1278,7 +1292,7 @@ function MachinesEditor({ exercise, owner, onChanged }) {
       {editing === 'new'
         ? <MachineForm exercise={e} machine={null} onDone={done} />
         : machines.length < 8 && !editing && (
-          <button type="button" className="button button--ghost" onClick={() => setEditing('new')}>+ Тренажёр</button>
+          <button type="button" className="button button--ghost" onClick={() => setEditing('new')}>+ Тренажёр или оборудование</button>
         )}
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
     </div>
@@ -1294,24 +1308,31 @@ function MachinesEditor({ exercise, owner, onChanged }) {
 function MachineForm({ exercise, machine, onDone }) {
   const [name, setName] = useState(machine ? machine.name : '');
   const [setup, setSetup] = useState(machine ? machine.setup : '');
-  const [photo, setPhoto] = useState(null);
-  const [preview, setPreview] = useState('');
-  const [dropPhoto, setDropPhoto] = useState(false);
+  // Тренажёр или оборудование (владелец, 09.10.2026)
+  const [kind, setKind] = useState(machine && machine.kind === 'equipment' ? 'equipment' : 'machine');
+  // Фото несколько (09.10.2026): уже сохранённые — убранные удаляются только
+  // по «Сохранить» — и новые, ещё не загруженные
+  const had = machine ? (machine.photos && machine.photos.length ? machine.photos : machine.photo ? [machine.photo] : []) : [];
+  const [dropped, setDropped] = useState([]);
+  const [added, setAdded] = useState([]); // [{ blob, url }]
   const [saved, setSaved] = useState({ exerciseId: exercise.id, uid: machine ? machine.uid : '' });
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
+  const kept = had.filter((u) => !dropped.includes(u));
+  const total = kept.length + added.length;
   const pick = async (ev) => {
-    const file = ev.target.files && ev.target.files[0];
+    const files = [...(ev.target.files || [])].slice(0, MAX_MACHINE_PHOTOS - total);
     ev.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
     setFailure(null);
     try {
-      const blob = await shrinkPhoto(file);
-      setPhoto(blob);
-      setPreview(URL.createObjectURL(blob));
-      setDropPhoto(false);
+      const next = [];
+      for (const file of files) {
+        const blob = await shrinkPhoto(file);
+        next.push({ blob, url: URL.createObjectURL(blob) });
+      }
+      setAdded((v) => [...v, ...next]);
     } catch (err) {
       setFailure(err);
     }
@@ -1323,22 +1344,29 @@ function MachineForm({ exercise, machine, onDone }) {
     let result = null;
     try {
       const r = await apiMutate('library.exercise.machine.save', {
-        exerciseId: saved.exerciseId, uid: saved.uid || undefined, name, setup, removePhoto: dropPhoto && !photo,
+        exerciseId: saved.exerciseId, uid: saved.uid || undefined, name, setup, kind,
+        ...(dropped.length ? { removePhotoUrls: dropped } : {}),
       });
       result = r.exercise;
       setSaved({ exerciseId: r.exercise.id, uid: r.uid });
-      if (photo) await uploadMachinePhoto(r.exercise.id, r.uid, photo);
+      setDropped([]);
+      // Новые — по одному, по порядку; загруженное уходит из очереди
+      for (const a of added) {
+        await uploadMachinePhoto(r.exercise.id, r.uid, a.blob);
+        setAdded((v) => v.filter((x) => x !== a));
+      }
       haptic('success');
       onDone(result);
     } catch (err) {
-      setFailure(result ? new Error('Тренажёр сохранён, а фото не загрузилось: ' + err.message) : err);
+      setFailure(result ? new Error('Сохранено, а фото загрузилось не всё: ' + err.message) : err);
     } finally {
       setBusy(false);
     }
   };
 
+  const word = kind === 'equipment' ? 'оборудование' : 'тренажёр';
   const remove = async () => {
-    if (!saved.uid || !window.confirm(`Убрать тренажёр «${name || machine.name}»?`)) return;
+    if (!saved.uid || !window.confirm(`Убрать «${name || machine.name}»?`)) return;
     setBusy(true);
     try {
       const r = await apiMutate('library.exercise.machine.delete', { exerciseId: saved.exerciseId, uid: saved.uid });
@@ -1350,52 +1378,72 @@ function MachineForm({ exercise, machine, onDone }) {
     }
   };
 
-  const current = preview || (!dropPhoto && machine && machine.photo ? machine.photo : '');
   const touch = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   return (
     <div className="library__form library__machine-form">
+      <div className="field">
+        <span className="field__label">Что это</span>
+        <Segmented label="Что это" items={MACHINE_KIND_ITEMS} value={kind} onChange={setKind} />
+      </div>
       <label className="field">
         <span className="field__label">Название</span>
         <input className="field__input" value={name} maxLength={80} autoFocus={!machine}
-          onChange={(ev) => setName(ev.target.value)} placeholder="Hammer у окна, Technogym…" />
+          onChange={(ev) => setName(ev.target.value)} placeholder={kind === 'equipment' ? 'Гантели, фитбол, степ-платформа…' : 'Hammer у окна, Technogym…'} />
       </label>
       <div className="field">
-        <span className="field__label">Фото</span>
-        {current && <MachinePhoto machine={{ name: name || 'тренажёр', photo: current }} />}
-        <div className="library__machine-actions">
-          {/* Камера — отдельной кнопкой (08.10.2026): без capture Android
-              открывал только галерею, снять тренажёр было нечем. На
-              компьютере камеры у выбора файла нет — кнопка одна */}
-          {touch && (
+        <span className="field__label">Фото{total ? ' · ' + total + ' из ' + MAX_MACHINE_PHOTOS : ''}</span>
+        {total > 0 && (
+          <div className="library__photos">
+            {kept.map((u) => (
+              <div key={u} className="library__photo">
+                <img src={mediaUrl(u)} alt="" loading="lazy" />
+                <button type="button" className="library__photo-x" aria-label="Убрать фото" onClick={() => setDropped((v) => [...v, u])}><IconClose size={14} /></button>
+              </div>
+            ))}
+            {added.map((a) => (
+              <div key={a.url} className="library__photo">
+                <img src={a.url} alt="" />
+                <button type="button" className="library__photo-x" aria-label="Убрать фото" onClick={() => setAdded((v) => v.filter((x) => x !== a))}><IconClose size={14} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        {total < MAX_MACHINE_PHOTOS && (
+          <div className="library__machine-actions">
+            {/* Камера — отдельной кнопкой (08.10.2026): без capture Android
+                открывал только галерею, снять тренажёр было нечем */}
+            {touch && (
+              <label className="button button--ghost">
+                Сфотографировать
+                <input type="file" accept="image/*" capture="environment" hidden onChange={pick} />
+              </label>
+            )}
             <label className="button button--ghost">
-              {current ? 'Переснять' : 'Сфотографировать'}
-              <input type="file" accept="image/*" capture="environment" hidden onChange={pick} />
+              {touch ? 'Из галереи' : total ? 'Ещё фото' : 'Выбрать фото'}
+              <input type="file" accept="image/*" multiple hidden onChange={pick} />
             </label>
-          )}
-          <label className="button button--ghost">
-            {touch ? 'Выбрать из галереи' : current ? 'Другое фото' : 'Выбрать фото'}
-            <input type="file" accept="image/*" hidden onChange={pick} />
-          </label>
-          {current && <button type="button" className="button button--ghost" onClick={() => { setPhoto(null); setPreview(''); setDropPhoto(true); }}>Убрать фото</button>}
-        </div>
-        <span className="field__hint">Снимайте тренажёр без людей в кадре — фото увидят клиенты.</span>
+          </div>
+        )}
+        <span className="field__hint">Первое фото — главное. Снимайте без людей в кадре — фото увидят клиенты.</span>
       </div>
       <label className="field">
-        <span className="field__label">Где регулировки</span>
+        <span className="field__label">Настройка</span>
         <textarea className="field__input library__textarea" value={setup} maxLength={1500} rows={4}
           onChange={(ev) => setSetup(ev.target.value)}
-          placeholder={'Спинка — рычаг справа под сиденьем.\nВалик — кнопка слева, тянуть на себя.'} />
+          placeholder={kind === 'equipment' ? 'Где лежит, что взять для разминки…' : 'Спинка — рычаг справа под сиденьем.\nВалик — кнопка слева, тянуть на себя.'} />
         <span className="field__hint">Без цифр: настройка у каждого клиента своя — её записывают в занятии. Шаг — строка.</span>
       </label>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       <div className="library__actions">
         <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
         <button type="button" className="button button--ghost" disabled={busy} onClick={() => onDone(null)}>Отмена</button>
-        {saved.uid && <button type="button" className="button button--ghost danger" disabled={busy} onClick={remove}>Убрать</button>}
+        {saved.uid && <button type="button" className="button button--ghost danger" disabled={busy} onClick={remove}>Убрать {word}</button>}
       </div>
     </div>
   );
 }
+
+const MAX_MACHINE_PHOTOS = 6;
 
 /**
  * Замены упражнения (07.10.2026, FT-479): тренажёр занят — клиент в

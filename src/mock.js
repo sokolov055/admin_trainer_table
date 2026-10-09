@@ -722,7 +722,7 @@ let demoNotes = { 'm:rack01': { text: 'Крюки на 4-й, упоры на 2-�
 export function mockMachinePhoto(exerciseId, uid, url) {
   const e = demoExercises.find((x) => x.id === Number(exerciseId));
   const m = e && (e.machines || []).find((x) => x.uid === uid);
-  if (m) m.photo = url;
+  if (m) { m.photos = [...(m.photos || (m.photo ? [m.photo] : [])), url]; m.photo = m.photos[0]; }
 }
 
 /** Правка тренажёров и замен общего — своя версия (как на сервере), своё — на месте */
@@ -1557,7 +1557,10 @@ const MOCK = {
       m = { uid: 'demo' + (++demoMachineSeq), name, photo: '', setup: '' };
       machines.push(m);
     }
-    Object.assign(m, { name, setup: String(params.setup || '').trim(), ...(params.removePhoto ? { photo: '' } : {}) });
+    // Как на сервере: вид, фото списком, убрать одно или все
+    const drop = [].concat(params.removePhotoUrls || [], params.removePhotoUrl || []);
+    const photos = params.removePhoto ? [] : (m.photos || (m.photo ? [m.photo] : [])).filter((u) => !drop.includes(u));
+    Object.assign(m, { name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : (params.kind ? 'machine' : m.kind || 'machine'), photos, photo: photos[0] || '' });
     return { exercise: { ...e }, uid: m.uid };
   },
   'library.exercise.machine.delete': (params) => {
