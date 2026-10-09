@@ -968,6 +968,14 @@ test('тренировки программы переставляются пе�
     await tab.locator('.plan-edit__order-bar').getByRole('button', { name: 'Развернуть' }).click();
     const firstTitle = await tab.locator('.plan-edit__title').first().inputValue();
     assert.equal(firstTitle, 'Тренировка 2 — низ', 'порядок сохранился и в развёрнутом редакторе');
+
+    // Панель «Сохранить шаблон» — только на вкладке шаблонов: она вынесена
+    // в body и раньше ездила по всем разделам (09.10.2026)
+    await tab.locator('.plan-edit__float').waitFor({ timeout: 3000 });
+    await tab.getByRole('button', { name: 'Клиенты', exact: true }).click();
+    await assert.doesNotReject(tab.waitForFunction(() => !document.querySelector('.plan-edit__float'), null, { timeout: 3000 }), 'в «Клиентах» панели шаблона нет');
+    await tab.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await assert.doesNotReject(tab.locator('.plan-edit__float').waitFor({ timeout: 3000 }), 'вернулись — панель снова на месте');
   } finally {
     await context.close();
   }

@@ -154,6 +154,17 @@ export default function PlanEditor({
    * Только transform, opacity и тень; с reduce motion — без движения.
    */
   const rootRef = useRef(null);
+  // Панель кнопок вынесена в body и не прячется вместе с вкладкой: раздел
+  // «Шаблоны» остаётся смонтированным (hidden), и панель ездила по всем
+  // разделам (09.10.2026). Видна, только пока редактор на экране
+  const [onScreen, setOnScreen] = useState(true);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const pending = useRef(null);
   const reducedMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return true; } };
   const rowsOf = (bi) => {
@@ -691,7 +702,7 @@ export default function PlanEditor({
           места программы. Панель — у края экрана, вне ленты: «липкое»
           позиционирование ломается внутри сдвигаемых слоёв (листание
           разделов), и кнопка оставалась внизу страницы */}
-      {typeof document !== 'undefined' && createPortal(
+      {typeof document !== 'undefined' && onScreen && createPortal(
         <div className="plan-edit__float" role="toolbar" aria-label="Правка программы">
           <button className="button button--primary" disabled={busy} onClick={save}>
             {busy ? 'Сохраняю…' : submitLabel}
