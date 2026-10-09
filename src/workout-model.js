@@ -180,6 +180,30 @@ export function summary(session) {
       .reduce((m, s) => m + volumeOf(s, trackOf(e)), 0), 0),
     pending: sets.filter(s => s.state === 'pending').length };
 }
+/**
+ * «Завершить»: неотмеченные подходы — пропущены с пометкой closed. По ней
+ * «Продолжить» отличает их от пропущенных руками (09.10.2026). Прежние
+ * пометки снимаются: после прошлого «Продолжить» подход могли пропустить
+ * уже сами. Копия — server/src/lib/watch-workout.js (closeSets)
+ */
+export function closeSets(exercises) {
+  return exercises.map(e => ({ ...e, sets: e.sets.map(({ closed, ...x }) => (x.state === 'pending' ? { ...x, state: 'skipped', closed: true } : x)) }));
+}
+
+/**
+ * «Продолжить тренировку» в завершённом (владелец, 09.10.2026: нажали
+ * «Завершить» по ошибке): занятие снова идёт, пропущенные при завершении
+ * подходы — снова в работе, и экран встаёт на первый из них. Пропущенные
+ * руками остаются пропущенными. В занятиях до пометки closed отличить
+ * нельзя — возвращаются все пропущенные
+ */
+export function reopenSession(session) {
+  const marked = session.exercises.some(e => e.sets.some(x => x.closed));
+  return { ...session, status: 'active', restUntil: 0,
+    exercises: session.exercises.map(e => ({ ...e, sets: e.sets.map(({ closed, ...x }) => (
+      x.state === 'skipped' && (closed || !marked) ? { ...x, state: 'pending' } : x)) })) };
+}
+
 export function clock(ms) {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');

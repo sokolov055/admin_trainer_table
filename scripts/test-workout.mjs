@@ -76,6 +76,38 @@ test('интерфейс: запись подхода, пауза, продол�
   assert.ok(tree.root.findAllByType('button').some(b => text(b).includes('Тренировка тест')));
   await act(async () => tree.unmount()); tree = null;
 });
+test('«Завершить» по ошибке: «Продолжить» возвращает занятие с неотмеченного подхода (09.10.2026)', async () => {
+  data.clear(); await mount();
+  await saveNow();
+  await act(async () => tree.root.findAllByType('button').find(n => text(n) === 'Норм').props.onClick());
+  await click('Завершить'); await click('Завершить');
+  let saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+  assert.equal(saved.status, 'completed');
+  assert.deepEqual([saved.exercises[0].sets[1].state, saved.exercises[0].sets[1].closed], ['skipped', true]);
+  // В шапке завершённого — «Продолжить»; внизу — «Продолжить тренировку»
+  assert.ok(button('Продолжить тренировку'));
+  await click('Продолжить');
+  saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+  assert.equal(saved.status, 'active');
+  assert.equal(saved.exercises[0].sets[0].state, 'done', 'сделанный остаётся сделанным');
+  assert.equal(saved.exercises[0].sets[1].state, 'pending', 'пропущенный при завершении — снова в работе');
+  assert.equal(saved.exercises[0].sets[1].closed, undefined);
+  assert.ok(button('Завершить'), 'занятие снова можно вести и завершить');
+  await act(async () => tree.unmount()); tree = null;
+});
+test('«Продолжить» не возвращает подходы, пропущенные руками', async () => {
+  const { closeSets, reopenSession } = await import('../src/workout-model.js');
+  const session = { status: 'active', restUntil: 5, exercises: [{ sets: [
+    { state: 'done' }, { state: 'skipped' }, { state: 'pending' }] }] };
+  const closed = { ...session, status: 'completed', exercises: closeSets(session.exercises) };
+  assert.deepEqual(closed.exercises[0].sets.map(x => x.state + (x.closed ? '*' : '')), ['done', 'skipped', 'skipped*']);
+  const back = reopenSession(closed);
+  assert.equal(back.status, 'active'); assert.equal(back.restUntil, 0);
+  assert.deepEqual(back.exercises[0].sets.map(x => x.state), ['done', 'skipped', 'pending']);
+  // Занятие, завершённое до пометки closed, — возвращаются все пропущенные
+  const old = { status: 'completed', exercises: [{ sets: [{ state: 'done' }, { state: 'skipped' }] }] };
+  assert.deepEqual(reopenSession(old).exercises[0].sets.map(x => x.state), ['done', 'pending']);
+});
 test('черновик восстанавливается после отключения сети и размонтирования', async () => {
   data.clear(); offline = true; await mount();
   const weight = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));

@@ -3,7 +3,7 @@ import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { blankSet, clock, fromPlan, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine } from './workout-model.js';
+import { blankSet, clock, closeSets, fromPlan, reopenSession, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -812,9 +812,26 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { /* старый браузер */ }
   };
   const finishAs = (kind) => {
-    change(v => ({ ...v, status: kind === 'complete' ? 'completed' : 'cancelled', restUntil: 0, exercises: v.exercises.map(e => ({ ...e, sets: e.sets.map(x => (x.state === 'pending' ? { ...x, state: 'skipped' } : x)) })) }));
+    change(v => ({ ...v, status: kind === 'complete' ? 'completed' : 'cancelled', restUntil: 0, exercises: closeSets(v.exercises) }));
     setConfirm('');
     save();
+  };
+
+  /**
+   * «Продолжить» в завершённом или отменённом занятии (владелец, 09.10.2026:
+   * «Завершить» нажимают по ошибке). Занятие снова идёт — и у тренера, и у
+   * клиента; подходы, пропущенные при завершении, снова в работе, экран —
+   * у первого из них. Другое занятие уже идёт — сервер ответит конфликтом,
+   * его покажет обычная плашка
+   */
+  const resume = () => {
+    change(reopenSession);
+    save();
+    haptic('medium');
+    setTimeout(() => {
+      const row = document.querySelector && (document.querySelector('.workout__set--current') || document.querySelector('.workout__exercise--current'));
+      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 80);
   };
 
   /** В занятии уже есть оценка — подсказку под кнопками больше не показываем */
@@ -1681,6 +1698,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <button type="button" className="button button--primary" onClick={() => setConfirm('complete')}>Завершить</button>
             <button type="button" className="button button--ghost" onClick={() => setConfirm('cancel')}>Отменить</button>
           </span>}
+          {!editable && <span className="workout__head-actions">
+            <button type="button" className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить</button>
+          </span>}
         </div>
         {editable && confirm && <div className="workout__confirm" role="alertdialog" aria-label={confirm === 'complete' ? 'Завершить тренировку' : 'Отменить занятие'}>
           <p>{confirmText}</p>
@@ -1817,7 +1837,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>
-      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={record.dirty || busy} onClick={() => { store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}
+      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={record.dirty || busy} onClick={() => { store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}
       {/* «Сохранить сейчас» и «Скачать результат» убраны (03.10.2026):
           сохраняется само. Не сохранилось — «Повторить» в сообщении об
           ошибке вверху; конфликт версий — «Скачать мой черновик» там же */}

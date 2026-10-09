@@ -13,6 +13,7 @@
  */
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
 import { trackOf, volumeOf, setText as trackSetText } from './exercise-track.js';
+import { closeSets } from './workout-model.js';
 import { rateSet, isDumbbell, stepOf, suggestText } from './effort.js';
 
 const isEffort = (e) => ['easy', 'ok', 'hard'].includes(e);
@@ -401,8 +402,8 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
     } else if (a.kind === 'finish') {
       // Ни одного сделанного подхода — занятия не было: отмена, как в приложении
       const any = s.exercises.some((ex) => ex.sets.some((set) => set.state === 'done'));
-      s = { ...s, status: any ? 'completed' : 'cancelled', restUntil: 0,
-        exercises: s.exercises.map((ex) => ({ ...ex, sets: ex.sets.map((set) => set.state === 'pending' ? { ...set, state: 'skipped' } : set) })) };
+      // Неотмеченные — пропущены с пометкой closed: «Продолжить» вернёт их
+      s = { ...s, status: any ? 'completed' : 'cancelled', restUntil: 0, exercises: closeSets(s.exercises) };
     }
   }
   return s;
