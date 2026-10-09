@@ -10,7 +10,7 @@ import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
-import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, cardioFrom, cardioGoal } from './exercise-track.js';
+import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, planSet, cardioFrom, cardioGoal, intervalsText } from './exercise-track.js';
 
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
@@ -1001,7 +1001,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const track = { ...trackOf(x), metrics: cardio.metrics, goal: cardioGoal(cardio), speedUnit: cardio.speedUnit || '' };
     if (cardio.modes) track.modes = cardio.modes;
     const next = { ...x, cardio, track };
-    return { ...next, prescription: planScheme(next) };
+    // Неотмеченные отрезки — по новому плану: поменяли круги — время всех
+    // кругов другое. Вписанное руками (не как было в плане) не трогаем
+    const was = planSet(x, trackOf(x));
+    const now = planSet(next, trackOf(next));
+    const sets = x.sets.map(set => {
+      if (set.state !== 'pending') return set;
+      const out = { ...set };
+      Object.keys({ ...was, ...now }).forEach(k => {
+        if (!out[k] || out[k] === was[k]) out[k] = now[k] || '';
+      });
+      return out;
+    });
+    return { ...next, sets, prescription: planScheme(next) };
   });
 
   /**
@@ -1055,6 +1067,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                     <span className={'workout__effort-dot workout__effort-dot--' + ex.sets[r].effort} aria-hidden="true" />{EFFORT_WORD[ex.sets[r].effort]}
                   </span>}
                 </div>}
+              {/* Интервалы — в каждом круге под названием: что делать на аэробайке,
+                  видно без открытия настроек (владелец, 09.10.2026) */}
+              {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && tuning !== ex.id + ':' + r && (
+                <button type="button" className="workout__round-plan" onClick={() => startTune(ex.id + ':' + r)}>{intervalsText(ex.cardio.intervals, trackOf(ex))}</button>
+              )}
               {tuning === ex.id + ':' + r && tuneEditor(ex, ei, ex.id + ':' + r, true)}
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
               {memberEffort(members, k, r)}

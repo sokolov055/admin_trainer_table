@@ -500,6 +500,14 @@ test('кардио в занятии: режим, метрики, «+ метри
     assert.ok(local.root.findAllByType('input').some(n => n.props['aria-label'] === 'Беговая дорожка, отрезок 1, расстояние, м'));
     assert.ok(local.root.findAllByProps({ className: 'intervals__plan small muted' }).some(n => /^Интервалы: 5 × ускорение 1:00 \(13 км\/ч, 250 м\)/.test(text(n))), 'таймер — по новым интервалам');
 
+    // Расстояние отрезка — по интервалам: 5 кругов × 250 м
+    const dist = () => local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Беговая дорожка, отрезок 1, расстояние, м');
+    assert.equal(dist().props.value, '1250');
+    await act(async () => { dist().props.onChange({ target: { value: '' } }); await delay(); });
+    // И время — все круги подряд: 5 × (1:00 + 2:00)
+    const time = () => local.root.findAllByType('input').find(n => /^Беговая дорожка, отрезок 1, время/.test(n.props['aria-label'] || ''));
+    assert.equal(time().props.value, '15:00');
+    await act(async () => { time().props.onChange({ target: { value: '' } }); await delay(); });
     // Отметить без итога нельзя: скорость — не результат
     const check = () => local.root.findAllByType('button').find(n => text(n) === 'Норм');
     await act(async () => { check().props.onClick(); await delay(); });
@@ -630,6 +638,10 @@ test('кардио без интервалов в плане — интерва�
     await press(button('Функциональное кардио'));
     assert.ok(button('Запустить интервалы'), 'таймер интервалов — у упражнения суперсета');
     assert.ok(local.root.findAllByType('p').some(p => /Аэробайк: интервалы 6 × ускорение 1:00/.test(text(p))), 'план — по интервалам');
+    // В каждом круге — интервалы строкой, время отрезка — по кругам
+    assert.equal(local.root.findAllByProps({ className: 'workout__round-plan' }).length, 1, 'в круге, где есть аэробайк');
+    const times = local.root.findAllByType('input').filter(n => /^Аэробайк, отрезок \d, время/.test(n.props['aria-label'] || '')).map(n => n.props.value);
+    assert.deepEqual(times, ['18:00'], 'было 10 мин по плану — стало 6 × (1:00 + 2:00)');
     await press(button('Готово'));
     // Касание единиц — настройки: у кардио — интервалы
     await press(local.root.findAllByType('button').find(b => b.props['aria-label'] === 'Аэробайк: настройки'));

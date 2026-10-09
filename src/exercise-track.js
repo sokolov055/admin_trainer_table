@@ -494,8 +494,10 @@ export function planSet(ex, track) {
     ['speed', 'incline', 'level'].forEach((k) => { if (st[k]) out[k] = String(st[k]).replace(',', '.'); });
     // Цель — как повторы у силового: чаще всего так и сделают. Время — если
     // его записывают, главная цель — всегда: по ней отрезок и отмечают
-    const t = c.targets || {};
     const goal = cardioGoal(c);
+    // У функционального цели — у фаз: прежние цели аэробного (время «10»)
+    // остаются в плане, но в отрезок не идут (FT-513)
+    const t = goal === 'intervals' ? {} : c.targets || {};
     const time = String(t.time || '');
     if (((c.metrics || ['time']).includes('time') || goal === 'time') && /^\d{1,3}(:[0-5]\d){0,2}$/.test(time)) out.time = time;
     const amount = String(t[goal] || '').trim();
