@@ -186,7 +186,7 @@ test('суперсет из программы виден в занятии', as
   let local;
   try {
     await act(async () => {
-      local = renderer.create(React.createElement(Workout, { launch: { block: superset, month: 'Сентябрь 2026' }, onClose() {} }));
+      local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block: superset, month: 'Сентябрь 2026' }, onClose() {} }));
       await delay();
     });
 
@@ -583,7 +583,7 @@ test('корзина подхода удаляет с «Вернуть»; выб
   let local;
   try {
     await act(async () => {
-      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
       await delay();
     });
     const press = async (match) => {
@@ -742,7 +742,7 @@ test('цель кардио, поправленная в сделанном кр
   let local;
   try {
     await act(async () => {
-      local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
+      local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block, month: 'Сентябрь 2026' }, onClose() {} }));
       await delay();
     });
     const input = label => local.root.findAllByType('input').find(n => n.props['aria-label'] === label);
@@ -768,9 +768,13 @@ test('цель кардио, поправленная в сделанном кр
   }
 });
 
-test('клиент название и вид упражнения не меняет — только подходы (09.10.2026)', async () => {
+test('клиент не меняет ни названия, ни состава занятия — только подходы (09.10.2026, FT-531)', async () => {
   data.clear();
-  const block = { title: 'Ноги', exercises: [{ name: 'Жим ногами', sets: '3', reps: '12', weight: '100' }] };
+  const block = { title: 'Ноги', exercises: [
+    { name: 'Жим ногами', sets: '3', reps: '12', weight: '100' },
+    { name: 'Подтягивания', supersetGroup: 'A', sets: '2', reps: '8', weight: '' },
+    { name: 'Отжимания', supersetGroup: 'A', sets: '2', reps: '15', weight: '' },
+  ] };
   let local;
   try {
     await act(async () => {
@@ -778,7 +782,26 @@ test('клиент название и вид упражнения не меня
       await delay();
     });
     assert.equal(local.root.findAllByType('button').find(b => text(b) === 'Жим ногами'), undefined, 'название — текстом, не кнопкой');
-    assert.ok(local.root.findAllByType('button').find(b => b.props['aria-label'] === 'Жим ногами: настройки'), 'настройки подходов — доступны');
+    const buttons = () => local.root.findAllByType('button');
+    assert.deepEqual(buttons().map(b => b.props['aria-label'] || '').filter(l => /^[^,]+: настройки$/.test(l)), [], 'меню настроек под названием — нет, и в суперсете');
+    assert.ok(!buttons().some(b => text(b) === 'Выбрать'), '«Выбрать» — нет');
+    assert.ok(!buttons().some(b => text(b) === 'Разъединить'), '«Разъединить» — нет');
+    assert.ok(buttons().find(b => text(b) === 'Добавить подход'), 'добавить подход — может');
+    assert.ok(local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Жим ногами, подход 1, вес в кг'), 'вес в строке подхода — правит');
+
+    // FT-532: разминочный — сверху, перед рабочими, половина веса кратно 2,5
+    const weight = (n) => local.root.findAllByType('input').find(x => x.props['aria-label'] === `Жим ногами, подход ${n}, вес в кг`);
+    const warm = buttons().find(b => text(b) === 'Добавить разминочный подход');
+    assert.ok(warm, 'кнопка над подходами — и у клиента');
+    await act(async () => { warm.props.onClick(); await delay(); });
+    assert.equal(weight(1).props.value, '50');
+    assert.equal(weight(2).props.value, '100', 'рабочие — после разминки');
+    assert.equal(weight(4).props.value, '100');
+    // Второй разминочный — после первого, всё ещё перед рабочими
+    await act(async () => { buttons().find(b => text(b) === 'Добавить разминочный подход').props.onClick(); await delay(); });
+    assert.equal(weight(2).props.value, '50');
+    assert.equal(weight(3).props.value, '100');
+    assert.equal(local.root.findAll(n => n.type === 'span' && /· Р$/.test(text(n))).length, 2, 'оба помечены «Р»');
   } finally {
     if (local) local.unmount();
   }

@@ -526,6 +526,8 @@
 
 /* Тише: «Добавить подход» — не главное действие; заметка свёрнута */
 .workout__add { margin-top: var(--space-2); border-style: dashed; }
+/* Над подходами — отступ снизу, а не сверху (FT-532) */
+.workout__exercise .workout__add.workout__add--warmup { margin-top: var(--space-2); margin-bottom: var(--space-2); }
 .workout__note { margin-top: var(--space-1); }
 .workout__note textarea { width: 100%; margin-top: 4px; }
 @media (prefers-reduced-motion: no-preference) {

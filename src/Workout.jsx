@@ -3,7 +3,7 @@ import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { blankSet, clock, closeSets, fromPlan, reopenSession, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine } from './workout-model.js';
+import { blankSet, clock, closeSets, fromPlan, reopenSession, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -110,7 +110,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Переименование касанием по названию (02.10.2026): id упражнения
   const [renaming, setRenaming] = useState('');
   // Клиент (и тренер в режиме «смотрите как клиент») название и вид не меняет
-  // (владелец, 09.10.2026): это решает тренер; подходы, вес, настройки — может
+  // (владелец, 09.10.2026): это решает тренер. С 10.10.2026 (FT-531) и состав
+  // занятия тоже: нет «Выбрать», настроек под названием, перестановки
+  // удержанием, удаления упражнения и «Разъединить». Подходы — отмечает,
+  // вес и повторы в строках, «Добавить подход» — может
   const asClient = !clientRow || clientView;
   // Настройки касанием по единицам (FT-513): id упражнения, в круге — id:круг
   const [tuning, setTuning] = useState('');
@@ -1077,9 +1080,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return <section className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-unit={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
       <div className="workout__rounds-head" onPointerDown={holdToMove('g' + group)}>
         <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
-        <button className="button button--ghost" onClick={split}>Разъединить</button>
+        {!asClient && <button className="button button--ghost" onClick={split}>Разъединить</button>}
       </div>
-      <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.{editable ? ' Порядок внутри — подержите название и перетащите.' : ''}</p>
+      <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.{editable && !asClient ? ' Порядок внутри — подержите название и перетащите.' : ''}</p>
       {members.some(({ ex }) => planText(ex.prescription)) && (
         <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '')).join('; ')}</p>
       )}
@@ -1101,7 +1104,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   {/* Название — касанием: из базы или новое прямо здесь */}
                   {asClient ? ex.name : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>}
                   {/* Единицы — касанием: вес, повторы, время, у кардио — интервалы (FT-513) */}
-                  <button type="button" className="workout__round-units" aria-expanded={tuning === ex.id + ':' + r} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id + ':' + r)}> · {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</button>
+                  {!asClient && <button type="button" className="workout__round-units" aria-expanded={tuning === ex.id + ':' + r} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id + ':' + r)}> · {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</button>}
                   {/* Сделано — с оценкой, как у обычных подходов (03.10.2026) */}
                   {ex.sets[r].state === 'done' && ex.sets[r].effort && <span className={'workout__round-effort workout__round-effort--' + ex.sets[r].effort}>
                     <span className={'workout__effort-dot workout__effort-dot--' + ex.sets[r].effort} aria-hidden="true" />{EFFORT_WORD[ex.sets[r].effort]}
@@ -1167,7 +1170,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * число («Добавить круг» под ним), а заметка — здесь же.
    */
   const startTune = (id) => {
-    if (swallowClick.current || !editable) return;
+    if (swallowClick.current || !editable || asClient) return;
     setRenaming('');
     setTuning(tuning === id ? '' : id);
   };
@@ -1245,7 +1248,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return { ...v, exercises };
   });
   const holdToMove = (key, inner = null) => (e) => {
-    if (!editable || reorder || drag.current || (e.button !== undefined && e.button !== 0)) return;
+    if (!editable || asClient || reorder || drag.current || (e.button !== undefined && e.button !== 0)) return;
     // Внутри суперсета — не тащить заодно весь суперсет
     if (inner) e.stopPropagation();
     const x0 = e.clientX, y0 = e.clientY, id = e.pointerId, head = e.currentTarget;
@@ -1715,7 +1718,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             он стартует сам после каждого отмеченного подхода */}
         {editable && !confirm && <div className="workout__toolbar workout__toolbar--head">
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
-          <button className={'button workout__pick-toggle' + (picking ? ' is-on' : '')} aria-pressed={picking} onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>
+          {!asClient && <button className={'button workout__pick-toggle' + (picking ? ' is-on' : '')} aria-pressed={picking} onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>}
           <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds })); startRest(seconds); }}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
         </div>}
         {/* Полоса своя, а не браузерный progress: системный выглядит
@@ -1766,7 +1769,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const finished = doneSets === ex.sets.length;
           const compact = picking || !!reorder;
           return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
-          <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
+          <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable || asClient} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}
@@ -1787,12 +1790,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {/* «4 × 12» крупно убрано (владелец, 09.10.2026): подходы и повторы
               и так видны в строках. Единицы — касанием: подходы, вес, время,
               у кардио — цели и интервалы, как в круге суперсета */}
-          {!ex.sets.some(x => x.who) && <button type="button" className="workout__units-tap" aria-expanded={tuning === ex.id} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id)}>
+          {!ex.sets.some(x => x.who) && !asClient && <button type="button" className="workout__units-tap" aria-expanded={tuning === ex.id} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id)}>
             {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}<IconSliders size={12} aria-hidden="true" />
           </button>}
           {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
+          {/* Разминка — сверху, над подходами (FT-532): встаёт перед рабочими */}
+          {trackOf(ex).kind !== 'cardio' && !ex.sets.some(x => x.who) && (
+            <button type="button" className="button button--ghost button--block workout__add workout__add--warmup" disabled={ex.sets.length >= 20} onClick={() => updateExercise(ei, withWarmup)}>
+              Добавить разминочный подход
+            </button>
+          )}
           {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}</div>}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
           {trackOf(ex).kind === 'cardio' && !isFunctional(ex) && metricAdd(ex, ei)}

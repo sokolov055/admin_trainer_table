@@ -280,10 +280,29 @@ function withTechnique(e, ex) {
   const fromHistory = Array.isArray(e.startSets) && e.startSets.length > 0;
   if (tech.warmup && !fromHistory && !sets.some(x => x.kind === 'warmup') && (kind === 'strength' || kind === 'bodyweight')) {
     const first = sets[0];
-    const w = Number(String(first.weight || '').replace(',', '.'));
-    const half = w > 0 ? String(Math.floor(w / 2 / 2.5) * 2.5) : '';
-    sets = [...Array.from({ length: tech.warmup }, () => ({ ...first, weight: half && half !== '0' ? half : first.weight, kind: 'warmup' })), ...sets];
+    sets = [...Array.from({ length: tech.warmup }, () => ({ ...first, weight: warmupWeight(first.weight), kind: 'warmup' })), ...sets];
   }
   if (tech.dropset) sets[sets.length - 1] = { ...sets[sets.length - 1], drops: [{ weight: '', reps: '' }] };
   return { ...ex, sets };
+}
+
+/** Вес разминки — половина рабочего, кратно 2,5; меньше 2,5 — как у рабочего */
+function warmupWeight(weight) {
+  const w = Number(String(weight || '').replace(',', '.'));
+  const half = w > 0 ? Math.floor(w / 2 / 2.5) * 2.5 : 0;
+  return half > 0 ? String(half) : weight || '';
+}
+
+/**
+ * «Добавить разминочный подход» в занятии (FT-532, 10.10.2026): после уже
+ * стоящих разминочных, перед рабочими. Повторы — как у первого рабочего,
+ * вес — по тому же правилу, что разминка из программы
+ */
+export function withWarmup(ex) {
+  if (ex.sets.length >= 20 || ex.sets.some(x => x.who)) return ex;
+  const found = ex.sets.findIndex(x => x.kind !== 'warmup');
+  const at = found < 0 ? ex.sets.length : found;
+  const { effort, suggest, raised, own, drops, ...source } = ex.sets[at] || ex.sets[ex.sets.length - 1] || blankSet();
+  const set = { ...source, weight: warmupWeight(source.weight), state: 'pending', kind: 'warmup' };
+  return { ...ex, sets: [...ex.sets.slice(0, at), set, ...ex.sets.slice(at)] };
 }
