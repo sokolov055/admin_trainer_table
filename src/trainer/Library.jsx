@@ -33,6 +33,9 @@ export const LIBRARY_PANES = [
   { value: 'program', label: 'Программы' },
   { value: 'workout', label: 'Тренировки' },
   { value: 'exercises', label: 'Упражнения' },
+  // Тренажёры клуба (владелец, 09.10.2026): все записанные у упражнений —
+  // одним списком, с фото и тем, где регулировки
+  { value: 'machines', label: 'Тренажёры' },
   // Блюда для рациона клиентов: черновики на проверку, публикация, правка
   { value: 'dishes', label: 'Блюда' },
 ];
@@ -84,6 +87,7 @@ const LEVELS = [
 
 export default function Library({ pane }) {
   if (pane === 'dishes') return <Dishes />;
+  if (pane === 'machines') return <Machines />;
   return pane === 'exercises' ? <Exercises /> : <Templates key={pane} kind={pane} />;
 }
 
@@ -808,6 +812,110 @@ function Exercises() {
       ))}
       {shown.length > 200 && <p className="small muted">Показаны первые 200 — уточните поиск.</p>}
       {del.bar}
+    </>
+  );
+}
+
+/**
+ * Тренажёры (владелец, 09.10.2026): все тренажёры, записанные у упражнений
+ * (FT-478), одним списком. Один и тот же тренажёр бывает у нескольких
+ * упражнений — он одной строкой, под ним упражнения. Сам тренажёр живёт у
+ * упражнения: правка и новый — в карточке упражнения, сюда ведёт касание.
+ */
+function Machines() {
+  const { loading, data, error, reload } = useData('library.exercises', {}, []);
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState('');        // ключ тренажёра
+  const [exercise, setExercise] = useState(null); // id упражнения из тренажёра
+  const [editing, setEditing] = useState(null);
+
+  useBackGesture(() => setEditing(null), !!editing);
+  useBackGesture(() => setExercise(null), !editing && !!exercise);
+  useBackGesture(() => setOpen(''), !editing && !exercise && !!open);
+  useReturnScroll(!!(open || exercise || editing));
+
+  if (loading) return <Loading lead={false} rows={5} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+
+  const all = data.exercises;
+  const keyOf = (name) => String(name || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+  const groups = new Map();
+  all.forEach((e) => (e.machines || []).forEach((m) => {
+    const k = keyOf(m.name);
+    if (!groups.has(k)) groups.set(k, { key: k, name: m.name, photo: '', setup: '', uses: [] });
+    const g = groups.get(k);
+    if (!g.photo && m.photo) g.photo = m.photo;
+    if (!g.setup && m.setup) g.setup = m.setup;
+    g.uses.push(e);
+  }));
+  const list = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+
+  if (editing) {
+    return (
+      <ExerciseEditor
+        exercise={editing}
+        muscles={data.muscles}
+        onCancel={() => setEditing(null)}
+        onSaved={() => { setEditing(null); reload(); }}
+      />
+    );
+  }
+  const current = exercise ? all.find((e) => e.id === exercise) : null;
+  if (current) {
+    return (
+      <ExerciseView
+        exercise={current}
+        owner={!!data.owner}
+        all={all}
+        onSetup={reload}
+        onChanged={(saved) => { setExercise(saved.id); reload(); }}
+        onBack={() => setExercise(null)}
+        onEdit={() => setEditing(current)}
+        onDeleted={() => { setExercise(null); reload(); }}
+        onRemove={() => setExercise(null)}
+      />
+    );
+  }
+  const machine = open ? list.find((g) => g.key === open) : null;
+  if (machine) {
+    return (
+      <>
+        <Back onClick={() => setOpen('')}>Тренажёры</Back>
+        <h2 className="library__title">{machine.name}</h2>
+        <MachinePhoto machine={machine} />
+        {machine.setup
+          ? <><h4 className="setup__title">Где регулировки</h4><SetupText text={machine.setup} /></>
+          : <p className="small muted">Как настраивается — не записано. Добавьте в карточке упражнения.</p>}
+        <h4 className="setup__title">Упражнения на нём</h4>
+        {machine.uses.map((e) => (
+          <button key={e.id} className="item" onClick={() => { setExercise(e.id); haptic(); }}>
+            <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Badge kind="good">своё</Badge>}</div>
+            {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
+          </button>
+        ))}
+      </>
+    );
+  }
+
+  const nq = keyOf(q);
+  const shown = list.filter((g) => !nq || g.key.includes(nq) || g.uses.some((e) => keyOf(e.name).includes(nq)));
+  return (
+    <>
+      <Search value={q} onChange={setQ} placeholder="Поиск тренажёра" />
+      <p className="small muted library__count">{shown.length} {plural(shown.length, 'тренажёр', 'тренажёра', 'тренажёров')}</p>
+      {!list.length && (
+        <Empty title="Тренажёров пока нет" text="Тренажёр добавляется в карточке упражнения: «Упражнения» → упражнение → «Тренажёры»." />
+      )}
+      {shown.map((g) => (
+        <button key={g.key} className="item" onClick={() => { setOpen(g.key); haptic(); }}>
+          <div className="item__top"><span className="item__name">{g.name}</span></div>
+          <div className="item__meta">
+            <span>{g.uses.map((e) => e.name).join(', ')}</span>
+            {g.photo && <Badge>фото</Badge>}
+            {g.setup && <Badge>настройка</Badge>}
+          </div>
+        </button>
+      ))}
     </>
   );
 }
