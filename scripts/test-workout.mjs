@@ -41,7 +41,7 @@ const output = await build({ entryPoints: ['src/Workout.jsx'], bundle: true, wri
   format: 'cjs', platform: 'node', external: ['react'], define: { 'import.meta.env.VITE_MOCK': '"1"' },
   plugins: [{ name: 'test-api', setup(b) {
     b.onResolve({ filter: /\/(api|telegram|session)\.js$/ }, args => ({ path: args.path, namespace: 'test' }));
-    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const apiStale=()=>({data:{exercises:[]},stale:false,promise:Promise.resolve({exercises:[]})}); export const onMutated=()=>()=>{}; export const getInitData=()=>""; export const getToken=()=>"demo"; export const haptic=()=>{};' }));
+    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const apiStale=()=>({data:{exercises:[]},stale:false,promise:Promise.resolve({exercises:[]})}); export const onMutated=()=>()=>{}; export const getInitData=()=>""; export const getToken=()=>"demo"; export const haptic=()=>{}; export const apiPrimary=apiPublic; export const logout=()=>{}; export const environmentInfo=()=>({}); export const hasToken=()=>true; export const describeDevice=()=>"";' }));
     b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
   } }] });
 const module = { exports: {} };

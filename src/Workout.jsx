@@ -23,7 +23,8 @@ import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { useData } from './useData.js';
-import { SetupText, MachineInfo, MachineNote } from './media.jsx';
+import { SetupText, MachineInfo, MachineNote, Media } from './media.jsx';
+import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
 import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, wasSet, scaleTo } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
@@ -1066,6 +1067,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <p className="workout__last" key={'last' + ex.id}>{ex.name}: {lastRunText(ex.lastRun).replace(/^Последний раз/, 'последний раз')}</p>
       ))}
       {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
+      {members.map(({ ex }) => ex.exerciseId && setups[ex.exerciseId]
+        ? <React.Fragment key={'about' + ex.id}>{aboutView(setups[ex.exerciseId], null, ex.name)}</React.Fragment> : null)}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
@@ -1545,6 +1548,28 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     </>;
   };
 
+  /**
+   * Тренажёр и техника (владелец, 09.10.2026): клиенту в зале одним касанием —
+   * как выглядит тренажёр и как настраивается, техника, мышцы, анимация; под
+   * ними уже подходы. То же, что в карточке упражнения программы
+   */
+  const aboutView = (info, chosen = null, title = '') => {
+    const setup = chosen ? chosen.setup || chosen.photo || info.setup : info.setup;
+    const muscles = info.muscles && ((info.muscles.primary || []).length || (info.muscles.secondary || []).length) ? info.muscles : null;
+    if (!setup && !info.notes && !info.media && !muscles) return null;
+    const label = setup ? (chosen ? 'Тренажёр «' + chosen.name + '» и техника' : 'Тренажёр и техника') : 'Техника';
+    return <details className="workout__setup workout__about">
+      <summary>{title ? title + ': ' + label.toLowerCase() : label}</summary>
+      {setup && (chosen ? <MachineInfo machine={chosen} principle={info.setup} /> : <SetupText text={info.setup} />)}
+      {info.notes && <p className="workout__technique">{info.notes}</p>}
+      {muscles && <div className="muscles muscles--block">
+        <MuscleFigure primary={muscles.primary || []} secondary={muscles.secondary || []} size="sm" />
+        <MuscleNames primary={muscles.primary || []} secondary={muscles.secondary || []} max={4} />
+      </div>}
+      <Media media={info.media} />
+    </details>;
+  };
+
   const extrasView = (ex, ei, info) => {
     const machines = info.machines || [];
     const split = ex.sets.some((x) => x.who);
@@ -1577,12 +1602,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           onSaved={(n) => setNotes((v) => { const next = { ...v }; if (n) next[noteTarget] = n; else delete next[noteTarget]; return next; })} />
       )}
       {split && splitView(ex, ei, info)}
-      {!split && (chosen ? chosen.setup || chosen.photo || info.setup : info.setup) && (
-        <details className="workout__setup">
-          <summary>{chosen ? 'Тренажёр «' + chosen.name + '»: фото, регулировки' : 'Как настроить тренажёр'}</summary>
-          {chosen ? <MachineInfo machine={chosen} principle={info.setup} /> : <SetupText text={info.setup} />}
-        </details>
-      )}
+      {!split && aboutView(info, chosen)}
       {alts.length > 0 && editable && !started && (
         <div className="workout__alts">
           <span className="small muted">Занято? Заменить на:</span>
@@ -1715,7 +1735,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           }
           const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
           const finished = doneSets === ex.sets.length;
-          const [main, ...rest] = planText(ex.prescription).split(' · ').filter(Boolean);
           const compact = picking || !!reorder;
           return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable} label={`Удалить упражнение «${ex.name}»`}
@@ -1735,15 +1754,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {!compact && <>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {ex.exerciseId && setups[ex.exerciseId] && extrasView(ex, ei, setups[ex.exerciseId])}
-          {/* План — касанием: подходы, вес, время, у кардио — цели и
-              интервалы (FT-513). Плана нет — единицы, как в круге суперсета.
-              У пары вес у каждого свой — правится в строках подходов */}
-          {ex.sets.some(x => x.who)
-            ? main && <p className="workout__target"><strong>{main}</strong>{rest.map((r, i) => <span key={i}>{r}</span>)}</p>
-            : <button type="button" className={'workout__target workout__target-tap' + (main ? '' : ' workout__target--units')} aria-expanded={tuning === ex.id} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id)}>
-              {main ? <><strong>{main}</strong>{rest.map((r, i) => <span key={i}>{r}</span>)}</> : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}
-              <IconSliders size={13} aria-hidden="true" />
-            </button>}
+          {/* «4 × 12» крупно убрано (владелец, 09.10.2026): подходы и повторы
+              и так видны в строках. Единицы — касанием: подходы, вес, время,
+              у кардио — цели и интервалы, как в круге суперсета */}
+          {!ex.sets.some(x => x.who) && <button type="button" className="workout__units-tap" aria-expanded={tuning === ex.id} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id)}>
+            {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}<IconSliders size={12} aria-hidden="true" />
+          </button>}
           {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
