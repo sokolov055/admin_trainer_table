@@ -140,6 +140,47 @@ export function CardioKind({ value, disabled, onChange }) {
   );
 }
 
+/**
+ * Интервалы отрезка в занятии (FT-513, владелец): вместо «Время / Скорость» —
+ * круги и каждый интервал с его целями. Что задаётся у интервала и как он
+ * называется — в плане (IntervalsEdit); здесь только числа, свои в каждом
+ * круге суперсета.
+ */
+export function IntervalsRow({ intervals, track, label, disabled, onChange }) {
+  const iv = intervals || NEW_INTERVALS;
+  const phases = phasesOf(iv);
+  // Круги — своим полем, как в IntervalsEdit: пока стирают, уходит прежнее
+  const [rounds, setRounds] = useState(String(iv.rounds || ''));
+  useEffect(() => { setRounds(String(iv.rounds || '')); }, [iv.rounds]);
+  const editRounds = (text) => {
+    const v = text.replace(/\D/g, '');
+    setRounds(v);
+    if (Number(v) >= 1 && Number(v) <= 50) onChange({ rounds: Number(v), phases });
+  };
+  const editPhase = (i, k, v) => onChange({ rounds: iv.rounds, phases: phases.map((p, j) => (j === i ? { ...p, fields: phaseKeys(p), [k]: k === 'time' ? v.replace(/\D/g, '') : v } : p)) });
+  return (
+    <div className="intervals-row">
+      <label className="intervals-row__rounds"><span>Кругов</span>
+        <input aria-label={label + ', кругов'} inputMode="numeric" maxLength={2} value={rounds} disabled={disabled} onChange={(e) => editRounds(e.target.value)} onBlur={() => setRounds(String(iv.rounds || ''))} />
+      </label>
+      {phases.map((p, i) => {
+        const keys = phaseKeys(p);
+        return (
+          <div className="intervals-row__phase" key={i}>
+            <span className="intervals-row__name">{phaseName(p, i)}</span>
+            <div className="intervals-row__fields">
+              {keys.map((k) => {
+                const f = phaseField(k, track);
+                return <label key={k}><span>{f.head}</span><input aria-label={label + ', ' + phaseName(p, i).toLowerCase() + ', ' + f.head.toLowerCase()} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={phaseValue(p, k)} disabled={disabled} onChange={(e) => editPhase(i, k, e.target.value)} /></label>;
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function CardioPlan({ value, track, disabled, onChange, kind = true }) {
   const c = value;
   const set = (patch) => onChange({ ...c, ...patch });

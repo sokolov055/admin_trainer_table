@@ -192,8 +192,8 @@ test('кардио: интервалы главной целью, скорост
   assert.equal(t.speedUnit, 'rpm');
   assert.deepEqual(settingsFields(t).map((f) => f.head), ['Скорость, об/мин', 'Уровень'], 'у «другого» есть скорость и уровень');
   assert.equal(cardioLine(plan, t), 'интервалы 6 × ускорение 1:00 (90 об/мин) / замедление 2:00 (60 об/мин)');
-  // Время не записывают — калории вписывают руками
-  assert.deepEqual(planSet({ cardio: plan }, t), {});
+  // Итог отрезка — всегда по интервалам (FT-513): время всех кругов
+  assert.deepEqual(planSet({ cardio: plan }, t), { time: '18:00' });
   assert.deepEqual(t.metrics, ['kcal']);
 
   // Записывают время — в отрезок сразу все круги подряд: 6 × (1:00 + 2:00)

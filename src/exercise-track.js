@@ -233,6 +233,35 @@ export function intervalPhases(intervals, track) {
   return list;
 }
 
+/**
+ * Итоги отрезка по интервалам — все круги подряд: время «6 × (1:00 + 2:00)»
+ * → 18:00 (только если время есть у каждой фазы, иначе итог не сосчитать),
+ * расстояние и калории фаз — 6 × (200 + 300) → 3000 м. Пишутся в отрезок
+ * вместе с его интервалами: по ним считают прогресс и историю
+ */
+export function intervalsTotals(intervals, track) {
+  const out = {};
+  const phases = phasesOf(intervals);
+  const rounds = Number(intervals && intervals.rounds) || 0;
+  if (!phases.length || !rounds) return out;
+  if (phases.every((p) => phaseSeconds(p) > 0)) {
+    const total = intervalPhases(intervals, track).reduce((n, p) => n + p.seconds, 0);
+    if (total > 0 && total < 1000 * 60) out.time = clockText(total);
+  }
+  ['distance', 'kcal'].forEach((m) => {
+    const one = phases.reduce((n, p) => n + (phaseKeys(p).includes(m) ? num(p[m]) : 0), 0);
+    const total = Math.round(one * rounds * 100) / 100;
+    if (total > 0) out[m] = String(total);
+  });
+  return out;
+}
+
+/** Функциональное кардио — интервалами: отрезок пишут кругами и фазами */
+export const isFunctional = (ex) => !!(ex && ex.cardio && ex.cardio.intervals && cardioGoal(ex.cardio) === 'intervals');
+
+/** Интервалы отрезка: свои (FT-513, в каждом круге суперсета свои) или из плана */
+export const setIntervals = (set, ex) => (set && set.intervals) || (ex && ex.cardio && ex.cardio.intervals) || null;
+
 /** Что записывать и какие настройки у отрезка — по фазам: время всегда */
 export function intervalsUse(intervals) {
   const keys = new Set(phasesOf(intervals).flatMap(phaseKeys));
@@ -334,7 +363,8 @@ const num = (v) => Number(String(v || '').replace(',', '.')) || 0;
  */
 export function missing(set, track) {
   if (track.kind === 'cardio') {
-    const any = TIME.test(String(set.time || '')) || num(set.distance) > 0 || num(set.kcal) > 0;
+    // Интервалы отрезка — уже итог: круги и фазы
+    const any = TIME.test(String(set.time || '')) || num(set.distance) > 0 || num(set.kcal) > 0 || Number(set.intervals && set.intervals.rounds) > 0;
     return any ? '' : 'Введите время, расстояние или калории перед отметкой.';
   }
   if (byTime(track)) return TIME.test(String(set.time || '')) ? '' : 'Введите время перед отметкой: минуты или мм:сс.';
@@ -374,6 +404,10 @@ const dropsText = (set) => (set.drops || [])
 
 /** Один подход строкой: «40 кг × 8 → 30 × 6», «20 мин · 8 км/ч · 3%» */
 export function setText(set, track = STRENGTH) {
+  // Функциональное: круги и фазы — «4 × ускорение 1:00 (35 км/ч) / …», пульс
+  if (track.kind === 'cardio' && set.intervals) {
+    return [intervalsText(set.intervals, track), set.pulse && 'пульс ' + set.pulse].filter(Boolean).join(' · ') || '?';
+  }
   if (track.kind === 'cardio') {
     const parts = [
       ['time', timeText(set.time, track)],
@@ -502,22 +536,7 @@ export function planSet(ex, track) {
     if (((c.metrics || ['time']).includes('time') || goal === 'time') && /^\d{1,3}(:[0-5]\d){0,2}$/.test(time)) out.time = time;
     const amount = String(t[goal] || '').trim();
     if (goal !== 'time' && /^\d+([.,]\d+)?$/.test(amount)) out[goal] = amount.replace(',', '.');
-    // Интервалы: время отрезка — все круги подряд, «6 × (1:00 + 2:00)» → 18:00
-    // Время — только если оно есть у каждой фазы: иначе итог не сосчитать
-    const phases = phasesOf(c.intervals);
-    if (goal === 'intervals' && !out.time && (c.metrics || ['time']).includes('time') && phases.every((p) => phaseSeconds(p) > 0)) {
-      const total = intervalPhases(c.intervals, track).reduce((n, p) => n + p.seconds, 0);
-      if (total > 0 && total < 1000 * 60) out.time = clockText(total);
-    }
-    // Расстояние и калории фаз — тоже за все круги: 6 × (200 + 300) → 3000 м
-    if (goal === 'intervals' && c.intervals) {
-      ['distance', 'kcal'].forEach((m) => {
-        if (out[m] || !(c.metrics || []).includes(m)) return;
-        const one = phases.reduce((n, p) => n + (phaseKeys(p).includes(m) ? num(p[m]) : 0), 0);
-        const total = Math.round(one * (Number(c.intervals.rounds) || 0) * 100) / 100;
-        if (total > 0) out[m] = String(total);
-      });
-    }
+    if (goal === 'intervals' && c.intervals) return { ...intervalsTotals(c.intervals, track), ...out };
     return out;
   }
   const reps = String(ex.reps || '');

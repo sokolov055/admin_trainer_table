@@ -10,13 +10,13 @@ import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
-import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, planSet, cardioFrom, cardioGoal, intervalsText } from './exercise-track.js';
+import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, planSet, cardioFrom, cardioGoal, intervalsTotals, isFunctional, setIntervals } from './exercise-track.js';
 
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
 const rowFields = (track) => trackFields({ ...track, perSide: false });
 import IntervalTimer from './IntervalTimer.jsx';
-import CardioPlan, { CardioKind } from './trainer/CardioPlan.jsx';
+import CardioPlan, { CardioKind, IntervalsRow } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
 import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
@@ -475,6 +475,20 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   const updateExercise = (index, fn) => change(s => ({ ...s, exercises: s.exercises.map((e, i) => i === index ? fn(e) : e) }));
   const updateSet = (ei, si, fn) => updateExercise(ei, e => ({ ...e, sets: e.sets.map((s, i) => i === si ? fn(s) : s) }));
+  /**
+   * Функциональное кардио (FT-513): у отрезка свои круги и фазы — в каждом
+   * круге суперсета свои. Пока не правили — из плана; при правке и отметке
+   * они записываются в отрезок вместе с итогами (время, расстояние, калории
+   * всех кругов) — по итогам считают историю и прогресс
+   */
+  const withIntervals = (set, iv, track) => {
+    const t = intervalsTotals(iv, track);
+    return { ...set, intervals: iv, time: t.time || '', distance: t.distance || '', kcal: t.kcal || '' };
+  };
+  const pinIntervals = (x, si) => (isFunctional(x) && !x.sets[si].intervals
+    ? { ...x, sets: x.sets.map((set, i) => (i === si ? withIntervals(set, setIntervals(set, x), trackOf(x)) : set)) }
+    : x);
+  const lackOf = (ex, si) => missing(pinIntervals(ex, si).sets[si], trackOf(ex));
   const replaceExercise = async (ei, picked) => {
     const current = state.current && state.current.session.exercises[ei];
     if (!current) return;
@@ -755,16 +769,21 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           </button>}
         {!inRound && set.state === 'done' && <span className="workout__cardio-done"><IconCheck size={16} /> сделан</span>}
       </div>
-      <div className="workout__cardio-grid">
-        {fields.map(f => (
-          <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
-        ))}
-      </div>
+      {/* Функциональное — не время и скорость, а круги и каждый интервал со
+          своими целями (владелец, 09.10.2026): в каждом круге суперсета свои */}
+      {isFunctional(ex)
+        ? <IntervalsRow intervals={setIntervals(set, ex)} track={track} label={`${ex.name}, отрезок ${si + 1}`} disabled={!editable}
+          onChange={iv => updateSet(ei, si, x => withIntervals(x, iv, track))} />
+        : <div className="workout__cardio-grid">
+          {fields.map(f => (
+            <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
+          ))}
+        </div>}
       {/* Как у силовых: отрезок отмечается оценкой, она же запускает отдых */}
       {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
-        const lack = missing(set, track);
+        const lack = lackOf(ex, si);
         if (lack) { setMessage(lack); return; }
-        updateSet(ei, si, s => ({ ...s, state: 'done', effort }));
+        updateExercise(ei, x => { const y = pinIntervals(x, si); return { ...y, sets: y.sets.map((s, i) => (i === si ? { ...s, state: 'done', effort } : s)) }; });
         if (allDone()) { afterLast(); return; }
         if (restAfter) startRest(restFor(effort, restBase()));
       }, current)}
@@ -883,11 +902,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const after = members.slice(k + 1).find(({ ex: e }) => e.sets[r] && e.sets[r].state === 'pending');
     const key = group + ':' + r;
     const pick = (effort) => {
-      const why = missing(set, trackOf(ex));
+      const why = lackOf(ex, r);
       if (why) { setRoundLack({ key, text: ex.name + ': ' + why.replace(/ перед отметкой.*$/, '').toLowerCase() }); return; }
       setRoundLack(null);
       const rated = rateSet(ex, r, effort);
-      updateExercise(ei, x => rateSet(x, r, effort).ex);
+      updateExercise(ei, x => rateSet(pinIntervals(x, r), r, effort).ex);
       if (!last) return;
       if (allDone()) { afterLast(); return; }
       // Круг закончен — отдых по всем оценкам круга
@@ -1047,7 +1066,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       ))}
       {/* Кардио интервалами и в суперсете — со своим таймером (FT-511) */}
       {members.filter(({ ex }) => trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals).map(({ ex }) => (
-        <div key={'iv' + ex.id}><p className="small muted">{ex.name}</p><IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} /></div>
+        <div key={'iv' + ex.id}><p className="small muted">{ex.name}</p><IntervalTimer intervals={setIntervals(ex.sets.find(x => x.state === 'pending'), ex)} track={trackOf(ex)} /></div>
       ))}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
@@ -1067,11 +1086,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                     <span className={'workout__effort-dot workout__effort-dot--' + ex.sets[r].effort} aria-hidden="true" />{EFFORT_WORD[ex.sets[r].effort]}
                   </span>}
                 </div>}
-              {/* Интервалы — в каждом круге под названием: что делать на аэробайке,
-                  видно без открытия настроек (владелец, 09.10.2026) */}
-              {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && tuning !== ex.id + ':' + r && (
-                <button type="button" className="workout__round-plan" onClick={() => startTune(ex.id + ':' + r)}>{intervalsText(ex.cardio.intervals, trackOf(ex))}</button>
-              )}
               {tuning === ex.id + ':' + r && tuneEditor(ex, ei, ex.id + ':' + r, true)}
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
               {memberEffort(members, k, r)}
@@ -1720,10 +1734,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
-          {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={ex.cardio.intervals} track={trackOf(ex)} />}
+          {trackOf(ex).kind === 'cardio' && ex.cardio && ex.cardio.intervals && <IntervalTimer intervals={setIntervals(ex.sets.find(x => x.state === 'pending'), ex)} track={trackOf(ex)} />}
           {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}</div>}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
-          {trackOf(ex).kind === 'cardio' && metricAdd(ex, ei)}
+          {trackOf(ex).kind === 'cardio' && !isFunctional(ex) && metricAdd(ex, ei)}
           {/* У пары подход добавляется кругом — по одному каждому, кто
               делает упражнение, с его последним весом */}
           {(() => {
