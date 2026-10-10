@@ -119,9 +119,14 @@ function PackageEnding({ state, payer, trainer }) {
   );
 }
 
+/** Как часто открытый «Обзор» клиента сверяет баланс и занятия с сервером */
+const LIVE_MS = 15000;
+
 export function Overview({ clientRow, clientView = false }) {
+  // У клиента — живой: тренер провёл оплату, баланс меняется без «потянуть»
+  // (у тренера карточка перечитывается сама после его записи — onMutated)
   const { loading, data, error, reload } = useData(
-    'client.overview', clientRow ? { clientRow } : {}, [clientRow]
+    'client.overview', clientRow ? { clientRow } : {}, [clientRow], { live: clientRow ? 0 : LIVE_MS }
   );
 
   if (loading) return <Loading rows={2} />;

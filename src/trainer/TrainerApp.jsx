@@ -572,7 +572,13 @@ function ClientPicker({ title, note, action, Icon = null, first = null, onSelect
  * не должны быть одеты одинаково; месяцы остаются фишками в теле, потому
  * что это и есть фильтр.
  */
-function ClientDetail({ client, onBack, onPreview }) {
+function ClientDetail({ client: opened, onBack, onPreview }) {
+  // Карточка открывается снимком строки списка, а баланс, занятия и цена в
+  // нём меняются: тренер провёл оплату — список перечитывается (onMutated),
+  // и шапка с «Оплатами» берут строку оттуда, а не прежний снимок (10.10.2026)
+  const list = useData('trainer.clients', {}, []);
+  const fresh = ((list.data && list.data.clients) || []).find((c) => c.row === opened.row);
+  const client = fresh ? { ...opened, ...fresh } : opened;
   const [view, setView] = useState('overview');
   const current = CLIENT_VIEWS.find((v) => v.value === view) || CLIENT_VIEWS[0];
   const ids = CLIENT_VIEWS.map((v) => v.value);

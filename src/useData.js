@@ -19,8 +19,13 @@ import { onPullRefresh } from './gestures.jsx';
  * Возвращает { data, loading, stale, error, reload }:
  *   loading — нечего показать и данные едут;
  *   stale   — показанное могло устареть, обновление идёт или не удалось.
+ *
+ * options.live — мс: пока экран виден, перечитывать с этим шагом и сразу
+ * при возвращении в приложение. Тихо: показанное не трогается до ответа,
+ * сбой не показывается. Для того, что меняет другой человек, — баланс
+ * клиента после оплаты у тренера (10.10.2026, владелец).
  */
-export function useData(action, params, deps = []) {
+export function useData(action, params, deps = [], options = {}) {
   const [state, setState] = useState({
     data: null, loading: true, stale: false, error: null,
   });
@@ -56,6 +61,31 @@ export function useData(action, params, deps = []) {
   // После записи данных — перечитать тихо: спрятанный раздел иначе
   // показал бы цифры до записи, пока его не пересоберут
   useEffect(() => onMutated(() => { load(); }), deps);
+
+  const live = Number(options.live) || 0;
+  useEffect(() => {
+    if (!live || typeof document === 'undefined') return undefined;
+    let alive = true;
+    let timer = null;
+    const visible = () => document.visibilityState !== 'hidden';
+    const quiet = () => {
+      if (!visible()) return;
+      apiStale(action, params).promise
+        .then((fresh) => { if (alive) setState({ data: fresh, loading: false, stale: false, error: null }); })
+        .catch(() => { /* прежнее остаётся на экране */ });
+    };
+    const restart = () => { clearInterval(timer); timer = setInterval(quiet, live); };
+    const back = () => { if (visible()) { quiet(); restart(); } else clearInterval(timer); };
+    restart();
+    document.addEventListener('visibilitychange', back);
+    window.addEventListener('focus', back);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', back);
+      window.removeEventListener('focus', back);
+    };
+  }, [live, ...deps]);
 
   return { ...state, reload: load };
 }
