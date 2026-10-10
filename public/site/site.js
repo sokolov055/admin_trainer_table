@@ -1,77 +1,61 @@
-document.documentElement.classList.add('js');
-
 const year = document.getElementById('year');
 if (year) year.textContent = String(new Date().getFullYear());
 
-const revealWithoutGsap = () => {
-  const elements = document.querySelectorAll('.reveal');
-  if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    elements.forEach((element) => element.classList.add('is-visible'));
-    return;
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      entry.target.classList.add('is-visible');
-      observer.unobserve(entry.target);
-    });
-  }, { threshold: 0.16, rootMargin: '0px 0px -6% 0px' });
-
-  elements.forEach((element) => observer.observe(element));
-};
-
-if (!window.gsap || !window.ScrollTrigger) {
-  revealWithoutGsap();
-} else {
-  const { gsap, ScrollTrigger } = window;
-  gsap.registerPlugin(ScrollTrigger);
-
-  const media = gsap.matchMedia();
-  media.add({
-    animate: '(prefers-reduced-motion: no-preference)',
-    desktop: '(min-width: 721px)'
-  }, ({ conditions }) => {
-    if (!conditions.animate) {
-      gsap.set('.hero-animate, .hero-device, .reveal', { clearProps: 'all' });
-      document.querySelectorAll('.reveal').forEach((element) => element.classList.add('is-visible'));
-      gsap.set('.together__line', { scaleY: 1 });
-      return;
+// Меню на телефоне: полноэкранный список разделов
+const toggle = document.querySelector('.menu-toggle');
+const nav = document.getElementById('site-nav');
+if (toggle && nav) {
+  const setOpen = (open) => {
+    // Меню начинается под шапкой: над ней может быть полоса объявления
+    if (open) nav.style.setProperty('--menu-top', `${Math.round(nav.parentElement.getBoundingClientRect().bottom)}px`);
+    document.documentElement.classList.toggle('menu-open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+  };
+  toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
+  nav.addEventListener('click', (event) => { if (event.target.closest('a')) setOpen(false); });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+      setOpen(false);
+      toggle.focus();
     }
+  });
+  matchMedia('(min-width: 761px)').addEventListener('change', (event) => { if (event.matches) setOpen(false); });
+}
 
-    const intro = gsap.timeline({ defaults: { duration: .72, ease: 'power3.out' } });
-    intro
-      .fromTo('.topbar', { autoAlpha: 0, y: -14 }, { autoAlpha: 1, y: 0, duration: .45 })
-      .fromTo('.hero__copy .hero-animate', { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, stagger: .08 }, '<.08')
-      .fromTo('.hero__rail', { autoAlpha: 0, x: -14 }, { autoAlpha: 1, x: 0, duration: .48 }, '<.18')
-      .fromTo('.hero-device', { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, stagger: .11 }, '<.08');
+// Демо оценки подхода — те же правила, что в приложении (src/effort.js):
+// легко → следующие подходы +2,5 кг (отдых короче, только если прибавлять некуда);
+// тяжело → отдых на 30 с дольше, вес снижается, если не добил повторы
+// или тяжело второй раз подряд; норм — всё как в плане.
+const demo = document.querySelector('[data-effort-demo]');
+if (demo) {
+  const OUTCOMES = {
+    easy: { next: '75 кг', rest: '1:30', why: '+2,5 кг · было легко. Оставшиеся подходы стали тяжелее.' },
+    norm: { next: '72,5 кг', rest: '1:30', why: 'Как в плане. Два раза «норм» подряд — и в следующий раз вес вырастет.' },
+    hard: { next: '72,5 кг', rest: '2:00', why: 'Вес тот же, отдых дольше. Не добили повторы или тяжело второй раз — вес снизится.' },
+  };
+  const next = demo.querySelector('[data-next]');
+  const rest = demo.querySelector('[data-rest]');
+  const why = demo.querySelector('[data-why]');
+  const buttons = demo.querySelectorAll('[data-effort]');
 
-    ScrollTrigger.batch('.reveal', {
-      start: 'top 86%',
-      once: true,
-      onEnter: (elements) => {
-        elements.forEach((element) => element.classList.add('is-visible'));
-        gsap.fromTo(elements, { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: .68, stagger: .06, ease: 'power3.out', clearProps: 'transform,opacity,visibility' });
-      }
-    });
+  const swap = (element, value) => {
+    if (element.textContent === value) return;
+    element.textContent = value;
+    element.classList.remove('is-changed');
+    void element.offsetWidth; // перезапуск анимации смены значения
+    element.classList.add('is-changed');
+  };
 
-    if (conditions.desktop) {
-      gsap.to('.device--trainer', {
-        y: -34,
-        ease: 'none',
-        scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 1 }
-      });
-      gsap.to('.device--client', {
-        y: 22,
-        ease: 'none',
-        scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 1 }
-      });
-    }
-
-    gsap.to('.together__line', {
-      scaleY: 1,
-      ease: 'none',
-      scrollTrigger: { trigger: '.together', start: 'top 78%', end: 'bottom 72%', scrub: .7 }
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const effort = button.dataset.effort;
+      const outcome = OUTCOMES[effort];
+      demo.dataset.state = effort;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+      swap(next, outcome.next);
+      swap(rest, outcome.rest);
+      swap(why, outcome.why);
     });
   });
 }

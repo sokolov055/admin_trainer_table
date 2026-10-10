@@ -4,9 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111512">
-  <meta name="description" content="Fit Track соединяет программу тренера, фактические тренировки клиента, прогресс и питание в одном приложении.">
-  <title>Fit Track | Тренировки под контролем</title>
+  <meta name="description" content="Fit Track — тренировки по программе тренера на iPhone, Apple Watch, Android и в браузере. Подход отмечается одним касанием, вес на следующий подход приложение подбирает само. Бесплатно, без рекламы.">
+  <meta property="og:title" content="Fit Track — зал по плану, а не наугад">
+  <meta property="og:description" content="Программа тренера в телефоне и на часах. Было легко — вес вырастет сам. Бесплатно, без рекламы и подписок.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://sokolov055.github.io/admin_trainer_table/site/img/c-workout-after.webp">
+  <title>Fit Track — зал по плану, а не наугад</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23111512'/%3E%3Cpath fill='%23f2f4ee' d='M11 35h11v18H11zm16-12h11v30H27z'/%3E%3Cpath fill='%2367d17b' d='M43 10h11v43H43z'/%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -19,165 +24,304 @@
         <path fill="var(--paper)" d="M16 55h18v31H16zM41 35h18v51H41z"/>
         <path fill="var(--accent)" d="M66 13h18v73H66z"/>
       </symbol>
-      <symbol id="arrow" viewBox="0 0 24 24">
-        <path d="M5 12h13M13 7l5 5-5 5"/>
-      </symbol>
-      <symbol id="download" viewBox="0 0 24 24">
-        <path d="M12 3v12M7 10l5 5 5-5M5 20h14"/>
-      </symbol>
+      <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 7l5 5-5 5"/></symbol>
+      <symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></symbol>
+      <symbol id="apple" viewBox="0 0 24 24"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8-.7 0-1.9-.8-3.1-.8-1.6 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3.1.7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.5 1.3-2.6 0 0-2.5-1-2.5-3.7zM14.1 5.9c.6-.8 1.1-1.8 1-2.9-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2.1-.5 2.7-1.3z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="android" viewBox="0 0 24 24"><path d="M7 10v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-6zM7 9a5 5 0 0 1 10 0zM8.5 4.5 9.6 6M15.5 4.5 14.4 6M4.5 10.5v4M19.5 10.5v4M10 17v3M14 17v3"/></symbol>
+      <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.4 5.3 3.4 8.5s-1 6.1-3.4 8.5c-2.4-2.4-3.4-5.3-3.4-8.5s1-6.1 3.4-8.5z"/></symbol>
+      <symbol id="menu" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></symbol>
+      <symbol id="close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
     </defs>
   </svg>
 
-  <header class="topbar hero-animate">
+  <a class="announce" href="https://apps.apple.com/ru/app/id6816619723">
+    <span>Fit Track в App Store — для iPhone и Apple Watch</span>
+    <svg aria-hidden="true"><use href="#arrow"/></svg>
+  </a>
+
+  <header class="topbar">
     <a class="brand" href="#top" aria-label="Fit Track, к началу страницы">
       <svg class="brand__mark" aria-hidden="true"><use href="#logo"/></svg>
       <span>Fit Track</span>
     </a>
-    <nav class="topbar__nav" aria-label="Разделы страницы">
-      <a href="#how">Как работает</a>
-      <a href="#client">Клиенту</a>
-      <a href="#trainer">Тренеру</a>
-      <a class="topbar__cta" href="#download">Скачать</a>
+    <nav class="topbar__nav" id="site-nav" aria-label="Разделы страницы">
+      <a href="#effort">Тренировка</a>
+      <a href="#watch">Часы</a>
+      <a href="#progress">Прогресс</a>
+      <a href="#trainer">Тренерам</a>
+      <a href="#faq">Вопросы</a>
     </nav>
+    <div class="topbar__actions">
+      <a class="topbar__cta" href="#download">Скачать</a>
+      <button class="menu-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Открыть меню">
+        <svg class="menu-toggle__open" aria-hidden="true"><use href="#menu"/></svg>
+        <svg class="menu-toggle__close" aria-hidden="true"><use href="#close"/></svg>
+      </button>
+    </div>
   </header>
 
   <main id="main">
     <section class="hero" id="top">
       <div class="hero__copy">
-        <h1 class="hero-animate">Тренировки остаются в работе.</h1>
-        <p class="hero__lead hero-animate">Тренер задаёт план. Клиент фиксирует подходы. Прогресс остаётся у обоих перед глазами.</p>
-        <div class="hero__actions hero-animate">
-          <a class="button button--primary" href="#how">
-            Смотреть возможности
+        <h1>Зал по плану, а&nbsp;не&nbsp;наугад.</h1>
+        <p class="hero__lead">Программа тренера в&nbsp;телефоне и&nbsp;на&nbsp;часах. Подход&nbsp;— одно касание, а&nbsp;вес на&nbsp;следующий приложение подберёт по&nbsp;вашему самочувствию.</p>
+        <div class="hero__actions">
+          <a class="button button--primary" href="https://apps.apple.com/ru/app/id6816619723">
+            <svg aria-hidden="true"><use href="#apple"/></svg>
+            Скачать в App Store
+          </a>
+          <a class="button button--quiet" href="#download">Android и браузер</a>
+        </div>
+        <ul class="hero__facts" aria-label="Коротко">
+          <li>Бесплатно</li>
+          <li>Без рекламы и подписок</li>
+          <li>Вход по коду из письма</li>
+        </ul>
+      </div>
+
+      <div class="hero__visual">
+        <img class="hero__phone" src="img/c-workout-after.webp" width="760" height="1551" alt="Тренировка в Fit Track: жим лёжа, первый подход отмечен, у второго вес вырос на 2,5 кг с подписью «было легко»">
+        <img class="hero__watch" src="img/watch-01.webp" width="420" height="672" alt="Apple Watch: жим штанги лёжа, подход 1 из 4, 40 кг и кнопка «Отдых»">
+        <p class="hero__note"><strong>+2,5 кг</strong> было легко&nbsp;— следующий подход тяжелее</p>
+      </div>
+    </section>
+
+    <section class="effort" id="effort">
+      <div class="effort__copy">
+        <h2>Было легко&nbsp;— вес вырастет сам.</h2>
+        <p>Вместо галочки у&nbsp;каждого подхода три кнопки. Приложение помнит, сколько вы&nbsp;поднимали в&nbsp;прошлый раз, и&nbsp;двигает вес следующих подходов. Отдых запускается сам.</p>
+        <p class="effort__hint">Попробуйте&nbsp;— отметьте подход.</p>
+      </div>
+
+      <div class="effort-demo" data-effort-demo>
+        <div class="effort-demo__head">
+          <strong>Жим лёжа</strong>
+          <span>подход 1 из 4</span>
+        </div>
+        <div class="effort-demo__row" aria-label="Подход: 72,5 килограмма на 8 повторов">
+          <span><small>Вес, кг</small>72,5</span>
+          <span><small>Повторы</small>8</span>
+        </div>
+        <div class="effort-demo__buttons" role="group" aria-label="Как прошёл подход">
+          <button type="button" class="effort-btn effort-btn--easy" data-effort="easy" aria-pressed="false">Легко</button>
+          <button type="button" class="effort-btn effort-btn--norm" data-effort="norm" aria-pressed="false">Норм</button>
+          <button type="button" class="effort-btn effort-btn--hard" data-effort="hard" aria-pressed="false">Тяжело</button>
+        </div>
+        <div class="effort-demo__result" aria-live="polite">
+          <p class="effort-demo__next"><small>Следующий подход</small><b data-next>72,5 кг</b></p>
+          <p class="effort-demo__why" data-why>Отметьте, как прошёл подход</p>
+          <p class="effort-demo__rest"><small>Отдых</small><b data-rest>1:30</b></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="watch" id="watch">
+      <div class="watch__copy">
+        <h2>Телефон можно не&nbsp;доставать.</h2>
+        <p>Apple Watch показывает упражнение, вес и&nbsp;отдых. Вес подкручивается колёсиком, подход отмечается на&nbsp;запястье, тренер видит его сразу.</p>
+        <p class="watch__privacy">
+          <svg aria-hidden="true"><use href="#lock"/></svg>
+          <span>Пульс и&nbsp;калории остаются на&nbsp;часах и&nbsp;в&nbsp;«Здоровье»&nbsp;— тренеру и&nbsp;на&nbsp;сервер они не&nbsp;уходят.</span>
+        </p>
+      </div>
+      <ol class="watch__screens">
+        <li>
+          <img src="img/watch-01.webp" width="420" height="672" loading="lazy" alt="Часы: упражнение, подход и вес">
+          <span>Вес колёсиком</span>
+        </li>
+        <li>
+          <img src="img/watch-02.webp" width="420" height="672" loading="lazy" alt="Часы: отдых с обратным отсчётом 1:01">
+          <span>Отдых на весь экран</span>
+        </li>
+        <li>
+          <img src="img/watch-04.webp" width="420" height="672" loading="lazy" alt="Часы: время тренировки, сделанные подходы и пульс">
+          <span>Пульс и подходы</span>
+        </li>
+      </ol>
+    </section>
+
+    <section class="progress" id="progress">
+      <div class="progress__intro">
+        <h2>Зеркало врёт. График&nbsp;— нет.</h2>
+        <p>Итоги недели, рекорды, карта мышц и&nbsp;вес на&nbsp;графике. Видно, что работа в&nbsp;зале не&nbsp;проходит даром.</p>
+      </div>
+      <div class="shelf" tabindex="0" aria-label="Экраны прогресса, прокручиваются вбок">
+        <figure>
+          <img src="img/c-summary-muscles.webp" width="760" height="1551" loading="lazy" alt="Итоги недели: 2 тренировки, 6 840 кг поднято, 2 рекорда, карта мышц">
+          <figcaption><strong>Итоги недели</strong>Тоннаж, рекорды и&nbsp;мышцы, которые были в&nbsp;работе</figcaption>
+        </figure>
+        <figure>
+          <img src="img/c-awards.webp" width="760" height="1551" loading="lazy" alt="Награды: неделя шагов, 50 тренировок, месяц без пропусков">
+          <figcaption><strong>Награды и&nbsp;серии</strong>Серию жалко прервать</figcaption>
+        </figure>
+        <figure>
+          <img src="img/c-weight.webp" width="760" height="1551" loading="lazy" alt="Вес 76,9 кг, минус 5,5 кг, график по датам замеров">
+          <figcaption><strong>Вес и&nbsp;замеры</strong>Талия, грудь, бёдра&nbsp;— каждый замер на&nbsp;графике</figcaption>
+        </figure>
+        <figure>
+          <img src="img/c-home.webp" width="760" height="1551" loading="lazy" alt="Обзор клиента: оплачено вперёд 4 тренировки, следующая тренировка послезавтра">
+          <figcaption><strong>Занятия и&nbsp;оплата</strong>Сколько тренировок оплачено и&nbsp;когда следующая</figcaption>
+        </figure>
+        <figure>
+          <img src="img/n-ration-1.webp" width="760" height="1551" loading="lazy" alt="Питание: отметьте, что есть дома, — приложение подберёт блюда">
+          <figcaption><strong>Ужин из&nbsp;того, что есть дома</strong>Норма калорий и&nbsp;блюда из&nbsp;ваших продуктов</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="paths">
+      <h2>С&nbsp;тренером или&nbsp;сам.</h2>
+      <div class="paths__grid">
+        <div class="path">
+          <h3>С тренером</h3>
+          <ul>
+            <li>Программа на&nbsp;месяц от&nbsp;тренера</li>
+            <li>Тренер видит каждый подход и&nbsp;замер</li>
+            <li>Пожелание к&nbsp;программе своими словами</li>
+            <li>Расписание и&nbsp;баланс оплаченных занятий</li>
+          </ul>
+        </div>
+        <div class="path">
+          <h3>Сам</h3>
+          <ul>
+            <li>Свободная тренировка с&nbsp;таймером отдыха</li>
+            <li>Шаги и&nbsp;тренировки из&nbsp;«Здоровья» и&nbsp;Health Connect</li>
+            <li>Рацион из&nbsp;того, что есть дома</li>
+            <li>Серии, награды и&nbsp;рекорды</li>
+          </ul>
+        </div>
+      </div>
+      <p class="paths__note">Кабинет можно завести самому, а&nbsp;к&nbsp;тренеру привязаться позже&nbsp;— только с&nbsp;вашего согласия.</p>
+    </section>
+
+    <section class="trainer" id="trainer">
+      <div class="trainer__visual">
+        <img class="trainer__back" src="img/t-schedule.webp" width="760" height="1551" loading="lazy" alt="Расписание тренера на три дня с занятиями клиентов">
+        <img class="trainer__front" src="img/t-home.webp" width="760" height="1551" loading="lazy" alt="Панель тренера: 4 занятия сегодня, 26 тренировок за месяц, список клиентов">
+      </div>
+      <div class="trainer__content">
+        <h2>Тренеру&nbsp;— без таблиц.</h2>
+        <p class="trainer__lead">Клиенты, программы, расписание и&nbsp;оплаты в&nbsp;одном месте. Баланс занятий считается сам&nbsp;— из&nbsp;расписания и&nbsp;оплат, без споров о&nbsp;долге.</p>
+        <dl class="feature-list">
+          <div><dt>Программа из&nbsp;шаблона</dt><dd>Библиотека тренировок и&nbsp;упражнений, сплиты, программа на&nbsp;месяц в&nbsp;пару касаний.</dd></div>
+          <div><dt>Журнал клиента</dt><dd>Каждый подход с&nbsp;весом, повторами и&nbsp;оценкой&nbsp;— сразу после тренировки.</dd></div>
+          <div><dt>Расписание со&nbsp;списанием</dt><dd>Проведённое занятие само списывается с&nbsp;оплаченного пакета.</dd></div>
+          <div><dt>Глазами клиента</dt><dd>Открыть приложение так, как его видит клиент, и&nbsp;вернуться в&nbsp;свою панель.</dd></div>
+        </dl>
+        <div class="trainer__cta">
+          <p>Самостоятельная регистрация тренеров скоро откроется. Хотите вести клиентов в&nbsp;Fit Track одним из&nbsp;первых&nbsp;— напишите.</p>
+          <a class="button button--quiet" href="mailto:sokolov055@icloud.com?subject=Fit%20Track%20%D0%B4%D0%BB%D1%8F%20%D1%82%D1%80%D0%B5%D0%BD%D0%B5%D1%80%D0%B0">
+            Написать о&nbsp;подключении
             <svg aria-hidden="true"><use href="#arrow"/></svg>
           </a>
-          <a class="button button--quiet" href="https://sokolov055.github.io/admin_trainer_table/">Открыть кабинет</a>
-        </div>
-      </div>
-
-      <div class="hero__visual" aria-label="Настоящие экраны Fit Track для тренера и клиента">
-        <div class="hero__rail hero-animate" aria-hidden="true">
-          <span>План</span><i></i><span>Занятие</span><i></i><span>Результат</span>
-        </div>
-        <figure class="device device--trainer hero-device">
-          <figcaption>Тренер</figcaption>
-          <img src="trainer.png" width="780" height="1688" alt="Панель тренера со списком клиентов и рабочей сводкой">
-        </figure>
-        <figure class="device device--client hero-device">
-          <figcaption>Клиент</figcaption>
-          <img src="client.png" width="780" height="1688" alt="Кабинет клиента с балансом и ближайшей тренировкой">
-        </figure>
-      </div>
-    </section>
-
-    <section class="mechanism" id="how">
-      <div class="mechanism__intro reveal">
-        <h2>Один цикл вместо разрозненных сообщений.</h2>
-        <p>Fit Track сохраняет связь между тем, что запланировал тренер, что сделал клиент и как меняется результат.</p>
-      </div>
-      <div class="flow reveal" aria-label="Цикл работы в Fit Track">
-        <article>
-          <strong>План</strong>
-          <p>Программа, упражнения, подходы, суперсеты и кардио.</p>
-        </article>
-        <article>
-          <strong>Занятие</strong>
-          <p>Фактический вес, повторы, RPE, заметки и таймер отдыха.</p>
-        </article>
-        <article>
-          <strong>Разбор</strong>
-          <p>История тренировок, замеры, шаги и динамика нагрузок.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="role" id="client">
-      <div class="role__visual reveal">
-        <figure class="screen screen--client">
-          <img src="client.png" width="780" height="1688" loading="lazy" alt="Главный экран клиента Fit Track">
-        </figure>
-        <p class="screen-note">Всё нужное перед тренировкой видно сразу.</p>
-      </div>
-      <div class="role__content reveal">
-        <h2>Клиент знает, что делать сегодня.</h2>
-        <p class="role__lead">Никаких поисков программы в переписке. План, занятие и история открываются в одном кабинете.</p>
-        <div class="feature-list">
-          <article><h3>Программа в телефоне</h3><p>Упражнения и нагрузка доступны прямо в зале.</p></article>
-          <article><h3>Журнал по ходу занятия</h3><p>Подходы сохраняются вместе с весом, повторами и самочувствием.</p></article>
-          <article><h3>Прогресс в контексте</h3><p>Замеры, шаги и рабочие веса показывают реальную динамику.</p></article>
-          <article><h3>Расписание и питание</h3><p>Ближайшее занятие, баланс пакета и рацион всегда рядом.</p></article>
         </div>
       </div>
     </section>
 
-    <section class="role role--trainer" id="trainer">
-      <div class="role__content reveal">
-        <h2>Тренер видит, кому нужна помощь.</h2>
-        <p class="role__lead">Рабочий день складывается в одну систему: клиенты, программы, расписание, прогресс и оплаты.</p>
-        <div class="feature-list">
-          <article><h3>Клиенты и расписание</h3><p>Ближайшие занятия и важные статусы собраны в общей картине.</p></article>
-          <article><h3>Программы и шаблоны</h3><p>Месяцы тренировок и библиотека упражнений редактируются в приложении.</p></article>
-          <article><h3>Фактическая работа</h3><p>Тренер открывает выполненное занятие и видит каждый подход.</p></article>
-          <article><h3>Оплаты и сводка</h3><p>Баланс пакетов, платежи и рабочие показатели не теряются.</p></article>
-        </div>
+    <section class="price" id="price">
+      <div class="price__copy">
+        <h2>Сколько стоит?</h2>
+        <p>Занятия вы&nbsp;оплачиваете тренеру, как и&nbsp;раньше. Приложение только считает, сколько тренировок осталось.</p>
       </div>
-      <div class="role__visual reveal">
-        <figure class="screen screen--trainer">
-          <img src="trainer.png" width="780" height="1688" loading="lazy" alt="Панель тренера Fit Track">
-        </figure>
-        <p class="screen-note">Сначала те клиенты, которым нужно внимание.</p>
+      <div class="price__plan">
+        <p class="price__amount">0&nbsp;₽</p>
+        <p class="price__terms">Без рекламы, подписок и&nbsp;встроенных покупок</p>
+        <ul>
+          <li>Тренировки, часы и&nbsp;таймер отдыха</li>
+          <li>Прогресс, награды и&nbsp;замеры</li>
+          <li>Рацион из&nbsp;того, что есть дома</li>
+          <li>iPhone, Apple Watch, Android и&nbsp;браузер</li>
+        </ul>
+        <a class="button button--primary" href="#download">Скачать</a>
       </div>
     </section>
 
-    <section class="together">
-      <div class="together__line" aria-hidden="true"></div>
-      <div class="together__copy reveal">
-        <h2>Один журнал.<br>Две точки зрения.</h2>
-        <p>Клиент отмечает работу в зале. Тренер видит факт, корректирует следующий план и сохраняет общий контекст.</p>
-      </div>
-      <div class="together__facts reveal">
-        <p><strong>Без ручного переноса</strong><span>Факт занятия уже связан с программой.</span></p>
-        <p><strong>Без потери контекста</strong><span>История остаётся рядом с текущим планом.</span></p>
+    <section class="faq" id="faq">
+      <h2>Вопросы</h2>
+      <div class="faq__list">
+        <details>
+          <summary>Нужен ли тренер?<svg aria-hidden="true"><use href="#plus"/></svg></summary>
+          <p>Нет. Кабинет можно завести самому по&nbsp;почте и&nbsp;заниматься со&nbsp;свободной тренировкой. Если появится тренер, он&nbsp;пришлёт ссылку, и&nbsp;вы&nbsp;привяжетесь к&nbsp;нему с&nbsp;согласия&nbsp;— история тренировок останется.</p>
+        </details>
+        <details>
+          <summary>Как войти?<svg aria-hidden="true"><use href="#plus"/></svg></summary>
+          <p>По&nbsp;почте, без пароля: приложение пришлёт код в&nbsp;письме. Клиент тренера может войти и&nbsp;по&nbsp;его ссылке.</p>
+        </details>
+        <details>
+          <summary>Где хранятся мои данные?<svg aria-hidden="true"><use href="#plus"/></svg></summary>
+          <p>На&nbsp;сервере в&nbsp;Москве. Тренировки и&nbsp;замеры видите вы&nbsp;и&nbsp;ваш тренер, для рекламы они не&nbsp;используются и&nbsp;никому не&nbsp;продаются. Подробно&nbsp;— в&nbsp;<a href="../privacy.html">политике конфиденциальности</a>.</p>
+        </details>
+        <details>
+          <summary>Есть ли версия для Android?<svg aria-hidden="true"><use href="#plus"/></svg></summary>
+          <p>Да: приложение для Android можно скачать с&nbsp;этой страницы, шаги и&nbsp;тренировки оно берёт из&nbsp;Health Connect. Карточка в&nbsp;Google Play готовится. Без установки Fit Track работает в&nbsp;браузере.</p>
+        </details>
+        <details>
+          <summary>Какие нужны часы?<svg aria-hidden="true"><use href="#plus"/></svg></summary>
+          <p>Приложение для часов&nbsp;— на&nbsp;Apple Watch. С&nbsp;Android шаги и&nbsp;тренировки с&nbsp;часов приходят через Health Connect.</p>
+        </details>
+        <details>
+          <summary>Как удалить аккаунт?<svg aria-hidden="true"><use href="#plus"/></svg></summary>
+          <p>В&nbsp;приложении: «Настройки», последний пункт&nbsp;— «Удалить аккаунт». Данные удаляются вместе с&nbsp;ним. Перед этим можно скачать их&nbsp;копию.</p>
+        </details>
       </div>
     </section>
 
     <section class="download" id="download">
-      <div class="download__copy reveal">
-        <h2>Fit Track уже можно использовать.</h2>
-        <p>Откройте кабинет в браузере или установите Android-приложение. Версии для магазинов готовятся к публикации.</p>
-      </div>
-      <div class="download__actions reveal">
-        <a class="store store--primary" href="https://raw.githubusercontent.com/sokolov055/admin_trainer_table/main/public/android/fit-track.apk">
-          <svg aria-hidden="true"><use href="#download"/></svg>
-          <span><small>Скачать сейчас</small>Android APK</span>
+      <h2>Начните со&nbsp;следующей тренировки.</h2>
+      <div class="download__actions">
+        <a class="store store--primary" href="https://apps.apple.com/ru/app/id6816619723">
+          <svg aria-hidden="true"><use href="#apple"/></svg>
+          <span><small>iPhone и Apple Watch</small>App Store</span>
+        </a>
+        <a class="store" href="https://raw.githubusercontent.com/sokolov055/admin_trainer_table/main/public/android/fit-track.apk">
+          <svg aria-hidden="true"><use href="#android"/></svg>
+          <span><small>Скачать файл APK</small>Android</span>
         </a>
         <a class="store" href="https://sokolov055.github.io/admin_trainer_table/">
-          <span><small>Без установки</small>Открыть в браузере</span>
-          <svg aria-hidden="true"><use href="#arrow"/></svg>
+          <svg aria-hidden="true"><use href="#globe"/></svg>
+          <span><small>Без установки</small>В браузере</span>
         </a>
-        <div class="stores-soon" aria-label="Версии в магазинах готовятся">
-          <span><small>Скоро</small>App Store</span>
-          <span><small>Скоро</small>Google Play</span>
-        </div>
       </div>
+      <p class="download__help">Как поставить на&nbsp;Android или добавить на&nbsp;экран «Домой»&nbsp;— <a href="../install-guide.html">инструкция по&nbsp;установке</a>.</p>
     </section>
   </main>
 
-  <footer>
-    <a class="brand" href="#top">
-      <svg class="brand__mark" aria-hidden="true"><use href="#logo"/></svg>
-      <span>Fit Track</span>
-    </a>
-    <nav aria-label="Документы">
-      <a href="https://sokolov055.github.io/admin_trainer_table/privacy.html">Политика</a>
-      <a href="https://sokolov055.github.io/admin_trainer_table/terms.html">Соглашение</a>
-      <a href="https://sokolov055.github.io/admin_trainer_table/support.html">Поддержка</a>
-    </nav>
-    <p>© <span id="year">2026</span> Fit Track</p>
+  <footer class="footer">
+    <div class="footer__top">
+      <a class="brand" href="#top">
+        <svg class="brand__mark" aria-hidden="true"><use href="#logo"/></svg>
+        <span>Fit Track</span>
+      </a>
+      <nav class="footer__groups" aria-label="Ссылки">
+        <div>
+          <h3>Приложение</h3>
+          <a href="https://apps.apple.com/ru/app/id6816619723">App Store</a>
+          <a href="https://raw.githubusercontent.com/sokolov055/admin_trainer_table/main/public/android/fit-track.apk">Android</a>
+          <a href="https://sokolov055.github.io/admin_trainer_table/">Веб-версия</a>
+        </div>
+        <div>
+          <h3>Помощь</h3>
+          <a href="../client-guide.html">Инструкция клиента</a>
+          <a href="../install-guide.html">Установка</a>
+          <a href="../support.html">Поддержка</a>
+        </div>
+        <div>
+          <h3>Документы</h3>
+          <a href="../privacy.html">Политика конфиденциальности</a>
+          <a href="../terms.html">Пользовательское соглашение</a>
+          <a href="../consent.html">Согласие на обработку данных</a>
+        </div>
+      </nav>
+    </div>
+    <p class="footer__word" aria-hidden="true">Fit Track</p>
+    <div class="footer__bottom">
+      <p>© <span id="year">2026</span> Fit Track</p>
+      <p>Не заменяет консультацию врача.</p>
+    </div>
   </footer>
 
-  <script src="vendor/gsap.min.js"></script>
-  <script src="vendor/ScrollTrigger.min.js"></script>
   <script src="site.js"></script>
 </body>
 </html>
