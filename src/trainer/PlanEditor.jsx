@@ -16,6 +16,7 @@ import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 import ClientSetup from './ClientSetup.jsx';
+import { ExerciseMachines } from './MachinesEditor.jsx';
 
 /**
  * Редактор программы месяца.
@@ -104,6 +105,7 @@ export default function PlanEditor({
   // Вид, исправленный здесь, — сразу на экране, не дожидаясь списка базы
   const [kinds, setKinds] = useState({}); // название → вид
   const [kindAt, setKindAt] = useState(''); // 'bi:ei' — у какого упражнения открыт «Вид»
+  const [machinesAt, setMachinesAt] = useState(''); // 'bi:ei' — у какого открыты тренажёры
   const [kindNote, setKindNote] = useState(null); // { at, text, error }
   const trackIn = (exercise) => {
     if (exercise.cardio) return trackOf(exercise);
@@ -602,7 +604,23 @@ export default function PlanEditor({
                       onClick={() => setKindAt(kindAt === bi + ':' + ei ? '' : bi + ':' + ei)}
                     >Вид</button>
                   )}
+                  {/* Тренажёры и оборудование (10.10.2026): прикрепить прямо
+                      здесь, а не уходить в базу упражнений */}
+                  {exercise.name && (
+                    <button
+                      type="button"
+                      className={'button button--ghost plan-edit__pair' + (machinesAt === bi + ':' + ei ? ' plan-edit__pair--on' : '')}
+                      aria-expanded={machinesAt === bi + ':' + ei}
+                      disabled={busy}
+                      onClick={() => setMachinesAt(machinesAt === bi + ':' + ei ? '' : bi + ':' + ei)}
+                    >Тренажёры</button>
+                  )}
                 </div>
+                {machinesAt === bi + ':' + ei && exercise.name && (
+                  <div className="plan-edit__kind">
+                    <ExerciseMachines exerciseId={exercise.exerciseId} name={exercise.name} />
+                  </div>
+                )}
                 {kindAt === bi + ':' + ei && exercise.name && (
                   <div className="plan-edit__kind">
                     <ExerciseKind track={track} disabled={busy} onChange={(t) => changeKind(bi, ei, t)} note={kindNote && kindNote.at === bi + ':' + ei ? kindNote : null} />

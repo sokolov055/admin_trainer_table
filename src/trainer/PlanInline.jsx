@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import ExercisePicker from './ExercisePicker.jsx';
 import ClientSetup from './ClientSetup.jsx';
+import { ExerciseMachines } from './MachinesEditor.jsx';
 import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { haptic } from '../telegram.js';
@@ -279,6 +280,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
                   onSaved={(saved) => changeMuscles(i, saved)}
                 />
               )}
+              {/* Тренажёры и оборудование (10.10.2026) — прямо в программе */}
+              {ex.name && <ExerciseMachines key={'m:' + keyOf(ex.name)} exerciseId={ex.exerciseId} name={ex.name} />}
               <div className="plan-inline__panel-actions">
                 <button type="button" className="button button--primary" onClick={() => setOpen(ex.name ? null : { kind: 'name', i })}>Готово</button>
               </div>

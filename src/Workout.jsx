@@ -22,6 +22,7 @@ import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, 
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
+import { ExerciseMachines } from './trainer/MachinesEditor.jsx';
 import { useData } from './useData.js';
 import { SetupText, MachineInfo, MachineNote, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
@@ -1158,6 +1159,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           onKeyDown={e => { if (e.key === 'Enter') closePanel(id); }} />}
       {trackEditor(ex, ei)}
       {trackOf(ex).kind === 'cardio' && <CardioKind value={cardioOf(ex)} onChange={c => editCardio(ei, c)} />}
+      {/* Тренажёры и оборудование (10.10.2026): тренер прикрепляет прямо в
+          занятии — выбор под упражнением появится сразу */}
+      {clientRow && ex.name && <ExerciseMachines exerciseId={ex.exerciseId} name={ex.name} onChanged={(saved) => { if (saved && !ex.exerciseId) updateExercise(ei, x => ({ ...x, exerciseId: saved.id })); setSetupsTick(t => t + 1); }} />}
       <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
       <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>
     </div>
@@ -1493,6 +1497,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // часто, а список id при этом почти не меняется.
   const setupIds = s ? [...new Set(s.exercises.map(e => e.exerciseId).filter(Boolean))].sort((a, b) => a - b).join(',') : '';
   const [setups, setSetups] = useState({});
+  const [setupsTick, setSetupsTick] = useState(0); // тренажёр прикреплён в занятии — перечитать
   // Личные настройки тренажёров этого клиента («спинка 3») — у каждого свои
   const [notes, setNotes] = useState({});
   // У сплит-пары (FT-488) — у каждого своя: { кто: { цель: настройка } }.
@@ -1505,7 +1510,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       .then(r => { if (alive && r && r.setups) { setSetups(r.setups); setNotes(r.notes || {}); setNotesBy(r.notesBy || {}); } })
       .catch(() => {});
     return () => { alive = false; };
-  }, [setupIds]);
+  }, [setupIds, setupsTick]);
 
   // Куда смотреть: первое упражнение с неотмеченным подходом и этот
   // подход. Оно обведено, подход подсвечен, его «готово» — залито; всё
