@@ -842,11 +842,17 @@ function Machines() {
   const [open, setOpen] = useState('');        // ключ тренажёра
   const [exercise, setExercise] = useState(null); // id упражнения из тренажёра
   const [editing, setEditing] = useState(null);
+  // Правка/создание тренажёра прямо отсюда: { exercise, machine|null }; pick — выбор упражнения
+  const [form, setForm] = useState(null);
+  const [pick, setPick] = useState(false);
+  const [pq, setPq] = useState('');
 
-  useBackGesture(() => setEditing(null), !!editing);
-  useBackGesture(() => setExercise(null), !editing && !!exercise);
-  useBackGesture(() => setOpen(''), !editing && !exercise && !!open);
-  useReturnScroll(!!(open || exercise || editing));
+  useBackGesture(() => setForm(null), !!form);
+  useBackGesture(() => { setPick(false); setPq(''); }, !form && pick);
+  useBackGesture(() => setEditing(null), !form && !pick && !!editing);
+  useBackGesture(() => setExercise(null), !form && !pick && !editing && !!exercise);
+  useBackGesture(() => setOpen(''), !form && !pick && !editing && !exercise && !!open);
+  useReturnScroll(!!(open || exercise || editing || form || pick));
 
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -866,6 +872,38 @@ function Machines() {
   }));
   const list = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
+  const matchOf = (e, g) => (e.machines || []).find((m) => (m.kind === 'equipment' ? 'equipment' : 'machine') === g.kind && keyOf(m.name) === keyOf(g.name)) || null;
+  if (form) {
+    return (
+      <>
+        <Back onClick={() => setForm(null)}>{form.machine ? form.machine.name : 'Тренажёры и оборудование'}</Back>
+        <p className="library__sub">{'Упражнение: ' + form.exercise.name}</p>
+        <MachineForm
+          exercise={form.exercise}
+          machine={form.machine}
+          onDone={(saved) => { setForm(null); setPick(false); setPq(''); setOpen(''); if (saved) reload(); }}
+        />
+      </>
+    );
+  }
+  if (pick) {
+    const npq = keyOf(pq);
+    const choices = all.filter((e) => !npq || keyOf(e.name).includes(npq)).slice(0, 50);
+    return (
+      <>
+        <Back onClick={() => { setPick(false); setPq(''); }}>Тренажёры и оборудование</Back>
+        <h2 className="library__title">К какому упражнению?</h2>
+        <p className="library__sub">Тренажёр хранится у упражнения. Выберите, где он используется — потом можно добавить его и к другим.</p>
+        <Search value={pq} onChange={setPq} placeholder="Поиск упражнения" />
+        {choices.map((e) => (
+          <button key={e.id} className="item" onClick={() => { setForm({ exercise: e, machine: null }); haptic(); }}>
+            <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Tag tone="good">своё</Tag>}</div>
+            {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
+          </button>
+        ))}
+      </>
+    );
+  }
   if (editing) {
     return (
       <ExerciseEditor
@@ -902,13 +940,18 @@ function Machines() {
         <MachinePhoto machine={machine} />
         {machine.setup
           ? <><h4 className="setup__title">{machine.kind === 'equipment' ? 'Настройка' : 'Где регулировки'}</h4><SetupText text={machine.setup} /></>
-          : <p className="small muted">Настройка не записана. Добавьте в карточке упражнения ниже.</p>}
+          : <p className="small muted">Настройка не записана — нажмите «Изменить».</p>}
         <h4 className="setup__title">Упражнения</h4>
         {machine.uses.map((e) => (
-          <button key={e.id} className="item" onClick={() => { setExercise(e.id); haptic(); }}>
-            <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Tag tone="good">своё</Tag>}</div>
-            {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
-          </button>
+          <div key={e.id}>
+            <button className="item" onClick={() => { setExercise(e.id); haptic(); }}>
+              <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Tag tone="good">своё</Tag>}</div>
+              {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
+            </button>
+            <button type="button" className="button button--ghost" onClick={() => { setForm({ exercise: e, machine: matchOf(e, machine) }); haptic(); }}>
+              {'Изменить у «' + e.name + '»'}
+            </button>
+          </div>
         ))}
       </>
     );
@@ -921,6 +964,7 @@ function Machines() {
   const kinds = [{ value: '', label: 'Все' }, { value: 'machine', label: 'Тренажёры' }, { value: 'equipment', label: 'Оборудование' }];
   return (
     <>
+      <button type="button" className="button button--ghost" onClick={() => { setPick(true); haptic(); }}>+ Тренажёр или оборудование</button>
       <Search value={q} onChange={setQ} placeholder="Поиск тренажёра или оборудования" />
       <Chips className="library__filters" items={kinds} value={kindOf} onChange={setKindOf} />
       {list.length > 0 && (
@@ -929,7 +973,7 @@ function Machines() {
         </div>
       )}
       {!list.length && (
-        <Empty title="Пока пусто" text="Тренажёр или оборудование добавляется в карточке упражнения: «Упражнения» → упражнение → «Тренажёры и оборудование»." />
+        <Empty title="Пока пусто" text="Нажмите «+ Тренажёр или оборудование» — выберите упражнение и заполните карточку." />
       )}
       {shown.map((g) => (
         <button key={g.key} className="item" onClick={() => { setOpen(g.key); haptic(); }}>
