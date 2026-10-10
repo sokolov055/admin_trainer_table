@@ -3,7 +3,7 @@ import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { blankSet, clock, closeSets, fromPlan, reopenSession, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
+import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -1360,7 +1360,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const add = () => { flip('', { duration: 380, only: 'sec:' }); change(v => {
       const exercises = [...v.exercises];
       const at = exercises.findIndex(e => e.id === b.id);
-      exercises.splice(at, 0, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] });
+      exercises.splice(at, 0, newExercise(v));
       return { ...v, exercises };
     }); };
     const join = () => {
@@ -1843,7 +1843,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <button type="button" className="button button--critical" disabled={!picked.size || picked.size >= s.exercises.length} onClick={pickDelete}>Удалить</button>
           </div>
         )}
-        <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '', sets: [blankSet()] }] }))}>Добавить упражнение</button>
+        <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, newExercise(s)] }))}>Добавить упражнение</button>
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>
       {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={record.dirty || busy} onClick={() => { store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}

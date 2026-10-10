@@ -307,6 +307,18 @@ export function withWarmup(ex) {
   return { ...ex, sets: [...ex.sets.slice(0, at), set, ...ex.sets.slice(at)] };
 }
 
+/**
+ * Упражнение, добавленное в идущее занятие. У сплита — по подходу каждому
+ * участнику, дальше «Добавить круг»; без этого второе упражнение свободной
+ * тренировки пары оказывалось на одного (10.10.2026). Участников занятие не
+ * хранит — они видны по подходам уже записанных упражнений.
+ */
+export function newExercise(session) {
+  const whos = [...new Set((session?.exercises || []).flatMap(e => e.sets.map(x => x.who)).filter(Boolean))];
+  return { id: uid(), name: 'Новое упражнение', note: '', prescription: '', prevWeight: '',
+    sets: whos.length ? whos.map(who => ({ ...blankSet(), who })) : [blankSet()] };
+}
+
 /** Подход в конец с часов тренера (FT-533) — как последний, неотмеченный */
 export function withSet(ex) {
   if (ex.sets.length >= 20 || ex.sets.some(x => x.who)) return ex;

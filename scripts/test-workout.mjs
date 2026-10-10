@@ -403,6 +403,19 @@ test('сплит: подходы кругами по людям, у каждог
   assert.equal(setLabel(solo.exercises[0].sets, 1), '2');
 });
 
+test('сплит: добавленное в занятие упражнение — по подходу каждому участнику', async () => {
+  const { fromPlan, newExercise } = await import('../src/workout-model.js');
+  // Свободная тренировка пары: первое упражнение уже на двоих
+  const free = fromPlan({ title: 'Свободная тренировка', exercises: [{ name: 'Первое упражнение', sets: 3 }] }, '', ['Евгений', 'Екатерина']);
+  const added = newExercise(free);
+  assert.deepEqual(added.sets.map((x) => x.who), ['Евгений', 'Екатерина'], 'второе упражнение не на одного');
+  assert.ok(added.sets.every((x) => x.state === 'pending' && x.weight === ''));
+
+  const solo = newExercise(fromPlan({ title: 'X', exercises: [{ name: 'Жим', sets: 2 }] }, '', []));
+  assert.equal(solo.sets.length, 1);
+  assert.equal(solo.sets[0].who, undefined);
+});
+
 test('сплит (FT-488): у каждого свой тренажёр и свой вес на нём', async () => {
   const { fromPlan, withMemberMachine } = await import('../src/workout-model.js');
   const members = ['Евгений', 'Екатерина'];
