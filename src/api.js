@@ -264,6 +264,7 @@ export async function apiBatch(requests) {
  * два подряд идущих опроса.
  */
 export function apiPublic(action, params = {}) {
+  if (action.includes('.onboarding.')) return apiPrimary(action, params);
   return request(action, params);
 }
 
@@ -498,7 +499,7 @@ async function getJson(url, payload, timeoutMs = 0) {
  *    Решение о повторе принимает человек, видя сообщение об ошибке.
  */
 export async function apiMutate(action, params = {}, { quiet = false } = {}) {
-  const data = await request(action, params);
+  const data = await (action.includes('.onboarding.') ? apiPrimary(action, params) : request(action, params));
 
   memory.clear();
   // Не стираем, а помечаем: при связи экраны всё равно перечитают свежее,

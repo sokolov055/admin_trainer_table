@@ -17,6 +17,7 @@
 
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
+import { onboardingMock } from './onboarding-mock.js';
 
 const daysAgo = (n) => {
   const d = new Date();
@@ -1763,7 +1764,8 @@ const MOCK = {
 
 export function mockApi(action, params) {
   const role = new URLSearchParams(window.location.search).get('mockRole') || 'client';
-  const handler = action.startsWith('workout.') ? p => workoutMock(action, p) : MOCK[action];
+  const handler = action.includes('.onboarding.') ? p => onboardingMock(action, p)
+    : action.startsWith('workout.') ? p => workoutMock(action, p) : MOCK[action];
 
   return new Promise((resolve, reject) => {
     // Небольшая задержка — чтобы скелетоны и состояния загрузки были видны

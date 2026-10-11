@@ -24,11 +24,13 @@ globalThis.window = globalThis.window || { location: { search: '', href: 'https:
 
 let mode = 'refused';
 const hosts = [];
+const methods = [];
 globalThis.fetch = (url, init = {}) => {
   if (String(url).includes('config.json')) {
     return Promise.resolve({ ok: true, json: async () => ({ apiUrl: 'https://api.primary.test', fallbackUrl: 'https://spare.test' }) });
   }
   hosts.push(new URL(url).host);
+  methods.push(init.method);
   if (String(url).includes('primary')) {
     if (mode === 'refused') return Promise.reject(new TypeError('getaddrinfo ENOTFOUND'));
     return new Promise((_, reject) => init.signal && init.signal.addEventListener('abort', () => { const e = new Error('aborted'); e.name = 'AbortError'; reject(e); }));
@@ -40,7 +42,15 @@ const output = await build({ entryPoints: ['src/api.js'], bundle: true, write: f
   define: { 'import.meta.env.VITE_MOCK': '"0"', 'import.meta.env.VITE_API_URL': '""', 'import.meta.env.PROD': 'false', 'import.meta.env.DEV': 'false' } });
 const mod = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0].text + '\n})')(createRequire(import.meta.url), mod, mod.exports);
-const { api, apiMutate } = mod.exports;
+const { api, apiMutate, apiPublic } = mod.exports;
+
+test('FT-552: ответы и выключатель только POST на основной сервер, без GET и внешнего резерва', async () => {
+  mode = 'refused'; hosts.length = 0; methods.length = 0;
+  await assert.rejects(apiMutate('client.onboarding.save', { answers: { goal: 'fitness' }, revision: 0, step: 0 }), /не отвечает/);
+  await assert.rejects(apiPublic('client.onboarding.get'), /не отвечает/);
+  assert.deepEqual(hosts, ['api.primary.test', 'api.primary.test']);
+  assert.deepEqual(methods, ['POST', 'POST']);
+});
 
 test('основной не соединился — тренировки и остальное через запасной', async () => {
   mode = 'refused'; hosts.length = 0;

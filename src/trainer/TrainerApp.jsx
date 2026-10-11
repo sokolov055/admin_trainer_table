@@ -379,7 +379,7 @@ export default function TrainerApp({ me }) {
         {view === 'expenses' && <Expenses />}
         {view === 'logs' && owner && <Logs />}
         {view === 'trainers' && owner && <Trainers />}
-        {view === 'settings' && <Settings />}
+        {view === 'settings' && <Settings owner={owner} />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
       </main>
       )}
