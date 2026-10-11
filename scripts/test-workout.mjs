@@ -15,7 +15,34 @@ const data = new Map();
 // стоит Node 18, а в CI стоит Node 20 — ровно так тест и сломался.
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 globalThis.localStorage = { getItem: k => data.get(k) || null, setItem: (k, v) => data.set(k, v), removeItem: k => data.delete(k) };
-globalThis.window = { addEventListener() {}, removeEventListener() {} };
+let nativeEnabled = false;
+let nativeActions = [];
+const nativeTakeCalls = [];
+const workoutActivity = {
+  async takeActions({ sessionId } = {}) {
+    nativeTakeCalls.push(sessionId || '');
+    const mine = nativeActions.filter(a => !sessionId || a.sessionId === sessionId);
+    nativeActions = nativeActions.filter(a => !mine.includes(a));
+    return { actions: mine };
+  },
+  async update() { return { shown: true }; },
+  async end() {},
+  async restAlarm() { return { ok: true }; },
+  async cancelRestAlarm() {},
+  async restAlarmState() { return { state: 'scheduled' }; },
+  async setRestSignal() {},
+  async buzz() {},
+  async addListener() { return { remove() {} }; },
+};
+globalThis.window = {
+  addEventListener() {}, removeEventListener() {},
+  Capacitor: {
+    isNativePlatform: () => nativeEnabled,
+    getPlatform: () => 'ios',
+    isPluginAvailable: name => nativeEnabled && name === 'WorkoutActivity',
+    Plugins: { WorkoutActivity: workoutActivity },
+  },
+};
 // document умеет подписку: экран занятия перечитывает чужие правки при
 // возврате к приложению, и проверить это можно только настоящим событием.
 const docListeners = new Map();
@@ -31,8 +58,10 @@ const hideOnce = () => { document.hidden = true; const r = (docListeners.get('vi
 async function saveNow() { await act(async () => { await hideOnce(); await delay(); }); }
 let offline = false;
 let holdSave = null;
+let holdList = null;
 globalThis.__workoutApi = async (action, params) => {
   if (offline) throw new Error('Связи нет');
+  if (action === 'workout.list' && holdList) { const gate = holdList; holdList = null; await gate; }
   if (action === 'workout.save' && holdSave) { const gate = holdSave; holdSave = null; await gate; }
   try { return workoutMock(action, { ...params, __role: 'client' }); }
   catch (error) { error.code = 400; throw error; }
@@ -75,6 +104,50 @@ test('интерфейс: запись подхода, пауза, продол�
   await click('К журналу');
   assert.ok(tree.root.findAllByType('button').some(b => text(b).includes('Тренировка тест')));
   await act(async () => tree.unmount()); tree = null;
+});
+
+test('отдых с Live Activity ждёт загрузки занятия, сохраняется и переживает перезапуск (FT-349)', async () => {
+  data.clear(); await mount(); await saveNow();
+  const initial = JSON.parse(data.get('workout_demo_server:3'))[0];
+  assert.ok(initial && initial.status === 'active');
+  if (tree) { tree.unmount(); tree = null; }
+  for (const key of [...data.keys()]) if (key.startsWith('workout_draft_v1:')) data.delete(key);
+
+  const until = Date.now() + 120000;
+  nativeEnabled = true;
+  nativeActions = [
+    { kind: 'done', sessionId: initial.id, exerciseId: initial.exercises[0].id, who: '', weight: '40', setIndex: 0 },
+    { kind: 'rest', sessionId: initial.id, restUntil: until },
+  ];
+  nativeTakeCalls.length = 0;
+  let releaseList;
+  holdList = new Promise(resolve => { releaseList = resolve; });
+
+  try {
+    await mount(false);
+    await act(async () => { await wake(); await delay(); });
+    assert.equal(nativeActions.length, 2, 'до загрузки занятия одноразовая очередь не забрана');
+    assert.deepEqual(nativeTakeCalls, []);
+
+    await act(async () => { releaseList(); await delay(); await delay(); await delay(); });
+    assert.deepEqual(nativeTakeCalls, [initial.id], 'забрана только очередь открытого занятия');
+    assert.equal(nativeActions.length, 0);
+    let saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+    assert.equal(saved.exercises[0].sets[0].state, 'done');
+    assert.equal(saved.restUntil, until);
+
+    await mount(false);
+    saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+    assert.equal(saved.exercises[0].sets[0].state, 'done', 'подход не откатился после перезапуска');
+    assert.equal(saved.restUntil, until, 'таймер не откатился после перезапуска');
+  } finally {
+    if (releaseList) releaseList();
+    holdList = null;
+    nativeEnabled = false;
+    nativeActions = [];
+    nativeTakeCalls.length = 0;
+    if (tree) { tree.unmount(); tree = null; }
+  }
 });
 test('«Завершить» по ошибке: «Продолжить» возвращает занятие с неотмеченного подхода (09.10.2026)', async () => {
   data.clear(); await mount();

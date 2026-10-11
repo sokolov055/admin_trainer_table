@@ -103,6 +103,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const flip = useFlip(fieldsRef);
   const [now, setNow] = useState(Date.now());
   const state = useRef(null), key = useRef(''), saving = useRef(false), mounted = useRef(true);
+  // visibilitychange может прийти раньше, чем журнал загрузил занятие.
+  // Очередь плашки одноразовая: до готовности экрана её нельзя забирать.
+  const readyRef = useRef(false);
+  readyRef.current = ready;
+  const takingLiveActions = useRef(false);
   const conflictRef = useRef(null);
   // Просили сохранить, пока шло прежнее сохранение (см. save)
   const saveAgain = useRef(false);
@@ -319,18 +324,27 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Отдых, начатый кнопкой на плашке, пока приложение спало: в занятие —
   // и на сервер. Уведомление о конце уже поставил телефон (restLocal)
   const applyPendingRest = async () => {
-    // Сборка с очередью подходов: журнал нажатий — «Отдых» (подход сделан
-    // + отдых) и вес — проигрываем по порядку
-    const actions = await takeActions();
-    const cur = state.current?.session;
-    if (actions.length && cur && ['active', 'paused'].includes(cur.status)) {
-      if (applyActions(cur, actions) !== cur) { change(v => applyActions(v, actions, localRestPlatform())); save(); }
+    if (!readyRef.current || takingLiveActions.current) return;
+    const sessionId = state.current?.session?.id;
+    if (!sessionId) return;
+    takingLiveActions.current = true;
+    try {
+      // Сборка с очередью подходов: журнал нажатий — «Отдых» (подход сделан
+      // + отдых) и вес — проигрываем по порядку. Забираем только для
+      // открытого занятия: чужая очередь должна дождаться своего экрана.
+      const actions = await takeActions(sessionId);
+      const cur = state.current?.session;
+      if (actions.length && cur?.id === sessionId && ['active', 'paused'].includes(cur.status)) {
+        if (applyActions(cur, actions) !== cur) { change(v => applyActions(v, actions, localRestPlatform())); save(); }
+      }
+      const rest = await takePendingRest();
+      const s = state.current?.session;
+      if (!rest || !s || s.id !== rest.sessionId || s.status !== 'active' || rest.restUntil <= (s.restUntil || 0)) return;
+      change(v => ({ ...v, restUntil: rest.restUntil, restLocal: localRestPlatform() }));
+      save();
+    } finally {
+      takingLiveActions.current = false;
     }
-    const rest = await takePendingRest();
-    const s = state.current?.session;
-    if (!rest || !s || s.id !== rest.sessionId || s.status !== 'active' || rest.restUntil <= (s.restUntil || 0)) return;
-    change(v => ({ ...v, restUntil: rest.restUntil, restLocal: localRestPlatform() }));
-    save();
   };
   useEffect(() => { if (ready) applyPendingRest(); }, [ready]);
   // «+30 с» / «Закрыть» на будильнике отдыха (iPhone, часы) — сразу в
