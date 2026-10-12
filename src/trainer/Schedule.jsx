@@ -9,14 +9,8 @@ import { IconAlert, IconBack, IconCopy, IconPlus } from '../icons.jsx';
 import { gridDropStart, monthDropStart, moveRequest } from './calendar-move.js';
 
 /**
- * Расписание тренера — занятия из его Google Календаря.
- *
- * Календарь остаётся местом, где живут события: заведённое с телефона в
- * Google появляется здесь, заведённое здесь — там, с инициалами и номером
- * клиента в названии. Поэтому ничего не расходится, и деньги видят те же
- * занятия.
- *
- * Вид — как в Google Календаре (решение владельца 30.09.2026): сетка по
+ * Расписание тренера хранится в Fit Track.
+ * Вид: сетка по
  * часам на 1 день, 3 дня или неделю и сетка месяца. Нажатие на пустое место
  * сетки — новое занятие на это время, на событие — правка, на день в
  * месяце или шапке — этот день крупно. Выбранный вид помнится на телефоне.
@@ -145,7 +139,6 @@ export default function Schedule() {
           haptic();
         }}
         clients={(clients.data && clients.data.clients) || []}
-        serviceEmail={data && data.serviceEmail}
         onDone={() => { setEditing(null); setPreset(null); reload(); }}
         onCancel={() => { setEditing(null); setPreset(null); }}
       />
@@ -196,12 +189,6 @@ export default function Schedule() {
       {error && <ErrorState error={error} onRetry={reload} />}
       {moveFailure && <Note tone="critical" icon={IconAlert}>Не удалось перенести событие: {moveFailure.message || 'повторите ещё раз'}</Note>}
 
-      {/* Google Календарь — только у владельца сервиса; у других тренеров
-          расписание живёт в приложении, и предупреждать не о чем */}
-      {!loading && !error && data && !data.calendar && data.owner !== false && (
-        <Note tone="critical" icon={IconAlert}>Календарь не подключён на сервере.</Note>
-      )}
-
       {!error && (loading && !data && !known.current.length ? <Loading lead={false} rows={4} /> : view === 'month' ? (
         <SwipePager onShift={(dir) => { setAnchor(shifted(view, anchor, dir)); haptic(); }}>
           <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} onMove={moveEvent} />
@@ -211,9 +198,6 @@ export default function Schedule() {
           onShift={(n) => { setAnchor(addDays(anchor, n)); haptic(); }} />
       ))}
 
-      {data && data.feedUrl && (
-        <PhoneCalendar url={data.feedUrl} text="Все занятия и личные события — в календаре телефона: подпишитесь один раз, дальше он обновляется сам." />
-      )}
     </>
   );
 }
@@ -750,7 +734,7 @@ function MonthGrid({ start, anchor, events, onDay, onEvent, onMove }) {
 }
 
 /** Создать, перенести или удалить занятие либо личное событие */
-function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onCopy }) {
+function EventForm({ event, preset, clients, onDone, onCancel, onCopy }) {
   // Новое — на время, куда нажали в сетке (или 10:00 опорного дня)
   const base = (preset && preset.date) || startOfDay(new Date());
   const presetMinutes = preset && Number.isFinite(preset.minutes) ? preset.minutes : 10 * 60;
@@ -952,48 +936,8 @@ function EventForm({ event, preset, clients, serviceEmail, onDone, onCancel, onC
               </button>
             </div>
           )}
-          {serviceEmail && (
-            <p className="small muted" style={{ margin: 0 }}>
-              Запись идёт в ваш Google Календарь от имени {serviceEmail}.
-            </p>
-          )}
         </div>
       </Panel>
     </>
-  );
-}
-
-/**
- * Подписка календаря телефона на ленту. webcal:// открывает «Подписаться»
- * в Календаре iPhone; на Android ссылку добавляют в Google Календаре
- * («Другие календари → По URL»), поэтому рядом — «Скопировать».
- */
-export function PhoneCalendar({ url, text }) {
-  const [copied, setCopied] = useState(false);
-  const webcal = url.replace(/^https?:/, 'webcal:');
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      haptic('success');
-    } catch (_) {
-      window.prompt('Скопируйте ссылку:', url);
-    }
-  };
-
-  return (
-    <Section title="Календарь телефона">
-      <Panel pad>
-        <p className="small muted" style={{ marginTop: 0 }}>{text}</p>
-        <div className="library__actions" style={{ marginTop: 0 }}>
-          <a className="button button--primary" href={webcal}>Подписаться</a>
-          <button className="button" onClick={copy}><IconCopy size={16} />{copied ? 'Скопировано' : 'Скопировать ссылку'}</button>
-        </div>
-        <p className="small muted" style={{ marginBottom: 0 }}>
-          iPhone: «Подписаться» откроет Календарь. Android: Google Календарь → «Другие календари» → «+» → «По URL» → вставьте ссылку.
-        </p>
-      </Panel>
-    </Section>
   );
 }

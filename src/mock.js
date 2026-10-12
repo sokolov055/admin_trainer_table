@@ -1089,8 +1089,8 @@ const MOCK = {
     return {
       events: changed,
       calendar: true,
-      serviceEmail: 'demo@example.iam.gserviceaccount.com',
-      feedUrl: 'https://example.invalid/ics/t-demo.ics',
+      serviceEmail: '',
+      feedUrl: '',
     };
   },
   'trainer.schedule.save': (params) => {
@@ -1129,7 +1129,7 @@ const MOCK = {
       { kind: 'cancel', who: 'trainer', late: false, charged: false, reason: '', clientRow: 4, clientName: 'Евгений и Екатерина', fromAt: daysAgo(6), toAt: null },
     ],
   }),
-  'client.schedule.feed': () => ({ url: 'https://example.invalid/ics/c-demo.ics' }),
+  'client.schedule.feed': () => ({ url: '' }),
 
   // Семья в демо: у Анны — брат, за которого она платит
   'family.list': () => ({ members: [{ row: 5, name: 'Дмитрий Соколов', payer: false }] }),
@@ -1377,10 +1377,8 @@ const MOCK = {
     };
   },
 
-  // Пересчёт по календарю в демо ничего не считает, но отвечает той же
-  // формой и с той же задержкой: кнопка в демо должна вести себя как в бою,
-  // иначе проверять по ней нечего.
-  'calendar.refresh': () => ({
+  // Демо локального пересчёта баланса по расписанию.
+  'trainer.schedule.refresh': () => ({
     clients: 5, trainings: 34, revenue: 102000,
     mirrorUpdated: true, ms: 12400, at: new Date().toISOString(),
   }),

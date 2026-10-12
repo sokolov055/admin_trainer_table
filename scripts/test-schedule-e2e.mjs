@@ -36,6 +36,9 @@ test('личное событие создаётся и переносится �
     await page.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await page.goto(origin + '/?mockRole=trainer');
     await page.getByRole('button', { name: 'Расписание' }).first().click();
+    assert.equal(await page.getByText('Календарь не подключён на сервере.').count(), 0);
+    assert.equal(await page.getByRole('heading', { name: 'Календарь телефона' }).count(), 0);
+    assert.equal(await page.locator('a[href^="webcal:"]').count(), 0);
     await page.getByRole('button', { name: 'Добавить событие' }).click();
     await page.getByRole('radio', { name: 'Личное событие' }).click();
     await page.getByLabel('Название события').fill('Массаж QA');
@@ -53,6 +56,7 @@ test('личное событие создаётся и переносится �
 
     await page.getByRole('button', { name: /Массаж QA/ }).first().click();
     assert.equal(await page.getByLabel('Время').inputValue(), '11:00', 'перетаскивание на час вниз сохранилось');
+    assert.equal(await page.getByText(/Запись идёт в ваш Google Календарь/).count(), 0);
     await page.getByRole('button', { name: 'Расписание' }).first().click();
 
     mkdirSync(REVIEW, { recursive: true });
