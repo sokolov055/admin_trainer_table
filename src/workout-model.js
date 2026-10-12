@@ -1,4 +1,4 @@
-import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf, planOneSide } from './exercise-track.js';
+import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf, planOneSide, missing } from './exercise-track.js';
 
 export const uid = () => crypto.randomUUID();
 export const blankSet = () => ({ weight: '', reps: '', rpe: '', state: 'pending', kind: 'work' });
@@ -179,6 +179,22 @@ export function summary(session) {
       .filter(s => s.state === 'done' && s.kind !== 'warmup')
       .reduce((m, s) => m + volumeOf(s, trackOf(e)), 0), 0),
     pending: sets.filter(s => s.state === 'pending').length };
+}
+
+/** Выполненный подход без результата блокирует сохранение всего занятия (FT-565). */
+export function resultIssue(session) {
+  for (const ex of session.exercises) {
+    const track = trackOf(ex);
+    for (let si = 0; si < ex.sets.length; si += 1) {
+      const set = ex.sets[si];
+      if (set.state !== 'done') continue;
+      // В старых занятиях вес мог быть пустым; сервер требует результат,
+      // но не заставляет дописывать вес в уже выполненные подходы.
+      const lack = missing(set, track, { requireWeight: false });
+      if (lack) return `${ex.name}, подход ${setLabel(ex.sets, si)}: ${lack.replace(/ перед отметкой( подхода)?/, '')}`;
+    }
+  }
+  return '';
 }
 /**
  * «Завершить»: неотмеченные подходы — пропущены с пометкой closed. По ней

@@ -186,6 +186,15 @@ test('тренировку можно провести, и блок станов
   const firstExercise = page.locator('.workout__exercise').first();
   assert.equal(await firstExercise.locator('.workout__name-tap').count(), 0);
 
+  // FT-565: повторы могут стереть уже после отметки подхода. Завершение
+  // должно назвать проблемную строку и оставить занятие доступным для правки.
+  await first.getByRole('textbox').nth(1).fill('');
+  await page.getByRole('button', { name: 'Завершить', exact: true }).click();
+  await page.locator('.workout__confirm').getByRole('button', { name: 'Завершить', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'Жим лёжа, подход 1: Введите число повторов.' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Продолжить тренировку', exact: true }).count(), 0);
+  await first.getByRole('textbox').nth(1).fill('8');
+
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();
   await page.locator('.workout__confirm').getByRole('button', { name: 'Завершить', exact: true }).click();
 

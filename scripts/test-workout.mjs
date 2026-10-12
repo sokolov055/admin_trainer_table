@@ -181,6 +181,44 @@ test('«Продолжить» не возвращает подходы, про�
   const old = { status: 'completed', exercises: [{ sets: [{ state: 'done' }, { state: 'skipped' }] }] };
   assert.deepEqual(reopenSession(old).exercises[0].sets.map(x => x.state), ['done', 'pending']);
 });
+
+test('FT-565: выполненный подход без повторов не завершает занятие; исправление сохраняет результат', async () => {
+  data.clear(); await mount(); await saveNow();
+  await act(async () => tree.root.findAllByType('button').find(n => text(n) === 'Норм').props.onClick());
+  await saveNow();
+  const reps = tree.root.findAllByType('input').find(n => /подход 1, повторы/.test(n.props['aria-label'] || ''));
+  await act(async () => reps.props.onChange({ target: { value: '' } }));
+  await saveNow();
+  assert.ok(tree.root.findAllByProps({ role: 'alert' }).some(n => text(n).includes('Присед, подход 1: Введите число повторов.')));
+  await click('Завершить'); await click('Завершить');
+  const draftKey = [...data.keys()].find(k => k.startsWith('workout_draft_v1:'));
+  assert.equal(JSON.parse(data.get(draftKey)).session.status, 'active', 'не показываем несохранённое занятие завершённым');
+  assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].status, 'active');
+  assert.ok(!button('Продолжить тренировку'));
+
+  await act(async () => reps.props.onChange({ target: { value: '12' } }));
+  await click('Завершить'); await click('Завершить');
+  const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+  assert.equal(saved.status, 'completed');
+  assert.equal(saved.exercises[0].sets[0].reps, '12');
+  assert.equal(saved.exercises[0].sets[0].state, 'done', 'отметка выполнения сохранена');
+  assert.equal(saved.exercises[0].sets[1].state, 'skipped');
+  await mount(false);
+  assert.ok(button('Продолжить тренировку'), 'после повторного открытия занятие действительно завершено');
+  await act(async () => tree.unmount()); tree = null;
+});
+
+test('FT-565: проверка результата учитывает тип упражнения и участника пары', async () => {
+  const { resultIssue } = await import('../src/workout-model.js');
+  const session = (track, set) => ({ exercises: [{ name: 'Упражнение', track, sets: [set] }] });
+  assert.equal(resultIssue(session({ kind: 'strength' }, { state: 'done', weight: '', reps: '12' })), '', 'старый подход без веса допустим');
+  assert.match(resultIssue(session({ kind: 'bodyweight' }, { state: 'done', reps: '', who: 'Настя' })), /Упражнение, подход Настя · 1/);
+  assert.equal(resultIssue(session({ kind: 'bodyweight' }, { state: 'pending', reps: '' })), '', 'при завершении неотмеченное будет пропущено');
+  assert.match(resultIssue(session({ kind: 'timed' }, { state: 'done', time: '' })), /Введите время/);
+  assert.equal(resultIssue(session({ kind: 'timed' }, { state: 'done', time: '30' })), '');
+  assert.match(resultIssue(session({ kind: 'cardio' }, { state: 'done' })), /время, расстояние или калории/);
+  assert.equal(resultIssue(session({ kind: 'cardio' }, { state: 'done', distance: '2' })), '');
+});
 test('черновик восстанавливается после отключения сети и размонтирования', async () => {
   data.clear(); offline = true; await mount();
   const weight = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));

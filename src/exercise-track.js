@@ -361,7 +361,7 @@ const num = (v) => Number(String(v || '').replace(',', '.')) || 0;
  * Чего не хватает, чтобы отметить подход выполненным; пусто — всё есть.
  * Сервер проверяет то же самое (validateSession).
  */
-export function missing(set, track) {
+export function missing(set, track, { requireWeight = true } = {}) {
   if (track.kind === 'cardio') {
     // Интервалы отрезка — уже итог: круги и фазы
     const any = TIME.test(String(set.time || '')) || num(set.distance) > 0 || num(set.kcal) > 0 || Number(set.intervals && set.intervals.rounds) > 0;
@@ -371,7 +371,7 @@ export function missing(set, track) {
   // Силовое: вес обязателен — число от нуля (владелец, 07.10.2026). Пустой вес
   // раньше сохранялся, и «было» у следующего раза нечем было считать. Со своим
   // весом и статикой вес — «добавка», он может быть пустым
-  if (track.kind === 'strength' && !/^\d+([.,]\d+)?$/.test(String(set.weight || '').trim())) {
+  if (requireWeight && track.kind === 'strength' && !/^\d+([.,]\d+)?$/.test(String(set.weight || '').trim())) {
     return 'Введите вес перед отметкой подхода — число, 0 и больше.';
   }
   return /^\d+$/.test(String(set.reps || '')) && Number(set.reps) >= 1 ? '' : 'Введите число повторов перед отметкой подхода.';
