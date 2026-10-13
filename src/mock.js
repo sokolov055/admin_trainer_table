@@ -714,14 +714,15 @@ Object.assign(demoExercises[2], { setupOk: true, setup: 'Стойки — крю
 const DEMO_RACK = { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' };
 const DEMO_SMITH = { uid: 'smith1', name: 'Стойка у зеркала', photo: '', setup: '' };
 Object.assign(demoExercises[2], { machines: [DEMO_RACK, DEMO_SMITH], alternatives: [{ id: 10, name: 'Жим ногами' }] });
+const demoMachines = [DEMO_RACK, DEMO_SMITH];
 let demoMachineSeq = 0;
 // Своя настройка Анны на раме — записал тренер
 let demoNotes = { 'm:rack01': { text: 'Крюки на 4-й, упоры на 2-й', by: 'trainer', updatedAt: '2026-10-01T10:00:00.000Z' } };
 
 /** Фото тренажёра в демо — data-URL сразу в каталог (library.js, uploadMachinePhoto) */
 export function mockMachinePhoto(exerciseId, uid, url) {
-  const e = demoExercises.find((x) => x.id === Number(exerciseId));
-  const m = e && (e.machines || []).find((x) => x.uid === uid);
+  const e = exerciseId ? demoExercises.find((x) => x.id === Number(exerciseId)) : null;
+  const m = (e && (e.machines || []).find((x) => x.uid === uid)) || demoMachines.find((x) => x.uid === uid);
   if (m) { m.photos = [...(m.photos || (m.photo ? [m.photo] : [])), url]; m.photo = m.photos[0]; }
 }
 
@@ -1555,6 +1556,7 @@ const MOCK = {
     if (!m) {
       if (machines.length >= 8) throw new Error('Тренажёров у упражнения — не больше 8.');
       m = { uid: 'demo' + (++demoMachineSeq), name, photo: '', setup: '' };
+      demoMachines.push(m);
       machines.push(m);
     }
     // Как на сервере: вид, фото списком, убрать одно или все
@@ -1573,6 +1575,47 @@ const MOCK = {
     const uids = params.uids || [];
     e.machines = [...(e.machines || [])].sort((a, b) => (uids.includes(b.uid) ? 1 : 0) - (uids.includes(a.uid) ? 1 : 0));
     return { exercise: { ...e } };
+  },
+  'library.machines': () => ({
+    machines: demoMachines.map((m) => ({
+      ...m,
+      kind: m.kind === 'equipment' ? 'equipment' : 'machine',
+      photos: m.photos || (m.photo ? [m.photo] : []),
+      mine: true,
+      common: false,
+      uses: demoExercises.filter((e) => (e.machines || []).some((x) => x.uid === m.uid))
+        .map((e) => ({ id: e.id, name: e.name, muscle: e.muscle, mine: e.mine, common: e.common })),
+    })),
+    exercises: demoExercises.map((e) => ({ id: e.id, name: e.name, muscle: e.muscle, mine: e.mine, common: e.common })),
+    owner: true,
+  }),
+  'library.machine.save': (params) => {
+    const name = String(params.name || '').trim();
+    if (name.length < 2) throw new Error('Назовите тренажёр или оборудование.');
+    let m = params.uid && demoMachines.find((x) => x.uid === params.uid);
+    if (params.uid && !m) throw new Error('Тренажёр или оборудование не найдено.');
+    if (!m) {
+      m = { uid: 'demo' + (++demoMachineSeq), name, photo: '', photos: [], setup: '', kind: 'machine' };
+      demoMachines.push(m);
+    }
+    const drop = [].concat(params.removePhotoUrls || [], params.removePhotoUrl || []);
+    const photos = params.removePhoto ? [] : (m.photos || (m.photo ? [m.photo] : [])).filter((u) => !drop.includes(u));
+    Object.assign(m, { name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : 'machine', photos, photo: photos[0] || '' });
+    return { machine: { ...m }, uid: m.uid };
+  },
+  'library.machine.delete': (params) => {
+    const at = demoMachines.findIndex((m) => m.uid === params.uid);
+    if (at < 0) throw new Error('Тренажёр или оборудование не найдено.');
+    demoMachines.splice(at, 1);
+    demoExercises.forEach((e) => { e.machines = (e.machines || []).filter((m) => m.uid !== params.uid); });
+    return { ok: true };
+  },
+  'library.exercise.machine.attach': (params) => {
+    const e = demoEditable(params.exerciseId);
+    const m = demoMachines.find((x) => x.uid === params.uid);
+    if (!m) throw new Error('Тренажёр или оборудование не найдено.');
+    if (!(e.machines || []).some((x) => x.uid === m.uid)) e.machines = [...(e.machines || []), m];
+    return { exercise: { ...e }, uid: m.uid };
   },
   'library.exercise.alternatives': (params) => {
     const e = demoEditable(params.exerciseId);

@@ -827,159 +827,135 @@ function Exercises() {
   );
 }
 
-/**
- * Тренажёры (владелец, 09.10.2026): все тренажёры, записанные у упражнений
- * (FT-478), одним списком. Один и тот же тренажёр бывает у нескольких
- * упражнений — он одной строкой, под ним упражнения. Сам тренажёр живёт у
- * упражнения: правка и новый — в карточке упражнения, сюда ведёт касание.
- */
+/** FT-569: отдельный каталог и явные связи с несколькими упражнениями. */
 function Machines() {
-  const { loading, data, error, reload } = useData('library.exercises', {}, []);
+  const { loading, data, error, reload } = useData('library.machines', {}, []);
   const [q, setQ] = useState('');
-  const [kindOf, setKindOf] = useState('');    // '' — все, machine, equipment
-  const [open, setOpen] = useState('');        // ключ тренажёра
-  const [exercise, setExercise] = useState(null); // id упражнения из тренажёра
-  const [editing, setEditing] = useState(null);
-  // Правка/создание тренажёра прямо отсюда: { exercise, machine|null }; pick — выбор упражнения
+  const [kindOf, setKindOf] = useState('');
+  const [open, setOpen] = useState('');
   const [form, setForm] = useState(null);
-  const [pick, setPick] = useState(false);
-  const [pq, setPq] = useState('');
+  const [exerciseQ, setExerciseQ] = useState('');
+  const [busyExercise, setBusyExercise] = useState(0);
+  const [failure, setFailure] = useState(null);
 
   useBackGesture(() => setForm(null), !!form);
-  useBackGesture(() => { setPick(false); setPq(''); }, !form && pick);
-  useBackGesture(() => setEditing(null), !form && !pick && !!editing);
-  useBackGesture(() => setExercise(null), !form && !pick && !editing && !!exercise);
-  useBackGesture(() => setOpen(''), !form && !pick && !editing && !exercise && !!open);
-  useReturnScroll(!!(open || exercise || editing || form || pick));
+  useBackGesture(() => { setOpen(''); setExerciseQ(''); setFailure(null); }, !form && !!open);
+  useReturnScroll(!!(open || form));
 
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
-  const all = data.exercises;
-  const keyOf = (name) => String(name || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
-  const groups = new Map();
-  all.forEach((e) => (e.machines || []).forEach((m) => {
-    const kind = m.kind === 'equipment' ? 'equipment' : 'machine';
-    const k = kind + ':' + keyOf(m.name);
-    if (!groups.has(k)) groups.set(k, { key: k, name: m.name, kind, photos: [], setup: '', uses: [] });
-    const g = groups.get(k);
-    const photos = m.photos && m.photos.length ? m.photos : m.photo ? [m.photo] : [];
-    if (!g.photos.length && photos.length) g.photos = photos;
-    if (!g.setup && m.setup) g.setup = m.setup;
-    g.uses.push(e);
-  }));
-  const list = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const list = data.machines || [];
+  const exercises = data.exercises || [];
+  const keyOf = (value) => String(value || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+  const machine = open ? list.find((item) => item.uid === open) : null;
 
-  const matchOf = (e, g) => (e.machines || []).find((m) => (m.kind === 'equipment' ? 'equipment' : 'machine') === g.kind && keyOf(m.name) === keyOf(g.name)) || null;
   if (form) {
     return (
       <>
-        <Back onClick={() => setForm(null)}>{form.machine ? form.machine.name : 'Тренажёры и оборудование'}</Back>
-        <p className="library__sub">{'Упражнение: ' + form.exercise.name}</p>
+        <Back onClick={() => setForm(null)}>Тренажёры и оборудование</Back>
+        <h2 className="library__title">{form.machine ? 'Изменить карточку' : 'Новая карточка'}</h2>
+        <p className="library__sub">Карточку можно сохранить без упражнения и привязать позже.</p>
         <MachineForm
-          exercise={form.exercise}
           machine={form.machine}
-          onDone={(saved) => { setForm(null); setPick(false); setPq(''); setOpen(''); if (saved) reload(); }}
+          canDelete={!form.machine || !!data.owner || !!form.machine.mine}
+          onDone={() => { setForm(null); setOpen(''); reload(); }}
         />
       </>
     );
   }
-  if (pick) {
-    const npq = keyOf(pq);
-    const choices = all.filter((e) => !npq || keyOf(e.name).includes(npq)).slice(0, 50);
-    return (
-      <>
-        <Back onClick={() => { setPick(false); setPq(''); }}>Тренажёры и оборудование</Back>
-        <h2 className="library__title">К какому упражнению?</h2>
-        <p className="library__sub">Тренажёр хранится у упражнения. Выберите, где он используется — потом можно добавить его и к другим.</p>
-        <Search value={pq} onChange={setPq} placeholder="Поиск упражнения" />
-        {choices.map((e) => (
-          <button key={e.id} className="item" onClick={() => { setForm({ exercise: e, machine: null }); haptic(); }}>
-            <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Tag tone="good">своё</Tag>}</div>
-            {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
-          </button>
-        ))}
-      </>
-    );
-  }
-  if (editing) {
-    return (
-      <ExerciseEditor
-        exercise={editing}
-        muscles={data.muscles}
-        onCancel={() => setEditing(null)}
-        onSaved={() => { setEditing(null); reload(); }}
-      />
-    );
-  }
-  const current = exercise ? all.find((e) => e.id === exercise) : null;
-  if (current) {
-    return (
-      <ExerciseView
-        exercise={current}
-        owner={!!data.owner}
-        all={all}
-        onSetup={reload}
-        onChanged={(saved) => { setExercise(saved.id); reload(); }}
-        onBack={() => setExercise(null)}
-        onEdit={() => setEditing(current)}
-        onDeleted={() => { setExercise(null); reload(); }}
-        onRemove={() => setExercise(null)}
-      />
-    );
-  }
-  const machine = open ? list.find((g) => g.key === open) : null;
+
   if (machine) {
+    const attached = new Set(machine.uses.map((exercise) => exercise.id));
+    const nq = keyOf(exerciseQ);
+    const choices = exercises
+      .filter((exercise) => !nq || keyOf(exercise.name).includes(nq) || keyOf(exercise.muscle).includes(nq))
+      .sort((a, b) => Number(attached.has(b.id)) - Number(attached.has(a.id)) || a.name.localeCompare(b.name, 'ru'));
+    const toggle = async (exercise) => {
+      setBusyExercise(exercise.id);
+      setFailure(null);
+      try {
+        await apiMutate(attached.has(exercise.id) ? 'library.exercise.machine.delete' : 'library.exercise.machine.attach', {
+          exerciseId: exercise.id,
+          uid: machine.uid,
+        });
+        haptic('success');
+        reload();
+      } catch (err) {
+        setFailure(err);
+      } finally {
+        setBusyExercise(0);
+      }
+    };
+
     return (
       <>
-        <Back onClick={() => setOpen('')}>Тренажёры и оборудование</Back>
-        <h2 className="library__title">{machine.name}</h2>
-        <p className="library__sub">{machine.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{machine.photos.length > 1 ? ' · ' + machine.photos.length + ' фото' : ''}</p>
+        <Back onClick={() => { setOpen(''); setExerciseQ(''); setFailure(null); }}>Тренажёры и оборудование</Back>
+        <div className="item__top">
+          <div>
+            <h2 className="library__title">{machine.name}</h2>
+            <p className="library__sub">{machine.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{machine.photos.length > 1 ? ' · ' + machine.photos.length + ' фото' : ''}</p>
+          </div>
+          {machine.mine && <Tag tone="good">своё</Tag>}
+        </div>
         <MachinePhoto machine={machine} />
         {machine.setup
-          ? <><h4 className="setup__title">{machine.kind === 'equipment' ? 'Настройка' : 'Где регулировки'}</h4><SetupText text={machine.setup} /></>
-          : <p className="small muted">Настройка не записана — нажмите «Изменить».</p>}
+          ? <><h4 className="setup__title">{machine.kind === 'equipment' ? 'Как использовать' : 'Где регулировки'}</h4><SetupText text={machine.setup} /></>
+          : <p className="small muted">Описание не добавлено.</p>}
+        <button type="button" className="button button--ghost" onClick={() => { setForm({ machine }); haptic(); }}>Изменить карточку</button>
+
         <h4 className="setup__title">Упражнения</h4>
-        {machine.uses.map((e) => (
-          <div key={e.id}>
-            <button className="item" onClick={() => { setExercise(e.id); haptic(); }}>
-              <div className="item__top"><span className="item__name">{e.name}</span>{e.mine && <Tag tone="good">своё</Tag>}</div>
-              {e.muscle && <div className="item__meta"><span>{e.muscle}</span></div>}
+        <p className="small muted">Отметьте все упражнения, где нужен этот предмет. Для жима лёжа можно выбрать и скамью, и гриф отдельными карточками.</p>
+        <Search value={exerciseQ} onChange={setExerciseQ} placeholder="Поиск упражнения" />
+        {choices.slice(0, 100).map((exercise) => {
+          const checked = attached.has(exercise.id);
+          return (
+            <button
+              type="button"
+              key={exercise.id}
+              className="item"
+              aria-pressed={checked}
+              disabled={!!busyExercise}
+              onClick={() => toggle(exercise)}
+            >
+              <div className="item__top">
+                <span className="item__name">{exercise.name}</span>
+                {checked && <Tag tone="good">привязано</Tag>}
+              </div>
+              {exercise.muscle && <div className="item__meta"><span>{exercise.muscle}</span></div>}
             </button>
-            <button type="button" className="button button--ghost" onClick={() => { setForm({ exercise: e, machine: matchOf(e, machine) }); haptic(); }}>
-              {'Изменить у «' + e.name + '»'}
-            </button>
-          </div>
-        ))}
+          );
+        })}
+        {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       </>
     );
   }
 
   const nq = keyOf(q);
   const shown = list
-    .filter((g) => !kindOf || g.kind === kindOf)
-    .filter((g) => !nq || keyOf(g.name).includes(nq) || g.uses.some((e) => keyOf(e.name).includes(nq)));
+    .filter((item) => !kindOf || item.kind === kindOf)
+    .filter((item) => !nq || keyOf(item.name).includes(nq) || item.uses.some((exercise) => keyOf(exercise.name).includes(nq)));
   const kinds = [{ value: '', label: 'Все' }, { value: 'machine', label: 'Тренажёры' }, { value: 'equipment', label: 'Оборудование' }];
+
   return (
     <>
-      <button type="button" className="button button--ghost" onClick={() => { setPick(true); haptic(); }}>+ Тренажёр или оборудование</button>
+      <button type="button" className="button button--ghost" onClick={() => { setForm({ machine: null }); haptic(); }}>+ Создать карточку</button>
+      <p className="library__sub">Создавайте тренажёры и оборудование отдельно, затем привязывайте каждую карточку к любому числу упражнений.</p>
       <Search value={q} onChange={setQ} placeholder="Поиск тренажёра или оборудования" />
       <Chips className="library__filters" items={kinds} value={kindOf} onChange={setKindOf} />
-      {list.length > 0 && (
-        <div className="library__count">
-          <p>{shown.length} {plural(shown.length, 'объект', 'объекта', 'объектов')}</p>
-        </div>
-      )}
-      {!list.length && (
-        <Empty title="Пока пусто" text="Нажмите «+ Тренажёр или оборудование» — выберите упражнение и заполните карточку." />
-      )}
-      {shown.map((g) => (
-        <button key={g.key} className="item" onClick={() => { setOpen(g.key); haptic(); }}>
-          <div className="item__top"><span className="item__name">{g.name}</span></div>
+      {list.length > 0 && <div className="library__count"><p>{shown.length} {plural(shown.length, 'объект', 'объекта', 'объектов')}</p></div>}
+      {!list.length && <Empty title="Пока пусто" text="Создайте карточку тренажёра или оборудования. Упражнения можно добавить после сохранения." />}
+      {shown.map((item) => (
+        <button key={item.uid} className="item" onClick={() => { setOpen(item.uid); haptic(); }}>
+          <div className="item__top">
+            <span className="item__name">{item.name}</span>
+            {item.mine && <Tag tone="good">своё</Tag>}
+          </div>
           <div className="item__meta">
-            <span>{(g.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + g.uses.map((e) => e.name).join(', ')}</span>
-            {g.photos.length > 0 && <Tag>{g.photos.length > 1 ? g.photos.length + ' фото' : 'фото'}</Tag>}
-            {g.setup && <Tag>настройка</Tag>}
+            <span>{item.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}</span>
+            <span>{item.uses.length ? item.uses.map((exercise) => exercise.name).join(', ') : 'пока без упражнений'}</span>
+            {item.photos.length > 0 && <Tag>{item.photos.length > 1 ? item.photos.length + ' фото' : 'фото'}</Tag>}
+            {item.setup && <Tag>описание</Tag>}
           </div>
         </button>
       ))}

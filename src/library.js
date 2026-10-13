@@ -73,7 +73,7 @@ export async function shrinkPhoto(file, max = 1600) {
   }
 }
 
-/** Фото к тренажёру упражнения: сначала тренажёр сохраняют, потом фото — к нему */
+/** Фото объекта каталога: exerciseId нужен только старому встроенному редактору. */
 export async function uploadMachinePhoto(exerciseId, uid, blob) {
   if (import.meta.env.VITE_MOCK === '1') {
     const url = await new Promise((resolve) => {
@@ -96,7 +96,10 @@ export async function uploadMachinePhoto(exerciseId, uid, blob) {
 
   let res;
   try {
-    res = await fetch(base + '/media/photo?exerciseId=' + encodeURIComponent(exerciseId) + '&uid=' + encodeURIComponent(uid), {
+    const query = exerciseId
+      ? 'exerciseId=' + encodeURIComponent(exerciseId) + '&uid=' + encodeURIComponent(uid)
+      : 'machineUid=' + encodeURIComponent(uid);
+    res = await fetch(base + '/media/photo?' + query, {
       method: 'POST', headers, body: blob,
     });
   } catch (_) {

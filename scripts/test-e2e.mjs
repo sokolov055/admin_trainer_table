@@ -890,6 +890,58 @@ test('шаблон назначается клиенту, общий копир�
 });
 
 /**
+ * FT-569: оборудование заводится само по себе, а затем одной карточкой
+ * связывается с несколькими упражнениями.
+ */
+test('оборудование создаётся без упражнения и привязывается к нескольким', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+
+    await phone.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await phone.getByRole('tab', { name: 'Тренажёры и оборудование', exact: true }).click();
+    await phone.getByRole('button', { name: '+ Создать карточку', exact: true }).click();
+    await phone.getByRole('radio', { name: 'Оборудование', exact: true }).click();
+    await phone.getByLabel('Название').fill('Разборные гантели');
+    await phone.getByLabel('Настройка').fill('Стойка у окна.');
+    await phone.getByRole('button', { name: 'Сохранить', exact: true }).click();
+
+    const card = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Разборные гантели' });
+    await card.waitFor({ timeout: 5000 });
+    await assert.doesNotReject(card.getByText('пока без упражнений').waitFor({ timeout: 3000 }), 'карточка сохранена отдельно');
+    await card.click();
+
+    const bench = phone.getByRole('button', { name: /Жим гантелей лёжа/ });
+    await bench.click();
+    await phone.waitForFunction(() => {
+      const row = [...document.querySelectorAll('#root main:not([hidden]) .item')]
+        .find((item) => item.textContent.includes('Жим гантелей лёжа'));
+      return row && row.getAttribute('aria-pressed') === 'true';
+    });
+
+    const squat = phone.getByRole('button', { name: /Приседания со штангой/ });
+    await squat.click();
+    await phone.waitForFunction(() => {
+      const row = [...document.querySelectorAll('#root main:not([hidden]) .item')]
+        .find((item) => item.textContent.includes('Приседания со штангой'));
+      return row && row.getAttribute('aria-pressed') === 'true';
+    });
+
+    await phone.getByRole('button', { name: 'Тренажёры и оборудование', exact: true }).click();
+    const linked = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Разборные гантели' });
+    await assert.doesNotReject(linked.getByText(/Жим гантелей лёжа/).waitFor({ timeout: 3000 }));
+    await assert.doesNotReject(linked.getByText(/Приседания со штангой/).waitFor({ timeout: 3000 }));
+  } finally {
+    await context.close();
+  }
+});
+
+/**
  * Порядок тренировок в редакторе — перетаскиванием в свёрнутом списке:
  * развёрнутая тренировка выше экрана, тащить её целиком нельзя.
  */

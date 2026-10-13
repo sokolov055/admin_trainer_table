@@ -37,8 +37,9 @@ export function MachinesEditor({ exercise, owner, onChanged }) {
   const e = exercise;
   const machines = e.machines || [];
   const [editing, setEditing] = useState(null);
+  const [picking, setPicking] = useState(false);
   const [failure, setFailure] = useState(null);
-  useEffect(() => { setEditing(null); setFailure(null); }, [e.id]);
+  useEffect(() => { setEditing(null); setPicking(false); setFailure(null); }, [e.id]);
 
   const done = (saved) => { setEditing(null); if (saved) onChanged(saved); };
   const first = async (m) => {
@@ -74,10 +75,14 @@ export function MachinesEditor({ exercise, owner, onChanged }) {
             </div>
           </div>
         )))}
+      {picking && <MachinePicker exercise={e} attached={machines} onDone={(saved) => { setPicking(false); if (saved) onChanged(saved); }} />}
       {editing === 'new'
         ? <MachineForm exercise={e} machine={null} onDone={done} />
         : machines.length < 8 && !editing && (
-          <button type="button" className="button button--ghost" onClick={() => setEditing('new')}>+ Тренажёр или оборудование</button>
+          <div className="library__machine-actions">
+            <button type="button" className="button button--ghost" onClick={() => setPicking((v) => !v)}>{picking ? 'Закрыть каталог' : 'Добавить из каталога'}</button>
+            <button type="button" className="button button--ghost" onClick={() => { setPicking(false); setEditing('new'); }}>+ Создать новое</button>
+          </div>
         )}
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
     </div>
@@ -90,7 +95,7 @@ export function MachinesEditor({ exercise, owner, onChanged }) {
  * фото кладётся уже к нему. Не загрузилось фото — тренажёр остаётся, форма
  * открыта: повторное «Сохранить» правит его, а не заводит второй.
  */
-export function MachineForm({ exercise, machine, onDone }) {
+export function MachineForm({ exercise = null, machine, onDone, canDelete = true }) {
   const [name, setName] = useState(machine ? machine.name : '');
   const [setup, setSetup] = useState(machine ? machine.setup : '');
   // Тренажёр или оборудование (владелец, 09.10.2026)
@@ -100,7 +105,7 @@ export function MachineForm({ exercise, machine, onDone }) {
   const had = machine ? (machine.photos && machine.photos.length ? machine.photos : machine.photo ? [machine.photo] : []) : [];
   const [dropped, setDropped] = useState([]);
   const [added, setAdded] = useState([]); // [{ blob, url }]
-  const [saved, setSaved] = useState({ exerciseId: exercise.id, uid: machine ? machine.uid : '' });
+  const [saved, setSaved] = useState({ exerciseId: exercise ? exercise.id : 0, uid: machine ? machine.uid : '' });
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
 
@@ -128,16 +133,16 @@ export function MachineForm({ exercise, machine, onDone }) {
     setFailure(null);
     let result = null;
     try {
-      const r = await apiMutate('library.exercise.machine.save', {
-        exerciseId: saved.exerciseId, uid: saved.uid || undefined, name, setup, kind,
+      const r = await apiMutate(exercise ? 'library.exercise.machine.save' : 'library.machine.save', {
+        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind,
         ...(dropped.length ? { removePhotoUrls: dropped } : {}),
       });
-      result = r.exercise;
-      setSaved({ exerciseId: r.exercise.id, uid: r.uid });
+      result = exercise ? r.exercise : r.machine;
+      setSaved({ exerciseId: exercise ? r.exercise.id : 0, uid: r.uid });
       setDropped([]);
       // Новые — по одному, по порядку; загруженное уходит из очереди
       for (const a of added) {
-        await uploadMachinePhoto(r.exercise.id, r.uid, a.blob);
+        await uploadMachinePhoto(exercise ? r.exercise.id : null, r.uid, a.blob);
         setAdded((v) => v.filter((x) => x !== a));
       }
       haptic('success');
@@ -151,12 +156,17 @@ export function MachineForm({ exercise, machine, onDone }) {
 
   const word = kind === 'equipment' ? 'оборудование' : 'тренажёр';
   const remove = async () => {
-    if (!saved.uid || !window.confirm(`Убрать «${name || machine.name}»?`)) return;
+    const question = exercise
+      ? `Убрать «${name || machine.name}» из упражнения?`
+      : `Удалить «${name || machine.name}» из каталога и всех упражнений?`;
+    if (!saved.uid || !window.confirm(question)) return;
     setBusy(true);
     try {
-      const r = await apiMutate('library.exercise.machine.delete', { exerciseId: saved.exerciseId, uid: saved.uid });
+      const r = await apiMutate(exercise ? 'library.exercise.machine.delete' : 'library.machine.delete', {
+        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid,
+      });
       haptic('success');
-      onDone(r.exercise);
+      onDone(exercise ? r.exercise : null);
     } catch (err) {
       setFailure(err);
       setBusy(false);
@@ -222,7 +232,7 @@ export function MachineForm({ exercise, machine, onDone }) {
       <div className="library__actions">
         <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
         <button type="button" className="button button--ghost" disabled={busy} onClick={() => onDone(null)}>Отмена</button>
-        {saved.uid && <button type="button" className="button button--ghost danger" disabled={busy} onClick={remove}>Убрать {word}</button>}
+        {saved.uid && canDelete && <button type="button" className="button button--ghost danger" disabled={busy} onClick={remove}>{exercise ? 'Убрать ' + word : 'Удалить из каталога'}</button>}
       </div>
     </div>
   );
@@ -231,6 +241,47 @@ export function MachineForm({ exercise, machine, onDone }) {
 const MAX_MACHINE_PHOTOS = 6;
 
 const normName = (v) => String(v || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+
+function MachinePicker({ exercise, attached, onDone }) {
+  const { loading, data, error, reload } = useData('library.machines', {}, []);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState('');
+  const [failure, setFailure] = useState(null);
+  const used = new Set((attached || []).map((m) => m.uid));
+  const list = (data && data.machines || []).filter((m) => !used.has(m.uid) && (!normName(q) || normName(m.name).includes(normName(q))));
+
+  const attach = async (m) => {
+    setBusy(m.uid);
+    setFailure(null);
+    try {
+      const r = await apiMutate('library.exercise.machine.attach', { exerciseId: exercise.id, uid: m.uid });
+      haptic('success');
+      onDone(r.exercise);
+    } catch (err) {
+      setFailure(err);
+      setBusy('');
+    }
+  };
+
+  return (
+    <div className="library__form">
+      <label className="field">
+        <span className="field__label">Найти в каталоге</span>
+        <input className="field__input" value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Гантели, скамья, гриф…" />
+      </label>
+      {loading && <p className="small muted">Загружаю каталог…</p>}
+      {error && <Note tone="critical" icon={IconAlert}>{error.message}<button type="button" className="button button--ghost" onClick={reload}>Повторить</button></Note>}
+      {!loading && !error && !list.length && <p className="small muted">Подходящих объектов нет. Создайте новый рядом.</p>}
+      {list.slice(0, 50).map((m) => (
+        <button type="button" key={m.uid} className="item" disabled={!!busy} onClick={() => attach(m)}>
+          <span className="item__name">{m.name}</span>
+          <span className="item__meta">{m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{m.uses.length ? ' · ещё в ' + m.uses.length : ''}</span>
+        </button>
+      ))}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+    </div>
+  );
+}
 
 /**
  * Тренажёры упражнения по его id или названию — для строки программы,
