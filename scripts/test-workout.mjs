@@ -87,6 +87,35 @@ async function click(label) { const b = button(label); assert.ok(b, label); asse
 async function mount(launch = true) { if (tree) tree.unmount(); await act(async () => { tree = renderer.create(React.createElement(Workout, { launch: launch ? { block, month: 'Сентябрь 2026' } : null, onClose() {} })); await delay(); }); }
 after(() => { if (tree) tree.unmount(); });
 
+test('FT-565: клиент и тренер принимают заполненное время круга без ввода и могут исправить', async () => {
+  const timedBlock = { title: 'Статика', exercises: ['Планка на локтях', 'Стульчик'].map(name => ({ name, sets: '2', track: { kind: 'timed' }, supersetGroup: 'g' })) };
+  for (const clientRow of [undefined, 3]) {
+    data.clear();
+    if (tree) { tree.unmount(); tree = null; }
+    nativeEnabled = true;
+    try {
+      await act(async () => { tree = renderer.create(React.createElement(Workout, { clientRow, launch: { block: timedBlock, month: 'Октябрь 2026' }, onClose() {} })); await delay(); });
+      const times = () => tree.root.findAllByType('input').filter(n => /подход [12], время, с$/.test(n.props['aria-label'] || ''));
+      assert.deepEqual(times().map(n => n.props.value), ['60', '60', '60', '60']);
+      for (let n = 0; n < 4; n++) await click('Норм');
+      await click('Завершить');
+      if (button('Завершить')) await click('Завершить');
+      let saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+      assert.equal(saved.status, 'completed');
+      assert.ok(saved.exercises.every(e => e.sets.every(s => s.time === '60' && s.state === 'done')));
+      await click('Исправить результат');
+      await act(async () => { times()[0].props.onChange({ target: { value: '45' } }); await delay(); });
+      await saveNow();
+      saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+      assert.equal(saved.exercises[0].sets[0].time, '45');
+      assert.equal(saved.exercises[0].sets[1].time, '60');
+    } finally {
+      nativeEnabled = false;
+      if (tree) { tree.unmount(); tree = null; }
+    }
+  }
+});
+
 test('интерфейс: запись подхода, пауза, продолжение, завершение и история', async () => {
   data.clear(); await mount();
   await saveNow();

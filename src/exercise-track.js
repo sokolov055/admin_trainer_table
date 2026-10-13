@@ -542,7 +542,9 @@ export function planSet(ex, track) {
   const reps = String(ex.reps || '');
   if (byTime(track)) {
     const m = reps.match(/^(\d{1,3}(:[0-5]\d){0,2})/);
-    const out = { time: m ? m[1] : '' };
+    // Статика без времени в программе: прежние «60» были только подсказкой.
+    // Предложение записываем в подход; человек принимает его оценкой или правит.
+    const out = { time: m ? m[1] : track.kind === 'timed' ? '60' : '' };
     if (track.kind !== 'cardio') return out;
     const mode = String(ex.weight || '').replace(/,(\d)/g, '.$1');
     const numAt = (re) => { const x = mode.match(re); return x ? x[1] : ''; };

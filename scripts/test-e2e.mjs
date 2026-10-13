@@ -5,6 +5,37 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, rmSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
+import { fromPlan } from '../src/workout-model.js';
+
+test('FT-565: предложенное время статики принимается без ввода и сохраняется после reload', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  phone.on('pageerror', error => consoleErrors.push(String(error)));
+  const session = fromPlan({ title: 'Статика без ввода', exercises: ['Планка на локтях', 'Стульчик'].map(name => ({ name, sets: '2', track: { kind: 'timed' }, supersetGroup: 'g' })) }, 'Октябрь 2026');
+  session.revision = 1;
+  try {
+    await phone.goto(origin);
+    await phone.evaluate(s => {
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      localStorage.setItem('workout_demo_server:3', JSON.stringify([s]));
+    }, session);
+    await phone.reload();
+    await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    await phone.getByRole('button', { name: /Вернуться к занятию/ }).click();
+    const times = phone.getByRole('textbox', { name: /подход [12], время, с$/ });
+    await times.first().waitFor();
+    assert.equal(await times.count(), 4);
+    for (let i = 0; i < 4; i++) assert.equal(await times.nth(i).inputValue(), '60');
+    for (let i = 0; i < 4; i++) await phone.getByRole('button', { name: 'Норм', exact: true }).first().click();
+    await phone.getByRole('button', { name: 'Завершить', exact: true }).click();
+    await phone.getByRole('button', { name: 'Исправить результат', exact: true }).waitFor();
+    await phone.reload();
+    const saved = await phone.evaluate(() => JSON.parse(localStorage.getItem('workout_demo_server:3'))[0]);
+    assert.equal(saved.status, 'completed');
+    assert.ok(saved.exercises.every(e => e.sets.every(s => s.time === '60' && s.state === 'done')));
+    assert.equal(consoleErrors.length, 0);
+  } finally { await context.close(); }
+});
 
 /**
  * Проход по экранам настоящим браузером.
