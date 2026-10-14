@@ -211,6 +211,36 @@ test('неверный код: круг краснеет, крестик, зат
     assert.equal(await cells.inputValue(), '', 'ряд снова пустой');
   } finally { await context.close(); }
 });
+test('клавиатура iPhone не закрывает ячейки кода: страница сдвигается, ячейки по центру видимой части', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', reducedMotion: 'reduce' });
+  const p = await context.newPage();
+  p.on('pageerror', (error) => consoleErrors.push(String(error)));
+  // Как в Safari: окно той же высоты, а видимая часть над клавиатурой — меньше
+  await p.addInitScript(() => {
+    const listeners = new Set();
+    const vv = { height: 844, offsetTop: 0, offsetLeft: 0, width: 390, scale: 1,
+      addEventListener: (type, fn) => listeners.add(fn), removeEventListener: (type, fn) => listeners.delete(fn) };
+    Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
+    window.__keyboard = (h) => { vv.height = 844 - h; listeners.forEach((fn) => fn()); };
+  });
+  try {
+    await p.goto(origin);
+    await p.fill('input[type=email]', 'back@example.com');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    const cells = p.locator('input[autocomplete=one-time-code]');
+    await cells.waitFor();
+    await p.evaluate(() => window.__keyboard(336));
+    await cells.focus();
+    await p.waitForFunction(() => {
+      const r = document.querySelector('.signin__otp .otp').getBoundingClientRect();
+      return r.bottom <= 844 - 336 && r.top >= 0;
+    }, null, { timeout: 3000 });
+    const pad = await p.evaluate(() => document.body.style.paddingBottom);
+    assert.equal(pad, '336px', 'снизу место под клавиатуру');
+    await cells.blur();
+    assert.equal(await p.evaluate(() => document.body.style.paddingBottom), '', 'клавиатура ушла — отступ убран');
+  } finally { await context.close(); }
+});
 test('почта тренера на странице клиента ведёт на вход тренера с той же почтой; Back — обратно', async () => {
   const { context, p } = await loginWindow();
   try {

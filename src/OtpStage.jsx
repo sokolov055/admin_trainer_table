@@ -70,6 +70,7 @@ export default function OtpStage({
   const n = length;
   const input = useRef(null);
   const orbit = useRef(null);
+  const stage = useRef(null);
   // input → checking → ok | fail → ok-collapse | fail-collapse → done | failed
   const [step, setStep] = useState(phase === 'checking' ? 'checking' : 'input');
   const spin = useRef({ angle: 0, speed: 0, frame: 0, started: 0, last: 0 });
@@ -161,6 +162,44 @@ export default function OtpStage({
 
   useEffect(() => () => cancelAnimationFrame(spin.current.frame), []);
 
+  // Клавиатура iPhone закрывала ячейки (владелец, 15.10.2026): экран входа
+  // короткий, прокручивать Safari некуда. Пока поле в фокусе — снизу отступ
+  // на высоту клавиатуры, и ячейки встают по центру видимой части экрана.
+  // Где клавиатура сжимает само окно (Android), отступ не нужен — kb ≈ 0.
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' && window.visualViewport;
+    const el = input.current;
+    if (!vv || !el) return undefined;
+    let on = false;
+    let raf = 0;
+    const fit = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (!on || !stage.current) return;
+        const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+        document.body.style.paddingBottom = kb > 80 ? kb + 'px' : '';
+        if (kb <= 80) return;
+        const r = stage.current.getBoundingClientRect();
+        const want = Math.max(12, (vv.height - r.height) / 2);
+        const delta = r.top - vv.offsetTop - want;
+        if (Math.abs(delta) > 8) window.scrollBy({ top: delta, behavior: reducedMotion() ? 'auto' : 'smooth' });
+      });
+    };
+    const focus = () => { on = true; fit(); setTimeout(fit, 400); };
+    const blur = () => { on = false; document.body.style.paddingBottom = ''; };
+    el.addEventListener('focus', focus);
+    el.addEventListener('blur', blur);
+    vv.addEventListener('resize', fit);
+    if (document.activeElement === el) focus();
+    return () => {
+      el.removeEventListener('focus', focus);
+      el.removeEventListener('blur', blur);
+      vv.removeEventListener('resize', fit);
+      cancelAnimationFrame(raf);
+      blur();
+    };
+  }, [readOnly]);
+
   useEffect(() => {
     if (phase === 'input' && autoFocus && input.current && !readOnly) input.current.focus();
   }, [phase, autoFocus, readOnly]);
@@ -180,7 +219,7 @@ export default function OtpStage({
   };
 
   return (
-    <div className={'otp otp--' + step} style={{ '--otp-cell': CELL + 'px', '--otp-r': radius(n) + 'px' }}
+    <div ref={stage} className={'otp otp--' + step} style={{ '--otp-cell': CELL + 'px', '--otp-r': radius(n) + 'px' }}
       onClick={() => input.current && input.current.focus()}>
       <div ref={orbit} className="otp__orbit">
         <span className="otp__track" aria-hidden="true" />
