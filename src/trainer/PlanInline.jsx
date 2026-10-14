@@ -466,6 +466,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
         {/* Сплит: кто делает и с каким весом */}
         {split && (
           <div className="plan-inline__split">
+            <p className="small muted">Кнопка с именем — делает ли упражнение; рядом вес. Снятому вес не нужен.</p>
             {members.map((m) => {
               const doing = !ex.performers || !ex.performers.length || ex.performers.includes(m);
               return (

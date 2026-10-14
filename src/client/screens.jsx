@@ -14,7 +14,7 @@ import {
   Chips, Segmented, Options, Field, Note, Delta,
   formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash } from '../icons.jsx';
+import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, captureScreen } from '../gestures.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
@@ -701,6 +701,15 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {/* Пока программа правится, текущие тренировки под редактором не
           показываем: они мешали и путали, что правится, а что нет */}
       <>
+      {/* Сплит: программа одна на двоих. Кто делает упражнение и какой у
+          каждого вес, задаётся внутри упражнения — снаружи этого не видно
+          (FT-540: «не понял, как создавать им программу») */}
+      {canEdit && (data.members || []).length > 1 && (
+        <Note tone="info" icon={IconUsers}>
+          Программа общая для пары: {data.members.join(' и ')}. Новую тренировку добавляйте один раз — она появится у обоих.
+          Откройте упражнение: кнопки с именами — кто его делает, рядом вес каждого.
+        </Note>
+      )}
       {shownBlocks.length === 0 && canEdit && !templateTool && (
         <Section title={'Месяц «' + data.month + '» пуст'}>
           <Panel pad>
