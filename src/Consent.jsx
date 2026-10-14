@@ -13,7 +13,7 @@ import { SignOut } from './ui.jsx';
  * версию и способ подтверждения (server/src/lib/consents.js).
  */
 
-const BASE = 'https://sokolov055.github.io/admin_trainer_table/';
+const BASE = 'https://app.fitness100.ru/';
 
 export function ConsentChecks({ value, onChange, disabled }) {
   const set = (key) => (event) => onChange({ ...value, [key]: event.target.checked });

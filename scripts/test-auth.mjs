@@ -231,7 +231,7 @@ test('кабинет из браузера переносится в прило�
   const url = appIntentUrl('T'.repeat(43), 'https://sokolov055.github.io/admin_trainer_table/?tab=progress');
   assert.match(url, /^intent:\/\/sokolov055\.github\.io\/admin_trainer_table\/\?loginTicket=T{43}#Intent;/);
   assert.match(url, /;package=app\.fittrack;/);
-  assert.match(url, /S\.browser_fallback_url=https%3A%2F%2Fraw\.githubusercontent\.com%2F.*fit-track\.apk;end$/);
+  assert.match(url, /S\.browser_fallback_url=https%3A%2F%2Fapi\.fitness100\.ru%2Fandroid%2Ffit-track\.apk;end$/);
 
   assert.equal(
     ticketToHash('https://sokolov055.github.io/admin_trainer_table/?loginTicket=abc'),

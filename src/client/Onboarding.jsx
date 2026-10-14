@@ -85,7 +85,7 @@ export default function Onboarding({ initial, onClose, onDone, onDisabled }) {
         : question ? (step === 0 ? 'Подберём программу под вашу цель и график.' : question.hint)
           : 'Эти программы подходят под ваши ответы. Посмотрите упражнения и выберите одну.'}</p>
       {saved.consentNeeded && <label className="onboarding__consent"><input type="checkbox" checked={agreed} disabled={busy} onChange={(e) => setAgreed(e.target.checked)} />
-        <span>Даю <a href="https://sokolov055.github.io/admin_trainer_table/onboarding-consent.html" target="_blank" rel="noopener noreferrer">отдельное согласие</a> на сохранение цели, опыта, места занятий и графика для подбора программы. Можно продолжить пользоваться приложением без анкеты.</span></label>}
+        <span>Даю <a href="https://app.fitness100.ru/onboarding-consent.html" target="_blank" rel="noopener noreferrer">отдельное согласие</a> на сохранение цели, опыта, места занятий и графика для подбора программы. Можно продолжить пользоваться приложением без анкеты.</span></label>}
       {question && !saved.consentNeeded && <div className="options" role="group" aria-label={question.title}>
         {question.options.map(([id, title, hint]) => <button type="button" key={id} disabled={busy}
           aria-pressed={answers[question.key] === id}

@@ -8,12 +8,12 @@ import React from 'react';
  * приложения для iPhone экраны вшиты, и относительная ссылка вела бы в
  * никуда; внешняя ссылка открывается в браузере телефона.
  */
-export const PRIVACY_URL = 'https://sokolov055.github.io/admin_trainer_table/privacy.html';
+export const PRIVACY_URL = 'https://app.fitness100.ru/privacy.html';
 /** Согласие на обработку ПДн и пользовательское соглашение — отдельные тексты (156-ФЗ) */
-export const CONSENT_URL = 'https://sokolov055.github.io/admin_trainer_table/consent.html';
-export const TERMS_URL = 'https://sokolov055.github.io/admin_trainer_table/terms.html';
+export const CONSENT_URL = 'https://app.fitness100.ru/consent.html';
+export const TERMS_URL = 'https://app.fitness100.ru/terms.html';
 /** Поддержка — почта разработчика (App Store 1.5: способ связаться) */
-export const SUPPORT_URL = 'https://sokolov055.github.io/admin_trainer_table/support.html';
+export const SUPPORT_URL = 'https://app.fitness100.ru/support.html';
 
 export default function PrivacyLink() {
   return (

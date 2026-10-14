@@ -20,7 +20,9 @@ import { apiPrimary } from './api.js';
 import { getToken } from './session.js';
 import { detectBrowser, ANDROID_APP_PACKAGE } from './browser.js';
 
-export const ANDROID_APK_URL = 'https://raw.githubusercontent.com/sokolov055/admin_trainer_table/main/public/android/fit-track.apk';
+// APK — с нашего сервера (14.10.2026; до того GitHub). Адрес API, а не сайта:
+// приложение отдаёт чужой адрес браузеру, и тот скачивает файл (deploy/nginx.conf)
+export const ANDROID_APK_URL = 'https://api.fitness100.ru/android/fit-track.apk';
 
 /** Показывать ли «Открыть в приложении»: Android, браузер (не само приложение), вход есть */
 export function canOpenInApp(options = {}) {
@@ -86,8 +88,9 @@ export function localLink(href, hereHref) {
   try { url = new URL(href); } catch (_) { return ''; }
   const here = new URL(hereHref);
   const base = new URL('./', here.href);
-  // Сайт — прежний адрес; app.fitness100.ru — адрес для ссылок (с 27.09.2026):
-  // на iPhone он открывает приложение, и приложение открывает у себя ту же страницу
+  // Сайт — app.fitness100.ru (с 14.10.2026; прежний адрес на GitHub Pages
+  // остался в старых ссылках). На iPhone app.fitness100.ru открывает
+  // приложение (с 27.09.2026), и оно открывает у себя ту же страницу
   const site = url.protocol === 'https:' && ((url.host === 'sokolov055.github.io' && url.pathname.startsWith('/admin_trainer_table'))
     || url.host === LINK_HOST);
   if (url.protocol === APP_SCHEME + ':' || (site && here.origin !== url.origin)) {

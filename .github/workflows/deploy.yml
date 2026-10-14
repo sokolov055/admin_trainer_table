@@ -1,4 +1,14 @@
-# Сборка и публикация мини-приложения на GitHub Pages.
+# Сборка и публикация приложения на нашем сервере (app.fitness100.ru).
+#
+# С 14.10.2026 сайт живёт на VPS в России: GitHub (США) больше не получает
+# IP-адреса пользователей. GitHub Pages отдаёт только страницы-указатели на
+# новый адрес (scripts/build-moved-site.mjs) — для старых ссылок и
+# Android-приложений до версии 7.
+#
+# Сборка уезжает на сервер под ключом WEB_DEPLOY_KEY (секрет репозитория).
+# На сервере этот ключ умеет только одно — принять архив сборки
+# (server/deploy/web-receive.sh в основном репозитории): ни входа в
+# консоль, ни других команд.
 #
 # Адрес Apps Script лежит в секрете VITE_API_URL (Settings → Secrets and
 # variables → Actions). В репозитории его нет: он попадает только в готовую
@@ -58,9 +68,35 @@ jobs:
       # новой сборкой (mobile/prepare-ios.sh). Старые тестовые сборки без
       # web.json просто перестают обновляться.
 
+      - name: Выложить на app.fitness100.ru
+        env:
+          KEY: ${{ secrets.WEB_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/web_deploy
+          chmod 600 ~/.ssh/web_deploy
+          # Ключ сервера закреплён: подменённый сервер сборку не получит
+          echo '194.58.102.135 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEQaceivhYg70FPYy+ZedCn+YYIFuo7GXO0/FDNQzlgZ' > ~/.ssh/known_hosts
+          tar -czf - -C dist . | ssh -i ~/.ssh/web_deploy -o BatchMode=yes webdeploy@194.58.102.135 "${GITHUB_SHA:0:7}"
+          rm -f ~/.ssh/web_deploy
+
+      - name: Проверить, что доехало
+        run: |
+          for i in 1 2 3 4 5 6; do
+            live=$(curl -s --max-time 20 "https://app.fitness100.ru/?t=$(date +%s)" | grep -oE 'build-sha" content="[0-9a-f]+' | grep -oE '[0-9a-f]+$' || true)
+            [ "$live" = "${GITHUB_SHA:0:7}" ] && { echo "На app.fitness100.ru: $live"; exit 0; }
+            sleep 5
+          done
+          echo "На app.fitness100.ru не та сборка: '$live'" >&2
+          exit 1
+
+      # Старый адрес — только указатели на новый, без приложения
+      - name: Переадресация для GitHub Pages
+        run: node scripts/build-moved-site.mjs dist moved
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: moved
 
   deploy:
     needs: build
