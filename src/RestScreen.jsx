@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import PlankGame from './PlankGame.jsx';
 import { clock } from './workout-model.js';
 import { alarmRings, alarmClosed } from './native-rest.js';
 import { ringOnce, stopVibration } from './rest-alarm.js';
@@ -14,7 +15,8 @@ import './rest.css';
  * не нажмут «Закрыть» (не дольше двух минут). Свёрнутое приложение
  * сигналит уведомлением (native-rest.js) и плашкой (Live Activity).
  */
-export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse }) {
+export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse, allowGame = false }) {
+  const [gameUntil, setGameUntil] = useState(0);
   const left = until - now;
   const over = left <= 0;
   const stopRef = useRef(onStop);
@@ -60,6 +62,11 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const share = over ? 1 : Math.max(0, Math.min(1, left / Math.max(1, total)));
   const R = 120;
   const C = 2 * Math.PI * R;
+  if (!over && allowGame && gameUntil === until) return (
+    <div className="rest-screen rest-screen--game" role="dialog" aria-modal="true" aria-label="Игра во время отдыха">
+      <PlankGame restLeft={left} onClose={() => setGameUntil(0)} />
+    </div>
+  );
   return (
     <div className={'rest-screen' + (over ? ' rest-screen--over' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}
       onTouchStart={touchStart} onTouchEnd={touchEnd} onTouchCancel={() => { swipe.current = null; }}>
@@ -100,6 +107,7 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
             </>}
         </div>
       )}
+      {!over && allowGame && <button type="button" className="button" onClick={() => setGameUntil(until)}>Тренер в планке</button>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>
         {over
           ? <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закрыть</button>

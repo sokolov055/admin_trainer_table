@@ -1,0 +1,93 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import { build } from 'esbuild';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { QUESTIONS } from '../src/plank-game.js';
+
+test('планка: мобильный экран, правильный ответ, проигрыш, таймер, победа и фото', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errors = []; page.on('pageerror', e => errors.push(String(e)));
+  try {
+    const game = await build({ entryPoints: ['src/plank-preview.jsx'], bundle: true, write: false, format: 'iife', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' } });
+    const image = readFileSync('src/assets/plank-coach.png').toString('base64');
+    const food = readFileSync('src/assets/plank-food.png').toString('base64');
+    const css = readFileSync('src/styles.css', 'utf8') + readFileSync('src/plank-game.css', 'utf8').replace("url('./assets/plank-coach.png')", `url('data:image/png;base64,${image}')`).replace("url('./assets/plank-food.png')", `url('data:image/png;base64,${food}')`);
+    await page.setContent(`<style>${css}</style><div id="root"></div>`);
+    await page.addScriptTag({ content: game.outputFiles[0].text });
+    await page.clock.install();
+    await page.getByLabel('Категория', { exact: true }).selectOption('muscle');
+    await page.getByLabel('Сложность', { exact: true }).selectOption('1');
+    await page.getByRole('button', { name: 'Поставить тренера в планку' }).click();
+    const answer = async (correct) => {
+      const text = await page.locator('.plank-game h3').innerText();
+      const q = QUESTIONS.find(q => q.text === text); assert.ok(q);
+      await page.getByRole('button', { name: q.answers[correct ? q.correct : (q.correct + 1) % 3], exact: true }).click();
+    };
+    await answer(true);
+    assert.equal(await page.getByRole('heading', { name: 'Верно! Продолжаем?' }).count(), 1);
+    await page.getByRole('button', { name: 'Следующий вопрос' }).click();
+    await answer(false);
+    assert.equal(await page.getByRole('heading', { name: 'Игра окончена' }).count(), 1);
+    assert.equal(await page.locator('.plank-game__coach--standing').count(), 1);
+    await page.getByRole('button', { name: 'Сыграть ещё' }).click();
+    await page.clock.runFor(10001);
+    assert.match(await page.locator('.plank-game__result').innerText(), /Не успел ответить/);
+    await page.getByRole('button', { name: 'Сыграть ещё' }).click();
+    for (let i = 0; i < 5; i++) {
+      await answer(true);
+      await page.getByRole('button', { name: i === 4 ? 'Забрать победу' : 'Следующий вопрос' }).click();
+    }
+    assert.equal(await page.getByRole('heading', { name: 'Ты победил!' }).count(), 1);
+    await page.setContent(`<style>${css}</style><div id="root"></div>`);
+    await page.addScriptTag({ content: game.outputFiles[0].text });
+    await page.getByLabel('Категория', { exact: true }).selectOption('muscle');
+    await page.locator('input[type=file]').setInputFiles({ name: 'coach.png', mimeType: 'image/png', buffer: readFileSync('src/assets/plank-coach.png') });
+    assert.equal(await page.locator('.plank-game__avatar').count(), 1);
+    await page.getByRole('button', { name: 'Убрать фото' }).click();
+    assert.equal(await page.locator('.plank-game__avatar').count(), 0);
+    mkdirSync('reports/plank', { recursive: true });
+    await page.screenshot({ path: 'reports/plank/mobile.png', fullPage: true });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.getByRole('button', { name: 'Поставить тренера в планку' }).click();
+    await page.screenshot({ path: 'reports/plank/mobile-playing.png', fullPage: true });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({ path: 'reports/plank/desktop.png', fullPage: true });
+    await page.getByRole('button', { name: 'Выбрать другую категорию' }).click();
+    await page.getByLabel('Категория', { exact: true }).selectOption('music');
+    await page.getByLabel('Сложность', { exact: true }).selectOption('4');
+    await page.evaluate(() => { Math.random = () => 0; const Original = window.AudioContext; window.audioNodes = 0; window.AudioContext = class extends Original { createOscillator() { window.audioNodes += 1; return super.createOscillator(); } }; });
+    await page.getByRole('button', { name: 'Поставить тренера в планку' }).click();
+    assert.equal(await page.evaluate(() => window.audioNodes), 0, 'звук не запускается сам');
+    await page.getByRole('button', { name: 'Слушать задание' }).click();
+    await page.waitForFunction(() => window.audioNodes > 0);
+    await page.clock.runFor(2000);
+    await page.getByRole('button', { name: 'Послушать ещё' }).waitFor();
+    assert.equal(await page.getByRole('timer').innerText(), '10', 'на ответ даны полные 10 секунд');
+    await page.getByRole('button', { name: 'Выбрать другую категорию' }).click();
+    await page.getByRole('button', { name: 'Включить фон' }).click();
+    await page.getByRole('button', { name: 'Выключить фон' }).waitFor();
+    await page.getByRole('button', { name: 'Выключить фон' }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByLabel('Категория', { exact: true }).selectOption('food');
+    await page.getByLabel('Сложность', { exact: true }).selectOption('1');
+    await page.evaluate(() => { Math.random = () => .999; });
+    await page.getByRole('button', { name: 'Поставить тренера в планку' }).click();
+    await page.screenshot({ path: 'reports/plank/mobile-picture.png', fullPage: true });
+    // Общий компонент отдыха: та же игра, таймер нельзя продлить или отменить игрой.
+    const fixture = await build({ stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {RestScreen} from './src/RestScreen.jsx'; let now=Date.now(); const root=createRoot(document.getElementById('root')); window.renderRest=(allowGame=true, over=false)=>root.render(<RestScreen until={now+30000} now={over?now+30001:now} total={30000} allowGame={allowGame} onStop={()=>{}}/>); window.renderRest();`, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, format: 'iife', loader: { '.css': 'empty', '.png': 'dataurl' }, logLevel: 'silent', define: { 'import.meta.env': '{}', 'process.env.NODE_ENV': '"production"' }, plugins: [{ name: 'alarm-stubs', setup(b) { b.onResolve({ filter: /^(\.\/native-rest\.js|\.\/rest-alarm\.js)$/ }, a => ({ path: a.path, namespace: 'stub' })); b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const alarmRings=()=>false; export const alarmClosed=async()=>false; export const ringOnce=()=>{}; export const stopVibration=()=>{};' })); } }] });
+    await page.goto('about:blank');
+    await page.setContent('<div id="root"></div>');
+    await page.addScriptTag({ content: fixture.outputFiles[0].text });
+    await page.getByRole('button', { name: 'Тренер в планке', exact: true }).click();
+    await page.getByRole('button', { name: 'Поставить тренера в планку' }).click();
+    await page.evaluate(() => window.renderRest(true, true));
+    await page.getByRole('dialog', { name: 'Отдых окончен' }).waitFor();
+    assert.equal(await page.locator('.plank-game').count(), 0);
+    await page.evaluate(() => window.renderRest(false, false));
+    await page.getByRole('dialog', { name: 'Отдых', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Тренер в планке', exact: true }).count(), 0);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});

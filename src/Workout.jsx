@@ -29,6 +29,7 @@ import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
 import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, wasSet, scaleTo } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
+import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
@@ -60,6 +61,7 @@ function supersetMark(exercises, index) {
 
 // backLabel — куда ведёт «назад»: из программы — к ней, из меню — к списку клиентов
 export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose, backLabel = 'К программе' }) {
+  const plankEnabled = usePlankAccess();
   const [record, setRecord] = useState(null);
   const [history, setHistory] = useState([]);
   const [ready, setReady] = useState(false);
@@ -1682,6 +1684,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const restLayer = restShown && (dom ? (node) => createPortal(node, document.body) : (node) => node)(restFolded
     ? <RestPill left={s.restUntil - now} onOpen={() => setCollapsedUntil(0)} />
     : <RestScreen
+      allowGame={asClient && plankEnabled}
       until={s.restUntil}
       total={startedHere ? here.total : (s.restSeconds || 90) * 1000}
       now={now}

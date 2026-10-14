@@ -25,6 +25,8 @@ import { apiPublic } from '../api.js';
 import MyTrainer, { LinkOffers } from './MyTrainer.jsx';
 import { ConsentGate } from '../Consent.jsx';
 import { accountState, pendingTrainerLink } from '../trainer-link.js';
+import PlankGame from '../PlankGame.jsx';
+import { usePlankAccess } from '../plank-access.js';
 
 /**
  * Панель клиента.
@@ -59,6 +61,7 @@ const TABS = [
  * зашедший включить уведомления не должен листать свой рост и телефон.
  */
 const MENU = [
+  { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlan },
   // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
@@ -76,6 +79,7 @@ const FAMILY = { id: 'family', label: 'Семья', note: 'Тренировки 
 const TRAINER = { id: 'trainer', label: 'Мой тренер', note: 'ID и привязка к тренеру', Icon: IconLink };
 
 export default function ClientApp({ me, clientRow, preview }) {
+  const plankEnabled = usePlankAccess();
   const [view, setView] = useState('overview');
 
   // Семья — в своём кабинете и в «смотрю как клиент» (тренер проверяет,
@@ -117,7 +121,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   const [consented, setConsented] = useState(false);
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, guide, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => m.id !== 'plank-game' || plankEnabled), guide, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -295,6 +299,7 @@ export default function ClientApp({ me, clientRow, preview }) {
 
       {!onTab && (
       <main className="app__body" key={view}>
+        {view === 'plank-game' && plankEnabled && <PlankGame onClose={() => go(lastTab)} />}
         {view === 'profile' && (
           <>
             <p className="small muted">

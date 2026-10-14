@@ -35,6 +35,7 @@ const waitingPage = (
 );
 import { Gestures } from './gestures.jsx';
 import RestLayer from './RestLayer.jsx';
+import { PlankAccess } from './plank-access.js';
 
 /**
  * Корень приложения: спрашивает сервер «кто я» и по ответу показывает
@@ -224,12 +225,12 @@ export default function App() {
   const me = state.me;
 
   return (
-    <>
+    <PlankAccess.Provider value={me.role === 'client' && me.plankGameEnabled === true}>
       <Deferred fallback={waitingPage}>
         {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
       </Deferred>
       <Gestures />
-      <RestLayer />
+      <RestLayer allowGame={me.role === 'client' && me.plankGameEnabled === true} />
       {/* Подсказка живёт не только сразу после входа. Ставят приложение
           редко с первого раза: человек заходит посмотреть баланс, закрывает
           вкладку и через неделю снова ищет ссылку в переписке. Поэтому она
@@ -244,7 +245,7 @@ export default function App() {
       {canOpenInApp()
         ? <AppHint active={!initData} />
         : <InstallHint active={!initData} installReady={installReady} />}
-    </>
+    </PlankAccess.Provider>
   );
 }
 

@@ -15,7 +15,7 @@ import { onLiveAction } from './native-activity.js';
  * телефона, который запустил отдых (rest-here.js). Экран тренировки
  * открыт — отдых рисует он сам, а этот слой молчит.
  */
-export default function RestLayer() {
+export default function RestLayer({ allowGame = false }) {
   const [, redraw] = useState(0);
   useEffect(() => onRestHere(() => redraw((n) => n + 1)), []);
   // Кнопки будильника вне экрана тренировки: «+30 с» — отдых идёт дальше,
@@ -51,6 +51,7 @@ export default function RestLayer() {
   }
   return createPortal(
     <RestScreen
+      allowGame={allowGame}
       until={rest.until}
       total={rest.total || 90000}
       now={now}

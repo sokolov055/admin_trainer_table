@@ -883,6 +883,7 @@ const MOCK = {
     tgName: 'Demo',
     tgUsername: 'demo',
     photoUrl: '',
+    plankGameEnabled: params.__role !== 'trainer' && new URLSearchParams(window.location.search).get('mockPlank') !== '0',
     hasPersonalSheet: true,
     // ?mockUnlinked=1 — клиент, зарегистрировавшийся сам, без тренера
     unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',

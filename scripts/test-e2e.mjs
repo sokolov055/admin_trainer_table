@@ -108,6 +108,22 @@ test('вход в кабинет доходит до программы', async 
   await page.getByRole('heading', { name: /Тренировка 1/ }).waitFor({ timeout: 20000 });
 });
 
+test('планка доступна тестовому клиенту и скрыта без серверного разрешения', async () => {
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /Тренер в планке/ }).click();
+  await page.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
+  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
+  const normalContext = await browser.newContext({ storageState: await page.context().storageState(), viewport: VIEWPORT });
+  const normal = await normalContext.newPage();
+  try {
+    await normal.goto(origin + '?mockPlank=0');
+    await normal.getByRole('button', { name: 'Меню', exact: true }).click();
+    await normal.waitForFunction(() => !Array.from(document.querySelectorAll('.menu__item')).some(el => el.textContent.includes('Тренер в планке')));
+    assert.equal(await normal.getByRole('button', { name: /Тренер в планке/ }).count(), 0);
+  } finally { await normalContext.close(); }
+});
+
 /**
  * Первое упражнение блока терялось: строка с заголовком «Тренировка»
  * пропускалась целиком, а у части тренеров в ней же стоит первое
