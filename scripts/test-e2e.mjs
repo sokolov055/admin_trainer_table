@@ -26,9 +26,15 @@ test('FT-565: предложенное время статики принима�
     await times.first().waitFor();
     assert.equal(await times.count(), 4);
     for (let i = 0; i < 4; i++) assert.equal(await times.nth(i).inputValue(), '60');
-    for (let i = 0; i < 4; i++) await phone.getByRole('button', { name: 'Норм', exact: true }).first().click();
+    // После первого круга суперсета встаёт штатный экран отдыха — закрываем его
+    for (let i = 0; i < 4; i++) {
+      await phone.getByRole('button', { name: 'Норм', exact: true }).first().click();
+      if (i === 1) await phone.getByRole('button', { name: 'Закончить отдых', exact: true }).click();
+    }
     await phone.getByRole('button', { name: 'Завершить', exact: true }).click();
     await phone.getByRole('button', { name: 'Исправить результат', exact: true }).waitFor();
+    // Сохранение уходит запросом — перезагрузка раньше него проверяла бы гонку теста
+    await phone.waitForFunction(() => JSON.parse(localStorage.getItem('workout_demo_server:3'))[0].status === 'completed');
     await phone.reload();
     const saved = await phone.evaluate(() => JSON.parse(localStorage.getItem('workout_demo_server:3'))[0]);
     assert.equal(saved.status, 'completed');
