@@ -75,21 +75,30 @@ export function Media({ media }) {
  * глаз находил их сразу. Сама инструкция общая, без марок: залы разные,
  * а регулировки у тренажёров одни и те же — сиденье, спинка, валик, упор.
  */
-export function SetupText({ text }) {
-  if (!text) return null;
+export function setupParts(text) {
+  if (!text) return { steps: [], mistakes: [] };
   const lines = String(text).split('\n').map((l) => l.trim()).filter(Boolean);
   const steps = lines.filter((l) => !/^ошибка:/i.test(l));
   const cap = (l) => l.charAt(0).toUpperCase() + l.slice(1);
   const mistakes = lines.filter((l) => /^ошибка:/i.test(l)).map((l) => cap(l.replace(/^ошибка:\s*/i, '')));
+  return { steps, mistakes };
+}
+
+export function SetupMistakes({ mistakes = [] }) {
+  if (!mistakes.length) return null;
+  return <div className="setup__mistakes">
+    <strong>{mistakes.length > 1 ? 'Частые ошибки' : 'Частая ошибка'}</strong>
+    <ul>{mistakes.map((l, i) => <li key={i}>{l}</li>)}</ul>
+  </div>;
+}
+
+export function SetupText({ text, showMistakes = true }) {
+  if (!text) return null;
+  const { steps, mistakes } = setupParts(text);
   return (
     <div className="setup">
       <ul className="setup__steps">{steps.map((l, i) => <li key={i}>{l}</li>)}</ul>
-      {mistakes.length > 0 && (
-        <div className="setup__mistakes">
-          <strong>{mistakes.length > 1 ? 'Частые ошибки' : 'Частая ошибка'}</strong>
-          <ul>{mistakes.map((l, i) => <li key={i}>{l}</li>)}</ul>
-        </div>
-      )}
+      {showMistakes && <SetupMistakes mistakes={mistakes} />}
     </div>
   );
 }

@@ -202,6 +202,27 @@ test('суперсет показан одной группой с числом 
   assert.equal(await group.locator('.exercise').count(), 2, 'в группе оба упражнения');
 });
 
+/** FT-570: настройки конкретной модели не повторяют общую инструкцию. */
+test('в активной тренировке тренажёр раскрывается отдельно от инструкции упражнения', async () => {
+  await section('Тренировка 2 — низ').getByRole('button', { name: 'Начать тренировку' }).click();
+  await page.getByRole('heading', { name: 'Тренировка 2 — низ' }).first().waitFor({ timeout: 20000 });
+
+  const squat = page.locator('.workout__exercise').filter({ hasText: 'Присед со штангой' });
+  const about = squat.locator('.workout__about');
+  await about.getByRole('heading', { name: 'Как настроить', exact: true }).waitFor({ timeout: 10000 });
+  assert.equal(await about.locator('.setup__mistakes:visible').count(), 1, 'ошибка упражнения показана один раз');
+
+  const machine = about.locator('details.workout__machine-info');
+  await machine.getByText('Тренажёр · Силовая рама у окна', { exact: true }).click();
+  await machine.getByRole('heading', { name: 'Где регулировки', exact: true }).waitFor({ timeout: 5000 });
+  assert.equal(await machine.getByRole('heading', { name: 'Как настроить', exact: true }).count(), 0,
+    'общая инструкция не вложена в карточку тренажёра');
+
+  await page.getByRole('button', { name: 'Отменить', exact: true }).click();
+  await page.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();
+  await swipe(page, { x: 4, y: 420 }, { x: 340, y: 420 });
+});
+
 /**
  * Полный круг: провести тренировку и вернуться к программе. Проверяем
  * то, ради чего экран и сделан, — что проведённый блок помечен и ведёт к

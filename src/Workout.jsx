@@ -25,7 +25,7 @@ import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { ExerciseMachines } from './trainer/MachinesEditor.jsx';
 import { useData } from './useData.js';
-import { SetupText, MachineInfo, MachineNote, Media } from './media.jsx';
+import { SetupText, SetupMistakes, setupParts, MachineInfo, MachineNote, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
 import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, wasSet, scaleTo } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
@@ -1599,41 +1599,57 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         );
       })}
       {machines.length > 0 && editable && whos.some((w) => !chosenOf(w)) && <p className="small muted">На каком тренажёре? Вес у каждого свой.</p>}
-      {(used.length ? used : [null]).map((m) => ((m ? m.setup || m.photo || info.setup : info.setup) && (
+      {(used.length ? used : [null]).map((m) => ((m ? m.setup || m.photo || (m.photos && m.photos.length) : false) && (
         <details className="workout__setup" key={m ? m.uid : 'all'}>
-          <summary>{m ? 'Тренажёр «' + m.name + '»: фото, регулировки' : 'Как настроить тренажёр'}</summary>
-          {m ? <MachineInfo machine={m} principle={info.setup} /> : <SetupText text={info.setup} />}
+          <summary>{(m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + m.name}</summary>
+          <MachineInfo machine={m} />
         </details>
       )))}
+      {aboutView(info)}
     </>;
   };
 
   /**
-   * Тренажёр и техника (владелец, 09.10.2026): клиенту в зале одним касанием —
-   * как выглядит тренажёр и как настраивается, техника, мышцы, анимация; под
-   * ними уже подходы. То же, что в карточке упражнения программы
+   * В занятии подробности конкретного тренажёра раскрываются отдельно, а
+   * настройка и техника упражнения остаются на виду. Это два независимых
+   * источника: один тренажёр используют в разных упражнениях, поэтому его
+   * регулировки не должны повторять инструкцию упражнения (FT-570).
    */
   const aboutView = (info, chosen = null, title = '') => {
-    const setup = chosen ? chosen.setup || chosen.photo || info.setup : info.setup;
+    const photos = chosen && (chosen.photos && chosen.photos.length ? chosen.photos : chosen.photo ? [chosen.photo] : []);
+    const machineDetails = !!(chosen && (chosen.setup || photos.length));
     const muscles = info.muscles && ((info.muscles.primary || []).length || (info.muscles.secondary || []).length) ? info.muscles : null;
-    if (!setup && !info.notes && !info.media && !muscles) return null;
+    if (!machineDetails && !info.setup && !info.notes && !info.media && !muscles) return null;
 
     const word = chosen && chosen.kind === 'equipment' ? 'Оборудование' : 'Тренажёр';
-    const label = setup ? (chosen ? word + ' «' + chosen.name + '» и техника' : 'Тренажёр и техника') : 'Техника';
     // Техника часто записана тем же текстом, что «Как настроить», — второй
     // раз не показываем (владелец, 09.10.2026: текст повторялся под шагами)
     const flat = (t) => String(t || '').toLowerCase().replace(/[^a-zа-яё0-9]+/g, ' ').trim();
     const notes = info.notes && !(info.setup && (flat(info.setup).includes(flat(info.notes)) || flat(info.notes).includes(flat(info.setup)))) ? info.notes : '';
-    return <details className="workout__setup workout__about">
-      <summary>{title ? title + ': ' + label.toLowerCase() : label}</summary>
-      {setup && (chosen ? <MachineInfo machine={chosen} principle={info.setup} /> : <SetupText text={info.setup} />)}
-      {notes && <p className="workout__technique">{notes}</p>}
+    const technique = setupParts(notes);
+    const mistakes = [...setupParts(info.setup).mistakes, ...technique.mistakes]
+      .filter((mistake, index, all) => all.findIndex((item) => flat(item) === flat(mistake)) === index);
+    return <div className="workout__about">
+      {title && <h4 className="workout__about-name">{title}</h4>}
+      {machineDetails && <details className="workout__setup workout__machine-info">
+        <summary>{word + ' · ' + chosen.name}</summary>
+        <MachineInfo machine={chosen} />
+      </details>}
+      {info.setup && <section className="workout__guide">
+        <h4 className="workout__guide-title">Как настроить</h4>
+        <SetupText text={info.setup} showMistakes={false} />
+      </section>}
+      {technique.steps.length > 0 && <section className="workout__guide">
+        <h4 className="workout__guide-title">Как выполнять</h4>
+        <p className="workout__technique">{technique.steps.join('\n')}</p>
+      </section>}
+      <SetupMistakes mistakes={mistakes} />
       {muscles && <div className="muscles muscles--block">
         <MuscleFigure primary={muscles.primary || []} secondary={muscles.secondary || []} size="sm" />
         <MuscleNames primary={muscles.primary || []} secondary={muscles.secondary || []} max={4} />
       </div>}
       <Media media={info.media} />
-    </details>;
+    </div>;
   };
 
   const extrasView = (ex, ei, info) => {

@@ -59,8 +59,10 @@ async function saveNow() { await act(async () => { await hideOnce(); await delay
 let offline = false;
 let holdSave = null;
 let holdList = null;
+let exerciseSetupResponse = null;
 globalThis.__workoutApi = async (action, params) => {
   if (offline) throw new Error('Связи нет');
+  if (action === 'exercise.setup' && exerciseSetupResponse) return exerciseSetupResponse;
   if (action === 'workout.list' && holdList) { const gate = holdList; holdList = null; await gate; }
   if (action === 'workout.save' && holdSave) { const gate = holdSave; holdSave = null; await gate; }
   try { return workoutMock(action, { ...params, __role: 'client' }); }
@@ -666,6 +668,44 @@ test('другой тренажёр: веса неотмеченных — с п
   const none = withMachine(press, null);
   assert.equal(none.machine, undefined, 'без тренажёра');
   assert.deepEqual(none.sets, press.sets, 'без ответа сервера веса не меняются');
+});
+
+test('FT-570: регулировки тренажёра раскрываются отдельно, инструкция упражнения не дублируется', async () => {
+  data.clear();
+  const machine = {
+    uid: 'shoulder-press', name: 'Technogym', kind: 'machine', photo: '/machine.jpg',
+    setup: 'Рычаг — под сиденьем.\nОшибка: не тяните рычаг под нагрузкой.',
+  };
+  exerciseSetupResponse = { setups: { 42: {
+    name: 'Жим от плеч',
+    setup: 'Сиденье — рукоятки на уровне плеч.\nОшибка: не отрывайте спину от спинки.',
+    notes: 'Прижмите спину к спинке. Выжимайте рукоятки вверх и плавно опускайте.',
+    machines: [machine], alternatives: [], noteKey: 'e:жим от плеч',
+  } }, notes: {} };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: {
+        title: 'Плечи', exercises: [{ name: 'Жим от плеч', exerciseId: 42, machine, sets: '3', reps: '10', weight: '20' }],
+      }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+
+    const about = local.root.find(n => n.props.className === 'workout__about');
+    assert.deepEqual(about.findAll(n => n.props.className === 'workout__guide-title').map(text), ['Как настроить', 'Как выполнять']);
+    const details = about.findAllByType('details');
+    assert.equal(details.length, 1, 'у тренажёра одна отдельная раскрывашка');
+    assert.equal(text(details[0].findByType('summary')), 'Тренажёр · Technogym');
+    assert.equal(details[0].findAll(n => n.props.className === 'machine__h' && text(n) === 'Как настроить').length, 0,
+      'общая инструкция упражнения не повторяется внутри тренажёра');
+    assert.equal(about.findAll(n => n.props.className === 'workout__technique').length, 1, 'техника показана один раз');
+    assert.equal(about.findAll(n => n.props.className === 'setup__mistakes').length, 2,
+      'ошибка тренажёра остаётся внутри раскрывашки, ошибка упражнения — одна после техники');
+    assert.equal(text(about.findAll(n => n.props.className === 'setup__mistakes')[1]), 'Частая ошибкаНе отрывайте спину от спинки.');
+  } finally {
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
 });
 
 /**
