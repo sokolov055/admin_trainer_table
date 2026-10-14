@@ -1269,6 +1269,47 @@ test('тренировка в программе переносится удер
   }
 });
 
+test('FT-568: список и карточка показывают один баланс даже со старым кешем обзора', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', isMobile: true, hasTouch: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => {
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      localStorage.setItem('api_cache_v1:client.overview|{"clientRow":3}', JSON.stringify({
+        at: Date.now() - 86400000, data: { row: 3, balance: 58500, price: 2250,
+          trainingsLeft: 26, trainingsThisMonth: 4, nextTrainingDate: '2026-10-11T18:00:00' },
+      }));
+    });
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('tab', { name: /^Все · / }).click({ timeout: 10000 });
+    const row = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Анна Морозова' }).first();
+    await row.waitFor({ timeout: 20000 });
+    assert.match(await row.innerText(), /12\s*000/);
+    await phone.evaluate(() => {
+      window.__balanceHints = [];
+      new MutationObserver(() => {
+        const hint = document.querySelector('.card-section[data-view="overview"] .lead__hint');
+        if (hint) window.__balanceHints.push(hint.textContent);
+      }).observe(document.getElementById('root'), { childList: true, subtree: true, characterData: true });
+    });
+    await row.click();
+    const overview = phone.locator('.card-section[data-view="overview"]');
+    await overview.locator('.lead__hint').waitFor({ timeout: 10000 });
+    assert.match(await overview.locator('.lead__hint').innerText(), /12\s*000 ₽ на балансе/);
+    assert.match(await overview.locator('.lead__value').innerText(), /4 тренировки/);
+    await phone.waitForTimeout(700);
+    assert.ok((await phone.evaluate(() => window.__balanceHints)).every((hint) => !hint.includes('58')),
+      'устаревший кеш не мелькает даже до ответа сервера');
+    await phone.getByRole('button', { name: 'К списку' }).click();
+    await phone.locator('.item').filter({ hasText: 'Анна Морозова' }).first().click();
+    assert.match(await phone.locator('.card-section[data-view="overview"] .lead__hint').innerText(), /12\s*000/);
+  } finally {
+    await context.close();
+  }
+});
+
 test('в карточке клиента тренировки выбираются, копируются, удаляются и переименовываются', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
   const phone = await context.newPage();

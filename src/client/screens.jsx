@@ -26,6 +26,7 @@ import { lazyPage, Deferred } from '../lazy.js';
 import SwipeRow from '../SwipeRow.jsx';
 import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
 import { uid } from '../workout-model.js';
+import { trainerOverview } from './trainer-overview.js';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
@@ -122,12 +123,13 @@ function PackageEnding({ state, payer, trainer }) {
 /** Как часто открытый «Обзор» клиента сверяет баланс и занятия с сервером */
 const LIVE_MS = 15000;
 
-export function Overview({ clientRow, clientView = false }) {
+export function Overview({ clientRow, clientView = false, trainerClient, trainerClients }) {
   // У клиента — живой: тренер провёл оплату, баланс меняется без «потянуть»
   // (у тренера карточка перечитывается сама после его записи — onMutated)
-  const { loading, data, error, reload } = useData(
-    'client.overview', clientRow ? { clientRow } : {}, [clientRow], { live: clientRow ? 0 : LIVE_MS }
+  const { loading, data: loaded, error, reload } = useData(
+    'client.overview', clientRow ? { clientRow } : {}, [clientRow], { live: LIVE_MS }
   );
+  const data = trainerOverview(loaded, trainerClient, trainerClients);
 
   if (loading) return <Loading rows={2} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;

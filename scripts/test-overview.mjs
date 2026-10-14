@@ -112,16 +112,50 @@ function overview(extra = {}) {
   };
 }
 
-function draw(data) {
+function draw(data, props = {}) {
   globalThis.__overview = {
     useData: () => ({ loading: false, data, error: null, reload() {} }),
     apiMutate: () => Promise.resolve({}),
   };
 
   let tree;
-  act(() => { tree = renderer.create(React.createElement(Overview, {})); });
+  act(() => { tree = renderer.create(React.createElement(Overview, props)); });
   return tree;
 }
+
+test('FT-568: старый обзор использует баланс, занятия и даты общей шапки тренера', () => {
+  const client = { row: 3, price: 2250, balance: 54000, trainings: 5, payer: '',
+    lastTrainingDate: '2026-10-12T18:00:00', nextTrainingDate: '2026-10-13T06:30:00' };
+  const tree = draw(overview({ balance: 58500, price: 2250, trainingsLeft: 26,
+    trainingsThisMonth: 4, nextTrainingDate: '2026-10-11T18:00:00' }), { clientRow: 3, trainerClient: client });
+  assert.match(screen(tree), /24 тренировки/);
+  assert.match(screen(tree), /54 000 ₽ на балансе/);
+  assert.doesNotMatch(screen(tree), /58 500|26 тренировок|11\.10\.2026/);
+  act(() => tree.update(React.createElement(Overview, { clientRow: 3,
+    trainerClient: { ...client, balance: 2250, trainings: 6 } })));
+  assert.match(screen(tree), /1 тренировка/);
+  assert.match(screen(tree), /Осталось одно оплаченное занятие/);
+  act(() => tree.unmount());
+});
+
+test('FT-568: общий снимок сохраняет деньги плательщика и сплита', () => {
+  const client = { row: 3, balance: 0, price: 2000, trainings: 5, payer: 'Борис' };
+  const tree = draw(overview({ balance: 0, payer: { name: 'Борис', balance: 10000, trainingsLeft: 5 } }),
+    { clientRow: 3, trainerClient: client, trainerClients: [{ name: 'Борис', balance: 4000 }] });
+  assert.match(screen(tree), /2 тренировки/);
+  assert.match(screen(tree), /Борис · 4 000 ₽/);
+  act(() => tree.update(React.createElement(Overview, { clientRow: 3,
+    trainerClient: { ...client, splitOf: 9, splitPayerName: 'Борис', splitBalance: 12000, splitTrainingsLeft: 3 } })));
+  assert.match(screen(tree), /3 тренировки/);
+  assert.match(screen(tree), /Борис · 12 000 ₽/);
+  act(() => tree.unmount());
+});
+
+test('FT-568: чужая строка не подменяет данные клиентского обзора', () => {
+  const tree = draw(overview(), { clientRow: 3, trainerClient: { row: 4, balance: 54000 } });
+  assert.match(screen(tree), /20 000 ₽ на балансе/);
+  act(() => tree.unmount());
+});
 
 /* ==========================================================================
  * Конец пакета

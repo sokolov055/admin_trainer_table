@@ -572,7 +572,7 @@ function ClientDetail({ client: opened, onBack, onPreview }) {
   // Карточка открывается снимком строки списка, а баланс, занятия и цена в
   // нём меняются: тренер провёл оплату — список перечитывается (onMutated),
   // и шапка с «Оплатами» берут строку оттуда, а не прежний снимок (10.10.2026)
-  const list = useData('trainer.clients', {}, []);
+  const list = useData('trainer.clients', {}, [], { live: 15000 });
   const fresh = ((list.data && list.data.clients) || []).find((c) => c.row === opened.row);
   const client = fresh ? { ...opened, ...fresh } : opened;
   const [view, setView] = useState('overview');
@@ -641,7 +641,9 @@ function ClientDetail({ client: opened, onBack, onPreview }) {
             data-view={v.value}
             style={{ marginTop: 'var(--space-4)' }}
           >
-            {v.value === 'payments'
+            {v.value === 'overview'
+              ? <Overview clientRow={client.row} trainerClient={client} trainerClients={list.data?.clients} />
+              : v.value === 'payments'
               ? <Payments client={client} />
               : <v.Screen clientRow={client.row} />}
           </div>
