@@ -1359,12 +1359,13 @@ function SheetView({ name, onBack }) {
  * на вопрос «куда пойти», а не «как оно себя ведёт». Настройка, которую
  * трогают один раз, стояла там, где каждый день ищут переход.
  */
-export function Settings() {
+export function Settings({ owner = false }) {
   return (
     <>
       <Section title="Внешний вид">
         <ThemeSetting />
       </Section>
+      {owner && <OnboardingSetting />}
 
       {/* Уведомления тренеру нужны не меньше, чем клиенту: отдых во время
           занятия он ведёт сам, и пуш о его конце приходит тому, кто это
@@ -1381,3 +1382,4 @@ export function Settings() {
     </>
   );
 }
+import OnboardingSetting from './OnboardingSetting.jsx';

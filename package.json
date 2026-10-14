@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Telegram Mini App: личный кабинет клиента и панель тренера поверх Google Sheets",
   "scripts": {
-    "test": "node --test scripts/test-workout.mjs scripts/test-track.mjs scripts/test-cardio-plan.mjs scripts/test-plan.mjs scripts/test-ration.mjs scripts/test-ration-access.mjs scripts/test-auth.mjs scripts/test-preview.mjs scripts/test-trainer-calendar.mjs scripts/test-calendar-move.mjs scripts/test-metrics.mjs scripts/test-overview.mjs scripts/test-live-data.mjs scripts/test-push.mjs scripts/test-steps.mjs scripts/test-steps-huawei.mjs scripts/test-rest.mjs scripts/test-activity.mjs scripts/test-live-settle.mjs scripts/test-watch-link.mjs scripts/test-offline.mjs scripts/test-api-offline.mjs scripts/test-api-retry.mjs scripts/test-api-fallback.mjs scripts/test-pinch.mjs scripts/test-browser.mjs scripts/test-plank-game.mjs",
+    "test": "node --test scripts/test-workout.mjs scripts/test-track.mjs scripts/test-cardio-plan.mjs scripts/test-plan.mjs scripts/test-ration.mjs scripts/test-ration-access.mjs scripts/test-auth.mjs scripts/test-preview.mjs scripts/test-trainer-calendar.mjs scripts/test-calendar-move.mjs scripts/test-metrics.mjs scripts/test-overview.mjs scripts/test-live-data.mjs scripts/test-push.mjs scripts/test-steps.mjs scripts/test-steps-huawei.mjs scripts/test-rest.mjs scripts/test-activity.mjs scripts/test-live-settle.mjs scripts/test-watch-link.mjs scripts/test-offline.mjs scripts/test-api-offline.mjs scripts/test-api-retry.mjs scripts/test-api-fallback.mjs scripts/test-pinch.mjs scripts/test-browser.mjs scripts/test-plank-game.mjs scripts/test-onboarding.mjs",
     "test:overview": "node --test scripts/test-overview.mjs",
     "test:push": "node --test scripts/test-push.mjs",
     "test:metrics": "node --test scripts/test-metrics.mjs",
@@ -26,7 +26,9 @@
     "build:site": "node scripts/build-marketing-site.mjs",
     "preview": "vite preview",
     "switch-api": "node scripts/switch-api.js",
-    "test:plank": "node --test scripts/test-plank-game.mjs scripts/test-plank-browser.mjs"
+    "test:plank": "node --test scripts/test-plank-game.mjs scripts/test-plank-browser.mjs",
+    "test:onboarding": "node --test scripts/test-onboarding.mjs",
+    "test:onboarding-e2e": "node --test scripts/test-onboarding-e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",

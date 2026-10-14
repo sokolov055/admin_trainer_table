@@ -27,6 +27,7 @@ import { ConsentGate } from '../Consent.jsx';
 import { accountState, pendingTrainerLink } from '../trainer-link.js';
 import PlankGame from '../PlankGame.jsx';
 import { usePlankAccess } from '../plank-access.js';
+import Onboarding from './Onboarding.jsx';
 
 /**
  * Панель клиента.
@@ -99,6 +100,37 @@ export default function ClientApp({ me, clientRow, preview }) {
   // «Установить / Открыть в приложении» (AppHint.jsx)
   const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
   const own = !clientRow && !preview && !(me && me.member);
+  const [consented, setConsented] = useState(false);
+  const [onboarding, setOnboarding] = useState(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const onboardingClosed = useRef(false);
+  // Выключатель всегда читается с сервера. Возврат из фона и опрос закрывают
+  // анкету даже у человека, который оставил её открытой до отключения.
+  useEffect(() => {
+    if (!own || !me?.unlinked || (me.consentNeeded && !consented)) return undefined;
+    let alive = true;
+    let reading = false;
+    const refresh = async () => {
+      if (reading || document.visibilityState === 'hidden') return;
+      reading = true;
+      try {
+        const r = await apiPublic('client.onboarding.get');
+        if (!alive) return;
+        setOnboarding(r);
+        if (!r.enabled || !r.eligible) setOnboardingOpen(false);
+        else if (!onboardingClosed.current) setOnboardingOpen(true);
+      } catch (err) {
+        // Старый сервер не знает анкету — прежний кабинет остаётся доступен.
+        console.warn('Не удалось проверить доступность анкеты', err.message);
+        if (alive) setOnboardingOpen(false);
+      } finally { reading = false; }
+    };
+    refresh();
+    const timer = setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { alive = false; clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [own, me?.unlinked, me?.consentNeeded, consented]);
   // «Как пользоваться» (FT-495) — инструкция из меню, а не только кружком на «Обзоре»
   const [guideOpen, setGuideOpen] = useState(false);
   const guide = { id: 'guide', label: 'Как пользоваться', note: guideNote(), Icon: IconGuide, action: () => setGuideOpen(true) };
@@ -119,7 +151,6 @@ export default function ClientApp({ me, clientRow, preview }) {
     return () => { alive = false; };
   }, [mine, clientRow]);
   // Согласие по новым правилам ещё не подтверждено — сначала оно
-  const [consented, setConsented] = useState(false);
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
   const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => m.id !== 'plank-game' || plankEnabled), guide, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
@@ -127,7 +158,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
   // смахнуть вправо — вернуться на ту вкладку, где был человек
   const [lastTab, setLastTab] = useState('overview');
-  useBackGesture(() => setView(lastTab), !TABS.some((t) => t.id === view));
+  useBackGesture(() => setView(lastTab), !onboardingOpen && !TABS.some((t) => t.id === view));
 
   // Просмотр глазами клиента: лента разделов клиента, а слева от первого —
   // список клиентов тренера, откуда пришли. Смахивание вправо с первого
@@ -148,7 +179,7 @@ export default function ClientApp({ me, clientRow, preview }) {
     // За последним разделом — боковое меню: смахнуть влево открывает его
     openMenu: () => { setMenuOpen(true); haptic(); },
     closeMenu: () => setMenuOpen(false),
-    enabled: TABS.some((t) => t.id === view),
+    enabled: !onboardingOpen && TABS.some((t) => t.id === view),
   });
 
   // Боковое меню появилось ради «Моих данных»: вкладок внизу четыре, и
@@ -193,6 +224,11 @@ export default function ClientApp({ me, clientRow, preview }) {
     return <ConsentGate onDone={() => setConsented(true)} />;
   }
 
+  if (onboardingOpen && onboarding?.eligible) return <Onboarding initial={onboarding}
+    onClose={(r) => { onboardingClosed.current = true; setOnboarding(r); setOnboardingOpen(false); }}
+    onDisabled={() => { setOnboarding(null); setOnboardingOpen(false); }}
+    onDone={() => { onboardingClosed.current = true; setOnboarding(null); setOnboardingOpen(false); setView('plan'); }} />;
+
   return (
     <div className="app">
       {preview && (
@@ -220,6 +256,7 @@ export default function ClientApp({ me, clientRow, preview }) {
       )}
 
       <header className="app__header">
+        {onboarding?.enabled && onboarding?.eligible && <button className="button button--block" onClick={() => setOnboardingOpen(true)}>Продолжить подбор программы</button>}
         <div className="app__bar">
           <div className="app__headline">
             <h1 className="app__title">{me.name}</h1>
