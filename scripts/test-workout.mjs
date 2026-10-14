@@ -116,6 +116,29 @@ test('FT-565: клиент и тренер принимают заполненн
   }
 });
 
+test('отмена доступна во время сохранения и отправляется следом за ним (FT-571)', async () => {
+  data.clear(); await mount(); await saveNow();
+  const weight = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));
+  await act(async () => weight.props.onChange({ target: { value: '42' } }));
+  let release;
+  holdSave = new Promise(resolve => { release = resolve; });
+  let pending;
+  await act(async () => { pending = hideOnce(); await delay(); });
+  try {
+    await click('Отменить');
+    await click('Отменить');
+    assert.ok(tree.root.findAllByType('p').some(n => text(n).includes('Отменена')));
+  } finally {
+    await act(async () => { release(); await pending; await delay(); });
+  }
+  const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+  assert.equal(saved.status, 'cancelled');
+  assert.equal(saved.exercises[0].sets[0].weight, '42');
+  assert.ok(saved.exercises[0].sets.every(s => s.state === 'skipped'));
+  await mount(false);
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Отменена'));
+});
+
 test('интерфейс: запись подхода, пауза, продолжение, завершение и история', async () => {
   data.clear(); await mount();
   await saveNow();

@@ -1386,6 +1386,13 @@ const MOCK = {
     mirrorUpdated: true, ms: 12400, at: new Date().toISOString(),
   }),
 
+  'trainer.client.update': (params) => {
+    const client = CLIENTS.find(c => c.row === Number(params.clientRow));
+    if (!client) throw new Error('Клиент не найден');
+    if (typeof params.test === 'boolean') client.test = params.test;
+    return { ok: true };
+  },
+
   'trainer.clients': () => ({
     clients: CLIENTS,
     summary: {
