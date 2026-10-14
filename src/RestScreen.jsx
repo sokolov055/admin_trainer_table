@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PlankGame from './PlankGame.jsx';
+import { usePlankSession } from './PlankSession.jsx';
+import { activeRound } from './plank-game.js';
 import { clock } from './workout-model.js';
 import { alarmRings, alarmClosed } from './native-rest.js';
 import { ringOnce, stopVibration } from './rest-alarm.js';
@@ -17,8 +19,14 @@ import './rest.css';
  */
 export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse, allowGame = false }) {
   const [gameUntil, setGameUntil] = useState(0);
+  const [plank, plankSession] = usePlankSession();
   const left = until - now;
   const over = left <= 0;
+  // В том числе партия, открытая из меню под этим экраном: будильник
+  // не должен скрывать продолжающийся отсчёт вопроса.
+  useLayoutEffect(() => {
+    if (over && allowGame) plankSession.pause('rest', Date.now(), until);
+  }, [over, until, allowGame, plankSession]);
   const stopRef = useRef(onStop);
   const swipe = useRef(null);
   stopRef.current = onStop;
@@ -64,7 +72,7 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const C = 2 * Math.PI * R;
   if (!over && allowGame && gameUntil === until) return (
     <div className="rest-screen rest-screen--game" role="dialog" aria-modal="true" aria-label="Игра во время отдыха">
-      <PlankGame restLeft={left} onClose={() => setGameUntil(0)} />
+      <PlankGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />
     </div>
   );
   return (
@@ -107,7 +115,8 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
             </>}
         </div>
       )}
-      {!over && allowGame && <button type="button" className="button" onClick={() => setGameUntil(until)}>Тренер в планке</button>}
+      {over && allowGame && activeRound(plank.round) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
+      {!over && allowGame && <button type="button" className="button" onClick={() => setGameUntil(until)}>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</button>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>
         {over
           ? <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закрыть</button>

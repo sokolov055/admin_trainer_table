@@ -1,40 +1,110 @@
-.plank-game { max-width: 620px; margin: 0 auto; padding: 12px 0 24px; color: var(--text); }
-.plank-game__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.plank-game h2 { font-size: clamp(26px, 6vw, 36px); letter-spacing: -.025em; margin: 0 0 16px; }
-.plank-game__scene { background: #eaf4ef; color: #163d2e; border-radius: 16px; overflow: hidden; }
-.plank-game__coach { position: relative; aspect-ratio: 1.16; width: min(100%, 360px); margin: auto; background-image: url('./assets/plank-coach.png'); background-size: 172% 100%; background-position: left center; }
-.plank-game__coach--standing { background-size: 238% 100%; background-position: right center; }
-.plank-game__avatar { position: absolute; left: 5%; top: 39%; width: 21%; aspect-ratio: 1; object-fit: cover; border-radius: 50%; transform: rotate(-12deg); border: 2px solid #163d2e; }
-.plank-game__coach--standing .plank-game__avatar { left: 35%; top: 7%; width: 32%; transform: none; }
-.plank-game__photo { display: grid; gap: 8px; margin: 20px 0 10px; font-size: 14px; font-weight: 650; }
-.plank-game__photo input { max-width: 100%; font: inherit; }
-.plank-game__choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-.plank-game__choices label { display: grid; gap: 6px; font-size: 14px; }
-.plank-game__choices select { width: 100%; min-width: 0; min-height: 48px; padding: 8px; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
-.plank-game__answers button:disabled { cursor: default; opacity: .5; }
-.plank-game__question-image { display: block; max-height: 160px; max-width: 100%; margin: 0 auto 16px; }
-.plank-game__food { width: 160px; height: 160px; margin: 0 auto 16px; background: white url('./assets/plank-food.png') left center / 200% 100% no-repeat; border-radius: 12px; }
+.plank-game {
+  --pg-ink: #173c31; --pg-muted: #486255; --pg-paper: #fffdf6;
+  --pg-green: #216549; --pg-line: #d2ddd1; --pg-orange: #ffb750;
+  --pg-ease: cubic-bezier(.23, 1, .32, 1);
+  width: 100%; max-width: 640px; margin: 0 auto; color: var(--pg-ink);
+  background: var(--pg-paper); border-radius: 16px; overflow: clip;
+  font-family: inherit; text-align: left; isolation: isolate;
+}
+.plank-game *, .plank-game *::before, .plank-game *::after { box-sizing: border-box; }
+.plank-game ::selection { color: #fff; background: var(--pg-green); }
+.plank-game button, .plank-game select, .plank-game input { font: inherit; }
+.plank-game button { cursor: pointer; touch-action: manipulation; transition: transform 120ms var(--pg-ease), background-color 160ms ease, color 160ms ease; }
+.plank-game button:active:not(:disabled) { transform: scale(.97); }
+.plank-game button:disabled { cursor: default; opacity: .55; }
+.plank-game :is(button, select, input, summary):focus-visible { outline: 3px solid var(--pg-green); outline-offset: 3px; }
+.plank-game__toolbar { display: flex; align-items: center; gap: 4px; padding: 10px 12px; }
+.plank-game .plank-game__toolbar h2 { flex: 1; min-width: 0; font-size: clamp(19px, 5vw, 25px); letter-spacing: -.025em; line-height: 1.15; margin: 0 4px; font-weight: 850; }
+.plank-game__icon-button { flex: 0 0 44px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 12px; background: #edf2e8; color: var(--pg-ink); }
+.plank-game__rest { display: flex; gap: 7px; align-items: center; padding: 8px 16px; background: #dcebdc; font-size: 13px; font-variant-numeric: tabular-nums; }
+.plank-game__rest strong { font-size: 16px; white-space: nowrap; }
+.plank-game__rest > span:last-child { margin-left: auto; max-width: 112px; font-size: 11px; text-align: right; }
+.plank-game__scene { position: relative; height: clamp(205px, 48vw, 300px); overflow: hidden; background: #c6dfcb url('./assets/plank-gym.png') center 55% / cover no-repeat; }
+.plank-game__hud { position: absolute; z-index: 3; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: start; gap: 8px; font-size: 12px; }
+.plank-game__hud > span { display: flex; align-items: center; gap: 5px; padding: 7px 10px; background: var(--pg-paper); color: var(--pg-ink); border-radius: 12px; }
+.plank-game__hud strong { font-size: 18px; line-height: 1; font-variant-numeric: tabular-nums; }
+.plank-game__coach { position: absolute; width: min(94%, 420px); aspect-ratio: 1; bottom: -100px; left: 50%; margin-left: max(-47%, -210px); background: url('./assets/plank-coach-v2.png') 0 0 / 200% 200% no-repeat; transform-origin: 50% 66%; }
+.plank-game__coach--straining { background-position: 100% 0; }
+.plank-game--question .plank-game__scene { height: 180px; }
+.plank-game--media .plank-game__scene { height: 145px; }
+.plank-game--question .plank-game__coach { width: 300px; margin-left: -150px; bottom: -70px; }
+.plank-game--media .plank-game__coach { width: 260px; margin-left: -130px; bottom: -65px; }
+.plank-game__coach--standing, .plank-game__coach--resting { width: min(55%, 265px); margin-left: max(-27.5%, -132.5px); bottom: -8px; transform-origin: 50% 90%; }
+.plank-game__coach--standing { background-position: 100% 100%; animation: plank-rise 260ms var(--pg-ease) both; }
+.plank-game__coach--resting { background-position: 0 100%; }
+.plank-game--question .plank-game__coach--standing, .plank-game--question .plank-game__coach--resting { width: 175px; margin-left: -87.5px; bottom: -8px; }
+.plank-game__coach--holding { animation: plank-breathe 1800ms ease-in-out infinite; }
+.plank-game__scene--intense .plank-game__coach--holding { animation: plank-shake 220ms ease-in-out infinite alternate; }
+.plank-game__avatar { position: absolute; left: 5%; top: 29%; width: 18%; aspect-ratio: 1; object-fit: cover; border-radius: 50%; transform: rotate(-12deg); }
+.plank-game__coach--standing .plank-game__avatar { left: 36%; top: 3%; width: 27%; transform: none; }
+.plank-game__coach--resting .plank-game__avatar { left: 40%; top: 19%; width: 26%; transform: none; }
+.plank-game__sweat { position: absolute; left: 18%; bottom: 64px; }
+.plank-game__sweat i { position: absolute; width: 6px; height: 10px; border-radius: 75% 75% 75% 0; background: #279eb0; animation: plank-sweat 1100ms linear infinite; }
+.plank-game__sweat i:nth-child(2) { left: 16px; animation-delay: 300ms; }
+.plank-game__sweat i:nth-child(3) { left: 28px; animation-delay: 650ms; }
+.plank-game__reward { position: absolute; z-index: 4; top: 56px; right: 20px; color: #163c2e; background: #ffe7a8; border-radius: 12px; padding: 7px 14px; font-size: 28px; font-weight: 850; text-align: center; animation: plank-reward 260ms var(--pg-ease) both; }
+.plank-game__reward span { display: block; font-size: 12px; }
+.plank-game .plank-game__speech { margin: 0; padding: 13px 18px; min-height: 64px; display: flex; align-items: center; background: #dfebdb; color: var(--pg-ink); font-size: 15px; font-weight: 750; line-height: 1.4; }
+.plank-game__body { padding: 16px 18px 20px; }
+.plank-game .plank-game__rules { font-size: 15px; line-height: 1.5; margin: 0 0 16px; }
+.plank-game__choices { display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; margin-bottom: 16px; }
+.plank-game__choices label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; }
+.plank-game__choices select { width: 100%; min-width: 0; min-height: 46px; padding: 8px; border: 1px solid var(--pg-line); border-radius: 12px; color: var(--pg-ink); background: #fff; font-size: 14px; }
+.plank-game__primary { width: 100%; min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 14px; border: 0; border-radius: 12px; color: #fff; background: var(--pg-green); box-shadow: 0 4px 9px #173c3121; font-size: 15px; font-weight: 800; }
+.plank-game .plank-game__note { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--pg-muted); }
+.plank-game__stats { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 9px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.plank-game__stats strong { font-size: 25px; line-height: 1; }
+.plank-game__time { height: 7px; background: #dce7d9; border-radius: 7px; overflow: hidden; }
+.plank-game__time span { display: block; height: 100%; background: var(--pg-green); transform-origin: left; transition: transform 100ms linear; }
+.plank-game__time.is-urgent span { background: #b64827; }
+.plank-game .plank-game__topic { color: var(--pg-muted); font-size: 12px; font-weight: 650; margin: 14px 0 7px; }
+.plank-game h3 { margin: 0 0 14px; font-size: 21px; letter-spacing: -.02em; line-height: 1.3; font-weight: 800; }
+.plank-game__answers { display: grid; gap: 8px; }
+.plank-game__answers button { display: flex; align-items: center; gap: 12px; min-height: 54px; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--pg-line); border-radius: 12px; color: var(--pg-ink); background: #fff; font-size: 15px; font-weight: 650; line-height: 1.35; }
+.plank-game__answers button > span { width: 29px; height: 29px; display: grid; flex: 0 0 29px; place-items: center; border-radius: 8px; color: var(--pg-muted); background: #edf2e8; font-size: 13px; font-weight: 750; }
+.plank-game__question-image { display: block; max-height: 96px; max-width: 100%; margin: 0 auto 12px; }
+.plank-game__food { width: 96px; height: 96px; margin: 0 auto 12px; background: white url('./assets/plank-food.png') left center / 200% 100% no-repeat; border-radius: 12px; }
 .plank-game__food--oil { background-position: right center; }
-.plank-game--question .plank-game__scene { display: grid; grid-template-columns: minmax(120px, .85fr) 1.15fr; align-items: center; }
-.plank-game--question .plank-game__coach { width: min(100%, 180px); }
-.plank-game--question .plank-game__speech { padding: 14px; font-size: 15px; min-height: 0; text-align: left; }
-.plank-game--question .plank-game__food { width: 120px; height: 120px; }
-.plank-game__speech { padding: 0 20px 20px; margin: 0; min-height: 64px; text-align: center; font-weight: 700; font-size: 18px; line-height: 1.4; }
-.plank-game__intro p, .plank-game__result p { line-height: 1.5; }
-.plank-game__stats { display: flex; justify-content: space-between; gap: 16px; margin: 20px 0 12px; font-size: 14px; }
-.plank-game__stats strong { font-size: 23px; font-variant-numeric: tabular-nums; }
-.plank-game__time { height: 6px; border-radius: 8px; background: #d3e5db; overflow: hidden; }
-.plank-game__time span { display: block; height: 100%; background: #28804f; transform-origin: left; transition: transform 100ms linear; }
-.plank-game h3 { font-size: 21px; line-height: 1.3; margin: 20px 0 16px; }
-.plank-game__answers { display: grid; gap: 10px; }
-.plank-game__answers button { text-align: left; background: var(--surface, #fff); color: inherit; border: 1px solid var(--border, #cbd8d1); border-radius: 12px; padding: 16px; min-height: 52px; font: inherit; cursor: pointer; transition: transform 160ms ease-out, border-color 160ms ease-out; }
-.plank-game button:active { transform: scale(.98); }
-.plank-game button:focus-visible { outline: 3px solid #28804f; outline-offset: 3px; }
-.plank-game__intro > button, .plank-game__result > button { width: 100%; min-height: 52px; }
-.plank-game__rest { font-variant-numeric: tabular-nums; font-weight: 700; }
-.rest-screen.rest-screen--game { display: block; overflow-y: auto; touch-action: pan-y; cursor: auto; padding: calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 24px); }
-.plank-game__coach--holding { animation: plank-strain 1.8s ease-in-out infinite; }
-@keyframes plank-strain { 50% { transform: translateY(2px); } }
-@media (hover: hover) and (pointer: fine) { .plank-game__answers button:hover { border-color: #28804f; } }
-@media (max-width: 420px) { .plank-game__coach { width: 250px; } .plank-game__speech { font-size: 16px; min-height: 64px; } }
-@media (prefers-reduced-motion: reduce) { .plank-game__coach--holding { animation: none; } .plank-game button, .plank-game__time span { transition: none; } }
+.plank-game__listen { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 14px; }
+.plank-game__listen button { display: flex; align-items: center; gap: 8px; border: 0; border-radius: 12px; min-height: 46px; padding: 10px 12px; background: #dcebdc; color: var(--pg-ink); font-weight: 700; }
+.plank-game__listen small { flex-basis: 100%; color: var(--pg-muted); }
+.plank-game__wave { display: flex; align-items: center; gap: 3px; height: 30px; }
+.plank-game__wave i { width: 3px; background: var(--pg-green); border-radius: 3px; transform: scaleY(.4); }
+.plank-game__wave.is-playing i { animation: plank-wave 500ms ease-in-out infinite alternate; }
+.plank-game__result { text-align: center; padding: 12px 0 0; }
+.plank-game__result p { font-size: 15px; line-height: 1.5; margin: 12px 0 18px; }
+.plank-game__result-mark { display: grid; place-items: center; width: 46px; height: 46px; margin: 0 auto 12px; color: var(--pg-green); background: #dcebdc; border-radius: 50%; }
+.plank-game__result-mark svg { width: 28px; height: 28px; }
+.plank-game__result .plank-game__final-score { font-size: 42px; font-weight: 850; line-height: 1.1; }
+.plank-game__final-score span { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; }
+.plank-game__text-button { display: block; margin: 14px auto 0; min-height: 44px; padding: 8px 12px; border: 0; background: transparent; color: var(--pg-muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.plank-game__settings { margin-top: 16px; font-size: 13px; color: var(--pg-muted); }
+.plank-game__settings summary { padding: 12px 0; cursor: pointer; }
+.plank-game__settings label { display: flex; align-items: center; min-height: 44px; gap: 8px; }
+.plank-game__settings input { width: 18px; height: 18px; accent-color: var(--pg-green); }
+.plank-game__photo { display: grid; gap: 8px; margin-top: 20px; font-size: 13px; }
+.plank-game__photo input { max-width: 100%; }
+.plank-game__confirm { padding: 14px; background: #f9e6ce; border-radius: 12px; font-size: 14px; line-height: 1.5; }
+.plank-game__confirm button { min-height: 44px; margin: 4px; border: 1px solid #90795c; background: #fffdf6; color: var(--pg-ink); border-radius: 8px; padding: 8px; }
+.plank-game__error { color: #8b321c; font-size: 14px; line-height: 1.4; }
+.plank-game__confetti { position: absolute; inset: 0; pointer-events: none; }
+.plank-game__confetti i { position: absolute; top: 0; width: 7px; height: 13px; background: var(--pg-orange); animation: plank-confetti 1300ms ease-out both; }
+.plank-game__confetti i:nth-child(even) { background: var(--pg-green); }
+.rest-screen.rest-screen--game { display: block; overflow-y: auto; touch-action: pan-y; cursor: auto; background: #e7ede2; padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 16px); }
+.rest-screen__game-paused { font-size: 15px; line-height: 1.5; max-width: 340px; text-align: center; margin: 16px auto; }
+@keyframes plank-breathe { 50% { transform: translateY(2px) rotate(.35deg); } }
+@keyframes plank-shake { from { transform: translateY(1px) rotate(-.3deg); } to { transform: translateY(-1px) rotate(.3deg); } }
+@keyframes plank-rise { from { opacity: .3; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes plank-sweat { from { opacity: 0; transform: translate(0, -8px) rotate(-20deg); } 25% { opacity: .9; } to { opacity: 0; transform: translate(-10px, 35px) rotate(-20deg); } }
+@keyframes plank-reward { from { opacity: .2; transform: translateY(8px) scale(.95); } to { opacity: 1; transform: none; } }
+@keyframes plank-wave { to { transform: scaleY(1); } }
+@keyframes plank-confetti { from { opacity: 1; transform: translateY(-15px) rotate(0); } to { opacity: 0; transform: translateY(290px) rotate(240deg); } }
+@media (max-width: 420px) { .plank-game__coach { bottom: -85px; } .plank-game__coach--standing, .plank-game__coach--resting { bottom: 0; } .plank-game__body { padding: 14px; } }
+@media (max-width: 350px) { .plank-game__coach { bottom: -70px; } .plank-game__coach--standing, .plank-game__coach--resting { bottom: 0; } .plank-game__toolbar { padding: 8px; } .plank-game h3 { font-size: 19px; } }
+@media (hover: hover) and (pointer: fine) { .plank-game__answers button:hover:not(:disabled) { background: #edf2e8; } .plank-game__primary:hover { background: #184d37; } }
+@media (prefers-reduced-motion: reduce) {
+  .plank-game *, .plank-game *::before, .plank-game *::after { animation: none !important; transition: none !important; }
+  .plank-game button:active:not(:disabled) { transform: none; }
+  .plank-game__sweat, .plank-game__confetti { display: none; }
+  .plank-game__wave.is-playing i { transform: scaleY(1); }
+}

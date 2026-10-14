@@ -36,6 +36,7 @@ const waitingPage = (
 import { Gestures } from './gestures.jsx';
 import RestLayer from './RestLayer.jsx';
 import { PlankAccess } from './plank-access.js';
+import { PlankSessionProvider } from './PlankSession.jsx';
 
 /**
  * Корень приложения: спрашивает сервер «кто я» и по ответу показывает
@@ -226,6 +227,7 @@ export default function App() {
 
   return (
     <PlankAccess.Provider value={me.role === 'client' && me.plankGameEnabled === true}>
+    <PlankSessionProvider key={[me.identityType, me.chatId, me.email, me.role, me.member, me.plankGameEnabled].join(':')}>
       <Deferred fallback={waitingPage}>
         {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
       </Deferred>
@@ -245,6 +247,7 @@ export default function App() {
       {canOpenInApp()
         ? <AppHint active={!initData} />
         : <InstallHint active={!initData} installReady={installReady} />}
+    </PlankSessionProvider>
     </PlankAccess.Provider>
   );
 }

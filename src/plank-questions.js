@@ -1,3 +1,4 @@
+import { addExtraQuestions } from './plank-questions-extra.js';
 export const CATEGORIES = [
   { id: 'food', name: 'Еда и питание' }, { id: 'music', name: 'Музыка и ритм' },
   { id: 'gym', name: 'Тренажёрный зал' }, { id: 'history', name: 'История силы' },
@@ -181,4 +182,5 @@ add('music', 4, [
   ['Какое изменение задаёт крещендо?', 'Постепенное увеличение громкости', 'Снижение BPM', 'Понижение на октаву', 'Крещендо относится к динамике.'],
 ]);
 
+addExtraQuestions(add);
 export const QUESTION_BANK = bank;
