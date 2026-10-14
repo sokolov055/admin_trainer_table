@@ -1301,6 +1301,8 @@ test('смахнуть подход и нажать корзину пальце�
     await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
     const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
     await rows.nth(1).waitFor({ timeout: 20000 });
+    // FT-570: инструкции упражнений раскрыты и приходят после открытия — ждём их, иначе подходы съезжают
+    await c.locator('.workout__about').first().waitFor({ timeout: 10000 });
     await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await c.waitForTimeout(300);
     const before = await rows.count();
@@ -1342,6 +1344,8 @@ test('протянуть подход далеко влево и отпусти�
     await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
     const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
     await rows.nth(1).waitFor({ timeout: 20000 });
+    // FT-570: инструкции упражнений раскрыты и приходят после открытия — ждём их, иначе подходы съезжают
+    await c.locator('.workout__about').first().waitFor({ timeout: 10000 });
     await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await c.waitForTimeout(300);
     // Вес на одну сторону (07.10.2026): отметка в первом подходе — у всех,

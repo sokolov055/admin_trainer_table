@@ -715,6 +715,8 @@ Object.assign(demoExercises[2], { setupOk: true, setup: 'Стойки — крю
 const DEMO_RACK = { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' };
 const DEMO_SMITH = { uid: 'smith1', name: 'Стойка у зеркала', photo: '', setup: '' };
 Object.assign(demoExercises[2], { machines: [DEMO_RACK, DEMO_SMITH], alternatives: [{ id: 10, name: 'Жим ногами' }] });
+// Техника приседа (FT-570): одна строка совпадает с настройкой — в занятии она не повторяется
+Object.assign(demoExercises[2], { notes: 'Стойки — крюки на уровне середины груди.\nГриф на верх трапеций, лопатки сведены.\nВниз — таз назад, колени по линии носков; вверх — на выдохе.\nОшибка: колени заваливаются внутрь.' });
 const demoMachines = [DEMO_RACK, DEMO_SMITH];
 let demoMachineSeq = 0;
 // Своя настройка Анны на раме — записал тренер
@@ -1543,7 +1545,9 @@ const MOCK = {
     const setups = {};
     demoExercises
       .filter((e) => ids.includes(e.id))
-      .forEach((e) => { setups[e.id] = { name: e.name, setup: e.setupOk ? e.setup : '', machines: e.machines || [], alternatives: e.alternatives || [], noteKey: 'e:' + e.name.toLowerCase() }; });
+      .forEach((e) => { setups[e.id] = { name: e.name, setup: e.setupOk ? e.setup : '', machines: e.machines || [], alternatives: e.alternatives || [], noteKey: 'e:' + e.name.toLowerCase(),
+        // Как сервер (exerciseSetupFor): техника, анимация и мышцы
+        notes: e.notes || '', media: e.media || null, ...demoMuscles(e.name) }; });
     return { setups, notes: { ...demoNotes } };
   },
   // Своя настройка тренажёра у клиента — у каждого своя (07.10.2026)

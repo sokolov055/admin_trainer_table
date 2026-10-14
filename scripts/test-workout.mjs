@@ -679,8 +679,9 @@ test('FT-570: регулировки тренажёра раскрываются
   exerciseSetupResponse = { setups: { 42: {
     name: 'Жим от плеч',
     setup: 'Сиденье — рукоятки на уровне плеч.\nОшибка: не отрывайте спину от спинки.',
-    notes: 'Прижмите спину к спинке. Выжимайте рукоятки вверх и плавно опускайте.',
+    notes: 'Сиденье — рукоятки на уровне плеч.\nПрижмите спину к спинке. Выжимайте рукоятки вверх и плавно опускайте.',
     machines: [machine], alternatives: [], noteKey: 'e:жим от плеч',
+    muscles: { primary: ['Дельты'], secondary: [] }, media: { kind: 'animation', url: 'Shoulder_Press' },
   } }, notes: {} };
   let local;
   try {
@@ -694,11 +695,15 @@ test('FT-570: регулировки тренажёра раскрываются
     const about = local.root.find(n => n.props.className === 'workout__about');
     assert.deepEqual(about.findAll(n => n.props.className === 'workout__guide-title').map(text), ['Как настроить', 'Как выполнять']);
     const details = about.findAllByType('details');
-    assert.equal(details.length, 1, 'у тренажёра одна отдельная раскрывашка');
+    assert.equal(details.length, 2, 'у тренажёра своя раскрывашка, у мышц и анимации — своя');
+    assert.equal(text(details[1].findByType('summary')), 'Мышцы и анимация');
+    const musclesIn = (node) => node.findAll(n => n.props.className === 'muscles muscles--block').length;
+    assert.ok(musclesIn(about) === 1 && musclesIn(details[1]) === 1, 'мышцы — внутри раскрывашки, не на виду');
     assert.equal(text(details[0].findByType('summary')), 'Тренажёр · Technogym');
     assert.equal(details[0].findAll(n => n.props.className === 'machine__h' && text(n) === 'Как настроить').length, 0,
       'общая инструкция упражнения не повторяется внутри тренажёра');
     assert.equal(about.findAll(n => n.props.className === 'workout__technique').length, 1, 'техника показана один раз');
+    assert.ok(!text(about.find(n => n.props.className === 'workout__technique')).includes('Сиденье'), 'строка настройки не повторяется в технике');
     assert.equal(about.findAll(n => n.props.className === 'setup__mistakes').length, 2,
       'ошибка тренажёра остаётся внутри раскрывашки, ошибка упражнения — одна после техники');
     assert.equal(text(about.findAll(n => n.props.className === 'setup__mistakes')[1]), 'Частая ошибкаНе отрывайте спину от спинки.');

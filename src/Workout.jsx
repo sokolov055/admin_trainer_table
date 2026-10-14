@@ -1627,6 +1627,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const flat = (t) => String(t || '').toLowerCase().replace(/[^a-zа-яё0-9]+/g, ' ').trim();
     const notes = info.notes && !(info.setup && (flat(info.setup).includes(flat(info.notes)) || flat(info.notes).includes(flat(info.setup)))) ? info.notes : '';
     const technique = setupParts(notes);
+    // И построчно: одна и та же строка (пробные повторения, хват) бывает в обоих текстах
+    const setupLines = new Set(setupParts(info.setup).steps.map(flat));
+    technique.steps = technique.steps.filter((l) => !setupLines.has(flat(l)));
     const mistakes = [...setupParts(info.setup).mistakes, ...technique.mistakes]
       .filter((mistake, index, all) => all.findIndex((item) => flat(item) === flat(mistake)) === index);
     return <div className="workout__about">
@@ -1644,11 +1647,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <p className="workout__technique">{technique.steps.join('\n')}</p>
       </section>}
       <SetupMistakes mistakes={mistakes} />
-      {muscles && <div className="muscles muscles--block">
-        <MuscleFigure primary={muscles.primary || []} secondary={muscles.secondary || []} size="sm" />
-        <MuscleNames primary={muscles.primary || []} secondary={muscles.secondary || []} max={4} />
-      </div>}
-      <Media media={info.media} />
+      {/* Мышцы и анимация — одним касанием (владелец, 09.10.2026): на виду
+          они отодвигали подходы на экран вниз */}
+      {(muscles || info.media) && <details className="workout__setup workout__extra">
+        <summary>{[muscles && 'Мышцы', info.media && (info.media.kind === 'animation' ? 'анимация' : 'видео')].filter(Boolean).join(' и ').replace(/^./, (c) => c.toUpperCase())}</summary>
+        {muscles && <div className="muscles muscles--block">
+          <MuscleFigure primary={muscles.primary || []} secondary={muscles.secondary || []} size="sm" />
+          <MuscleNames primary={muscles.primary || []} secondary={muscles.secondary || []} max={4} />
+        </div>}
+        <Media media={info.media} />
+      </details>}
     </div>;
   };
 
