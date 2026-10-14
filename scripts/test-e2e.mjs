@@ -194,6 +194,23 @@ test('код — только цифры; «Вставить код» берёт
     await p.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
   } finally { await context.close(); }
 });
+test('неверный код: круг краснеет, крестик, затем пустой ряд для новой попытки', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const p = await context.newPage();
+  p.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await p.goto(origin);
+    await p.fill('input[type=email]', 'back@example.com');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    const cells = p.locator('input[autocomplete=one-time-code]');
+    await cells.fill('000000');
+    await p.locator('.otp--checking').waitFor({ timeout: 2000 });
+    await p.locator('.otp--failed').waitFor({ timeout: 8000 });
+    await p.getByText('Код не подошёл.').waitFor();
+    await p.locator('.otp--input').waitFor({ timeout: 5000 });
+    assert.equal(await cells.inputValue(), '', 'ряд снова пустой');
+  } finally { await context.close(); }
+});
 test('почта тренера на странице клиента ведёт на вход тренера с той же почтой; Back — обратно', async () => {
   const { context, p } = await loginWindow();
   try {

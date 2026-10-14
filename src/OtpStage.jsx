@@ -1,51 +1,65 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { IconCheck } from './icons.jsx';
+import React, { useEffect, useRef, useState } from 'react';
+import { IconCheck, IconClose } from './icons.jsx';
 
 /**
- * Ввод кода и проверка номера — одной сценой (08.10.2026, FT-489).
+ * Ввод кода и проверка — одной сценой (FT-489, FT-574; ролик владельца
+ * 15.10.2026).
  *
- * Образец — ролик, который прислал владелец: ячейки кода в ряд; набран
- * последний знак — ячейки разлетаются по кругу и кружат, пока идёт
- * проверка; подтвердилось — встают ровно и зеленеют, сжимаются в точку, из
- * точки — галочка в кольце. Не подтвердилось — возвращаются в ряд и
- * качаются, как «нет» головой.
+ * Набрана цифра — по рамке её ячейки пробегает светлая дуга. Набран
+ * последний знак — за рядом проступает тонкая окружность и точка в центре,
+ * ячейки встают на неё, круг раскручивается с ускорением (около полусекунды),
+ * кружит, пока идёт проверка, плавно тормозит и встаёт так, что цифры
+ * стоят прямо. Верно — ячейки загораются зелёным, по спирали стягиваются в
+ * центр, оттуда — галочка в кольце и искры. Неверно — то же красным и
+ * крестик; потом снова пустой ряд (onSettled('error')).
  *
  * Движение здесь не украшение, а состояние: человек видит, что код ушёл и
- * его проверяют, без отдельного «Проверяем…». Сцена редкая — раз при входе,
- * поэтому ей можно быть заметной; при «Уменьшить движение» остаются только
- * смены состояний без полёта и кружения.
+ * его проверяют. Кручение ведётся покадрово (requestAnimationFrame): CSS не
+ * умеет «разогнаться, а затем остановиться там, где цифры стоят прямо».
+ * При «Уменьшить движение» остаются только смены состояний.
  *
- * phase: 'input' — ряд и ввод; 'checking' — круг и кружение; 'success' —
- * зелёные → точка → галочка, по окончании onSettled; 'error' — ряд, качание.
+ * phase (от родителя): 'input' — ряд и ввод; 'checking' — круг и кружение;
+ * 'success' / 'error' — ответ пришёл: круг тормозит и показывает исход,
+ * по окончании onSettled('success' | 'error').
  * Для проверки звонком кода нет: readOnly и сразу 'checking'.
  *
- * charset: 'digits' — код из СМС; 'alnum' — код из письма, буквы и цифры
- * (FT-574: та же сцена при входе и регистрации по почте).
+ * charset: 'digits' — код из СМС и из письма; 'alnum' — буквы и цифры
+ * (постоянный код демо-входа App Review).
  */
 
 const CELL = 40;
 const GAP = 8;
-const COLLAPSE_AFTER_MS = 760;
-const CHECK_AFTER_MS = 380;
-const SETTLE_AFTER_MS = 900;
+/** Ряд → круг: столько длится перестроение (transition у ячеек) */
+const RING_MS = 560;
+/** Разгон до полной скорости */
+const ACCEL_MS = 500;
+/** Полная скорость: оборот за 0,7 с */
+const SPIN_DEG_PER_MS = 360 / 700;
+/** Торможение — не короче этого */
+const BRAKE_MIN_MS = 700;
+/** Исход (зелёный или красный) виден, потом ячейки уходят в центр */
+const HOLD_MS = 700;
+/** Спираль в точку */
+const COLLAPSE_MS = 460;
+/** Значок виден, потом onSettled */
+const BADGE_MS = 1000;
+/** Искры вокруг галочки */
+const SPARKS = 8;
 
 function rowPos(i, n) {
   return { x: (i - (n - 1) / 2) * (CELL + GAP), y: 0 };
 }
 
+const radius = (n) => (n <= 4 ? 46 : 56);
+
 function ringPos(i, n) {
-  const r = n <= 4 ? 46 : 56;
+  const r = radius(n);
   const a = ((i * 360) / n - 90) * (Math.PI / 180);
   return { x: Math.round(r * Math.cos(a)), y: Math.round(r * Math.sin(a)) };
 }
 
-/** Текущий угол поворота кружащего круга — чтобы остановить его плавно */
-function currentAngle(el) {
-  const m = getComputedStyle(el).transform;
-  if (!m || m === 'none') return 0;
-  const [a, b] = m.slice(m.indexOf('(') + 1, -1).split(',').map(Number);
-  return Math.round((Math.atan2(b, a) * 180) / Math.PI);
-}
+const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export default function OtpStage({
   length = 6, value = '', onChange, onComplete, phase = 'input', onSettled,
@@ -53,44 +67,109 @@ export default function OtpStage({
   charset = 'digits', doneLabel = 'Номер подтверждён',
 }) {
   const alnum = charset === 'alnum';
+  const n = length;
   const input = useRef(null);
   const orbit = useRef(null);
-  const [step, setStep] = useState(phase); // success раскладывается на свои шаги
-  const [stop, setStop] = useState(null);  // угол, где кружение остановили
+  // input → checking → ok | fail → ok-collapse | fail-collapse → done | failed
+  const [step, setStep] = useState(phase === 'checking' ? 'checking' : 'input');
+  const spin = useRef({ angle: 0, speed: 0, frame: 0, started: 0, last: 0 });
+  const settledRef = useRef(onSettled);
+  settledRef.current = onSettled;
+
+  // Дуга по рамке ячейки, в которую только что встала цифра
+  const [spark, setSpark] = useState(null);
+  const typed = useRef(value.length);
+  useEffect(() => {
+    if (value.length > typed.current && !reducedMotion()) setSpark({ i: value.length - 1, key: Date.now() });
+    typed.current = value.length;
+  }, [value]);
+
+  const paint = (angle, transition = 'none') => {
+    if (!orbit.current) return;
+    orbit.current.style.transition = transition;
+    orbit.current.style.transform = `rotate(${angle}deg)`;
+  };
 
   useEffect(() => {
-    if (phase !== 'success') { setStep(phase); setStop(null); return undefined; }
-    setStep('success');
-    const t1 = setTimeout(() => setStep('collapse'), COLLAPSE_AFTER_MS);
-    const t2 = setTimeout(() => setStep('done'), COLLAPSE_AFTER_MS + CHECK_AFTER_MS);
-    const t3 = setTimeout(() => onSettled && onSettled(), COLLAPSE_AFTER_MS + CHECK_AFTER_MS + SETTLE_AFTER_MS);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    const s = spin.current;
+    const timers = [];
+    if (phase === 'input') {
+      cancelAnimationFrame(s.frame);
+      Object.assign(s, { angle: 0, speed: 0, started: 0, last: 0 });
+      paint(0);
+      setStep('input');
+      return undefined;
+    }
+    if (phase === 'checking') {
+      setStep('checking');
+      if (reducedMotion()) return undefined;
+      // Кружение — после перестроения в круг; разгон с ускорением
+      Object.assign(s, { angle: 0, speed: 0, started: performance.now() + RING_MS, last: 0 });
+      const tick = (now) => {
+        if (now >= s.started) {
+          const dt = s.last ? now - s.last : 0;
+          s.last = now;
+          const t = Math.min(1, (now - s.started) / ACCEL_MS);
+          s.speed = SPIN_DEG_PER_MS * t * t;
+          s.angle += s.speed * dt;
+          paint(s.angle);
+        }
+        s.frame = requestAnimationFrame(tick);
+      };
+      s.frame = requestAnimationFrame(tick);
+      return () => cancelAnimationFrame(s.frame);
+    }
+
+    // success / error: тормозим и показываем исход
+    const ok = phase === 'success';
+    const reveal = () => {
+      setStep(ok ? 'ok' : 'fail');
+      timers.push(setTimeout(() => {
+        setStep(ok ? 'ok-collapse' : 'fail-collapse');
+        // Спираль: круг докручивается, пока ячейки уходят в центр
+        if (!reducedMotion()) paint(s.angle + 220, `transform ${COLLAPSE_MS}ms cubic-bezier(0.55, 0, 0.75, 0.2)`);
+      }, HOLD_MS));
+      timers.push(setTimeout(() => setStep(ok ? 'done' : 'failed'), HOLD_MS + COLLAPSE_MS));
+      timers.push(setTimeout(() => settledRef.current && settledRef.current(ok ? 'success' : 'error'), HOLD_MS + COLLAPSE_MS + BADGE_MS));
+    };
+    cancelAnimationFrame(s.frame);
+    if (reducedMotion() || s.speed <= 0) {
+      paint(0);
+      reveal();
+      return () => timers.forEach(clearTimeout);
+    }
+    // Равнозамедленно до ближайшего положения, где цифры стоят прямо:
+    // круг симметричен, поэтому годится любой шаг 360/n
+    const from = s.angle;
+    const v = s.speed;
+    const unit = 360 / n;
+    const target = Math.ceil((from + (v * BRAKE_MIN_MS) / 2) / unit) * unit;
+    const T = (2 * (target - from)) / v;
+    const t0 = performance.now();
+    const brake = (now) => {
+      const t = Math.min(T, now - t0);
+      s.angle = from + v * t - (v / (2 * T)) * t * t;
+      paint(s.angle);
+      if (t < T) { s.frame = requestAnimationFrame(brake); return; }
+      s.angle = target;
+      s.speed = 0;
+      reveal();
+    };
+    s.frame = requestAnimationFrame(brake);
+    return () => { cancelAnimationFrame(s.frame); timers.forEach(clearTimeout); };
   }, [phase]);
 
-  // Кружение останавливается не рывком: первый кадр — круг замирает там,
-  // где был (кружение снято, угол тот же), следующий — плавно доходит до
-  // ближайшего полного оборота, чтобы цифры встали ровно
-  useLayoutEffect(() => {
-    if (phase !== 'success' || !orbit.current || stop) return undefined;
-    const from = currentAngle(orbit.current);
-    setStop({ angle: from, moving: false });
-    const frame = requestAnimationFrame(() => requestAnimationFrame(() => {
-      setStop({ angle: from > 0 ? 360 : 0, moving: true });
-    }));
-    return () => cancelAnimationFrame(frame);
-  }, [phase]);
+  useEffect(() => () => cancelAnimationFrame(spin.current.frame), []);
 
   useEffect(() => {
     if (phase === 'input' && autoFocus && input.current && !readOnly) input.current.focus();
   }, [phase, autoFocus, readOnly]);
 
-  const n = length;
   const chars = Array.from({ length: n }, (_, i) => value[i] || '');
-  const ring = step !== 'input' && step !== 'error';
-  const spinning = step === 'checking';
-  const orbitStyle = stop
-    ? { transform: `rotate(${stop.angle}deg)`, transition: stop.moving ? undefined : 'none' }
-    : undefined;
+  const ring = step !== 'input';
+  // Круг повёрнут на угол остановки — каждая ячейка поворачивается обратно,
+  // чтобы цифры стояли прямо, а не лёжа
+  const upright = ring ? -spin.current.angle : 0;
 
   const type = (event) => {
     if (readOnly || disabled || phase !== 'input') return;
@@ -101,8 +180,10 @@ export default function OtpStage({
   };
 
   return (
-    <div className={'otp otp--' + step} style={{ '--otp-cell': CELL + 'px' }} onClick={() => input.current && input.current.focus()}>
-      <div ref={orbit} className={'otp__orbit' + (spinning ? ' otp__orbit--spin' : '')} style={orbitStyle}>
+    <div className={'otp otp--' + step} style={{ '--otp-cell': CELL + 'px', '--otp-r': radius(n) + 'px' }}
+      onClick={() => input.current && input.current.focus()}>
+      <div ref={orbit} className="otp__orbit">
+        <span className="otp__track" aria-hidden="true" />
         {chars.map((c, i) => {
           const p = ring ? ringPos(i, n) : rowPos(i, n);
           const active = step === 'input' && !readOnly && i === Math.min(value.length, n - 1);
@@ -112,17 +193,30 @@ export default function OtpStage({
               className={'otp__cell' + (c ? ' otp__cell--filled' : '') + (active ? ' otp__cell--active' : '')}
               style={{ transform: `translate(${p.x}px, ${p.y}px)`, transitionDelay: (ring ? i * 35 : (n - 1 - i) * 25) + 'ms' }}
             >
-              {readOnly ? <span className="otp__dot" /> : c}
+              <span className="otp__glyph" style={step === 'ok' || step === 'fail' ? { transform: `rotate(${upright % 360}deg)` } : undefined}>
+                {readOnly ? <span className="otp__dot" /> : c}
+              </span>
+              {spark && spark.i === i && step === 'input' && <span key={spark.key} className="otp__spark" aria-hidden="true" />}
             </span>
           );
         })}
       </div>
+      <span className="otp__hub" aria-hidden="true" />
       <span className="otp__core" aria-hidden="true" />
-      <span className="otp__done" aria-hidden="true">
+      <span className="otp__done otp__done--ok" aria-hidden="true">
+        {Array.from({ length: SPARKS }, (_, i) => (
+          <span key={i} className="otp__burst" style={{ '--a': (i * 360) / SPARKS + 'deg', '--d': (i % 2 ? 46 : 58) + 'px' }} />
+        ))}
         <svg className="otp__halo" viewBox="0 0 72 72" width="72" height="72">
           <circle cx="36" cy="36" r="33" />
         </svg>
         <span className="otp__badge"><IconCheck size={22} /></span>
+      </span>
+      <span className="otp__done otp__done--fail" aria-hidden="true">
+        <svg className="otp__halo" viewBox="0 0 72 72" width="72" height="72">
+          <circle cx="36" cy="36" r="33" />
+        </svg>
+        <span className="otp__badge"><IconClose size={22} /></span>
       </span>
       {!readOnly && (
         <input
@@ -141,7 +235,7 @@ export default function OtpStage({
         />
       )}
       <span className="sr-status" role="status">
-        {step === 'checking' ? 'Проверяем' : step === 'done' ? doneLabel : step === 'error' ? 'Код не подошёл' : ''}
+        {step === 'checking' ? 'Проверяем' : step === 'done' ? doneLabel : step === 'failed' ? 'Код не подошёл' : ''}
       </span>
     </div>
   );

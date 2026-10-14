@@ -115,13 +115,13 @@ export default function PhoneLogin({ mode = 'login', options = { call: true, sms
     try {
       settle(await call('confirm', { key: check.key, code: value, device: describeDevice() }));
     } catch (error) {
+      // Красный круг и крестик; пустой ряд — когда сцена доиграет (onSettled)
       fail(error);
-      // Ряд вернулся и качнулся — можно вводить заново
-      setTimeout(() => { setCode(''); setPhase('input'); }, 600);
     }
   };
 
-  const onSettled = () => {
+  const onSettled = (kind) => {
+    if (kind === 'error') { setCode(''); setPhase('input'); return; }
     if (!after) return;
     if (after.kind === 'token') setToken(after.token);
     if (after.kind === 'name') { setStep('name'); setPhase('input'); }

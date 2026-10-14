@@ -41,8 +41,8 @@ const SUPPORT_EMAIL = 'sokolovk055@yandex.ru';
  */
 const REVIEW_EMAIL = 'appreview@fittrack.demo';
 
-/** Кружение проверки — не меньше одного оборота (OtpStage: 1,5 с на круг) */
-const CHECK_MIN_MS = 1400;
+/** Проверка видна целиком: круг встаёт, разгоняется и делает пару оборотов */
+const CHECK_MIN_MS = 1800;
 
 /** Повторный код — не чаще раза в минуту (так же считает сервер) */
 const RESEND_SEC = 60;
@@ -342,8 +342,8 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
       // Почта тренера (тренер из базы) — сервер говорит это после верного кода
       if (!trainer && error && error.code === 409) { setTrainerEmail(true); setPhase('input'); return; }
       setProblem((error && error.message) || 'Сервер не отвечает.');
+      // Красный круг и крестик; пустой ряд — когда сцена доиграет (settled)
       setPhase('error');
-      setTimeout(() => { setCode(''); setPhase('input'); }, 700);
     }
   };
 
@@ -366,11 +366,12 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
     check(found);
   };
 
-  const settled = () => {
+  const settled = (kind) => {
     const res = answer.current;
     answer.current = null;
+    if (kind === 'error') setCode('');
     setPhase('input');
-    if (res) finish(res);
+    if (kind !== 'error' && res) finish(res);
   };
 
   // Регистрация: тот же код ещё раз — уже с именем и согласиями

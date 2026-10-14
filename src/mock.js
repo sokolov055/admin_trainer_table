@@ -927,6 +927,8 @@ const MOCK = {
     return { sent: true, ttlMin: 15 };
   },
   'auth.client.confirm': (p) => {
+    // 000000 — неверный код: красный круг и крестик в сцене OtpStage
+    if (String(p.code) === '000000') throw Object.assign(new Error('Код не подошёл.'), { code: 400 });
     // Анкета подбора (FT-552) в демо — с ?mockOnboarding=1; регистрация — её первые шаги
     if (!p.name && !String(p.email || '').startsWith('back@')) return { needName: true, questionnaire: new URLSearchParams(window.location.search).get('mockOnboarding') === '1' };
     setDemoLoginRole('client');

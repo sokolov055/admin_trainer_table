@@ -4841,15 +4841,22 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 }
 
 /* ==========================================================================
-   Ввод кода и проверка номера (FT-489, OtpStage.jsx) — по ролику владельца:
-   ряд → круг и кружение (проверка) → зелёные → точка → галочка в кольце.
-   Ячейки стоят абсолютно в центре сцены и двигаются transform'ом, поэтому
-   переход между рядом и кругом — один и тот же transition.
+   Ввод кода и проверка (FT-489, FT-574, OtpStage.jsx) — по ролику владельца:
+   дуга по рамке набранной ячейки → окружность и точка → ячейки на круге →
+   разгон, кружение, торможение → зелёные (красные) → спираль в точку →
+   галочка с искрами (крестик). Ячейки стоят абсолютно в центре сцены и
+   двигаются transform'ом; кручение — у .otp__orbit, покадрово из JS.
    ========================================================================== */
+
+@property --otp-arc {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
 
 .otp {
   position: relative;
-  height: 156px;
+  height: 172px;
   display: grid;
   place-items: center;
   user-select: none;
@@ -4859,12 +4866,43 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .otp__orbit {
   position: absolute;
   inset: 0;
-  transition: transform 460ms var(--ease-out);
+  will-change: transform;
 }
 
-.otp__orbit--spin { animation: otp-spin 1500ms linear infinite; }
+/* Окружность, по которой встают ячейки: проступает раньше, чем они двинутся */
+.otp__track {
+  position: absolute;
+  left: calc(50% - var(--otp-r));
+  top: calc(50% - var(--otp-r));
+  width: calc(var(--otp-r) * 2);
+  height: calc(var(--otp-r) * 2);
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  opacity: 0;
+  scale: 0.7;
+  transition: opacity 360ms ease, scale 520ms var(--ease-out), border-color 260ms ease;
+}
+.otp:not(.otp--input) .otp__track { opacity: 1; scale: 1; }
+.otp--ok .otp__track { border-color: var(--good-line); }
+.otp--fail .otp__track { border-color: var(--critical-line); }
+/* В финале окружность остаётся внешним кольцом вокруг значка */
 
-@keyframes otp-spin { to { transform: rotate(360deg); } }
+/* Точка в центре круга */
+.otp__hub {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0;
+  scale: 0;
+  transition: opacity 300ms ease 200ms, scale 400ms var(--ease-out) 200ms, background-color 260ms ease;
+}
+.otp--checking .otp__hub,
+.otp--ok .otp__hub,
+.otp--fail .otp__hub { opacity: 1; scale: 1; }
+.otp--ok .otp__hub { background: var(--good-text); }
+.otp--fail .otp__hub { background: var(--critical-text); }
 
 .otp__cell {
   position: absolute;
@@ -4882,19 +4920,43 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   font-variant-numeric: tabular-nums;
   color: var(--text);
   transition:
-    transform 520ms var(--ease-out),
-    border-color 200ms ease,
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms ease,
     background-color 260ms ease,
+    box-shadow 260ms ease,
     color 260ms ease,
     opacity 300ms ease,
-    scale 300ms var(--ease-out);
+    scale 320ms var(--ease-out);
 }
+
+.otp__glyph { display: inline-block; transition: transform 340ms cubic-bezier(0.34, 1.4, 0.64, 1); }
 
 .otp__cell--filled { border-color: color-mix(in srgb, var(--text) 45%, transparent); }
 
 .otp__cell--active {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+/* Дуга-огонёк: один круг по рамке набранной ячейки */
+.otp__spark {
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--otp-arc), transparent 0deg 250deg, color-mix(in srgb, var(--accent) 60%, transparent) 300deg, var(--accent) 340deg, #fff 356deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  filter: drop-shadow(0 0 3px var(--accent));
+  pointer-events: none;
+  animation: otp-arc 720ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes otp-arc {
+  from { --otp-arc: 0deg; opacity: 1; }
+  80% { opacity: 1; }
+  to { --otp-arc: 360deg; opacity: 0; }
 }
 
 .otp__dot {
@@ -4904,40 +4966,56 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   background: var(--text-muted);
 }
 
-/* В круге ячейки чуть меньше — круг не должен быть шире ряда */
-.otp--checking .otp__cell,
-.otp--success .otp__cell { scale: 0.9; }
+/* На круге ячейки чуть меньше — круг не должен быть шире ряда */
+.otp:not(.otp--input) .otp__cell { scale: 0.9; }
 
-.otp--success .otp__cell {
+/* Исход: зелёный или красный, с подсветкой рамки */
+.otp--ok .otp__cell,
+.otp--ok-collapse .otp__cell {
   background: var(--good-fill);
   border-color: var(--good-line);
   color: var(--good-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--good-line) 35%, transparent), 0 0 18px color-mix(in srgb, var(--good-line) 45%, transparent);
 }
+.otp--fail .otp__cell,
+.otp--fail-collapse .otp__cell {
+  background: var(--critical-fill);
+  border-color: var(--critical-line);
+  color: var(--critical-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--critical-line) 35%, transparent), 0 0 18px color-mix(in srgb, var(--critical-line) 45%, transparent);
+}
+.otp--ok .otp__dot { background: var(--good-text); }
+.otp--fail .otp__dot { background: var(--critical-text); }
 
-.otp--success .otp__dot { background: var(--good-text); }
-
-/* Сжатие в точку: ячейки уходят в центр, на их месте — зелёная точка */
-.otp--collapse .otp__cell,
-.otp--done .otp__cell {
+/* Спираль в точку: ячейки уходят в центр, круг докручивается (JS) */
+.otp--ok-collapse .otp__cell,
+.otp--fail-collapse .otp__cell,
+.otp--done .otp__cell,
+.otp--failed .otp__cell {
   transform: translate(0, 0) !important;
-  scale: 0.2;
+  scale: 0.15;
   opacity: 0;
   transition-delay: 0ms !important;
-  transition-duration: 340ms;
+  transition-duration: 440ms;
+  transition-timing-function: cubic-bezier(0.55, 0, 0.75, 0.2);
 }
 
 .otp__core {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--chart-up-strong);
+  box-shadow: 0 0 14px var(--chart-up-strong);
   scale: 0;
   transition: scale 260ms var(--ease-out);
 }
-
-.otp--collapse .otp__core { scale: 1; transition-delay: 180ms; }
-.otp--done .otp__core { scale: 0; }
+.otp--ok-collapse .otp__core,
+.otp--fail-collapse .otp__core { scale: 1; transition-delay: 260ms; }
+.otp--fail-collapse .otp__core,
+.otp--failed .otp__core { background: var(--critical); box-shadow: 0 0 14px var(--critical); }
+.otp--done .otp__core,
+.otp--failed .otp__core { scale: 0; }
 
 .otp__done {
   position: absolute;
@@ -4949,17 +5027,25 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 }
 
 .otp__badge {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
   display: grid;
   place-items: center;
   background: var(--good-fill);
   color: var(--good-text);
   border: 1.5px solid var(--good-line);
-  scale: 0.4;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--good-line) 40%, transparent);
+  scale: 0.3;
+  rotate: -25deg;
   opacity: 0;
-  transition: scale 420ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease;
+  transition: scale 520ms cubic-bezier(0.34, 1.56, 0.64, 1), rotate 520ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease;
+}
+.otp__done--fail .otp__badge {
+  background: var(--critical-fill);
+  color: var(--critical-text);
+  border-color: var(--critical-line);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--critical-line) 40%, transparent);
 }
 
 .otp__halo {
@@ -4977,15 +5063,35 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   stroke-dashoffset: 208;
   transform: rotate(-90deg);
   transform-origin: 36px 36px;
-  transition: stroke-dashoffset 600ms var(--ease-out) 120ms;
+  transition: stroke-dashoffset 700ms var(--ease-out) 160ms;
 }
+.otp__done--fail .otp__halo circle { stroke: var(--critical); }
 
-.otp--done .otp__badge { scale: 1; opacity: 1; }
-.otp--done .otp__halo circle { stroke-dashoffset: 0; }
+.otp--done .otp__done--ok .otp__badge,
+.otp--failed .otp__done--fail .otp__badge { scale: 1; rotate: 0deg; opacity: 1; }
+.otp--done .otp__done--ok .otp__halo circle,
+.otp--failed .otp__done--fail .otp__halo circle { stroke-dashoffset: 0; }
+/* Крестик — «нет» головой */
+.otp--failed .otp__done--fail { animation: otp-shake 460ms var(--ease-out) 380ms both; }
 
-/* Не подошёл — назад в ряд и «нет» головой */
-.otp--error .otp__orbit { animation: otp-shake 420ms var(--ease-out); }
-.otp--error .otp__cell { border-color: var(--critical-line); color: var(--critical-text); }
+/* Искры вокруг галочки */
+.otp__burst {
+  position: absolute;
+  left: calc(50% - 2.5px);
+  top: calc(50% - 2.5px);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--chart-up-strong);
+  opacity: 0;
+}
+.otp--done .otp__burst { animation: otp-burst 900ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both; }
+
+@keyframes otp-burst {
+  0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(1); }
+}
 
 @keyframes otp-shake {
   0%, 100% { transform: translateX(0); }
@@ -5018,10 +5124,13 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .otp__orbit--spin,
-  .otp--error .otp__orbit { animation: none; }
-  .otp__orbit,
+  .otp__spark,
+  .otp__burst,
+  .otp--failed .otp__done--fail { animation: none; }
+  .otp__track,
+  .otp__hub,
   .otp__cell,
+  .otp__glyph,
   .otp__core,
   .otp__badge,
   .otp__halo circle { transition-duration: 1ms !important; transition-delay: 0ms !important; }
