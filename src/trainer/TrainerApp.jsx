@@ -11,7 +11,7 @@ import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { APP_VERSION } from '../version.js';
-import { Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../ui.jsx';
+import { BackButton, Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../ui.jsx';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
@@ -21,7 +21,7 @@ import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
-  IconUsers, IconChart, IconLog, IconSliders, IconMenu, IconClose, IconBack, IconPhone, IconSearch, IconMoney,
+  IconUsers, IconChart, IconLog, IconSliders, IconMenu, IconClose, IconPhone, IconSearch, IconMoney,
   IconPlan, IconCalendar, IconKey, IconProgress,
 } from '../icons.jsx';
 import { WorkoutJournal } from '../client/screens.jsx';
@@ -267,6 +267,9 @@ export default function TrainerApp({ me }) {
     {card}
     <div className="app" hidden={!!openClient}>
       <header className="app__header">
+        {/* Экран меню закрывает нижние вкладки — видимый путь назад, туда,
+            откуда пришли (FT-567); смахнуть вправо делает то же */}
+        {inMenu && <BackButton label={(TABS.find((t) => t.id === lastTab) || TABS[0]).label} onClick={() => go(lastTab)} />}
         <div className="app__bar">
           <div className="app__headline">
             <h1 className="app__title">{current.label}</h1>
@@ -620,10 +623,7 @@ function ClientDetail({ client: opened, onBack, onPreview }) {
   return (
     <div className="app">
       <header className="app__header">
-        <button className="button button--ghost" style={{ marginBottom: 8 }} onClick={onBack}>
-          <IconBack size={16} />
-          К списку
-        </button>
+        <BackButton label="К списку" onClick={onBack} />
         <h1 className="app__title">{client.name}</h1>
         <p className="app__subtitle">Карточка клиента · {current.label}</p>
       </header>

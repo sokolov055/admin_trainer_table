@@ -492,7 +492,7 @@ test('смахнуть вправо возвращает из «Моих дан�
     // Назад: из экрана меню пальцем вправо — на вкладку, откуда пришли
     await phone.getByRole('button', { name: 'Меню' }).click();
     await phone.getByRole('button', { name: /Мои данные/ }).click();
-    await phone.locator('#root .app__subtitle', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 });
+    await phone.locator('#root .app__title', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 });
     // Меню закрывается с анимацией — пока оно в DOM, жесты выключены
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
 
@@ -582,7 +582,7 @@ test('смахнуть вправо возвращает из «Моих дан�
     assert.equal(await phone.locator('.tabbar').getAttribute('aria-hidden'), 'true', 'нижнее меню спрятано');
     await swipe(phone, { x: 60, y: 60 }, { x: 110, y: 62 }, { steps: 20, frameMs: 30 });
     await phone.waitForTimeout(700);
-    assert.equal(await phone.locator('#root .app__subtitle').textContent(), 'Настройки', 'короткий жест не уводит');
+    assert.equal(await phone.locator('#root .app__title').textContent(), 'Настройки', 'короткий жест не уводит');
 
     // Потянуть вниз: индикатор докручивается до конца обновления и уходит
     await swipe(phone, { x: 195, y: 160 }, { x: 195, y: 520 }, { steps: 16 });
@@ -682,6 +682,106 @@ test('глазами клиента — из карточки, и обратно
  * Журнал тренировок — в боковом меню тренера (28.09.2026): выбрал клиента
  * по имени — открылся его журнал.
  */
+/**
+ * Видимые возвраты (FT-567): на экранах меню, в занятии и в рационе есть
+ * кнопка «назад», и она, жест, системный Back и Back браузера ведут в одно
+ * место. Раньше из «Настроек» уйти можно было только жестом, а Back
+ * браузера уводил со страницы целиком.
+ */
+test('FT-567: видимый «назад» и Back браузера на экранах меню, в занятии и в рационе', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  const title = () => phone.locator('#root .app__title').first().textContent();
+  const subtitle = () => phone.locator('#root .app__subtitle').first().textContent();
+  const menu = async (item) => {
+    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: item }).click();
+    await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
+  };
+  try {
+    await phone.goto(origin + '/?access=' + 'A'.repeat(44));
+    await phone.getByRole('button', { name: 'Войти в кабинет' }).click();
+    await phone.locator('#root .app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 10000 });
+    const home = phone.url();
+
+    // Клиент: экран меню — крупно, где человек, и кнопка туда, откуда пришёл
+    await openTabOn(phone, 'Прогресс');
+    await menu(/Настройки/);
+    assert.equal(await title(), 'Настройки');
+    await phone.getByRole('button', { name: 'Назад: Прогресс' }).click();
+    await phone.locator('#root .app__subtitle', { hasText: 'Прогресс' }).waitFor({ timeout: 5000 });
+
+    // Back браузера закрывает экран меню, а не уводит со страницы
+    await menu(/Мои данные/);
+    await phone.waitForTimeout(100);
+    await phone.goBack();
+    await phone.locator('#root .app__subtitle', { hasText: 'Прогресс' }).waitFor({ timeout: 5000 });
+    assert.equal(phone.url(), home, 'страница та же');
+    // Закрыли кнопкой — лишней записи в истории не осталось
+    await menu(/Настройки/);
+    await phone.getByRole('button', { name: 'Назад: Прогресс' }).click();
+    await phone.waitForTimeout(200);
+    assert.equal(await phone.evaluate(() => !!(history.state && history.state.ftBack)), false, 'страховочная запись снята');
+
+    // Занятие: «Программа» выходит, не завершая; «Вернуться к занятию» — обратно
+    await openTabOn(phone, 'Тренировки');
+    await phone.getByRole('button', { name: 'Начать тренировку' }).first().click();
+    await phone.locator('.workout__header').waitFor({ timeout: 20000 });
+    await phone.getByRole('button', { name: 'Назад: Программа' }).click();
+    await phone.getByRole('button', { name: /Вернуться к занятию/ }).click();
+    await phone.locator('.workout__header').waitFor({ timeout: 10000 });
+    // Back браузера из занятия — тоже к программе, занятие идёт
+    await phone.waitForTimeout(100);
+    await phone.goBack();
+    await phone.getByRole('button', { name: /Вернуться к занятию/ }).waitFor({ timeout: 5000 });
+    assert.equal(phone.url(), home);
+
+    // Рацион: Back браузера (как жест и системный Back) — на шаг, как кнопка
+    await openTabOn(phone, 'Питание');
+    // Рацион открывается после нормы — в демо её сначала посчитать
+    await phone.getByPlaceholder('лет').fill('31');
+    await phone.getByPlaceholder('кг').first().fill('64');
+    await phone.getByPlaceholder('см').fill('168');
+    await phone.getByText('Женский', { exact: true }).first().click();
+    await phone.getByText(/^Подвижный/).first().click();
+    await phone.locator('text=Тренировок в неделю').locator('xpath=..').getByText('3', { exact: true }).first().click();
+    await phone.getByText('Похудение', { exact: true }).first().click();
+    await phone.getByRole('button', { name: 'Посчитать норму' }).click();
+    const build = phone.getByRole('button', { name: 'Собрать рацион' });
+    await build.waitFor({ timeout: 10000 });
+    {
+      await build.click();
+      await phone.getByRole('heading', { name: 'Что есть дома' }).waitFor({ timeout: 10000 });
+      // Блюда подбираются от трёх продуктов
+      const items = phone.locator('.pantry__item:not(.pantry__item--on)');
+      while (await phone.getByRole('button', { name: 'Подобрать блюда' }).isDisabled()) await items.first().click();
+      await phone.getByRole('button', { name: 'Подобрать блюда' }).click();
+      await phone.getByRole('heading', { name: 'Что приготовить' }).waitFor({ timeout: 5000 });
+      await phone.waitForTimeout(100);
+      await phone.goBack();
+      await phone.getByRole('heading', { name: 'Что есть дома' }).waitFor({ timeout: 5000 });
+      await phone.getByRole('button', { name: 'К норме' }).click();
+      await build.waitFor({ timeout: 5000 });
+    }
+
+    // Тренер: из «Расходов» — к разделу, откуда пришёл
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await openTabOn(phone, 'Расписание');
+    await menu(/Расходы/);
+    assert.equal(await title(), 'Расходы');
+    await phone.getByRole('button', { name: 'Назад: Расписание' }).click();
+    await phone.locator('#root .app__title', { hasText: 'Расписание' }).waitFor({ timeout: 5000 });
+    assert.match(await subtitle(), /^Панель тренера/);
+  } finally {
+    await context.close();
+  }
+});
+
+const openTabOn = (p, label) => p.getByRole('button', { name: label, exact: true }).click();
+
 test('журнал тренировок открывается из меню по имени клиента', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
   const phone = await context.newPage();

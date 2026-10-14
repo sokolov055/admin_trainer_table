@@ -10,7 +10,7 @@ import { useViewMotion } from '../viewMotion.js';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink, IconGuide } from '../icons.jsx';
 import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
-import { Drawer, Section, SignOut } from '../ui.jsx';
+import { BackButton, Drawer, Section, SignOut } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
 import { screensNote } from '../native-bridge.js';
 import Profile from './Profile.jsx';
@@ -256,10 +256,14 @@ export default function ClientApp({ me, clientRow, preview }) {
 
       <header className="app__header">
         {onboarding?.enabled && onboarding?.eligible && <button className="button button--block" onClick={() => setOnboardingOpen(true)}>Продолжить подбор программы</button>}
+        {/* Экран меню закрывает нижние вкладки — видимый путь назад, туда,
+            откуда пришли (FT-567). Здесь главное — где человек, поэтому
+            крупно название экрана, а имя — строкой под ним */}
+        {!onTab && <BackButton label={(TABS.find((t) => t.id === lastTab) || TABS[0]).label} onClick={() => go(lastTab)} />}
         <div className="app__bar">
           <div className="app__headline">
-            <h1 className="app__title">{me.name}</h1>
-            <p className="app__subtitle">{current.label}</p>
+            <h1 className="app__title">{onTab ? me.name : current.label}</h1>
+            <p className="app__subtitle">{onTab ? current.label : me.name}</p>
           </div>
           <button
             className="icon-button"

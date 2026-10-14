@@ -2,6 +2,8 @@ import { openSwipeRow, closeSwipeRow } from './swipe.js';
 import React, { useEffect, useRef } from 'react';
 import { haptic } from './telegram.js';
 import { scrollToClamped } from './scroll.js';
+import { createHistoryGuard } from './history-back.js';
+import { isNativeApp } from './native-bridge.js';
 
 /**
  * Два жеста, которых ждут от приложения на телефоне: потянуть вниз —
@@ -31,6 +33,17 @@ import { scrollToClamped } from './scroll.js';
 
 const backStack = [];
 const refreshers = new Set();
+
+/**
+ * Back браузера — по той же стопке (history-back.js). Ставится при первом
+ * экране с «назад»; в приложениях iOS и Android — нет, там Back свой.
+ */
+let historyGuard = null;
+function noteBackStack() {
+  if (typeof window === 'undefined' || !window.history || typeof window.history.pushState !== 'function' || isNativeApp()) return;
+  if (!historyGuard) historyGuard = createHistoryGuard({ win: window, size: () => backStack.length, onBack: () => goBack() });
+  historyGuard.schedule();
+}
 
 /**
  * Снимок экрана, с которого сейчас уходят.
@@ -113,9 +126,11 @@ export function useBackGesture(handler, enabled = true, snapshotName = null) {
     if (fresh || named) pendingSnapshot = null;
 
     backStack.push(entry);
+    noteBackStack();
     return () => {
       const at = backStack.indexOf(entry);
       if (at !== -1) backStack.splice(at, 1);
+      noteBackStack();
     };
   }, [enabled]);
 }

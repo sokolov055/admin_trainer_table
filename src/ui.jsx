@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefresh, IconSearch } from './icons.jsx';
+import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefresh, IconSearch, IconBack } from './icons.jsx';
 import { environmentInfo } from './telegram.js';
 import { hasToken, describeDevice } from './session.js';
 import { logout } from './api.js';
@@ -164,6 +164,24 @@ export function Lead({ label, value, hint, tone, facts }) {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Видимый «назад» над заголовком экрана (FT-567). Жест и системный Back
+ * делают то же самое, но о них нужно знать заранее; кнопка видна всем,
+ * в том числе в браузере с мышью. Подпись — куда вернёт: «Клиенты»,
+ * «Программа», а не безличное «Назад», если это известно.
+ */
+export function BackButton({ label = 'Назад', onClick }) {
+  // «Клиенты», «Программа» — читалке экрана нужно ещё и «назад», иначе это
+  // не отличить от одноимённой вкладки; «К списку» говорит само за себя
+  const aria = label === 'Назад' || /^К /.test(label) ? undefined : 'Назад: ' + label;
+  return (
+    <button type="button" className="button button--ghost app__back" aria-label={aria} onClick={onClick}>
+      <IconBack size={16} />
+      {label}
+    </button>
   );
 }
 

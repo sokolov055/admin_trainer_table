@@ -16,7 +16,7 @@ import {
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { useBackGesture, captureScreen } from '../gestures.jsx';
+import { captureScreen } from '../gestures.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
@@ -2051,9 +2051,8 @@ export function Nutrition({ clientRow, clientView = false }) {
   // Проба тренера: тот же раздел, но на своём устройстве (см. Ration trial)
   const [trial, setTrial] = useState(false);
 
-  // Рацион — экран поверх питания: смахнуть вправо возвращает к норме
-  useBackGesture(() => setRation(false), ration);
-  useBackGesture(() => setTrial(false), trial);
+  // Рацион — экран поверх питания. Его «назад» (кнопка, жест, Back) живёт
+  // в самом Ration: шаг за шагом, как кнопка в его шапке (FT-567)
 
   // Тренер переключается между клиентами в одной и той же карточке, и
   // экран при этом не размонтируется. Без сброса «норма записана» осталось

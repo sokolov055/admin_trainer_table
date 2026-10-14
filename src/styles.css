@@ -5576,3 +5576,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
    три кнопки 15-го кегля в строку телефона не помещаются */
 .library__actions .button { flex: 1 1 0; }
 .library__actions .button--primary { flex: 1 1 100%; }
+
+/* Видимый «назад» над заголовком (FT-567): тот же вид, что «К списку» в карточке */
+.app__back { align-self: flex-start; margin: 0 0 var(--space-2) calc(-1 * var(--space-2)); padding-inline: var(--space-2); min-height: 36px; }

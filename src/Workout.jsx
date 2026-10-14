@@ -6,6 +6,7 @@ import { haptic } from './telegram.js';
 import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
+import { BackButton } from './ui.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
@@ -1713,8 +1714,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     ? (stats && !stats.pending ? 'Все подходы сделаны. Завершить тренировку?' : `Выполнено ${setsWord(stats ? stats.done : 0)}. ${stats && stats.pending === 1 ? 'Оставшийся будет отмечен пропущенным' : 'Оставшиеся ' + (stats ? stats.pending : 0) + ' будут отмечены пропущенными'}.`)
     : 'Занятие останется в журнале с отметкой «Отменена».';
   return <div className="workout">
-    {/* В занятии «назад» — смахнуть вправо (09.10.2026); в списке журнала кнопка остаётся */}
-    {!s && <button className="button" onClick={close}>{backLabel}</button>}
+    {/* В списке журнала — кнопка, куда вернёт: к программе или к списку клиентов */}
+    {!s && <BackButton label={backLabel} onClick={close} />}
     {!ready && <p role="status">Открываем журнал тренировок…</p>}
     {storageError && <p role="alert" className="workout__error">Устройство не сохранило черновик. Не закрывайте экран до сохранения в облаке.</p>}
     {message && <div role="alert" className="workout__error"><p>{message}</p><button className="button" disabled={busy} onClick={() => { setMessage(''); record?.dirty ? save() : list().catch(e => setMessage(e.message)); }}>Повторить</button></div>}
@@ -1726,6 +1727,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     </div>}
     {s && <>
       <header className="workout__header">
+        {/* Видимый выход из занятия (FT-567; 09.10 был только жест): занятие
+            не завершается и не отменяется — сохраняется и идёт дальше, в
+            программе его ждёт «Вернуться к занятию». То же, что смахнуть вправо */}
+        <BackButton label={backLabel === 'К программе' ? 'Программа' : backLabel} onClick={close} />
         {/* Название — касанием: переименовывает только тренер (07.10.2026), сервер это же проверяет */}
         {renamingTitle && clientRow && !clientView
           ? <input className="workout__title-input" aria-label="Название занятия" autoFocus value={s.title} maxLength={160} onChange={e => change(v => ({ ...v, title: e.target.value }))} onBlur={() => setRenamingTitle(false)} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingTitle(false); }} />

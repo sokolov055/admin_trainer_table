@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, createContext, useContext 
 import { Section, Panel, Note, Search, formatNumber, plural } from '../ui.jsx';
 import { IconCheck, IconClose, IconBack, IconNutrition, IconShare } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { useTabLock } from '../gestures.jsx';
+import { useTabLock, useBackGesture } from '../gestures.jsx';
 import { MEALS } from './recipes.js';
 import { CATALOG, setCatalog } from './catalog.js';
 import {
@@ -769,6 +769,16 @@ export default function Ration({ targets, onClose, trial = false }) {
   // рацион, разделы пальцем не листаются: выход — кнопкой «Назад»
   useTabLock(true);
 
+  // «Назад» — на шаг: день → карточки → продукты → к норме. Кнопка в шапке,
+  // жест и системный Back ведут одинаково: раньше жест закрывал рацион
+  // целиком, а кнопка — только шаг (FT-567)
+  const back = () => {
+    if (step === 'pantry') onClose();
+    else if (step === 'swipe') setStep('pantry');
+    else setStep('swipe');
+  };
+  useBackGesture(back);
+
   // Своё — на сегодня: завтра начинается с чистого дня. Недавние продукты
   // — на устройстве, на случай без сети; основная база общая, на сервере.
   // День — по Москве, как на сервере: иначе ночью своё уезжало бы во вчера
@@ -916,11 +926,7 @@ export default function Ration({ targets, onClose, trial = false }) {
         <button
           type="button"
           className="ration__back"
-          onClick={() => {
-            if (step === 'pantry') onClose();
-            else if (step === 'swipe') setStep('pantry');
-            else setStep('swipe');
-          }}
+          onClick={back}
         >
           <IconBack size={18} />
           {step === 'pantry' ? 'К норме' : 'Назад'}
