@@ -131,7 +131,7 @@ test('вход в кабинет доходит до программы', async 
   // тренера в демо взять неоткуда, а пройти вход целиком надо.
   await page.fill('input[type=email]', 'demo@example.com');
   await page.getByRole('button', { name: 'Прислать код' }).click();
-  await page.locator('input[autocomplete=one-time-code]').fill('ABC123');
+  await page.locator('input[autocomplete=one-time-code]').fill('123456');
   await page.fill('input[autocomplete=name]', 'Анна Морозова');
   await page.getByRole('button', { name: 'Далее' }).click();
   const checks = page.locator('.consent input[type=checkbox]');
@@ -171,12 +171,29 @@ test('вернувшийся клиент: почта → код → сразу 
     assert.equal(new URL(p.url()).pathname, '/', 'остались на странице клиента');
     assert.equal(await p.locator('input[type=email]').inputValue(), 'back@example.com', 'почта не стёрлась');
     await p.getByRole('button', { name: 'Прислать код' }).click();
-    await p.locator('input[autocomplete=one-time-code]').fill('ABC123');
+    await p.locator('input[autocomplete=one-time-code]').fill('123456');
     await p.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
     assert.equal(await p.locator('input[autocomplete=name]').count(), 0, 'имя у вернувшегося не спрашивали');
   } finally { await context.close(); }
 });
 
+test('код — только цифры; «Вставить код» берёт код из фразы и сразу проверяет', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', permissions: ['clipboard-read', 'clipboard-write'] });
+  const p = await context.newPage();
+  p.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await p.goto(origin);
+    await p.fill('input[type=email]', 'back@example.com');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    const cells = p.locator('input[autocomplete=one-time-code]');
+    await cells.pressSequentially('AB12');
+    assert.equal(await cells.inputValue(), '12', 'буквы в код не попадают');
+    await p.evaluate(() => navigator.clipboard.writeText('Ваш код для входа: 123456'));
+    await p.getByRole('button', { name: 'Вставить код' }).click();
+    await p.locator('.otp--checking').waitFor({ timeout: 2000 });
+    await p.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
+  } finally { await context.close(); }
+});
 test('почта тренера на странице клиента ведёт на вход тренера с той же почтой; Back — обратно', async () => {
   const { context, p } = await loginWindow();
   try {
@@ -203,7 +220,7 @@ test('тренер входит на /trainer; после выхода устр�
     assert.equal(await p.getByRole('button', { name: /Вход для клиентов/ }).count(), 1, 'путь к входу клиента есть');
     await p.fill('input[type=email]', 'owner@example.com');
     await p.getByRole('button', { name: 'Прислать код' }).click();
-    await p.locator('input[autocomplete=one-time-code]').fill('ABC123');
+    await p.locator('input[autocomplete=one-time-code]').fill('123456');
     await p.getByRole('tab', { name: /^Все · / }).waitFor({ timeout: 60000 });
     assert.equal(new URL(p.url()).pathname, '/', 'кабинет — с адреса приложения');
     // Вход кончился — на корне снова вход тренера
@@ -224,7 +241,7 @@ test('не тренер на /trainer: после кода — заявка с �
     await p.fill('input[type=email]', 'new@example.com');
     await p.getByRole('button', { name: 'Прислать код' }).click();
     await p.getByText(/только если адрес открывает кабинет тренера/).waitFor();
-    await p.locator('input[autocomplete=one-time-code]').fill('ABC123');
+    await p.locator('input[autocomplete=one-time-code]').fill('123456');
     await p.fill('input[autocomplete=name]', 'Ольга');
     await p.getByRole('button', { name: 'Далее' }).click();
     await p.getByText('Шаг 2 из 2 · Условия').waitFor();

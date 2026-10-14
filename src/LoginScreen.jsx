@@ -5,7 +5,7 @@ import OtpStage from './OtpStage.jsx';
 import { haptic } from './telegram.js';
 import { Segmented, BackButton } from './ui.jsx';
 import { setToken, describeDevice } from './session.js';
-import { IconKey, IconUsers, IconUserPlus, IconCheck, IconChevron, IconMail, IconPlan, IconHome, IconCalendar } from './icons.jsx';
+import { IconKey, IconUsers, IconUserPlus, IconCheck, IconChevron, IconMail, IconPlan, IconHome, IconCalendar, IconCopy } from './icons.jsx';
 import PasteLink from './PasteLink.jsx';
 import { ConsentChecks, TrainerConsentChecks } from './Consent.jsx';
 import { isNativeApp } from './native-bridge.js';
@@ -33,6 +33,16 @@ import './login.css';
  */
 
 const SUPPORT_EMAIL = 'sokolovk055@yandex.ru';
+
+/**
+ * Код из письма — шесть цифр (сервер, 14.10.2026). Исключение — демо для
+ * проверяющего App Store: его постоянный код задан раньше и может быть с
+ * буквами (mobile/APP_STORE.md), для этой почты поле принимает и буквы.
+ */
+const REVIEW_EMAIL = 'appreview@fittrack.demo';
+
+/** Кружение проверки — не меньше одного оборота (OtpStage: 1,5 с на круг) */
+const CHECK_MIN_MS = 1400;
 
 /** Повторный код — не чаще раза в минуту (так же считает сервер) */
 const RESEND_SEC = 60;
@@ -236,6 +246,7 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
   const [quiz, setQuiz] = useState(false);   // после регистрации — анкета подбора программы (FT-552)
   const [sentAt, setSentAt] = useState(0);
   const left = useCountdown(sentAt, RESEND_SEC);
+  const review = email.trim().toLowerCase() === REVIEW_EMAIL;
 
   const go = (next, backwards = false) => {
     setBack(backwards);
@@ -317,17 +328,42 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
     setPhase('checking');
     setProblem('');
     setTrainerEmail(false);
+    // Сервер отвечает за доли секунды, и круг мелькал незаметно (владелец,
+    // 14.10.2026): кружение показываем не меньше одного оборота
+    const shown = new Promise((resolve) => setTimeout(resolve, CHECK_MIN_MS));
     try {
-      answer.current = await confirm(typed);
+      const res = await confirm(typed);
+      await shown;
+      answer.current = res;
       haptic();
       setPhase('success');
     } catch (error) {
+      await shown;
       // Почта тренера (тренер из базы) — сервер говорит это после верного кода
       if (!trainer && error && error.code === 409) { setTrainerEmail(true); setPhase('input'); return; }
       setProblem((error && error.message) || 'Сервер не отвечает.');
       setPhase('error');
-      setTimeout(() => { setCode(''); setPhase('input'); }, 600);
+      setTimeout(() => { setCode(''); setPhase('input'); }, 700);
     }
+  };
+
+  // Код из буфера обмена: в письме он часто внутри фразы («Ваш код: 123456»)
+  const paste = async () => {
+    if (checking) return;
+    setProblem('');
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch (_) { /* браузер не дал */ }
+    const found = review
+      ? (String(text).toUpperCase().match(/[A-Z0-9]{6}/) || [])[0]
+      : (String(text).match(/\d{6}/) || [])[0] || String(text).replace(/\D/g, '').slice(0, 6);
+    if (!found || found.length < 6) {
+      setProblem(text
+        ? 'В скопированном нет кода из шести цифр. Скопируйте код из письма.'
+        : 'Не получилось прочитать скопированное. Нажмите на ячейки и удерживайте — «Вставить».');
+      return;
+    }
+    setCode(found);
+    check(found);
   };
 
   const settled = () => {
@@ -392,7 +428,7 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
         ? 'Отметьте оба пункта, чтобы отправить заявку.'
         : 'Отметьте оба пункта — без них кабинет не сможет хранить ваши тренировки, замеры и питание.');
     return (
-      <form className="signin__register" onSubmit={submit} noValidate>
+      <form key="register" className="signin__register" onSubmit={submit} noValidate>
         <BackButton label="Назад" onClick={stepBack} />
         <p className="onboarding__progress-text">
           {'Шаг ' + (reg + 1) + ' из ' + icons.length + ' · ' + (reg === 0 ? 'Имя' : trainer ? 'Условия' : 'Согласия')}
@@ -436,7 +472,7 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
   }
 
   return (
-    <form className="signin__form" onSubmit={submit} noValidate>
+    <form key="login" className="signin__form" onSubmit={submit} noValidate>
       {step !== 'email' && <BackButton label="Назад" onClick={stepBack} />}
       <Steps labels={['Почта', 'Код']} current={step === 'email' ? 0 : 1} />
 
@@ -471,8 +507,13 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
           <div className="field signin__otp">
             <span className="field__label">Код из письма</span>
             {/* Шестой знак — проверка уходит сама, кнопка «Войти» тут лишняя */}
-            <OtpStage charset="alnum" value={code} onChange={setCode} onComplete={check} phase={phase} onSettled={settled}
+            <OtpStage charset={review ? 'alnum' : 'digits'} value={code} onChange={setCode} onComplete={check} phase={phase} onSettled={settled}
               label="Код из письма" doneLabel="Код подтверждён" autoFocus />
+            {!checking && (
+              <button type="button" className="signin__paste" onClick={paste}>
+                <IconCopy size={16} />Вставить код
+              </button>
+            )}
             <span className="field__hint">
               {trainer
                 ? 'Письмо приходит, только если адрес открывает кабинет тренера. Нет письма — проверьте адрес и «Спам».'

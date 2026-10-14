@@ -27,7 +27,7 @@ const shot = (name) => page.screenshot({ path: `${DEST}-${name}.png` });
 await page.goto(origin);
 await page.fill('input[type=email]', 'demo@example.com');
 await page.getByRole('button', { name: 'Прислать код' }).click();
-await page.locator('input[autocomplete=one-time-code]').fill('ABC123');
+await page.locator('input[autocomplete=one-time-code]').fill('123456');
 await page.fill('input[autocomplete=name]', 'Анна Морозова');
 await page.getByRole('button', { name: 'Далее' }).click();
 const checks = page.locator('.consent input[type=checkbox]');

@@ -25,9 +25,9 @@ import { IconCheck } from './icons.jsx';
 
 const CELL = 40;
 const GAP = 8;
-const COLLAPSE_AFTER_MS = 520;
+const COLLAPSE_AFTER_MS = 760;
 const CHECK_AFTER_MS = 380;
-const SETTLE_AFTER_MS = 700;
+const SETTLE_AFTER_MS = 900;
 
 function rowPos(i, n) {
   return { x: (i - (n - 1) / 2) * (CELL + GAP), y: 0 };
