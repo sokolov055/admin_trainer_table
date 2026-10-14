@@ -60,7 +60,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
     return c.balance < 0 || days === null || days > s.staleDays;
   });
 
-  // «Ближайшие» — только те, у кого занятие сегодня (решение владельца
+  // «Сегодня» — только те, у кого занятие сегодня (решение владельца
   // 30.09.2026): заходят сюда за сегодняшним днём, а не за неделей вперёд.
   // Прошедшие не попадают: сервер отдаёт дату, пока занятие не кончилось.
   const upcoming = clients.filter((c) => c.nextTrainingDate && isTodayLocal(c.nextTrainingDate));
@@ -70,7 +70,8 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   const splits = clients.filter((c) => c.splitOf || (c.members && c.members.length > 1));
 
   const filters = [
-    { value: 'next', label: `Ближайшие · ${upcoming.length}` },
+    // Было «Ближайшие» — обещало больше, чем показывает (FT-567)
+    { value: 'next', label: `Сегодня · ${upcoming.length}` },
     { value: 'all', label: `Все · ${clients.length}` },
     { value: 'splits', label: `Сплиты · ${splits.length}` },
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
@@ -90,7 +91,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
     return true;
   });
 
-  // «Ближайшие» — единственный фильтр, который ещё и сортирует: список
+  // «Сегодня» — единственный фильтр, который ещё и сортирует: список
   // отвечает на вопрос «кто следующий», а на него нельзя ответить порядком
   // строк в таблице. Даты в ISO сравниваются как строки — этого достаточно,
   // они одного формата и одного пояса.

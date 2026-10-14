@@ -11,7 +11,7 @@ import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { APP_VERSION } from '../version.js';
-import { BackButton, Chips, Drawer, Empty, ErrorState, Loading, Search, Section } from '../ui.jsx';
+import { BackButton, Chips, Drawer, Empty, ErrorState, Loading, Search, Section, SubNav } from '../ui.jsx';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
@@ -68,7 +68,9 @@ const TABS = [
   { id: 'schedule', label: 'Расписание', Icon: IconCalendar },
   // Библиотека: шаблоны программ и тренировок, упражнения. Отсюда
   // программы раскладываются клиентам за минуту (Library.jsx).
-  { id: 'library', label: 'Шаблоны', Icon: IconPlan },
+  // «Библиотека», а не «Шаблоны» (FT-567): здесь ещё упражнения, тренажёры
+  // и блюда — прежнее название их не обещало
+  { id: 'library', label: 'Библиотека', Icon: IconPlan },
   { id: 'dashboard', label: 'Сводка', Icon: IconChart },
 ];
 
@@ -142,6 +144,13 @@ export default function TrainerApp({ me }) {
   const [libPane, setLibPane] = useState('program');
   const [menuOpen, setMenuOpen] = useState(false);
   const [openClient, setOpenClient] = useState(null);
+  // С какого раздела открыть карточку: из расписания — сразу «Тренировки»
+  const [openView, setOpenView] = useState('overview');
+  // Откуда открыли — туда и «назад»: из расписания карточка возвращает к занятию
+  const [openFrom, setOpenFrom] = useState('К списку');
+  const openCard = (client, at = 'overview', from = 'К списку') => {
+    captureScreen('client-card'); setOpenView(at); setOpenFrom(from); setOpenClient(client);
+  };
   const [previewClient, setPreviewClient] = useState(null);
 
   // Вкладка, с которой ушли в боковое меню: «назад» из расходов или логов
@@ -236,7 +245,10 @@ export default function TrainerApp({ me }) {
   // получит после любой записи (onMutated) и по «потянуть вниз»
   const card = openClient && (
     <ClientDetail
+      key={openClient.row + ':' + openView}
       client={openClient}
+      initialView={openView}
+      backLabel={openFrom}
       onBack={() => setOpenClient(null)}
       onPreview={(client) => { captureScreen('card'); setPreviewClient(client); haptic(); }}
     />
@@ -290,19 +302,19 @@ export default function TrainerApp({ me }) {
             ниже у списков свои фильтры, и два одинаковых ряда подряд
             читались бы как один длинный набор кнопок. */}
         {view === 'clients' && (
-          <div className="app__subnav">
+          <SubNav>
             <Chips items={CLIENT_PANES} value={clientPane} onChange={switchPane(setClientPane)} variant="nav" />
-          </div>
+          </SubNav>
         )}
         {view === 'dashboard' && (
-          <div className="app__subnav">
+          <SubNav>
             <Chips items={DASH} value={dashPane} onChange={switchPane(setDashPane)} variant="nav" />
-          </div>
+          </SubNav>
         )}
         {view === 'library' && (
-          <div className="app__subnav">
+          <SubNav>
             <Chips items={LIBRARY_PANES} value={libPane} onChange={switchPane(setLibPane)} variant="nav" />
-          </div>
+          </SubNav>
         )}
       </header>
 
@@ -328,7 +340,7 @@ export default function TrainerApp({ me }) {
             {clientPane === 'active' && <Stories />}
             {clientPane === 'active' && (
               <Clients
-                onOpenClient={(client) => { captureScreen('client-card'); setOpenClient(client); }}
+                onOpenClient={(client) => openCard(client)}
                 onRefresh={runScheduleRefresh}
                 refreshRevision={scheduleRevision}
               />
@@ -344,7 +356,7 @@ export default function TrainerApp({ me }) {
           hidden={view !== 'schedule'}
           data-kept={tabs.kept('schedule') ? '' : undefined}
         >
-          <Schedule />
+          <Schedule onOpenClient={(client, at) => openCard(client, at, 'К занятию')} />
         </main>
       )}
 
@@ -510,9 +522,9 @@ function MyWorkouts() {
 
   return (
     <>
-      <div className="app__subnav card-bar">
+      <SubNav className="card-bar">
         <NavTabs items={MY_VIEWS} value={view} onChange={(id) => { sections.leave(); setView(id); haptic(); }} />
-      </div>
+      </SubNav>
       {MY_VIEWS.map((v) => sections.shown(v.value) && (
         <div
           key={v.value}
@@ -574,14 +586,14 @@ function ClientPicker({ title, note, action, Icon = null, first = null, onSelect
  * не должны быть одеты одинаково; месяцы остаются фишками в теле, потому
  * что это и есть фильтр.
  */
-function ClientDetail({ client: opened, onBack, onPreview }) {
+function ClientDetail({ client: opened, initialView = 'overview', backLabel = 'К списку', onBack, onPreview }) {
   // Карточка открывается снимком строки списка, а баланс, занятия и цена в
   // нём меняются: тренер провёл оплату — список перечитывается (onMutated),
   // и шапка с «Оплатами» берут строку оттуда, а не прежний снимок (10.10.2026)
   const list = useData('trainer.clients', {}, [], { live: 15000 });
   const fresh = ((list.data && list.data.clients) || []).find((c) => c.row === opened.row);
   const client = fresh ? { ...opened, ...fresh } : opened;
-  const [view, setView] = useState('overview');
+  const [view, setView] = useState(() => (CLIENT_VIEWS.some((v) => v.value === initialView) ? initialView : 'overview'));
   const current = CLIENT_VIEWS.find((v) => v.value === view) || CLIENT_VIEWS[0];
   const ids = CLIENT_VIEWS.map((v) => v.value);
 
@@ -614,6 +626,10 @@ function ClientDetail({ client: opened, onBack, onPreview }) {
   });
 
   useBackGesture(onBack, view === ids[0], 'client-card');
+  // С других разделов смахивание вправо листает к предыдущему, а Back
+  // Android и браузера — к списку, как «К списку» (FT-567): раньше на
+  // «Оплатах» Back Android сворачивал приложение
+  useBackGesture(onBack, view !== ids[0], null, { swipe: false });
 
   useViewMotion(view, {
     direction: byOrder(ids),
@@ -623,7 +639,7 @@ function ClientDetail({ client: opened, onBack, onPreview }) {
   return (
     <div className="app">
       <header className="app__header">
-        <BackButton label="К списку" onClick={onBack} />
+        <BackButton label={backLabel} onClick={onBack} />
         <h1 className="app__title">{client.name}</h1>
         <p className="app__subtitle">Карточка клиента · {current.label}</p>
       </header>
@@ -632,9 +648,9 @@ function ClientDetail({ client: opened, onBack, onPreview }) {
         {/* Сначала — кто это и сколько на балансе, потом разделы: бар
             стоит прямо над тем, что он переключает */}
         <ClientCard client={client} onPreview={() => onPreview(client)} />
-        <div className="app__subnav card-bar">
+        <SubNav className="card-bar">
           <NavTabs ref={barRef} items={CLIENT_VIEWS} value={view} onChange={open} />
-        </div>
+        </SubNav>
         {CLIENT_VIEWS.map((v) => sections.shown(v.value) && (
           <div
             key={v.value}

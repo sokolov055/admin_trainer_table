@@ -5579,3 +5579,11 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 /* Видимый «назад» над заголовком (FT-567): тот же вид, что «К списку» в карточке */
 .app__back { align-self: flex-start; margin: 0 0 var(--space-2) calc(-1 * var(--space-2)); padding-inline: var(--space-2); min-height: 36px; }
+
+/* Ряд подразделов: край, за которым есть ещё разделы, затухает (FT-567) */
+.app__subnav.is-more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+.app__subnav.is-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 40px); mask-image: linear-gradient(to right, transparent, #000 40px); }
+.app__subnav.is-more-left.is-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 56px), transparent); }
+
+/* Занятие в расписании → программа и карточка клиента (FT-567) */
+.schedule__client-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }

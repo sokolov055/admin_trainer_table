@@ -36,7 +36,7 @@ export const LIBRARY_PANES = [
   { value: 'exercises', label: 'Упражнения' },
   // Тренажёры клуба (владелец, 09.10.2026): все записанные у упражнений —
   // одним списком, с фото и тем, где регулировки
-  { value: 'machines', label: 'Тренажёры и оборудование' },
+  { value: 'machines', label: 'Тренажёры' },
   // Блюда для рациона клиентов: черновики на проверку, публикация, правка
   { value: 'dishes', label: 'Блюда' },
 ];
@@ -623,7 +623,7 @@ export function TemplateApply({ clientRow, month, onApplied, onCancel }) {
       {list.loading && <Loading lead={false} rows={2} />}
       {list.error && <ErrorState error={list.error} onRetry={list.reload} />}
       {list.data && list.data.templates.length === 0 && (
-        <p className="small muted">Шаблонов нет. Их заводят в разделе «Шаблоны» нижнего меню или сохраняют из программы клиента.</p>
+        <p className="small muted">Шаблонов нет. Их заводят в разделе «Библиотека» нижнего меню или сохраняют из программы клиента.</p>
       )}
       {list.data && list.data.templates.map((t) => (
         <button className="item" key={t.id} onClick={() => { setPicked(t); haptic(); }}>
@@ -853,7 +853,7 @@ function Machines() {
   if (form) {
     return (
       <>
-        <Back onClick={() => setForm(null)}>Тренажёры и оборудование</Back>
+        <Back onClick={() => setForm(null)}>Тренажёры</Back>
         <h2 className="library__title">{form.machine ? 'Изменить карточку' : 'Новая карточка'}</h2>
         <p className="library__sub">Карточку можно сохранить без упражнения и привязать позже.</p>
         <MachineForm
@@ -890,7 +890,7 @@ function Machines() {
 
     return (
       <>
-        <Back onClick={() => { setOpen(''); setExerciseQ(''); setFailure(null); }}>Тренажёры и оборудование</Back>
+        <Back onClick={() => { setOpen(''); setExerciseQ(''); setFailure(null); }}>Тренажёры</Back>
         <div className="item__top">
           <div>
             <h2 className="library__title">{machine.name}</h2>

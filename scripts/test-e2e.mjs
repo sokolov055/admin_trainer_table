@@ -775,6 +775,33 @@ test('FT-567: видимый «назад» и Back браузера на экр
     await phone.getByRole('button', { name: 'Назад: Расписание' }).click();
     await phone.locator('#root .app__title', { hasText: 'Расписание' }).waitFor({ timeout: 5000 });
     assert.match(await subtitle(), /^Панель тренера/);
+
+    // Расписание → занятие → сразу программа этого клиента
+    await openTabOn(phone, 'Расписание');
+    // Сетка держит соседние дни за краем экрана — берём занятие, что видно
+    const lessons = phone.locator('.cal-event:not(.cal-event--personal):not(.cal-event--cancelled)', { hasText: 'Анна' });
+    await lessons.first().waitFor({ state: 'attached', timeout: 10000 });
+    let lesson = null;
+    for (let i = 0; i < await lessons.count() && !lesson; i++) {
+      const box = await lessons.nth(i).boundingBox();
+      if (box && box.x >= 0 && box.x + box.width <= VIEWPORT.width) lesson = lessons.nth(i);
+    }
+    assert.ok(lesson, 'на экране есть занятие Анны');
+    await lesson.click();
+    await phone.getByRole('button', { name: 'Программа клиента' }).click();
+    await phone.locator('#root .app__subtitle', { hasText: 'Карточка клиента · Тренировки' }).waitFor({ timeout: 10000 });
+    assert.equal(await phone.locator('#root .app__title').first().textContent(), 'Анна Морозова');
+    await phone.getByRole('button', { name: 'К занятию' }).waitFor({ timeout: 3000 });
+    // Back браузера с не первого раздела карточки — к тому, откуда пришли
+    await phone.getByRole('tab', { name: 'Оплаты' }).click();
+    await phone.waitForTimeout(150);
+    await phone.goBack();
+    await phone.getByRole('button', { name: 'Программа клиента' }).waitFor({ timeout: 5000 });
+    // И из записи — к сетке расписания, со страницы не уходя
+    await phone.waitForTimeout(150);
+    await phone.goBack();
+    await phone.getByRole('button', { name: 'Программа клиента' }).waitFor({ state: 'detached', timeout: 5000 });
+    assert.match(phone.url(), /mockRole=trainer/);
   } finally {
     await context.close();
   }
@@ -948,7 +975,7 @@ test('похожие упражнения объединяются в одно',
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
 
-    await phone.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await phone.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await phone.getByRole('tab', { name: 'Упражнения', exact: true }).click();
     await phone.getByRole('button', { name: 'Похожие', exact: true }).click();
     await phone.getByText('жим лежа со штангой').waitFor({ timeout: 10000 });
@@ -985,7 +1012,7 @@ test('разделы карточки клиента листаются смах
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
 
-    // «Ближайшие» по умолчанию — только занятия сегодня, в демо их может не
+    // «Сегодня» по умолчанию — только занятия сегодня, в демо их может не
     // быть: берём клиента из «Все»
     await phone.getByRole('tab', { name: /^Все · / }).click({ timeout: 10000 });
     await phone.locator('#root main:not([hidden]) .item').first().click({ timeout: 10000 });
@@ -1029,7 +1056,7 @@ test('шаблон назначается клиенту, общий копир�
     await tab.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await tab.goto(origin + '/?mockRole=trainer');
 
-    await tab.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await visible('.item', { hasText: 'Похудение, 3 раза в неделю' }).first().waitFor({ timeout: 10000 });
     await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).click();
 
@@ -1102,8 +1129,8 @@ test('оборудование создаётся без упражнения и
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
 
-    await phone.getByRole('button', { name: 'Шаблоны', exact: true }).click();
-    await phone.getByRole('tab', { name: 'Тренажёры и оборудование', exact: true }).click();
+    await phone.getByRole('button', { name: 'Библиотека', exact: true }).click();
+    await phone.getByRole('tab', { name: 'Тренажёры', exact: true }).click();
     await phone.getByRole('button', { name: '+ Создать карточку', exact: true }).click();
     await phone.getByRole('radio', { name: 'Оборудование', exact: true }).click();
     await phone.getByLabel('Название').fill('Разборные гантели');
@@ -1131,7 +1158,7 @@ test('оборудование создаётся без упражнения и
       return row && row.getAttribute('aria-pressed') === 'true';
     });
 
-    await phone.getByRole('button', { name: 'Тренажёры и оборудование', exact: true }).click();
+    await phone.getByRole('button', { name: 'Тренажёры', exact: true }).click();
     const linked = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Разборные гантели' });
     await assert.doesNotReject(linked.getByText(/Жим гантелей лёжа/).waitFor({ timeout: 3000 }));
     await assert.doesNotReject(linked.getByText(/Приседания со штангой/).waitFor({ timeout: 3000 }));
@@ -1155,7 +1182,7 @@ test('тренировки программы переставляются пе�
     await tab.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await tab.goto(origin + '/?mockRole=trainer');
 
-    await tab.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).first().click();
     await tab.getByRole('button', { name: 'Изменить' }).click();
     await tab.getByRole('button', { name: 'Свернуть тренировки' }).click();
@@ -1224,7 +1251,7 @@ test('тренировки программы переставляются пе�
     await tab.locator('.plan-edit__float').waitFor({ timeout: 3000 });
     await tab.getByRole('button', { name: 'Клиенты', exact: true }).click();
     await assert.doesNotReject(tab.waitForFunction(() => !document.querySelector('.plan-edit__float'), null, { timeout: 3000 }), 'в «Клиентах» панели шаблона нет');
-    await tab.getByRole('button', { name: 'Шаблоны', exact: true }).click();
+    await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await assert.doesNotReject(tab.locator('.plan-edit__float').waitFor({ timeout: 3000 }), 'вернулись — панель снова на месте');
   } finally {
     await context.close();

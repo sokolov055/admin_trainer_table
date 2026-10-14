@@ -110,7 +110,9 @@ export function captureScreen(name) {
  * карточки клиента) открывается позже родителя и перекрывает его. Функция
  * берётся из ref на момент жеста — меняться между кадрами ей можно.
  */
-export function useBackGesture(handler, enabled = true, snapshotName = null) {
+// swipe: false — только системный Back и Back браузера, без смахивания:
+// там, где вправо уже листает разделы (карточка клиента не на первом)
+export function useBackGesture(handler, enabled = true, snapshotName = null, { swipe = true } = {}) {
   const ref = useRef(handler);
   ref.current = handler;
 
@@ -120,6 +122,7 @@ export function useBackGesture(handler, enabled = true, snapshotName = null) {
     const named = snapshotName ? namedSnapshots.get(snapshotName) : null;
     const fresh = !named && pendingSnapshot && Date.now() - pendingSnapshot.at < SNAPSHOT_FRESH_MS;
     const entry = {
+      swipe,
       run: () => ref.current && ref.current(),
       snapshot: named || (fresh ? pendingSnapshot : null),
     };
@@ -827,7 +830,7 @@ export function Gestures() {
         y0: t.clientY,
         mode: null,
         atTop: (window.scrollY || document.documentElement.scrollTop) <= 0,
-        canBack: backStack.length > 0 && free,
+        canBack: backStack.length > 0 && backStack[backStack.length - 1].swipe !== false && free,
         // Строка со смахиванием влево (удалить подход) забирает себе
         // движение влево; «назад» вправо с неё по-прежнему работает
         canTabs: !!tabHost && free && tabLocks === 0 && !(e.target.closest && e.target.closest('[data-swipe-left]')),

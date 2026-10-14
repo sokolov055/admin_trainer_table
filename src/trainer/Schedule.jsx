@@ -1,4 +1,5 @@
 import { useReturnScroll } from '../scroll.js';
+import { useBackGesture } from '../gestures.jsx';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
@@ -88,7 +89,8 @@ function titleOf(view, anchor, start, days) {
   return MONTHS_TITLE[start.getMonth()].slice(0, 3) + ' - ' + MONTHS_TITLE[end.getMonth()].slice(0, 3).toLowerCase() + ' ' + end.getFullYear();
 }
 
-export default function Schedule() {
+// onOpenClient(client, раздел) — к карточке клиента занятия (FT-567)
+export default function Schedule({ onOpenClient = null }) {
   const [view, setViewState] = useState(readView);
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [editing, setEditing] = useState(null); // null | {} — новое | событие
@@ -96,6 +98,9 @@ export default function Schedule() {
   const [movedEvents, setMovedEvents] = useState({});
   const [moveFailure, setMoveFailure] = useState(null);
   useReturnScroll(!!editing);
+  // Запись открыта поверх сетки: смахнуть вправо, Back Android и браузера —
+  // к расписанию, как кнопка «Расписание» над формой (FT-567)
+  useBackGesture(() => { setEditing(null); setPreset(null); }, !!editing);
 
   const setView = (v) => {
     setViewState(v);
@@ -139,6 +144,7 @@ export default function Schedule() {
           haptic();
         }}
         clients={(clients.data && clients.data.clients) || []}
+        onOpenClient={onOpenClient}
         onDone={() => { setEditing(null); setPreset(null); reload(); }}
         onCancel={() => { setEditing(null); setPreset(null); }}
       />
@@ -734,7 +740,7 @@ function MonthGrid({ start, anchor, events, onDay, onEvent, onMove }) {
 }
 
 /** Создать, перенести или удалить занятие либо личное событие */
-function EventForm({ event, preset, clients, onDone, onCancel, onCopy }) {
+function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenClient }) {
   // Новое — на время, куда нажали в сетке (или 10:00 опорного дня)
   const base = (preset && preset.date) || startOfDay(new Date());
   const presetMinutes = preset && Number.isFinite(preset.minutes) ? preset.minutes : 10 * 60;
@@ -818,6 +824,17 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy }) {
       <Panel pad>
         <div className="library__form">
           <strong>{event.id ? (personal ? 'Личное событие' : 'Занятие') : event.copyOf ? 'Копия события' : 'Новое событие'}</strong>
+          {/* Из занятия — сразу к человеку (FT-567): раньше путь к его
+              программе шёл через «Клиенты» и поиск по списку */}
+          {event.id && !personal && onOpenClient && (() => {
+            const who = clients.find((c) => c.row === Number(event.clientRow));
+            return who ? (
+              <div className="schedule__client-links">
+                <button type="button" className="button" onClick={() => onOpenClient(who, 'plan')}>Программа клиента</button>
+                <button type="button" className="button button--ghost" onClick={() => onOpenClient(who, 'overview')}>Карточка</button>
+              </div>
+            ) : null;
+          })()}
           {event.copyOf && (
             <p className="small muted" style={{ margin: 0 }}>Скопированы название или клиент, дата, время и длительность. Проверьте их и нажмите «Добавить».</p>
           )}

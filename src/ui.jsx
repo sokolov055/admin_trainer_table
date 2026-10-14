@@ -318,6 +318,31 @@ function useActiveInView(rowRef, value) {
   }, [value]);
 }
 
+/**
+ * Ряд подразделов в шапке (FT-567). Пять разделов карточки или библиотеки
+ * на телефоне не помещаются, а полоса прокрутки скрыта — и раньше ничто не
+ * говорило, что справа есть ещё «Питание» или «Блюда». Теперь край, за
+ * которым есть что листать, затухает.
+ */
+export function SubNav({ className = '', children }) {
+  const ref = useRef(null);
+  const [edges, setEdges] = useState('');
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const check = () => {
+      const rest = el.scrollWidth - el.clientWidth - el.scrollLeft;
+      setEdges((el.scrollLeft > 4 ? ' is-more-left' : '') + (rest > 4 ? ' is-more-right' : ''));
+    };
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(check) : null;
+    if (ro) { ro.observe(el); [...el.children].forEach((child) => ro.observe(child)); }
+    return () => { el.removeEventListener('scroll', check); if (ro) ro.disconnect(); };
+  }, []);
+  return <div ref={ref} className={'app__subnav' + (className ? ' ' + className : '') + edges}>{children}</div>;
+}
+
 export function Chips({ items, value, onChange, variant, className }) {
   const rowRef = useRef(null);
   useActiveInView(rowRef, value);

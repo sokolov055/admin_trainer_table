@@ -32,20 +32,32 @@ const NavTabs = forwardRef(function NavTabs({ items, value, onChange }, ref) {
    * в каждом кадре.
    */
   const scrollAnim = useRef(0);
+  // Прокручивается сам ряд или, в шапке, его обёртка .app__subnav: там ряд
+  // во всю ширину и сам не листается — и выбранное «Питание» оставалось
+  // за краем экрана (FT-567). Так же ищет прокрутку Chips (ui.jsx)
+  const scroller = () => {
+    const row = rowRef.current;
+    if (!row) return null;
+    const wide = (el) => el && el.scrollWidth > el.clientWidth + 1;
+    return wide(row) ? row : wide(row.parentElement) ? row.parentElement : null;
+  };
   const scrollFor = (box) => {
     const row = rowRef.current;
-    if (!row || !box) return null;
-    const max = row.scrollWidth - row.clientWidth;
-    if (max <= 0) return null;
+    const el = scroller();
+    if (!row || !el || !box) return null;
+    const max = el.scrollWidth - el.clientWidth;
+    // Кнопки меряются от ряда, прокрутка — у обёртки: переводим в её счёт
+    const shift = el === row ? 0 : row.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft;
+    const x = box.x + shift;
     const pad = 28;
-    let left = row.scrollLeft;
-    if (box.x - pad < left) left = box.x - pad;
-    else if (box.x + box.w + pad > left + row.clientWidth) left = box.x + box.w + pad - row.clientWidth;
+    let left = el.scrollLeft;
+    if (x - pad < left) left = x - pad;
+    else if (x + box.w + pad > left + el.clientWidth) left = x + box.w + pad - el.clientWidth;
     return Math.max(0, Math.min(max, left));
   };
 
   const glide = (target) => {
-    const row = rowRef.current;
+    const row = scroller();
     cancelAnimationFrame(scrollAnim.current);
     if (!row || target === null || Math.abs(target - row.scrollLeft) < 1) return;
     const from = row.scrollLeft;
@@ -91,7 +103,8 @@ const NavTabs = forwardRef(function NavTabs({ items, value, onChange }, ref) {
       // Ряд едет за таблеткой, а не таблетка за край
       cancelAnimationFrame(scrollAnim.current);
       const left = scrollFor({ x, w });
-      if (left !== null && rowRef.current) rowRef.current.scrollLeft = left;
+      const el = scroller();
+      if (left !== null && el) el.scrollLeft = left;
     },
     release() {
       const pill = pillRef.current;

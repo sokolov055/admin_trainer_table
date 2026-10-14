@@ -635,7 +635,7 @@ export function AddBlock({ onAdd, busy }) {
   return (
     <div className="plan-inline__add-menu">
       {templates.loading && <p className="small muted">Загружаю шаблоны…</p>}
-      {!templates.loading && !list.length && <p className="small muted">Шаблонов тренировок нет — их заводят в разделе «Шаблоны».</p>}
+      {!templates.loading && !list.length && <p className="small muted">Шаблонов тренировок нет — их заводят в разделе «Библиотека».</p>}
       {list.map((t) => (
         <button type="button" key={t.id} className="item" disabled={!!loading} onClick={async () => {
           setLoading(t.id);

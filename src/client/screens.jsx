@@ -688,7 +688,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       )}
 
       {savedTemplate && (
-        <p className="small muted">Шаблон сохранён — он в разделе «Шаблоны» нижнего меню.</p>
+        <p className="small muted">Шаблон сохранён — он в разделе «Библиотека» нижнего меню.</p>
       )}
       {saveState.startsWith('error:') && (
         <p className="small plan__failure" role="alert">

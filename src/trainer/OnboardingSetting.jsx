@@ -45,7 +45,7 @@ export default function OnboardingSetting() {
               </select></label>)}</div>}
           </div>;
         })}
-        {!data.templates.length && <p>Сначала создайте программы в разделе «Шаблоны».</p>}
+        {!data.templates.length && <p>Сначала создайте программы в разделе «Библиотека».</p>}
         <button className="button button--block" disabled={busy} onClick={() => save(data.enabled)}>Сохранить стартовые программы</button>
         <button className="button button--primary button--block" disabled={busy || data.emergencyOff || catalog.length < 3} onClick={() => save(true)}>Сохранить и включить анкету</button>
         {catalog.length < 3 && <p className="small muted">Для включения выберите хотя бы три программы.</p>}
