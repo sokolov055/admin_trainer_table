@@ -1,7 +1,9 @@
 # Банк вопросов FT-563
 
-120 авторских вопросов, 6 категорий × 4 уровня × 5 вопросов. Короткие партии
-до 10 вопросов; в выбранной категории одного уровня доступно 5. Формулировки
+240 авторских вопросов, 6 категорий × 4 уровня × 10 вопросов. Партия проходит
+ещё не показанную часть выбранной подборки: до 40 вопросов темы, до 10 одного
+уровня в теме или до 240 вперемешку. Увиденные вопросы учитываются в памяти
+кабинета до перезагрузки. После исчерпания подборки начинается новый цикл. Формулировки
 и варианты написаны для игры, а не скопированы из источников. Проверено 14.10.2026.
 
 ## Источники для сверки
@@ -23,10 +25,19 @@
 - Женские медали Сиднея: [IWF, 2000](https://iwf.sport/2025/02/11/iwf120y-1-2000-women-compete-in-the-olympics/).
 - Братья Уайдер и 1946 год: [IFBB Pro League](https://www.ifbbpro.com/about-the-league/).
 - Создание Мистер Олимпия и Шварценеггер: [биография Джо Уайдера](https://www.joeweider.com/about-joe/joe-weider/).
+- Пищеварительные ферменты, дисахариды и всасывание: [OpenStax, Chemical Digestion](https://openstax.org/books/anatomy-and-physiology-2e/pages/23-7-chemical-digestion-and-absorption-a-closer-look).
+- Типы мышечных волокон: [OpenStax, Types of Muscle Fibers](https://openstax.org/books/anatomy-and-physiology/pages/10-5-types-of-muscle-fibers).
+- Расход энергии в обычной жизни: [IAEA, Assessment of Total Energy Expenditure](https://www-pub.iaea.org/MTCD/Publications/PDF/Pub1370_web.pdf).
+- Выведение углерода при окислении жира: [Meerman, Brown, BMJ 2014](https://www.bmj.com/content/349/bmj.g7257).
+- Ранний чемпионат мира: [IWF, турнир 1891 года](https://iwf.sport/2025/03/25/iwf120y-43-1891-the-first-of-the-89-world-championships-so-far/).
+- Первые руководители IPF: [история IPF](https://www.powerlifting.sport/federation/history).
+- Олимпийская хронология: [Олимпийский комитет Австралии](https://www.olympics.com.au/sports/weightlifting/).
+- Частоты, интервалы и равномерная темперация: [OpenStax, Math and Music](https://openstax.org/books/contemporary-mathematics/pages/13-4-math-and-music).
 
 Музыкальные задания — авторские синтезированные примеры: BPM, ровный ритм,
 частоты тонов, метрические акценты, мажор/минор. Их параметры задаются явно
 в коде. Банк не даёт персональных программ, схем препаратов или лечебных советов.
 
 Картинки упражнений используют существующий каталог `public/anim` проекта.
-Продукты и тренер созданы imagegen; prompts лежат рядом с PNG.
+Продукты, тренер и зал созданы встроенным imagegen; точные prompts лежат рядом
+с PNG и встроены в метаданные новых изображений. Звуки авторские, без записей песен.
