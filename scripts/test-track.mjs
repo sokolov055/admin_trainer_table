@@ -16,6 +16,23 @@ const cardio = { kind: 'cardio', machine: 'treadmill', unilateral: false, perSid
 const bw = { kind: 'bodyweight', machine: '', unilateral: false, perSide: false };
 const lunge = { kind: 'strength', machine: '', unilateral: true, perSide: true };
 
+test('FT-565: время статики заполнено до отметки, план имеет приоритет', () => {
+  const timed = { kind: 'timed' };
+  assert.deepEqual(planSet({ reps: '' }, timed), { time: '60' });
+  assert.deepEqual(planSet({ reps: '45 с' }, timed), { time: '45' });
+  assert.deepEqual(planSet({ reps: '1:30' }, timed), { time: '1:30' });
+  const block = { title: 'Круг', exercises: ['Планка на локтях', 'Стульчик'].map(name => ({ name, sets: '2', supersetGroup: 'g', track: timed })) };
+  for (const members of [[], ['Евгений', 'Анна']]) {
+    const session = fromPlan(block, 'Октябрь 2026', members);
+    for (const ex of session.exercises) for (const set of ex.sets) {
+      assert.equal(set.time, '60', 'это значение снимка, а не placeholder');
+      assert.equal(set.state, 'pending', 'выполнение подтверждает человек');
+      assert.equal(missing(set, trackOf(ex)), '');
+    }
+  }
+  assert.deepEqual(planSet({ reps: '' }, cardio), { time: '' }, 'минуты кардио не подменяем секундами статики');
+});
+
 test('колонки подхода — по типу и тренажёру', () => {
   assert.deepEqual(rowFields(trackOf({})).map((f) => f.key), ['weight', 'reps'], 'нет типа — силовое, как раньше');
   assert.deepEqual(rowFields(cardio).map((f) => f.key), ['time', 'speed', 'incline']);

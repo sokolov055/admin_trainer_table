@@ -3,7 +3,7 @@ import { flushSync, createPortal } from 'react-dom';
 import { apiPublic, apiMutate } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
+import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -259,6 +259,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // страницу — и сервер не узнавал об отдыхе (уведомление не приходило).
     if (r && r.dirty && saving.current) { saveAgain.current = true; return; }
     if (!r || !r.dirty || saving.current || conflictRef.current || !key.current) return;
+    if (!r.pending) {
+      const issue = resultIssue(r.session);
+      if (issue) {
+        if (mounted.current) setMessage('Не сохранено: ' + issue + ' Исправьте результат подхода. Черновик остаётся на устройстве.');
+        return;
+      }
+    }
     saving.current = true; if (mounted.current) setBusy(true);
     // Повторяем ровно тот снимок, чей ответ потерялся. Новые нажатия
     // остаются в черновике и отправятся уже следующей версией.
@@ -832,6 +839,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { /* старый браузер */ }
   };
   const finishAs = (kind) => {
+    if (kind === 'complete') {
+      const issue = resultIssue(state.current.session);
+      if (issue) {
+        setConfirm('');
+        setMessage('Не удалось завершить: ' + issue + ' Исправьте результат подхода и завершите тренировку снова.');
+        return;
+      }
+    }
     change(v => ({ ...v, status: kind === 'complete' ? 'completed' : 'cancelled', restUntil: 0, exercises: closeSets(v.exercises) }));
     setConfirm('');
     save();

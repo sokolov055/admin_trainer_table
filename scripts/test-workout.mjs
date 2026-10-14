@@ -87,6 +87,35 @@ async function click(label) { const b = button(label); assert.ok(b, label); asse
 async function mount(launch = true) { if (tree) tree.unmount(); await act(async () => { tree = renderer.create(React.createElement(Workout, { launch: launch ? { block, month: 'Сентябрь 2026' } : null, onClose() {} })); await delay(); }); }
 after(() => { if (tree) tree.unmount(); });
 
+test('FT-565: клиент и тренер принимают заполненное время круга без ввода и могут исправить', async () => {
+  const timedBlock = { title: 'Статика', exercises: ['Планка на локтях', 'Стульчик'].map(name => ({ name, sets: '2', track: { kind: 'timed' }, supersetGroup: 'g' })) };
+  for (const clientRow of [undefined, 3]) {
+    data.clear();
+    if (tree) { tree.unmount(); tree = null; }
+    nativeEnabled = true;
+    try {
+      await act(async () => { tree = renderer.create(React.createElement(Workout, { clientRow, launch: { block: timedBlock, month: 'Октябрь 2026' }, onClose() {} })); await delay(); });
+      const times = () => tree.root.findAllByType('input').filter(n => /подход [12], время, с$/.test(n.props['aria-label'] || ''));
+      assert.deepEqual(times().map(n => n.props.value), ['60', '60', '60', '60']);
+      for (let n = 0; n < 4; n++) await click('Норм');
+      await click('Завершить');
+      if (button('Завершить')) await click('Завершить');
+      let saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+      assert.equal(saved.status, 'completed');
+      assert.ok(saved.exercises.every(e => e.sets.every(s => s.time === '60' && s.state === 'done')));
+      await click('Исправить результат');
+      await act(async () => { times()[0].props.onChange({ target: { value: '45' } }); await delay(); });
+      await saveNow();
+      saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+      assert.equal(saved.exercises[0].sets[0].time, '45');
+      assert.equal(saved.exercises[0].sets[1].time, '60');
+    } finally {
+      nativeEnabled = false;
+      if (tree) { tree.unmount(); tree = null; }
+    }
+  }
+});
+
 test('интерфейс: запись подхода, пауза, продолжение, завершение и история', async () => {
   data.clear(); await mount();
   await saveNow();
@@ -180,6 +209,44 @@ test('«Продолжить» не возвращает подходы, про�
   // Занятие, завершённое до пометки closed, — возвращаются все пропущенные
   const old = { status: 'completed', exercises: [{ sets: [{ state: 'done' }, { state: 'skipped' }] }] };
   assert.deepEqual(reopenSession(old).exercises[0].sets.map(x => x.state), ['done', 'pending']);
+});
+
+test('FT-565: выполненный подход без повторов не завершает занятие; исправление сохраняет результат', async () => {
+  data.clear(); await mount(); await saveNow();
+  await act(async () => tree.root.findAllByType('button').find(n => text(n) === 'Норм').props.onClick());
+  await saveNow();
+  const reps = tree.root.findAllByType('input').find(n => /подход 1, повторы/.test(n.props['aria-label'] || ''));
+  await act(async () => reps.props.onChange({ target: { value: '' } }));
+  await saveNow();
+  assert.ok(tree.root.findAllByProps({ role: 'alert' }).some(n => text(n).includes('Присед, подход 1: Введите число повторов.')));
+  await click('Завершить'); await click('Завершить');
+  const draftKey = [...data.keys()].find(k => k.startsWith('workout_draft_v1:'));
+  assert.equal(JSON.parse(data.get(draftKey)).session.status, 'active', 'не показываем несохранённое занятие завершённым');
+  assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].status, 'active');
+  assert.ok(!button('Продолжить тренировку'));
+
+  await act(async () => reps.props.onChange({ target: { value: '12' } }));
+  await click('Завершить'); await click('Завершить');
+  const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+  assert.equal(saved.status, 'completed');
+  assert.equal(saved.exercises[0].sets[0].reps, '12');
+  assert.equal(saved.exercises[0].sets[0].state, 'done', 'отметка выполнения сохранена');
+  assert.equal(saved.exercises[0].sets[1].state, 'skipped');
+  await mount(false);
+  assert.ok(button('Продолжить тренировку'), 'после повторного открытия занятие действительно завершено');
+  await act(async () => tree.unmount()); tree = null;
+});
+
+test('FT-565: проверка результата учитывает тип упражнения и участника пары', async () => {
+  const { resultIssue } = await import('../src/workout-model.js');
+  const session = (track, set) => ({ exercises: [{ name: 'Упражнение', track, sets: [set] }] });
+  assert.equal(resultIssue(session({ kind: 'strength' }, { state: 'done', weight: '', reps: '12' })), '', 'старый подход без веса допустим');
+  assert.match(resultIssue(session({ kind: 'bodyweight' }, { state: 'done', reps: '', who: 'Настя' })), /Упражнение, подход Настя · 1/);
+  assert.equal(resultIssue(session({ kind: 'bodyweight' }, { state: 'pending', reps: '' })), '', 'при завершении неотмеченное будет пропущено');
+  assert.match(resultIssue(session({ kind: 'timed' }, { state: 'done', time: '' })), /Введите время/);
+  assert.equal(resultIssue(session({ kind: 'timed' }, { state: 'done', time: '30' })), '');
+  assert.match(resultIssue(session({ kind: 'cardio' }, { state: 'done' })), /время, расстояние или калории/);
+  assert.equal(resultIssue(session({ kind: 'cardio' }, { state: 'done', distance: '2' })), '');
 });
 test('черновик восстанавливается после отключения сети и размонтирования', async () => {
   data.clear(); offline = true; await mount();
