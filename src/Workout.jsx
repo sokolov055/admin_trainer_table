@@ -1730,7 +1730,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {editable && confirm && <div className="workout__confirm" role="alertdialog" aria-label={confirm === 'complete' ? 'Завершить тренировку' : 'Отменить занятие'}>
           <p>{confirmText}</p>
           <div className="workout__confirm-actions">
-            <button type="button" className={'button ' + (confirm === 'complete' ? 'button--primary' : 'button--critical')} disabled={busy || !!conflict || (confirm === 'complete' && !stats.done)} onClick={() => finishAs(confirm)}>{confirm === 'complete' ? 'Завершить' : 'Отменить'}</button>
+            {/* Отмена меняет черновик сразу; save отправит её после текущего запроса. */}
+            <button type="button" className={'button ' + (confirm === 'complete' ? 'button--primary' : 'button--critical')} disabled={!!conflict || (confirm === 'complete' && (busy || !stats.done))} onClick={() => finishAs(confirm)}>{confirm === 'complete' ? 'Завершить' : 'Отменить'}</button>
             <button type="button" className="button button--ghost" onClick={() => setConfirm('')}>{confirm === 'complete' && !stats.pending ? 'Ещё не всё' : 'Продолжить'}</button>
           </div>
         </div>}

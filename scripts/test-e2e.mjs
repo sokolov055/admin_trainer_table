@@ -558,6 +558,43 @@ test('смахнуть вправо возвращает из «Моих дан�
  * «Глазами клиента» вместо пункта меню). Смахнули вправо с первого
  * раздела или «К карточке» — снова карточка этого клиента.
  */
+test('игра на отдыхе у тестового клиента глазами тренера (FT-572)', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', error => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('tab', { name: /^Все · / }).click();
+    await phone.locator('#root main:not([hidden]) .item').first().click();
+    await phone.getByRole('button', { name: 'Глазами клиента' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
+    assert.equal(await phone.getByRole('button', { name: /Тренер в планке/ }).count(), 0);
+    await phone.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
+    await phone.getByRole('button', { name: 'К карточке', exact: true }).click();
+    await phone.getByRole('button', { name: 'Подробнее', exact: true }).click();
+    await phone.getByLabel('Тестовый клиент', { exact: true }).check();
+    await phone.waitForFunction(() => !document.querySelector('.client-test input').disabled);
+    await phone.getByRole('button', { name: 'Глазами клиента' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
+    await phone.getByRole('button', { name: /Тренер в планке/ }).click();
+    await phone.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
+    await phone.getByRole('button', { name: 'Назад', exact: true }).click();
+    await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    await phone.getByRole('button', { name: 'Начать тренировку', exact: true }).first().click();
+    await phone.getByLabel('Таймер отдыха').selectOption('60');
+    if (process.env.SHOT_PREVIEW_GAME) await phone.screenshot({ path: process.env.SHOT_PREVIEW_GAME });
+    await phone.getByRole('button', { name: 'Тренер в планке', exact: true }).click();
+    await phone.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
+    await phone.getByRole('button', { name: 'Назад', exact: true }).click();
+    await phone.getByRole('button', { name: 'Закончить отдых', exact: true }).click();
+    await phone.getByRole('button', { name: 'Отменить', exact: true }).click();
+    await phone.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();
+    await phone.locator('.workout__header').getByText(/Отменена/).waitFor();
+  } finally { await context.close(); }
+});
+
 test('глазами клиента — из карточки, и обратно в неё', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
   const phone = await context.newPage();

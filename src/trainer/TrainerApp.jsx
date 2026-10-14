@@ -5,6 +5,7 @@ import { Clients, Lost, Logs, Settings, ClientCard } from './screens.jsx';
 import { Finance, Processes } from './Metrics.jsx';
 import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
+import { PlankAccess } from '../plank-access.js';
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
@@ -217,17 +218,19 @@ export default function TrainerApp({ me }) {
 
   if (previewClient) {
     return (
-      <ClientApp
-        me={{ ...me, name: previewClient.name }}
-        clientRow={previewClient.row}
-        preview={{
-          // Открыли из карточки — туда же и возвращаемся: карточка
-          // (openClient) под просмотром никуда не делась
-          onChange: () => { setPreviewClient(null); haptic(); },
-          onExit: () => { setPreviewClient(null); if (!openClient) setView('clients'); haptic(); },
-          single: !!openClient,
-        }}
-      />
+      <PlankAccess.Provider value={previewClient.test === true}>
+        <ClientApp
+          me={{ ...me, name: previewClient.name }}
+          clientRow={previewClient.row}
+          preview={{
+            // Открыли из карточки — туда же и возвращаемся: карточка
+            // (openClient) под просмотром никуда не делась
+            onChange: () => { setPreviewClient(null); haptic(); },
+            onExit: () => { setPreviewClient(null); if (!openClient) setView('clients'); haptic(); },
+            single: !!openClient,
+          }}
+        />
+      </PlankAccess.Provider>
     );
   }
 
@@ -239,7 +242,7 @@ export default function TrainerApp({ me }) {
     <ClientDetail
       client={openClient}
       onBack={() => setOpenClient(null)}
-      onPreview={() => { captureScreen('card'); setPreviewClient(openClient); haptic(); }}
+      onPreview={(client) => { captureScreen('card'); setPreviewClient(client); haptic(); }}
     />
   );
 
@@ -632,7 +635,7 @@ function ClientDetail({ client: opened, onBack, onPreview }) {
       <main className="app__body app__body--plain">
         {/* Сначала — кто это и сколько на балансе, потом разделы: бар
             стоит прямо над тем, что он переключает */}
-        <ClientCard client={client} onPreview={onPreview} />
+        <ClientCard client={client} onPreview={() => onPreview(client)} />
         <div className="app__subnav card-bar">
           <NavTabs ref={barRef} items={CLIENT_VIEWS} value={view} onChange={open} />
         </div>
