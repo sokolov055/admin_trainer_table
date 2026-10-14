@@ -18,6 +18,9 @@ import { IconCheck } from './icons.jsx';
  * phase: 'input' — ряд и ввод; 'checking' — круг и кружение; 'success' —
  * зелёные → точка → галочка, по окончании onSettled; 'error' — ряд, качание.
  * Для проверки звонком кода нет: readOnly и сразу 'checking'.
+ *
+ * charset: 'digits' — код из СМС; 'alnum' — код из письма, буквы и цифры
+ * (FT-574: та же сцена при входе и регистрации по почте).
  */
 
 const CELL = 40;
@@ -47,7 +50,9 @@ function currentAngle(el) {
 export default function OtpStage({
   length = 6, value = '', onChange, onComplete, phase = 'input', onSettled,
   readOnly = false, disabled = false, label = 'Код', autoFocus = false,
+  charset = 'digits', doneLabel = 'Номер подтверждён',
 }) {
+  const alnum = charset === 'alnum';
   const input = useRef(null);
   const orbit = useRef(null);
   const [step, setStep] = useState(phase); // success раскладывается на свои шаги
@@ -89,7 +94,8 @@ export default function OtpStage({
 
   const type = (event) => {
     if (readOnly || disabled || phase !== 'input') return;
-    const next = event.target.value.replace(/\D/g, '').slice(0, n);
+    const raw = event.target.value;
+    const next = (alnum ? raw.toUpperCase().replace(/[^A-Z0-9]/g, '') : raw.replace(/\D/g, '')).slice(0, n);
     onChange && onChange(next);
     if (next.length === n && onComplete) onComplete(next);
   };
@@ -123,7 +129,10 @@ export default function OtpStage({
           ref={input}
           className="otp__input"
           aria-label={label}
-          inputMode="numeric"
+          inputMode={alnum ? 'text' : 'numeric'}
+          autoCapitalize={alnum ? 'characters' : undefined}
+          autoCorrect="off"
+          spellCheck={false}
           autoComplete="one-time-code"
           maxLength={n}
           value={value}
@@ -132,7 +141,7 @@ export default function OtpStage({
         />
       )}
       <span className="sr-status" role="status">
-        {step === 'checking' ? 'Проверяем' : step === 'done' ? 'Номер подтверждён' : step === 'error' ? 'Код не подошёл' : ''}
+        {step === 'checking' ? 'Проверяем' : step === 'done' ? doneLabel : step === 'error' ? 'Код не подошёл' : ''}
       </span>
     </div>
   );

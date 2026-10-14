@@ -1,13 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiPublic, apiMutate } from '../api.js';
-import { IconBack, IconCheck, IconPlan, IconUsers, IconHome, IconCalendar } from '../icons.jsx';
+import { IconBack, IconCheck, IconPlan, IconUsers, IconHome, IconCalendar, IconUserPlus, IconKey } from '../icons.jsx';
 import { QUESTIONS, canAdvance } from './onboarding-model.js';
 import './onboarding.css';
+import '../brand-type.css';
 
 const ICONS = [IconPlan, IconUsers, IconHome, IconCalendar];
+// Регистрация (LoginScreen.jsx) — первые шаги той же анкеты: имя, согласия
+const LEAD_ICONS = [IconUserPlus, IconKey];
 
-/** Вся анкета хранится на сервере, а не в общем кеше устройства. */
-export default function Onboarding({ initial, onClose, onDone, onDisabled }) {
+/**
+ * Вся анкета хранится на сервере, а не в общем кеше устройства.
+ * lead — сколько шагов уже пройдено при регистрации (FT-574): счёт
+ * продолжается, а не начинается заново с «Шаг 1».
+ */
+export default function Onboarding({ initial, onClose, onDone, onDisabled, lead = 0 }) {
   const [saved, setSaved] = useState(initial);
   const [answers, setAnswers] = useState(initial.answers || {});
   const [busy, setBusy] = useState(false);
@@ -74,9 +81,9 @@ export default function Onboarding({ initial, onClose, onDone, onDisabled }) {
       {!result && <button type="button" className="button button--ghost" disabled={busy} onClick={() => move(step, true)}>Продолжить позже</button>}
     </div>
     {!result && <>
-      <p className="onboarding__progress-text">{step < 4 ? `Шаг ${step + 1} из 5 · ${QUESTIONS[step].label}` : 'Шаг 5 из 5 · Выбор программы'}</p>
-      <div className="onboarding__progress" role="progressbar" aria-label="Подбор программы" aria-valuemin={0} aria-valuemax={5} aria-valuenow={step + 1}>
-        {[...ICONS, IconCheck].map((Icon, i) => <span key={i} className={i <= step ? 'onboarding__step onboarding__step--active' : 'onboarding__step'} aria-hidden="true"><Icon size={18} /></span>)}
+      <p className="onboarding__progress-text">{step < 4 ? `Шаг ${step + 1 + lead} из ${5 + lead} · ${QUESTIONS[step].label}` : `Шаг ${5 + lead} из ${5 + lead} · Выбор программы`}</p>
+      <div className="onboarding__progress" role="progressbar" aria-label="Подбор программы" aria-valuemin={0} aria-valuemax={5 + lead} aria-valuenow={step + 1 + lead}>
+        {[...LEAD_ICONS.slice(0, lead), ...ICONS, IconCheck].map((Icon, i) => <span key={i} className={i <= step + lead ? 'onboarding__step onboarding__step--active' : 'onboarding__step'} aria-hidden="true"><Icon size={18} /></span>)}
       </div>
     </>}
     <div className="onboarding__content" key={result ? 'result' : step}>

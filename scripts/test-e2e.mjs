@@ -132,17 +132,109 @@ test('вход в кабинет доходит до программы', async 
   await page.fill('input[type=email]', 'demo@example.com');
   await page.getByRole('button', { name: 'Прислать код' }).click();
   await page.locator('input[autocomplete=one-time-code]').fill('ABC123');
-  await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await page.fill('input[autocomplete=name]', 'Анна Морозова');
+  await page.getByRole('button', { name: 'Далее' }).click();
   const checks = page.locator('.consent input[type=checkbox]');
   await checks.nth(0).check();
   await checks.nth(1).check();
-  await page.getByRole('button', { name: 'Завести кабинет' }).click();
+  await page.getByRole('button', { name: 'Создать кабинет' }).click();
 
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
 
   await openTab('Тренировки');
   await page.getByRole('heading', { name: /Тренировка 1/ }).waitFor({ timeout: 20000 });
+});
+
+/**
+ * FT-574: вход клиента и вход тренера — две страницы. Каждый сценарий —
+ * в своём окне: основной `page` уже вошёл клиентом.
+ */
+const loginWindow = async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const p = await context.newPage();
+  p.on('pageerror', (error) => consoleErrors.push(String(error)));
+  return { context, p };
+};
+
+test('вернувшийся клиент: почта → код → сразу кабинет; «назад» между шагами — на этой же странице', async () => {
+  const { context, p } = await loginWindow();
+  try {
+    await p.goto(origin);
+    await p.getByRole('heading', { name: 'Войти или создать кабинет' }).waitFor({ timeout: 30000 });
+    assert.equal(await p.locator('.signin__steps li').count(), 2, 'шаги входа видны сразу: почта и код');
+    await p.fill('input[type=email]', 'back@example.com');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    await p.getByText('Код отправлен на').waitFor();
+    // Back браузера — к почте, а не со страницы
+    await p.goBack();
+    await p.locator('input[type=email]').waitFor({ timeout: 5000 });
+    assert.equal(new URL(p.url()).pathname, '/', 'остались на странице клиента');
+    assert.equal(await p.locator('input[type=email]').inputValue(), 'back@example.com', 'почта не стёрлась');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    await p.locator('input[autocomplete=one-time-code]').fill('ABC123');
+    await p.getByRole('button', { name: 'Тренировки', exact: true }).waitFor({ timeout: 60000 });
+    assert.equal(await p.locator('input[autocomplete=name]').count(), 0, 'имя у вернувшегося не спрашивали');
+  } finally { await context.close(); }
+});
+
+test('почта тренера на странице клиента ведёт на вход тренера с той же почтой; Back — обратно', async () => {
+  const { context, p } = await loginWindow();
+  try {
+    await p.goto(origin);
+    await p.fill('input[type=email]', 'owner@example.com');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    await p.getByText('Это почта тренера.').waitFor();
+    assert.equal(await p.getByRole('button', { name: 'Прислать код' }).count(), 0, 'главное действие — вход тренера');
+    await p.getByRole('button', { name: 'Войти как тренер' }).click();
+    await p.getByRole('heading', { name: 'Кабинет тренера' }).waitFor();
+    assert.equal(new URL(p.url()).pathname, '/trainer');
+    assert.equal(await p.locator('input[type=email]').inputValue(), 'owner@example.com');
+    await p.goBack();
+    await p.getByRole('heading', { name: 'Войти или создать кабинет' }).waitFor({ timeout: 5000 });
+    assert.equal(new URL(p.url()).pathname, '/');
+  } finally { await context.close(); }
+});
+
+test('тренер входит на /trainer; после выхода устройство открывает вход тренера', async () => {
+  const { context, p } = await loginWindow();
+  try {
+    await p.goto(origin + '/trainer');
+    await p.getByRole('heading', { name: 'Кабинет тренера' }).waitFor({ timeout: 30000 });
+    assert.equal(await p.getByRole('button', { name: /Вход для клиентов/ }).count(), 1, 'путь к входу клиента есть');
+    await p.fill('input[type=email]', 'owner@example.com');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    await p.locator('input[autocomplete=one-time-code]').fill('ABC123');
+    await p.getByRole('tab', { name: /^Все · / }).waitFor({ timeout: 60000 });
+    assert.equal(new URL(p.url()).pathname, '/', 'кабинет — с адреса приложения');
+    // Вход кончился — на корне снова вход тренера
+    await p.evaluate(() => localStorage.removeItem('auth_token_v1'));
+    await p.goto(origin);
+    await p.getByRole('heading', { name: 'Кабинет тренера' }).waitFor({ timeout: 30000 });
+    assert.equal(new URL(p.url()).pathname, '/trainer');
+    await p.getByRole('button', { name: /Вход для клиентов/ }).click();
+    await p.getByRole('heading', { name: 'Войти или создать кабинет' }).waitFor();
+    assert.equal(new URL(p.url()).pathname, '/');
+  } finally { await context.close(); }
+});
+
+test('не тренер на /trainer: после кода — заявка с условиями для тренеров', async () => {
+  const { context, p } = await loginWindow();
+  try {
+    await p.goto(origin + '/trainer');
+    await p.fill('input[type=email]', 'new@example.com');
+    await p.getByRole('button', { name: 'Прислать код' }).click();
+    await p.getByText(/только если адрес открывает кабинет тренера/).waitFor();
+    await p.locator('input[autocomplete=one-time-code]').fill('ABC123');
+    await p.fill('input[autocomplete=name]', 'Ольга');
+    await p.getByRole('button', { name: 'Далее' }).click();
+    await p.getByText('Шаг 2 из 2 · Условия').waitFor();
+    const checks = p.locator('.consent input[type=checkbox]');
+    await checks.nth(0).check();
+    await checks.nth(1).check();
+    assert.equal(await p.getByRole('link', { name: 'условия для тренеров' }).count(), 1);
+    await p.getByRole('button', { name: 'Отправить заявку' }).click();
+    await p.getByText('Заявка на кабинет тренера отправлена.', { exact: false }).waitFor();
+  } finally { await context.close(); }
 });
 
 test('планка доступна тестовому клиенту и скрыта без серверного разрешения', async () => {

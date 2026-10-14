@@ -103,7 +103,7 @@ export default function Trainers() {
 
       <Section title="Заявки" note="Кабинет откроется, когда вы одобрите — тренеру придёт письмо">
         {pending.length === 0
-          ? <Empty icon={IconKey} title="Новых заявок нет" text="Тренер подаёт заявку сам: «Вход для тренера» на экране входа." />
+          ? <Empty icon={IconKey} title="Новых заявок нет" text="Тренер подаёт заявку сам — на странице входа для тренеров (адрес …/trainer)." />
           : <div className="trainer-list">{pending.map(row)}</div>}
       </Section>
 

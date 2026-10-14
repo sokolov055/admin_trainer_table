@@ -2364,7 +2364,7 @@ th.sticky, td.sticky {
   display: block;
   width: fit-content;
   margin: var(--space-5) auto 0;
-  color: var(--accent-text);
+  color: var(--accent);
   font-size: var(--text-sm);
   text-underline-offset: 4px;
 }

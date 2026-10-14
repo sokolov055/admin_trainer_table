@@ -10,7 +10,7 @@ import { useViewMotion } from '../viewMotion.js';
 import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink, IconGuide } from '../icons.jsx';
 import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
-import { BackButton, Drawer, Section, SignOut } from '../ui.jsx';
+import { BackButton, Drawer, Section, SignOut, Loading } from '../ui.jsx';
 import { APP_VERSION } from '../version.js';
 import { screensNote } from '../native-bridge.js';
 import Profile from './Profile.jsx';
@@ -27,6 +27,7 @@ import { accountState, pendingTrainerLink } from '../trainer-link.js';
 import PlankGame from '../PlankGame.jsx';
 import { usePlankAccess } from '../plank-access.js';
 import Onboarding from './Onboarding.jsx';
+import { signupLead, clearSignupLead } from '../login-route.js';
 
 /**
  * Панель клиента.
@@ -103,6 +104,9 @@ export default function ClientApp({ me, clientRow, preview }) {
   const [onboarding, setOnboarding] = useState(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const onboardingClosed = useRef(false);
+  // Только что зарегистрировался — анкета продолжает шаги регистрации (FT-574)
+  const [lead, setLead] = useState(signupLead);
+  const dropLead = () => { clearSignupLead(); setLead(0); };
   // Выключатель всегда читается с сервера. Возврат из фона и опрос закрывают
   // анкету даже у человека, который оставил её открытой до отключения.
   useEffect(() => {
@@ -116,12 +120,12 @@ export default function ClientApp({ me, clientRow, preview }) {
         const r = await apiPublic('client.onboarding.get');
         if (!alive) return;
         setOnboarding(r);
-        if (!r.enabled || !r.eligible) setOnboardingOpen(false);
+        if (!r.enabled || !r.eligible) { setOnboardingOpen(false); dropLead(); }
         else if (!onboardingClosed.current) setOnboardingOpen(true);
       } catch (err) {
         // Старый сервер не знает анкету — прежний кабинет остаётся доступен.
         console.warn('Не удалось проверить доступность анкеты', err.message);
-        if (alive) setOnboardingOpen(false);
+        if (alive) { setOnboardingOpen(false); dropLead(); }
       } finally { reading = false; }
     };
     refresh();
@@ -223,10 +227,15 @@ export default function ClientApp({ me, clientRow, preview }) {
     return <ConsentGate onDone={() => setConsented(true)} />;
   }
 
-  if (onboardingOpen && onboarding?.eligible) return <Onboarding initial={onboarding}
-    onClose={(r) => { onboardingClosed.current = true; setOnboarding(r); setOnboardingOpen(false); }}
-    onDisabled={() => { setOnboarding(null); setOnboardingOpen(false); }}
-    onDone={() => { onboardingClosed.current = true; setOnboarding(null); setOnboardingOpen(false); setView('plan'); }} />;
+  // После регистрации кабинет не мелькает: ждём ответа об анкете
+  if (lead && own && (!me || (me.unlinked && !onboarding))) {
+    return <div className="app"><main className="app__body"><Loading rows={3} /></main></div>;
+  }
+
+  if (onboardingOpen && onboarding?.eligible) return <Onboarding initial={onboarding} lead={lead}
+    onClose={(r) => { onboardingClosed.current = true; setOnboarding(r); setOnboardingOpen(false); dropLead(); }}
+    onDisabled={() => { setOnboarding(null); setOnboardingOpen(false); dropLead(); }}
+    onDone={() => { onboardingClosed.current = true; setOnboarding(null); setOnboardingOpen(false); dropLead(); setView('plan'); }} />;
 
   return (
     <div className="app">

@@ -900,7 +900,7 @@ const MOCK = {
   // «ждёт одобрения»; адрес owner@… — сразу кабинет
   'auth.trainer.request': () => ({ sent: true, ttlMin: 15 }),
   'auth.trainer.confirm': (p) => (String(p.email || '').startsWith('owner@')
-    ? { token: 'demo-session', email: p.email }
+    ? (setDemoLoginRole('trainer'), { token: 'demo-session', email: p.email })
     : p.name ? { pending: true, email: p.email } : { needName: true, email: p.email }),
   // Тренеры сервиса — экран владельца (Trainers.jsx)
   'owner.trainers': () => ({ trainers: mockTrainers }),
@@ -920,8 +920,18 @@ const MOCK = {
   'trainer.ledger.settle': (p) => ({ row: { row: p.clientRow, settled: true } }),
 
   // Аккаунт без тренера и привязка (lib/accounts.js на сервере)
-  'auth.client.request': () => ({ sent: true, ttlMin: 15 }),
-  'auth.client.confirm': (p) => (p.name ? { token: 'demo-session', created: true } : { needName: true }),
+  // Почта тренера (owner@…) в клиентской форме — как сервер: 409 (FT-574);
+  // back@… — вернувшийся клиент: кабинет сразу, без имени
+  'auth.client.request': (p) => {
+    if (String(p.email || '').startsWith('owner@')) throw Object.assign(new Error('Это почта тренера — войдите на странице для тренеров: app.fitness100.ru/trainer.'), { code: 409 });
+    return { sent: true, ttlMin: 15 };
+  },
+  'auth.client.confirm': (p) => {
+    // Анкета подбора (FT-552) в демо — с ?mockOnboarding=1; регистрация — её первые шаги
+    if (!p.name && !String(p.email || '').startsWith('back@')) return { needName: true, questionnaire: new URLSearchParams(window.location.search).get('mockOnboarding') === '1' };
+    setDemoLoginRole('client');
+    return { token: 'demo-session', created: !!p.name };
+  },
   'auth.trainer.link.inspect': () => ({ trainerName: 'Константин Соколов' }),
   // Вход по телефону (FT-489): звонок «проходит» на третьем опросе, код
   // из СМС в демо — 123456; ?mockPhone=0 — способа нет, как без ключа SMS.ru
@@ -1815,8 +1825,16 @@ const MOCK = {
   }),
 };
 
+/** Роль после входа в демо (FT-574): вход на /trainer открывает кабинет тренера */
+function demoLoginRole() {
+  try { return window.sessionStorage.getItem('mockRole') || ''; } catch (_) { return ''; }
+}
+function setDemoLoginRole(role) {
+  try { window.sessionStorage.setItem('mockRole', role); } catch (_) { /* приватный режим */ }
+}
+
 export function mockApi(action, params) {
-  const role = new URLSearchParams(window.location.search).get('mockRole') || 'client';
+  const role = new URLSearchParams(window.location.search).get('mockRole') || demoLoginRole() || 'client';
   const handler = action.includes('.onboarding.') ? p => onboardingMock(action, p)
     : action.startsWith('workout.') ? p => workoutMock(action, p) : MOCK[action];
 

@@ -120,7 +120,8 @@ async function openShell() {
 /** Адрес самого приложения: корень области воркера или index.html в нём */
 function isShellPath(pathname) {
   const root = new URL(self.registration.scope).pathname;
-  return pathname === root || pathname === root + 'index.html';
+  // /trainer — вход тренера, та же страница (FT-574)
+  return pathname === root || pathname === root + 'index.html' || pathname === root + 'trainer';
 }
 
 async function cacheForever(request) {
