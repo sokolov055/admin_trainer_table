@@ -67,7 +67,7 @@ const output = await build({
         };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Processes=()=>null;` };
-        if (args.path === 'schedule') return { loader: 'jsx', contents: `export default () => null; export const PhoneCalendar=()=>null;` };
+        if (args.path === 'schedule') return { loader: 'jsx', contents: `export default () => null;` };
         if (args.path === 'expenses') return { loader: 'jsx', contents: `export const Expenses=()=>null;` };
         if (args.path === 'client-screens') return { contents: `export const Overview=()=>null; export const Plan=()=>null; export const Progress=()=>null; export const Nutrition=()=>null; export const WorkoutJournal=()=>null;` };
         if (args.path === 'client-app') return { loader: 'jsx', contents: `export default function ClientApp(){ return null; }` };
@@ -90,13 +90,13 @@ vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0]
 );
 const TrainerApp = module.exports.default;
 
-test('календарь обновляется в фоне при входе и повторный запуск не дублируется', async () => {
+test('локальное расписание пересчитывается в фоне при входе и повторный запуск не дублируется', async () => {
   let calls = 0;
   let finish;
   globalThis.__calendarRefreshHarness = {
     apiMutate(action, params) {
       calls += 1;
-      assert.equal(action, 'calendar.refresh');
+      assert.equal(action, 'trainer.schedule.refresh');
       assert.deepEqual(params, {});
       return new Promise((resolve) => { finish = resolve; });
     },
@@ -138,7 +138,7 @@ test('тренер не владелец: календарь не пересчи
     tree = renderer.create(React.createElement(TrainerApp, { me: { name: 'Мария', owner: false } }));
   });
 
-  assert.equal(calls, 0, 'Google Календарь только у владельца');
+  assert.equal(calls, 0, 'общий пересчёт доступен только владельцу');
   const labels = tree.root.findAll((node) => node.props && node.props.className === 'menu__label')
     .map((node) => node.children.join(''));
   assert.ok(labels.includes('Расходы'));

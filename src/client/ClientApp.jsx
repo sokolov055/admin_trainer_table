@@ -20,7 +20,6 @@ import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
 import Family from './Family.jsx';
-import { PhoneCalendar } from '../trainer/Schedule.jsx';
 import { apiPublic } from '../api.js';
 import MyTrainer, { LinkOffers } from './MyTrainer.jsx';
 import { ConsentGate } from '../Consent.jsx';
@@ -374,7 +373,6 @@ export default function ClientApp({ me, clientRow, preview }) {
               <RestSignalSetting />
             </Section>
 
-            <ScheduleFeed clientRow={clientRow} />
 
             {/* Выход стоит последним: это конец разговора, а не раздел.
                 Когда этот же кабинет открывает тренер из карточки клиента,
@@ -426,22 +424,4 @@ function OverviewOffers() {
   }, [revision]);
   if (!requests.length && !pendingTrainerLink()) return null;
   return <LinkOffers requests={requests} onChanged={() => setRevision((n) => n + 1)} />;
-}
-
-/**
- * Свои тренировки в календаре телефона — подпиской по ссылке. Нет ключа
- * или сервер не ответил — блока просто нет: это удобство, а не раздел.
- */
-function ScheduleFeed({ clientRow }) {
-  const [url, setUrl] = useState('');
-  useEffect(() => {
-    let alive = true;
-    apiPublic('client.schedule.feed', clientRow ? { clientRow } : {})
-      .then((r) => { if (alive && r && r.url) setUrl(r.url); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [clientRow]);
-
-  if (!url) return null;
-  return <PhoneCalendar url={url} text="Ваши тренировки — в календаре телефона: подпишитесь один раз, новые занятия появятся сами." />;
 }

@@ -63,7 +63,7 @@ const visibleMain = () => document.querySelector('#root .app > main:not([hidden]
 
 const TABS = [
   { id: 'clients', label: 'Клиенты', Icon: IconUsers },
-  // Расписание: занятия из Google Календаря, запись туда же (Schedule.jsx)
+  // Расписание всех тренеров хранится в Fit Track.
   { id: 'schedule', label: 'Расписание', Icon: IconCalendar },
   // Библиотека: шаблоны программ и тренировок, упражнения. Отсюда
   // программы раскладываются клиентам за минуту (Library.jsx).
@@ -185,35 +185,31 @@ export default function TrainerApp({ me }) {
   useViewMotion(clientPane, { direction: byOrder(CLIENT_PANES.map((p) => p.value)), target: paneTarget });
   useViewMotion(dashPane, { direction: byOrder(DASH.map((p) => p.value)), target: paneTarget });
   useViewMotion(libPane, { direction: byOrder(LIBRARY_PANES.map((p) => p.value)), target: paneTarget });
-  const [calendarRevision, setCalendarRevision] = useState(0);
-  const calendarRequest = useRef(null);
+  const [scheduleRevision, setScheduleRevision] = useState(0);
+  const scheduleRequest = useRef(null);
 
-  // Календарь — источник баланса, тренировок и ближайших занятий. Запускаем
-  // его пересчёт сразу после входа тренера, но не ждём перед показом панели:
-  // список открывается из зеркала, а свежие числа тихо заменяют его позже.
-  // Та же функция срабатывает, когда страницу тянут вниз, поэтому два
-  // одновременных запуска склеиваются ещё до серверной защиты от дублей.
-  const runCalendarRefresh = useCallback(() => {
-    // Google Календарь — только у владельца; у остальных расписание в
-    // приложении, и пересчитывать нечего
+  // Пересчитываем локальные занятия перед обновлением балансов.
+  // Запросы входа и обновления жестом объединяются.
+  const runScheduleRefresh = useCallback(() => {
+    // Общий пересчёт доступен владельцу; остальные обновляют свои данные.
     if (!owner) return Promise.resolve(null);
-    if (calendarRequest.current) return calendarRequest.current;
+    if (scheduleRequest.current) return scheduleRequest.current;
 
-    const request = apiMutate('calendar.refresh', {}, { quiet: true })
+    const request = apiMutate('trainer.schedule.refresh', {}, { quiet: true })
       .then((result) => {
-        setCalendarRevision((value) => value + 1);
+        setScheduleRevision((value) => value + 1);
         return result;
       })
       // Фоновая ошибка не закрывает панель: старые данные полезнее
       // полноэкранного отказа, а повтор — потянуть страницу вниз
       .catch(() => null)
-      .finally(() => { calendarRequest.current = null; });
+      .finally(() => { scheduleRequest.current = null; });
 
-    calendarRequest.current = request;
+    scheduleRequest.current = request;
     return request;
   }, [owner]);
 
-  useEffect(() => { runCalendarRefresh(); }, [runCalendarRefresh]);
+  useEffect(() => { runScheduleRefresh(); }, [runScheduleRefresh]);
 
   if (previewClient) {
     return (
@@ -327,8 +323,8 @@ export default function TrainerApp({ me }) {
             {clientPane === 'active' && (
               <Clients
                 onOpenClient={(client) => { captureScreen('client-card'); setOpenClient(client); }}
-                onRefresh={runCalendarRefresh}
-                refreshRevision={calendarRevision}
+                onRefresh={runScheduleRefresh}
+                refreshRevision={scheduleRevision}
               />
             )}
             {clientPane === 'lost' && <Lost />}
