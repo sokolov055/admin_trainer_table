@@ -117,12 +117,6 @@ export function mediaUrl(url) {
   return String(currentApiUrl() || '').replace(/\/$/, '') + url;
 }
 
-/** Встраиваемый YouTube: плеер прямо в приложении, а не уход в браузер */
-export function youtubeEmbed(url) {
-  const m = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{11})/.exec(url || '');
-  return m ? 'https://www.youtube.com/embed/' + m[1] : '';
-}
-
 /** «Сентябрь 2026» — месяц так называется в программе клиента */
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 

@@ -1431,7 +1431,7 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
             <textarea className="field__input library__textarea" value={notes} maxLength={2000} onChange={(e) => setNotes(e.target.value)} placeholder="На что обратить внимание" />
           </label>
 
-          <Field label="Видео — ссылка" inputMode="url" value={link} onChange={setLink} placeholder="https://youtu.be/…" hint="YouTube, VK, Rutube — любая ссылка" />
+          <Field label="Видео — ссылка" inputMode="url" value={link} onChange={setLink} placeholder="https://…" hint="Клиент увидит кнопку «Открыть видео» — ролик откроется на том сайте. Чтобы видео играло прямо в приложении, загрузите файл." />
 
           <label className="field">
             <span className="field__label">Или файлом с телефона</span>

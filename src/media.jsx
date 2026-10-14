@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { haptic } from './telegram.js';
 import { apiMutate } from './api.js';
-import { mediaUrl, youtubeEmbed } from './library.js';
+import { mediaUrl } from './library.js';
 
 /**
  * Видео и анимация техники упражнения.
@@ -61,18 +61,9 @@ export function Media({ media }) {
   if (media.kind === 'file') {
     return <video className="library__video" src={mediaUrl(media.url)} controls playsInline preload="metadata" />;
   }
-  const embed = youtubeEmbed(media.url);
-  if (embed) {
-    return (
-      <iframe
-        className="library__video"
-        src={embed}
-        title="Видео упражнения"
-        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-      />
-    );
-  }
+  // Чужой плеер (YouTube и др.) не встраиваем (14.10.2026): он грузится сам
+  // при открытии карточки и передаёт адрес клиента за рубеж без его действия.
+  // Ссылка открывается только по нажатию — как переход на любой сайт.
   return <a className="button button--block" href={media.url} target="_blank" rel="noreferrer">Открыть видео</a>;
 }
 
