@@ -222,6 +222,7 @@ test('клавиатура iPhone не закрывает ячейки кода:
       addEventListener: (type, fn) => listeners.add(fn), removeEventListener: (type, fn) => listeners.delete(fn) };
     Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
     window.__keyboard = (h) => { vv.height = 844 - h; listeners.forEach((fn) => fn()); };
+    window.__pan = (y) => { vv.offsetTop = y; listeners.forEach((fn) => fn()); };
   });
   try {
     await p.goto(origin);
@@ -235,6 +236,9 @@ test('клавиатура iPhone не закрывает ячейки кода:
       const r = document.querySelector('.signin__otp .otp').getBoundingClientRect();
       return r.bottom <= 844 - 336 && r.top >= 0;
     }, null, { timeout: 3000 });
+    // Safari сам сдвигает видимую часть — отступ от этого не уменьшается
+    await p.evaluate(() => window.__pan(180));
+    await p.waitForTimeout(200);
     const pad = await p.evaluate(() => document.body.style.paddingBottom);
     assert.equal(pad, '336px', 'снизу место под клавиатуру');
     await cells.blur();

@@ -172,13 +172,18 @@ export default function OtpStage({
     if (!vv || !el) return undefined;
     let on = false;
     let raf = 0;
+    let pad = 0;
     const fit = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         if (!on || !stage.current) return;
-        const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-        document.body.style.paddingBottom = kb > 80 ? kb + 'px' : '';
-        if (kb <= 80) return;
+        // Высота клавиатуры — без сдвига видимой части (offsetTop): Safari
+        // сам сдвигает её, открывая клавиатуру, и прежний расчёт урезал
+        // отступ — страница укорачивалась и отскакивала назад (15.10.2026).
+        // Пока поле в фокусе, отступ только растёт
+        const kb = Math.max(0, Math.round(window.innerHeight - vv.height));
+        if (kb <= 80 && !pad) return;
+        if (kb > pad) { pad = kb; document.body.style.paddingBottom = pad + 'px'; }
         const r = stage.current.getBoundingClientRect();
         const want = Math.max(12, (vv.height - r.height) / 2);
         const delta = r.top - vv.offsetTop - want;
@@ -186,7 +191,7 @@ export default function OtpStage({
       });
     };
     const focus = () => { on = true; fit(); setTimeout(fit, 400); };
-    const blur = () => { on = false; document.body.style.paddingBottom = ''; };
+    const blur = () => { on = false; pad = 0; document.body.style.paddingBottom = ''; };
     el.addEventListener('focus', focus);
     el.addEventListener('blur', blur);
     vv.addEventListener('resize', fit);
