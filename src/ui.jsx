@@ -324,8 +324,13 @@ function useActiveInView(rowRef, value) {
  * говорило, что справа есть ещё «Питание» или «Блюда». Теперь край, за
  * которым есть что листать, затухает.
  */
-export function SubNav({ className = '', children }) {
-  const ref = useRef(null);
+/**
+ * Классы края ряда, который листается вбок: is-more-left / is-more-right —
+ * там ещё есть что листать, край затухает (styles.css). Общий для рядов
+ * подразделов (SubNav) и фильтров (Chips): на «Клиентах» фильтры
+ * «Требуют внимания» обрезались краем без всякого намёка (FT-567).
+ */
+function useEdgeFade(ref) {
   const [edges, setEdges] = useState('');
   useLayoutEffect(() => {
     const el = ref.current;
@@ -340,14 +345,21 @@ export function SubNav({ className = '', children }) {
     if (ro) { ro.observe(el); [...el.children].forEach((child) => ro.observe(child)); }
     return () => { el.removeEventListener('scroll', check); if (ro) ro.disconnect(); };
   }, []);
+  return edges;
+}
+
+export function SubNav({ className = '', children }) {
+  const ref = useRef(null);
+  const edges = useEdgeFade(ref);
   return <div ref={ref} className={'app__subnav' + (className ? ' ' + className : '') + edges}>{children}</div>;
 }
 
 export function Chips({ items, value, onChange, variant, className }) {
   const rowRef = useRef(null);
   useActiveInView(rowRef, value);
+  const edges = useEdgeFade(rowRef);
   return (
-    <div ref={rowRef} className={'chips' + (variant ? ' chips--' + variant : '') + (className ? ' ' + className : '')} role="tablist">
+    <div ref={rowRef} className={'chips' + (variant ? ' chips--' + variant : '') + (className ? ' ' + className : '') + edges} role="tablist">
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const label = typeof item === 'string' ? item : item.label;

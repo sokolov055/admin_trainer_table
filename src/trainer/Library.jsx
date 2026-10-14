@@ -939,7 +939,11 @@ function Machines() {
 
   return (
     <>
-      <button type="button" className="button button--ghost" onClick={() => { setForm({ machine: null }); haptic(); }}>+ Создать карточку</button>
+      {/* Как «Новый шаблон» и «Своё блюдо» в соседних вкладках — синей
+          кнопкой во всю ширину, а не ссылкой (владелец, 14.10.2026) */}
+      <div className="library__bar">
+        <button type="button" className="button button--primary" onClick={() => { setForm({ machine: null }); haptic(); }}>Новый тренажёр</button>
+      </div>
       <p className="library__sub">Создавайте тренажёры и оборудование отдельно, затем привязывайте каждую карточку к любому числу упражнений.</p>
       <Search value={q} onChange={setQ} placeholder="Поиск тренажёра или оборудования" />
       <Chips className="library__filters" items={kinds} value={kindOf} onChange={setKindOf} />

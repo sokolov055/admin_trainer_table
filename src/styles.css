@@ -5593,3 +5593,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 /* Занятие в расписании → программа и карточка клиента (FT-567) */
 .schedule__client-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Ряд фильтров, который листается вбок, — тот же намёк краем (FT-567) */
+.chips.is-more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+.chips.is-more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 32px); mask-image: linear-gradient(to right, transparent, #000 32px); }
+.chips.is-more-left.is-more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 48px), transparent); }

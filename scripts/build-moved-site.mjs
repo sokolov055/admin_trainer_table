@@ -18,6 +18,10 @@
  * - Android-приложение до версии 7 открывает этот адрес внутри себя, а
  *   переход на другой адрес унесло бы в браузер — ему показываем «Обновите
  *   приложение» со ссылкой на новый APK;
+ * - иконка на экране «Домой» iPhone, добавленная со старого адреса, тоже
+ *   открывает его, а переход на другой адрес выводит из режима приложения —
+ *   новый адрес открывался с панелью Safari. Такому заходу не переходим
+ *   молча, а объясняем, как поставить новую иконку (владелец, 14.10.2026);
  * - sw.js снимает прежний сервис-воркер и чистит его кеш: иначе он ещё
  *   долго показывал бы старое приложение с этого адреса.
  *
@@ -65,6 +69,17 @@ a.button{display:block;margin-top:20px;padding:14px;border-radius:12px;backgroun
 <p>Открываем новый адрес — app.fitness100.ru…</p>
 <a class="button" id="go" href="${NEW_SITE}/">Открыть Fit Track</a>
 </section>
+<section id="icon" hidden>
+<h1>Обновите иконку</h1>
+<p>Fit Track переехал на app.fitness100.ru. Эта иконка ведёт на старый адрес, поэтому приложение открывается с панелью браузера.</p>
+<ol>
+<li>Удалите эту иконку с экрана «Домой».</li>
+<li>Откройте <b>app.fitness100.ru</b> в Safari.</li>
+<li>Нажмите «Поделиться» → «На экран „Домой“».</li>
+</ol>
+<p>Новая иконка откроется без панели браузера. Войдите в ней ещё раз.</p>
+<a class="button" id="go-icon" href="${NEW_SITE}/">Открыть Fit Track сейчас</a>
+</section>
 <section id="update" hidden>
 <h1>Обновите приложение</h1>
 <p>Fit Track переехал на наш сервер в России. Эта версия приложения открывает старый адрес — установите новую, она откроется как раньше.</p>
@@ -91,6 +106,25 @@ a.button{display:block;margin-top:20px;padding:14px;border-radius:12px;backgroun
 
   var token = '';
   try { token = localStorage.getItem('auth_token_v1') || ''; } catch (e) {}
+
+  // Старая иконка на экране «Домой»: сначала объяснить, переход — по кнопке
+  var standalone = navigator.standalone === true
+    || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  if (standalone && path === '/' && !window.__ftGo) {
+    document.getElementById('moving').hidden = true;
+    document.getElementById('icon').hidden = false;
+    document.getElementById('go-icon').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      window.__ftGo = true;
+      document.getElementById('icon').hidden = true;
+      document.getElementById('moving').hidden = false;
+      move();
+    });
+    return;
+  }
+  move();
+
+  function move() {
   // Документы (политика, согласие) открываются без входа
   if (!token || path !== '/') { location.replace(target + location.hash); return; }
 
@@ -108,6 +142,7 @@ a.button{display:block;margin-top:20px;padding:14px;border-radius:12px;backgroun
     try { localStorage.removeItem('auth_token_v1'); } catch (e) {}
     location.replace(target + '#loginTicket=' + encodeURIComponent(ticket));
   }).catch(plain);
+  }
 })();
 </script>
 </body>

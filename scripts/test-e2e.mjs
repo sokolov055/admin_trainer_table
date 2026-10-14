@@ -1131,7 +1131,7 @@ test('оборудование создаётся без упражнения и
 
     await phone.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await phone.getByRole('tab', { name: 'Тренажёры', exact: true }).click();
-    await phone.getByRole('button', { name: '+ Создать карточку', exact: true }).click();
+    await phone.getByRole('button', { name: 'Новый тренажёр', exact: true }).click();
     await phone.getByRole('radio', { name: 'Оборудование', exact: true }).click();
     await phone.getByLabel('Название').fill('Разборные гантели');
     await phone.getByLabel('Настройка').fill('Стойка у окна.');
