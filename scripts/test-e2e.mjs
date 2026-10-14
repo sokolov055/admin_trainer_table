@@ -231,18 +231,30 @@ test('клавиатура iPhone не закрывает ячейки кода:
     const cells = p.locator('input[autocomplete=one-time-code]');
     await cells.waitFor();
     await p.evaluate(() => window.__keyboard(336));
-    await cells.focus();
-    await p.waitForFunction(() => {
+    // Касание ячеек — фокус в неподвижное поле вверху экрана (в body)
+    await p.locator('.signin__otp .otp').click();
+    assert.equal(await p.evaluate(() => document.activeElement.autocomplete), 'one-time-code');
+    assert.equal(await p.evaluate(() => document.activeElement.parentElement === document.body), true, 'поле не двигают сдвиги страницы');
+    const visible = () => p.waitForFunction(() => {
+      const vv = window.visualViewport;
       const r = document.querySelector('.signin__otp .otp').getBoundingClientRect();
-      return r.bottom <= 844 - 336 && r.top >= 0;
+      return r.top - vv.offsetTop >= 0 && r.bottom - vv.offsetTop <= vv.height;
     }, null, { timeout: 3000 });
-    // Safari сам сдвигает видимую часть — отступ от этого не уменьшается
-    await p.evaluate(() => window.__pan(180));
-    await p.waitForTimeout(200);
-    const pad = await p.evaluate(() => document.body.style.paddingBottom);
-    assert.equal(pad, '336px', 'снизу место под клавиатуру');
+    await visible();
+    assert.equal(await p.evaluate(() => window.scrollY), 0, 'без прокрутки — только сдвиг экрана');
+    // Повторные касания при открытой клавиатуре — экран стоит (запись владельца 15.10.2026)
+    const shifted = await p.evaluate(() => document.querySelector('main').style.transform);
+    assert.ok(shifted, 'экран поднят над клавиатурой');
+    for (let t = 0; t < 3; t += 1) {
+      await p.locator('.signin__otp .otp').click();
+      assert.equal(await p.evaluate(() => document.querySelector('main').style.transform), shifted, 'касание не сдвигает экран');
+      assert.equal(await p.evaluate(() => document.activeElement.autocomplete), 'one-time-code', 'фокус остаётся в поле');
+    }
+    // Safari сдвинул видимую часть — ячейки всё равно на виду
+    await p.evaluate(() => window.__pan(120));
+    await visible();
     await cells.blur();
-    assert.equal(await p.evaluate(() => document.body.style.paddingBottom), '', 'клавиатура ушла — отступ убран');
+    await p.waitForFunction(() => !document.querySelector('main').style.transform, null, { timeout: 3000 });
   } finally { await context.close(); }
 });
 test('почта тренера на странице клиента ведёт на вход тренера с той же почтой; Back — обратно', async () => {

@@ -5101,11 +5101,18 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   80% { transform: translateX(2px); }
 }
 
-/* Поле ввода — невидимое поверх сцены: клавиатура, вставка и подсказка
-   кода из СМС работают как у обычного поля */
+/* Поле ввода — невидимое и неподвижное вверху экрана: Safari не к чему
+   прокручивать страницу при фокусе (иначе она прыгала, 15.10.2026);
+   касание ячеек ставит фокус сюда (OtpStage focusInput). Клавиатура и
+   подсказка кода из СМС и письма работают как у обычного поля */
 .otp__input {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  pointer-events: none;
   opacity: 0;
   font-size: 16px;
   caret-color: transparent;

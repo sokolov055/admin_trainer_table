@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { IconCheck, IconClose } from './icons.jsx';
 
 /**
@@ -162,51 +163,75 @@ export default function OtpStage({
 
   useEffect(() => () => cancelAnimationFrame(spin.current.frame), []);
 
-  // Клавиатура iPhone закрывала ячейки (владелец, 15.10.2026): экран входа
-  // короткий, прокручивать Safari некуда. Пока поле в фокусе — снизу отступ
-  // на высоту клавиатуры, и ячейки встают по центру видимой части экрана.
-  // Где клавиатура сжимает само окно (Android), отступ не нужен — kb ≈ 0.
+  // Клавиатура iPhone закрывала ячейки (владелец, 15.10.2026). Прокрутка
+  // страницы спорила с Safari: он сам прокручивает к полю под пальцем, и
+  // страница прыгала вверх-вниз. Поэтому поле ввода стоит неподвижно вверху
+  // экрана (CSS .otp__input) — Safari прокручивать незачем, — а экран над
+  // клавиатурой поднимаем сами сдвигом (transform), без прокрутки: ячейки
+  // по центру видимой части. Где клавиатура сжимает окно (Android), kb ≈ 0
+  // и сдвиг не нужен.
   useEffect(() => {
     const vv = typeof window !== 'undefined' && window.visualViewport;
     const el = input.current;
     if (!vv || !el) return undefined;
     let on = false;
     let raf = 0;
-    let pad = 0;
+    let shift = 0;
+    const page = () => stage.current && stage.current.closest('main');
+    const apply = (value) => {
+      const main = page();
+      if (!main) return;
+      shift = value;
+      main.style.transition = reducedMotion() ? '' : 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)';
+      main.style.transform = value ? `translateY(${-value}px)` : '';
+    };
     const fit = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         if (!on || !stage.current) return;
-        // Высота клавиатуры — без сдвига видимой части (offsetTop): Safari
-        // сам сдвигает её, открывая клавиатуру, и прежний расчёт урезал
-        // отступ — страница укорачивалась и отскакивала назад (15.10.2026).
-        // Пока поле в фокусе, отступ только растёт
         const kb = Math.max(0, Math.round(window.innerHeight - vv.height));
-        if (kb <= 80 && !pad) return;
-        if (kb > pad) { pad = kb; document.body.style.paddingBottom = pad + 'px'; }
+        if (kb <= 80) { apply(0); return; }
         const r = stage.current.getBoundingClientRect();
+        // Где ячейки стояли бы без сдвига — в координатах видимой части
+        const top = r.top + shift - vv.offsetTop;
         const want = Math.max(12, (vv.height - r.height) / 2);
-        const delta = r.top - vv.offsetTop - want;
-        if (Math.abs(delta) > 8) window.scrollBy({ top: delta, behavior: reducedMotion() ? 'auto' : 'smooth' });
+        const next = Math.max(0, Math.round(top - want));
+        if (Math.abs(next - shift) > 2) apply(next);
       });
     };
     const focus = () => { on = true; fit(); setTimeout(fit, 400); };
-    const blur = () => { on = false; pad = 0; document.body.style.paddingBottom = ''; };
+    const blur = () => { on = false; cancelAnimationFrame(raf); apply(0); };
     el.addEventListener('focus', focus);
     el.addEventListener('blur', blur);
     vv.addEventListener('resize', fit);
+    vv.addEventListener('scroll', fit);
     if (document.activeElement === el) focus();
     return () => {
       el.removeEventListener('focus', focus);
       el.removeEventListener('blur', blur);
       vv.removeEventListener('resize', fit);
-      cancelAnimationFrame(raf);
+      vv.removeEventListener('scroll', fit);
       blur();
     };
   }, [readOnly]);
 
+  // Касание ячеек — фокус в неподвижное поле. Если оно уже в фокусе без
+  // клавиатуры (autoFocus без жеста пользователя), снимаем и ставим снова:
+  // iOS открывает клавиатуру только на фокус внутри касания
+  const focusInput = () => {
+    const el = input.current;
+    if (!el || el.disabled) return;
+    if (document.activeElement === el) {
+      // Клавиатура уже открыта — ничего не трогаем: переоткрытие дёргало экран
+      const vv = window.visualViewport;
+      if (vv && window.innerHeight - vv.height > 80) return;
+      el.blur();
+    }
+    el.focus({ preventScroll: true });
+  };
+
   useEffect(() => {
-    if (phase === 'input' && autoFocus && input.current && !readOnly) input.current.focus();
+    if (phase === 'input' && autoFocus && input.current && !readOnly) input.current.focus({ preventScroll: true });
   }, [phase, autoFocus, readOnly]);
 
   const chars = Array.from({ length: n }, (_, i) => value[i] || '');
@@ -225,7 +250,9 @@ export default function OtpStage({
 
   return (
     <div ref={stage} className={'otp otp--' + step} style={{ '--otp-cell': CELL + 'px', '--otp-r': radius(n) + 'px' }}
-      onClick={() => input.current && input.current.focus()}>
+      // Нажатие не уводит фокус с поля: иначе сдвиг сбрасывался под пальцем
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={focusInput}>
       <div ref={orbit} className="otp__orbit">
         <span className="otp__track" aria-hidden="true" />
         {chars.map((c, i) => {
@@ -262,7 +289,8 @@ export default function OtpStage({
         </svg>
         <span className="otp__badge"><IconClose size={22} /></span>
       </span>
-      {!readOnly && (
+      {/* Поле — в body: сдвиги и анимации страницы не двигают его (fixed) */}
+      {!readOnly && createPortal(
         <input
           ref={input}
           className="otp__input"
@@ -276,7 +304,8 @@ export default function OtpStage({
           value={value}
           onChange={type}
           disabled={disabled || phase !== 'input'}
-        />
+        />,
+        document.body,
       )}
       <span className="sr-status" role="status">
         {step === 'checking' ? 'Проверяем' : step === 'done' ? doneLabel : step === 'failed' ? 'Код не подошёл' : ''}
