@@ -5578,7 +5578,13 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .library__actions .button--primary { flex: 1 1 100%; }
 
 /* Видимый «назад» над заголовком (FT-567): тот же вид, что «К списку» в карточке */
-.app__back { align-self: flex-start; margin: 0 0 var(--space-2) calc(-1 * var(--space-2)); padding-inline: var(--space-2); min-height: 36px; }
+.app__back { align-self: flex-start; }
+/* Один вид у всех «назад» (FT-567, этап 3): синий текст со стрелкой от левого
+   края, как в «Библиотеке» (.library__back), а не серая кнопка — раньше
+   карточка, экраны меню и «Библиотека» показывали «назад» по-разному */
+.app__back { min-height: 40px; gap: 4px; margin: 0 0 var(--space-2); padding: 0; border: 0; background: none; color: var(--accent); font-size: 14px; font-weight: 600; }
+.app__back svg { margin-left: -4px; }
+.app__back:active { transform: none; opacity: 0.55; }
 
 /* Ряд подразделов: край, за которым есть ещё разделы, затухает (FT-567) */
 .app__subnav.is-more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
