@@ -294,7 +294,9 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
   if (!primary) primary = { label: 'Далее', disabled: !canAdvance(answers, step), onClick: () => forward() };
 
   return (
-    <main className="onboarding ob" aria-busy={busy}>
+    // data-no-gestures: в анкете нечего обновлять «потянуть вниз», а барабаны
+    // и прокрутка вниз запускали индикатор обновления
+    <main className="onboarding ob" aria-busy={busy} data-no-gestures="">
       <header className="ob__top">
         <StageBar stages={stages} current={stage} label="Подбор программы" />
         {id !== 'done' && <button type="button" className="ob__later" disabled={busy} onClick={later}>Позже</button>}

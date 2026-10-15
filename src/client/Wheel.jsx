@@ -101,7 +101,8 @@ export function Sheet({ title, onClose, onDone, done = 'Готово', children 
   }, []);
 
   return createPortal(
-    <div className={'ob-sheet' + (leaving ? ' is-leaving' : '')}>
+    // data-no-gestures: барабан крутят вниз — это не «потяни, чтобы обновить»
+    <div className={'ob-sheet' + (leaving ? ' is-leaving' : '')} data-no-gestures="">
       <div className="ob-sheet__scrim" onClick={() => close(onClose)} />
       <section ref={panel} className="ob-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="ob-sheet-title">
         <span className="ob-sheet__grip" aria-hidden="true" />

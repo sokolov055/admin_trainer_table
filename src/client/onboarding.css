@@ -263,6 +263,9 @@
   max-width: 560px; margin: 0 auto; padding: 12px 20px 12px; box-sizing: border-box; background: var(--bg);
 }
 .kb-open .onboarding { padding-bottom: 120px; }
+/* Клавиатура едет: панель невидима и проявляется уже на месте */
+.ob__footer { transition: opacity 180ms var(--ease-out); }
+.kb-moving .ob__footer { opacity: 0; transition: none; }
 /* Остаток анимации появления (transform) у предка сделал бы панель
    «закреплённой» относительно него, а не экрана */
 .kb-open .signin__register, .kb-open .ob__body { animation: none; transform: none; }
