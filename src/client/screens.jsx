@@ -2,7 +2,9 @@ import { useReturnScroll } from '../scroll.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
-import { apiBatch, apiMutate, apiPublic } from '../api.js';
+import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
+import { journalList, onOutboxChange, justSynced, localWorkouts, withLocalWeights } from '../workout-outbox.js';
+import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures } from '../offline-writes.js';
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
@@ -28,6 +30,7 @@ import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
 import { uid } from '../workout-model.js';
 import { trainerOverview } from './trainer-overview.js';
 import { GoalBanner } from './focus.jsx';
+import { onlineDaysLeft, onlineDay } from '../online.js';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
@@ -172,10 +175,25 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
   const leadMoney = payer ? payer.balance : data.balance;
   const leadLeft = payer ? payer.trainingsLeft : data.trainingsLeft;
   const leadIsTrainings = leadLeft !== null && leadLeft !== undefined && leadMoney > 0;
+  // Онлайн-ведение (FT-530): занятий с тренером нет — вместо пакета срок
+  const online = data.online || null;
+  const onlineLeft = online ? onlineDaysLeft(online.until) : null;
 
   return (
     <>
       {clientRow && !clientView && <GoalBanner clientRow={clientRow} section="overview" />}
+      {online ? (
+        <Lead
+          label={onlineLeft !== null && onlineLeft >= 0 ? 'Онлайн-ведение оплачено' : 'Онлайн-ведение'}
+          value={onlineLeft === null ? 'Срок не указан' : onlineLeft < 0 ? 'Срок истёк' : 'по ' + onlineDay(online.until)}
+          tone={onlineLeft !== null && onlineLeft < 0 ? 'critical' : onlineLeft !== null ? 'good' : undefined}
+          hint={
+            onlineLeft !== null && onlineLeft < 0
+              ? 'Закончился ' + onlineDay(online.until) + ' · ' + (clientRow && !clientView ? 'напомните клиенту об оплате' : 'напишите тренеру, чтобы продлить')
+              : (clientRow && !clientView ? 'Клиент сам строит график' : 'График строите сами, тренер на связи в мессенджере')
+          }
+        />
+      ) : (
       <Lead
         label={leadIsTrainings ? 'Оплачено вперёд' : 'Баланс'}
         value={
@@ -213,6 +231,7 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
         ]}
       />
+      )}
 
       {/* Конец пакета. Стоит сразу под главной цифрой, потому что это
           единственная новость, требующая действия СЕГОДНЯ: «осталось 2»
@@ -220,7 +239,7 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           пришёл заниматься. */}
       <PackageEnding state={data.packageEnding} payer={data.payer} trainer={!!clientRow && !clientView} />
 
-      {sinceTraining !== null && sinceTraining > 14 && (
+      {!online && sinceTraining !== null && sinceTraining > 14 && (
         <Section>
           <Panel pad>
             <div className="warn">
@@ -245,13 +264,16 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
             <Row label="Последний замер">
               <StatusBadge value={data.lastMeasureStatus} fallback="не было" />
             </Row>
-            <Row label="Следующая тренировка">
-              {data.nextTrainingDate
-                ? formatDate(data.nextTrainingDate) + ', ' + formatTime(data.nextTrainingDate)
-                : data.scheduleKnown !== true
-                  ? 'расписание временно недоступно'
-                  : 'не назначена'}
-            </Row>
+            {/* Онлайн (FT-530): занятий с тренером нет — и ждать нечего */}
+            {!online && (
+              <Row label="Следующая тренировка">
+                {data.nextTrainingDate
+                  ? formatDate(data.nextTrainingDate) + ', ' + formatTime(data.nextTrainingDate)
+                  : data.scheduleKnown !== true
+                    ? 'расписание временно недоступно'
+                    : 'не назначена'}
+              </Row>
+            )}
             {data.lastTrainingDate && (
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>
             )}
@@ -381,16 +403,23 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
   // придёт ответ. Перечитываем после выхода из журнала — там занятие
   // могли завершить или отменить.
+  // Без связи (FT-566) — последний полученный список и занятия, ещё не
+  // отправленные с телефона: они сразу во «Выполненных» и считаются
+  // проведёнными в программе
+  const [journalOffline, setJournalOffline] = useState(false);
   useEffect(() => {
     let alive = true;
-    apiPublic('workout.list', { ...(clientRow ? { clientRow } : {}), ...(familyRow ? { familyRow } : {}) })
+    journalList(clientRow, familyRow ? { familyRow } : {})
       .then((r) => {
         if (!alive) return;
-        setSessions((r && r.sessions) || []);
+        setSessions(r.sessions);
+        setJournalOffline(r.offline);
       })
       .catch(() => { if (alive) setSessions([]); });
     return () => { alive = false; };
   }, [clientRow, workout, familyRow, journalTick]);
+  // Очередь телефона ушла на сервер или пополнилась — перечитать список
+  useEffect(() => onOutboxChange(() => setJournalTick((t) => t + 1)), []);
 
   // Выход из журнала — перечитать и программу: тренер мог переименовать
   // занятие, и тренировка в программе переименовалась вместе с ним
@@ -464,6 +493,14 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     .filter((s) => s.status === 'completed' && inMonthLabel(s.startedAt || s.updatedAt, doneLabel))
     .sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
   const freeWorkout = () => openWorkout({ block: FREE_BLOCK, month: '' });
+  // «Было» — с учётом занятий, ещё не дошедших до сервера (FT-566): без
+  // связи вторая подряд тренировка подсказывала бы вес двухнедельной давности
+  const startBlock = async (block) => {
+    const local = familyRow ? [] : await localWorkouts(clientRow).catch(() => []);
+    openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [] });
+  };
+  // Нет связи — честно: что на экране и от какого числа
+  const savedAt = journalOffline ? apiStoredAt('client.plan', params) : 0;
 
   // Переименовать тренировку — тапом по названию (02.10.2026), без
   // редактора программы. Сохраняется тем же снимком месяца, что и редактор:
@@ -619,6 +656,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {/* Журнал тренировок — в боковом меню (решение владельца 28.09.2026:
           один журнал, а не два). Здесь — только незакрытое занятие: это
           первое, что человек должен узнать на этом экране. */}
+      {journalOffline && (
+        <p className="small muted plan__offline" role="status">
+          Нет связи. Программа и занятия — сохранённые на телефоне{savedAt ? ', обновлены ' + formatDate(new Date(savedAt).toISOString()) : ''}.
+          {' '}Тренировку можно провести: результат сохранится здесь и уйдёт на сервер, когда появится связь.
+        </p>
+      )}
       {runningLine}
       {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="plan" />}
 
@@ -925,7 +968,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 {!familyRow && <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>}
               </div>
             )}
-            {!running && !familyRow && <button className="button button--primary button--block" data-first-action={clientRow || clientView ? undefined : 'workout'} onClick={() => openWorkout({ block, month: data.month, members: data.members || [] })}>Начать тренировку</button>}
+            {!running && !familyRow && <button className="button button--primary button--block" data-first-action={clientRow || clientView ? undefined : 'workout'} onClick={() => startBlock(block)}>Начать тренировку</button>}
             <button
               type="button"
               className="plan__toggle"
@@ -1156,6 +1199,7 @@ function DoneSession({ session: s, canOpen, onRename, onOpen }) {
           <div>
             <strong>{s.month ? 'Тренировка проведена' : 'Свободная тренировка'}</strong>
             <span>{s.done ? s.done + ' ' + plural(s.done, 'подход', 'подхода', 'подходов') : 'без отмеченных подходов'}</span>
+            <SyncMark session={s} />
           </div>
           {canOpen && <button className="button" onClick={onOpen}>Посмотреть веса</button>}
         </div>
@@ -1191,6 +1235,18 @@ function DoneSession({ session: s, canOpen, onRename, onOpen }) {
       </Panel>
     </Section>
   );
+}
+
+/**
+ * Где занятие (FT-566): ещё только на телефоне, не принято сервером или
+ * только что ушло. Обычное занятие с сервера — без пометки.
+ */
+function SyncMark({ session: s }) {
+  if (s.local === 'conflict') return <span className="plan__sync plan__sync--problem">Не отправлено: занятие изменили на другом устройстве. Откройте, чтобы выбрать версию.</span>;
+  if (s.local === 'error') return <span className="plan__sync plan__sync--problem">Не отправлено: {s.localError || 'сервер не принял занятие'}. Откройте, чтобы исправить.</span>;
+  if (s.local) return <span className="plan__sync">Сохранено на телефоне · отправится, когда появится связь</span>;
+  if (justSynced(s.id)) return <span className="plan__sync plan__sync--done">Синхронизировано</span>;
+  return null;
 }
 
 /** «Октябрь 2026» — название следующего месяца */
@@ -1441,16 +1497,28 @@ function useProgressBundle(clientRow, familyRow = null) {
           return;
         }
 
-        setState({
-          loading: false,
-          error: null,
-          data: {
-            progress: okProgress ? progress.data : null,
-            measurements: okMeasurements ? measurements.data : null,
-            goal: (nutrition && nutrition.ok && nutrition.data
-              && nutrition.data.survey && nutrition.data.survey.goal) || null,
-          },
-        });
+        // Замеры, записанные без связи (FT-566, этап 2), — сразу в таблицах
+        // и изменениях, как будто сервер их уже принял. Семье — только
+        // серверное: записывать за неё нельзя
+        return (familyRow ? Promise.resolve([]) : localWrites(clientRow, 'measure').catch(() => []))
+          .then((pending) => {
+            if (!alive) return;
+            const merged = okMeasurements || pending.length ? withLocalMeasures(okMeasurements ? measurements.data : null, pending) : null;
+            setState({
+              loading: false,
+              error: null,
+              data: {
+                // Изменения по сериям — те же, что пересчитаны с телефонными
+                progress: okProgress
+                  ? (pending.length && merged ? { ...progress.data, series: merged.series } : progress.data)
+                  : null,
+                measurements: merged,
+                pending: pending.length,
+                goal: (nutrition && nutrition.ok && nutrition.data
+                  && nutrition.data.survey && nutrition.data.survey.goal) || null,
+              },
+            });
+          });
       })
       .catch((error) => {
         if (alive) setState({ loading: false, data: null, error });
@@ -1458,6 +1526,9 @@ function useProgressBundle(clientRow, familyRow = null) {
 
     return () => { alive = false; };
   }, [clientRow, familyRow, attempt]);
+
+  // Замеры с телефона ушли на сервер или добавились — перечитать
+  useEffect(() => onWritesChange(() => setAttempt((n) => n + 1)), []);
 
   return { ...state, reload: () => setAttempt((n) => n + 1) };
 }
@@ -1528,9 +1599,16 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       <div className="progress__add">
         {added && (
           <Note tone="good" icon={IconRuler}>
-            {added.replaced
-              ? 'Замер за ' + formatDate(added.date) + ' обновлён.'
-              : 'Замер за ' + formatDate(added.date) + ' записан.'}
+            {added.local
+              ? 'Нет связи — замер за ' + formatDate(added.date) + ' сохранён на телефоне и отправится, когда появится связь.'
+              : added.replaced
+                ? 'Замер за ' + formatDate(added.date) + ' обновлён.'
+                : 'Замер за ' + formatDate(added.date) + ' записан.'}
+          </Note>
+        )}
+        {!added && data.pending > 0 && (
+          <Note icon={IconRuler}>
+            {data.pending === 1 ? 'Один замер' : 'Замеров: ' + data.pending} — на телефоне, отправится, когда появится связь.
           </Note>
         )}
         <button className="button button--primary button--block" onClick={() => { setAdded(null); setAdding(true); }}>
@@ -1846,12 +1924,22 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
       const payload = {};
       filled.forEach((f) => { payload[f] = String(values[f]).trim(); });
 
-      const result = await apiMutate('measure.create', {
+      const params = {
         ...(clientRow ? { clientRow } : {}),
         ...(sheetName ? { sheetName } : {}),
         date,
         values: payload,
-      });
+      };
+      let result;
+      try {
+        result = await apiMutate('measure.create', params);
+      } catch (err) {
+        // Нет связи (FT-566, этап 2) — замер на телефон, на сервер — сам,
+        // когда связь появится. Отказ сервера — как раньше, показать
+        if (!isOffline(err)) throw err;
+        await queueWrite('measure', params);
+        result = { date, local: true };
+      }
 
       onSaved(result);
     } catch (err) {

@@ -16,6 +16,7 @@ import SwipeRow from '../SwipeRow.jsx';
 import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachinesEditor, MachineForm, extrasHint } from './MachinesEditor.jsx';
+import { useSelfCard, selfPick } from './selfCard.js';
 
 /**
  * Библиотека тренера: шаблоны программ и тренировок, упражнения.
@@ -88,17 +89,17 @@ const LEVELS = [
   { value: 'Опытный', label: 'Опытный' },
 ];
 
-export default function Library({ pane }) {
+export default function Library({ pane, owner = false }) {
   if (pane === 'dishes') return <Dishes />;
   if (pane === 'machines') return <Machines />;
-  return pane === 'exercises' ? <Exercises /> : <Templates key={pane} kind={pane} />;
+  return pane === 'exercises' ? <Exercises /> : <Templates key={pane} kind={pane} owner={owner} />;
 }
 
 /* ==========================================================================
  * Шаблоны
  * ========================================================================== */
 
-function Templates({ kind }) {
+function Templates({ kind, owner }) {
   const [scope, setScope] = useState('mine');
   const [q, setQ] = useState('');
   const [goal, setGoal] = useState('');
@@ -137,7 +138,7 @@ function Templates({ kind }) {
   }
 
   if (assigning) {
-    return <AssignToClient template={assigning} onDone={() => setAssigning(null)} onCancel={() => setAssigning(null)} />;
+    return <AssignToClient template={assigning} owner={owner} onDone={() => setAssigning(null)} onCancel={() => setAssigning(null)} />;
   }
 
   if (open) {
@@ -547,8 +548,11 @@ export function AssignForm({ template, clientRow, defaultMonth, onDone }) {
   );
 }
 
-function AssignToClient({ template, onDone, onCancel }) {
+function AssignToClient({ template, owner, onDone, onCancel }) {
   const clients = useData('trainer.clients', {}, []);
+  // Себя («Мои тренировки») — первым, как в журнале: в trainer.clients
+  // карточки тренера нет, и шаблон себе было не назначить
+  const self = useSelfCard(owner);
   const [q, setQ] = useState('');
   const [client, setClient] = useState(null);
   const [done, setDone] = useState(null);
@@ -560,7 +564,9 @@ function AssignToClient({ template, onDone, onCancel }) {
         <Empty
           icon={IconCheck}
           title="Назначено"
-          text={`«${template.title}» — в программе ${done.client.name}, ${done.month}. Поправить под человека можно в его карточке, в разделе «Тренировки».`}
+          text={self.card && done.client.row === self.card.clientRow
+            ? `«${template.title}» — в ваших тренировках, ${done.month}. Поправить можно в разделе «Мои тренировки» бокового меню.`
+            : `«${template.title}» — в программе ${done.client.name}, ${done.month}. Поправить под человека можно в его карточке, в разделе «Тренировки».`}
         />
       </>
     );
@@ -579,11 +585,12 @@ function AssignToClient({ template, onDone, onCancel }) {
             <Search value={q} onChange={setQ} placeholder="Поиск клиента" />
             {clients.loading && <Loading lead={false} rows={4} />}
             {clients.error && <ErrorState error={clients.error} onRetry={clients.reload} />}
-            {clients.data && clients.data.clients
+            {clients.data && [...(selfPick(self.card) ? [selfPick(self.card)] : []), ...clients.data.clients]
               .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
               .map((c) => (
                 <button className="item" key={c.row} onClick={() => { setClient(c); haptic(); }}>
                   <div className="item__top"><span className="item__name">{c.name}</span></div>
+                  {c.note && <span className="item__meta">{c.note}</span>}
                 </button>
               ))}
           </>

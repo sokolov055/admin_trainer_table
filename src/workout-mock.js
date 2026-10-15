@@ -58,6 +58,8 @@ export function workoutMock(action, params) {
     return { deleted: previous.id };
   }
 
+  // Занятия целиком — для работы без сети (FT-566), как на сервере
+  if (action === 'workout.recent') return { owner: String(owner), days: 90, sessions: [...sessions].reverse() };
   if (action === 'workout.get') {
     if (!previous) throw new Error('Занятие не найдено');
     return { session: previous };

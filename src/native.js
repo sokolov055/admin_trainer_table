@@ -22,6 +22,7 @@ import { localLink } from './open-in-app.js';
 import { ensureBackgroundSync } from './native-sync.js';
 import { settleLive } from './live-settle.js';
 import { linkWidgets, reloadWidgets } from './native-widget.js';
+import { loadApiConfig, currentApiUrl } from './apiConfig.js';
 
 export { isNativeApp };
 
@@ -102,7 +103,15 @@ export function startNative() {
 function checkUpdate(info) {
   const mine = Number(info && info.build) || 0;
   if (!mine) return;
-  fetch(new URL('android/latest.json', window.location.href).href, { cache: 'no-store' })
+  // С адреса API, а не сайта (FT-566): с экранами внутри APK адрес сайта
+  // оболочка отдаёт из своих файлов, и latest.json там тот, с которым
+  // собирали, — новой версии приложение бы не увидело. Тот же файл с сайта
+  // сервер отдаёт и по адресу API (server/deploy/nginx.conf)
+  loadApiConfig()
+    .then(() => {
+      const api = String(currentApiUrl() || '').replace(/\/$/, '');
+      return fetch(api ? api + '/android/latest.json' : new URL('android/latest.json', window.location.href).href, { cache: 'no-store' });
+    })
     .then((res) => (res.ok ? res.json() : null))
     .then((latest) => {
       if (!latest || !(Number(latest.versionCode) > mine) || !latest.apk) return;

@@ -27,6 +27,12 @@ export default function DeleteAccount({ unlinked = false }) {
     setProblem('');
     try {
       await apiMutate('account.delete', {});
+      // Копия данных на телефоне (FT-566: очередь занятий, история за 90
+      // дней, видео программы) удаляется вместе с аккаунтом, а не доживает
+      // на устройстве: политика обещает удаление всего
+      await import('./workout-outbox.js').then((m) => m.forgetOfflineAccount()).catch(() => {});
+      await import('./offline-media.js').then((m) => m.forgetVideos()).catch(() => {});
+      await import('./offline-account.js').then((m) => m.setOfflineAccount(null)).catch(() => {});
       clearApiCache();
       clearToken();
     } catch (error) {

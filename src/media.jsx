@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { haptic } from './telegram.js';
 import { apiMutate } from './api.js';
 import { mediaUrl } from './library.js';
+import { useVideoSrc } from './offline-media.js';
+import { isOffline, queueWrite } from './offline-writes.js';
 
 /**
  * Видео и анимация техники упражнения.
@@ -58,15 +60,19 @@ export function Animation({ id }) {
 export function Media({ media }) {
   if (!media) return null;
   if (media.kind === 'animation') return <Animation id={media.url} />;
-  if (media.kind === 'file') {
-    return <video className="library__video" src={mediaUrl(media.url)} controls playsInline preload="metadata" />;
-  }
+  if (media.kind === 'file') return <FileVideo url={media.url} />;
   // Чужой плеер (YouTube и др.) не встраиваем (14.10.2026): он грузится сам
   // при открытии карточки и передаёт адрес клиента за рубеж без его действия.
   // Ссылка открывается только по нажатию — как переход на любой сайт.
   return <a className="button button--block" href={media.url} target="_blank" rel="noreferrer">Открыть видео</a>;
 }
 
+
+/** Видео-файл с сервера; скачанное заранее — с телефона, без сети тоже (FT-566) */
+function FileVideo({ url }) {
+  const src = useVideoSrc(url, mediaUrl(url));
+  return <video className="library__video" src={src} controls playsInline preload="metadata" />;
+}
 
 /**
  * «Как настроить тренажёр» — короткая инструкция к упражнению (01.10.2026).
@@ -132,11 +138,11 @@ export function MachinePhoto({ machine }) {
  * 5» — у каждого клиента своя, поэтому живёт не у тренажёра, а у клиента.
  * Видна первой: ради неё в зале и открывают
  */
-export function PersonalNote({ text, trainer = false, by = '' }) {
+export function PersonalNote({ text, trainer = false, by = '', local = false }) {
   if (!text) return null;
   return (
     <div className="machine__note">
-      <strong>{trainer ? 'Настройка клиента' : 'Ваша настройка' + (by === 'trainer' ? ' · записал тренер' : '')}</strong>
+      <strong>{trainer ? 'Настройка клиента' : 'Ваша настройка' + (by === 'trainer' ? ' · записал тренер' : '')}{local ? ' · на телефоне, отправится при связи' : ''}</strong>
       <span>{text}</span>
     </div>
   );
@@ -159,9 +165,20 @@ export function MachineNote({ target, note, trainer, params, onSaved }) {
     setBusy(true);
     setError('');
     try {
-      const r = await apiMutate('client.machine.note.save', { ...params, target, text });
+      const request = { ...params, target, text };
+      let saved;
+      try {
+        saved = (await apiMutate('client.machine.note.save', request)).note;
+      } catch (e) {
+        // Нет связи (FT-566, этап 2): настройку — на телефон, на сервер — при
+        // связи. Отказ сервера — показать, как раньше
+        if (!isOffline(e)) throw e;
+        await queueWrite('note', request);
+        const clean = String(text || '').trim();
+        saved = clean ? { text: clean, by: trainer ? 'trainer' : 'client', local: true } : null;
+      }
       haptic('success');
-      onSaved(r.note);
+      onSaved(saved);
       setEditing(false);
     } catch (e) {
       setError(e.message);
@@ -173,7 +190,7 @@ export function MachineNote({ target, note, trainer, params, onSaved }) {
   if (!editing) {
     return note
       ? <div className="workout__note">
-        <PersonalNote text={note.text} trainer={trainer} by={note.by} />
+        <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} />
         <button type="button" className="workout__note-edit" onClick={() => setEditing(true)}>Изменить</button>
       </div>
       : <button type="button" className="workout__note-add" onClick={() => setEditing(true)}>

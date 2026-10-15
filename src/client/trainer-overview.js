@@ -22,7 +22,10 @@ export function trainerOverview(data, client, clients = []) {
     trainingsThisMonth: client.trainings,
     lastTrainingDate: client.lastTrainingDate,
     nextTrainingDate: client.nextTrainingDate,
-    packageEnding: { ...data.packageEnding, known: left !== null && left !== undefined,
+    // Онлайн-ведение (FT-530) — из той же строки списка, что и шапка
+    online: client.online ? { until: client.onlineUntil || null } : null,
+    // У онлайн-клиента пакета занятий нет — и предупреждать не о чем
+    packageEnding: { ...data.packageEnding, known: !client.online && left !== null && left !== undefined,
       left, soon: left > 0 && left <= perWeek, out: left !== null && left <= 0 },
   };
 }

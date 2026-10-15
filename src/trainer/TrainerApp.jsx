@@ -31,7 +31,7 @@ import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Trainers from './Trainers.jsx';
 import { screensNote } from '../native-bridge.js';
-import { setSelfRow } from '../native-activity.js';
+import { useSelfCard, selfPick } from './selfCard.js';
 
 /**
  * Панель тренера.
@@ -384,7 +384,7 @@ export default function TrainerApp({ me }) {
           data-kept={tabs.kept('library') ? '' : undefined}
         >
           <div key={libPane}>
-            <Library pane={libPane} />
+            <Library pane={libPane} owner={owner} />
           </div>
         </main>
       )}
@@ -467,7 +467,7 @@ function JournalScreen({ owner }) {
       title="Журнал тренировок"
       note="Выберите клиента — откроются все его занятия"
       action="Открыть журнал"
-      first={self.card ? { row: self.card.clientRow, name: 'Я · ' + self.card.name, note: 'Мои тренировки' } : null}
+      first={selfPick(self.card)}
       onSelect={setClient}
     />
   );
@@ -483,23 +483,6 @@ function ClientPreviewPicker({ onSelect }) {
       onSelect={onSelect}
     />
   );
-}
-
-/**
- * Карточка самого тренера («Мои тренировки», сервер: trainer.self). Заводится
- * при первом обращении; не владельцу — не спрашиваем: раздел пока его.
- */
-function useSelfCard(enabled) {
-  const [state, setState] = useState({ card: null, error: null, loading: !!enabled });
-  const load = useCallback(() => {
-    if (!enabled) return;
-    setState((s) => ({ ...s, loading: true, error: null }));
-    apiMutate('trainer.self', {})
-      .then((card) => { setSelfRow(card && card.clientRow); setState({ card, error: null, loading: false }); })
-      .catch((error) => setState({ card: null, error, loading: false }));
-  }, [enabled]);
-  useEffect(() => { load(); }, [load]);
-  return { ...state, reload: load };
 }
 
 const MY_VIEWS = [

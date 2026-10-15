@@ -2099,6 +2099,21 @@ th.sticky, td.sticky {
 
 .plan__done .button { flex: 0 0 auto; }
 
+/* Занятие без сети (FT-566): где оно сейчас. Своей строкой под подходами —
+   это не похвала, а состояние, и читать его надо отдельно. Проблема —
+   цветом предупреждения: сама она не решится */
+.plan__done .plan__sync { display: block; margin-top: 2px; }
+.plan__done .plan__sync--problem { color: var(--warning-text); }
+.plan__done .plan__sync--done { color: var(--good-text); }
+
+.plan__offline {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--warning-fill);
+  color: var(--warning-text);
+}
+
 /* Суперсет — не украшение, а указание: эти упражнения делают подряд.
    Поэтому группа читается как одно целое — общая рамка и общий заголовок
    с числом кругов, — а число подходов у строк внутри не повторяется. */

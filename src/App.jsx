@@ -10,6 +10,7 @@ import { InstallHint, TransferLoginScreen } from './AuthTransfer.jsx';
 import AppHint from './AppHint.jsx';
 import { canOpenInApp } from './open-in-app.js';
 import { lazyPage, Deferred, warmUp } from './lazy.js';
+import { setOfflineAccount } from './offline-account.js';
 
 // Кабинеты и экраны входа — по требованию (lazy.js): клиенту не нужен
 // кабинет тренера, вошедшему — экраны входа
@@ -81,6 +82,24 @@ export default function App() {
   // Кабинет показан — догружаем остальное, пока человек смотрит на него
   const role = state.me && state.me.role;
   useEffect(() => { if (role) warmUp(LATER[role] || LATER.client); }, [role]);
+
+  // Работа без сети (FT-566): чьи данные на телефоне — сразу, как известно,
+  // кто вошёл; отправка неотправленных занятий и запас программы — чуть
+  // позже и отдельными частями: первому экрану они не нужны
+  const known = state.me;
+  useEffect(() => {
+    if (!known || !known.role) return undefined;
+    setOfflineAccount(known);
+    const timer = setTimeout(() => {
+      Promise.all([import('./workout-outbox.js'), import('./offline-prefetch.js')])
+        .then(([outbox, prefetch]) => {
+          outbox.startOutbox();
+          prefetch.prefetchOffline(known);
+        })
+        .catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [known]);
 
   const load = () => {
     const cached = apiStale('me', {});

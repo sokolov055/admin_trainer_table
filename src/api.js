@@ -38,8 +38,10 @@ import { loadApiConfig, currentApiUrl, fallbackApiUrl } from './apiConfig.js';
  *  Не «свежими» — именно пригодными: их всё равно тут же обновляют. */
 const STALE_TTL_MS = 12 * 60 * 60 * 1000;
 
-/** Без связи показываем и более старое — лишь бы не пустой экран */
-const OFFLINE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Без связи показываем и более старое — лишь бы не пустой экран. 90 дней —
+ *  окно работы без сети (FT-566): программа, сохранённая перед долгим
+ *  перерывом в связи, должна открыться и через месяц */
+const OFFLINE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 /**
  * Дольше ответа не ждём. Без предела запрос на плохой мобильной связи
@@ -179,6 +181,35 @@ export async function api(action, params = {}, options = {}) {
 
   inFlight.set(key, promise);
   return promise;
+}
+
+/**
+ * Чтение мимо памяти страницы, с отметкой, откуда ответ (FT-566):
+ * { data, offline, at }. Сервер ответил — свежее, и оно же сохраняется;
+ * не ответил (код 0) — последнее сохранённое, offline: true, at — когда
+ * его получили. Для экранов, которым нужно и свежее, и честное «нет связи,
+ * данные от …».
+ */
+export async function apiFresh(action, params = {}) {
+  const key = cacheKey(action, params);
+  try {
+    const data = await request(action, params, { read: true });
+    memory.set(key, data);
+    writeStored(key, data);
+    return { data, offline: false, at: Date.now() };
+  } catch (err) {
+    if (err && err.code === 0) {
+      const old = readStored(key, true);
+      if (old) return { data: old.data, offline: true, at: old.at };
+    }
+    throw err;
+  }
+}
+
+/** Когда получен сохранённый на телефоне ответ (мс) или 0 */
+export function apiStoredAt(action, params = {}) {
+  const old = readStored(cacheKey(action, params), true);
+  return old ? old.at : 0;
 }
 
 /**

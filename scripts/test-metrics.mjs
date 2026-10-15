@@ -46,11 +46,14 @@ const output = await build({
           contents: `export const apiMutate = (action, params) => globalThis.__metrics.apiMutate(action, params);
             export const apiPrimary = async () => ({});
             export const apiPublic = async () => ({});
+            export const apiFresh = async () => ({ data: {}, offline: false, at: 0 });
+            export const apiStoredAt = () => 0;
             export const logout = () => {};
             export const apiStale = () => ({ data: null, stale: false, promise: Promise.resolve({}) });`,
         };
         if (args.path === 'telegram') return {
           contents: `export const haptic = () => {};
+            export const getInitData = () => '';
             export const getThemeMode = () => 'auto';
             export const setThemeMode = (value) => value;
             export const environmentInfo = () => ({ inTelegram: false });`,
