@@ -67,7 +67,8 @@ test('три в ряд: свайп, пауза посреди каскада, в
   const [a,b] = await pair(page); const box = await page.locator(`[data-cell="${a}"]`).boundingBox();
   await page.mouse.move(box.x+box.width/2, box.y+box.height/2); await page.mouse.down();
   await page.mouse.move(box.x+box.width/2+(b-a === 1 ? box.width : 0), box.y+box.height/2+(b-a === 6 ? box.height : 0)); await page.mouse.up();
-  await page.clock.runFor(190); assert.equal((await read(page)).frame.kind, 'clear');
+  await page.clock.runFor(280); assert.equal((await read(page)).frame.kind, 'clear');
+  await page.screenshot({ path: 'reports/match/clear-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Пауза', exact: true }).click();
   const stopped = await read(page); await page.clock.runFor(30000);
   assert.deepEqual((await read(page)).game, stopped.game);
@@ -117,7 +118,7 @@ test('три в ряд: полный раунд, результат, новый 
   const ended = await read(page); assert.equal(ended.game.moves, 0); assert.equal(ended.mode, 'won');
   assert.equal(ended.busy, false);
   await page.screenshot({ path: 'reports/match/win-390.png', fullPage: true });
-  await page.getByRole('button', { name: 'Следующий раунд', exact: true }).click();
+  await page.getByRole('button', { name: 'Следующая глава', exact: true }).click();
   assert.equal((await read(page)).game.level, 2); assert.equal((await read(page)).game.moves, 12);
   await page.setViewportSize({ width: 320, height: 640 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
@@ -157,7 +158,7 @@ test('три в ряд: проигрыш, фокус внутри результ
   assert.equal(await dialog.getByRole('button').first().evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Shift+Tab');
   assert.equal(await last.evaluate(el => el === document.activeElement), true);
-  await page.getByRole('button', { name: 'Играть ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Повторить главу', exact: true }).click();
   const retried = await read(page);
   assert.equal(retried.mode, 'playing'); assert.equal(retried.game.moves, 12);
   assert.equal(retried.game.score, 0); assert.equal(retried.game.level, 1);

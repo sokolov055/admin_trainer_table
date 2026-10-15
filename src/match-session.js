@@ -38,7 +38,10 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
     let message = snapshot.message;
     if (frame.kind === 'clear') {
       const chapter = chapterFor(frame.game.level);
-      message = chapterComplete(frame.game) && frame.storyGain
+      const halfway = Math.ceil(chapter.count / 2);
+      message = frame.storyGain && snapshot.game.collected < halfway && frame.game.collected >= halfway
+        ? chapter.halfway
+        : chapterComplete(frame.game) && frame.storyGain
         ? `${chapter.task} готовы! +${frame.points} очков`
         : `${frame.combo > 1 ? `Каскад ×${frame.combo}. ` : ''}+${frame.points} очков${frame.storyGain ? ` · ${chapter.task} +${frame.storyGain}` : ''}${frame.creations.length ? ' · Бонус!' : ''}`;
     }
