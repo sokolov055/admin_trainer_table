@@ -25,6 +25,7 @@ import MyTrainer, { LinkOffers } from './MyTrainer.jsx';
 import { ConsentGate } from '../Consent.jsx';
 import { accountState, pendingTrainerLink } from '../trainer-link.js';
 import PlankGame from '../PlankGame.jsx';
+import ScooterGame from '../ScooterGame.jsx';
 import { usePlankAccess } from '../plank-access.js';
 import Onboarding from './Onboarding.jsx';
 import { signupLead, clearSignupLead } from '../login-route.js';
@@ -63,6 +64,7 @@ const TABS = [
  */
 const MENU = [
   { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlan },
+  { id: 'scooter-game', label: 'На самокате до зала', note: 'Успей к тренировке за минуту', Icon: IconPlan },
   // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
@@ -155,7 +157,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   }, [mine, clientRow]);
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => m.id !== 'plank-game' || plankEnabled), guide, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['plank-game', 'scooter-game'].includes(m.id) || plankEnabled), guide, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -349,6 +351,7 @@ export default function ClientApp({ me, clientRow, preview }) {
       {!onTab && (
       <main className="app__body" key={view}>
         {view === 'plank-game' && plankEnabled && <PlankGame onClose={() => go(lastTab)} />}
+        {view === 'scooter-game' && plankEnabled && <ScooterGame onClose={() => go(lastTab)} />}
         {view === 'profile' && (
           <>
             <p className="small muted">

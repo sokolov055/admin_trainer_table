@@ -2,7 +2,7 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
 import { fromPlan } from '../src/workout-model.js';
@@ -317,11 +317,24 @@ test('не тренер на /trainer: после кода — заявка с �
   } finally { await context.close(); }
 });
 
-test('планка доступна тестовому клиенту и скрыта без серверного разрешения', async () => {
+test('обе игры доступны тестовому клиенту и скрыты без серверного разрешения', async () => {
+  try {
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /Тренер в планке/ }).click();
   await page.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
   await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /На самокате до зала/ }).click();
+  await page.locator('.menu__item').first().waitFor({ state: 'hidden' });
+  mkdirSync(join(ROOT, 'reports/scooter'), { recursive: true });
+  await page.screenshot({ path: join(ROOT, 'reports/scooter/app-ready.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Поехали!', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('[data-scooter=viewport]')?.dataset.phase === 'playing');
+  await page.getByRole('button', { name: 'Влево', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('[data-scooter=viewport]')?.dataset.lane === '0', null, { timeout: 3000 });
+  await page.waitForFunction(() => Number(document.querySelector('[data-scooter=progress]').value) > 30);
+  await page.screenshot({ path: join(ROOT, 'reports/scooter/app-playing.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Закрыть игру', exact: true }).click();
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
   const normalContext = await browser.newContext({ storageState: await page.context().storageState(), viewport: VIEWPORT });
   const normal = await normalContext.newPage();
@@ -330,7 +343,12 @@ test('планка доступна тестовому клиенту и скр�
     await normal.getByRole('button', { name: 'Меню', exact: true }).click();
     await normal.waitForFunction(() => !Array.from(document.querySelectorAll('.menu__item')).some(el => el.textContent.includes('Тренер в планке')));
     assert.equal(await normal.getByRole('button', { name: /Тренер в планке/ }).count(), 0);
+    assert.equal(await normal.getByRole('button', { name: /На самокате до зала/ }).count(), 0);
   } finally { await normalContext.close(); }
+  } catch (error) {
+    console.error('Game QA:', error, await page.locator('[data-scooter=viewport]').evaluateAll(els => els.map(el => ({ phase: el.dataset.phase, lane: el.dataset.lane }))));
+    throw error;
+  }
 });
 
 /**

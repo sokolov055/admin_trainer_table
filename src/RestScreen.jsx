@@ -1,5 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PlankGame from './PlankGame.jsx';
+import ScooterGame from './ScooterGame.jsx';
+import { useScooterSession } from './ScooterSession.jsx';
 import { usePlankSession } from './PlankSession.jsx';
 import { activeRound } from './plank-game.js';
 import { clock } from './workout-model.js';
@@ -19,14 +21,20 @@ import './rest.css';
  */
 export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse, allowGame = false }) {
   const [gameUntil, setGameUntil] = useState(0);
+  const [gameKind, setGameKind] = useState('plank');
+  const scooterSession = useScooterSession();
+  const scooterActive = ['playing', 'countdown', 'paused'].includes(scooterSession.game.phase);
   const [plank, plankSession] = usePlankSession();
   const left = until - now;
   const over = left <= 0;
   // В том числе партия, открытая из меню под этим экраном: будильник
   // не должен скрывать продолжающийся отсчёт вопроса.
   useLayoutEffect(() => {
-    if (over && allowGame) plankSession.pause('rest', Date.now(), until);
-  }, [over, until, allowGame, plankSession]);
+    if (over && allowGame) {
+      plankSession.pause('rest', Date.now(), until);
+      scooterSession.pause();
+    }
+  }, [over, until, allowGame, plankSession, scooterSession]);
   const stopRef = useRef(onStop);
   const swipe = useRef(null);
   stopRef.current = onStop;
@@ -71,8 +79,10 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const R = 120;
   const C = 2 * Math.PI * R;
   if (!over && allowGame && gameUntil === until) return (
-    <div className="rest-screen rest-screen--game" role="dialog" aria-modal="true" aria-label="Игра во время отдыха">
-      <PlankGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />
+    <div className={'rest-screen rest-screen--game' + (gameKind === 'scooter' ? ' rest-screen--scooter' : '')} role="dialog" aria-modal="true" aria-label="Игра во время отдыха">
+      {gameKind === 'scooter'
+        ? <ScooterGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />
+        : <PlankGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />}
     </div>
   );
   return (
@@ -115,8 +125,11 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
             </>}
         </div>
       )}
-      {over && allowGame && activeRound(plank.round) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
-      {!over && allowGame && <button type="button" className="button" onClick={() => setGameUntil(until)}>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</button>}
+      {over && allowGame && (activeRound(plank.round) || scooterActive) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
+      {!over && allowGame && <>
+        <button type="button" className="button" onClick={() => { setGameKind('plank'); setGameUntil(until); }}>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</button>
+        <button type="button" className="button" onClick={() => { setGameKind('scooter'); setGameUntil(until); }}>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</button>
+      </>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>
         {over
           ? <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закрыть</button>
