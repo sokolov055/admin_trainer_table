@@ -1,4 +1,6 @@
 // Чистые правила: случайность входит в состояние, а каждый ход воспроизводим.
+import { chapterFor, chapterComplete } from './match-story.js';
+
 export const MATCH_TUNING = Object.freeze({ size: 6, types: 6, moves: 12, points: 20, target: 900, maxCascades: 40 });
 export const PIECES = Object.freeze([
   { name: 'Гантель', color: '#28d5dd' }, { name: 'Гиря', color: '#b47bff' },
@@ -78,7 +80,7 @@ function freshBoard(state) {
 }
 
 export function createMatchGame(seed = Date.now(), level = 1) {
-  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: MATCH_TUNING.moves, score: 0, bestCombo: 0, turns: 0, board: [] };
+  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: MATCH_TUNING.moves, score: 0, collected: 0, bestCombo: 0, turns: 0, board: [] };
   game.target = MATCH_TUNING.target + (game.level - 1) * 200;
   game.board = freshBoard(game);
   return game;
@@ -153,13 +155,13 @@ export function resolveMove(game, a, b) {
   const frames = [];
   const frame = (kind, duration, extra = {}) => frames.push({ kind, duration, game: { ...state, board: state.board.slice() }, ...extra });
   if (!isLegalSwap(game.board, a, b)) {
-    frame('swap', 160);
+    frame('swap', 220, { a, b });
     state.board = game.board;
-    frame('reject', 180);
+    frame('reject', 240, { a, b });
     return { valid: false, frames, game };
   }
   state.moves--; state.turns++;
-  frame('swap', 170);
+  frame('swap', 230, { a, b });
   let combo = 0;
   let groups = findMatches(state.board);
   let forced = [];
@@ -174,7 +176,7 @@ export function resolveMove(game, a, b) {
   while (groups.length || forced.length) {
     combo++;
     if (combo > MATCH_TUNING.maxCascades) {
-      state = reshuffle(state); frame('shuffle', 260); break;
+      state = reshuffle(state); frame('shuffle', 320); break;
     }
     const creations = [];
     for (const group of groups) {
@@ -188,24 +190,26 @@ export function resolveMove(game, a, b) {
     const protectedCells = new Set(creations.map(c => c.at));
     const { cells, effects } = expandClears(state.board, [...new Set([...groups.flatMap(g => g.cells), ...forced])], protectedCells, combo === 1 ? colorTargets : {});
     const points = cells.length * MATCH_TUNING.points * Math.min(combo, 4);
+    const storyGain = cells.filter(i => state.board[i]?.type === chapterFor(state.level).type).length;
     state.score += points;
+    state.collected += storyGain;
     state.bestCombo = Math.max(state.bestCombo, combo);
     // Старая фигура видна в кадре исчезновения, новая появляется после него.
-    frame('clear', 270, { cells, effects, creations, combo, points });
+    frame('clear', 390, { cells, effects, creations, combo, points, storyGain });
     state.board = state.board.map((t, i) => {
       const made = creations.find(c => c.at === i);
       return made ? { ...t, power: made.power } : t;
     });
     const from = collapse(state, new Set(cells));
-    frame('drop-start', 24, { from, combo });
-    frame('fall', 280, { combo });
+    frame('drop-start', 36, { from, combo });
+    frame('fall', 380, { from, combo });
     forced = [];
     groups = findMatches(state.board);
   }
   if (state.moves > 0 && !legalMoves(state.board).length) {
-    state = reshuffle(state); frame('shuffle', 300);
+    state = reshuffle(state); frame('shuffle', 340);
   }
   return { valid: true, frames, game: state };
 }
 
-export const earnedStars = game => game.score >= game.target * 1.8 ? 3 : game.score >= game.target * 1.35 ? 2 : game.score >= game.target ? 1 : 0;
+export const earnedStars = game => !chapterComplete(game) ? 0 : game.score >= game.target * 1.8 ? 3 : game.score >= game.target * 1.35 ? 2 : game.score >= game.target ? 1 : 0;

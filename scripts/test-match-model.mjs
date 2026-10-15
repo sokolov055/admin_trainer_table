@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMatchGame, findMatches, legalMoves, resolveMove, adjacent, reshuffle, earnedStars } from '../src/match-model.js';
 import { createMatchSession } from '../src/match-session.js';
+import { MATCH_CHAPTERS, chapterFor, chapterComplete, chapterProgress } from '../src/match-story.js';
 
 const boardOf = rows => rows.flat().map((type, id) => ({ id: id + 1, type, power: null }));
 const base = () => createMatchGame(153);
@@ -10,12 +11,26 @@ test('начальное поле: 2000 воспроизводимых поле�
   for (let seed = 0; seed < 2000; seed++) {
     const game = createMatchGame(seed);
     assert.equal(game.board.length, 36);
+    assert.equal(game.collected, 0);
     assert.equal(new Set(game.board.map(t => t.id)).size, 36);
     assert.equal(findMatches(game.board).length, 0);
     assert.ok(legalMoves(game.board).length);
   }
   assert.deepEqual(createMatchGame(19), createMatchGame(19));
   assert.equal(adjacent(5, 6), false, 'край строки не соединяется с началом следующей');
+});
+
+test('три главы дают разные сюжетные цели; звёзды требуют очков и собранных фигур', () => {
+  assert.equal(MATCH_CHAPTERS.length, 3);
+  assert.equal(new Set(MATCH_CHAPTERS.map(chapter => chapter.type)).size, 3);
+  for (let level = 1; level <= 3; level++) {
+    const game = createMatchGame(19, level), chapter = chapterFor(level);
+    assert.deepEqual(chapterProgress(game), { collected: 0, required: chapter.count });
+    assert.equal(chapterComplete(game), false);
+    assert.equal(earnedStars({ ...game, score: game.target * 2 }), 0);
+    assert.equal(earnedStars({ ...game, collected: chapter.count, score: game.target }), 1);
+    assert.equal(chapterComplete({ ...game, collected: chapter.count }), true);
+  }
 });
 
 test('обмен без совпадения возвращает поле, не расходует ход и не меняет вход', () => {
@@ -55,6 +70,8 @@ test('два цветных заряда убирают всё поле один
     if (both) { assert.equal(clear.cells.length, 36); assert.equal(clear.points, 720); }
     else assert.ok(clear.cells.length >= game.board.filter(t => t.type === game.board[1].type).length);
     assert.equal(new Set(clear.cells).size, clear.cells.length);
+    assert.equal(clear.storyGain, clear.cells.filter(i => clear.game.board[i].type === chapterFor(game.level).type).length);
+    assert.ok(turn.game.collected >= clear.storyGain);
   }
 });
 
@@ -77,7 +94,7 @@ test('случайные партии: целостность поля, очко
       assert.ok(game.board.every(t => t && t.type >= 0 && t.type < 6));
     }
     assert.equal(resolveMove(game, 0, 1).frames.length, 0);
-    assert.equal(earnedStars(game) > 0, game.score >= game.target);
+    assert.equal(earnedStars(game) > 0, game.score >= game.target && chapterComplete(game));
   }
 });
 
