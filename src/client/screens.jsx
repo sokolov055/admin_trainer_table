@@ -27,6 +27,7 @@ import SwipeRow from '../SwipeRow.jsx';
 import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
 import { uid } from '../workout-model.js';
 import { trainerOverview } from './trainer-overview.js';
+import { GoalBanner } from './focus.jsx';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
@@ -139,18 +140,21 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
   // что можно делать уже сейчас и как появится остальное.
   if (data.unlinked) {
     return (
+      <>
+      {clientRow && !clientView && <GoalBanner clientRow={clientRow} section="overview" />}
       <Section title="Тренера пока нет">
         <Panel pad>
           <p className="small">
-            Уже сейчас можно считать норму и собирать рацион в «Питании», записывать
-            замеры и смотреть шаги в «Прогрессе».
+            Программа — в «Тренировках», норма и рацион — в «Питании», замеры,
+            шаги и награды — в «Прогрессе».
           </p>
           <p className="small muted">
             Когда тренер привяжет вас — по ID из меню «Мой тренер» или своей ссылкой, —
-            здесь появятся занятия, программа и оплата.
+            здесь появятся занятия с ним, расписание и оплата.
           </p>
         </Panel>
       </Section>
+      </>
     );
   }
 
@@ -171,6 +175,7 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
 
   return (
     <>
+      {clientRow && !clientView && <GoalBanner clientRow={clientRow} section="overview" />}
       <Lead
         label={leadIsTrainings ? 'Оплачено вперёд' : 'Баланс'}
         value={
@@ -615,6 +620,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           один журнал, а не два). Здесь — только незакрытое занятие: это
           первое, что человек должен узнать на этом экране. */}
       {runningLine}
+      {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="plan" />}
 
       {/* Пожелания клиента (FT-498) — тренеру до того, как он возьмётся
           править программу: их ради этого и пишут */}
@@ -1540,6 +1546,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
             замер» стоит в самом пустом состоянии, а не отдельно над ним.
             Пока форма открыта, на её месте — она */}
         {adding && addMeasure}
+        {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="progress" />}
         {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
         {!familyRow && <Summary clientRow={clientRow} />}
         <Empty
@@ -1604,6 +1611,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
 
   return (
     <>
+      {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="progress" />}
       {addMeasure}
 
       {/* Цели, серии и награды — сразу под записью замера: ответ на
@@ -2121,6 +2129,7 @@ export function Nutrition({ clientRow, clientView = false }) {
 
   return (
     <>
+      <GoalBanner clientRow={clientRow} clientView={clientView} section="nutrition" />
       {configured && (
         <Lead
           label="Суточная норма"

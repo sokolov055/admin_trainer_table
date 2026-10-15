@@ -13,7 +13,7 @@ import { chromium } from 'playwright';
  */
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const OUT = join(ROOT, 'dist-first-steps-test');
-const SHOTS = join(ROOT, '../reports/ft-561');
+const SHOTS = join(ROOT, '../reports/ft-577');
 let server, browser, origin;
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 before(async () => {
@@ -41,23 +41,44 @@ async function open(width = 390) {
   return page;
 }
 
-test('подсказка ведёт к «Начать тренировку», после занятия — первый день в режиме', async () => {
+// Касание по центру подсвеченного окна — как пальцем: автоклик Playwright
+// прокручивает страницу перед нажатием и попадает в старое положение окна
+async function tapHole(page) {
+  const box = await page.locator('.tour__hole').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+test('тур проходит все разделы и меню, последний шаг — «Начать тренировку»; потом первый день в режиме', async () => {
   const page = await open(); const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const card = page.getByRole('dialog', { name: 'Начните первое занятие' });
-  await card.waitFor();
-  await page.screenshot({ path: join(SHOTS, 'hint-390.png') });
+  const tabs = ['overview', 'plan', 'progress', 'nutrition'];
+  for (const [i, title] of ['Обзор — главное на сегодня', 'Тренировки', 'Прогресс', 'Питание', 'Меню «Ещё»'].entries()) {
+    const card = page.getByRole('dialog', { name: title });
+    await card.waitFor();
+    assert.match(await card.textContent(), new RegExp(`${i + 1} из 6`));
+    // Тур сам открывает раздел, о котором рассказывает
+    if (tabs[i]) await page.waitForFunction((t) => document.querySelector(`.tabbar [data-tab="${t}"]`)?.getAttribute('aria-current') === 'page', tabs[i]);
+    if (i === 1) await page.screenshot({ path: join(SHOTS, 'tour-plan-390.png') });
+    // Касание мимо карточки ничего не делает
+    await page.mouse.click(200, 120);
+    await card.waitFor();
+    await page.getByRole('button', { name: 'Далее' }).click();
+  }
+  const last = page.getByRole('dialog', { name: 'Начните первое занятие' });
+  await last.waitFor();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: join(SHOTS, 'tour-action-390.png') });
   // Касание мимо подсвеченной кнопки не проходит: вкладка не меняется
   await page.mouse.click(20, 830);
   assert.equal(await page.locator('.tabbar [data-tab="plan"]').getAttribute('aria-current'), 'page');
-  await page.locator('main.app__body:not([hidden]) [data-first-action="workout"]').first().click();
-  await card.waitFor({ state: 'detached' });
-  assert.equal(await page.locator('.first-hint').count(), 0, 'затемнение не остаётся');
+  await tapHole(page);
+  await last.waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.tour').count(), 0, 'затемнение не остаётся');
   await saved(page, '"hint":"workout"');
   await page.reload();
   const regime = page.getByRole('heading', { name: '1 день в режиме' });
   await regime.waitFor();
-  assert.equal(await page.getByRole('dialog', { name: 'Начните первое занятие' }).count(), 0, 'подсказка не повторяется');
+  assert.equal(await page.locator('.tour').count(), 0, 'тур не повторяется');
   // В браузере уведомлений телефона нет — и вопроса о них тоже
   assert.equal(await page.getByRole('heading', { name: 'Сигнал конца отдыха' }).count(), 0);
   await page.screenshot({ path: join(SHOTS, 'regime-390.png') });
@@ -69,22 +90,24 @@ test('подсказка ведёт к «Начать тренировку», п
   assert.deepEqual(errors, []); await page.close();
 });
 
-test('«Пропустить» закрывает подсказку навсегда; без флага демо подсказки нет', async () => {
+test('«Пропустить» на любом шаге закрывает тур навсегда; без флага демо тура нет', async () => {
   const page = await open(1280);
-  await page.getByRole('dialog', { name: 'Начните первое занятие' }).waitFor();
+  await page.getByRole('dialog', { name: 'Обзор — главное на сегодня' }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.getByRole('button', { name: 'Далее' }).click();
+  await page.getByRole('dialog', { name: 'Тренировки' }).waitFor();
   await page.getByRole('button', { name: 'Пропустить' }).click();
-  assert.equal(await page.locator('.first-hint').count(), 0);
+  assert.equal(await page.locator('.tour').count(), 0);
   await saved(page, '"hint":"skipped"');
   await page.reload(); await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
   await page.waitForTimeout(500);
-  assert.equal(await page.locator('.first-hint').count(), 0);
+  assert.equal(await page.locator('.tour').count(), 0);
   await page.close();
   const plain = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await plain.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-first-steps-token'));
   await plain.goto(origin);
   await plain.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
   await plain.waitForTimeout(500);
-  assert.equal(await plain.locator('.first-hint').count(), 0);
+  assert.equal(await plain.locator('.tour, .first-hint').count(), 0);
   await plain.close();
 });

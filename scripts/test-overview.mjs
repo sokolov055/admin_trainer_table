@@ -51,7 +51,8 @@ const output = await build({
             export const apiPrimary = async () => ({});
             export const logout = () => {};
             export const apiBatch = async () => ({});
-            export const apiStale = () => ({ data: null, stale: false, promise: Promise.resolve({}) });`,
+            export const apiStale = () => ({ data: null, stale: false, promise: Promise.resolve({}) });
+            export const onMutated = () => () => {};`,
         };
         if (args.path === 'telegram') return {
           contents: `export const haptic = () => {};

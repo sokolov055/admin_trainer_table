@@ -47,13 +47,14 @@ export function useFirstSteps(enabled) {
     try {
       const r = await apiPrimary('client.firstSteps.get');
       let hint = r.hint;
+      let action = r.action || null;
       // Шаги подсказываем только там, где они есть: в браузере и на
       // телефоне без «Здоровья»/Health Connect смотреть было бы нечего
-      if (hint === 'steps') {
+      if (hint === 'steps' || action === 'steps') {
         const ok = isNativeApp() && (await stepsAvailability().catch(() => ({}))).available;
-        if (!ok) hint = null;
+        if (!ok) { if (hint === 'steps') hint = null; if (action === 'steps') action = null; }
       }
-      setState({ ...r, hint });
+      setState({ ...r, hint, action });
     } catch (_) {
       // Старый сервер не знает этих действий — просто ничего не показываем
       setState(null);
@@ -85,7 +86,7 @@ export function useFirstSteps(enabled) {
 
 /** Что убрать с экрана сразу, не дожидаясь ответа сервера */
 function pick(prev, action) {
-  if (action === 'client.firstSteps.hint') return { hint: null };
+  if (action === 'client.firstSteps.hint') return { hint: null, tour: false };
   if (action === 'client.firstSteps.regimeSeen') return { regime: null };
   if (action === 'client.firstSteps.notify') return { notify: false };
   return {};

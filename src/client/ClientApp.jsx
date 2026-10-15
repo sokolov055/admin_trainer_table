@@ -30,6 +30,9 @@ import { usePlankAccess } from '../plank-access.js';
 import Onboarding from './Onboarding.jsx';
 import { signupLead, clearSignupLead } from '../login-route.js';
 import { useFirstSteps, FirstHint, FirstRegime } from './FirstSteps.jsx';
+import Tour from './Tour.jsx';
+import { forgetFocus, GoalBanner } from './focus.jsx';
+import { isNativeApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked } from './Permissions.jsx';
 
 /**
@@ -147,8 +150,10 @@ export default function ClientApp({ me, clientRow, preview }) {
   // в режиме, уведомления. Только свой кабинет и не поверх анкеты
   const firstSteps = useFirstSteps(own && !onboardingOpen && !(me && me.consentNeeded && !consented));
   const fs = firstSteps.state;
-  // Подсказка «Начать тренировку» стоит на «Тренировках» — туда и ведём
-  const hintPlan = fs?.hint === 'workout';
+  // Подсказка «Начать тренировку» стоит на «Тренировках» — туда и ведём.
+  // Новый сервер вместо неё даёт тур (FT-577): разделы он открывает сам
+  const tour = !!fs?.tour;
+  const hintPlan = !tour && fs?.hint === 'workout';
   useEffect(() => { if (hintPlan) setView((v) => (v === 'overview' ? 'plan' : v)); }, [hintPlan]);
   // «Как пользоваться» (FT-495) — инструкция из меню, а не только кружком на «Обзоре»
   const [guideOpen, setGuideOpen] = useState(false);
@@ -248,10 +253,10 @@ export default function ClientApp({ me, clientRow, preview }) {
     return <div className="app"><main className="app__body"><Loading rows={3} /></main></div>;
   }
 
-  if (onboardingOpen && onboarding?.eligible) return <Onboarding initial={onboarding} lead={lead}
+  if (onboardingOpen && onboarding?.eligible) return <Onboarding initial={onboarding} lead={lead} name={me?.name}
     onClose={(r) => { onboardingClosed.current = true; setOnboarding(r); setOnboardingOpen(false); dropLead(); }}
     onDisabled={() => { setOnboarding(null); setOnboardingOpen(false); dropLead(); }}
-    onDone={() => { onboardingClosed.current = true; setOnboarding(null); setOnboardingOpen(false); dropLead(); setView('plan'); }} />;
+    onDone={() => { onboardingClosed.current = true; forgetFocus(); setOnboarding(null); setOnboardingOpen(false); dropLead(); setView('overview'); firstSteps.refresh(); }} />;
 
   if (own && justSignedUp && !permsDone && !permissionsAsked()) {
     if (perms === null) return <div className="app"><main className="app__body"><Loading rows={3} /></main></div>;
@@ -341,7 +346,12 @@ export default function ClientApp({ me, clientRow, preview }) {
 
       {guideOpen && <GuideViewer onClose={() => setGuideOpen(false)} />}
 
-      {fs?.hint && onTab && !menuOpen && !guideOpen && (fs.hint !== 'workout' || view === 'plan') && (
+      {tour && onTab && !guideOpen && (
+        <Tour unlinked={!!(me && me.unlinked)} action={fs.action} app={isNativeApp()}
+          onTab={(id) => { setMenuOpen(false); if (id !== view) go(id); }}
+          onDone={(result) => firstSteps.send('client.firstSteps.hint', { result })} />
+      )}
+      {!tour && fs?.hint && onTab && !menuOpen && !guideOpen && (fs.hint !== 'workout' || view === 'plan') && (
         <FirstHint key={fs.hint} kind={fs.hint} onDone={(result) => firstSteps.send('client.firstSteps.hint', { result })} />
       )}
 
@@ -367,6 +377,9 @@ export default function ClientApp({ me, clientRow, preview }) {
               относящееся к этому клиенту. */}
           {t.id === 'overview' && own && ((me && me.unlinked) || pendingTrainerLink()) && <OverviewOffers />}
           {t.id === 'overview' && personal && <Stories personal={personal} />}
+          {/* Цель — сразу под историями: первое, что видно на «Обзоре» (FT-577).
+              Тренер в карточке клиента видит её внутри самого Overview */}
+          {t.id === 'overview' && (!clientRow || preview) && <GoalBanner clientRow={clientRow} clientView={!!preview} section="overview" />}
           {t.id === 'overview' && fs && (fs.regime || fs.notify) && (
             <FirstRegime regime={fs.regime} notify={fs.notify}
               onSeen={() => firstSteps.send('client.firstSteps.regimeSeen', {})}

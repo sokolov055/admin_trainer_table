@@ -4,9 +4,33 @@ const load = () => JSON.parse(localStorage.getItem(KEY) || '{"step":0,"answers":
 const store = (r) => localStorage.setItem(KEY, JSON.stringify(r));
 const enabled = () => new URLSearchParams(location.search).get('mockOnboarding') === '1'
   && localStorage.getItem('fittrack_demo_onboarding_off') !== '1';
-const programs = [1, 2, 3].map((id) => ({ id, title: `Демо-программа ${id}`, description: 'Пример для проверки интерфейса', days: 2,
-  blocks: [{ title: 'Демо-занятие', exercises: [{ name: 'Пример упражнения', sets: '2', reps: '10' }] }] }));
-export function onboardingMock(action, p) {
+const programs = [
+  { id: 1, title: 'Старт в зале', description: 'Базовые движения всего тела, по три подхода', blocks: [
+    { title: 'Занятие А', exercises: [{ name: 'Жим ногами', sets: '3', reps: '12' }, { name: 'Тяга верхнего блока', sets: '3', reps: '12' }, { name: 'Жим гантелей лёжа', sets: '3', reps: '10' }] },
+    { title: 'Занятие Б', exercises: [{ name: 'Гоблет-присед', sets: '3', reps: '10' }, { name: 'Тяга гантели в наклоне', sets: '3', reps: '10' }] }] },
+  { id: 2, title: 'Сила: основа', description: 'Присед, жим и тяга с постепенной прибавкой', blocks: [
+    { title: 'Занятие', exercises: [{ name: 'Присед со штангой', sets: '4', reps: '6' }, { name: 'Жим лёжа', sets: '4', reps: '6' }] }] },
+  { id: 3, title: 'Кардио и тонус', description: 'Круговые тренировки и интервалы', blocks: [
+    { title: 'Круг', exercises: [{ name: 'Выпады', sets: '3', reps: '12' }, { name: 'Отжимания', sets: '3', reps: '10' }] }] },
+];
+const NUTRITION_GOAL = { lose: 'lose', fitness: 'keep', strength: 'keep', muscle: 'gain' };
+const GOAL_LABELS = { lose: 'Похудеть', fitness: 'Быть в форме', strength: 'Стать сильнее', muscle: 'Набрать мышцы' };
+const NUT_LABELS = { lose: 'Похудение', keep: 'Поддержание формы', gain: 'Набор мышечной массы' };
+const complete = (a) => ['goal', 'experience', 'place', 'days'].every((k) => a[k] !== undefined);
+const body = (a) => ['sex', 'age', 'height', 'weight'].every((k) => a[k] !== undefined);
+
+/** Норма — той же демо-формулой, что анкета питания (mockCompute в mock.js) */
+function norm(a, compute) {
+  if (!body(a)) return null;
+  const goal = NUTRITION_GOAL[a.goal] || 'keep';
+  const calc = compute({ age: a.age, height: a.height, weight: a.weight, sex: a.sex, lifestyle: a.lifestyle || 'desk', trainings: a.days || 0, goal, pace: a.pace });
+  const out = { bmr: calc.bmr, age: a.age, height: a.height, weight: a.weight, paces: [] };
+  if (!a.lifestyle || !a.goal) return out;
+  return { ...out, ready: true, goal, goalLabel: NUT_LABELS[goal], tdee: calc.tdee, pace: calc.pace, paceLabel: calc.paceLabel,
+    kcal: calc.kcal, protein: calc.protein, fat: calc.fat, carbs: calc.carbs };
+}
+
+export function onboardingMock(action, p, compute) {
   const saved = load();
   if (action === 'owner.onboarding.get') return { enabled: enabled(), emergencyOff: false, catalog: [], templates: programs };
   if (action === 'owner.onboarding.save') {
@@ -23,10 +47,27 @@ export function onboardingMock(action, p) {
     Object.assign(saved, { answers: p.answers, step: p.step, revision: saved.revision + 1 }); store(saved);
   }
   if (action === 'client.onboarding.choose') {
-    Object.assign(saved, { completed: true, selectedTitle: programs.find((r) => r.id === p.templateId).title }); store(saved);
-    return { completed: true, selectedTitle: saved.selectedTitle, days: saved.answers.days };
+    const picked = programs.find((r) => r.id === p.templateId);
+    const n = norm(saved.answers, compute);
+    Object.assign(saved, { completed: true, selectedTitle: picked.title, revision: saved.revision + 1 }); store(saved);
+    return { completed: true, selectedTitle: picked.title, days: saved.answers.days, goal: saved.answers.goal,
+      norm: n && n.ready ? { kcal: n.kcal, protein: n.protein, fat: n.fat, carbs: n.carbs, goalLabel: n.goalLabel, paceLabel: n.paceLabel } : null };
   }
-  return { enabled: true, eligible: !saved.completed, ...saved, programs: saved.step === 4 ? programs.map((r) => ({ ...r, days: saved.answers.days })) : [] };
+  return { enabled: true, eligible: !saved.completed, ...saved,
+    programs: complete(saved.answers) ? programs.map((r) => ({ ...r, days: saved.answers.days })) : [],
+    norm: norm(saved.answers, compute), prefill: { sex: null, age: null, height: null, weight: null, lifestyle: null } };
+}
+
+/** Цель для разделов в демо: из пройденной анкеты, иначе из анкеты питания */
+export function focusMock(nutrition, compute) {
+  const s = load();
+  let goal = s.completed ? s.answers.goal : null;
+  if (!goal && nutrition) goal = { lose: 'lose', keep: 'fitness', gain: 'muscle' }[nutrition.survey.goal] || null;
+  const n = s.completed ? norm(s.answers, compute) : null;
+  const kcal = nutrition ? nutrition.targets : n && n.ready ? n : null;
+  return { goal, goalLabel: goal ? GOAL_LABELS[goal] : '', source: s.completed ? 'onboarding' : 'nutrition',
+    week: s.completed ? s.answers.days : 2, program: s.completed ? s.selectedTitle : '',
+    norm: kcal ? { kcal: kcal.kcal, protein: kcal.protein, fat: kcal.fat, carbs: kcal.carbs } : null };
 }
 
 // Первые шаги (FT-561/FT-510) в демо — только с ?mockFirstSteps=1, чтобы
@@ -36,7 +77,7 @@ const FS_KEY = 'fittrack_demo_first_steps';
 export function firstStepsMock(action, p) {
   // Флаг запоминается: приложение убирает лишнее из адреса при запуске
   if (new URLSearchParams(location.search).get('mockFirstSteps') === '1') sessionStorage.setItem('mockFirstSteps', '1');
-  if (sessionStorage.getItem('mockFirstSteps') !== '1') return { hint: null, regime: null, notify: false };
+  if (sessionStorage.getItem('mockFirstSteps') !== '1') return { hint: null, tour: false, action: null, regime: null, notify: false };
   const s = JSON.parse(localStorage.getItem(FS_KEY) || '{}');
   if (action === 'client.firstSteps.hint' && !s.hint) s.hint = p.result;
   if (action === 'client.firstSteps.regimeSeen') s.regime = true;
@@ -46,6 +87,8 @@ export function firstStepsMock(action, p) {
   const today = (new Date().getDay() + 6) % 7;
   return {
     hint: s.hint ? null : 'workout',
+    tour: !s.hint,
+    action: s.hint ? null : 'workout',
     regime: s.hint && !s.regime ? { count: 1, week: days.map((label, i) => ({ day: 'd' + i, label, on: i === today, today: i === today })) } : null,
     notify: !!s.hint && !s.notify,
   };

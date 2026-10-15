@@ -28,41 +28,78 @@ async function open(width = 390, enabled = true) {
   await page.goto(origin + '?mockUnlinked=1' + (enabled ? '&mockOnboarding=1' : ''));
   return page;
 }
-const next = (page) => page.getByRole('button', { name: 'Далее', exact: true });
-async function answer(page, label) { await page.getByRole('button', { name: new RegExp('^' + label) }).click(); await next(page).click(); }
-test('анкета: согласие, назад, прерывание, выбор программы и продолжение без питания', async () => {
+const next = (page) => page.locator('.ob__next');
+const radio = (page, name) => page.getByRole('radio', { name: new RegExp('^' + name) });
+const sheetDone = (page) => page.locator('.ob-sheet__done');
+test('анкета 2.0: согласие, данные барабанами, обмен, цель и темп, назад, прерывание, план и программа', async () => {
   const page = await open(); const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const confirm = page.getByRole('button', { name: 'Подтвердить и продолжить' });
-  await confirm.waitFor(); assert.equal(await confirm.isDisabled(), true);
-  await page.getByRole('checkbox').check(); await confirm.click();
+  const go = page.getByRole('button', { name: 'Поехали' });
+  await go.waitFor(); assert.equal(await go.isDisabled(), true);
+  await page.getByRole('checkbox').check(); await go.click();
+  await page.getByRole('heading', { name: /Приятно познакомиться|Расскажите о себе/ }).waitFor();
   assert.equal(await next(page).isDisabled(), true);
-  await answer(page, 'Быть в форме');
-  await page.getByRole('button', { name: 'Начинаю' }).click();
-  await page.getByRole('button', { name: 'Назад', exact: true }).click();
-  assert.equal(await page.getByRole('button', { name: /^Быть в форме/ }).getAttribute('aria-pressed'), 'true');
+  // Пол открывает барабан возраста; «Далее» в окне ведёт к следующему пустому полю
+  await radio(page, 'Мужской').click();
+  await page.getByRole('dialog', { name: 'Возраст' }).waitFor();
+  await page.getByRole('spinbutton', { name: 'Возраст' }).press('ArrowDown');
+  await page.waitForTimeout(500);
+  await sheetDone(page).click(); await page.getByRole('dialog', { name: 'Рост' }).waitFor();
+  await sheetDone(page).click(); await page.getByRole('dialog', { name: 'Вес' }).waitFor();
+  await sheetDone(page).click(); await page.getByRole('dialog').waitFor({ state: 'detached' });
+  assert.match(await page.locator('.ob-tile').first().textContent(), /31 год/);
   await next(page).click();
-  assert.equal(await page.getByRole('button', { name: /^Начинаю/ }).getAttribute('aria-pressed'), 'true');
-  await page.getByRole('button', { name: 'Продолжить позже' }).click();
+  await page.getByRole('heading', { name: /Базовый обмен рассчитан/ }).waitFor();
+  await next(page).click();
+  await radio(page, 'Подвижный').click();
+  await radio(page, 'Похудеть').click();
+  await page.getByRole('dialog', { name: 'Темп похудения' }).waitFor();
+  assert.equal(await radio(page, 'Ровный').getAttribute('aria-checked'), 'true', 'по умолчанию — средний темп');
+  await sheetDone(page).click();
+  await radio(page, 'Только начинаю').click();
+  await page.getByRole('heading', { name: 'Где будете заниматься?' }).waitFor();
+  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  assert.equal(await radio(page, 'Только начинаю').getAttribute('aria-checked'), 'true');
+  await page.getByRole('button', { name: 'Позже' }).click();
   await page.getByRole('button', { name: 'Продолжить подбор программы' }).click();
   await page.getByRole('heading', { name: 'Как давно вы занимаетесь?' }).waitFor();
   await page.reload(); await page.getByRole('heading', { name: 'Как давно вы занимаетесь?' }).waitFor();
-  assert.equal(await page.getByRole('button', { name: /^Начинаю/ }).getAttribute('aria-pressed'), 'true');
-  await next(page).click(); await answer(page, 'В зале'); await answer(page, 'Два раза');
-  await page.getByRole('heading', { name: 'Выберите программу', exact: true }).waitFor();
-  mkdirSync(join(ROOT, '../reports/ft-552'), { recursive: true });
-  await page.screenshot({ path: join(ROOT, '../reports/ft-552/programs-390.png'), fullPage: true });
-  assert.equal(await page.getByRole('button', { name: 'Выбрать эту программу' }).count(), 3);
-  await page.getByRole('button', { name: 'Выбрать эту программу' }).first().click();
+  assert.equal(await radio(page, 'Только начинаю').getAttribute('aria-checked'), 'true');
+  await next(page).click(); await radio(page, 'В зале').click(); await radio(page, 'Два раза').click();
+  await page.getByRole('heading', { name: /Ваш план готов/ }).waitFor();
+  await page.locator('.ob-macro').first().waitFor();
+  mkdirSync(join(ROOT, '../reports/ft-577'), { recursive: true });
+  await page.screenshot({ path: join(ROOT, '../reports/ft-577/plan-390.png'), fullPage: true });
+  await next(page).click();
+  await page.getByRole('heading', { name: 'Программа под вашу цель' }).waitFor();
+  assert.equal(await page.locator('.ob__error').count(), 0, 'ответы сохранились без ошибки');
+  await page.locator('.ob-program').first().waitFor();
+  assert.equal(await page.locator('.ob-program').count(), 3);
+  assert.equal(await next(page).isDisabled(), true);
+  await page.locator('.ob-program__pick').first().click();
   await page.getByRole('button', { name: 'Начать по этой программе' }).click();
-  await page.getByRole('heading', { name: 'Программа готова' }).waitFor();
-  await page.screenshot({ path: join(ROOT, '../reports/ft-552/result-390.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Перейти к занятиям' }).click();
+  await page.getByRole('heading', { name: /Всё готово/ }).waitFor();
+  await page.screenshot({ path: join(ROOT, '../reports/ft-577/done-390.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Продолжить' }).click();
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
+  await page.getByRole('region', { name: 'Ваша цель' }).first().waitFor();
   assert.deepEqual(errors, []); await page.close();
 });
+test('без данных о теле: обмен, активность, темп и план пропускаются — сразу программы', async () => {
+  const page = await open();
+  await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Поехали' }).click();
+  await page.getByRole('button', { name: /Пропустить/ }).click();
+  await radio(page, 'Похудеть').click();
+  await radio(page, 'Только начинаю').click();
+  assert.equal(await page.getByRole('dialog').count(), 0, 'без данных о теле темп не спрашиваем');
+  await radio(page, 'Дома').click(); await radio(page, 'Три раза').click();
+  await page.getByRole('heading', { name: 'Программа под вашу цель' }).waitFor();
+  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.getByRole('heading', { name: 'Сколько раз в неделю?' }).waitFor();
+  await page.close();
+});
 test('выключение на проде закрывает открытую анкету при возврате; без флага прежний кабинет', async () => {
-  const page = await open(); await page.getByRole('button', { name: 'Подтвердить и продолжить' }).waitFor();
+  const page = await open(); await page.getByRole('button', { name: 'Поехали' }).waitFor();
   await page.evaluate(() => { localStorage.setItem('fittrack_demo_onboarding_off', '1'); window.dispatchEvent(new Event('focus')); });
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
   assert.equal(await page.locator('.onboarding').count(), 0); await page.close();
@@ -70,11 +107,11 @@ test('выключение на проде закрывает открытую �
   assert.equal(await old.locator('.onboarding').count(), 0); await old.close();
 });
 test('мобильный и широкий экран: без переполнения, крупный текст и уменьшение движения', async () => {
-  const shots = join(ROOT, '../reports/ft-552'); mkdirSync(shots, { recursive: true });
+  const shots = join(ROOT, '../reports/ft-577'); mkdirSync(shots, { recursive: true });
   for (const width of [390, 1280]) {
     const page = await open(width); await page.getByRole('checkbox').waitFor();
-    await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Подтвердить и продолжить' }).click();
-    await page.getByRole('button', { name: /^Быть в форме/ }).waitFor();
+    await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Поехали' }).click();
+    await page.getByRole('radio', { name: /Мужской/ }).waitFor();
     await page.screenshot({ path: join(shots, `question-${width}.png`), fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -91,7 +128,7 @@ test('выключатель владельца доступен в настро
   await page.getByRole('button', { name: /^Настройки/ }).click();
   const off = page.getByRole('button', { name: 'Выключить анкету для всех' });
   await off.waitFor();
-  await page.screenshot({ path: join(ROOT, '../reports/ft-552/owner-390.png'), fullPage: true });
+  await page.screenshot({ path: join(ROOT, '../reports/ft-577/owner-390.png'), fullPage: true });
   await off.click(); await page.getByText('Анкета выключена', { exact: true }).waitFor();
   await page.goto(origin + '?mockRole=trainer&mockCoach=1');
   await page.getByRole('button', { name: 'Меню', exact: true }).click();

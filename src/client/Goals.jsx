@@ -124,8 +124,9 @@ function stepsLine(steps) {
 
 // Цели ставит только тренер (владелец, 08.10.2026)
 function whoSet(goal, viewer) {
-  if (viewer === 'trainer') return goal.setBy === 'trainer' ? 'цель поставили вы' : 'цель по умолчанию — поставьте клиенту';
-  return goal.setBy === 'trainer' ? 'цель поставил тренер' : 'цель по умолчанию — её поставит тренер';
+  // self — график из анкеты подбора программы у клиента без тренера (FT-577)
+  if (viewer === 'trainer') return goal.setBy === 'trainer' ? 'цель поставили вы' : goal.setBy === 'self' ? 'цель из анкеты клиента — можно поменять' : 'цель по умолчанию — поставьте клиенту';
+  return goal.setBy === 'trainer' ? 'цель поставил тренер' : goal.setBy === 'self' ? 'по вашему графику из анкеты' : 'цель по умолчанию — её поставит тренер';
 }
 
 function GoalForm({ goal, clientRow, onDone }) {
