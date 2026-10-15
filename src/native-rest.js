@@ -180,3 +180,28 @@ async function cancelRestEndNow() {
   if (!notes) return;
   try { await notes.cancel({ notifications: [{ id: REST_ID }] }); } catch (_) { /* уже нет */ }
 }
+
+/**
+ * Разрешение на уведомления телефона — для вопроса после первого «дня в
+ * режиме» (FT-510). Это те же уведомления, которыми звенит конец отдыха;
+ * удалённые push здесь не включаются (на сервере они на паузе, PUSH_OFF).
+ * 'granted' | 'denied' | 'prompt' | '' (не телефон или старая сборка)
+ */
+export async function notifyPermission() {
+  const notes = local();
+  if (!notes || !notes.checkPermissions) return '';
+  try {
+    const { display } = await notes.checkPermissions();
+    return display === 'granted' || display === 'denied' ? display : 'prompt';
+  } catch (_) { return ''; }
+}
+
+/** Показать системное окно — только по нажатию «Разрешить» */
+export async function askNotifyPermission() {
+  const notes = local();
+  if (!notes || !notes.requestPermissions) return '';
+  try {
+    const { display } = await notes.requestPermissions();
+    return display === 'granted' ? 'granted' : 'denied';
+  } catch (_) { return 'denied'; }
+}

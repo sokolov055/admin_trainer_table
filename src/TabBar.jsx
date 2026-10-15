@@ -35,6 +35,7 @@ export default function TabBar({ tabs, active, onSelect }) {
         return (
           <button
             key={t.id}
+            data-tab={t.id}
             className={'tabbar__item' + (current ? ' tabbar__item--active' : '')}
             onClick={() => onSelect(t.id)}
             tabIndex={onTab ? undefined : -1}

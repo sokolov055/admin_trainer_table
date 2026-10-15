@@ -919,7 +919,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 {!familyRow && <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>}
               </div>
             )}
-            {!running && !familyRow && <button className="button button--primary button--block" onClick={() => openWorkout({ block, month: data.month, members: data.members || [] })}>Начать тренировку</button>}
+            {!running && !familyRow && <button className="button button--primary button--block" data-first-action={clientRow || clientView ? undefined : 'workout'} onClick={() => openWorkout({ block, month: data.month, members: data.members || [] })}>Начать тренировку</button>}
             <button
               type="button"
               className="plan__toggle"

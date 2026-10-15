@@ -29,6 +29,7 @@ import ScooterGame from '../ScooterGame.jsx';
 import { usePlankAccess } from '../plank-access.js';
 import Onboarding from './Onboarding.jsx';
 import { signupLead, clearSignupLead } from '../login-route.js';
+import { useFirstSteps, FirstHint, FirstRegime } from './FirstSteps.jsx';
 
 /**
  * Панель клиента.
@@ -136,6 +137,13 @@ export default function ClientApp({ me, clientRow, preview }) {
     document.addEventListener('visibilitychange', refresh);
     return () => { alive = false; clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [own, me?.unlinked, me?.consentNeeded, consented]);
+  // Первые шаги (FT-561, FT-510): подсказка первого действия, первый день
+  // в режиме, уведомления. Только свой кабинет и не поверх анкеты
+  const firstSteps = useFirstSteps(own && !onboardingOpen && !(me && me.consentNeeded && !consented));
+  const fs = firstSteps.state;
+  // Подсказка «Начать тренировку» стоит на «Тренировках» — туда и ведём
+  const hintPlan = fs?.hint === 'workout';
+  useEffect(() => { if (hintPlan) setView((v) => (v === 'overview' ? 'plan' : v)); }, [hintPlan]);
   // «Как пользоваться» (FT-495) — инструкция из меню, а не только кружком на «Обзоре»
   const [guideOpen, setGuideOpen] = useState(false);
   const guide = { id: 'guide', label: 'Как пользоваться', note: guideNote(), Icon: IconGuide, action: () => setGuideOpen(true) };
@@ -322,6 +330,10 @@ export default function ClientApp({ me, clientRow, preview }) {
 
       {guideOpen && <GuideViewer onClose={() => setGuideOpen(false)} />}
 
+      {fs?.hint && onTab && !menuOpen && !guideOpen && (fs.hint !== 'workout' || view === 'plan') && (
+        <FirstHint key={fs.hint} kind={fs.hint} onDone={(result) => firstSteps.send('client.firstSteps.hint', { result })} />
+      )}
+
       {/* key на контейнере перезапускает появление при смене вкладки:
           экран собирается той же короткой лесенкой, что и при первой
           загрузке, а не подменяется рывком */}
@@ -344,6 +356,11 @@ export default function ClientApp({ me, clientRow, preview }) {
               относящееся к этому клиенту. */}
           {t.id === 'overview' && own && ((me && me.unlinked) || pendingTrainerLink()) && <OverviewOffers />}
           {t.id === 'overview' && personal && <Stories personal={personal} />}
+          {t.id === 'overview' && fs && (fs.regime || fs.notify) && (
+            <FirstRegime regime={fs.regime} notify={fs.notify}
+              onSeen={() => firstSteps.send('client.firstSteps.regimeSeen', {})}
+              onNotify={(result) => firstSteps.send('client.firstSteps.notify', { result })} />
+          )}
           <t.Screen clientRow={clientRow} clientView={!!preview} />
         </main>
       ))}

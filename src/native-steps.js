@@ -275,6 +275,48 @@ export async function connectWorkouts() {
 }
 
 /**
+ * Шаги и тренировки одним окном — для анкеты (FT-510): человек один раз
+ * читает, зачем это, и видит одно системное окно, а не два подряд. Дальше
+ * — те же отправки, что у кнопок «Подключить» в «Прогрессе»: второго
+ * импорта нет.
+ *
+ * Итог честный: steps/workouts — 'ok' (данные ушли), 'empty' (записей нет;
+ * на iPhone так же выглядит и запрет), 'denied' (Android сказал «не
+ * выдано»), 'error' (чтение упало), 'off' (на телефоне этого нет).
+ */
+export async function connectHealth() {
+  await pickSource();
+  const h = health();
+  if (!h || !(await stepsAvailability()).available) return { ok: false, steps: 'off', workouts: 'off' };
+  const withWorkouts = workoutsAvailable();
+  const read = onIphone()
+    ? (withWorkouts ? ['steps', 'workouts'] : ['steps'])
+    : (withWorkouts ? ['steps', ...ANDROID_WORKOUT_READS] : ['steps']);
+  let granted = null;
+  try {
+    const res = await h.requestAuthorization({ read });
+    granted = res && res.readAuthorized;
+  } catch (_) {
+    return { ok: false, steps: 'error', workouts: withWorkouts ? 'error' : 'off' };
+  }
+  // Android честно говорит, что выдано; iPhone — нет, там «прошли окно»
+  const allowed = (type) => onIphone() || (granted || []).includes(type);
+  const out = { ok: true, steps: 'off', workouts: 'off' };
+  const run = async (on, key, sync) => {
+    if (!on) return 'denied';
+    try { localStorage.setItem(key, '1'); } catch (_) {}
+    try {
+      const r = await sync(true);
+      return r.reason === 'ok' ? 'ok' : r.reason === 'denied' ? 'denied' : 'empty';
+    } catch (_) { return 'error'; }
+  };
+  out.steps = await run(allowed('steps'), ON_KEY, syncSteps);
+  if (withWorkouts) out.workouts = await run(allowed('workouts'), WORKOUTS_ON_KEY, syncWorkouts);
+  out.ok = out.steps !== 'denied' || out.workouts === 'ok';
+  return out;
+}
+
+/**
  * Прочитать тренировки за месяц и отправить. Как и с шагами, iPhone не
  * говорит, что чтение запрещено: запрет выглядит как «тренировок нет».
  */

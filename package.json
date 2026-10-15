@@ -30,7 +30,8 @@
     "test:plank": "node --test scripts/test-plank-game.mjs scripts/test-plank-browser.mjs",
     "test:onboarding": "node --test scripts/test-onboarding.mjs",
     "test:moved": "node --test scripts/test-moved-site.mjs",
-    "test:onboarding-e2e": "node --test scripts/test-onboarding-e2e.mjs"
+    "test:onboarding-e2e": "node --test scripts/test-onboarding-e2e.mjs",
+    "test:first-steps-e2e": "node --test scripts/test-first-steps-e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",

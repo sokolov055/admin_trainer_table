@@ -1,0 +1,43 @@
+/* Первые шаги после анкеты (FirstSteps.jsx, FT-561/FT-510) */
+
+/* Подсказка: четыре полосы затемнения ловят касания мимо кнопки,
+   сама кнопка в «окне» остаётся настоящей */
+.first-hint { position: fixed; inset: 0; z-index: 60; pointer-events: none; animation: first-hint-in 200ms var(--ease-out) both; }
+.first-hint__block { position: fixed; background: rgba(12, 11, 9, 0.58); pointer-events: auto; }
+.first-hint__ring { position: fixed; border-radius: var(--radius); box-shadow: 0 0 0 3px var(--accent-solid), 0 0 0 7px var(--accent-wash); pointer-events: none; }
+.first-hint__card {
+  position: fixed; left: 16px; right: 16px; max-width: 420px; margin: 0 auto;
+  background: var(--surface); color: var(--text); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  padding: 16px 16px 12px; pointer-events: auto;
+}
+.first-hint__card h2 { margin: 0 0 6px; font-size: var(--text-md); line-height: 1.3; }
+.first-hint__card h2:focus { outline: none; }
+.first-hint__card p { margin: 0 0 8px; color: var(--text-secondary); line-height: 1.5; }
+.first-hint__card .button { min-height: 44px; margin-left: -8px; }
+@keyframes first-hint-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Первый день в режиме */
+.first-regime { position: relative; margin-bottom: 16px; }
+.first-regime__close { position: absolute; top: 6px; right: 6px; }
+.first-regime__title { margin: 0 44px 14px 0; font-size: var(--text-xl); line-height: 1.2; letter-spacing: -0.01em; }
+.first-regime__week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 0 0 12px; padding: 0; }
+.first-regime__day { display: grid; justify-items: center; gap: 6px; color: var(--text-muted); font-size: var(--text-xs); }
+.first-regime__dot {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--border-strong); color: var(--accent-text);
+}
+.first-regime__day.is-today .first-regime__dot { border-color: var(--accent); }
+.first-regime__day.is-today { color: var(--text); font-weight: 600; }
+.first-regime__day.is-on .first-regime__dot { background: var(--accent-solid); border-color: var(--accent-solid); animation: first-regime-pop 320ms var(--ease-out) both; }
+.first-regime__notify { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.first-regime__notify h3 { margin: 0 0 6px; font-size: var(--text-base); }
+.first-regime__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@keyframes first-regime-pop { from { transform: scale(0.6); } to { transform: scale(1); } }
+
+/* Шаг анкеты «Шаги и тренировки» (HealthAsk.jsx) */
+.health-ask__list { margin: 0 0 16px; padding-left: 20px; line-height: 1.6; }
+.health-ask__footer { display: grid; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .first-hint, .first-regime__day.is-on .first-regime__dot { animation: none; }
+}

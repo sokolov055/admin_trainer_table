@@ -28,3 +28,25 @@ export function onboardingMock(action, p) {
   }
   return { enabled: true, eligible: !saved.completed, ...saved, programs: saved.step === 4 ? programs.map((r) => ({ ...r, days: saved.answers.days })) : [] };
 }
+
+// Первые шаги (FT-561/FT-510) в демо — только с ?mockFirstSteps=1, чтобы
+// подсказка не перекрывала остальные демо-сценарии. День в режиме в демо
+// засчитывается сразу после подсказки: журнала с датами здесь нет.
+const FS_KEY = 'fittrack_demo_first_steps';
+export function firstStepsMock(action, p) {
+  // Флаг запоминается: приложение убирает лишнее из адреса при запуске
+  if (new URLSearchParams(location.search).get('mockFirstSteps') === '1') sessionStorage.setItem('mockFirstSteps', '1');
+  if (sessionStorage.getItem('mockFirstSteps') !== '1') return { hint: null, regime: null, notify: false };
+  const s = JSON.parse(localStorage.getItem(FS_KEY) || '{}');
+  if (action === 'client.firstSteps.hint' && !s.hint) s.hint = p.result;
+  if (action === 'client.firstSteps.regimeSeen') s.regime = true;
+  if (action === 'client.firstSteps.notify' && !s.notify) s.notify = p.result;
+  localStorage.setItem(FS_KEY, JSON.stringify(s));
+  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const today = (new Date().getDay() + 6) % 7;
+  return {
+    hint: s.hint ? null : 'workout',
+    regime: s.hint && !s.regime ? { count: 1, week: days.map((label, i) => ({ day: 'd' + i, label, on: i === today, today: i === today })) } : null,
+    notify: !!s.hint && !s.notify,
+  };
+}
