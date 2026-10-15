@@ -472,7 +472,7 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
         </div>
         {/* Низ — как в анкете (Onboarding.jsx): круглая «Назад» и одна
             ведущая кнопка на одном месте на всех шагах; над клавиатурой
-            его поднимает --kb (keyboard-inset.js) */}
+            его закрепляет keyboard-inset.js */}
         <footer className="ob__footer">
           <button type="button" className="ob__back" aria-label="Назад" disabled={busy} onClick={stepBack}><IconBack size={20} /></button>
           <button className="button button--primary ob__next" disabled={busy || !ready}>

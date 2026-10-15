@@ -542,15 +542,13 @@ test('профиль сохраняется и объясняет опечатк
   );
 
   await page.getByRole('textbox', { name: 'Рост, см' }).fill('168');
-  await page.getByRole('textbox', { name: 'Имя пользователя' }).fill('@anna_fit');
   await page.getByRole('button', { name: 'Сохранить' }).click();
 
   await assert.doesNotReject(page.getByText('Сохранено.').waitFor({ timeout: 10000 }));
 
-  // Тренеру нужна не строка, а ссылка, по которой открывается переписка
-  await assert.doesNotReject(
-    page.getByRole('link', { name: 'Открыть переписку' }).waitFor({ timeout: 5000 }),
-  );
+  // Telegram с экрана убран (15.10.2026); почта — просто «Почта»
+  assert.equal(await page.getByRole('textbox', { name: 'Имя пользователя' }).count(), 0);
+  assert.equal(await page.getByRole('textbox', { name: 'Почта', exact: true }).count(), 1);
 });
 
 /**

@@ -127,25 +127,12 @@ export default function Profile({ clientRow }) {
         </div>
 
         <div className="survey__group">
-          <Field label="Почта для связи" placeholder="anna@example.com" inputMode="email" value={form.email} onChange={(v) => set('email', v)} disabled={busy} />
+          <Field label="Почта" placeholder="anna@example.com" inputMode="email" value={form.email} onChange={(v) => set('email', v)} disabled={busy} />
         </div>
 
-        <div className="survey__group">
-          <div className="survey__legend">
-            Telegram
-            <span className="survey__legend-note">чтобы тренер мог написать вам одним нажатием</span>
-          </div>
-
-          <Field label="Имя пользователя" placeholder="@anna_fit" inputMode="text" value={form.telegram} onChange={(v) => set('telegram', v)} disabled={busy} />
-
-          {/* Бота больше нет (27.09.2026): ник — просто контакт, вписывается
-              руками; входить через Telegram нельзя */}
-          {form.telegramUrl && (
-            <div className="survey__actions">
-              <a className="button button--ghost" href={form.telegramUrl} target="_blank" rel="noreferrer">Открыть переписку</a>
-            </div>
-          )}
-        </div>
+        {/* Telegram убран с экрана (владелец, 15.10.2026): бота нет с
+            27.09.2026, ник никто не вписывал. Сохранённый ник не стирается —
+            форма отправляет его как был */}
       </div>
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}

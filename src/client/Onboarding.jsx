@@ -11,7 +11,7 @@ import {
 import Art from './OnboardingArt.jsx';
 import StageBar from './StageBar.jsx';
 import { Wheel, Sheet, range } from './Wheel.jsx';
-import Permissions, { usePermissions } from './Permissions.jsx';
+import Permissions, { usePermissions, useAppOffer, AppOffer } from './Permissions.jsx';
 import { MuscleFigure, tallyExercises, splitTally, nameLine } from '../muscles/MuscleMap.jsx';
 import { useKeyboardInset } from '../keyboard-inset.js';
 import './onboarding.css';
@@ -92,6 +92,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
   // Сколько ответов ещё в пути: план и программы ждут последнего из них
   const [pending, setPending] = useState(0);
   const perms = usePermissions();
+  const offer = useAppOffer();
   const [askPerms, setAskPerms] = useState(false);
   const heading = useRef(null);
   const mounted = useRef(true);
@@ -196,9 +197,9 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
       setResult(r);
     } catch (err) { fail(err); } finally { if (mounted.current) setBusy(false); }
   };
-  const finish = () => (perms ? setAskPerms(true) : onDone());
+  const finish = () => (perms || offer ? setAskPerms(true) : onDone());
 
-  if (askPerms) return <Permissions need={perms} onDone={onDone} />;
+  if (askPerms) return perms ? <Permissions need={perms} onDone={onDone} /> : <AppOffer platform={offer} onDone={onDone} />;
 
   const id = result ? 'done' : saved.consentNeeded ? 'welcome' : STEPS[step];
   const stages = lead ? [SIGNUP_STAGE, ...STAGES] : STAGES;

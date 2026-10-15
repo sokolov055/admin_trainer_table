@@ -33,7 +33,7 @@ import { useFirstSteps, FirstHint, FirstRegime } from './FirstSteps.jsx';
 import Tour from './Tour.jsx';
 import { forgetFocus, GoalBanner } from './focus.jsx';
 import { isNativeApp } from '../native-bridge.js';
-import Permissions, { usePermissions, permissionsAsked } from './Permissions.jsx';
+import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
 
 /**
  * Панель клиента.
@@ -74,7 +74,7 @@ const MENU = [
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
   // У тренера журнал клиентов в меню остался
-  { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, Telegram', Icon: IconUsers },
+  { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта', Icon: IconUsers },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
 
@@ -261,6 +261,9 @@ export default function ClientApp({ me, clientRow, preview }) {
   if (own && justSignedUp && !permsDone && !permissionsAsked()) {
     if (perms === null) return <div className="app"><main className="app__body"><Loading rows={3} /></main></div>;
     if (perms) return <Permissions need={perms} onDone={() => setPermsDone(true)} />;
+    // В браузере на телефоне — тот же шаг словами и ссылка на приложение (FT-577)
+    const platform = appOffer();
+    if (platform) return <AppOffer platform={platform} onDone={() => setPermsDone(true)} />;
   }
 
   return (

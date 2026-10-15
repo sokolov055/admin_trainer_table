@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { isNativeApp } from '../native-bridge.js';
+import { detectBrowser } from '../browser.js';
 import { stepsAvailability, stepsOn, connectHealth, healthHub, onIphone, workoutsAvailable } from '../native-steps.js';
 import { ensureBackgroundSync, backgroundSyncAvailable, backgroundSyncStatus, requestBackgroundAccess } from '../native-sync.js';
 import { notifyPermission, askNotifyPermission } from '../native-rest.js';
@@ -126,5 +127,51 @@ export default function Permissions({ need, onDone }) {
         ? <button type="button" className="button button--primary button--block" onClick={onDone}>Перейти к занятиям</button>
         : <button type="button" className="button button--primary button--block" disabled={busy} onClick={run}>{busy ? 'Спрашиваем…' : 'Продолжить'}</button>}
     </footer>
+  </main>;
+}
+
+/**
+ * Тот же шаг в браузере (FT-577): сайт не может читать «Здоровье» и Health
+ * Connect и не ставит сигнал отдыха телефоном, поэтому вместо системных
+ * окон — короткое объяснение и ссылка на приложение. Один раз на устройстве;
+ * «Продолжить в браузере» — полноценный путь, ничего не закрывается.
+ */
+const OFFER_KEY = 'fittrack_app_offer_v1';
+const STORE = { ios: 'https://apps.apple.com/ru/app/id6816619723', android: '/site/#download' };
+
+/** Платформа, для которой показать шаг, или null — уже показан, приложение, компьютер */
+export function appOffer() {
+  if (isNativeApp()) return null;
+  try { if (localStorage.getItem(OFFER_KEY) === '1') return null; } catch (_) { /* приватный режим */ }
+  const p = detectBrowser().platform;
+  return p === 'ios' || p === 'android' ? p : null;
+}
+
+export function useAppOffer() {
+  const [platform] = useState(appOffer);
+  return platform;
+}
+
+export function AppOffer({ platform, onDone }) {
+  const heading = useRef(null);
+  useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
+  const done = () => { try { localStorage.setItem(OFFER_KEY, '1'); } catch (_) {} onDone(); };
+  return <main className="onboarding">
+    <div className="onboarding__content">
+      <h1 ref={heading} tabIndex={-1}>Шаги и уведомления — в приложении</h1>
+      <p className="onboarding__intro">В браузере всё остальное работает так же, но телефон не даёт сайту доступ к шагам, тренировкам с часов и сигналу конца отдыха.</p>
+      <ul className="permissions__list">
+        <li><strong>Шаги и тренировки</strong><span>Приложение берёт их из {platform === 'ios' ? '«Здоровья»' : 'Health Connect'} — видно вам и тренеру.</span></li>
+        <li><strong>Сигнал конца отдыха</strong><span>Телефон подаст его, даже с заблокированным экраном.</span></li>
+        {platform === 'ios' && <li><strong>Apple Watch</strong><span>Подходы и отдых — на часах.</span></li>}
+      </ul>
+      <p className="small muted">Войдите в приложении той же почтой — программа и ответы уже там.</p>
+    </div>
+    <footer className="ob__footer">
+      <a className="button button--primary ob__next" href={STORE[platform]} target="_blank" rel="noopener noreferrer" onClick={done}>
+        {platform === 'ios' ? 'Скачать в App Store' : 'Скачать для Android'}
+      </a>
+    </footer>
+    <button type="button" className="ob-skip" onClick={done}>Продолжить в браузере</button>
   </main>;
 }
