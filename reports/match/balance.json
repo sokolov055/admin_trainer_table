@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-15",
+  "scope": "Численная симуляция; интересность и удобство на физическом устройстве не оценены",
+  "target": 900,
+  "results": [
+    {
+      "strategy": "random",
+      "games": 1000,
+      "winRate": 92.9,
+      "median": 1320,
+      "p10": 960,
+      "p90": 2100,
+      "min": 720,
+      "max": 4980,
+      "specialsPerGame": 1.06,
+      "cascadesPerGame": 4.166
+    },
+    {
+      "strategy": "greedy",
+      "games": 1000,
+      "winRate": 94.7,
+      "median": 1440,
+      "p10": 960,
+      "p90": 2240,
+      "min": 720,
+      "max": 3860,
+      "specialsPerGame": 2.325,
+      "cascadesPerGame": 3.856
+    }
+  ]
+}

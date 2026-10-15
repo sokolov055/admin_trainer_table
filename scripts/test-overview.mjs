@@ -29,6 +29,7 @@ const output = await build({
   format: 'cjs',
   platform: 'node',
   external: ['react'],
+  loader: { '.png': 'dataurl' },
   plugins: [{
     name: 'overview-stubs',
     setup(bundle) {

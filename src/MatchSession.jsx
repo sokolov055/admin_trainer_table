@@ -2,8 +2,8 @@ import React, { createContext, useContext, useState, useSyncExternalStore } from
 import { createMatchSession } from './match-session.js';
 
 const Context = createContext(null);
-export function MatchSessionProvider({ children }) {
-  const [session] = useState(createMatchSession);
+export function MatchSessionProvider({ children, seed }) {
+  const [session] = useState(() => createMatchSession({ seed }));
   return <Context.Provider value={session}>{children}</Context.Provider>;
 }
 export function useMatchSession() {

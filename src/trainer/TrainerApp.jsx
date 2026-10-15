@@ -6,6 +6,7 @@ import { Finance, Processes } from './Metrics.jsx';
 import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
 import { PlankAccess } from '../plank-access.js';
+import { MatchSessionProvider } from '../MatchSession.jsx';
 import { Overview, Plan, Progress, Nutrition } from '../client/screens.jsx';
 import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
@@ -224,6 +225,7 @@ export default function TrainerApp({ me }) {
   if (previewClient) {
     return (
       <PlankAccess.Provider value={previewClient.test === true}>
+        <MatchSessionProvider key={previewClient.row}>
         <ClientApp
           me={{ ...me, name: previewClient.name }}
           clientRow={previewClient.row}
@@ -235,6 +237,7 @@ export default function TrainerApp({ me }) {
             single: !!openClient,
           }}
         />
+        </MatchSessionProvider>
       </PlankAccess.Provider>
     );
   }
