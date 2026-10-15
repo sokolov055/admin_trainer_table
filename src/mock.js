@@ -1252,7 +1252,7 @@ const MOCK = {
       // «Мои тренировки» в демо — карточка №99
       self: trainer && Number(params.clientRow) === 99,
       // Сплит в демо — «Евгений и Екатерина» (строка 4)
-      members: Number(params.clientRow) === 4 ? ['Евгений', 'Екатерина'] : [],
+      members: Number(params.clientRow) === 4 ? ['Евгений', 'Екатерина'] : [29, 30, 31].includes(Number(params.clientRow)) ? ['Олег', 'Светлана'] : [],
       blocks: month
         ? withDemoMuscles(Number(params.clientRow) === 4
           ? PLAN_BLOCKS.map((b) => ({ ...b, exercises: b.exercises.map((e, i) => ({

@@ -44,6 +44,9 @@ function noteBackStack() {
   if (!historyGuard) historyGuard = createHistoryGuard({ win: window, size: () => backStack.length, onBack: () => goBack() });
   historyGuard.schedule();
 }
+// После перезагрузки страница может стоять на нашей записи, а стопка пуста —
+// сторож нужен сразу, чтобы снять запись, иначе первый Back ничего не делает (FT-584)
+noteBackStack();
 
 /**
  * Снимок экрана, с которого сейчас уходят.
