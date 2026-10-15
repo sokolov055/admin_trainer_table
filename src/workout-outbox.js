@@ -34,6 +34,7 @@ import { offlineAccount, onOfflineAccount, takeFallbacks } from './offline-accou
 import { storageKey } from './workout-draft.js';
 import { uid } from './workout-model.js';
 import { isWorkoutOpen } from './native-activity.js';
+import { flushWrites, onWritesChange, pendingWrites } from './offline-writes.js';
 
 const FINISHED = ['completed', 'cancelled'];
 
@@ -111,12 +112,15 @@ export async function localWorkouts(clientRow) {
   return rows.map(({ key, value }) => ({ sessionId: String(key).slice(prefix.length), ...value }));
 }
 
-/** Сколько всего ждёт отправки у этого человека — перед выходом из аккаунта */
+/**
+ * Сколько всего ждёт отправки у этого человека — перед выходом из
+ * аккаунта: занятия и записи этапа 2 (замеры, настройки тренажёров)
+ */
 export async function pendingWorkouts() {
   const account = offlineAccount();
   if (!account) return 0;
   const rows = await dbList('outbox', account + '|').catch(() => []);
-  return rows.length;
+  return rows.length + await pendingWrites();
 }
 
 /**
@@ -213,7 +217,10 @@ async function run() {
     else left += 1;
   }
   if (sent) changed();
-  return { sent, left };
+  // Замеры и настройки тренажёров (offline-writes.js) — следом, тем же
+  // поводом. Связи нет — workout.save уже это показал, но их проба дешёвая
+  const writes = await flushWrites().catch(() => ({ sent: 0, left: 0 }));
+  return { sent: sent + writes.sent, left: left + writes.left };
 }
 
 /**
@@ -318,6 +325,7 @@ export function startOutbox() {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'hidden') kick(); });
   }
   onOutboxChange(() => { if (!timer) schedule(1); });
+  onWritesChange(() => { if (!timer) schedule(1); });
   onOfflineAccount((next) => { if (next) adoptFallbacks().then(kick).catch(kick); });
   adoptFallbacks().then(kick).catch(kick);
 }
@@ -330,7 +338,7 @@ async function adoptFallbacks() {
   const to = offlineAccount();
   const from = takeFallbacks();
   for (const old of from) {
-    for (const store of ['outbox', 'sessions']) {
+    for (const store of ['outbox', 'sessions', 'writes']) {
       const rows = await dbList(store, old + '|').catch(() => []);
       for (const { key, value } of rows) {
         await dbPut(store, to + String(key).slice(old.length), value);
@@ -439,7 +447,7 @@ export async function saveRecentWorkouts(clientRow, sessions) {
 /** Выход из аккаунта: всё этого человека с телефона */
 export async function forgetOfflineAccount(account = offlineAccount()) {
   if (!account) return;
-  await Promise.all(['outbox', 'sessions'].map((store) => dbReplace(store, account + '|', []).catch(() => {})));
+  await Promise.all(['outbox', 'sessions', 'writes'].map((store) => dbReplace(store, account + '|', []).catch(() => {})));
   changed();
 }
 

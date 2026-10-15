@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { flushSync, createPortal } from 'react-dom';
 import { apiFresh, apiPublic, apiMutate } from './api.js';
 import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWorkout, settleClosed } from './workout-outbox.js';
+import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
@@ -1585,8 +1586,25 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (!setupIds) return undefined;
     let alive = true;
     // Без связи — сохранённые (offline-prefetch.js запасает их по программе)
-    apiFresh('exercise.setup', { ...params, ids: setupIds })
-      .then(({ data: r }) => { if (alive && r && r.setups) { setSetups(r.setups); setNotes(r.notes || {}); setNotesBy(r.notesBy || {}); } })
+    // Поверх — настройки, записанные без связи и ещё не отправленные
+    // (FT-566, этап 2): на экране они такие же, как принятые сервером
+    Promise.all([apiFresh('exercise.setup', { ...params, ids: setupIds }), localWrites(clientRow, 'note').catch(() => [])])
+      .then(([{ data: r }, pending]) => {
+        if (!alive || !r || !r.setups) return;
+        const own = { ...(r.notes || {}) };
+        const by = { ...(r.notesBy || {}) };
+        pending.forEach(({ params: p }) => {
+          const text = String(p.text || '').trim();
+          const note = text ? { text, by: asClient ? 'client' : 'trainer', local: true } : null;
+          if (p.member) {
+            const next = { ...(by[p.member] || {}) };
+            if (note) next[p.target] = note; else delete next[p.target];
+            by[p.member] = next;
+          } else if (note) own[p.target] = note;
+          else delete own[p.target];
+        });
+        setSetups(r.setups); setNotes(own); setNotesBy(by);
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, [setupIds, setupsTick]);

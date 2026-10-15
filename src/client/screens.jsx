@@ -4,6 +4,7 @@ import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
 import { journalList, onOutboxChange, justSynced, localWorkouts, withLocalWeights } from '../workout-outbox.js';
+import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures } from '../offline-writes.js';
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
@@ -1496,16 +1497,28 @@ function useProgressBundle(clientRow, familyRow = null) {
           return;
         }
 
-        setState({
-          loading: false,
-          error: null,
-          data: {
-            progress: okProgress ? progress.data : null,
-            measurements: okMeasurements ? measurements.data : null,
-            goal: (nutrition && nutrition.ok && nutrition.data
-              && nutrition.data.survey && nutrition.data.survey.goal) || null,
-          },
-        });
+        // Замеры, записанные без связи (FT-566, этап 2), — сразу в таблицах
+        // и изменениях, как будто сервер их уже принял. Семье — только
+        // серверное: записывать за неё нельзя
+        return (familyRow ? Promise.resolve([]) : localWrites(clientRow, 'measure').catch(() => []))
+          .then((pending) => {
+            if (!alive) return;
+            const merged = okMeasurements || pending.length ? withLocalMeasures(okMeasurements ? measurements.data : null, pending) : null;
+            setState({
+              loading: false,
+              error: null,
+              data: {
+                // Изменения по сериям — те же, что пересчитаны с телефонными
+                progress: okProgress
+                  ? (pending.length && merged ? { ...progress.data, series: merged.series } : progress.data)
+                  : null,
+                measurements: merged,
+                pending: pending.length,
+                goal: (nutrition && nutrition.ok && nutrition.data
+                  && nutrition.data.survey && nutrition.data.survey.goal) || null,
+              },
+            });
+          });
       })
       .catch((error) => {
         if (alive) setState({ loading: false, data: null, error });
@@ -1513,6 +1526,9 @@ function useProgressBundle(clientRow, familyRow = null) {
 
     return () => { alive = false; };
   }, [clientRow, familyRow, attempt]);
+
+  // Замеры с телефона ушли на сервер или добавились — перечитать
+  useEffect(() => onWritesChange(() => setAttempt((n) => n + 1)), []);
 
   return { ...state, reload: () => setAttempt((n) => n + 1) };
 }
@@ -1583,9 +1599,16 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       <div className="progress__add">
         {added && (
           <Note tone="good" icon={IconRuler}>
-            {added.replaced
-              ? 'Замер за ' + formatDate(added.date) + ' обновлён.'
-              : 'Замер за ' + formatDate(added.date) + ' записан.'}
+            {added.local
+              ? 'Нет связи — замер за ' + formatDate(added.date) + ' сохранён на телефоне и отправится, когда появится связь.'
+              : added.replaced
+                ? 'Замер за ' + formatDate(added.date) + ' обновлён.'
+                : 'Замер за ' + formatDate(added.date) + ' записан.'}
+          </Note>
+        )}
+        {!added && data.pending > 0 && (
+          <Note icon={IconRuler}>
+            {data.pending === 1 ? 'Один замер' : 'Замеров: ' + data.pending} — на телефоне, отправится, когда появится связь.
           </Note>
         )}
         <button className="button button--primary button--block" onClick={() => { setAdded(null); setAdding(true); }}>
@@ -1901,12 +1924,22 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
       const payload = {};
       filled.forEach((f) => { payload[f] = String(values[f]).trim(); });
 
-      const result = await apiMutate('measure.create', {
+      const params = {
         ...(clientRow ? { clientRow } : {}),
         ...(sheetName ? { sheetName } : {}),
         date,
         values: payload,
-      });
+      };
+      let result;
+      try {
+        result = await apiMutate('measure.create', params);
+      } catch (err) {
+        // Нет связи (FT-566, этап 2) — замер на телефон, на сервер — сам,
+        // когда связь появится. Отказ сервера — как раньше, показать
+        if (!isOffline(err)) throw err;
+        await queueWrite('measure', params);
+        result = { date, local: true };
+      }
 
       onSaved(result);
     } catch (err) {

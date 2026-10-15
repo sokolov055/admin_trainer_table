@@ -172,3 +172,32 @@ test('без сети: две тренировки подряд, перезап�
     await context.close();
   }
 });
+
+test('этап 2: замер без сети — сразу на экране, со связью — на сервер', { timeout: 120000 }, async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const page = await context.newPage();
+  page.on('pageerror', (error) => errors.push(String(error)));
+  try {
+    await page.goto(origin);
+    await page.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await page.goto(origin);
+    // Со связью открыли «Прогресс» — замеры с сервера сохранены на телефоне
+    await page.getByRole('button', { name: 'Прогресс', exact: true }).click({ timeout: 60000 });
+    await page.getByRole('button', { name: 'Записать замер' }).waitFor({ timeout: 20000 });
+
+    await page.evaluate(() => localStorage.setItem('demo_offline', '1'));
+    await page.getByRole('button', { name: 'Записать замер' }).click();
+    await page.getByRole('textbox', { name: 'Вес, кг' }).fill('74,2');
+    await page.getByRole('button', { name: 'Записать', exact: true }).click();
+    await page.getByText(/Нет связи — замер за .* сохранён на телефоне/).waitFor({ timeout: 20000 });
+    assert.equal((await stored(page, 'writes')).length, 1, 'замер — в очереди телефона');
+    assert.ok(await page.getByText(/74[,.]2/).first().isVisible(), 'новый вес — уже в таблице');
+
+    await page.evaluate(() => { localStorage.removeItem('demo_offline'); window.dispatchEvent(new Event('online')); });
+    for (let i = 0; i < 40 && (await stored(page, 'writes')).length; i += 1) await page.waitForTimeout(500);
+    assert.equal((await stored(page, 'writes')).length, 0, 'ушёл на сервер');
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});

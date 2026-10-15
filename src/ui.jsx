@@ -141,9 +141,10 @@ export function SignOut() {
           {unsent > 0 && (
             <div className="setting__note" role="alert">
               <strong>
-                {unsent === 1 ? 'Одна тренировка ещё не отправлена' : 'Тренировок не отправлено: ' + unsent}
+                {unsent === 1 ? 'Одна запись ещё не отправлена' : 'Не отправлено записей: ' + unsent}
               </strong>{' '}
-              — нет связи с сервером. После выхода они удалятся с телефона.
+              (тренировки, замеры, настройки тренажёров) — нет связи с сервером.
+              После выхода они удалятся с телефона.
               Лучше дождаться связи: тогда они отправятся сами.
               <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                 <button className="button" onClick={() => setUnsent(0)} disabled={busy}>Не выходить</button>

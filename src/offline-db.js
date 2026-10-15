@@ -12,7 +12,9 @@
  *   outbox   — занятия, ещё не подтверждённые сервером (workout-outbox.js);
  *   sessions — занятия с сервера за 90 дней, целиком;
  *   media    — видео упражнений: Blob по адресу;
- *   meta     — мелочи: когда что обновляли.
+ *   meta     — мелочи: когда что обновляли;
+ *   writes   — замеры и настройки тренажёров, записанные без связи
+ *              (offline-writes.js, этап 2 FT-566).
  *
  * Ключи outbox и sessions начинаются с аккаунта (offline-account.js):
  * один телефон — разные люди, и чужие записи не видны и не отправляются.
@@ -23,8 +25,10 @@
  */
 
 const NAME = 'fittrack-offline';
-const VERSION = 1;
-export const STORES = ['outbox', 'sessions', 'media', 'meta'];
+// 2 — хранилище writes (этап 2 FT-566). Недостающие хранилища создаёт
+// onupgradeneeded, прежние данные остаются
+const VERSION = 2;
+export const STORES = ['outbox', 'sessions', 'media', 'meta', 'writes'];
 
 let opening = null;
 
