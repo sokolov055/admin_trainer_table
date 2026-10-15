@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { apiPublic, apiMutate } from '../api.js';
 import { IconBack, IconCheck, IconPlan, IconUsers, IconHome, IconCalendar, IconUserPlus, IconKey } from '../icons.jsx';
 import { QUESTIONS, canAdvance } from './onboarding-model.js';
-import HealthAsk, { useHealthAsk } from './HealthAsk.jsx';
+import Permissions, { usePermissions } from './Permissions.jsx';
 import './onboarding.css';
 import '../brand-type.css';
 
@@ -28,11 +28,11 @@ export default function Onboarding({ initial, onClose, onDone, onDisabled, lead 
   const step = saved.step || 0;
   const question = QUESTIONS[step];
   const [agreed, setAgreed] = useState(false);
-  // Шаги и тренировки с часов — последним шагом анкеты, после выбора
-  // программы (FT-510): только в приложении, где они есть и ещё не подключены
-  const healthNeeded = useHealthAsk();
-  const [askHealth, setAskHealth] = useState(false);
-  const finish = () => (healthNeeded ? setAskHealth(true) : onDone());
+  // Разрешения — последним шагом анкеты, после выбора программы (FT-510):
+  // только в приложении и только то, что ещё не спрашивали
+  const perms = usePermissions();
+  const [askPerms, setAskPerms] = useState(false);
+  const finish = () => (perms ? setAskPerms(true) : onDone());
   useEffect(() => () => { mounted.current = false; }, []);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [step, result]);
 
@@ -78,7 +78,7 @@ export default function Onboarding({ initial, onClose, onDone, onDisabled, lead 
     if (r) setSaved(r);
   };
 
-  if (askHealth) return <HealthAsk onDone={onDone} />;
+  if (askPerms) return <Permissions need={perms} onDone={onDone} />;
 
   return <main className="onboarding" aria-busy={busy}>
     <div className="onboarding__top">

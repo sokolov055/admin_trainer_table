@@ -30,6 +30,7 @@ import { usePlankAccess } from '../plank-access.js';
 import Onboarding from './Onboarding.jsx';
 import { signupLead, clearSignupLead } from '../login-route.js';
 import { useFirstSteps, FirstHint, FirstRegime } from './FirstSteps.jsx';
+import Permissions, { usePermissions, permissionsAsked } from './Permissions.jsx';
 
 /**
  * Панель клиента.
@@ -110,6 +111,11 @@ export default function ClientApp({ me, clientRow, preview }) {
   // Только что зарегистрировался — анкета продолжает шаги регистрации (FT-574)
   const [lead, setLead] = useState(signupLead);
   const dropLead = () => { clearSignupLead(); setLead(0); };
+  // Разрешения на телефоне — сразу после регистрации (FT-510): последним
+  // шагом анкеты, а без анкеты (выключена, отложена) — отдельным экраном
+  const [justSignedUp] = useState(() => !!signupLead());
+  const perms = usePermissions();
+  const [permsDone, setPermsDone] = useState(false);
   // Выключатель всегда читается с сервера. Возврат из фона и опрос закрывают
   // анкету даже у человека, который оставил её открытой до отключения.
   useEffect(() => {
@@ -246,6 +252,11 @@ export default function ClientApp({ me, clientRow, preview }) {
     onClose={(r) => { onboardingClosed.current = true; setOnboarding(r); setOnboardingOpen(false); dropLead(); }}
     onDisabled={() => { setOnboarding(null); setOnboardingOpen(false); dropLead(); }}
     onDone={() => { onboardingClosed.current = true; setOnboarding(null); setOnboardingOpen(false); dropLead(); setView('plan'); }} />;
+
+  if (own && justSignedUp && !permsDone && !permissionsAsked()) {
+    if (perms === null) return <div className="app"><main className="app__body"><Loading rows={3} /></main></div>;
+    if (perms) return <Permissions need={perms} onDone={() => setPermsDone(true)} />;
+  }
 
   return (
     <div className="app">
