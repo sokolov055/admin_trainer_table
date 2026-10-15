@@ -1,7 +1,7 @@
 // Чистые правила: случайность входит в состояние, а каждый ход воспроизводим.
 import { chapterFor, chapterComplete } from './match-story.js';
 
-export const MATCH_TUNING = Object.freeze({ size: 6, types: 6, moves: 12, points: 20, target: 900, maxCascades: 40 });
+export const MATCH_TUNING = Object.freeze({ size: 9, types: 6, moves: 20, points: 20, target: 2000, maxCascades: 40 });
 export const PIECES = Object.freeze([
   { name: 'Гантель', color: '#28d5dd' }, { name: 'Гиря', color: '#b47bff' },
   { name: 'Диск', color: '#479aff' }, { name: 'Яблоко', color: '#ff6572' },
@@ -80,9 +80,15 @@ function freshBoard(state) {
 }
 
 export function createMatchGame(seed = Date.now(), level = 1) {
-  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: MATCH_TUNING.moves, score: 0, collected: 0, bestCombo: 0, turns: 0, board: [] };
-  game.target = MATCH_TUNING.target + (game.level - 1) * 200;
+  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: MATCH_TUNING.moves, score: 0, collected: 0, uncovered: 0, bestCombo: 0, turns: 0, board: [], covers: [] };
+  game.target = MATCH_TUNING.target + (game.level - 1) * 250;
   game.board = freshBoard(game);
+  const patterns = [
+    [19, 20, 28, 29, 51, 52, 60, 61],
+    [22, 23, 31, 32, 48, 49, 57, 58],
+    [29, 30, 38, 39, 41, 42, 50, 51],
+  ];
+  game.covers = patterns[game.level - 1].slice();
   return game;
 }
 
@@ -151,9 +157,9 @@ function collapse(state, removed) {
 // Кадры содержат только данные. Представление управляет длительностью, а не правилами.
 export function resolveMove(game, a, b) {
   if (game.moves <= 0 || !adjacent(a, b)) return { valid: false, frames: [], game };
-  let state = { ...game, board: swap(game.board, a, b) };
+  let state = { ...game, board: swap(game.board, a, b), covers: (game.covers || []).slice() };
   const frames = [];
-  const frame = (kind, duration, extra = {}) => frames.push({ kind, duration, game: { ...state, board: state.board.slice() }, ...extra });
+  const frame = (kind, duration, extra = {}) => frames.push({ kind, duration, game: { ...state, board: state.board.slice(), covers: state.covers.slice() }, ...extra });
   if (!isLegalSwap(game.board, a, b)) {
     frame('swap', 220, { a, b });
     state.board = game.board;
@@ -190,12 +196,15 @@ export function resolveMove(game, a, b) {
     const protectedCells = new Set(creations.map(c => c.at));
     const { cells, effects } = expandClears(state.board, [...new Set([...groups.flatMap(g => g.cells), ...forced])], protectedCells, combo === 1 ? colorTargets : {});
     const points = cells.length * MATCH_TUNING.points * Math.min(combo, 4);
+    const reveals = state.covers.filter(covered => cells.some(i => Math.abs(rowOf(i) - rowOf(covered)) + Math.abs(colOf(i) - colOf(covered)) <= 1));
     const storyGain = cells.filter(i => state.board[i]?.type === chapterFor(state.level).type).length;
     state.score += points;
     state.collected += storyGain;
+    state.uncovered += reveals.length;
+    state.covers = state.covers.filter(i => !reveals.includes(i));
     state.bestCombo = Math.max(state.bestCombo, combo);
     // Старая фигура видна в кадре исчезновения, новая появляется после него.
-    frame('clear', 390, { cells, effects, creations, combo, points, storyGain });
+    frame('clear', 390, { cells, effects, creations, combo, points, storyGain, reveals });
     state.board = state.board.map((t, i) => {
       const made = creations.find(c => c.at === i);
       return made ? { ...t, power: made.power } : t;

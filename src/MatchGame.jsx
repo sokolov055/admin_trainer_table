@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { useMatchSession } from './MatchSession.jsx';
-import { PIECES, POWER_NAMES, earnedStars, rowOf, colOf } from './match-model.js';
+import { MATCH_TUNING, PIECES, POWER_NAMES, earnedStars, rowOf, colOf } from './match-model.js';
 import { chapterFor, chapterProgress } from './match-story.js';
 import { createMatchAudio } from './match-audio.js';
 import { restHere, onRestHere } from './rest-here.js';
@@ -110,10 +110,10 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
   const key = event => {
     const at = Number(event.currentTarget.dataset.cell);
     let next = at;
-    if (event.key === 'ArrowRight' && colOf(at) < 5) next++;
+    if (event.key === 'ArrowRight' && colOf(at) < MATCH_TUNING.size - 1) next++;
     else if (event.key === 'ArrowLeft' && colOf(at) > 0) next--;
-    else if (event.key === 'ArrowDown' && rowOf(at) < 5) next += 6;
-    else if (event.key === 'ArrowUp' && rowOf(at) > 0) next -= 6;
+    else if (event.key === 'ArrowDown' && rowOf(at) < MATCH_TUNING.size - 1) next += MATCH_TUNING.size;
+    else if (event.key === 'ArrowUp' && rowOf(at) > 0) next -= MATCH_TUNING.size;
     else return;
     event.preventDefault();
     if (event.shiftKey) session.move(at, next, token.current);
@@ -132,7 +132,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
     const dx = event.clientX - p.x, dy = event.clientY - p.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 14) { session.select(p.at, token.current); setFocusCell(p.at); }
     else {
-      const next = Math.abs(dx) > Math.abs(dy) ? p.at + Math.sign(dx) : p.at + 6 * Math.sign(dy);
+      const next = Math.abs(dx) > Math.abs(dy) ? p.at + Math.sign(dx) : p.at + MATCH_TUNING.size * Math.sign(dy);
       session.move(p.at, next, token.current);
     }
   };
@@ -173,8 +173,8 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
         <b data-match="story-progress" aria-label={`${chapter.task}: ${progress.collected} из ${progress.required}`}>{progress.collected}<i> / {progress.required}</i></b>
       </div>
       <div className="match-board-frame">
-        <div className={`match-board match-board--${frame?.kind || 'idle'}`} role="group" aria-label="Игровое поле 6 на 6" aria-describedby={instructions} onPointerDown={down} onPointerUp={up} onPointerCancel={() => { pointer.current = null; }} onLostPointerCapture={() => { pointer.current = null; }}>
-          <div className="match-sockets" aria-hidden="true">{Array.from({ length: 36 }, (_, i) => <span key={i} className={(rowOf(i) + colOf(i)) % 2 ? 'is-alternate' : ''} />)}</div>
+        <div className={`match-board match-board--${frame?.kind || 'idle'}`} role="group" aria-label={`Игровое поле ${MATCH_TUNING.size} на ${MATCH_TUNING.size}`} aria-describedby={instructions} onPointerDown={down} onPointerUp={up} onPointerCancel={() => { pointer.current = null; }} onLostPointerCapture={() => { pointer.current = null; }}>
+          <div className="match-sockets" aria-hidden="true">{Array.from({ length: MATCH_TUNING.size ** 2 }, (_, i) => <span key={i} className={(rowOf(i) + colOf(i)) % 2 ? 'is-alternate' : ''} />)}</div>
           {game.board.map((tile, at) => {
             const row = frame?.kind === 'drop-start' ? (frame.from[tile.id] ?? rowOf(at)) : rowOf(at);
             return <button type="button" key={tile.id} data-cell={at} data-type={tile.type} data-power={tile.power || ''}
@@ -186,11 +186,12 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
               <Piece type={tile.type} power={tile.power} />
             </button>;
           })}
+          <div className="match-covers" aria-hidden="true">{[...game.covers, ...(frame?.kind === 'clear' ? frame.reveals : [])].map(at => <i key={at} className={`match-cover${frame?.kind === 'clear' && frame.reveals.includes(at) ? ' is-revealing' : ''}`} style={{ left: `${colOf(at) / MATCH_TUNING.size * 100}%`, top: `${rowOf(at) / MATCH_TUNING.size * 100}%` }}><span>?</span></i>)}</div>
           {frame?.kind === 'clear' && <div className="match-fx" key={serial} aria-hidden="true">
-            {frame.cells.map(at => <i key={`ring-${at}`} className="match-burst-ring" style={{ left: `${(colOf(at) + .5) / 6 * 100}%`, top: `${(rowOf(at) + .5) / 6 * 100}%`, '--burst-color': PIECES[game.board[at].type].color }} />)}
-            {frame.cells.flatMap(at => [0, 1, 2, 3, 4, 5].map(k => <i key={`${at}-${k}`} className="match-spark" style={{ left: `${(colOf(at) + .5) / 6 * 100}%`, top: `${(rowOf(at) + .5) / 6 * 100}%`, '--dx': `${[31,-31,14,-14,27,-27][k]}px`, '--dy': `${[-28,-24,36,34,8,10][k]}px`, background: PIECES[game.board[at].type].color }} />))}
-            {frame.effects.filter(e => e.power === 'row' || e.power === 'col').map(e => <i key={e.at} className={`match-beam match-beam--${e.power}`} style={e.power === 'row' ? { top: `${(rowOf(e.at) + .5) / 6 * 100}%` } : { left: `${(colOf(e.at) + .5) / 6 * 100}%` }} />)}
-            {frame.effects.filter(e => e.power === 'burst' || e.power === 'color').map(e => <i key={`power-${e.at}`} className="match-power-wave" style={{ left: `${(colOf(e.at) + .5) / 6 * 100}%`, top: `${(rowOf(e.at) + .5) / 6 * 100}%` }} />)}
+            {frame.cells.map(at => <i key={`ring-${at}`} className="match-burst-ring" style={{ left: `${(colOf(at) + .5) / MATCH_TUNING.size * 100}%`, top: `${(rowOf(at) + .5) / MATCH_TUNING.size * 100}%`, '--burst-color': PIECES[game.board[at].type].color }} />)}
+            {frame.cells.flatMap(at => [0, 1, 2, 3, 4, 5].map(k => <i key={`${at}-${k}`} className="match-spark" style={{ left: `${(colOf(at) + .5) / MATCH_TUNING.size * 100}%`, top: `${(rowOf(at) + .5) / MATCH_TUNING.size * 100}%`, '--dx': `${[25,-25,12,-12,22,-22][k]}px`, '--dy': `${[-23,-20,28,27,6,8][k]}px`, background: PIECES[game.board[at].type].color }} />))}
+            {frame.effects.filter(e => e.power === 'row' || e.power === 'col').map(e => <i key={e.at} className={`match-beam match-beam--${e.power}`} style={e.power === 'row' ? { top: `${(rowOf(e.at) + .5) / MATCH_TUNING.size * 100}%` } : { left: `${(colOf(e.at) + .5) / MATCH_TUNING.size * 100}%` }} />)}
+            {frame.effects.filter(e => e.power === 'burst' || e.power === 'color').map(e => <i key={`power-${e.at}`} className="match-power-wave" style={{ left: `${(colOf(e.at) + .5) / MATCH_TUNING.size * 100}%`, top: `${(rowOf(e.at) + .5) / MATCH_TUNING.size * 100}%` }} />)}
           </div>}
         </div>
         {frame?.kind === 'clear' && active && <div className="match-combo" key={serial} aria-hidden="true"><strong>{frame.combo > 1 ? `Каскад ×${frame.combo}` : frame.effects.length ? 'ЗАРЯД!' : frame.creations.length ? 'Суперзаряд!' : 'Попадание!'}</strong><span>+{frame.points}</span></div>}
@@ -222,7 +223,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <button className="match-primary" ref={primary} onClick={() => { setHelp(false); if (mode === 'paused') resume(); }}>Понятно</button>
         </> : mode === 'ready' ? <>
           <div className="match-story-intro"><div className="match-story-portrait" aria-hidden="true" /><div><span>{chapter.place}</span><h3 id={title}>{chapter.title}</h3><p>{chapter.intro}</p></div></div>
-          <div className="match-mission match-mission--story"><span>12 ходов</span><span>{number(game.target)} очков</span><span><Piece type={chapter.type} /> ×{progress.required}</span></div>
+          <div className="match-mission match-mission--story"><span>{game.moves} {movesLabel(game.moves)}</span><span>{number(game.target)} очков</span><span><Piece type={chapter.type} /> ×{progress.required}</span></div>
           <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={() => start(1)}>{assets === 'ready' ? 'Играть' : 'Готовим поле…'}</button>
           <button className="match-secondary" onClick={openHelp}>Как играть</button>
         </> : mode === 'paused' ? <>

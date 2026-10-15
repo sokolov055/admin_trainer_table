@@ -1,4 +1,4 @@
-import { createMatchGame, legalMoves, resolveMove, earnedStars } from './match-model.js';
+import { MATCH_TUNING, createMatchGame, legalMoves, resolveMove, earnedStars } from './match-model.js';
 import { chapterFor, chapterComplete } from './match-story.js';
 
 // Одна очередь анимации на кабинет. Смена сцены и пауза сохраняют её позицию.
@@ -88,7 +88,7 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
       if (!allowed(token) || snapshot.busy) return;
       const selected = snapshot.selected;
       if (selected === index) { emit({ selected: null }); return; }
-      if (selected != null && Math.abs(Math.floor(selected / 6) - Math.floor(index / 6)) + Math.abs(selected % 6 - index % 6) === 1) move(selected, index, token);
+    if (selected != null && Math.abs(Math.floor(selected / MATCH_TUNING.size) - Math.floor(index / MATCH_TUNING.size)) + Math.abs(selected % MATCH_TUNING.size - index % MATCH_TUNING.size) === 1) move(selected, index, token);
       else emit({ selected: index, hint: null });
     },
     hint(token) {
