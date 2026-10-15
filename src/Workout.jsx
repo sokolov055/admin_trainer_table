@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync, createPortal } from 'react-dom';
-import { apiPublic, apiMutate } from './api.js';
+import { apiFresh, apiPublic, apiMutate } from './api.js';
+import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWorkout, settleClosed } from './workout-outbox.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
@@ -144,8 +145,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       if (mounted.current) setStorageError(false);
     } catch (_) { if (mounted.current) setStorageError(true); }
   };
+  // Список — с сервера, без связи — последний полученный и очередь
+  // телефона (FT-566, workout-outbox.js)
   const list = async () => {
-    const result = await apiPublic('workout.list', params);
+    const result = await journalList(clientRow);
     if (mounted.current) setHistory(result.sessions);
     return result.sessions;
   };
@@ -165,10 +168,36 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const open = async id => {
     setBusy(true); setMessage('');
     try {
-      const result = await apiPublic('workout.get', { ...params, id });
+      // Занятие из очереди телефона (ещё не на сервере) — обратно в
+      // черновик: дальше его сохраняет журнал обычным путём, с проверкой
+      // версии и выбором при конфликте (FT-566)
+      const local = await peekLocalWorkout(clientRow, id);
+      if (local) {
+        store(local);
+        let kept = null;
+        try { kept = localStorage.getItem(key.current); } catch (_) {}
+        if (kept) await dropLocalWorkout(clientRow, id);
+        return;
+      }
+      const result = await journalGet(clientRow, id);
       store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: Date.now() });
     } catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
+  };
+  /**
+   * Закрытое, но не отправленное занятие — в очередь телефона, черновик —
+   * свободен (FT-566). Раньше оно держало черновик, пока не уйдёт на сервер,
+   * и без связи следующую тренировку было не начать. Не вышло записать в
+   * очередь — false: черновик остаётся, человеку говорим, что не так.
+   */
+  const park = async record => {
+    try {
+      await enqueueWorkout(clientRow, record);
+      return true;
+    } catch (e) {
+      setMessage('Не удалось сохранить занятие на телефоне: ' + e.message + ' Черновик остаётся — не закрывайте его, пока не появится связь.');
+      return false;
+    }
   };
   const freshRecord = session => ({ session, revision: 0, dirty: true, tick: Date.now(), edit: 1 });
 
@@ -180,6 +209,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       let draft = null;
       try { draft = JSON.parse(localStorage.getItem(key.current)); } catch (_) { setStorageError(true); }
       if (!alive) return;
+      // Начинают новую тренировку, а в черновике — закрытое, но не
+      // отправленное: оно уходит в очередь телефона и отправится само, а
+      // экран свободен (FT-566). Сервер для этого не нужен — без связи
+      // так же
+      if (launch && launch.block && draft && draft.session && ['completed', 'cancelled'].includes(draft.session.status)
+        && (draft.dirty || draft.pending) && await park(draft)) {
+        if (!alive) return;
+        draft = null;
+        try { localStorage.removeItem(key.current); } catch (_) {}
+      }
       if (draft && draft.session) store(draft);
       try {
         // Начинают тренировку из программы — журнал не ждём дольше 6 с: без
@@ -238,7 +277,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         }
       } finally { if (alive) setReady(true); }
     })();
-    return () => { alive = false; mounted.current = false; };
+    return () => {
+      alive = false; mounted.current = false;
+      // Экран закрыли — закрытое неотправленное занятие уходит в очередь
+      // телефона и отправляется, как только будет связь (FT-566)
+      settleClosed(clientRow);
+    };
   }, []);
 
   const change = transform => {
@@ -848,7 +892,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         return;
       }
     }
-    change(v => ({ ...v, status: kind === 'complete' ? 'completed' : 'cancelled', restUntil: 0, exercises: closeSets(v.exercises) }));
+    // finishedAt — когда завершили на самом деле: без сети занятие дойдёт
+    // до сервера позже, и время отправки его бы сдвинуло (FT-566)
+    change(v => ({ ...v, status: kind === 'complete' ? 'completed' : 'cancelled', restUntil: 0, finishedAt: new Date().toISOString(), exercises: closeSets(v.exercises) }));
     setConfirm('');
     save();
   };
@@ -1538,8 +1584,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   useEffect(() => {
     if (!setupIds) return undefined;
     let alive = true;
-    apiPublic('exercise.setup', { ...params, ids: setupIds })
-      .then(r => { if (alive && r && r.setups) { setSetups(r.setups); setNotes(r.notes || {}); setNotesBy(r.notesBy || {}); } })
+    // Без связи — сохранённые (offline-prefetch.js запасает их по программе)
+    apiFresh('exercise.setup', { ...params, ids: setupIds })
+      .then(({ data: r }) => { if (alive && r && r.setups) { setSetups(r.setups); setNotes(r.notes || {}); setNotesBy(r.notesBy || {}); } })
       .catch(() => {});
     return () => { alive = false; };
   }, [setupIds, setupsTick]);
@@ -1913,7 +1960,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, newExercise(s)] }))}>Добавить упражнение</button>
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>
-      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={record.dirty || busy} onClick={() => { store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}
+      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}
       {/* «Сохранить сейчас» и «Скачать результат» убраны (03.10.2026):
           сохраняется само. Не сохранилось — «Повторить» в сообщении об
           ошибке вверху; конфликт версий — «Скачать мой черновик» там же */}

@@ -99,14 +99,28 @@ export function Empty({ icon, title, text, action }) {
  */
 export function SignOut() {
   const [busy, setBusy] = useState(false);
+  // Неотправленные тренировки (FT-566): сколько — и выходить ли всё равно
+  const [unsent, setUnsent] = useState(0);
 
   if (!hasToken()) return null;
 
-  const run = async () => {
+  const run = async (anyway = false) => {
     setBusy(true);
+    // Тренировки, проведённые без сети, живут только на телефоне. Сначала
+    // пробуем отправить; не ушли — спрашиваем: выход стирает их с телефона
+    // (чужому человеку на этом устройстве они не должны достаться)
+    const outbox = await import('./workout-outbox.js').catch(() => null);
+    if (outbox && !anyway) {
+      await outbox.flushOutbox().catch(() => {});
+      const left = await outbox.pendingWorkouts().catch(() => 0);
+      if (left) { setUnsent(left); setBusy(false); return; }
+    }
     // Фоновая отправка шагов (Android) не должна пережить выход: её ключ
     // гасим первым, пока есть связь (native-sync.js)
     await stopBackgroundSync().catch(() => {});
+    if (outbox) await outbox.forgetOfflineAccount().catch(() => {});
+    await import('./offline-media.js').then((m) => m.forgetVideos()).catch(() => {});
+    await import('./offline-account.js').then((m) => m.setOfflineAccount(null)).catch(() => {});
     // Сбрасывать busy не нужно: сразу после выхода экран сменится целиком
     logout();
   };
@@ -116,7 +130,7 @@ export function SignOut() {
       <Panel pad>
         <div className="setting">
           <div className="setting__label">{describeDevice()}</div>
-          <button className="button" onClick={run} disabled={busy}>
+          <button className="button" onClick={() => run(false)} disabled={busy}>
             <IconExit size={16} />
             {busy ? 'Выходим…' : 'Выйти'}
           </button>
@@ -124,6 +138,19 @@ export function SignOut() {
             Приложение закроется на этом устройстве. Чтобы вернуться,
             войдите снова — по почте или по ссылке тренера.
           </div>
+          {unsent > 0 && (
+            <div className="setting__note" role="alert">
+              <strong>
+                {unsent === 1 ? 'Одна тренировка ещё не отправлена' : 'Тренировок не отправлено: ' + unsent}
+              </strong>{' '}
+              — нет связи с сервером. После выхода они удалятся с телефона.
+              Лучше дождаться связи: тогда они отправятся сами.
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <button className="button" onClick={() => setUnsent(0)} disabled={busy}>Не выходить</button>
+                <button className="button button--critical" onClick={() => run(true)} disabled={busy}>Выйти и удалить</button>
+              </div>
+            </div>
+          )}
         </div>
       </Panel>
     </Section>

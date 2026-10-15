@@ -410,7 +410,9 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
       // Ни одного сделанного подхода — занятия не было: отмена, как в приложении
       const any = s.exercises.some((ex) => ex.sets.some((set) => set.state === 'done'));
       // Неотмеченные — пропущены с пометкой closed: «Продолжить» вернёт их
-      s = { ...s, status: any ? 'completed' : 'cancelled', restUntil: 0, exercises: closeSets(s.exercises) };
+      // finishedAt — когда завершили на самом деле: без сети занятие дойдёт
+      // до сервера позже, и время отправки его бы сдвинуло (FT-566)
+      s = { ...s, status: any ? 'completed' : 'cancelled', restUntil: 0, finishedAt: new Date().toISOString(), exercises: closeSets(s.exercises) };
     }
   }
   return s;

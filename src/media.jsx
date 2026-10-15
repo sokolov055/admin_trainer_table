@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { haptic } from './telegram.js';
 import { apiMutate } from './api.js';
 import { mediaUrl } from './library.js';
+import { useVideoSrc } from './offline-media.js';
 
 /**
  * Видео и анимация техники упражнения.
@@ -58,15 +59,19 @@ export function Animation({ id }) {
 export function Media({ media }) {
   if (!media) return null;
   if (media.kind === 'animation') return <Animation id={media.url} />;
-  if (media.kind === 'file') {
-    return <video className="library__video" src={mediaUrl(media.url)} controls playsInline preload="metadata" />;
-  }
+  if (media.kind === 'file') return <FileVideo url={media.url} />;
   // Чужой плеер (YouTube и др.) не встраиваем (14.10.2026): он грузится сам
   // при открытии карточки и передаёт адрес клиента за рубеж без его действия.
   // Ссылка открывается только по нажатию — как переход на любой сайт.
   return <a className="button button--block" href={media.url} target="_blank" rel="noreferrer">Открыть видео</a>;
 }
 
+
+/** Видео-файл с сервера; скачанное заранее — с телефона, без сети тоже (FT-566) */
+function FileVideo({ url }) {
+  const src = useVideoSrc(url, mediaUrl(url));
+  return <video className="library__video" src={src} controls playsInline preload="metadata" />;
+}
 
 /**
  * «Как настроить тренажёр» — короткая инструкция к упражнению (01.10.2026).

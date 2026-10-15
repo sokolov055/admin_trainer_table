@@ -2,7 +2,8 @@ import { useReturnScroll } from '../scroll.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
-import { apiBatch, apiMutate, apiPublic } from '../api.js';
+import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
+import { journalList, onOutboxChange, justSynced, localWorkouts, withLocalWeights } from '../workout-outbox.js';
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
@@ -401,16 +402,23 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // ждёт: программа рисуется сразу, строка про занятие появляется, когда
   // придёт ответ. Перечитываем после выхода из журнала — там занятие
   // могли завершить или отменить.
+  // Без связи (FT-566) — последний полученный список и занятия, ещё не
+  // отправленные с телефона: они сразу во «Выполненных» и считаются
+  // проведёнными в программе
+  const [journalOffline, setJournalOffline] = useState(false);
   useEffect(() => {
     let alive = true;
-    apiPublic('workout.list', { ...(clientRow ? { clientRow } : {}), ...(familyRow ? { familyRow } : {}) })
+    journalList(clientRow, familyRow ? { familyRow } : {})
       .then((r) => {
         if (!alive) return;
-        setSessions((r && r.sessions) || []);
+        setSessions(r.sessions);
+        setJournalOffline(r.offline);
       })
       .catch(() => { if (alive) setSessions([]); });
     return () => { alive = false; };
   }, [clientRow, workout, familyRow, journalTick]);
+  // Очередь телефона ушла на сервер или пополнилась — перечитать список
+  useEffect(() => onOutboxChange(() => setJournalTick((t) => t + 1)), []);
 
   // Выход из журнала — перечитать и программу: тренер мог переименовать
   // занятие, и тренировка в программе переименовалась вместе с ним
@@ -484,6 +492,14 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     .filter((s) => s.status === 'completed' && inMonthLabel(s.startedAt || s.updatedAt, doneLabel))
     .sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
   const freeWorkout = () => openWorkout({ block: FREE_BLOCK, month: '' });
+  // «Было» — с учётом занятий, ещё не дошедших до сервера (FT-566): без
+  // связи вторая подряд тренировка подсказывала бы вес двухнедельной давности
+  const startBlock = async (block) => {
+    const local = familyRow ? [] : await localWorkouts(clientRow).catch(() => []);
+    openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [] });
+  };
+  // Нет связи — честно: что на экране и от какого числа
+  const savedAt = journalOffline ? apiStoredAt('client.plan', params) : 0;
 
   // Переименовать тренировку — тапом по названию (02.10.2026), без
   // редактора программы. Сохраняется тем же снимком месяца, что и редактор:
@@ -639,6 +655,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {/* Журнал тренировок — в боковом меню (решение владельца 28.09.2026:
           один журнал, а не два). Здесь — только незакрытое занятие: это
           первое, что человек должен узнать на этом экране. */}
+      {journalOffline && (
+        <p className="small muted plan__offline" role="status">
+          Нет связи. Программа и занятия — сохранённые на телефоне{savedAt ? ', обновлены ' + formatDate(new Date(savedAt).toISOString()) : ''}.
+          {' '}Тренировку можно провести: результат сохранится здесь и уйдёт на сервер, когда появится связь.
+        </p>
+      )}
       {runningLine}
       {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="plan" />}
 
@@ -945,7 +967,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 {!familyRow && <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>}
               </div>
             )}
-            {!running && !familyRow && <button className="button button--primary button--block" data-first-action={clientRow || clientView ? undefined : 'workout'} onClick={() => openWorkout({ block, month: data.month, members: data.members || [] })}>Начать тренировку</button>}
+            {!running && !familyRow && <button className="button button--primary button--block" data-first-action={clientRow || clientView ? undefined : 'workout'} onClick={() => startBlock(block)}>Начать тренировку</button>}
             <button
               type="button"
               className="plan__toggle"
@@ -1176,6 +1198,7 @@ function DoneSession({ session: s, canOpen, onRename, onOpen }) {
           <div>
             <strong>{s.month ? 'Тренировка проведена' : 'Свободная тренировка'}</strong>
             <span>{s.done ? s.done + ' ' + plural(s.done, 'подход', 'подхода', 'подходов') : 'без отмеченных подходов'}</span>
+            <SyncMark session={s} />
           </div>
           {canOpen && <button className="button" onClick={onOpen}>Посмотреть веса</button>}
         </div>
@@ -1211,6 +1234,18 @@ function DoneSession({ session: s, canOpen, onRename, onOpen }) {
       </Panel>
     </Section>
   );
+}
+
+/**
+ * Где занятие (FT-566): ещё только на телефоне, не принято сервером или
+ * только что ушло. Обычное занятие с сервера — без пометки.
+ */
+function SyncMark({ session: s }) {
+  if (s.local === 'conflict') return <span className="plan__sync plan__sync--problem">Не отправлено: занятие изменили на другом устройстве. Откройте, чтобы выбрать версию.</span>;
+  if (s.local === 'error') return <span className="plan__sync plan__sync--problem">Не отправлено: {s.localError || 'сервер не принял занятие'}. Откройте, чтобы исправить.</span>;
+  if (s.local) return <span className="plan__sync">Сохранено на телефоне · отправится, когда появится связь</span>;
+  if (justSynced(s.id)) return <span className="plan__sync plan__sync--done">Синхронизировано</span>;
+  return null;
 }
 
 /** «Октябрь 2026» — название следующего месяца */

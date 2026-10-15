@@ -897,6 +897,7 @@ const MOCK = {
     role: params.__role === 'trainer' ? 'trainer' : 'client',
     name: params.__role === 'trainer' ? 'Константин' : 'Анна Морозова',
     chatId: '11111',
+    accountId: params.__role === 'trainer' ? 'demo-trainer' : 'demo-client',
     tgName: 'Demo',
     tgUsername: 'demo',
     photoUrl: '',
@@ -1862,6 +1863,14 @@ export function mockApi(action, params) {
     // Небольшая задержка — чтобы скелетоны и состояния загрузки были видны
     // при разработке, а не проскакивали мгновенно.
     setTimeout(() => {
+      // Демо без связи (FT-566): браузерная проверка работы без сети
+      // выключает «сервер» так — как будто он не ответил вовсе (код 0)
+      let offline = false;
+      try { offline = localStorage.getItem('demo_offline') === '1'; } catch (_) {}
+      if (offline) {
+        reject(Object.assign(new Error('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.'), { code: 0 }));
+        return;
+      }
       if (!handler) {
         reject(Object.assign(new Error('Нет демо-данных для ' + action), { code: 404 }));
         return;

@@ -215,7 +215,9 @@ export function closeSets(exercises) {
  */
 export function reopenSession(session) {
   const marked = session.exercises.some(e => e.sets.some(x => x.closed));
-  return { ...session, status: 'active', restUntil: 0,
+  // finishedAt — время завершения с телефона (FT-566): снова идёт — его нет
+  const { finishedAt, ...open } = session;
+  return { ...open, status: 'active', restUntil: 0,
     exercises: session.exercises.map(e => ({ ...e, sets: e.sets.map(({ closed, ...x }) => (
       x.state === 'skipped' && (closed || !marked) ? { ...x, state: 'pending' } : x)) })) };
 }
