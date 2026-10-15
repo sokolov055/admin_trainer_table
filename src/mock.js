@@ -18,6 +18,7 @@
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
 import { onboardingMock, firstStepsMock, focusMock } from './onboarding-mock.js';
+import { isoDay } from './online.js';
 
 const daysAgo = (n) => {
   const d = new Date();
@@ -169,7 +170,20 @@ const CLIENTS = [
   { row: 5, name: 'Дмитрий Соколов', price: 2500, count: 12, balance: 7500, trainings: 9, revenue: 22500, payer: '', template: 'REPEAT_LAST_MONTH', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '❌ 02.08.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(1), nextTrainingDate: daysAhead(1, '08:30'), startDate: daysAgo(700), birthDate: null, chatId: '33333', clientKey: 'dmitry', hasLink: true },
   { row: 6, name: 'Мария Волкова', price: 3000, count: 10, balance: 0, trainings: 0, revenue: 0, payer: '', template: '', monthStatus: '', lastMeasureStatus: '', monthSheetStatus: '❌ нет "Сентябрь 2026"', lastTrainingDate: daysAgo(38), startDate: daysAgo(120), birthDate: null, chatId: '', clientKey: 'maria', hasLink: false },
   { row: 7, name: 'Игорь Лебедев', price: 3500, count: 8, balance: 14000, trainings: 7, revenue: 24500, payer: '', template: 'P02 — Сила', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 11.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(3), startDate: daysAgo(310), birthDate: null, chatId: '44444', clientKey: 'igor', hasLink: true },
+  // Онлайн-ведение (FT-530): занятий с тренером нет, оплачен месяц
+  { row: 8, name: 'Ксения Орлова', price: 6000, count: 0, balance: 0, trainings: 0, revenue: 6000, payer: '', template: '', monthStatus: '', lastMeasureStatus: '✅ 05.10.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: null, startDate: daysAgo(40), birthDate: null, chatId: '88888', clientKey: 'ksenia', hasLink: false, online: true, onlineUntil: isoDay(new Date(Date.now() + 20 * 86400000)) },
 ];
+
+// Онлайн-ведение (FT-530): у онлайн-клиента в обзоре срок вместо пакета
+function onlineOverview(params, base) {
+  const c = CLIENTS.find((x) => x.row === Number(params.clientRow));
+  if (!c || !c.online) return base;
+  return {
+    ...base, row: c.row, name: c.name, balance: c.balance, price: c.price,
+    trainingsLeft: null, trainingsThisMonth: 0, lastTrainingDate: null, nextTrainingDate: null,
+    packageEnding: { known: false }, online: { until: c.onlineUntil || null },
+  };
+}
 
 // Демо-ссылки входа: карточка → «Пригласить в приложение»
 let accessLinks = {};
@@ -984,7 +998,7 @@ const MOCK = {
   },
   'trainer.link.url': () => ({ token: 'Vx3kP9qLm2Rt8YwZ4nB7cJ5h', pending: [{ publicId: 'FT-7K2QM4', createdAt: daysAgo(0) }] }),
 
-  'client.overview': () => ({
+  'client.overview': (params = {}) => onlineOverview(params, {
     unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',
     name: 'Анна Морозова',
     row: 3,
@@ -1404,6 +1418,8 @@ const MOCK = {
     const client = CLIENTS.find(c => c.row === Number(params.clientRow));
     if (!client) throw new Error('Клиент не найден');
     if (typeof params.test === 'boolean') client.test = params.test;
+    if (typeof params.online === 'boolean') client.online = params.online;
+    if (params.onlineUntil !== undefined) client.onlineUntil = params.onlineUntil || null;
     return { ok: true };
   },
 

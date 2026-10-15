@@ -28,6 +28,7 @@ import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
 import { uid } from '../workout-model.js';
 import { trainerOverview } from './trainer-overview.js';
 import { GoalBanner } from './focus.jsx';
+import { onlineDaysLeft, onlineDay } from '../online.js';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
@@ -172,10 +173,25 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
   const leadMoney = payer ? payer.balance : data.balance;
   const leadLeft = payer ? payer.trainingsLeft : data.trainingsLeft;
   const leadIsTrainings = leadLeft !== null && leadLeft !== undefined && leadMoney > 0;
+  // Онлайн-ведение (FT-530): занятий с тренером нет — вместо пакета срок
+  const online = data.online || null;
+  const onlineLeft = online ? onlineDaysLeft(online.until) : null;
 
   return (
     <>
       {clientRow && !clientView && <GoalBanner clientRow={clientRow} section="overview" />}
+      {online ? (
+        <Lead
+          label={onlineLeft !== null && onlineLeft >= 0 ? 'Онлайн-ведение оплачено' : 'Онлайн-ведение'}
+          value={onlineLeft === null ? 'Срок не указан' : onlineLeft < 0 ? 'Срок истёк' : 'по ' + onlineDay(online.until)}
+          tone={onlineLeft !== null && onlineLeft < 0 ? 'critical' : onlineLeft !== null ? 'good' : undefined}
+          hint={
+            onlineLeft !== null && onlineLeft < 0
+              ? 'Закончился ' + onlineDay(online.until) + ' · ' + (clientRow && !clientView ? 'напомните клиенту об оплате' : 'напишите тренеру, чтобы продлить')
+              : (clientRow && !clientView ? 'Клиент сам строит график' : 'График строите сами, тренер на связи в мессенджере')
+          }
+        />
+      ) : (
       <Lead
         label={leadIsTrainings ? 'Оплачено вперёд' : 'Баланс'}
         value={
@@ -213,6 +229,7 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
         ]}
       />
+      )}
 
       {/* Конец пакета. Стоит сразу под главной цифрой, потому что это
           единственная новость, требующая действия СЕГОДНЯ: «осталось 2»
@@ -220,7 +237,7 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           пришёл заниматься. */}
       <PackageEnding state={data.packageEnding} payer={data.payer} trainer={!!clientRow && !clientView} />
 
-      {sinceTraining !== null && sinceTraining > 14 && (
+      {!online && sinceTraining !== null && sinceTraining > 14 && (
         <Section>
           <Panel pad>
             <div className="warn">
@@ -245,13 +262,16 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
             <Row label="Последний замер">
               <StatusBadge value={data.lastMeasureStatus} fallback="не было" />
             </Row>
-            <Row label="Следующая тренировка">
-              {data.nextTrainingDate
-                ? formatDate(data.nextTrainingDate) + ', ' + formatTime(data.nextTrainingDate)
-                : data.scheduleKnown !== true
-                  ? 'расписание временно недоступно'
-                  : 'не назначена'}
-            </Row>
+            {/* Онлайн (FT-530): занятий с тренером нет — и ждать нечего */}
+            {!online && (
+              <Row label="Следующая тренировка">
+                {data.nextTrainingDate
+                  ? formatDate(data.nextTrainingDate) + ', ' + formatTime(data.nextTrainingDate)
+                  : data.scheduleKnown !== true
+                    ? 'расписание временно недоступно'
+                    : 'не назначена'}
+              </Row>
+            )}
             {data.lastTrainingDate && (
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>
             )}

@@ -16,6 +16,7 @@ import PushSetting from '../PushSetting.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
+import { onlineDaysLeft, onlineLabel, addOnlineMonth } from '../online.js';
 
 /* ==================================================================
  * Клиенты
@@ -56,6 +57,9 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   const tests = data.clients.filter((c) => c.test && !c.pairHidden);
 
   const needsAttention = clients.filter((c) => {
+    // Онлайн-клиент (FT-530) с тренером не занимается — «давно не был» не
+    // про него; внимания требует истёкший срок ведения
+    if (c.online) return c.balance < 0 || onlineDaysLeft(c.onlineUntil) < 0;
     const days = daysSince(c.lastTrainingDate);
     return c.balance < 0 || days === null || days > s.staleDays;
   });
@@ -68,12 +72,15 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
   // Сплиты — пары, которые тренируются вместе по одной программе: участники
   // отдельными карточками (splitOf) и пары, ещё не разделённые на карточки
   const splits = clients.filter((c) => c.splitOf || (c.members && c.members.length > 1));
+  // Онлайн-ведение (FT-530): фильтром, а не отдельной вкладкой (решение владельца)
+  const online = clients.filter((c) => c.online);
 
   const filters = [
     // Было «Ближайшие» — обещало больше, чем показывает (FT-567)
     { value: 'next', label: `Сегодня · ${upcoming.length}` },
     { value: 'all', label: `Все · ${clients.length}` },
     { value: 'splits', label: `Сплиты · ${splits.length}` },
+    { value: 'online', label: `Онлайн · ${online.length}` },
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
     { value: 'debt', label: `Долг · ${s.negativeBalance}` },
     { value: 'nomeasure', label: 'Без замера' },
@@ -85,6 +92,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
 
     if (filter === 'next') return upcoming.indexOf(c) !== -1;
     if (filter === 'splits') return splits.indexOf(c) !== -1;
+    if (filter === 'online') return !!c.online;
     if (filter === 'attention') return needsAttention.indexOf(c) !== -1;
     if (filter === 'debt') return c.balance < 0;
     if (filter === 'nomeasure') return String(c.lastMeasureStatus || '').indexOf('✅') !== 0;
@@ -184,8 +192,11 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
           // вдобавок путалось с листом «Пропащие» — а туда клиент попадает
           // только вручную и означает это совсем другое.
           const days = daysSince(c.lastTrainingDate);
-          const noData = days === null;
-          const isStale = !noData && days > s.staleDays;
+          // Онлайн (FT-530): занятий с тренером нет — ни «нет данных»,
+          // ни «не был N дней»; вместо них срок ведения
+          const noData = days === null && !c.online;
+          const isStale = !noData && !c.online && days > s.staleDays;
+          const onlineLeft = c.online ? onlineDaysLeft(c.onlineUntil) : null;
           // Сплит: деньги пары — у плательщика; у остальных — кто платит
           const money = c.splitOf ? c.splitBalance : c.balance;
 
@@ -209,12 +220,20 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
                 )}
               </div>
               <div className="item__meta">
-                <span>
-                  {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')} за месяц
-                </span>
-                <span>
-                  {c.lastTrainingDate ? relativeDays(c.lastTrainingDate) : 'тренировок не было'}
-                </span>
+                {c.online ? (
+                  onlineLeft !== null && onlineLeft < 0
+                    ? <Badge kind="warn">онлайн · {onlineLabel(c.onlineUntil)}</Badge>
+                    : <span>онлайн · {onlineLabel(c.onlineUntil)}</span>
+                ) : (
+                  <>
+                    <span>
+                      {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')} за месяц
+                    </span>
+                    <span>
+                      {c.lastTrainingDate ? relativeDays(c.lastTrainingDate) : 'тренировок не было'}
+                    </span>
+                  </>
+                )}
 
                 {/* Когда следующая — не значок состояния, а обычный факт,
                     поэтому обычной строкой. Значком он спорил бы за
@@ -771,7 +790,8 @@ export function ClientCard({ client, onPreview }) {
                 Баланс {formatMoney(client.balance)}
               </Badge>
             )}
-            <Badge>{formatMoney(client.price)} за тренировку</Badge>
+            {/* Онлайн-ведение (FT-530) оплачивается месяцем */}
+            <Badge>{formatMoney(client.price)} {client.online ? 'в месяц' : 'за тренировку'}</Badge>
             {client.payer && <Badge>платит {client.payer}</Badge>}
           </>
         )}
@@ -804,6 +824,7 @@ export function ClientCard({ client, onPreview }) {
 
       <ClientContacts clientRow={client.row} />
 
+      <OnlineFlag client={client} />
       <TestFlag client={client} />
       <ClientEdit client={client} />
 
@@ -991,6 +1012,72 @@ function ClientEdit({ client }) {
           Отмена
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Онлайн-ведение (FT-530, 15.10.2026). Клиент сам строит график, занятий
+ * с тренером нет — оплачен месяц ведения. Перевести можно туда и обратно;
+ * «+ месяц» продлевает от конца срока (или от сегодня, если он прошёл).
+ * Сохраняется сразу, как «Тестовый клиент».
+ */
+function OnlineFlag({ client }) {
+  const [on, setOn] = useState(!!client.online);
+  const [until, setUntil] = useState(client.onlineUntil || '');
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState('');
+
+  const save = async (patch, undo) => {
+    setBusy(true);
+    setFailure('');
+    try {
+      await apiMutate('trainer.client.update', { clientRow: client.row, ...patch });
+    } catch (error) {
+      undo();
+      setFailure(error.message || 'Не получилось сохранить');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = (value) => {
+    const was = on;
+    setOn(value);
+    save({ online: value }, () => setOn(was));
+  };
+
+  const setDay = (value) => {
+    const was = until;
+    setUntil(value);
+    save({ onlineUntil: value }, () => setUntil(was));
+  };
+
+  const left = onlineDaysLeft(until);
+
+  return (
+    <div className="client-online" style={{ marginTop: 12 }}>
+      <label className="library__check">
+        <input type="checkbox" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+        <span>Онлайн-ведение</span>
+      </label>
+      <div className="small muted">
+        Сам строит график, оплачен месяц ведения. В списке — фильтр «Онлайн».
+      </div>
+      {on && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Field label="Оплачено по" type="date" value={until} onChange={setDay} disabled={busy} />
+          </div>
+          <button type="button" className="button" disabled={busy} onClick={() => { haptic(); setDay(addOnlineMonth(until)); }}>
+            + месяц
+          </button>
+        </div>
+      )}
+      {on && left !== null && left < 0 && (
+        <Note tone="warn" icon={IconAlert}>Срок ведения истёк — {onlineLabel(until).replace('срок истёк ', '')}.</Note>
+      )}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
     </div>
   );
 }
