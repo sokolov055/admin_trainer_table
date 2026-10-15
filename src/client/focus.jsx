@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiPublic, onMutated } from '../api.js';
+import { apiFresh, onMutated } from '../api.js';
 import { formatNumber } from '../ui.jsx';
 import Art from './OnboardingArt.jsx';
 import { timesWeek } from './onboarding-model.js';
@@ -56,7 +56,9 @@ export const FOCUS = {
 const cache = new Map();
 function load(key, clientRow, force = false) {
   if (!force && cache.has(key)) return cache.get(key);
-  const p = apiPublic('client.focus', clientRow ? { clientRow } : {}).catch(() => null);
+  // apiFresh, не apiPublic: ответ остаётся на телефоне, и без сети (FT-588)
+  // карточка цели показывается тем, что видели в последний раз
+  const p = apiFresh('client.focus', clientRow ? { clientRow } : {}).then((r) => r.data).catch(() => null);
   cache.set(key, p);
   return p;
 }

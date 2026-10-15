@@ -48,7 +48,7 @@ const output = await build({ entryPoints: ['src/api.js'], bundle: true, write: f
   define: { 'import.meta.env.VITE_MOCK': '"0"', 'import.meta.env.VITE_API_URL': '"https://api.test/"', 'import.meta.env.PROD': 'false', 'import.meta.env.DEV': 'false' } });
 const mod = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0].text + '\n})')(createRequire(import.meta.url), mod, mod.exports);
-const { api, apiMutate, apiBatch } = mod.exports;
+const { api, apiMutate, apiBatch, apiFresh } = mod.exports;
 
 test('после записи и без связи кабинет открывается на последнем известном', async () => {
   const fresh = await api('me', {}, { fresh: true });
@@ -111,4 +111,14 @@ test('«Прогресс» пакетом без связи — из сохра�
   const offline = await apiBatch(reqs);
   assert.equal(offline['client.progress'].ok, true);
   assert.equal(offline['client.measurements'].data.was, 'client.measurements');
+});
+
+test('цель клиента (client.focus) без связи — из сохранённого (FT-588)', async () => {
+  online = true;
+  const seen = await apiFresh('client.focus', {});
+  assert.equal(seen.offline, false);
+  online = false;
+  const offline = await apiFresh('client.focus', {});
+  assert.equal(offline.offline, true, 'без связи — сохранённое, а не ошибка');
+  assert.deepEqual(offline.data, seen.data, 'карточка «Ваша цель» получает те же данные');
 });
