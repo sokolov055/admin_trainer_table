@@ -612,7 +612,7 @@ test('клиент: журнала в меню нет, свободная тре
 test('клиент: «Как пользоваться» открывается из меню', async () => {
   await page.goto(origin);
   await page.getByRole('button', { name: 'Меню' }).click();
-  await page.getByRole('button', { name: /Как пользоваться/ }).click();
+  await page.locator('.menu__item').filter({ hasText: 'Как пользоваться' }).click();
   const viewer = page.locator('.story');
   await assert.doesNotReject(viewer.getByText('Как пользоваться Fit Track').waitFor({ timeout: 10000 }));
   await assert.doesNotReject(viewer.getByRole('heading', { name: 'Вход' }).waitFor({ timeout: 5000 }), 'первый кадр — «Вход»');

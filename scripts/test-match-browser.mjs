@@ -22,7 +22,7 @@ async function setup(t, options = {}) {
   await page.getByRole('button', { name: 'Играть', exact: true }).waitFor();
   await page.waitForFunction(() => !document.querySelector('.match-primary')?.disabled);
   await page.evaluate(() => document.fonts.ready);
-  await page.clock.pauseAt(new Date(Date.now() + 500));
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 500)));
   await page.clock.runFor(300);
   t.after(() => assert.deepEqual(errors, []));
   return page;
@@ -105,6 +105,7 @@ test('три в ряд: отдых имеет приоритет, две сце�
   await page.getByRole('button', { name: 'Продолжить игру', exact: true }).click();
   await move(page, 'greedy', scene); assert.equal((await read(page)).game.moves, saved.moves-1);
   await page.evaluate(() => showMatch({ menu: false, rest: true, until: Date.now()+30000, allowed: false }));
+  await page.locator('.match-game').waitFor({ state: 'detached' });
   assert.equal(await page.locator('.match-game').count(), 0);
   assert.equal(await page.getByRole('button', { name: /Три в ряд|Продолжить три в ряд/ }).count(), 0);
 });
