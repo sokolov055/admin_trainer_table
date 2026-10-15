@@ -317,7 +317,7 @@ test('не тренер на /trainer: после кода — заявка с �
   } finally { await context.close(); }
 });
 
-test('обе игры доступны тестовому клиенту и скрыты без серверного разрешения', async () => {
+test('три игры доступны тестовому клиенту и скрыты без серверного разрешения', async () => {
   try {
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /Тренер в планке/ }).click();
@@ -336,6 +336,18 @@ test('обе игры доступны тестовому клиенту и ск
   await page.screenshot({ path: join(ROOT, 'reports/scooter/app-playing.png'), fullPage: true });
   await page.getByRole('button', { name: 'Закрыть игру', exact: true }).click();
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /Три в ряд/ }).click();
+  await page.getByRole('button', { name: 'Играть', exact: true }).click();
+  await page.getByRole('button', { name: 'Подсказка', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.match-tile.is-hint').length === 2);
+  const cells = await page.locator('.match-tile.is-hint').evaluateAll(els => els.map(el => el.dataset.cell));
+  for (const at of cells) await page.locator(`[data-cell="${at}"]`).click();
+  await page.waitForFunction(() => document.querySelector('.match-game')?.dataset.busy === 'false');
+  assert.equal(await page.locator('[data-match=moves]').innerText(), '11');
+  mkdirSync(join(ROOT, 'reports/match'), { recursive: true });
+  await page.screenshot({ path: join(ROOT, 'reports/match/app-playing-390.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Закрыть игру', exact: true }).click();
   const normalContext = await browser.newContext({ storageState: await page.context().storageState(), viewport: VIEWPORT });
   const normal = await normalContext.newPage();
   try {
@@ -344,6 +356,7 @@ test('обе игры доступны тестовому клиенту и ск
     await normal.waitForFunction(() => !Array.from(document.querySelectorAll('.menu__item')).some(el => el.textContent.includes('Тренер в планке')));
     assert.equal(await normal.getByRole('button', { name: /Тренер в планке/ }).count(), 0);
     assert.equal(await normal.getByRole('button', { name: /На самокате до зала/ }).count(), 0);
+    assert.equal(await normal.getByRole('button', { name: /Три в ряд/ }).count(), 0);
   } finally { await normalContext.close(); }
   } catch (error) {
     console.error('Game QA:', error, await page.locator('[data-scooter=viewport]').evaluateAll(els => els.map(el => ({ phase: el.dataset.phase, lane: el.dataset.lane }))));
@@ -599,7 +612,7 @@ test('клиент: журнала в меню нет, свободная тре
 test('клиент: «Как пользоваться» открывается из меню', async () => {
   await page.goto(origin);
   await page.getByRole('button', { name: 'Меню' }).click();
-  await page.getByRole('button', { name: /Как пользоваться/ }).click();
+  await page.locator('.menu__item').filter({ hasText: 'Как пользоваться' }).click();
   const viewer = page.locator('.story');
   await assert.doesNotReject(viewer.getByText('Как пользоваться Fit Track').waitFor({ timeout: 10000 }));
   await assert.doesNotReject(viewer.getByRole('heading', { name: 'Вход' }).waitFor({ timeout: 5000 }), 'первый кадр — «Вход»');

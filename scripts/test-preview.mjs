@@ -14,6 +14,7 @@ const output = await build({
   format: 'cjs',
   platform: 'node',
   external: ['react'],
+  loader: { '.png': 'dataurl' },
   plugins: [{
     name: 'client-preview-stubs',
     setup(bundle) {
