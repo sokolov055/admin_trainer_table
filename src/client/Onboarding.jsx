@@ -262,7 +262,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
     </>;
   } else if (id === 'goal') {
     content = <>
-      {head('Цель', 'Какая у вас цель?', 'Под неё подстроим программу, норму питания и подсказки во всех разделах.')}
+      {head('Цель', 'Какая у вас цель?', 'Под неё подстроим программу, норму питания и подсказки во всех разделах. Поменять можно потом в «Моих данных».')}
       <Choices label="Цель" grid items={GOALS} value={answers.goal} onPick={(v) => pick('goal', v)} />
     </>;
   } else if (QUESTIONS[id]) {
@@ -516,7 +516,8 @@ export function uniqueSessions(blocks) {
 /** «грудь,трицепс/спина» → «грудь, трицепс · спина»: названия тренер пишет как удобно ему */
 export const tidyTitle = (t) => String(t || '').replace(/\s*\/\s*/g, ' · ').replace(/,(?=\S)/g, ', ');
 
-function Program({ p, i, best, on, onPick }) {
+/** Карточка программы — и в анкете, и при подборе заново в «Моих данных» (GoalChoice.jsx) */
+export function Program({ p, i, best, on, onPick }) {
   const [open, setOpen] = useState(null);
   const sessions = uniqueSessions(p.blocks);
   const all = sessions.flatMap((b) => b.exercises);

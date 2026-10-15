@@ -4,6 +4,7 @@ import { Field, Segmented, Note, Loading, ErrorState, Panel } from '../ui.jsx';
 import { IconAlert, IconCheck } from '../icons.jsx';
 import PhoneSetting from './PhoneSetting.jsx';
 import DataExport from './DataExport.jsx';
+import GoalChoice from './GoalChoice.jsx';
 
 /**
  * Мои данные.
@@ -76,6 +77,8 @@ export default function Profile({ clientRow }) {
     <>
     {/* Номер для входа — только у самого клиента: тренер в карточке его не
         подключает, вход подтверждает звонком владелец номера */}
+    {/* Цель и график из анкеты — тоже только у самого клиента (FT-582) */}
+    {!clientRow && <GoalChoice />}
     {!clientRow && <PhoneSetting />}
     <Panel pad>
       <div className="survey">

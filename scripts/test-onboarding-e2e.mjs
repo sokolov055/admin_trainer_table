@@ -141,3 +141,35 @@ test('выключатель владельца доступен в настро
   assert.equal(await page.getByRole('button', { name: 'Выключить анкету для всех' }).count(), 0);
   await page.close();
 });
+
+test('«Мои данные»: цель и график меняются, программа заменяется только по нажатию (FT-582)', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    localStorage.setItem('auth_token_v1', 'demo-onboarding-token');
+    localStorage.setItem('fittrack_demo_onboarding', JSON.stringify({ step: 8, revision: 3, consentNeeded: false, completed: true,
+      selectedTitle: 'Старт в зале', answers: { goal: 'fitness', experience: 'beginner', place: 'gym', days: 2 } }));
+  });
+  await page.goto(origin + '?mockUnlinked=1&mockOnboarding=1');
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /Мои данные/ }).click();
+  const goal = page.getByRole('radiogroup', { name: 'Цель' });
+  await goal.waitFor();
+  assert.equal(await goal.getByRole('radio', { name: 'Быть в форме' }).getAttribute('aria-checked'), 'true');
+  assert.equal(await page.locator('.goal-choice .ob-program').count(), 0, 'программа подходит — подбирать нечего');
+  await goal.getByRole('radio', { name: 'Набрать мышцы' }).click();
+  await page.getByRole('radiogroup', { name: 'Сколько раз в неделю?' }).getByRole('radio', { name: 'Три раза' }).click();
+  await page.locator('.goal-choice').getByRole('button', { name: 'Сохранить' }).click();
+  await page.getByText(/ниже варианты под новые/).waitFor();
+  const replace = page.getByRole('button', { name: 'Выберите программу' });
+  assert.equal(await replace.isDisabled(), true, 'без выбора ничего не заменяется');
+  await page.locator('.goal-choice .ob-program__pick').first().click();
+  mkdirSync(join(ROOT, '../reports/ft-582'), { recursive: true });
+  await page.screenshot({ path: join(ROOT, '../reports/ft-582/profile-390.png'), fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.getByRole('button', { name: 'Заменить программу' }).click();
+  await page.getByText(/в разделе «Тренировки»/).waitFor();
+  assert.equal(await page.locator('.goal-choice .ob-program').count(), 0);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

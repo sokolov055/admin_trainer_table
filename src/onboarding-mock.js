@@ -52,6 +52,27 @@ export function onboardingMock(action, p, compute) {
     localStorage.setItem('fittrack_demo_onboarding_off', p.enabled ? '0' : '1');
     return { enabled: enabled(), emergencyOff: false, catalog: p.catalog || [], templates: programs };
   }
+  // Цель и график в «Моих данных» (FT-582): программа «подходит», пока ответы
+  // те же, что при её выборе
+  const CHOICE = ['goal', 'experience', 'place', 'days'];
+  const pick = (a) => Object.fromEntries(CHOICE.map((k) => [k, a[k]]));
+  const choice = () => {
+    const fits = JSON.stringify(pick(saved.answers)) === JSON.stringify(saved.pickedFor || pick(saved.answers));
+    return { editable: true, answers: pick(saved.answers), program: saved.selectedTitle, fits, consentNeeded: false,
+      revision: saved.revision, programs: fits ? [] : programs.filter((r) => r.title !== saved.selectedTitle).map((r) => ({ ...r, days: saved.answers.days })) };
+  };
+  if (action === 'client.onboarding.choice') return saved.completed ? choice() : { editable: false, reason: 'none' };
+  if (action === 'client.onboarding.edit') {
+    if (p.revision !== saved.revision) throw new Error('Ответы изменились на другом устройстве.');
+    saved.pickedFor = saved.pickedFor || pick(saved.answers);
+    Object.assign(saved.answers, pick(p)); saved.revision += 1; store(saved);
+    return choice();
+  }
+  if (action === 'client.onboarding.replace') {
+    const picked = programs.find((r) => r.id === p.templateId);
+    Object.assign(saved, { selectedTitle: picked.title, pickedFor: pick(saved.answers), revision: saved.revision + 1 }); store(saved);
+    return { ...choice(), replaced: picked.title };
+  }
   if (!enabled()) {
     if (action === 'client.onboarding.get') return { enabled: false, eligible: false };
     throw new Error('Анкета отключена. Вернитесь в приложение.');
