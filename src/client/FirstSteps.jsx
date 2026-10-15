@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { apiPrimary, apiMutate, onMutated } from '../api.js';
-import { isNativeApp, iosApp } from '../native-bridge.js';
+import { isNativeApp } from '../native-bridge.js';
 import { stepsAvailability } from '../native-steps.js';
 import { notifyPermission, askNotifyPermission } from '../native-rest.js';
 import { IconCheck, IconClose } from '../icons.jsx';
@@ -21,9 +21,9 @@ import './first-steps.css';
  *    занятие — ещё не успех.
  * 3. Уведомления — в той же карточке, после успеха, своим экраном перед
  *    системным окном. Это уведомления телефона (конец отдыха); push с
- *    сервера на паузе и здесь не включаются. На iPhone кнопка —
- *    «Продолжить», без «Не сейчас» (App Review 5.1.1(iv)): отказаться можно
- *    в окне iOS или закрыть карточку.
+ *    сервера на паузе и здесь не включаются. Кнопка одна — «Продолжить»,
+ *    без «Не сейчас» (App Review 5.1.1(iv); владелец 15.10.2026 — везде как
+ *    на iPhone): отказаться можно в системном окне или закрыть карточку.
  */
 
 const HINTS = {
@@ -229,7 +229,6 @@ export function FirstRegime({ regime, notify, onSeen, onNotify }) {
     setAnswer(p === 'granted' ? 'Готово: телефон подаст сигнал, когда отдых закончится.' : 'Уведомления не разрешены. Включить их можно в настройках телефона.');
     onNotify(p || 'denied');
   };
-  const later = () => { onNotify('later'); if (regime) onSeen(); };
   const close = () => { if (ask) onNotify('later'); if (regime) onSeen(); setAnswer(''); };
 
   return (
@@ -253,8 +252,7 @@ export function FirstRegime({ regime, notify, onSeen, onNotify }) {
         <h3 id={regime ? undefined : 'first-regime-title'}>Сигнал конца отдыха</h3>
         <p className="small muted">Разрешите уведомления — телефон подаст сигнал, когда отдых между подходами закончится, даже с заблокированным экраном.</p>
         <div className="survey__actions">
-          <button type="button" className="button button--primary" disabled={busy} onClick={allow}>{busy ? 'Спрашиваем…' : iosApp() ? 'Продолжить' : 'Разрешить'}</button>
-          {!iosApp() && <button type="button" className="button button--ghost" disabled={busy} onClick={later}>Не сейчас</button>}
+          <button type="button" className="button button--primary" disabled={busy} onClick={allow}>{busy ? 'Спрашиваем…' : 'Продолжить'}</button>
         </div>
       </div>}
       {answer && <p className="small" role="status">{answer}</p>}

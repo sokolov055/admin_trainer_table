@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { isNativeApp, iosApp } from '../native-bridge.js';
+import { isNativeApp } from '../native-bridge.js';
 import { stepsAvailability, stepsOn, connectHealth, healthHub, onIphone } from '../native-steps.js';
 import { ensureBackgroundSync } from '../native-sync.js';
 import './onboarding.css';
@@ -9,16 +9,16 @@ import './first-steps.css';
  * Шаги и тренировки с часов — последний шаг анкеты (FT-510).
  *
  * Перед системным окном — свой экран: что возьмём, зачем и что не берём
- * (App Store 5.1.1, решение владельца 10.10.2026). «Не сейчас» ничего не
- * закрывает, подключить можно позже в «Прогрессе». Просим только шаги и
+ * (App Store 5.1.1, решение владельца 10.10.2026). Просим только шаги и
  * тренировки — не пульс, сон или вес. Согласие на них (редакция
  * 2026-10-02) человек уже подтвердил при входе: без него анкета не
  * открывается.
  *
- * iPhone: перед окном Apple только «Продолжить», без «Не сейчас» — App
- * Review (5.1.1(iv)) отклоняет экраны перед запросом разрешения с кнопкой
- * выхода и с «Разрешить» на своей кнопке. Отказаться можно в самом окне
- * «Здоровья». На Android — «Разрешить» и «Не сейчас», как решил владелец.
+ * Кнопка одна — «Продолжить», без «Не сейчас» (владелец, 15.10.2026 —
+ * везде как на iPhone): App Review (5.1.1(iv)) отклоняет экраны перед
+ * запросом разрешения с кнопкой выхода и с «Разрешить» на своей кнопке.
+ * Отказаться можно в самом системном окне; отказ ничего не закрывает,
+ * подключить можно позже в «Прогрессе».
  *
  * После окна — честный итог. iPhone не говорит, выдан ли доступ: пустой
  * ответ там — «записей нет или доступ не включён», а не «готово».
@@ -87,17 +87,14 @@ export default function HealthAsk({ onDone }) {
             <li>Тренировки: вид, время, калории и дистанция.</li>
             <li>Пульс, сон и вес не читаем.</li>
           </ul>
-          <p className="small muted">{iosApp()
-            ? 'Дальше iPhone спросит, что разрешить, — можно отказаться прямо в его окне. Без этого приложением можно пользоваться как обычно.'
-            : 'Отключить можно в «Прогрессе» или в настройках телефона. Без этого приложением можно пользоваться как обычно.'}</p>
+          <p className="small muted">Дальше телефон спросит, что разрешить, — можно отказаться прямо в его окне. Без этого приложением можно пользоваться как обычно.</p>
         </>}
     </div>
     <footer className="onboarding__footer health-ask__footer">
       {result
         ? <button type="button" className="button button--primary button--block" onClick={onDone}>Перейти к занятиям</button>
         : <>
-          <button type="button" className="button button--primary button--block" disabled={busy} onClick={allow}>{busy ? 'Подключаем…' : iosApp() ? 'Продолжить' : 'Разрешить'}</button>
-          {!iosApp() && <button type="button" className="button button--ghost button--block" disabled={busy} onClick={onDone}>Не сейчас</button>}
+          <button type="button" className="button button--primary button--block" disabled={busy} onClick={allow}>{busy ? 'Подключаем…' : 'Продолжить'}</button>
         </>}
     </footer>
   </main>;
