@@ -39,15 +39,15 @@ test('анкета 2.0: согласие, данные барабанами, о�
   await page.getByRole('checkbox').check(); await go.click();
   await page.getByRole('heading', { name: /Приятно познакомиться|Расскажите о себе/ }).waitFor();
   assert.equal(await next(page).isDisabled(), true);
-  // Пол открывает барабан возраста; «Далее» в окне ведёт к следующему пустому полю
+  // Пол открывает барабаны даты рождения; «Далее» в окне ведёт к следующему пустому полю
   await radio(page, 'Мужской').click();
-  await page.getByRole('dialog', { name: 'Возраст' }).waitFor();
-  await page.getByRole('spinbutton', { name: 'Возраст' }).press('ArrowDown');
+  await page.getByRole('dialog', { name: 'Дата рождения' }).waitFor();
+  await page.getByRole('spinbutton', { name: 'Месяц' }).press('ArrowDown');
   await page.waitForTimeout(500);
   await sheetDone(page).click(); await page.getByRole('dialog', { name: 'Рост' }).waitFor();
   await sheetDone(page).click(); await page.getByRole('dialog', { name: 'Вес' }).waitFor();
   await sheetDone(page).click(); await page.getByRole('dialog').waitFor({ state: 'detached' });
-  assert.match(await page.locator('.ob-tile').first().textContent(), /31 год/);
+  assert.match(await page.locator('.ob-tile').first().textContent(), /1 февраля \d{4}/);
   await next(page).click();
   await page.getByRole('heading', { name: /Базовый обмен рассчитан/ }).waitFor();
   await next(page).click();
@@ -76,7 +76,12 @@ test('анкета 2.0: согласие, данные барабанами, о�
   await page.locator('.ob-program').first().waitFor();
   assert.equal(await page.locator('.ob-program').count(), 3);
   assert.equal(await next(page).isDisabled(), true);
-  await page.locator('.ob-program__pick').first().click();
+  // Занятия без повторов; все упражнения — в нижнем окне, выбор оттуда же
+  assert.equal(await page.locator('.ob-program').first().locator('.ob-session').count(), 2);
+  await page.locator('.ob-session').first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Выбрать эту программу' }).click();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.ob-program__pick').first().getAttribute('aria-checked'), 'true');
   await page.getByRole('button', { name: 'Начать по этой программе' }).click();
   await page.getByRole('heading', { name: /Всё готово/ }).waitFor();
   await page.screenshot({ path: join(ROOT, '../reports/ft-577/done-390.png'), fullPage: true });

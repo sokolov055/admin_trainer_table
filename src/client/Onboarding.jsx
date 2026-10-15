@@ -6,11 +6,14 @@ import { formatNumber, plural } from '../ui.jsx';
 import {
   STEPS, STAGES, SIGNUP_STAGE, GOALS, LIFESTYLES, QUESTIONS, WHEELS, PACES,
   wheelStart, hasBody, canAdvance, nextStep, resumeStep, stageOf, timesWeek, bmrOf,
+  ageOf, MONTHS, daysIn, fmtBirth,
 } from './onboarding-model.js';
 import Art from './OnboardingArt.jsx';
 import StageBar from './StageBar.jsx';
 import { Wheel, Sheet, range } from './Wheel.jsx';
 import Permissions, { usePermissions } from './Permissions.jsx';
+import { MuscleFigure, tallyExercises, splitTally, nameLine } from '../muscles/MuscleMap.jsx';
+import { useKeyboardInset } from '../keyboard-inset.js';
 import './onboarding.css';
 import '../brand-type.css';
 
@@ -32,7 +35,7 @@ import '../brand-type.css';
  * человек пришёл прямо из неё, и раздел «Регистрация» уже пройден.
  */
 
-const BODY = ['sex', 'age', 'height', 'weight'];
+const BODY = ['sex', 'birth', 'height', 'weight'];
 const reduced = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /** Ход от 0 до 1 за ms — общий для чисел и дуги; при уменьшении движения сразу 1 */
@@ -60,12 +63,19 @@ function withPrefill(saved) {
   const pre = saved.prefill || {};
   if (!hasBody(answers)) {
     [...BODY, 'lifestyle'].forEach((k) => { if (answers[k] == null && pre[k] != null && pre[k] !== '') answers[k] = pre[k]; });
+    // Даты рождения нигде нет, а возраст известен (анкета питания) — пока он
+    if (!answers.birth && answers.age == null && pre.age) answers.age = pre.age;
   }
   return answers;
 }
 
 const clean = (a) => Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined && v !== null && v !== ''));
-const fmtBody = (k, v) => (k === 'age' ? v + ' ' + plural(v, 'год', 'года', 'лет') : formatNumber(v) + ' ' + WHEELS[k].unit);
+const years = (n) => n + ' ' + plural(n, 'год', 'года', 'лет');
+/** Значение плитки: дата рождения, а у прежнего черновика — возраст */
+function bodyValue(k, a) {
+  if (k === 'birth') return a.birth ? fmtBirth(a.birth) : a.age ? years(a.age) : '';
+  return a[k] ? formatNumber(a[k]) + ' ' + WHEELS[k].unit : '';
+}
 
 export default function Onboarding({ initial, name = '', onClose, onDone, onDisabled, lead = 0 }) {
   const first = String(name || '').trim().split(/\s+/)[0] || '';
@@ -89,6 +99,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
   const queue = useRef(Promise.resolve());
   const timer = useRef(null);
   useEffect(() => () => { mounted.current = false; clearTimeout(timer.current); }, []);
+  useKeyboardInset();
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [step, !!result, !!saved.consentNeeded]);
 
   const fail = (err) => { if (mounted.current) setFailure((err?.message || 'Не удалось сохранить ответы.') + ' Попробуйте ещё раз.'); };
@@ -147,7 +158,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
   };
   const skipBody = () => {
     const next = { ...answers };
-    [...BODY, 'lifestyle', 'pace'].forEach((k) => { delete next[k]; });
+    [...BODY, 'age', 'lifestyle', 'pace'].forEach((k) => { delete next[k]; });
     go(STEPS.indexOf('goal'), next);
   };
 
@@ -214,7 +225,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
     </>;
     primary = { label: busy ? 'Минуту…' : 'Поехали', disabled: busy || !agreed, onClick: consent };
   } else if (id === 'body') {
-    const next = BODY.slice(1).find((k) => !answers[k]);
+    const next = BODY.slice(1).find((k) => !bodyValue(k, answers));
     content = <>
       {head('О вас', first ? `Приятно познакомиться, ${first}!` : 'Расскажите о себе',
         'Начнём с основных данных — по ним посчитаем норму калорий. Не хотите — пропустите, программу подберём и так.')}
@@ -224,7 +235,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
           {[['f', 'Женский'], ['m', 'Мужской']].map(([v, l]) => (
             <button key={v} type="button" role="radio" aria-checked={answers.sex === v}
               className={'ob-pill' + (answers.sex === v ? ' is-on' : '')}
-              onClick={() => { setAnswers({ ...answers, sex: v }); haptic(); if (next && !answers[next]) setSheet(next); }}>
+              onClick={() => { setAnswers({ ...answers, sex: v }); haptic(); if (next) setSheet(next); }}>
               <Art name={v} size={22} />{l}
             </button>
           ))}
@@ -233,7 +244,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
       {BODY.slice(1).map((k, i) => (
         <button key={k} type="button" className="ob-tile" style={{ '--i': i + 1 }} aria-haspopup="dialog" onClick={() => setSheet(k)}>
           <span className="ob-tile__label">{WHEELS[k].label}</span>
-          <span className={'ob-tile__value' + (answers[k] ? '' : ' is-empty')}>{answers[k] ? fmtBody(k, answers[k]) : 'Выбрать'}</span>
+          <span className={'ob-tile__value' + (bodyValue(k, answers) ? '' : ' is-empty')}>{bodyValue(k, answers) || 'Выбрать'}</span>
           <IconChevron size={16} />
         </button>
       ))}
@@ -300,7 +311,7 @@ export default function Onboarding({ initial, name = '', onClose, onDone, onDisa
       </footer>
 
       {sheet && WHEELS[sheet] && <BodySheet key={sheet} k={sheet} answers={answers}
-        onDone={(v, nextKey) => { setAnswers((a) => ({ ...a, [sheet]: v })); setSheet(nextKey || null); }}
+        onDone={(v, nextKey) => { setAnswers((a) => { const n = { ...a, [sheet]: v }; if (sheet === 'birth') delete n.age; return n; }); setSheet(nextKey || null); }}
         onClose={() => setSheet(null)} />}
       {sheet === 'pace' && <PaceSheet goal={answers.goal} value={answers.pace || 'even'}
         onDone={(pace) => forward({ ...answers, pace })} onClose={() => setSheet(null)} />}
@@ -339,7 +350,8 @@ function BodySheet({ k, answers, onDone, onClose }) {
   const w = WHEELS[k];
   const start = answers[k] || wheelStart(k, answers.sex);
   const [value, setValue] = useState(start);
-  const next = BODY.slice(1).find((key) => key !== k && !answers[key]);
+  const next = BODY.slice(1).find((key) => key !== k && !bodyValue(key, answers));
+  if (k === 'birth') return <BirthSheet value={answers.birth || wheelStart('birth')} next={next} onDone={onDone} onClose={onClose} />;
   const kg = Math.floor(value);
   const tenth = Math.round((value - kg) * 10);
   return (
@@ -351,8 +363,35 @@ function BodySheet({ k, answers, onDone, onClose }) {
           <Wheel label="Вес, граммы" values={range(0, 9)} value={tenth} width={1}
             format={(v) => v * 100 + ' г'} onChange={(v) => setValue(Math.min(w.max, kg + v / 10))} />
         </> : <Wheel label={w.label} values={range(w.min, w.max)} value={value}
-          format={(v) => (k === 'age' ? v + ' ' + plural(v, 'год', 'года', 'лет') : v + ' ' + w.unit)} onChange={setValue} />}
+          format={(v) => v + ' ' + w.unit} onChange={setValue} />}
       </div>
+    </Sheet>
+  );
+}
+
+/**
+ * Дата рождения — три барабана, как у ONLYFITS: день, месяц, год. Возраст
+ * для нормы считается по ней; сама дата ложится и в «Мои данные».
+ * Возраст — от 14 до 100 лет, как в анкете питания.
+ */
+function BirthSheet({ value, next, onDone, onClose }) {
+  const now = new Date();
+  const [y0, m0, d0] = value.split('-').map(Number);
+  const [y, setY] = useState(y0);
+  const [m, setM] = useState(m0);
+  const [d, setD] = useState(d0);
+  const day = Math.min(d, daysIn(y, m));
+  const iso = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const age = ageOf({ birth: iso }, now);
+  const ok = age >= 14 && age <= 100;
+  return (
+    <Sheet title="Дата рождения" onClose={onClose} onDone={ok ? () => onDone(iso, next) : null} done={next ? 'Далее' : 'Готово'}>
+      <div className="ob-wheels">
+        <Wheel key={daysIn(y, m)} label="День" values={range(1, daysIn(y, m))} value={day} width={1} onChange={setD} />
+        <Wheel label="Месяц" values={range(1, 12)} value={m} width={2} format={(v) => MONTHS[v - 1]} onChange={setM} />
+        <Wheel label="Год" values={range(now.getFullYear() - 100, now.getFullYear() - 14)} value={y} width={1.3} onChange={setY} />
+      </div>
+      <p className={'ob-sheet__lead' + (ok ? '' : ' is-error')} role="status">{ok ? years(age) : 'Возраст — от 14 до 100 лет'}</p>
     </Sheet>
   );
 }
@@ -389,7 +428,7 @@ function BmrStep({ answers, first, head }) {
     <p className="ob__lead ob__lead--small">
       Столько тело тратит в полном покое — на сердце, дыхание и мозг. Это 60–70 % всех трат за день, остальное
       добавят движение и тренировки. Формула Миффлина — Сан-Жеора по вашим данным: {formatNumber(answers.height)} см,{' '}
-      {formatNumber(answers.weight)} кг, {answers.age} {plural(answers.age, 'год', 'года', 'лет')}.
+      {formatNumber(answers.weight)} кг, {years(ageOf(answers))}.
     </p>
   </>;
 }
@@ -459,24 +498,75 @@ function PlanStep({ norm, answers, first, head }) {
   </>;
 }
 
+/** Занятия без повторов: шаблон часто расписан на месяц и одни и те же
+ *  занятия идут по кругу — показывать их по четыре раза незачем */
+export function uniqueSessions(blocks) {
+  const seen = new Set();
+  return blocks.filter((b) => {
+    const key = b.title + '|' + b.exercises.map((e) => e.name).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** «грудь,трицепс/спина» → «грудь, трицепс · спина»: названия тренер пишет как удобно ему */
+export const tidyTitle = (t) => String(t || '').replace(/\s*\/\s*/g, ' · ').replace(/,(?=\S)/g, ', ');
+
 function Program({ p, i, best, on, onPick }) {
-  const count = p.blocks.reduce((s, b) => s + b.exercises.length, 0);
+  const [open, setOpen] = useState(null);
+  const sessions = uniqueSessions(p.blocks);
+  const all = sessions.flatMap((b) => b.exercises);
+  const { primary, secondary } = splitTally(tallyExercises(all));
+  const perSession = Math.round(all.length / Math.max(1, sessions.length));
   return (
     <article className={'ob-program' + (on ? ' is-on' : '')} style={{ '--i': i }}>
       <button type="button" role="radio" aria-checked={on} className="ob-program__pick" onClick={onPick}>
         <span className="ob-program__head">
           {best && <span className="ob-program__badge">Лучше всего под цель</span>}
-          <strong className="ob-program__title">{p.title}</strong>
-          <span className="ob-program__facts">{timesWeek(p.days)} · {p.blocks.length} {plural(p.blocks.length, 'занятие', 'занятия', 'занятий')} · {count} {plural(count, 'упражнение', 'упражнения', 'упражнений')}</span>
+          <strong className="ob-program__title">{tidyTitle(p.title)}</strong>
+          <span className="ob-program__chips">
+            <span>{timesWeek(p.days)}</span>
+            <span>{sessions.length} {plural(sessions.length, 'занятие', 'занятия', 'занятий')}{p.blocks.length > sessions.length ? ' по кругу' : ''}</span>
+            <span>~{perSession} {plural(perSession, 'упражнение', 'упражнения', 'упражнений')}</span>
+          </span>
           {p.description && <span className="ob-program__text">{p.description}</span>}
         </span>
         <span className="ob-choice__mark" aria-hidden="true">{on && <IconCheck size={14} />}</span>
+        {(primary.length > 0 || secondary.length > 0) && <span className="ob-program__body">
+          <MuscleFigure primary={primary} secondary={secondary} size="sm" />
+          <span className="ob-program__muscles">
+            <span className="ob-program__label">Что прорабатывает</span>
+            <span>{nameLine(primary, 5) || nameLine(secondary, 5)}</span>
+          </span>
+        </span>}
       </button>
-      <details className="ob-program__more">
-        <summary>Упражнения и инвентарь</summary>
-        {p.blocks.map((b, j) => <div key={j}><h3>{b.title}</h3>
-          <ul>{b.exercises.map((e, n) => <li key={n}>{e.name}{e.sets ? ` · ${e.sets} × ${e.reps || '—'}` : ''}</li>)}</ul></div>)}
-      </details>
+      <div className="ob-sessions" role="list" aria-label="Занятия программы">
+        {sessions.map((b, j) => (
+          <button key={j} type="button" role="listitem" className="ob-session" onClick={() => setOpen(j)}>
+            <span className="ob-session__num">{j + 1}</span>
+            <strong className="ob-session__title">{b.title}</strong>
+            <span className="ob-session__list">{b.exercises.slice(0, 3).map((e) => e.name).join(', ')}</span>
+            <span className="ob-session__more">{b.exercises.length} {plural(b.exercises.length, 'упражнение', 'упражнения', 'упражнений')}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" className="ob-program__all" onClick={() => setOpen(0)}>Все упражнения</button>
+      {open !== null && <Sheet title={tidyTitle(p.title)} onClose={() => setOpen(null)}
+        onDone={() => { setOpen(null); if (!on) onPick(); }} done={on ? 'Закрыть' : 'Выбрать эту программу'}>
+        <div className="ob-sheet__scroll" ref={(el) => { if (el && open) el.querySelector(`[data-session="${open}"]`)?.scrollIntoView({ block: 'start' }); }}>
+          {sessions.map((b, j) => (
+            <section key={j} className="ob-plan-session" data-session={j}>
+              <h3><span className="ob-session__num">{j + 1}</span>{b.title}</h3>
+              <ol>
+                {b.exercises.map((e, n) => (
+                  <li key={n}><span>{e.name}</span>{e.sets ? <span className="ob-plan-session__sets">{e.sets} × {e.reps || '—'}</span> : null}</li>
+                ))}
+              </ol>
+            </section>
+          ))}
+        </div>
+      </Sheet>}
     </article>
   );
 }

@@ -5,7 +5,8 @@ import OtpStage from './OtpStage.jsx';
 import { haptic } from './telegram.js';
 import { Segmented, BackButton } from './ui.jsx';
 import { setToken, describeDevice } from './session.js';
-import { IconKey, IconUsers, IconUserPlus, IconCheck, IconChevron, IconMail, IconCopy } from './icons.jsx';
+import { IconKey, IconUsers, IconUserPlus, IconCheck, IconChevron, IconMail, IconCopy, IconBack } from './icons.jsx';
+import { useKeyboardInset } from './keyboard-inset.js';
 import StageBar from './client/StageBar.jsx';
 import { STAGES, SIGNUP_STAGE } from './client/onboarding-model.js';
 import PasteLink from './PasteLink.jsx';
@@ -246,6 +247,7 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
   const [problem, setProblem] = useState('');
   const [trainerEmail, setTrainerEmail] = useState(false);
   const [quiz, setQuiz] = useState(false);   // после регистрации — анкета подбора программы (FT-552)
+  useKeyboardInset();
   const [sentAt, setSentAt] = useState(0);
   const left = useCountdown(sentAt, RESEND_SEC);
   const review = email.trim().toLowerCase() === REVIEW_EMAIL;
@@ -430,19 +432,21 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
         : 'Отметьте оба пункта — без них кабинет не сможет хранить ваши тренировки, замеры и питание.');
     return (
       <form key="register" className="signin__register" onSubmit={submit} noValidate>
-        <BackButton label="Назад" onClick={stepBack} />
-        <p className="onboarding__progress-text">
-          {'Шаг ' + (reg + 1) + ' из ' + (quiz ? 2 : icons.length) + ' · ' + (reg === 0 ? 'Имя' : trainer ? 'Условия' : 'Согласия')}
-        </p>
-        {/* Анкета включена — регистрация первый раздел её полосы (FT-577) */}
+        {/* Анкета включена — регистрация первый раздел её полосы, верх как
+            в анкете (FT-577) */}
         {quiz && !trainer
-          ? <StageBar stages={[SIGNUP_STAGE, ...STAGES]} current={0} label="Регистрация и подбор программы" />
-          : <div className="onboarding__progress" role="progressbar" aria-label={trainer ? 'Заявка тренера' : 'Регистрация'}
+          ? <div className="ob__top"><StageBar stages={[SIGNUP_STAGE, ...STAGES]} current={0} label="Регистрация и подбор программы" /></div>
+          : <>
+          <p className="onboarding__progress-text">
+            {'Шаг ' + (reg + 1) + ' из ' + icons.length + ' · ' + (reg === 0 ? 'Имя' : trainer ? 'Условия' : 'Согласия')}
+          </p>
+          <div className="onboarding__progress" role="progressbar" aria-label={trainer ? 'Заявка тренера' : 'Регистрация'}
             aria-valuemin={1} aria-valuemax={icons.length} aria-valuenow={reg + 1}>
             {icons.map((Icon, i) => (
               <span key={i} className={'onboarding__step' + (i <= reg ? ' onboarding__step--active' : '')} aria-hidden="true"><Icon size={18} /></span>
             ))}
-          </div>}
+          </div>
+          </>}
         <div key={reg} className={'onboarding__content signin__step' + (back ? ' signin__step--back' : '')}>
           <h1 ref={heading} tabIndex={-1}>{title}</h1>
           <p className="onboarding__intro">{intro}</p>
@@ -466,9 +470,14 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
             : <ConsentChecks value={agree} onChange={setAgree} disabled={busy} />)}
           {problem && <p className="login__problem" role="alert">{problem}</p>}
         </div>
-        <footer className="onboarding__footer">
-          <button className="button button--primary button--block" disabled={busy || !ready}>
+        {/* Низ — как в анкете (Onboarding.jsx): круглая «Назад» и одна
+            ведущая кнопка на одном месте на всех шагах; над клавиатурой
+            его поднимает --kb (keyboard-inset.js) */}
+        <footer className="ob__footer">
+          <button type="button" className="ob__back" aria-label="Назад" disabled={busy} onClick={stepBack}><IconBack size={20} /></button>
+          <button className="button button--primary ob__next" disabled={busy || !ready}>
             {busy ? 'Минуту…' : reg === 0 ? 'Далее' : trainer ? 'Отправить заявку' : 'Создать кабинет'}
+            <span className="ob__arrow" aria-hidden="true"><IconBack size={18} /></span>
           </button>
         </footer>
       </form>

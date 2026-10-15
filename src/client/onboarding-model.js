@@ -59,19 +59,32 @@ export const QUESTIONS = {
 
 /** Границы — как в анкете питания (lib/nutrition.js LIMITS) */
 export const WHEELS = {
-  age: { min: 14, max: 100, unit: 'лет', label: 'Возраст' },
+  birth: { label: 'Дата рождения' },
   height: { min: 120, max: 230, unit: 'см', label: 'Рост' },
   weight: { min: 30, max: 250, unit: 'кг', label: 'Вес' },
 };
 
 /** Значение, с которого открывается барабан, пока ничего не выбрано */
-export function wheelStart(key, sex) {
-  if (key === 'age') return 30;
+export function wheelStart(key, sex, now = new Date()) {
+  if (key === 'birth') return `${now.getFullYear() - 30}-01-01`;
   if (key === 'height') return sex === 'f' ? 165 : 178;
   return sex === 'f' ? 62 : 78;
 }
 
-export const hasBody = (a) => !!(a.sex && a.age && a.height && a.weight);
+/** Полных лет по дате рождения (ГГГГ-ММ-ДД); прежние черновики хранят возраст */
+export function ageOf(a, now = new Date()) {
+  if (!a.birth) return a.age || null;
+  const [y, m, d] = a.birth.split('-').map(Number);
+  let age = now.getFullYear() - y;
+  if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age -= 1;
+  return age;
+}
+
+export const hasBody = (a) => !!(a.sex && ageOf(a) && a.height && a.weight);
+
+export const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+export const daysIn = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+export const fmtBirth = (b) => { const [y, m, d] = b.split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
 
 /** Можно ли уйти с шага вперёд */
 export function canAdvance(answers, step) {
@@ -137,5 +150,5 @@ export const PACES = {
 /** Базовый обмен по Миффлину — Сан-Жеору, как на сервере (lib/nutrition.js) */
 export function bmrOf(a) {
   if (!hasBody(a)) return null;
-  return Math.round(10 * a.weight + 6.25 * a.height - 5 * a.age + (a.sex === 'm' ? 5 : -161));
+  return Math.round(10 * a.weight + 6.25 * a.height - 5 * ageOf(a) + (a.sex === 'm' ? 5 : -161));
 }

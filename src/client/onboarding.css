@@ -32,6 +32,8 @@
 
 /* ---------- Верх: разделы и «Позже» ---------- */
 .ob__top { display: flex; align-items: center; gap: 12px; min-height: 48px; }
+/* Место под поднятой над клавиатурой панелью: поле можно докрутить выше неё */
+.onboarding { padding-bottom: calc(max(20px, env(safe-area-inset-bottom)) + var(--kb, 0px)); }
 .ob__later { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 4px 0 8px; display: inline-flex; align-items: center; color: var(--text-secondary); font-size: 15px; font-weight: 600; cursor: pointer; border-radius: 10px; }
 .ob__later:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ob__later:disabled { opacity: 0.5; }
@@ -186,6 +188,44 @@
 .ob-program__more h3 { margin: 10px 0 6px; font-size: 15px; }
 .ob-program__more ul { margin: 0 0 8px; padding-left: 18px; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
 
+/* Карточка программы 2: мышцы, занятия плитками, упражнения — в нижнем окне */
+.ob-program { overflow: hidden; }
+.ob-program__pick { grid-template-columns: minmax(0, 1fr) auto; padding-bottom: 12px; }
+.ob-program__title { font-size: 20px; font-weight: 790; letter-spacing: -0.025em; }
+.ob-program__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ob-program__chips span { padding: 4px 10px; border-radius: 99px; background: var(--surface-sunken); color: var(--text); font-size: 13px; font-weight: 650; }
+.ob-program.is-on .ob-program__chips span { background: var(--surface); }
+.ob-program__body { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 16px; background: var(--surface-sunken); }
+.ob-program.is-on .ob-program__body { background: var(--surface); }
+.ob-program__body .muscles__figure { flex: 0 0 auto; }
+.ob-program__muscles { display: grid; gap: 2px; min-width: 0; font-size: 14px; line-height: 1.4; }
+.ob-program__label { color: var(--accent-solid); font-size: 12px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
+.ob-sessions {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 72%); gap: 10px;
+  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; padding: 2px 16px 12px;
+  scrollbar-width: none; overscroll-behavior-x: contain;
+}
+.ob-sessions::-webkit-scrollbar { display: none; }
+.ob-session {
+  display: grid; align-content: start; gap: 4px; min-height: 128px; padding: 12px; box-sizing: border-box;
+  border-radius: 16px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: inherit; text-align: left; cursor: pointer; scroll-snap-align: start; -webkit-tap-highlight-color: transparent;
+  transition: transform 140ms var(--ease-out);
+}
+.ob-session:active { transform: scale(0.98); }
+.ob-session:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ob-session__num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-wash); color: var(--accent-solid); font-size: 12.5px; font-weight: 780; font-variant-numeric: tabular-nums; }
+.ob-session__title { font-size: 15.5px; font-weight: 740; line-height: 1.3; }
+.ob-session__list { color: var(--text-secondary); font-size: 13px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ob-session__more { margin-top: 4px; color: var(--accent-solid); font-size: 12.5px; font-weight: 700; }
+.ob-program__all { all: unset; box-sizing: border-box; display: flex; align-items: center; min-height: 44px; margin: -4px 16px 6px; color: var(--accent-solid); font-size: 14.5px; font-weight: 680; cursor: pointer; }
+.ob-program__all:focus-visible { outline: 2px solid var(--accent); border-radius: 8px; }
+.ob-sheet__scroll { max-height: min(62dvh, 560px); overflow-y: auto; overscroll-behavior: contain; margin: 0 -20px; padding: 0 20px 8px; }
+.ob-plan-session h3 { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; font-size: 16px; font-weight: 740; }
+.ob-plan-session ol { list-style: none; margin: 0; padding: 0; }
+.ob-plan-session li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 15px; line-height: 1.35; }
+.ob-plan-session__sets { flex: 0 0 auto; padding: 2px 9px; border-radius: 99px; background: var(--surface-sunken); font-size: 13px; font-weight: 720; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 /* ---------- Всё готово ---------- */
 .ob-done { width: 88px; height: 88px; margin: 8px 0 18px; }
 .ob-done svg { width: 100%; height: 100%; }
@@ -203,7 +243,7 @@
 .ob__error { margin-top: 12px; padding: 14px 16px; border-radius: 14px; background: var(--critical-fill); color: var(--critical-text); }
 .ob__error p { margin: 0 0 8px; }
 .ob__footer {
-  position: sticky; bottom: 0; z-index: 2; display: flex; gap: 12px; margin: 0 -20px; padding: 14px 20px max(14px, env(safe-area-inset-bottom));
+  position: sticky; bottom: var(--kb, 0px); z-index: 2; display: flex; gap: 12px; margin: 0 -20px; padding: 14px 20px max(14px, env(safe-area-inset-bottom));
   background: linear-gradient(to bottom, transparent, var(--bg) 22%);
 }
 .ob__back {
@@ -233,6 +273,7 @@
 .ob-sheet__head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; }
 .ob-sheet__head h2 { margin: 0; font-size: 17px; font-weight: 720; }
 .ob-sheet__close { position: absolute; right: -4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--surface-sunken); color: var(--text); cursor: pointer; }
+.ob-sheet__lead.is-error { color: var(--critical-text); font-weight: 650; }
 .ob-sheet__lead { margin: 0 0 14px; color: var(--text-secondary); font-size: 14px; line-height: 1.45; text-align: center; }
 .ob-sheet__done { min-height: 54px; margin-top: 8px; border-radius: 16px; font-size: 17px; font-weight: 720; }
 .ob-sheet button { font-family: inherit; }

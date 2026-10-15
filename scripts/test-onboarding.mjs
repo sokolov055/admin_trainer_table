@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STEPS, LAST, canAdvance, nextStep, resumeStep, stageOf, bmrOf, timesWeek } from '../src/client/onboarding-model.js';
+import { STEPS, LAST, canAdvance, nextStep, resumeStep, stageOf, bmrOf, timesWeek, ageOf, hasBody, fmtBirth } from '../src/client/onboarding-model.js';
 
 const body = { sex: 'm', age: 30, height: 180, weight: 80 };
 const at = (id) => STEPS.indexOf(id);
@@ -48,4 +48,13 @@ test('разделы полосы, базовый обмен как на сер�
   assert.equal(bmrOf({ sex: 'm' }), null);
   assert.equal(timesWeek(3), '3 раза в неделю');
   assert.equal(timesWeek(5), '5 раз в неделю');
+});
+
+test('дата рождения: полных лет до и после дня рождения, хватает вместо возраста', () => {
+  const now = new Date(2026, 9, 15);
+  assert.equal(ageOf({ birth: '1996-10-15' }, now), 30);
+  assert.equal(ageOf({ birth: '1996-10-16' }, now), 29);
+  assert.equal(ageOf({ age: 41 }, now), 41, 'прежний черновик с возрастом');
+  assert.equal(hasBody({ sex: 'f', birth: '1990-05-05', height: 165, weight: 60 }), true);
+  assert.equal(fmtBirth('1997-05-05'), '5 мая 1997');
 });
