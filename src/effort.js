@@ -26,6 +26,11 @@
  * Последнее — отдых по кругу: хоть одно тяжело → +30 с; все легко и
  * прибавить было некуда → −30 с; иначе как выбран.
  *
+ * Вес следующих подходов отсчитывается от сделанного сейчас, а не от веса
+ * прошлой тренировки: прошлый раз 50 · 50 · 50, сегодня 60 и «легко» — дальше
+ * 62,5, а не 50. Лесенка прошлого раза сохраняется (подход, что был тяжелее
+ * на столько-то, тяжелее и теперь); подходы, что были легче, — свои.
+ *
  * Внутри занятия подходы идут лесенкой (100 · 120 · 140 · 160) или первый
  * легче остальных, поэтому «легко» прибавляет только после самого
  * тяжёлого подхода — лёгкий разминочный и должен быть лёгким; «тяжело»
@@ -164,6 +169,15 @@ export function roundRest(efforts, base, raised = false) {
   return base;
 }
 
+/** Вес подхода в прошлый раз (lastRun с сервера) по номеру: число или 0 */
+function wasKg(ex, i) {
+  const last = ex && ex.lastRun;
+  const set = ex && ex.sets && ex.sets[i];
+  if (!last || !set || set.who || !Array.isArray(last.weights)) return 0;
+  const w = num(last.weights[i]);
+  return w > 0 ? w : 0;
+}
+
 /**
  * Подход si отмечен оценкой effort. Возвращает упражнение (у подхода —
  * оценка, у следующих подходов того же человека — новый вес с причиной в
@@ -196,10 +210,20 @@ export function rateSet(ex, si, effort) {
     if (i === si) return { ...x, state: 'done', effort, ...(dir > 0 ? { raised: true } : {}) };
     if (!dir || i < si || !mine(x) || x.state !== 'pending' || x.kind === 'warmup' || x.own) return x;
     const w = num(x.weight);
-    // Двигаем подходы не легче этого: лесенка ниже — своя
-    if (!(w > 0) || w < cur) return x;
+    if (!(w > 0)) return x;
+    // Отсчёт — от того, что сделано сейчас, а не от веса прошлой тренировки
+    // (владелец, 16.10.2026): сделали 60 при прошлых 50·50·50 — следующим
+    // 60 ± шаг, а не 50. Лесенка прошлого раза сохраняется: подход, который
+    // был тяжелее на столько-то, тяжелее и теперь
+    const was = wasKg(ex, si);
+    const then = wasKg(ex, i);
+    let base;
+    if (was > 0 && then >= was) base = cur + (then - was);
+    // Нет истории — как было: не легче этого, лесенка ниже — своя
+    else if (w >= cur) base = w;
+    else return x;
     changed = true;
-    return { ...x, weight: text(Math.max(0, w + dir * stepOf(ex, w))), suggest };
+    return { ...x, weight: text(Math.max(0, base + dir * stepOf(ex, base))), suggest };
   });
   return { ex: { ...ex, sets }, raised: dir > 0 && changed, lowered: dir < 0 && changed };
 }
