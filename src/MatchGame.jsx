@@ -147,6 +147,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
   };
   const active = mode === 'playing' && !help && assets === 'ready';
   const clears = new Set(frame?.kind === 'clear' ? frame.cells : []);
+  const sparkCells = frame?.kind === 'clear' ? frame.cells.filter((_, i) => i % Math.ceil(frame.cells.length / 24) === 0) : [];
   const powerText = power => power ? `, ${POWER_NAMES[power]}` : '';
 
   return <section className={`match-game match-game--${mode}`} aria-label="Три в ряд" data-no-gestures data-phase={mode} data-busy={busy} ref={root} onKeyDown={panelKeys}>
@@ -189,7 +190,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <div className="match-covers" aria-hidden="true">{[...game.covers, ...(frame?.kind === 'clear' ? frame.reveals : [])].map(at => <i key={at} className={`match-cover${frame?.kind === 'clear' && frame.reveals.includes(at) ? ' is-revealing' : ''}`} style={{ left: `${colOf(at) / MATCH_TUNING.size * 100}%`, top: `${rowOf(at) / MATCH_TUNING.size * 100}%` }}><span>?</span></i>)}</div>
           {frame?.kind === 'clear' && <div className="match-fx" key={serial} aria-hidden="true">
             {frame.cells.map(at => <i key={`ring-${at}`} className="match-burst-ring" style={{ left: `${(colOf(at) + .5) / MATCH_TUNING.size * 100}%`, top: `${(rowOf(at) + .5) / MATCH_TUNING.size * 100}%`, '--burst-color': PIECES[game.board[at].type].color }} />)}
-            {frame.cells.flatMap(at => [0, 1, 2, 3, 4, 5].map(k => <i key={`${at}-${k}`} className="match-spark" style={{ left: `${(colOf(at) + .5) / MATCH_TUNING.size * 100}%`, top: `${(rowOf(at) + .5) / MATCH_TUNING.size * 100}%`, '--dx': `${[25,-25,12,-12,22,-22][k]}px`, '--dy': `${[-23,-20,28,27,6,8][k]}px`, background: PIECES[game.board[at].type].color }} />))}
+            {sparkCells.flatMap(at => [0, 1, 2, 3, 4, 5].map(k => <i key={`${at}-${k}`} className="match-spark" style={{ left: `${(colOf(at) + .5) / MATCH_TUNING.size * 100}%`, top: `${(rowOf(at) + .5) / MATCH_TUNING.size * 100}%`, '--dx': `${[25,-25,12,-12,22,-22][k]}px`, '--dy': `${[-23,-20,28,27,6,8][k]}px`, background: PIECES[game.board[at].type].color }} />))}
             {frame.effects.filter(e => e.power === 'row' || e.power === 'col').map(e => <i key={e.at} className={`match-beam match-beam--${e.power}`} style={e.power === 'row' ? { top: `${(rowOf(e.at) + .5) / MATCH_TUNING.size * 100}%` } : { left: `${(colOf(e.at) + .5) / MATCH_TUNING.size * 100}%` }} />)}
             {frame.effects.filter(e => e.power === 'burst' || e.power === 'color').map(e => <i key={`power-${e.at}`} className="match-power-wave" style={{ left: `${(colOf(e.at) + .5) / MATCH_TUNING.size * 100}%`, top: `${(rowOf(e.at) + .5) / MATCH_TUNING.size * 100}%` }} />)}
           </div>}
@@ -224,7 +225,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
         </> : mode === 'ready' ? <>
           <div className="match-story-intro"><div className="match-story-portrait" aria-hidden="true" /><div><span>{chapter.place}</span><h3 id={title}>{chapter.title}</h3><p>{chapter.intro}</p></div></div>
           <div className="match-mission match-mission--story"><span>{game.moves} {movesLabel(game.moves)}</span><span>{number(game.target)} очков</span><span><Piece type={chapter.type} /> ×{progress.required}</span><span>Ящики ×{chapter.coverGoal}</span></div>
-          <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={() => start(1)}>{assets === 'ready' ? 'Играть' : 'Готовим поле…'}</button>
+          <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={() => start(game.level)}>{assets === 'ready' ? 'Играть' : 'Готовим поле…'}</button>
           <button className="match-secondary" onClick={openHelp}>Как играть</button>
         </> : mode === 'paused' ? <>
           <div className="match-panel-mark"><span className="match-pause-icon" /></div>
@@ -242,7 +243,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <div className="match-result-score"><strong>{number(game.score)}</strong><span>очков за партию</span></div>
           <p className="match-result-quest">{chapter.task}: {progress.collected}/{progress.required} · Ящики: {progress.uncovered}/{progress.coversRequired}</p>
           <p className="match-panel__fine">Лучший каскад ×{Math.max(1, game.bestCombo)}</p>
-          <button className="match-primary" ref={primary} onClick={() => start(mode === 'won' ? (game.level < 3 ? game.level + 1 : 1) : game.level)}>{mode === 'won' ? (game.level < 3 ? 'Следующая глава' : 'Начать историю заново') : 'Повторить главу'}</button>
+          <button className="match-primary" ref={primary} onClick={() => mode === 'won' ? session.prepare(game.level < 3 ? game.level + 1 : 1, token.current) : start(game.level)}>{mode === 'won' ? (game.level < 3 ? 'Следующая глава' : 'Начать историю заново') : 'Повторить главу'}</button>
           <button className="match-secondary" onClick={close}>Вернуться {restLeft == null ? 'в приложение' : 'к отдыху'}</button>
           {mode === 'won' && <div className="match-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <i key={i} style={{ '--x': `${(i * 29 + 5) % 100}%`, '--delay': `${i * 35}ms`, '--turn': `${i * 47}deg`, background: PIECES[i % 6].color }} />)}</div>}
         </>}

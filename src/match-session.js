@@ -77,6 +77,12 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
       clearTimer(); queue = []; result = null; remaining = 0;
       emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level), mode: 'playing', frame: null, selected: null, hint: null, busy: false, message: chapterFor(level).task, reason: '', serial: snapshot.serial + 1 });
     },
+    prepare(level, token) {
+      if (token != null && owner()?.token !== token) return;
+      if (snapshot.mode !== 'won' || expired()) return;
+      clearTimer(); queue = []; result = null; remaining = 0;
+      emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level), mode: 'ready', frame: null, selected: null, hint: null, busy: false, message: '', reason: '', serial: snapshot.serial + 1 });
+    },
     pause,
     resume(token) {
       if (token != null && owner()?.token !== token) return;

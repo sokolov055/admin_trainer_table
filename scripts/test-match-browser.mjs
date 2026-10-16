@@ -127,6 +127,10 @@ test('три в ряд: полный раунд, результат, новый 
   await page.screenshot({ path: 'reports/match/win-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Следующая глава', exact: true }).click();
   assert.equal((await read(page)).game.level, 2); assert.equal((await read(page)).game.moves, MATCH_TUNING.moves);
+  assert.equal((await read(page)).mode, 'ready');
+  assert.match(await page.getByRole('dialog').innerText(), /Зарядить команду/);
+  await page.screenshot({ path: 'reports/match/chapter2-intro-390.png', fullPage: true });
+  await page.getByRole('button', { name: 'Играть', exact: true }).click();
   await page.setViewportSize({ width: 320, height: 640 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: 'reports/match/playing-320.png', fullPage: true });
