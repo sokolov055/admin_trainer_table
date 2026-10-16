@@ -15,7 +15,7 @@ import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconCl
 import SwipeRow from '../SwipeRow.jsx';
 import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
-import { MachinesEditor, MachineForm, extrasHint } from './MachinesEditor.jsx';
+import { MachinesEditor, MachineForm, AlternativesEditor, extrasHint } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
 
 /**
@@ -1269,76 +1269,6 @@ function SetupEditor({ exercise, canEdit, onSaved }) {
       {changed && (
         <button className="button" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить инструкцию'}</button>
       )}
-    </div>
-  );
-}
-
-/**
- * Замены упражнения (07.10.2026, FT-479): тренажёр занят — клиент в
- * занятии одним касанием меняет упражнение на одно из этих. У общего
- * упражнения в общей базе — замены тоже из общей базы
- */
-function AlternativesEditor({ exercise, owner, all, onChanged }) {
-  const e = exercise;
-  const alts = e.alternatives || [];
-  const [adding, setAdding] = useState(false);
-  const [q, setQ] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState(null);
-  useEffect(() => { setAdding(false); setQ(''); setFailure(null); }, [e.id]);
-
-  const save = async (ids) => {
-    setBusy(true);
-    setFailure(null);
-    try {
-      const r = await apiMutate('library.exercise.alternatives', { exerciseId: e.id, ids });
-      haptic('success');
-      setQ('');
-      onChanged(r.exercise);
-    } catch (err) {
-      setFailure(err);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const key = (t) => String(t || '').toLowerCase().replace(/ё/g, 'е');
-  const commonOnly = e.common && owner;
-  const found = q.trim().length < 2 ? [] : (all || [])
-    .filter((x) => x.id !== e.id && !alts.some((a) => a.id === x.id) && (!commonOnly || x.common))
-    .filter((x) => key(x.name).includes(key(q.trim())))
-    .slice(0, 8);
-
-  return (
-    <div className="library__extras">
-      <h3 className="setup__title">Замены</h3>
-      <p className="small muted">
-        {alts.length ? extrasHint(e, owner) : 'Чем заменить, если тренажёр занят: клиент поменяет упражнение в занятии одним касанием.'}
-      </p>
-      {alts.length > 0 && (
-        <div className="chips chips--flush chips--wrap">
-          {alts.map((a) => (
-            <button key={a.id} type="button" className="chip" disabled={busy} aria-label={`Убрать замену «${a.name}»`}
-              onClick={() => save(alts.filter((x) => x.id !== a.id).map((x) => x.id))}>
-              {a.name} ×
-            </button>
-          ))}
-        </div>
-      )}
-      {adding ? (
-        <div className="library__form">
-          <Search value={q} onChange={setQ} placeholder="Найти упражнение" />
-          {found.map((x) => (
-            <button key={x.id} type="button" className="button button--ghost library__alt-pick" disabled={busy}
-              onClick={() => save([...alts.map((a) => a.id), x.id])}>{x.name}</button>
-          ))}
-          {q.trim().length >= 2 && !found.length && <p className="small muted">Не нашлось.{commonOnly ? ' В общей базе — только общие упражнения.' : ''}</p>}
-          <button type="button" className="button button--ghost" onClick={() => { setAdding(false); setQ(''); }}>Готово</button>
-        </div>
-      ) : alts.length < 6 && (
-        <button type="button" className="button button--ghost" onClick={() => setAdding(true)}>+ Замена</button>
-      )}
-      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
     </div>
   );
 }

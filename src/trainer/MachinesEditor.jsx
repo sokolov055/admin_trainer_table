@@ -3,8 +3,9 @@ import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
 import { shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
-import { Segmented, Note } from '../ui.jsx';
+import { Segmented, Note, Search } from '../ui.jsx';
 import { IconAlert, IconClose } from '../icons.jsx';
+import { useReveal } from '../reveal.js';
 
 /*
  * Тренажёры и оборудование упражнения — редактор. Живёт отдельно от
@@ -286,6 +287,78 @@ function MachinePicker({ exercise, attached, onDone }) {
 }
 
 /**
+ * Замены упражнения (07.10.2026, FT-479): тренажёр занят — клиент в
+ * занятии одним касанием меняет упражнение на одно из этих. У общего
+ * упражнения в общей базе — замены тоже из общей базы
+ */
+export function AlternativesEditor({ exercise, owner, all, onChanged }) {
+  const e = exercise;
+  const alts = e.alternatives || [];
+  const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  useEffect(() => { setAdding(false); setQ(''); setFailure(null); }, [e.id]);
+  // Открыли поиск — он на экран, не под нижнее меню (FT-595)
+  const formRef = useReveal(adding ? 'form' : null);
+
+  const save = async (ids) => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      const r = await apiMutate('library.exercise.alternatives', { exerciseId: e.id, ids });
+      haptic('success');
+      setQ('');
+      onChanged(r.exercise);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const key = (t) => String(t || '').toLowerCase().replace(/ё/g, 'е');
+  const commonOnly = e.common && owner;
+  const found = q.trim().length < 2 ? [] : (all || [])
+    .filter((x) => x.id !== e.id && !alts.some((a) => a.id === x.id) && (!commonOnly || x.common))
+    .filter((x) => key(x.name).includes(key(q.trim())))
+    .slice(0, 8);
+
+  return (
+    <div className="library__extras">
+      <h3 className="setup__title">Замены упражнения</h3>
+      <p className="small muted">
+        {alts.length ? extrasHint(e, owner) : 'Чем заменить, если тренажёр занят или упражнение не подходит: клиент поменяет его в занятии одним касанием, а вес подтянется с прошлого раза. Связь работает в обе стороны.'}
+      </p>
+      {alts.length > 0 && (
+        <div className="chips chips--flush chips--wrap">
+          {alts.map((a) => (
+            <button key={a.id} type="button" className="chip" disabled={busy} aria-label={`Убрать замену «${a.name}»`}
+              onClick={() => save(alts.filter((x) => x.id !== a.id).map((x) => x.id))}>
+              {a.name} ×
+            </button>
+          ))}
+        </div>
+      )}
+      {adding ? (
+        <div className="library__form" ref={formRef}>
+          <Search value={q} onChange={setQ} placeholder="Найти упражнение" />
+          {found.map((x) => (
+            <button key={x.id} type="button" className="button button--ghost library__alt-pick" disabled={busy}
+              onClick={() => save([...alts.map((a) => a.id), x.id])}>{x.name}</button>
+          ))}
+          {q.trim().length >= 2 && !found.length && <p className="small muted">Не нашлось.{commonOnly ? ' В общей базе — только общие упражнения.' : ''}</p>}
+          <button type="button" className="button button--ghost" onClick={() => { setAdding(false); setQ(''); }}>Готово</button>
+        </div>
+      ) : alts.length < 6 && (
+        <button type="button" className="button button--ghost" onClick={() => setAdding(true)}>+ Замена</button>
+      )}
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+    </div>
+  );
+}
+
+/**
  * Тренажёры упражнения по его id или названию — для строки программы,
  * шаблона или занятия. Список берётся из базы тренера: у общего с своей
  * версией показывается своя (сервер, exercisesList), поэтому ищем и по
@@ -304,5 +377,11 @@ export function ExerciseMachines({ exerciseId, name, onChanged }) {
   if (!e) {
     return <p className="small muted">Тренажёр прикрепляется к упражнению из базы. Выберите упражнение из списка — потом добавьте к нему тренажёр или оборудование.</p>;
   }
-  return <MachinesEditor exercise={e} owner={!!data.owner} onChanged={(saved) => { reload(); if (onChanged) onChanged(saved); }} />;
+  const changed = (saved) => { reload(); if (onChanged) onChanged(saved); };
+  return <>
+    <MachinesEditor exercise={e} owner={!!data.owner} onChanged={changed} />
+    {/* Замены (владелец, 16.10.2026): прикрепляются там же, где тренажёры, —
+        в программе, шаблоне и занятии, а не только в базе упражнений */}
+    <AlternativesEditor exercise={e} owner={!!data.owner} all={all} onChanged={changed} />
+  </>;
 }
