@@ -838,6 +838,34 @@ test('«делал под другим названием?» — только т
   }
 });
 
+test('«делал под другим названием?» — и в идущем занятии, когда часть подходов сделана (16.10.2026)', async () => {
+  data.clear();
+  exerciseSetupResponse = { setups: { 90: { name: 'Жим над головой в тренажёре с дисками', setup: '', notes: '', machines: [], alternatives: [],
+    noteKey: 'e:жим', muscles: { primary: [], secondary: [] }, media: null } }, notes: {} };
+  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Клиент делал это под другим названием?');
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block: {
+        title: 'Плечи', exercises: [{ name: 'Жим над головой в тренажёре с дисками', exerciseId: 90, sets: '3', reps: '12', weight: '20', prevWeight: '20' }],
+      }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const button = (label) => local.root.findAllByType('button').find((b) => text(b) === label);
+    assert.equal(has(local), false, 'есть прошлый вес — под упражнением ссылки нет');
+    await act(async () => { button('Норм').props.onClick(); await delay(); });
+    assert.equal(has(local), false, 'подход сделан — под упражнением ссылки тоже нет');
+    // Название — касанием: в панели ссылка есть, пока занятие идёт
+    await act(async () => { local.root.findByProps({ className: 'workout__name-tap' }).props.onClick(); await delay(); });
+    assert.equal(has(local), true, 'в панели упражнения — можно перенести и посреди занятия');
+    await act(async () => { button('Готово').props.onClick(); await delay(); });
+    assert.equal(has(local), false, 'панель закрыта — ссылки нет');
+  } finally {
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
+});
+
 /**
  * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
  * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.

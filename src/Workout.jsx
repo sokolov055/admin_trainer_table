@@ -1223,7 +1223,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * ставим её сразу под шапку; видна — экран не двигаем
    */
   const closePanel = (id) => {
-    flushSync(() => { setRenaming(''); setTuning(''); });
+    flushSync(() => { setRenaming(''); setTuning(''); setHistoryPick(null); });
     const row = document.querySelector && document.querySelector('[data-anchor="' + id + '"]');
     if (!row || !row.getBoundingClientRect) return;
     const head = document.querySelector('.workout__header');
@@ -1248,6 +1248,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {/* Тренажёры и оборудование (10.10.2026): тренер прикрепляет прямо в
           занятии — выбор под упражнением появится сразу */}
       {clientRow && ex.name && <ExerciseMachines exerciseId={ex.exerciseId} name={ex.name} onChanged={(saved) => { if (saved && !ex.exerciseId) updateExercise(ei, x => ({ ...x, exerciseId: saved.id })); setSetupsTick(t => t + 1); }} />}
+      {/* Перенос истории из журнала клиента (владелец, 16.10.2026): в идущем
+          занятии тоже, когда часть подходов уже сделана, а упражнение
+          оказалось «тем же, но под старым названием»: сделанное остаётся
+          как есть, веса и настройка — у неотмеченных подходов */}
+      {!asClient && clientRow && editable && ex.exerciseId && (
+        <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
+          onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
+          after="Веса и настройка — уже в этом занятии." />
+      )}
       <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
       <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>
     </div>
@@ -1809,7 +1818,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           Связь в обе стороны (сервер), поэтому вернуться — тем же списком */}
       {/* Только тренеру (владелец, 16.10.2026): то же упражнение под старым
           названием — перенести веса и настройку из журнала клиента */}
-      {!asClient && clientRow && editable && ex.exerciseId && !started
+      {!asClient && clientRow && editable && ex.exerciseId && !started && renaming !== ex.id
         && ((!ex.prevWeight && !ex.lastRun) || historyPick === ex.id) && (
         <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
           onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
