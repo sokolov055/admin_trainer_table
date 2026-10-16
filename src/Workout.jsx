@@ -531,7 +531,35 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
 
   /** +30 секунд к отдыху — и уведомление переставить */
   const extendRest = () => {
-    restAt(Math.max(Date.now(), (state.current && state.current.session.restUntil) || 0) + 30000);
+    const was = (state.current && state.current.session.restUntil) || 0;
+    restAt(Math.max(Date.now(), was) + 30000, was > Date.now() ? restStartOf(was) : undefined);
+  };
+
+  /**
+   * Когда начался идущий отдых: восстанавливаем по запомненному старту, а
+   * если отдых пришёл с другого устройства (часы, второй телефон) —
+   * отсчитываем назад от выбранной длительности
+   */
+  const restStart = useRef({ until: 0, start: 0 });
+  const restStartOf = (until) => {
+    if (restStart.current.until === until && restStart.current.start) return restStart.current.start;
+    return until - ((state.current && state.current.session.restSeconds) || 90) * 1000;
+  };
+
+  /**
+   * Сменили длительность отдыха (владелец, 16.10.2026). Отдых уже идёт — он
+   * не начинается заново: идёт тот же, только с новой длиной от своего
+   * начала. Поставили меньше, чем уже прошло, — отдых заканчивается сразу.
+   * Отдых не идёт — как раньше, запускается новый
+   */
+  const changeRestLength = (seconds) => {
+    const cur = state.current && state.current.session;
+    const until = (cur && cur.restUntil) || 0;
+    const running = !!cur && cur.status === 'active' && until > Date.now();
+    const start = running ? restStartOf(until) : 0;
+    change(v => ({ ...v, restSeconds: seconds }));
+    if (!running) { startRest(seconds); return; }
+    restAt(Math.max(Date.now(), start + seconds * 1000), start);
   };
 
   /**
@@ -541,7 +569,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * restLocal — платформа этого телефона. Запрещены уведомления — отметки
    * нет, и уведомление придёт с сервера, как раньше.
    */
-  const restAt = (until) => {
+  const restAt = (until, start = Date.now()) => {
+    restStart.current = { until, start };
     // Длина отдыха — для кольца на экране отдыха
     setCollapsedUntil(0);
     change(v => ({ ...v, restUntil: until, restLocal: '' }));
@@ -1223,7 +1252,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * ставим её сразу под шапку; видна — экран не двигаем
    */
   const closePanel = (id) => {
-    flushSync(() => { setRenaming(''); setTuning(''); });
+    flushSync(() => { setRenaming(''); setTuning(''); setHistoryPick(null); });
     const row = document.querySelector && document.querySelector('[data-anchor="' + id + '"]');
     if (!row || !row.getBoundingClientRect) return;
     const head = document.querySelector('.workout__header');
@@ -1248,6 +1277,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {/* Тренажёры и оборудование (10.10.2026): тренер прикрепляет прямо в
           занятии — выбор под упражнением появится сразу */}
       {clientRow && ex.name && <ExerciseMachines exerciseId={ex.exerciseId} name={ex.name} onChanged={(saved) => { if (saved && !ex.exerciseId) updateExercise(ei, x => ({ ...x, exerciseId: saved.id })); setSetupsTick(t => t + 1); }} />}
+      {/* Перенос истории из журнала клиента (владелец, 16.10.2026): в идущем
+          занятии тоже, когда часть подходов уже сделана, а упражнение
+          оказалось «тем же, но под старым названием»: сделанное остаётся
+          как есть, веса и настройка — у неотмеченных подходов */}
+      {!asClient && clientRow && editable && ex.exerciseId && (
+        <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
+          onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
+          after="Веса и настройка — уже в этом занятии." />
+      )}
       <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
       <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>
     </div>
@@ -1809,7 +1847,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           Связь в обе стороны (сервер), поэтому вернуться — тем же списком */}
       {/* Только тренеру (владелец, 16.10.2026): то же упражнение под старым
           названием — перенести веса и настройку из журнала клиента */}
-      {!asClient && clientRow && editable && ex.exerciseId && !started
+      {!asClient && clientRow && editable && ex.exerciseId && !started && renaming !== ex.id
         && ((!ex.prevWeight && !ex.lastRun) || historyPick === ex.id) && (
         <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
           onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
@@ -1913,7 +1951,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {editable && !confirm && <div className="workout__toolbar workout__toolbar--head">
           <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
           {!asClient && <button className={'button workout__pick-toggle' + (picking ? ' is-on' : '')} aria-pressed={picking} onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>}
-          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => { const seconds = Number(e.target.value); change(v => ({ ...v, restSeconds: seconds })); startRest(seconds); }}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
+          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
         </div>}
         {/* Полоса своя, а не браузерный progress: системный выглядит
             по-разному в каждом движке и ни в одной теме не совпадает с
