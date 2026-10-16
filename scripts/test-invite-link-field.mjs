@@ -11,6 +11,9 @@ import renderer, { act } from 'react-test-renderer';
  * 16.10.2026): касание выделяет весь адрес, кнопка кладёт его в буфер.
  */
 
+// В Node старше 21 глобального navigator нет (компонент читает navigator.share)
+if (typeof navigator === 'undefined') globalThis.navigator = {};
+
 const URL_ = 'https://app.fitness100.ru/?access=UCxKf4lR15lnH6W3X9ZIfAKIg-weWuWbTBm0KRfAdfOb';
 const copied = [];
 globalThis.__access = {
