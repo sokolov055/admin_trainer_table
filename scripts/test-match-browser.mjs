@@ -44,9 +44,9 @@ test('три в ряд: касания, подсказка, неверный о�
   await page.clock.runFor(400);
   await page.screenshot({ path: '.impeccable/review/mobile.png', fullPage: true });
   const covered = (await read(page)).game.covers[0];
-  await page.locator(`[data-cell="${covered}"]`).click();
+  assert.equal(await page.locator(`[data-cell="${covered}"]`).getAttribute('aria-disabled'), 'true');
+  assert.equal((await page.evaluate(() => matchFixture.legal())).some(pair => pair.includes(covered)), false);
   assert.equal((await read(page)).game.moves, MATCH_TUNING.moves);
-  assert.match(await page.getByRole('status').innerText(), /закрытой клеткой/);
   await page.getByRole('button', { name: 'Подсказка', exact: true }).click();
   assert.equal(await page.locator('.is-hint').count(), 2);
   await move(page);
