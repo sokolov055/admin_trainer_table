@@ -4,6 +4,7 @@ import { apiMutate } from './api.js';
 import { mediaUrl } from './library.js';
 import { useVideoSrc } from './offline-media.js';
 import { isOffline, queueWrite } from './offline-writes.js';
+import { useReveal } from './reveal.js';
 
 /**
  * Видео и анимация техники упражнения.
@@ -165,6 +166,8 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => { if (!editing) setText(note ? note.text : ''); }, [note, editing]);
+  // Поле и «Сохранить» — на экран, не под нижнее меню (FT-595)
+  const formRef = useReveal(editing && (error || 'open'));
 
   const save = async () => {
     setBusy(true);
@@ -203,7 +206,7 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
         {(trainer ? '+ Настройка клиента' : '+ Моя настройка') + (label ? ' · ' + label : '')}
       </button>;
   }
-  return <div className="workout__note-form">
+  return <div className="workout__note-form" ref={formRef}>
     <textarea className="field__input" rows={2} maxLength={300} value={text} autoFocus
       aria-label={(trainer ? 'Настройка клиента' : 'Своя настройка') + (label ? ': ' + label : '')}
       placeholder="Спинка 3, сиденье 5, упор на 2-й" onChange={(e) => setText(e.target.value)} />

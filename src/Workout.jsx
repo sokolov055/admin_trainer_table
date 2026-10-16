@@ -40,6 +40,7 @@ import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
+import { useReveal } from './reveal.js';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
 
@@ -1633,6 +1634,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // У какого упражнения тренер открыл «делал под другим названием?» — пока
   // открыто, блок не прячется, даже когда веса уже подтянулись («Отменить»)
   const [historyPick, setHistoryPick] = useState(null);
+  // Раскрытый список замен — на экран (FT-595). Ошибки сохранения — нет
+  // (data-reveal="off"): они бывают и фоновые, и рывок к шапке посреди
+  // подходов мешал бы
+  const altsRef = useReveal(swapping);
   // Историю перенесли (HistoryMove) — веса неотмеченных подходов и
   // настройка — заново, уже по этому упражнению
   const reloadHistory = async (ei) => {
@@ -1817,7 +1822,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
             {swapping === ex.id ? 'Не заменять' : 'Заменить упражнение'}
           </button>
-          {swapping === ex.id && <div className="workout__alts-list">
+          {swapping === ex.id && <div className="workout__alts-list" ref={altsRef}>
             <p className="small muted">Тренажёр занят или упражнение не подходит — выберите, чем заменить. Вес подтянется с прошлого раза.</p>
             {alts.map((a) => (
               <button type="button" key={a.id} className="workout__alts-item"
@@ -1864,8 +1869,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     {!s && <BackButton label={backLabel} onClick={close} />}
     {!ready && <p role="status">Открываем журнал тренировок…</p>}
     {storageError && <p role="alert" className="workout__error">Устройство не сохранило черновик. Не закрывайте экран до сохранения в облаке.</p>}
-    {message && <div role="alert" className="workout__error"><p>{message}</p><button className="button" disabled={busy} onClick={() => { setMessage(''); record?.dirty ? save() : list().catch(e => setMessage(e.message)); }}>Повторить</button></div>}
-    {conflict && <div role="alert" className="workout__error">
+    {message && <div role="alert" className="workout__error" data-reveal="off"><p>{message}</p><button className="button" disabled={busy} onClick={() => { setMessage(''); record?.dirty ? save() : list().catch(e => setMessage(e.message)); }}>Повторить</button></div>}
+    {conflict && <div role="alert" className="workout__error" data-reveal="off">
       <h3>{conflict.activeConflict ? 'Уже есть текущее занятие' : 'Занятие изменено на другом устройстве'}</h3>
       <p>Ваш черновик сохранён отдельно. Скачайте его, затем откройте актуальную версию и перенесите нужные изменения.</p>
       <button className="button" onClick={exportDraft}>Скачать мой черновик</button>

@@ -9,6 +9,7 @@ import SwipeRow from '../SwipeRow.jsx';
 import { haptic } from '../telegram.js';
 import { apiPublic } from '../api.js';
 import { useData } from '../useData.js';
+import { useReveal } from '../reveal.js';
 import { trackOf, cardioFrom, planScheme, techniqueOf, techniqueText, planOneSide } from '../exercise-track.js';
 import { IconPlus, IconLinkPair, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
@@ -64,6 +65,9 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
 
   // Что открыто: { kind: 'name' | 'scheme', i }
   const [open, setOpen] = useState(null);
+  // Раскрыли подходы — панель целиком на экран (FT-595). Название не трогаем:
+  // поле подбора само поднимается к верху над клавиатурой (ExercisePicker)
+  const schemeRef = useReveal(open && open.kind === 'scheme' ? 'scheme:' + open.i : null);
   const [sure, setSure] = useState(false);
   const root = useRef(null);
   const drag = useRef(null);
@@ -417,7 +421,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const next = list[i + 1];
     const inGroup = !!ex.supersetGroup && list.filter((e) => e.supersetGroup === ex.supersetGroup).length > 1;
     return (
-      <div className="plan-inline__panel">
+      <div className="plan-inline__panel" ref={schemeRef}>
         {track.kind === 'cardio'
           ? (
             <CardioPlan
@@ -632,6 +636,8 @@ export function AddBlock({ onAdd, busy }) {
   const [mode, setMode] = useState(''); // '' | 'menu' | 'templates'
   const templates = useData('library.templates', { kind: 'workout' }, [mode === 'templates']);
   const [loading, setLoading] = useState(0);
+  // Меню и список шаблонов — под последней тренировкой, у нижнего края: на экран
+  const ref = useReveal(mode && mode + (mode === 'templates' && !templates.loading ? ':ready' : ''));
   if (!mode) {
     return (
       <button type="button" className="plan-inline__plus" aria-label="Добавить тренировку" disabled={busy} onClick={() => { setMode('menu'); haptic(); }}>
@@ -641,7 +647,7 @@ export function AddBlock({ onAdd, busy }) {
   }
   if (mode === 'menu') {
     return (
-      <div className="plan-inline__add-menu">
+      <div className="plan-inline__add-menu" ref={ref}>
         <button type="button" className="button button--block" onClick={() => setMode('templates')}>Из шаблонов тренировок</button>
         <button type="button" className="button button--primary button--block" onClick={() => { setMode(''); onAdd(null); }}>Новая тренировка</button>
         <button type="button" className="button button--ghost button--block" onClick={() => setMode('')}>Отмена</button>
@@ -650,7 +656,7 @@ export function AddBlock({ onAdd, busy }) {
   }
   const list = templates.data ? templates.data.templates : [];
   return (
-    <div className="plan-inline__add-menu">
+    <div className="plan-inline__add-menu" ref={ref}>
       {templates.loading && <p className="small muted">Загружаю шаблоны…</p>}
       {!templates.loading && !list.length && <p className="small muted">Шаблонов тренировок нет — их заводят в разделе «Библиотека».</p>}
       {list.map((t) => (

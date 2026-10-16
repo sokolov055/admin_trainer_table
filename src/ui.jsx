@@ -533,7 +533,7 @@ export function Note({ tone = 'info', icon, children }) {
   const IconComponent = icon || (tone === 'critical' ? IconAlert : tone === 'good' ? IconCheck : IconAlert);
 
   return (
-    <div className={'note note--' + tone}>
+    <div className={'note note--' + tone} data-reveal="">
       <span className="note__icon"><IconComponent size={18} /></span>
       <div className="note__text">{children}</div>
     </div>

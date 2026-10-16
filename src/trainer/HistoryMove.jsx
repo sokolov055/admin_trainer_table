@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
+import { useReveal } from '../reveal.js';
 
 /**
  * «Это то же упражнение, переименованное?» (владелец, 16.10.2026). Пока база
@@ -13,6 +14,9 @@ export default function HistoryMove({ clientRow, from, to, onClose, onMoved, aft
   const [step, setStep] = useState('ask');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  // Вопрос, ответ, ошибка — на экран: выбрали из длинного списка внизу, а
+  // вопрос встал выше экрана (FT-595)
+  const ref = useReveal(step + (error ? ':' + error : ''));
 
   const call = async (action, params, next) => {
     setStep('busy');
@@ -32,13 +36,13 @@ export default function HistoryMove({ clientRow, from, to, onClose, onMoved, aft
   const undo = () => call('client.exercise.history.undo', { moveId: result.moveId }, 'undone');
 
   if (step === 'undone') {
-    return <div className="history-move" role="status">
+    return <div className="history-move" role="status" ref={ref}>
       <p className="history-move__text">Перенос отменён — история осталась у «{from.name}».</p>
       <button type="button" className="history-move__link" onClick={onClose}>Закрыть</button>
     </div>;
   }
   if (step === 'done' && result) {
-    return <div className="history-move" role="status">
+    return <div className="history-move" role="status" ref={ref}>
       <p className="history-move__text">{result.moveId
         ? `Перенесено на «${to.name}»: ${result.sessions} ${plural(result.sessions)}${result.notes ? ' и настройка' : ''}.${after ? ' ' + after : ''}`
         : `Переносить нечего: в журнале клиента нет «${from.name}».`}</p>
@@ -50,7 +54,7 @@ export default function HistoryMove({ clientRow, from, to, onClose, onMoved, aft
     </div>;
   }
   const busy = step === 'busy';
-  return <div className="history-move">
+  return <div className="history-move" ref={ref}>
     <p className="history-move__text">Клиент уже делал «{from.name}». Это то же упражнение, только под новым названием?</p>
     <p className="small muted">Тогда его веса, «Было» и рекорды перейдут на «{to.name}». У других клиентов ничего не поменяется.</p>
     {error && <p className="small danger">{error}</p>}
@@ -80,6 +84,8 @@ export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '
   const [error, setError] = useState('');
   const [from, setFrom] = useState(null);
   const [query, setQuery] = useState('');
+  // Раскрыли — список на экран; журнал пришёл — ещё раз, он стал длиннее
+  const ref = useReveal(open && !from && (error ? 'error' : list ? 'list' : 'loading'));
 
   const show = async () => {
     setOpen(true);
@@ -102,7 +108,7 @@ export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '
   const items = (list || [])
     .filter((x) => !(x.exerciseId && x.exerciseId === to.id) && x.name !== to.name)
     .filter((x) => !words || x.name.toLowerCase().includes(words));
-  return <div className="history-move">
+  return <div className="history-move" ref={ref}>
     <p className="history-move__text">Что из журнала клиента — это «{to.name}»?</p>
     {error && <p className="small danger">{error}</p>}
     {!list && !error && <p className="small muted">Загружаю журнал…</p>}
