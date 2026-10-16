@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { createClientLink, fetchClientLink, revokeClientLink, shareAccessLink } from '../access.js';
+import { copyText, createClientLink, fetchClientLink, revokeClientLink, shareAccessLink } from '../access.js';
 import { formatDate } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { IconAlert, IconCheck, IconCopy, IconKey, IconRefresh, IconSend, IconTrash } from '../icons.jsx';
@@ -34,6 +34,13 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
   const [note, setNote] = useState('');
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // Адрес скопирован кнопкой рядом с ним — подпись держится пару секунд
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => setCopied(false), 2500);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   const load = () => {
     setState((value) => ({ ...value, loading: true, error: null }));
@@ -75,6 +82,12 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
     setConfirmRevoke(false);
     setNote('Ссылка отозвана. Уже открытые кабинеты остались — их закрывает «Сбросить доступ».');
     haptic();
+  });
+
+  const copy = (link) => run(async () => {
+    await copyText(link.url);
+    setCopied(true);
+    haptic('success');
   });
 
   const send = async (link) => {
@@ -135,8 +148,21 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
           >
             <summary>Ссылка и доступ</summary>
 
+            {/* Поле, а не текст (владелец, 16.10.2026): касание выделяет весь
+                адрес, а «Копировать» кладёт его в буфер одним нажатием */}
             <div className="access-link__row">
-              <code className="access-link__url">{link.url}</code>
+              <input
+                className="access-link__url"
+                type="text"
+                readOnly
+                value={link.url}
+                aria-label="Ссылка для входа"
+                onFocus={(event) => event.currentTarget.select()}
+              />
+              <button type="button" className="button access-link__copy" onClick={() => copy(link)} disabled={busy}>
+                {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                {copied ? 'Скопировано' : 'Копировать'}
+              </button>
             </div>
 
             <div className="access-link__actions">

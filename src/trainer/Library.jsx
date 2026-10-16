@@ -430,10 +430,12 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
           <Field label="Название" inputMode="text" placeholder={kind === 'program' ? 'Похудение, 3 раза в неделю' : 'Верх тела'} value={title} onChange={setTitle} />
           <GoalPicker value={goal} onChange={setGoal} />
 
-          <div>
+          {/* Уровень — у программы (владелец, 16.10.2026): у шаблона одной
+              тренировки его нет; у уже заведённого значение сохраняется */}
+          {kind === 'program' && <div>
             <span className="field__label">Уровень</span>
             <Segmented items={LEVELS} value={level} onChange={setLevel} label="Уровень" />
-          </div>
+          </div>}
 
           <label className="field">
             <span className="field__label">Описание</span>
@@ -441,7 +443,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
               className="field__input library__textarea"
               value={description}
               maxLength={1000}
-              placeholder="Для кого и как вести: частота, прогрессия, на что обратить внимание"
+              placeholder={kind === 'program' ? 'Для кого и как вести: частота, прогрессия, на что обратить внимание' : 'На что обратить внимание в этой тренировке'}
               onChange={(e) => setDescription(e.target.value)}
             />
           </label>

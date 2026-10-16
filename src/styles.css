@@ -3257,19 +3257,27 @@ code {
 .access-link__more[open] > summary { margin-bottom: var(--space-3); }
 
 .access-link__row {
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken, var(--fill));
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
 }
 
 .access-link__url {
-  display: block;
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  word-break: break-all;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken, var(--fill));
   color: var(--text);
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
 }
+
+.access-link__copy { flex: none; min-height: 44px; }
 
 .access-link__actions {
   display: flex;
