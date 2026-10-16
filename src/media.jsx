@@ -138,11 +138,11 @@ export function MachinePhoto({ machine }) {
  * 5» — у каждого клиента своя, поэтому живёт не у тренажёра, а у клиента.
  * Видна первой: ради неё в зале и открывают
  */
-export function PersonalNote({ text, trainer = false, by = '', local = false }) {
+export function PersonalNote({ text, trainer = false, by = '', local = false, label = '' }) {
   if (!text) return null;
   return (
     <div className="machine__note">
-      <strong>{trainer ? 'Настройка клиента' : 'Ваша настройка' + (by === 'trainer' ? ' · записал тренер' : '')}{local ? ' · на телефоне, отправится при связи' : ''}</strong>
+      <strong>{trainer ? 'Настройка клиента' : 'Ваша настройка' + (by === 'trainer' ? ' · записал тренер' : '')}{label ? ' · ' + label : ''}{local ? ' · на телефоне, отправится при связи' : ''}</strong>
       <span>{text}</span>
     </div>
   );
@@ -154,7 +154,12 @@ export function PersonalNote({ text, trainer = false, by = '', local = false }) 
  * сам или тренер в его занятии, и в следующий раз она здесь же — первой.
  * Пустой текст — стереть
  */
-export function MachineNote({ target, note, trainer, params, onSaved }) {
+/**
+ * label — название тренажёра, когда их у упражнения несколько (штанга,
+ * скамья): у каждого своя настройка. note.from — настройка показана со
+ * старого ключа упражнения (сервер, withLegacyNotes): сохранение переносит её
+ */
+export function MachineNote({ target, label = '', note, trainer, params, onSaved }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note ? note.text : '');
   const [busy, setBusy] = useState(false);
@@ -165,7 +170,7 @@ export function MachineNote({ target, note, trainer, params, onSaved }) {
     setBusy(true);
     setError('');
     try {
-      const request = { ...params, target, text };
+      const request = { ...params, target, text, ...(note && note.from ? { legacy: note.from } : {}) };
       let saved;
       try {
         saved = (await apiMutate('client.machine.note.save', request)).note;
@@ -190,17 +195,17 @@ export function MachineNote({ target, note, trainer, params, onSaved }) {
   if (!editing) {
     return note
       ? <div className="workout__note">
-        <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} />
+        <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} label={label} />
         <button type="button" className="workout__note-edit" onClick={() => setEditing(true)}>Изменить</button>
       </div>
       : <button type="button" className="workout__note-add" onClick={() => setEditing(true)}>
         {/* Короче (владелец, 09.10.2026): клиенту — своя, тренеру — клиента */}
-        {trainer ? '+ Настройка клиента' : '+ Моя настройка'}
+        {(trainer ? '+ Настройка клиента' : '+ Моя настройка') + (label ? ' · ' + label : '')}
       </button>;
   }
   return <div className="workout__note-form">
     <textarea className="field__input" rows={2} maxLength={300} value={text} autoFocus
-      aria-label={trainer ? 'Настройка клиента' : 'Своя настройка'}
+      aria-label={(trainer ? 'Настройка клиента' : 'Своя настройка') + (label ? ': ' + label : '')}
       placeholder="Спинка 3, сиденье 5, упор на 2-й" onChange={(e) => setText(e.target.value)} />
     {error && <p className="small danger">{error}</p>}
     <div className="workout__note-actions">

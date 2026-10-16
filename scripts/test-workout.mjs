@@ -715,6 +715,54 @@ test('FT-570: регулировки тренажёра раскрываются
 });
 
 /**
+ * Тренажёр закрепляет тренер (решение владельца 16.10.2026): в занятии
+ * выбирать нечего — первый подставлен сам с весом на нём, у каждого
+ * тренажёра набора (гриф, скамья) своя настройка; старая настройка «по
+ * упражнению» видна у первого и при правке переезжает под него.
+ */
+test('тренажёры закрепил тренер: выбора нет, первый сам, у каждого своя настройка, старая переезжает', async () => {
+  data.clear();
+  const bar = { uid: 'bar1', name: 'Гриф', kind: 'equipment' };
+  const bench = { uid: 'bench1', name: 'Скамья', kind: 'equipment' };
+  exerciseSetupResponse = { setups: { 77: {
+    name: 'Жим лёжа', setup: '', notes: '', machines: [bar, bench], alternatives: [], noteKey: 'e:жим лёжа',
+    muscles: { primary: [], secondary: [] }, media: null,
+  } }, notes: { 'm:bar1': { text: 'Хват 81', by: 'client', from: 'e:жим лёжа' } } };
+  const calls = [];
+  const api = globalThis.__workoutApi;
+  globalThis.__workoutApi = async (action, params) => {
+    calls.push([action, params]);
+    if (action === 'client.machine.note.save') return { note: { text: params.text, by: 'client' } };
+    return api(action, params);
+  };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: {
+        title: 'Грудь', exercises: [{ name: 'Жим лёжа', exerciseId: 77, sets: '3', reps: '10', weight: '60' }],
+      }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    assert.equal(local.root.findAll(n => n.props.role === 'radiogroup').length, 0, 'выбирать тренажёр нечего');
+    assert.ok(calls.some(([a, q]) => a === 'workout.exercise.history' && q.machineUid === 'bar1'), 'первый подставлен сам — с весом на нём');
+    assert.equal(text(local.root.find(n => n.props.className === 'small workout__gear')), 'Оборудование · Гриф   Оборудование · Скамья');
+    assert.deepEqual(local.root.findAll(n => n.props.className === 'machine__note').map(text), ['Ваша настройка · ГрифХват 81']);
+    assert.ok(local.root.findAllByType('button').some(b => text(b) === '+ Моя настройка · Скамья'), 'у скамьи своя');
+
+    const edit = local.root.findAllByType('button').find(b => text(b) === 'Изменить');
+    await act(async () => { edit.props.onClick(); await delay(); });
+    await act(async () => { local.root.find(n => n.type === 'textarea' && /Спинка 3/.test(n.props.placeholder || '')).props.onChange({ target: { value: 'Хват 80' } }); await delay(); });
+    await act(async () => { local.root.findAllByType('button').find(b => text(b) === 'Сохранить').props.onClick(); await delay(); });
+    const saved = calls.find(([a]) => a === 'client.machine.note.save')[1];
+    assert.deepEqual([saved.target, saved.text, saved.legacy], ['m:bar1', 'Хват 80', 'e:жим лёжа'], 'старая переезжает под гриф');
+  } finally {
+    globalThis.__workoutApi = api;
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
+});
+
+/**
  * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
  * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.
  */

@@ -26,6 +26,11 @@ import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { ExerciseMachines } from './trainer/MachinesEditor.jsx';
+
+/** У тренажёра есть что раскрыть: фото или где регулировки */
+function machineHasDetails(m) {
+  return !!(m && (m.setup || m.photo || (m.photos && m.photos.length)));
+}
 import { useData } from './useData.js';
 import { SetupText, SetupMistakes, setupParts, MachineInfo, MachineNote, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
@@ -1617,6 +1622,24 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
 
+  // Тренажёр закрепляет тренер (16.10.2026): в занятии он один — первый из
+  // привязанных, клиент не выбирает. Черновик, начатый до привязки, или
+  // тренажёр, прикреплённый тренером прямо в занятии, — подставляем сами,
+  // с весом с прошлого раза на нём (chooseMachine)
+  const autoMachine = useRef(new Set());
+  useEffect(() => {
+    if (!editable) return;
+    s.exercises.forEach((ex, ei) => {
+      const machines = (setups[ex.exerciseId] && setups[ex.exerciseId].machines) || [];
+      if (!machines.length || ex.sets.some((x) => x.who)) return;
+      if (ex.machine && machines.some((m) => m.uid === ex.machine.uid)) return;
+      const mark = ex.id + '|' + machines[0].uid;
+      if (autoMachine.current.has(mark)) return;
+      autoMachine.current.add(mark);
+      chooseMachine(ei, machines[0]);
+    });
+  }, [setups, editable, s && s.exercises]);
+
   /**
    * Под названием упражнения из базы (07.10.2026): на каком тренажёре
    * (FT-478) — вес у каждого свой, — как его настроить, и чем заменить, если
@@ -1624,54 +1647,52 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * замене не переносится, а терять его нельзя
    */
   /**
-   * Сплит-пара (FT-488): у каждого свой тренажёр, своя настройка и свой
-   * вес. Строкой на человека — в зале они рядом, и видно, кому что ставить
+   * Сплит-пара (FT-488): тренажёр у пары тот же, что закрепил тренер, а
+   * настройка и вес у каждого свои. Строкой на человека — в зале они рядом,
+   * и видно, кому что ставить
    */
   const splitView = (ex, ei, info) => {
     const machines = info.machines || [];
     const whos = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))]
       // Участник в своём кабинете — только своя строка настройки
       .filter((w) => clientRow || w in notesBy || !Object.keys(notesBy).length);
-    const chosenOf = (w) => (ex.machines && ex.machines[w] && machines.find((m) => m.uid === ex.machines[w].uid)) || null;
-    const used = [...new Set(whos.map(chosenOf).filter(Boolean))];
+    const targets = noteTargetsOf(info);
     return <>
+      {gearLine(machines)}
       {whos.map((w) => {
-        const chosen = chosenOf(w);
-        const target = chosen ? 'm:' + chosen.uid : (machines.length ? '' : info.noteKey || '');
         const own = notesBy[w] || {};
         const canNote = clientRow || w in notesBy;
         return (
           <div className="workout__member" key={w}>
             <span className="workout__member-name">{w}</span>
-            {machines.length > 0 && (
-              <div className="chips chips--flush chips--wrap" role="radiogroup" aria-label={'Тренажёр: ' + w}>
-                {machines.map((m) => (
-                  <button type="button" key={m.uid} role="radio" aria-checked={chosen === m}
-                    className={'chip' + (chosen === m ? ' chip--active' : '')} disabled={!editable}
-                    onClick={() => chooseMemberMachine(ei, w, chosen === m ? null : m)}>{m.name}</button>
-                ))}
-              </div>
-            )}
-            {target && canNote && (
-              <MachineNote key={w + target} target={target} note={own[target]} trainer={!asClient} params={{ ...params, member: w }}
+            {canNote && targets.map(({ target, label }) => (
+              <MachineNote key={w + target} target={target} label={label} note={own[target]} trainer={!asClient} params={{ ...params, member: w }}
                 onSaved={(n) => setNotesBy((v) => {
                   const next = { ...(v[w] || {}) };
                   if (n) next[target] = n; else delete next[target];
+                  if (own[target] && own[target].from) delete next[own[target].from];
                   return { ...v, [w]: next };
                 })} />
-            )}
+            ))}
           </div>
         );
       })}
-      {machines.length > 0 && editable && whos.some((w) => !chosenOf(w)) && <p className="small muted">На каком тренажёре? Вес у каждого свой.</p>}
-      {(used.length ? used : [null]).map((m) => ((m ? m.setup || m.photo || (m.photos && m.photos.length) : false) && (
-        <details className="workout__setup" key={m ? m.uid : 'all'}>
-          <summary>{(m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + m.name}</summary>
-          <MachineInfo machine={m} />
-        </details>
-      )))}
-      {aboutView(info)}
+      {aboutView(info, machines)}
     </>;
+  };
+
+  /** Куда писать настройку: каждый тренажёр упражнения, а без них — само упражнение */
+  const noteTargetsOf = (info) => {
+    const machines = info.machines || [];
+    if (machines.length) return machines.map((m) => ({ target: 'm:' + m.uid, label: machines.length > 1 ? m.name : '' }));
+    return info.noteKey ? [{ target: info.noteKey, label: '' }] : [];
+  };
+
+  /** Тренажёры без фото и регулировок — строкой: у остальных название в «Тренажёр · …» ниже (FT-570) */
+  const gearLine = (machines) => {
+    const plain = machines.filter((m) => !machineHasDetails(m));
+    if (!plain.length) return null;
+    return <p className="small workout__gear">{plain.map((m) => (m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + m.name).join('   ')}</p>;
   };
 
   /**
@@ -1680,13 +1701,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * источника: один тренажёр используют в разных упражнениях, поэтому его
    * регулировки не должны повторять инструкцию упражнения (FT-570).
    */
-  const aboutView = (info, chosen = null, title = '') => {
-    const photos = chosen && (chosen.photos && chosen.photos.length ? chosen.photos : chosen.photo ? [chosen.photo] : []);
-    const machineDetails = !!(chosen && (chosen.setup || photos.length));
+  const aboutView = (info, gear = null, title = '') => {
+    // Тренажёры упражнения — все, что закрепил тренер (штанга, гриф, скамья)
+    const withDetails = (Array.isArray(gear) ? gear : gear ? [gear] : []).filter(machineHasDetails);
+    const machineDetails = withDetails.length > 0;
     const muscles = info.muscles && ((info.muscles.primary || []).length || (info.muscles.secondary || []).length) ? info.muscles : null;
     if (!machineDetails && !info.setup && !info.notes && !info.media && !muscles) return null;
 
-    const word = chosen && chosen.kind === 'equipment' ? 'Оборудование' : 'Тренажёр';
     // Техника часто записана тем же текстом, что «Как настроить», — второй
     // раз не показываем (владелец, 09.10.2026: текст повторялся под шагами)
     const flat = (t) => String(t || '').toLowerCase().replace(/[^a-zа-яё0-9]+/g, ' ').trim();
@@ -1699,10 +1720,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       .filter((mistake, index, all) => all.findIndex((item) => flat(item) === flat(mistake)) === index);
     return <div className="workout__about">
       {title && <h4 className="workout__about-name">{title}</h4>}
-      {machineDetails && <details className="workout__setup workout__machine-info">
-        <summary>{word + ' · ' + chosen.name}</summary>
-        <MachineInfo machine={chosen} />
-      </details>}
+      {withDetails.map((m) => <details className="workout__setup workout__machine-info" key={m.uid}>
+        <summary>{(m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + m.name}</summary>
+        <MachineInfo machine={m} />
+      </details>)}
       {info.setup && <section className="workout__guide">
         <h4 className="workout__guide-title">Как настроить</h4>
         <SetupText text={info.setup} showMistakes={false} />
@@ -1728,36 +1749,33 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const extrasView = (ex, ei, info) => {
     const machines = info.machines || [];
     const split = ex.sets.some((x) => x.who);
-    const chosen = (ex.machine && machines.find((m) => m.uid === ex.machine.uid)) || null;
+    const primary = (ex.machine && machines.find((m) => m.uid === ex.machine.uid)) || machines[0] || null;
     const alts = (info.alternatives || []).filter((a) => a.id !== Number(ex.exerciseId));
     const started = ex.sets.some((x) => x.state === 'done');
-    const noteTarget = chosen ? 'm:' + chosen.uid : (machines.length ? '' : info.noteKey || '');
     return <>
+      {/* Тренажёр закрепил тренер (16.10.2026) — клиент его не выбирает */}
       {machines.length > 0 && !split && (
         <div className="workout__machines">
-          <div className="chips chips--flush chips--wrap" role="radiogroup" aria-label="Тренажёр">
-            {machines.map((m) => (
-              <button type="button" key={m.uid} role="radio" aria-checked={chosen === m}
-                className={'chip' + (chosen === m ? ' chip--active' : '')} disabled={!editable}
-                onClick={() => chooseMachine(ei, chosen === m ? null : m)}>{m.name}</button>
-            ))}
-          </div>
-          {!chosen && editable && <p className="small muted">На каком тренажёре? Вес у каждого свой.</p>}
-          {chosen && editable && !ex.prevWeight && !ex.lastRun && trackOf(ex).kind === 'strength'
+          {gearLine(machines)}
+          {primary && editable && !ex.prevWeight && !ex.lastRun && trackOf(ex).kind === 'strength'
             && ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim()) && (
-            <p className="small muted">На тренажёре «{chosen.name}» ещё не делали — впишите вес, дальше он запомнится.</p>
+            <p className="small muted">Здесь ещё не делали — впишите вес, дальше он запомнится.</p>
           )}
         </div>
       )}
       {/* Своя настройка — у каждого клиента своя, на виду, а не в
-          раскрывашке: ради неё в зале и смотрят. Тренажёров несколько —
-          сначала выбрать, на каком */}
-      {!split && noteTarget && (
-        <MachineNote key={noteTarget} target={noteTarget} note={notes[noteTarget]} trainer={!asClient} params={params}
-          onSaved={(n) => setNotes((v) => { const next = { ...v }; if (n) next[noteTarget] = n; else delete next[noteTarget]; return next; })} />
-      )}
+          раскрывашке: ради неё в зале и смотрят. У каждого тренажёра своя */}
+      {!split && noteTargetsOf(info).map(({ target, label }) => (
+        <MachineNote key={target} target={target} label={label} note={notes[target]} trainer={!asClient} params={params}
+          onSaved={(n) => setNotes((v) => {
+            const next = { ...v };
+            if (n) next[target] = n; else delete next[target];
+            if (v[target] && v[target].from) delete next[v[target].from];
+            return next;
+          })} />
+      ))}
       {split && splitView(ex, ei, info)}
-      {!split && aboutView(info, chosen)}
+      {!split && aboutView(info, machines)}
       {alts.length > 0 && editable && !started && (
         <div className="workout__alts">
           <span className="small muted">Занято? Заменить на:</span>
