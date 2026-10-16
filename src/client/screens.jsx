@@ -1018,6 +1018,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                   canRemove={shownBlocks.length > 1}
                   onChange={(exercises) => commit(shownBlocks.map((b, k) => (k === bi ? { ...b, exercises } : b)))}
                   onRemove={() => commit(shownBlocks.filter((_, k) => k !== bi))}
+                  // Перенесли историю (HistoryMove) — «Было» и веса заново с сервера
+                  onHistoryMoved={() => reload()}
                 />
               </Deferred>
             )}

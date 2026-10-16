@@ -74,6 +74,7 @@ test('в занятии тренер выбирает упражнение из 
   await act(async () => {
     tree = renderer.create(React.createElement(HistoryPick, {
       clientRow: 3, to: { id: 12, name: 'Подтягивания узким хватом с резиновой петлёй' }, onMoved: () => { moved += 1; },
+      after: 'Веса и настройка — уже в этом занятии.',
     }));
   });
   const button = (label) => tree.root.findAllByType('button').find((b) => text(b).startsWith(label));

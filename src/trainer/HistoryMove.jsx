@@ -74,7 +74,7 @@ function plural(n) {
  * его под старым названием — тренер выбирает его из журнала клиента, и
  * веса с настройкой переезжают сюда (HistoryMove). Только тренеру.
  */
-export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved }) {
+export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '«Было» и веса — уже в программе.' }) {
   const [list, setList] = useState(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -94,7 +94,7 @@ export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved }) {
   };
   const close = () => { setOpen(false); setFrom(null); setQuery(''); if (onClose) onClose(); };
 
-  if (from) return <HistoryMove clientRow={clientRow} from={from} to={to} onClose={close} onMoved={onMoved} after="Веса и настройка — уже в этом занятии." />;
+  if (from) return <HistoryMove clientRow={clientRow} from={from} to={to} onClose={close} onMoved={onMoved} after={after} />;
   if (!open) {
     return <button type="button" className="history-move__link" onClick={show}>Клиент делал это под другим названием?</button>;
   }

@@ -1807,7 +1807,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {!asClient && clientRow && editable && ex.exerciseId && !started
         && ((!ex.prevWeight && !ex.lastRun) || historyPick === ex.id) && (
         <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
-          onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)} />
+          onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
+          after="Веса и настройка — уже в этом занятии." />
       )}
       {alts.length > 0 && editable && (started
         ? <p className="small muted workout__alts-later">Заменить упражнение можно до первого подхода.</p>

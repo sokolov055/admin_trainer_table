@@ -1,5 +1,5 @@
 import ExercisePicker from './ExercisePicker.jsx';
-import HistoryMove, { hadHistory } from './HistoryMove.jsx';
+import HistoryMove, { HistoryPick, hadHistory } from './HistoryMove.jsx';
 import { planExerciseForSave } from '../plan-payload.js';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { separatorOf } from '../remove.js';
@@ -94,6 +94,8 @@ export default function PlanEditor({
   // Заменили упражнение, которое клиент уже делал, — спросить, не то же ли
   // это под новым названием (HistoryMove): { key, from, to }
   const [historyAsk, setHistoryAsk] = useState(null);
+  // У какой строки открыт «делал под другим названием?» (HistoryPick): 'bi-ei'
+  const [historyPick, setHistoryPick] = useState(null);
   const exercises = (library.data ? library.data.exercises : []).concat(extra);
   const [draft, setDraft] = useState(() => (blocks.length
     // id — тренировки в месяце: по нему сервер узнаёт её после
@@ -513,6 +515,12 @@ export default function PlanEditor({
                 {historyAsk && historyAsk.key === bi + '-' + ei && (
                   <HistoryMove clientRow={clientRow} from={historyAsk.from} to={historyAsk.to} onClose={() => setHistoryAsk(null)} />
                 )}
+                {clientRow && exercise.exerciseId && !(historyAsk && historyAsk.key === bi + '-' + ei)
+                  && (!hadHistory(exercise) || historyPick === bi + '-' + ei) ? (
+                  <HistoryPick clientRow={clientRow} to={{ id: Number(exercise.exerciseId), name: exercise.name }}
+                    onOpen={() => setHistoryPick(bi + '-' + ei)} onClose={() => setHistoryPick(null)}
+                    after="«Было» покажется после сохранения программы." />
+                ) : null}
 
                 {clientRow && exercise.exerciseId && <ClientSetup exerciseId={exercise.exerciseId} clientRow={clientRow}
                   members={split ? (exercise.performers && exercise.performers.length ? members.filter((m) => exercise.performers.includes(m)) : members) : []} />}
