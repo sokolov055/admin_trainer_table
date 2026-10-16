@@ -801,6 +801,19 @@ test('замена упражнения: кнопка, список, новое 
   }
 });
 
+test('тренажёр сменился: веса по нулям, подсказка — что было на прежнем (16.10.2026)', async () => {
+  const { withMachine } = await import('../src/workout-model.js');
+  const { otherMachineText } = await import('../src/effort.js');
+  const other = { date: '2026-10-15', machine: 'Тяга с дисками', weights: ['35', '40', '45', '50'], reps: ['15', '15', '15', '15'] };
+  const ex = withMachine({ name: 'Вертикальная тяга', sets: [{ weight: '', reps: '15', state: 'pending', kind: 'work' }] },
+    { uid: 'tg1', name: 'Technogym' }, { lastWeight: '', otherRun: other });
+  assert.deepEqual(ex.otherRun, other);
+  assert.equal(ex.sets[0].weight, '', 'вес с другого тренажёра не подставлен');
+  assert.equal(otherMachineText(ex.otherRun),
+    'Последний раз (15.10) вы делали это упражнение на тренажёре «Тяга с дисками»: 35 · 40 · 45 · 50 кг на 15 повторов. Здесь тренажёр другой — впишите вес заново.');
+  assert.equal(withMachine(ex, { uid: 'd1', name: 'Тяга с дисками' }, { lastWeight: '50' }).otherRun, undefined, 'на прежнем — подсказки нет');
+});
+
 /**
  * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
  * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.

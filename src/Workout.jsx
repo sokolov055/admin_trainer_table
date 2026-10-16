@@ -34,7 +34,7 @@ function machineHasDetails(m) {
 import { useData } from './useData.js';
 import { SetupText, SetupMistakes, setupParts, MachineInfo, MachineNote, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
-import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, wasSet, scaleTo } from './effort.js';
+import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, otherMachineText, wasSet, scaleTo } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
@@ -1761,7 +1761,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {gearLine(machines)}
           {primary && editable && !ex.prevWeight && !ex.lastRun && trackOf(ex).kind === 'strength'
             && ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim()) && (
-            <p className="small muted">Здесь ещё не делали — впишите вес, дальше он запомнится.</p>
+            <p className="small muted">{otherMachineText(ex.otherRun) || 'Здесь ещё не делали — впишите вес, дальше он запомнится.'}</p>
           )}
         </div>
       )}

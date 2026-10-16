@@ -239,6 +239,22 @@ const plural = (n, one, few, many) => {
  * сегодня как в прошлый раз». Повторы обязательно: 100 кг на 3 и на 12 —
  * разное.
  */
+/**
+ * Тренажёр сменился (владелец, 16.10.2026: другой зал, тренажёр другой
+ * фирмы): веса по нулям, но видно, что было на прежнем — сервер, otherRun
+ */
+export function otherMachineText(other) {
+  if (!other || !Array.isArray(other.weights) || !other.weights.length) return '';
+  const reps = Array.isArray(other.reps) ? other.reps : [];
+  const same = reps.length && reps.every((r) => r && r === reps[0]);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(other.date || '') ? ' (' + other.date.slice(8, 10) + '.' + other.date.slice(5, 7) + ')' : '';
+  const what = same
+    ? other.weights.join(' · ') + ' кг на ' + reps[0] + ' ' + plural(Number(reps[0]), 'повтор', 'повтора', 'повторов')
+    : other.weights.map((w, i) => w + (reps[i] ? '×' + reps[i] : '')).join(' · ') + ' кг';
+  const where = other.machine ? 'на тренажёре «' + other.machine + '»' : 'без тренажёра';
+  return 'Последний раз' + date + ' вы делали это упражнение ' + where + ': ' + what + '. Здесь тренажёр другой — впишите вес заново.';
+}
+
 export function lastRunText(last) {
   if (!last || !Array.isArray(last.weights) || !last.weights.length) return '';
   const reps = Array.isArray(last.reps) ? last.reps : [];

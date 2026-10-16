@@ -88,6 +88,8 @@ export function withMachine(ex, machine, history = null) {
   out.prevWeight = String(history.lastWeight || '');
   if (history.lastRun) out.lastRun = history.lastRun;
   else delete out.lastRun;
+  if (history.otherRun) out.otherRun = history.otherRun;
+  else delete out.otherRun;
   const starts = (history.startSets || []).filter((s) => s.kind !== 'warmup');
   let work = -1;
   out.sets = ex.sets.map((s) => {
@@ -279,6 +281,8 @@ function extrasOf(e, split) {
       ? { load: { muscle: e.exercise.muscle || '', equipment: e.exercise.equipment || '' } } : {}),
     ...(/^\d{1,3}/.test(String(e.reps || '')) ? { target: String(e.reps).match(/^\d{1,3}/)[0] } : {}),
     ...(!split && e.lastRun ? { lastRun: e.lastRun } : {}),
+    // На этом тренажёре ещё не делали — что было на прежнем (16.10.2026)
+    ...(!split && e.otherRun ? { otherRun: e.otherRun } : {}),
   };
 }
 
