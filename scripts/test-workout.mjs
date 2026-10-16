@@ -536,6 +536,28 @@ test('смена длительности идущего отдыха не пе�
 });
 
 /**
+ * Новое упражнение в ходе занятия (владелец, 16.10.2026): у клиента в
+ * тренировке по программе его нет, в свободной и у тренера — есть.
+ */
+test('клиент в тренировке по программе не добавляет упражнения; свободная и тренер — могут', async () => {
+  const two = { title: 'Верх', exercises: [{ name: 'Жим лёжа', sets: '2', reps: '8' }, { name: 'Тяга блока', sets: '2', reps: '8' }] };
+  const add = () => tree.root.findAllByType('button').filter(n => ['Добавить упражнение', 'Упражнение'].includes(text(n))).map(text);
+  const cases = [
+    { clientRow: undefined, month: 'Октябрь 2026', want: [], who: 'клиент, по программе' },
+    { clientRow: undefined, month: '', want: ['Упражнение', 'Добавить упражнение'], who: 'клиент, свободная' },
+    { clientRow: 3, month: 'Октябрь 2026', want: ['Упражнение', 'Добавить упражнение'], who: 'тренер, по программе' },
+  ];
+  for (const c of cases) {
+    data.clear();
+    if (tree) { tree.unmount(); tree = null; }
+    await act(async () => { tree = renderer.create(React.createElement(Workout, { clientRow: c.clientRow, launch: { block: two, month: c.month }, onClose() {} })); await delay(); });
+    assert.deepEqual(add(), c.want, c.who);
+  }
+  tree.unmount();
+  tree = null;
+});
+
+/**
  * Завершённое занятие не должно перехватывать запуск следующего.
  *
  * Черновик остаётся в хранилище, если экран закрыли, не нажав «К

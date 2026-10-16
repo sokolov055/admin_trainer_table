@@ -1477,6 +1477,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * поэтому кнопка там, где его видно, а не в настройках. У сплита подходы
    * идут по людям, круги там не собрать — кнопки нет.
    */
+  /**
+   * Новое упражнение в ходе занятия (владелец, 16.10.2026): у клиента в
+   * тренировке по программе (с месяцем) его нет — программу ведёт тренер,
+   * менять состав можно только заменой. В свободной тренировке (месяца нет)
+   * и у тренера — есть
+   */
+  const canAddExercise = (session) => !asClient || !(session && session.month);
   const joinBefore = (ei) => {
     const list = record?.session?.exercises || [];
     const a = list[ei - 1];
@@ -1497,9 +1504,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       flip('name:' + ((a.supersetGroup ? list.find(e => e.supersetGroup === a.supersetGroup) : a).id));
       change(v => ({ ...v, exercises: v.exercises.map(e => (e.id === a.id || e.id === b.id || merged.includes(e.supersetGroup) ? { ...e, supersetGroup: group } : e)) }));
     };
+    const canAdd = canAddExercise(record?.session);
+    if (!canAdd && !canJoin) return null;
     return (
       <div className="workout__between">
-        <button type="button" className="workout__join" disabled={list.length >= 30} onClick={add}><IconPlus aria-hidden="true" />Упражнение</button>
+        {canAdd && <button type="button" className="workout__join" disabled={list.length >= 30} onClick={add}><IconPlus aria-hidden="true" />Упражнение</button>}
         {canJoin && <button type="button" className="workout__join" onClick={join}><IconLinkPair aria-hidden="true" />Соединить в суперсет</button>}
       </div>
     );
@@ -2075,7 +2084,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <button type="button" className="button button--critical" disabled={!picked.size || picked.size >= s.exercises.length} onClick={pickDelete}>Удалить</button>
           </div>
         )}
-        <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, newExercise(s)] }))}>Добавить упражнение</button>
+        {canAddExercise(s) && <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, newExercise(s)] }))}>Добавить упражнение</button>}
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>
       {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}
