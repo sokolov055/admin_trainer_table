@@ -1,4 +1,4 @@
-import { createGame, begin, advance, steer, setLane, pause, resume, laneFromTilt, tiltAxis, DISTANCE } from './scooter-model.js';
+import { createGame, begin, advance, steer, setLane, pause, resume, activateNitro, laneFromTilt, tiltAxis, DISTANCE } from './scooter-model.js';
 import { StreetRenderer } from './scooter-render.js';
 
 export function mountScooter(root, session, blocked = () => false) {
@@ -13,7 +13,7 @@ const on = (target, type, handler) => target.addEventListener(type, event => {
   handler(event);
 }, { signal: controller.signal });
 const $ = id => root.querySelector('[data-scooter="' + id + '"]');
-const elements = Object.fromEntries(['time', 'distance', 'speed', 'score', 'combo', 'progress', 'progress-label', 'pause', 'left', 'right',
+const elements = Object.fromEntries(['time', 'distance', 'speed', 'score', 'combo', 'progress', 'progress-label', 'pause', 'left', 'right', 'nitro', 'nitro-count',
   'overlay', 'overlay-title', 'overlay-copy', 'overlay-hint', 'start', 'restart', 'result-stats', 'countdown', 'toast',
   'buttons-mode', 'tilt-mode', 'sensor-status', 'steering-hint'].map(id => [id, $(id)]));
 const renderer = new StreetRenderer($('scene'));
@@ -98,6 +98,7 @@ on(elements.restart, 'click', reset);
 on(elements.pause, 'click', () => { pause(game); renderUI(); });
 on(elements.left, 'click', () => steer(game, -1));
 on(elements.right, 'click', () => steer(game, 1));
+on(elements.nitro, 'click', () => { activateNitro(game); renderUI(); });
 on(elements['buttons-mode'], 'click', () => buttonsMode());
 on(elements['tilt-mode'], 'click', enableTilt);
 
@@ -105,6 +106,10 @@ on(window, 'keydown', event => {
   if (event.altKey || event.metaKey || event.ctrlKey) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     event.preventDefault(); if (!event.repeat) steer(game, event.key === 'ArrowLeft' ? -1 : 1);
+  }
+  if (event.code === 'Space' && !event.repeat) {
+    if (event.target instanceof HTMLElement && event.target.closest('button')) return;
+    event.preventDefault(); activateNitro(game); renderUI();
   }
   if (event.key === 'Escape' && !event.repeat) {
     if (game.phase === 'paused') { resume(game); previousTime = null; }
@@ -146,9 +151,13 @@ function renderUI() {
   elements.pause.disabled = !active;
   elements.left.disabled = !active;
   elements.right.disabled = !active;
+  elements.nitro.disabled = game.phase !== 'playing' || game.nitroCharges < 1 || game.nitro > 0;
+  elements.nitro.classList.toggle('active', game.nitro > 0);
+  elements.nitro.setAttribute('aria-label', game.nitro > 0 ? `Нитро включено, ${game.nitro.toFixed(1)} секунды` : `Включить нитро, зарядов ${game.nitroCharges}`);
+  elements['nitro-count'].textContent = game.nitro > 0 ? game.nitro.toFixed(1) : String(game.nitroCharges);
   elements.countdown.hidden = game.phase !== 'countdown';
   elements.countdown.textContent = Math.max(1, Math.ceil(game.countdown));
-  elements['steering-hint'].textContent = game.phase === 'playing' ? 'Найди свободную полосу' : 'Выбери свободную полосу';
+  elements['steering-hint'].textContent = game.nitro > 0 ? 'НИТРО · держи полосу' : game.phase === 'playing' ? 'Найди свободную полосу' : 'Выбери свободную полосу';
   if (game.event && game.event.until > game.elapsed && game.phase === 'playing') {
     if (game.event.serial !== previousEvent) {
       elements.toast.replaceChildren(Object.assign(document.createElement('span'), { textContent: game.event.text }));

@@ -1,7 +1,7 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
-import { DISTANCE } from './scooter-model.js';
+import { DISTANCE, TUNING } from './scooter-model.js';
 
-const C = { road: '#506765', line: '#eef2dd', sidewalk: '#d8d4bf', ink: '#24463c', shadow: '#102f2b36' };
+const C = { road: '#3f5755', line: '#f4f2dc', sidewalk: '#d8d4bf', ink: '#183d34', shadow: '#102f2b4a' };
 const palette = ['#dbac86', '#eac590', '#97bfb4', '#c6ad9c', '#afc7a3'];
 
 function shape(ctx, points, color) {
@@ -58,6 +58,13 @@ export function drawObject(ctx, type, x, y, size = 1, time = 0) {
     rect(ctx, -5, -20, 10, 7, '#edf8e7', 2);
     rect(ctx, -8, -2, 16, 10, '#f8f9ee', 2);
     line(ctx, [[-3, -11], [-3, -5]], '#d5f3ef', 3);
+  } else if (type === 'preworkout') {
+    shadow(ctx, 0, 1, 18, 22);
+    oval(ctx, 0, 1, 25, 28, '#bdf36f');
+    rect(ctx, -14, -18, 28, 37, '#eef9cf', 7);
+    rect(ctx, -12, -22, 24, 8, '#183e38', 3);
+    rect(ctx, -10, -10, 20, 20, '#64ce75', 4);
+    shape(ctx, [[2, -8], [-6, 2], [-1, 2], [-4, 9], [7, -3], [2, -3]], '#173c34');
   } else {
     const configs = {
       runner: { shirt: '#d97b52', hair: '#654b37', wide: 16, skin: '#d6a477', pants: '#284e4b' },
@@ -136,6 +143,19 @@ function scooter(ctx, x, y, lean, hit, time, reduced) {
   ctx.restore();
 }
 
+function nitroTrail(ctx, x, y, time, reduced) {
+  if (reduced) return;
+  ctx.save();
+  ctx.globalAlpha = .75;
+  for (let index = -3; index <= 3; index++) {
+    const spread = index * 17 + Math.sin(time * 16 + index) * 5;
+    const length = 54 + ((index + 4) % 3) * 24;
+    line(ctx, [[x + spread, y + 42], [x + spread * 1.35, y + 42 + length]], index % 2 ? '#d9ff8b' : '#fff7cf', index === 0 ? 5 : 3);
+  }
+  oval(ctx, x, y + 39, 28, 16, '#9ff06f');
+  ctx.restore();
+}
+
 function finish(ctx, y, width) {
   rect(ctx, 47, y - 110, width - 94, 81, '#f1e3bd', 5);
   rect(ctx, 55, y - 103, width - 110, 28, '#284f40', 4);
@@ -151,15 +171,16 @@ export class StreetRenderer {
   }
   resize() {
     const bounds = this.canvas.getBoundingClientRect();
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const ratio = Math.min(window.devicePixelRatio || 1, 3);
     this.canvas.width = Math.round(bounds.width * ratio); this.canvas.height = Math.round(bounds.height * ratio);
+    this.ctx.imageSmoothingEnabled = false;
     this.width = 420; this.height = bounds.height * 420 / bounds.width;
   }
   draw(game, reduced = false) {
     const ctx = this.ctx, w = this.width, h = this.height;
     ctx.setTransform(this.canvas.width / w, 0, 0, this.canvas.height / h, 0, 0);
     const playerY = h - 154;
-    const metresToPixels = Math.min(4.5, (playerY - 40) / 100);
+    const metresToPixels = Math.min(TUNING.roadPixelsPerMetre, (playerY - 40) / 72);
     const offset = game.distance * metresToPixels;
     rect(ctx, 0, 0, w, h, C.sidewalk);
     rect(ctx, 78, 0, w - 156, h, C.road);
@@ -211,6 +232,7 @@ export class StreetRenderer {
       drawObject(ctx, object.type, 122 + object.lane * 88, y, size, reduced ? 0 : game.elapsed);
     }
     const leaning = game.lane - game.x;
+    if (game.nitro > 0) nitroTrail(ctx, 122 + game.x * 88, playerY, game.elapsed, reduced);
     scooter(ctx, 122 + game.x * 88, playerY, leaning, game.invincible > 0, game.elapsed, reduced);
     if (game.phase === 'won') {
       ctx.textAlign = 'center'; ctx.font = '800 13px Manrope, sans-serif'; ctx.fillStyle = '#fff6d5';

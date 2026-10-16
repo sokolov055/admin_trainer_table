@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, createRoute, begin, advance, steer, setLane, pause, resume, laneFromTilt, tiltAxis, DISTANCE, DURATION } from '../src/scooter-model.js';
+import { createGame, createRoute, begin, advance, steer, setLane, pause, resume, activateNitro, laneFromTilt, tiltAxis, DISTANCE, DURATION, TUNING } from '../src/scooter-model.js';
 
 const playing = () => { const g = createGame(); begin(g); advance(g, 3.01); return g; };
 
@@ -23,7 +23,7 @@ test('пауза сохраняет время, дорогу и обратный
 test('свободный маршрут заканчивается победой до тренировки', () => {
   const g = playing(); g.route = []; advance(g, 60);
   assert.equal(g.phase, 'won'); assert.equal(g.distance, DISTANCE);
-  assert.ok(g.elapsed > 48 && g.elapsed < 51); assert.ok(g.remaining > 9);
+  assert.ok(g.elapsed > 46 && g.elapsed < 48); assert.ok(g.remaining > 12);
 });
 
 test('истечение времени даёт проигрыш и замораживает мир', () => {
@@ -66,6 +66,28 @@ test('бутылка прибавляет две секунды один раз'
   advance(g, 2); assert.equal(g.bottles, 1);
 });
 
+test('предтрен даёт заряд, а нитро временно умножает растущую скорость', () => {
+  const normal = playing(), boosted = playing();
+  normal.route = []; boosted.route = [{ at: 3, lane: 1, type: 'preworkout' }];
+  advance(boosted, .5);
+  assert.equal(boosted.preworkouts, 1); assert.equal(boosted.nitroCharges, 1);
+  normal.distance = boosted.distance; normal.remaining = boosted.remaining; normal.elapsed = boosted.elapsed;
+  advance(normal, 1 / 60);
+  assert.equal(activateNitro(boosted), true); assert.equal(boosted.nitroCharges, 0);
+  advance(boosted, 1 / 60);
+  assert.ok(boosted.speed > normal.speed * 1.7);
+  assert.equal(activateNitro(boosted), false, 'активное нитро нельзя наложить второй раз');
+  advance(boosted, TUNING.nitroDuration + .1);
+  assert.equal(boosted.nitro, 0);
+});
+
+test('обычная скорость заметно растёт по мере приближения к залу', () => {
+  const start = playing(); start.route = []; advance(start, 1 / 60);
+  const finish = playing(); finish.route = []; finish.distance = DISTANCE * .9; advance(finish, 1 / 60);
+  assert.ok(finish.speed > start.speed * 2);
+  assert.ok(finish.speed * 3.6 > 100);
+});
+
 test('одновременный контакт не накладывает двойной штраф', () => {
   const g = playing(); g.route = [{ at: 3, lane: 1, type: 'runner' }, { at: 4, lane: 1, type: 'curb' }];
   advance(g, 1); assert.equal(g.hits, 1);
@@ -84,9 +106,9 @@ test('100 маршрутов: свободная полоса есть в каж
   for (let seed = 1; seed <= 100; seed++) {
     const g = createGame(seed); begin(g); advance(g, 3);
     for (let frame = 0; frame < 3600 && g.phase === 'playing'; frame++) {
-      const next = g.route.find(o => o.type !== 'bottle' && o.at > g.distance - 3);
+      const next = g.route.find(o => o.type !== 'bottle' && o.type !== 'preworkout' && o.at > g.distance - 3);
       if (next) {
-        const occupied = g.route.filter(o => o.at === next.at && o.type !== 'bottle').map(o => o.lane);
+        const occupied = g.route.filter(o => o.at === next.at && o.type !== 'bottle' && o.type !== 'preworkout').map(o => o.lane);
         assert.ok(occupied.length < 3);
         const lanes = [0, 1, 2].filter(lane => !occupied.includes(lane)).sort((a, b) => Math.abs(a - g.x) - Math.abs(b - g.x));
         setLane(g, lanes[0]);

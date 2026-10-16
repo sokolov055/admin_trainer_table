@@ -9,7 +9,7 @@ import React from 'react'; import {createRoot} from 'react-dom/client';
 import ScooterGame from './src/ScooterGame.jsx'; import {ScooterSessionProvider,useScooterSession} from './src/ScooterSession.jsx';
 import {PlankSessionProvider} from './src/PlankSession.jsx'; import {RestScreen} from './src/RestScreen.jsx';
 function Fixture({menu=true,rest=false,until=Infinity,now=Date.now(),allowed=true,immersive=true}) {
- const session=useScooterSession(); window.readRide=()=>structuredClone(session.game);
+ const session=useScooterSession(); window.ride=session.game; window.readRide=()=>structuredClone(session.game);
  return <>{menu&&<ScooterGame immersive={immersive}/>} {rest&&<RestScreen until={until} now={now} total={30000} allowGame={allowed} onStop={()=>window.show({menu:false})}/>}</>;
 }
 const root=createRoot(document.getElementById('root'));
@@ -18,7 +18,7 @@ window.show({});` }, plugins: [{ name: 'silent-alarm', setup(b) { b.onResolve({ 
 
 async function setup(t) {
   const browser = await chromium.launch(); t.after(() => browser.close());
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3 });
   const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
   const css=['styles.css','rest.css','scooter.css'].map(f=>readFileSync('src/'+f,'utf8')).join('\n');
   await page.setContent('<style>'+css+'</style><div id="root"></div>');
@@ -35,6 +35,12 @@ test('самокат: кнопки, свайп, пауза, повторный �
   await page.screenshot({path:'reports/scooter/immersive-start-390.png',fullPage:true});
   await page.getByRole('button',{name:'В путь',exact:true}).click(); await page.clock.runFor(4200);
   await page.screenshot({path:'reports/scooter/immersive-playing-390.png',fullPage:true});
+  const canvasPixels=await page.locator('canvas').evaluate(element=>({width:element.width,css:element.clientWidth}));
+  assert.ok(canvasPixels.width>=canvasPixels.css*2.9,'Canvas использует полный DPR экрана');
+  await page.evaluate(()=>{ride.nitroCharges=1}); await page.clock.runFor(30);
+  await page.getByRole('button',{name:/Включить нитро/}).click(); await page.clock.runFor(120);
+  assert.ok((await page.evaluate(()=>readRide())).nitro>3);
+  await page.screenshot({path:'reports/scooter/immersive-nitro-390.png',fullPage:true});
   await page.keyboard.press('ArrowLeft');
   assert.equal((await page.evaluate(()=>readRide())).lane,0);
   await page.getByRole('button',{name:'Вправо',exact:true}).click();

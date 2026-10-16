@@ -41,13 +41,17 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
           <div className="overlay-body">
             <span className="overlay-kicker">60 секунд · 900 метров</span>
             <h2 id={title} data-scooter="overlay-title">Рывок до зала</h2>
-            <p data-scooter="overlay-copy">Держи свободную полосу, объезжай городской трафик и собирай воду. Столкновение −4 сек, вода +2 сек.</p>
+            <p data-scooter="overlay-copy">Скорость растёт по дороге. Собирай воду и предтрен: заряд появится на кнопке нитро. Столкновение −4 сек.</p>
             <div className="result-stats" data-scooter="result-stats" hidden />
             <button type="button" className="primary" data-scooter="start">В путь</button>
             <button type="button" className="secondary" data-scooter="restart" hidden>Начать заново</button>
             <p className="overlay-hint" data-scooter="overlay-hint">Стрелки, свайп или наклон телефона</p>
           </div>
         </section>
+        <button type="button" className="nitro-button" data-scooter="nitro" aria-label="Включить нитро, зарядов 0" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 1 5.8 13h5.1L9.8 23 18.5 9.7h-5.1L14.2 1Z" /></svg>
+          <span>Нитро</span><b data-scooter="nitro-count">0</b>
+        </button>
         <div className="steering" aria-label="Управление самокатом">
           <button type="button" data-scooter="left" aria-label="Влево" disabled><span className="arrow left-arrow" aria-hidden="true" /></button>
           <span data-scooter="steering-hint">Выбери свободную полосу</span>

@@ -1,7 +1,9 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
 export const TUNING = Object.freeze({ distance: 900, duration: 60, penalty: 4, bonus: 2,
-  startSpeed: 12, speedGain: 14, firstObstacle: 78, rowGap: 34, laneResponse: 8,
-  collisionHalfWidth: .53, collisionDepth: 1.8, grace: 1.4, slowDuration: .85, slowFactor: .45 });
+  startSpeed: 13, speedGain: 22, speedExponent: 1.7, roadPixelsPerMetre: 7.2,
+  firstObstacle: 78, rowGap: 34, laneResponse: 8,
+  collisionHalfWidth: .53, collisionDepth: 1.8, grace: 1.4, slowDuration: .85, slowFactor: .45,
+  nitroDuration: 3.2, nitroMultiplier: 1.75, nitroMax: 2 });
 export const DISTANCE = TUNING.distance;
 export const DURATION = TUNING.duration;
 export const HIT_PENALTY = TUNING.penalty;
@@ -27,13 +29,15 @@ export function createRoute(seed = 563) {
     if (row < 3 || row % 3 !== 2) occupied.splice(Math.floor(random() * 2), 1);
     for (const lane of occupied) objects.push({ id: `o${row}-${lane}`, row, at, lane, type: TYPES[row % TYPES.length], passed: false });
     if (row % 4 === 2) objects.push({ id: `b${row}`, row, at, lane: safe, type: 'bottle', passed: false });
+    if (row % 6 === 1) objects.push({ id: `p${row}`, row, at, lane: safe, type: 'preworkout', passed: false });
   }
   return objects;
 }
 
 export function createGame(seed = 563) {
   return { phase: 'ready', resumePhase: 'playing', countdown: 3, distance: 0, remaining: DURATION, elapsed: 0,
-    lane: 1, x: 1, speed: 0, hits: 0, bottles: 0, dodged: 0, score: 0, combo: 0, bestCombo: 0, invincible: 0, slow: 0,
+    lane: 1, x: 1, speed: 0, hits: 0, bottles: 0, preworkouts: 0, nitroCharges: 0, nitro: 0,
+    dodged: 0, score: 0, combo: 0, bestCombo: 0, invincible: 0, slow: 0,
     event: null, eventSerial: 0, route: createRoute(seed), seed };
 }
 
@@ -59,6 +63,14 @@ export function resume(game) {
   if (game.phase === 'paused') game.phase = game.resumePhase;
 }
 
+export function activateNitro(game) {
+  if (game.phase !== 'playing' || game.nitroCharges < 1 || game.nitro > 0) return false;
+  game.nitroCharges--;
+  game.nitro = TUNING.nitroDuration;
+  emit(game, 'nitro', 'Нитро! Скорость ×1,75');
+  return true;
+}
+
 function emit(game, kind, text) {
   game.event = { kind, text, until: game.elapsed + 1.6, serial: ++game.eventSerial };
 }
@@ -75,8 +87,11 @@ function tick(game, dt) {
   game.remaining = Math.max(0, game.remaining - interval);
   game.invincible = Math.max(0, game.invincible - interval);
   game.slow = Math.max(0, game.slow - interval);
+  game.nitro = Math.max(0, game.nitro - interval);
   game.x += (game.lane - game.x) * (1 - Math.exp(-TUNING.laneResponse * interval));
-  game.speed = (TUNING.startSpeed + TUNING.speedGain * game.distance / DISTANCE) * (game.slow > 0 ? TUNING.slowFactor : 1);
+  const progress = game.distance / DISTANCE;
+  const baseSpeed = TUNING.startSpeed + TUNING.speedGain * Math.pow(progress, TUNING.speedExponent);
+  game.speed = baseSpeed * (game.slow > 0 ? TUNING.slowFactor : 1) * (game.nitro > 0 ? TUNING.nitroMultiplier : 1);
   const previous = game.distance;
   game.distance = Math.min(DISTANCE, game.distance + game.speed * interval);
   for (const object of game.route) {
@@ -89,6 +104,13 @@ function tick(game, dt) {
         game.score += 25;
         game.remaining += TUNING.bonus;
         emit(game, 'bonus', 'Вода в дорогу! +2 сек');
+      } else if (object.type === 'preworkout') {
+        game.preworkouts++;
+        game.score += 50;
+        if (game.nitroCharges < TUNING.nitroMax) {
+          game.nitroCharges++;
+          emit(game, 'preworkout', 'Предтрен готов! Жми нитро');
+        } else emit(game, 'preworkout', 'Запас нитро полный! +50');
       } else if (!game.invincible) {
         game.hits++;
         game.combo = 0;
@@ -99,7 +121,7 @@ function tick(game, dt) {
       }
     } else if (object.at < game.distance - TUNING.collisionDepth) {
       object.passed = true;
-      if (object.type !== 'bottle') {
+      if (object.type !== 'bottle' && object.type !== 'preworkout') {
         game.dodged++;
         game.combo++;
         game.bestCombo = Math.max(game.bestCombo, game.combo);
