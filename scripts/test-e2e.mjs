@@ -1268,6 +1268,35 @@ test('разделы карточки клиента листаются смах
 });
 
 /**
+ * «Новый шаблон тренировки» (владелец, 16.10.2026): форма не как у программы —
+ * без «Уровня» и без пояснений про частоту и прогрессию.
+ */
+test('новый шаблон тренировки — без уровня, у программы он есть', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const tab = await context.newPage();
+  tab.on('pageerror', (error) => consoleErrors.push(String(error)));
+  const level = () => tab.locator('#root main:not([hidden]) .field__label', { hasText: /^Уровень$/ }).count();
+  try {
+    await tab.goto(origin + '/?mockRole=trainer');
+    await tab.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await tab.goto(origin + '/?mockRole=trainer');
+    await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
+
+    await tab.getByRole('tab', { name: 'Тренировки', exact: true }).click();
+    await tab.getByRole('button', { name: 'Новый шаблон тренировки' }).click();
+    await tab.getByRole('heading', { name: 'Упражнения' }).waitFor({ timeout: 5000 });
+    assert.equal(await level(), 0, 'у шаблона тренировки уровня нет');
+    assert.equal(await tab.getByPlaceholder('На что обратить внимание в этой тренировке').count(), 1, 'подсказка про тренировку');
+    await tab.getByRole('button', { name: 'Отмена' }).first().click();
+
+    await tab.getByRole('tab', { name: 'Программы', exact: true }).click();
+    await tab.getByRole('button', { name: 'Новый шаблон программы' }).click();
+    await tab.getByRole('heading', { name: 'Тренировки' }).waitFor({ timeout: 5000 });
+    assert.equal(await level(), 1, 'у программы уровень есть');
+  } finally { await context.close(); }
+});
+
+/**
  * Библиотека — ради скорости: шаблон программы назначается клиенту за
  * пару нажатий. Чужой общий шаблон копируется к себе, общее упражнение —
  * своей версией.
