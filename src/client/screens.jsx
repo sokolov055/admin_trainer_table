@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
+import { planExerciseForSave } from '../plan-payload.js';
 import { journalList, onOutboxChange, justSynced, localWorkouts, withLocalWeights } from '../workout-outbox.js';
 import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures } from '../offline-writes.js';
 import { LineChart } from '../charts.jsx';
@@ -520,7 +521,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             title: b.title,
             ...(b.id ? { id: b.id } : {}),
             ...(b.sourceId ? { sourceId: b.sourceId } : {}),
-            exercises: b.exercises.filter((e) => String(e.name || '').trim()),
+            // Только то, что сервер хранит (plan-payload.js): иначе большая
+            // программа не пролезала в предел запроса
+            exercises: b.exercises.filter((e) => String(e.name || '').trim()).map(planExerciseForSave),
           }))
           .filter((b) => b.exercises.length),
       });

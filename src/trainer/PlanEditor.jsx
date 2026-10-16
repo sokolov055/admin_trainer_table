@@ -1,5 +1,6 @@
 import ExercisePicker from './ExercisePicker.jsx';
 import HistoryMove, { hadHistory } from './HistoryMove.jsx';
+import { planExerciseForSave } from '../plan-payload.js';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { separatorOf } from '../remove.js';
 import SwipeRow from '../SwipeRow.jsx';
@@ -364,10 +365,12 @@ export default function PlanEditor({
         ...(b.sourceId ? { sourceId: b.sourceId } : {}),
         exercises: b.exercises.filter((e) => String(e.name || '').trim()),
       }));
+      // В сервер — только то, что он хранит (plan-payload.js); шаблону — как было
+      const forServer = clean.map((b) => ({ ...b, exercises: b.exercises.map(planExerciseForSave) }));
 
       const result = onSubmit
         ? await onSubmit(clean)
-        : await apiMutate('plan.save', { clientRow, month, blocks: clean });
+        : await apiMutate('plan.save', { clientRow, month, blocks: forServer });
 
       onSaved(result);
     } catch (error) {

@@ -487,6 +487,20 @@ async function postJson(url, payload, timeoutMs) {
       redirect: 'follow',
       ...(controller ? { signal: controller.signal } : {}),
     });
+    // Сервер ответил отказом не JSON — так nginx отвечает на слишком большой
+    // запрос (413, 16.10.2026: программа клиента перевалила за предел). Это
+    // ответ, а не обрыв: повторять GET-ом нельзя — тело запроса вместе с
+    // ключом входа ушло бы в адрес и в журналы, — и бессмысленно
+    const type = resp.headers && typeof resp.headers.get === 'function' ? String(resp.headers.get('content-type') || '') : '';
+    if (resp.status >= 400 && resp.status < 500 && !type.includes('json')) {
+      return {
+        ok: false,
+        code: resp.status,
+        error: resp.status === 413
+          ? 'Слишком много данных за один раз — сервер не принял сохранение. Напишите разработчику.'
+          : 'Сервер отклонил запрос (' + resp.status + ').',
+      };
+    }
     return await resp.json();
   } finally {
     if (timer) clearTimeout(timer);

@@ -201,3 +201,17 @@ test('прогресс: изменения с прошлого замера — 
     'Талия': { first: 91, last: 92, delta: 1, from: '2026-09-09' },
   });
 });
+
+test('16.10.2026: в plan.save — только то, что сервер хранит, без карточки из базы', async () => {
+  const { planExerciseForSave } = await import('../src/plan-payload.js');
+  const card = { id: 5, name: 'Жим лёжа', notes: 'x'.repeat(4000), machines: [{ uid: 'a', setup: 'y'.repeat(2000), photos: ['/1.jpg'] }] };
+  const heavy = {
+    name: 'Жим лёжа', exerciseId: 5, sets: '4', reps: '8', weight: '70', prevWeight: '67.5', rpe: '', supersetGroup: '',
+    technique: '', cardio: null, performers: [], splitWeights: {}, splitPrev: {},
+    exercise: card, startSets: [{ weight: '70' }], lastRun: { date: '2026-10-01' }, lastWeight: '70', muscles: { primary: ['Грудь'] }, track: { kind: 'strength' },
+  };
+  const out = planExerciseForSave(heavy);
+  assert.deepEqual(Object.keys(out).sort(), ['cardio', 'exerciseId', 'name', 'performers', 'prevWeight', 'reps', 'rpe', 'sets', 'splitPrev', 'splitWeights', 'supersetGroup', 'technique', 'weight']);
+  assert.ok(JSON.stringify(out).length < 300, 'карточка с техникой и тренажёрами не уходит на сервер');
+  assert.equal(heavy.exercise, card, 'на экране упражнение не тронуто');
+});

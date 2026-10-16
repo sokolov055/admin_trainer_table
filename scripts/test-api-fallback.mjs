@@ -33,6 +33,7 @@ globalThis.fetch = (url, init = {}) => {
   methods.push(init.method);
   if (String(url).includes('primary')) {
     if (mode === 'refused') return Promise.reject(new TypeError('getaddrinfo ENOTFOUND'));
+    if (mode === 'too-big') return Promise.resolve({ ok: false, status: 413, headers: { get: () => 'text/html' }, json: async () => { throw new SyntaxError('not json'); } });
     return new Promise((_, reject) => init.signal && init.signal.addEventListener('abort', () => { const e = new Error('aborted'); e.name = 'AbortError'; reject(e); }));
   }
   return Promise.resolve({ ok: true, json: async () => ({ ok: true, data: { from: 'spare' } }) });
@@ -68,4 +69,13 @@ test('основной не ответил за 20 с — на запасной 
   const error = await pending;
   assert.match(String(error && error.message), /не отвечает/);
   assert.ok(!hosts.includes('spare.test'), 'оплата не ушла второй раз на запасной адрес');
+});
+
+test('16.10.2026: nginx отверг запрос как слишком большой (413) — не повторяем GET-ом и не идём на запасной', async () => {
+  mode = 'too-big'; hosts.length = 0; methods.length = 0;
+  const error = await apiMutate('plan.save', { clientRow: 15, month: 'Октябрь 2026', blocks: [] }).then(() => null, (e) => e);
+  assert.match(String(error && error.message), /Слишком много данных/);
+  assert.equal(error.code, 413);
+  assert.deepEqual(methods, ['POST'], 'ключ входа и программа не ушли в адрес запроса');
+  assert.deepEqual(hosts, ['api.primary.test']);
 });
