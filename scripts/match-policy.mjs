@@ -8,8 +8,8 @@ function value(board, [a, b]) {
   const swapped = board.slice(); [swapped[a], swapped[b]] = [swapped[b], swapped[a]];
   return findMatches(swapped).reduce((n, g) => n + g.cells.length + (g.cells.length >= 4 ? 6 : 0) + g.cells.filter(i => swapped[i].power).length * 8, 0);
 }
-export function chooseMove(board, strategy, turn = 0) {
-  const options = legalMoves(board);
+export function chooseMove(board, strategy, turn = 0, covers = []) {
+  const options = legalMoves(board, covers);
   if (strategy === 'random') return options[(turn * 7919 + board[0].id * 13) % options.length];
   return options.sort((a, b) => (value(board, b) - value(board, a)) * (strategy === 'weak' ? -1 : 1))[0];
 }

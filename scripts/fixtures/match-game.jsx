@@ -14,8 +14,8 @@ function Fixture({ menu = true, rest = false, until = Infinity, now = Date.now()
   const [state, session] = useMatchSession();
   window.matchFixture = {
     read: () => structuredClone(session.getSnapshot()),
-    move: (strategy = 'greedy') => chooseMove(session.getSnapshot().game.board, strategy),
-    legal: () => legalMoves(session.getSnapshot().game.board),
+    move: (strategy = 'greedy') => chooseMove(session.getSnapshot().game.board, strategy, session.getSnapshot().game.turns, session.getSnapshot().game.covers),
+    legal: () => legalMoves(session.getSnapshot().game.board, session.getSnapshot().game.covers),
     setRest: setRestHere,
   };
   return <>{menu && <main className="match-preview"><MatchGame onClose={() => window.showMatch({ menu: false })} /></main>}{rest && <RestScreen until={until} total={30000} now={now} allowGame={allowed} onStop={() => window.showMatch({ menu: false })} />}</>;

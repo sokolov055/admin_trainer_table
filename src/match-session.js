@@ -1,4 +1,5 @@
-import { createMatchGame, legalMoves, resolveMove, earnedStars } from './match-model.js';
+import { MATCH_TUNING, createMatchGame, legalMoves, resolveMove, earnedStars } from './match-model.js';
+import { chapterFor, chapterComplete } from './match-story.js';
 
 // Одна очередь анимации на кабинет. Смена сцены и пауза сохраняют её позицию.
 export function createMatchSession({ seed = Date.now(), now = () => Date.now(), schedule = setTimeout, cancel = clearTimeout } = {}) {
@@ -35,7 +36,15 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
       return;
     }
     let message = snapshot.message;
-    if (frame.kind === 'clear') message = `${frame.combo > 1 ? `Каскад ×${frame.combo}. ` : ''}+${frame.points} очков${frame.creations.length ? '. Бонус создан!' : ''}`;
+    if (frame.kind === 'clear') {
+      const chapter = chapterFor(frame.game.level);
+      const halfway = Math.ceil(chapter.count / 2);
+      message = frame.storyGain && snapshot.game.collected < halfway && frame.game.collected >= halfway
+        ? chapter.halfway
+        : chapterComplete(frame.game) && (frame.storyGain || frame.reveals.length)
+        ? `${chapter.task} готовы! +${frame.points} очков`
+        : `${frame.combo > 1 ? `Каскад ×${frame.combo}. ` : ''}+${frame.points} очков${frame.storyGain ? ` · ${chapter.task} +${frame.storyGain}` : ''}${frame.reveals.length ? ` · Открыто ящиков: ${frame.reveals.length}` : ''}${frame.creations.length ? ' · Бонус!' : ''}`;
+    }
     if (frame.kind === 'reject') message = 'Здесь нет тройки. Ход сохранён.';
     if (frame.kind === 'shuffle') message = 'Новых ходов нет. Перемешиваем бесплатно.';
     emit({ game: frame.game, frame, message, serial: snapshot.serial + 1 });
@@ -43,6 +52,7 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
   };
   const move = (a, b, token) => {
     if (!allowed(token) || snapshot.busy) return false;
+    if (snapshot.game.covers?.includes(a) || snapshot.game.covers?.includes(b)) { emit({ selected: null, message: 'Закрытая клетка откроется после совпадения рядом.' }); return false; }
     const resolved = resolveMove(snapshot.game, a, b);
     if (!resolved.frames.length) return false;
     queue = resolved.frames.slice(); result = resolved.game;
@@ -65,7 +75,13 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
       if (token != null && owner()?.token !== token) return;
       if (expired()) return;
       clearTimer(); queue = []; result = null; remaining = 0;
-      emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level), mode: 'playing', frame: null, selected: null, hint: null, busy: false, message: 'Собери три одинаковых предмета', reason: '', serial: snapshot.serial + 1 });
+      emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level), mode: 'playing', frame: null, selected: null, hint: null, busy: false, message: chapterFor(level).task, reason: '', serial: snapshot.serial + 1 });
+    },
+    prepare(level, token) {
+      if (token != null && owner()?.token !== token) return;
+      if (snapshot.mode !== 'won' || expired()) return;
+      clearTimer(); queue = []; result = null; remaining = 0;
+      emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level), mode: 'ready', frame: null, selected: null, hint: null, busy: false, message: '', reason: '', serial: snapshot.serial + 1 });
     },
     pause,
     resume(token) {
@@ -77,14 +93,15 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
     move,
     select(index, token) {
       if (!allowed(token) || snapshot.busy) return;
+      if (snapshot.game.covers?.includes(index)) { emit({ selected: null, message: 'Собери тройку рядом с закрытой клеткой, чтобы открыть её.' }); return; }
       const selected = snapshot.selected;
       if (selected === index) { emit({ selected: null }); return; }
-      if (selected != null && Math.abs(Math.floor(selected / 6) - Math.floor(index / 6)) + Math.abs(selected % 6 - index % 6) === 1) move(selected, index, token);
+    if (selected != null && Math.abs(Math.floor(selected / MATCH_TUNING.size) - Math.floor(index / MATCH_TUNING.size)) + Math.abs(selected % MATCH_TUNING.size - index % MATCH_TUNING.size) === 1) move(selected, index, token);
       else emit({ selected: index, hint: null });
     },
     hint(token) {
       if (!allowed(token) || snapshot.busy) return;
-      emit({ hint: legalMoves(snapshot.game.board)[0] || null, selected: null, message: 'Поменяй местами подсвеченные предметы' });
+      emit({ hint: legalMoves(snapshot.game.board, snapshot.game.covers)[0] || null, selected: null, message: 'Поменяй местами подсвеченные предметы' });
     },
     toggleSound() { emit({ sound: !snapshot.sound }); },
   };

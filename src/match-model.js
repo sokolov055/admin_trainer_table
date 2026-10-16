@@ -1,5 +1,7 @@
 // Чистые правила: случайность входит в состояние, а каждый ход воспроизводим.
-export const MATCH_TUNING = Object.freeze({ size: 6, types: 6, moves: 12, points: 20, target: 900, maxCascades: 40 });
+import { chapterFor, chapterComplete } from './match-story.js';
+
+export const MATCH_TUNING = Object.freeze({ size: 9, types: 6, moves: 20, points: 20, target: 2000, maxCascades: 40 });
 export const PIECES = Object.freeze([
   { name: 'Гантель', color: '#28d5dd' }, { name: 'Гиря', color: '#b47bff' },
   { name: 'Диск', color: '#479aff' }, { name: 'Яблоко', color: '#ff6572' },
@@ -51,10 +53,11 @@ export function isLegalSwap(board, a, b) {
   if (board[a].power === 'color' || board[b].power === 'color' || (board[a].power && board[b].power)) return true;
   return findMatches(swap(board, a, b)).some(g => g.cells.includes(a) || g.cells.includes(b));
 }
-export function legalMoves(board) {
+export function legalMoves(board, covers = []) {
   const moves = [];
+  const closed = new Set(covers);
   for (let i = 0; i < N * N; i++) {
-    for (const j of [i + 1, i + N]) if (adjacent(i, j) && isLegalSwap(board, i, j)) moves.push([i, j]);
+    for (const j of [i + 1, i + N]) if (!closed.has(i) && !closed.has(j) && adjacent(i, j) && isLegalSwap(board, i, j)) moves.push([i, j]);
   }
   return moves;
 }
@@ -78,9 +81,16 @@ function freshBoard(state) {
 }
 
 export function createMatchGame(seed = Date.now(), level = 1) {
-  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: MATCH_TUNING.moves, score: 0, bestCombo: 0, turns: 0, board: [] };
-  game.target = MATCH_TUNING.target + (game.level - 1) * 200;
+  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: MATCH_TUNING.moves, score: 0, collected: 0, uncovered: 0, bestCombo: 0, turns: 0, board: [], covers: [] };
+  game.target = MATCH_TUNING.target + (game.level - 1) * 250;
   game.board = freshBoard(game);
+  const patterns = [
+    [19, 20, 28, 29, 51, 52, 60, 61],
+    [22, 23, 31, 32, 48, 49, 57, 58],
+    [29, 30, 38, 39, 41, 42, 50, 51],
+  ];
+  game.covers = patterns[game.level - 1].slice();
+  while (!legalMoves(game.board, game.covers).length) game.board = freshBoard(game);
   return game;
 }
 
@@ -92,7 +102,7 @@ export function reshuffle(game) {
       const j = Math.floor(random(state) * (i + 1));
       [state.board[i], state.board[j]] = [state.board[j], state.board[i]];
     }
-    if (!findMatches(state.board).length && legalMoves(state.board).length) return state;
+    if (!findMatches(state.board).length && legalMoves(state.board, state.covers).length) return state;
   }
   // Защитный выход для патологического состава; ход и счёт не списываются.
   const powers = state.board.filter(t => t.power).map(t => t.power);
@@ -148,18 +158,18 @@ function collapse(state, removed) {
 
 // Кадры содержат только данные. Представление управляет длительностью, а не правилами.
 export function resolveMove(game, a, b) {
-  if (game.moves <= 0 || !adjacent(a, b)) return { valid: false, frames: [], game };
-  let state = { ...game, board: swap(game.board, a, b) };
+  if (game.moves <= 0 || !adjacent(a, b) || game.covers?.includes(a) || game.covers?.includes(b)) return { valid: false, frames: [], game };
+  let state = { ...game, board: swap(game.board, a, b), covers: (game.covers || []).slice() };
   const frames = [];
-  const frame = (kind, duration, extra = {}) => frames.push({ kind, duration, game: { ...state, board: state.board.slice() }, ...extra });
+  const frame = (kind, duration, extra = {}) => frames.push({ kind, duration, game: { ...state, board: state.board.slice(), covers: state.covers.slice() }, ...extra });
   if (!isLegalSwap(game.board, a, b)) {
-    frame('swap', 160);
+    frame('swap', 220, { a, b });
     state.board = game.board;
-    frame('reject', 180);
+    frame('reject', 240, { a, b });
     return { valid: false, frames, game };
   }
   state.moves--; state.turns++;
-  frame('swap', 170);
+  frame('swap', 230, { a, b });
   let combo = 0;
   let groups = findMatches(state.board);
   let forced = [];
@@ -174,7 +184,7 @@ export function resolveMove(game, a, b) {
   while (groups.length || forced.length) {
     combo++;
     if (combo > MATCH_TUNING.maxCascades) {
-      state = reshuffle(state); frame('shuffle', 260); break;
+      state = reshuffle(state); frame('shuffle', 320); break;
     }
     const creations = [];
     for (const group of groups) {
@@ -188,24 +198,29 @@ export function resolveMove(game, a, b) {
     const protectedCells = new Set(creations.map(c => c.at));
     const { cells, effects } = expandClears(state.board, [...new Set([...groups.flatMap(g => g.cells), ...forced])], protectedCells, combo === 1 ? colorTargets : {});
     const points = cells.length * MATCH_TUNING.points * Math.min(combo, 4);
+    const reveals = state.covers.filter(covered => cells.some(i => Math.abs(rowOf(i) - rowOf(covered)) + Math.abs(colOf(i) - colOf(covered)) <= 1));
+    const storyGain = cells.filter(i => state.board[i]?.type === chapterFor(state.level).type).length;
     state.score += points;
+    state.collected += storyGain;
+    state.uncovered += reveals.length;
+    state.covers = state.covers.filter(i => !reveals.includes(i));
     state.bestCombo = Math.max(state.bestCombo, combo);
     // Старая фигура видна в кадре исчезновения, новая появляется после него.
-    frame('clear', 270, { cells, effects, creations, combo, points });
+    frame('clear', 390, { cells, effects, creations, combo, points, storyGain, reveals });
     state.board = state.board.map((t, i) => {
       const made = creations.find(c => c.at === i);
       return made ? { ...t, power: made.power } : t;
     });
     const from = collapse(state, new Set(cells));
-    frame('drop-start', 24, { from, combo });
-    frame('fall', 280, { combo });
+    frame('drop-start', 36, { from, combo });
+    frame('fall', 380, { from, combo });
     forced = [];
     groups = findMatches(state.board);
   }
-  if (state.moves > 0 && !legalMoves(state.board).length) {
-    state = reshuffle(state); frame('shuffle', 300);
+  if (state.moves > 0 && !legalMoves(state.board, state.covers).length) {
+    state = reshuffle(state); frame('shuffle', 340);
   }
   return { valid: true, frames, game: state };
 }
 
-export const earnedStars = game => game.score >= game.target * 1.8 ? 3 : game.score >= game.target * 1.35 ? 2 : game.score >= game.target ? 1 : 0;
+export const earnedStars = game => !chapterComplete(game) ? 0 : game.score >= game.target * 1.8 ? 3 : game.score >= game.target * 1.35 ? 2 : game.score >= game.target ? 1 : 0;
