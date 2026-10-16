@@ -1,4 +1,5 @@
 import ExercisePicker from './ExercisePicker.jsx';
+import HistoryMove, { hadHistory } from './HistoryMove.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { separatorOf } from '../remove.js';
 import SwipeRow from '../SwipeRow.jsx';
@@ -89,6 +90,9 @@ export default function PlanEditor({
   // одинаковые во всех программах — по ним строится «было» у клиента.
   const library = useData('library.exercises', {}, []);
   const [extra, setExtra] = useState([]);
+  // Заменили упражнение, которое клиент уже делал, — спросить, не то же ли
+  // это под новым названием (HistoryMove): { key, from, to }
+  const [historyAsk, setHistoryAsk] = useState(null);
   const exercises = (library.data ? library.data.exercises : []).concat(extra);
   const [draft, setDraft] = useState(() => (blocks.length
     // id — тренировки в месяце: по нему сервер узнаёт её после
@@ -477,7 +481,11 @@ export default function PlanEditor({
                   exerciseId={exercise.exerciseId}
                   exercises={exercises}
                   disabled={busy}
-                  onPick={({ name, exerciseId }) => change((next) => {
+                  onPick={({ name, exerciseId }) => {
+                    if (clientRow && exerciseId && exerciseId !== exercise.exerciseId && hadHistory(exercise)) {
+                      setHistoryAsk({ key: bi + '-' + ei, from: { id: exercise.exerciseId || null, name: exercise.name }, to: { id: exerciseId, name } });
+                    } else if (historyAsk && historyAsk.key === bi + '-' + ei) setHistoryAsk(null);
+                    change((next) => {
                     // Другое упражнение — «было» от прежнего ему не подходит
                     // (был жим лёжа, стали подтягивания). Своё «было» из
                     // журнала сервер покажет после сохранения
@@ -495,9 +503,13 @@ export default function PlanEditor({
                     next[bi].exercises[ei].track = base && base.track ? base.track : undefined;
                     next[bi].exercises[ei].exercise = base || null;
                     return next;
-                  })}
+                  });
+                  }}
                   onAdded={(saved) => setExtra((prev) => [...prev, saved])}
                 />
+                {historyAsk && historyAsk.key === bi + '-' + ei && (
+                  <HistoryMove clientRow={clientRow} from={historyAsk.from} to={historyAsk.to} onClose={() => setHistoryAsk(null)} />
+                )}
 
                 {clientRow && exercise.exerciseId && <ClientSetup exerciseId={exercise.exerciseId} clientRow={clientRow}
                   members={split ? (exercise.performers && exercise.performers.length ? members.filter((m) => exercise.performers.includes(m)) : members) : []} />}

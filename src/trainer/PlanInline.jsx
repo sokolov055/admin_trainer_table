@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import ExercisePicker from './ExercisePicker.jsx';
+import HistoryMove, { hadHistory } from './HistoryMove.jsx';
 import ClientSetup from './ClientSetup.jsx';
 import { ExerciseMachines } from './MachinesEditor.jsx';
 import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
@@ -53,6 +54,8 @@ const count = (v, fallback = 3) => {
 export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemove, canRemove = true }) {
   const library = useData('library.exercises', {}, []);
   const [extra, setExtra] = useState([]);
+  // Заменили упражнение, которое клиент уже делал (HistoryMove): { i, from, to }
+  const [historyAsk, setHistoryAsk] = useState(null);
   const base = (library.data ? library.data.exercises : []).concat(extra);
   const list = block.exercises;
   const split = members.length > 1;
@@ -249,6 +252,9 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
                 onPick={({ name, exerciseId }) => {
                   const pick = exerciseId && base.find((x) => x.id === exerciseId);
                   const changed = (exerciseId || null) !== (ex.exerciseId || null) || name !== ex.name;
+                  if (clientRow && exerciseId && exerciseId !== ex.exerciseId && hadHistory(ex)) {
+                    setHistoryAsk({ i, from: { id: ex.exerciseId || null, name: ex.name }, to: { id: exerciseId, name } });
+                  } else if (historyAsk && historyAsk.i === i) setHistoryAsk(null);
                   patch(i, {
                     name, exerciseId: exerciseId || null,
                     track: pick && pick.track ? pick.track : undefined,
@@ -263,6 +269,9 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
                 }}
                 onAdded={(saved) => setExtra((prev) => [...prev, saved])}
               />
+              {historyAsk && historyAsk.i === i && (
+                <HistoryMove clientRow={clientRow} from={historyAsk.from} to={historyAsk.to} onClose={() => setHistoryAsk(null)} />
+              )}
               {/* Вид упражнения — как в идущем занятии; пишется в базу */}
               {clientRow && ex.exerciseId ? <ClientSetup exerciseId={ex.exerciseId} clientRow={clientRow}
                 members={split ? (ex.performers && ex.performers.length ? members.filter((m) => ex.performers.includes(m)) : members) : []} /> : null}
