@@ -763,6 +763,45 @@ test('тренажёры закрепил тренер: выбора нет, п�
 });
 
 /**
+ * Замена упражнения (владелец, 16.10.2026): кнопкой со списком, вес нового —
+ * с прошлого раза; после первого подхода — пояснение, а не пропавшая кнопка.
+ */
+test('замена упражнения: кнопка, список, новое упражнение с его историей', async () => {
+  data.clear();
+  exerciseSetupResponse = { setups: {
+    77: { name: 'Жим штанги', setup: '', notes: '', machines: [], alternatives: [{ id: 78, name: 'Жим гантелей' }], noteKey: 'e:жим штанги',
+      muscles: { primary: [], secondary: [] }, media: null },
+    78: { name: 'Жим гантелей', setup: '', notes: '', machines: [], alternatives: [{ id: 77, name: 'Жим штанги' }], noteKey: 'e:жим гантелей',
+      muscles: { primary: [], secondary: [] }, media: null },
+  }, notes: {} };
+  const calls = [];
+  const api = globalThis.__workoutApi;
+  globalThis.__workoutApi = async (action, params) => { calls.push([action, params]); return api(action, params); };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: {
+        title: 'Грудь', exercises: [{ name: 'Жим штанги', exerciseId: 77, sets: '3', reps: '10', weight: '60' }],
+      }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const button = (label) => local.root.findAllByType('button').find((b) => text(b) === label);
+    assert.equal(button('Жим гантелей'), undefined, 'список свёрнут');
+    await act(async () => { button('Заменить упражнение').props.onClick(); await delay(); });
+    assert.ok(local.root.findAllByType('p').some((p) => /выберите, чем заменить/.test(text(p))), 'пояснение');
+    await act(async () => { button('Жим гантелей').props.onClick(); await delay(); });
+    assert.ok(local.root.findAllByType('h3').some((n) => text(n).includes('Жим гантелей')), 'упражнение заменено');
+    assert.ok(calls.some(([a, q]) => a === 'workout.exercise.history' && Number(q.exerciseId) === 78), 'вес — с прошлого раза на новом');
+    await act(async () => { button('Заменить упражнение').props.onClick(); await delay(); });
+    assert.ok(button('Жим штанги'), 'вернуться — тем же списком');
+  } finally {
+    globalThis.__workoutApi = api;
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
+});
+
+/**
  * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
  * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.
  */

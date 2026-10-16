@@ -1627,6 +1627,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // тренажёр, прикреплённый тренером прямо в занятии, — подставляем сами,
   // с весом с прошлого раза на нём (chooseMachine)
   const autoMachine = useRef(new Set());
+  // Какое упражнение сейчас меняют на замену — список раскрыт у него
+  const [swapping, setSwapping] = useState(null);
   useEffect(() => {
     if (!editable) return;
     s.exercises.forEach((ex, ei) => {
@@ -1776,16 +1778,24 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       ))}
       {split && splitView(ex, ei, info)}
       {!split && aboutView(info, machines)}
-      {alts.length > 0 && editable && !started && (
-        <div className="workout__alts">
-          <span className="small muted">Занято? Заменить на:</span>
-          <div className="chips chips--flush chips--wrap">
+      {/* Замена (владелец, 16.10.2026: понятнее и удобнее): клиент меняет
+          упражнение, а не тренажёр — одной кнопкой, со списком и пояснением.
+          Связь в обе стороны (сервер), поэтому вернуться — тем же списком */}
+      {alts.length > 0 && editable && (started
+        ? <p className="small muted workout__alts-later">Заменить упражнение можно до первого подхода.</p>
+        : <div className="workout__alts">
+          <button type="button" className="workout__alts-toggle" aria-expanded={swapping === ex.id}
+            onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
+            {swapping === ex.id ? 'Не заменять' : 'Заменить упражнение'}
+          </button>
+          {swapping === ex.id && <div className="workout__alts-list">
+            <p className="small muted">Тренажёр занят или упражнение не подходит — выберите, чем заменить. Вес подтянется с прошлого раза.</p>
             {alts.map((a) => (
-              <button type="button" key={a.id} className="chip" onClick={() => { haptic(); replaceExercise(ei, { name: a.name, exerciseId: a.id }); }}>{a.name}</button>
+              <button type="button" key={a.id} className="workout__alts-item"
+                onClick={() => { haptic(); setSwapping(null); replaceExercise(ei, { name: a.name, exerciseId: a.id }); }}>{a.name}</button>
             ))}
-          </div>
-        </div>
-      )}
+          </div>}
+        </div>)}
     </>;
   };
 
