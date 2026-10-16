@@ -53,10 +53,11 @@ export function isLegalSwap(board, a, b) {
   if (board[a].power === 'color' || board[b].power === 'color' || (board[a].power && board[b].power)) return true;
   return findMatches(swap(board, a, b)).some(g => g.cells.includes(a) || g.cells.includes(b));
 }
-export function legalMoves(board) {
+export function legalMoves(board, covers = []) {
   const moves = [];
+  const closed = new Set(covers);
   for (let i = 0; i < N * N; i++) {
-    for (const j of [i + 1, i + N]) if (adjacent(i, j) && isLegalSwap(board, i, j)) moves.push([i, j]);
+    for (const j of [i + 1, i + N]) if (!closed.has(i) && !closed.has(j) && adjacent(i, j) && isLegalSwap(board, i, j)) moves.push([i, j]);
   }
   return moves;
 }
@@ -89,6 +90,7 @@ export function createMatchGame(seed = Date.now(), level = 1) {
     [29, 30, 38, 39, 41, 42, 50, 51],
   ];
   game.covers = patterns[game.level - 1].slice();
+  while (!legalMoves(game.board, game.covers).length) game.board = freshBoard(game);
   return game;
 }
 
@@ -100,7 +102,7 @@ export function reshuffle(game) {
       const j = Math.floor(random(state) * (i + 1));
       [state.board[i], state.board[j]] = [state.board[j], state.board[i]];
     }
-    if (!findMatches(state.board).length && legalMoves(state.board).length) return state;
+    if (!findMatches(state.board).length && legalMoves(state.board, state.covers).length) return state;
   }
   // Защитный выход для патологического состава; ход и счёт не списываются.
   const powers = state.board.filter(t => t.power).map(t => t.power);
@@ -156,7 +158,7 @@ function collapse(state, removed) {
 
 // Кадры содержат только данные. Представление управляет длительностью, а не правилами.
 export function resolveMove(game, a, b) {
-  if (game.moves <= 0 || !adjacent(a, b)) return { valid: false, frames: [], game };
+  if (game.moves <= 0 || !adjacent(a, b) || game.covers?.includes(a) || game.covers?.includes(b)) return { valid: false, frames: [], game };
   let state = { ...game, board: swap(game.board, a, b), covers: (game.covers || []).slice() };
   const frames = [];
   const frame = (kind, duration, extra = {}) => frames.push({ kind, duration, game: { ...state, board: state.board.slice(), covers: state.covers.slice() }, ...extra });
@@ -215,7 +217,7 @@ export function resolveMove(game, a, b) {
     forced = [];
     groups = findMatches(state.board);
   }
-  if (state.moves > 0 && !legalMoves(state.board).length) {
+  if (state.moves > 0 && !legalMoves(state.board, state.covers).length) {
     state = reshuffle(state); frame('shuffle', 340);
   }
   return { valid: true, frames, game: state };

@@ -1,31 +1,90 @@
 {
-  "date": "2026-10-15",
+  "date": "2026-10-16",
   "scope": "Численная симуляция; интересность и удобство на физическом устройстве не оценены",
-  "target": 900,
+  "board": "9×9",
+  "targets": [
+    2000,
+    2250,
+    2500
+  ],
   "results": [
     {
+      "level": 1,
       "strategy": "random",
-      "games": 1000,
-      "winRate": 92.9,
-      "median": 1320,
-      "p10": 960,
-      "p90": 2100,
-      "min": 720,
-      "max": 4980,
-      "specialsPerGame": 1.06,
-      "cascadesPerGame": 4.166
+      "games": 300,
+      "winRate": 82,
+      "median": 3100,
+      "p10": 2160,
+      "p90": 4760,
+      "min": 1420,
+      "max": 8760,
+      "specialsPerGame": 2.59,
+      "cascadesPerGame": 10.17
     },
     {
+      "level": 1,
       "strategy": "greedy",
-      "games": 1000,
-      "winRate": 94.7,
-      "median": 1440,
-      "p10": 960,
-      "p90": 2240,
-      "min": 720,
-      "max": 3860,
-      "specialsPerGame": 2.325,
-      "cascadesPerGame": 3.856
+      "games": 300,
+      "winRate": 73,
+      "median": 3640,
+      "p10": 2100,
+      "p90": 6020,
+      "min": 1500,
+      "max": 13160,
+      "specialsPerGame": 6.15,
+      "cascadesPerGame": 9.59
+    },
+    {
+      "level": 2,
+      "strategy": "random",
+      "games": 300,
+      "winRate": 68.3,
+      "median": 3320,
+      "p10": 2160,
+      "p90": 4700,
+      "min": 1440,
+      "max": 6940,
+      "specialsPerGame": 2.76,
+      "cascadesPerGame": 10.56
+    },
+    {
+      "level": 2,
+      "strategy": "greedy",
+      "games": 300,
+      "winRate": 69.7,
+      "median": 3460,
+      "p10": 2160,
+      "p90": 5960,
+      "min": 1260,
+      "max": 13160,
+      "specialsPerGame": 6,
+      "cascadesPerGame": 9.3
+    },
+    {
+      "level": 3,
+      "strategy": "random",
+      "games": 300,
+      "winRate": 52,
+      "median": 3040,
+      "p10": 2080,
+      "p90": 4740,
+      "min": 1500,
+      "max": 8260,
+      "specialsPerGame": 2.64,
+      "cascadesPerGame": 10.05
+    },
+    {
+      "level": 3,
+      "strategy": "greedy",
+      "games": 300,
+      "winRate": 69,
+      "median": 3460,
+      "p10": 2080,
+      "p90": 5800,
+      "min": 1440,
+      "max": 13160,
+      "specialsPerGame": 6.07,
+      "cascadesPerGame": 9.48
     }
   ]
 }

@@ -167,10 +167,10 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <div className="match-stars" aria-label={`Звёзд: ${stars} из 3`}>{[1, 2, 3].map((n, i) => <Star key={n} filled={stars >= n} className={stars >= n ? 'is-earned' : ''} style={{ left: `${[55.56, 75, 100][i]}%` }} />)}</div>
         </div>
       </div>
-      <div className={`match-quest${frame?.kind === 'clear' && frame.storyGain ? ' is-progressing' : ''}`} key={frame?.kind === 'clear' && frame.storyGain ? serial : 'quest'}>
+      <div className={`match-quest${frame?.kind === 'clear' && (frame.storyGain || frame.reveals.length) ? ' is-progressing' : ''}`} key={frame?.kind === 'clear' && (frame.storyGain || frame.reveals.length) ? serial : 'quest'}>
         <Piece type={chapter.type} />
         <span><small>{chapter.title}</small><strong>{chapter.task}</strong></span>
-        <b data-match="story-progress" aria-label={`${chapter.task}: ${progress.collected} из ${progress.required}`}>{progress.collected}<i> / {progress.required}</i></b>
+        <div className="match-quest-progress"><b data-match="story-progress" aria-label={`${chapter.task}: ${progress.collected} из ${progress.required}`}>{progress.collected}<i> / {progress.required}</i></b><em data-match="covers-progress">Ящики {progress.uncovered}/{progress.coversRequired}</em></div>
       </div>
       <div className="match-board-frame">
         <div className={`match-board match-board--${frame?.kind || 'idle'}`} role="group" aria-label={`Игровое поле ${MATCH_TUNING.size} на ${MATCH_TUNING.size}`} aria-describedby={instructions} onPointerDown={down} onPointerUp={up} onPointerCancel={() => { pointer.current = null; }} onLostPointerCapture={() => { pointer.current = null; }}>
@@ -180,8 +180,8 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
             return <button type="button" key={tile.id} data-cell={at} data-type={tile.type} data-power={tile.power || ''}
               className={`match-tile${clears.has(at) ? ' is-clearing' : ''}${frame?.kind === 'reject' && (at === frame.a || at === frame.b) ? ' is-rejected' : ''}${frame?.kind === 'fall' && frame.from[tile.id] !== rowOf(at) ? ' is-falling' : ''}${selected === at ? ' is-selected' : ''}${hint?.includes(at) ? ' is-hint' : ''}`}
               style={{ transform: `translate(${colOf(at) * 100}%, ${row * 100}%)`, '--piece-color': PIECES[tile.type].color }}
-              aria-label={`${rowOf(at) + 1} ряд, ${colOf(at) + 1} столбец: ${PIECES[tile.type].name}${powerText(tile.power)}`}
-              aria-pressed={selected === at} aria-disabled={!active || busy} tabIndex={active && at === focusCell ? 0 : -1}
+              aria-label={`${rowOf(at) + 1} ряд, ${colOf(at) + 1} столбец: ${game.covers.includes(at) ? 'закрытая клетка' : PIECES[tile.type].name + powerText(tile.power)}`}
+              aria-pressed={selected === at} aria-disabled={!active || busy || game.covers.includes(at)} tabIndex={active && at === focusCell ? 0 : -1}
               onKeyDown={key} onClick={event => { if (event.detail === 0) session.select(at, token.current); }}>
               <Piece type={tile.type} power={tile.power} />
             </button>;
@@ -196,7 +196,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
         </div>
         {frame?.kind === 'clear' && active && <div className="match-combo" key={serial} aria-hidden="true"><strong>{frame.combo > 1 ? `Каскад ×${frame.combo}` : frame.effects.length ? 'ЗАРЯД!' : frame.creations.length ? 'Суперзаряд!' : 'Попадание!'}</strong><span>+{frame.points}</span></div>}
       </div>
-      <div className="match-feedback" role="status" aria-live="polite">{soundError || message || 'Собирай тройки. Лови каскады.'}</div>
+      <div className={`match-feedback${message === chapter.halfway ? ' match-feedback--story' : ''}`} role="status" aria-live="polite">{message === chapter.halfway && <strong>Тренер</strong>}{soundError || message || 'Собирай тройки. Лови каскады.'}</div>
       <footer className="match-footer">
         <button type="button" onClick={() => session.hint(token.current)} disabled={!active || busy}><svg className="match-hint-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9.7 9a2.5 2.5 0 1 1 3.6 2.2c-.9.5-1.3 1-1.3 2.3M12 17h.01" /></svg>Подсказка</button>
         <button type="button" onClick={openHelp}><IconGuide size={19} />Как играть</button>
@@ -212,7 +212,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <button className="match-primary" ref={primary} onClick={() => setLoadAttempt(x => x + 1)}>Загрузить ещё раз</button>
         </> : help ? <>
           <h3 id={title}>Собирай и заряжай</h3>
-          <p>Поменяй соседние предметы местами. Собирай очки и {chapter.task.toLowerCase()} для этой главы. Три одинаковых исчезнут, новые упадут сверху.</p>
+          <p>Поменяй соседние предметы местами. Собирай очки и {chapter.task.toLowerCase()}. Тройка рядом с закрытой клеткой открывает ящик. Открой {chapter.coverGoal} ящиков.</p>
           <div className="match-rules">
             <div><Piece type={0} /><span><strong>3 в ряд</strong>Очки и цепочки совпадений</span></div>
             <div><Piece type={1} power="row" /><span><strong>4 в ряд</strong>Собери заряд в тройку, чтобы убрать целую линию</span></div>
@@ -223,14 +223,14 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <button className="match-primary" ref={primary} onClick={() => { setHelp(false); if (mode === 'paused') resume(); }}>Понятно</button>
         </> : mode === 'ready' ? <>
           <div className="match-story-intro"><div className="match-story-portrait" aria-hidden="true" /><div><span>{chapter.place}</span><h3 id={title}>{chapter.title}</h3><p>{chapter.intro}</p></div></div>
-          <div className="match-mission match-mission--story"><span>{game.moves} {movesLabel(game.moves)}</span><span>{number(game.target)} очков</span><span><Piece type={chapter.type} /> ×{progress.required}</span></div>
+          <div className="match-mission match-mission--story"><span>{game.moves} {movesLabel(game.moves)}</span><span>{number(game.target)} очков</span><span><Piece type={chapter.type} /> ×{progress.required}</span><span>Ящики ×{chapter.coverGoal}</span></div>
           <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={() => start(1)}>{assets === 'ready' ? 'Играть' : 'Готовим поле…'}</button>
           <button className="match-secondary" onClick={openHelp}>Как играть</button>
         </> : mode === 'paused' ? <>
           <div className="match-panel-mark"><span className="match-pause-icon" /></div>
           <h3 id={title}>{state.reason === 'rest' ? 'Пора к подходу' : 'Можно выдохнуть'}</h3>
           <p>{state.reason === 'rest' ? 'Поле и ходы сохранены. Продолжим на следующем отдыхе.' : 'Твои комбинации подождут. Продолжишь с того же места.'}</p>
-          <p className="match-story-pause">{chapter.task}: {progress.collected} из {progress.required}</p>
+          <p className="match-story-pause">{chapter.task}: {progress.collected}/{progress.required} · Ящики: {progress.uncovered}/{progress.coversRequired}</p>
           <div className="match-mission"><span>{game.moves} {movesLabel(game.moves)}</span><span><strong>{number(game.score)}</strong> очков</span></div>
           <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={resume}>{assets === 'ready' ? 'Продолжить игру' : 'Готовим поле…'}</button>
           <button className="match-secondary" onClick={close}>Вернуться {restLeft == null ? 'в приложение' : 'к отдыху'}</button>
@@ -240,7 +240,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <h3 id={title}>{mode === 'won' ? (game.level === 3 ? 'Рекорд взят!' : chapter.title + ' — готово!') : 'Попробуем ещё раз?'}</h3>
           <p>{mode === 'won' ? chapter.won : `${chapter.lost} ${game.score < game.target ? `До цели по очкам — ${number(game.target - game.score)}.` : ''}`}</p>
           <div className="match-result-score"><strong>{number(game.score)}</strong><span>очков за партию</span></div>
-          <p className="match-result-quest">{chapter.task}: {progress.collected} / {progress.required}</p>
+          <p className="match-result-quest">{chapter.task}: {progress.collected}/{progress.required} · Ящики: {progress.uncovered}/{progress.coversRequired}</p>
           <p className="match-panel__fine">Лучший каскад ×{Math.max(1, game.bestCombo)}</p>
           <button className="match-primary" ref={primary} onClick={() => start(mode === 'won' ? (game.level < 3 ? game.level + 1 : 1) : game.level)}>{mode === 'won' ? (game.level < 3 ? 'Следующая глава' : 'Начать историю заново') : 'Повторить главу'}</button>
           <button className="match-secondary" onClick={close}>Вернуться {restLeft == null ? 'в приложение' : 'к отдыху'}</button>

@@ -41,9 +41,9 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
       const halfway = Math.ceil(chapter.count / 2);
       message = frame.storyGain && snapshot.game.collected < halfway && frame.game.collected >= halfway
         ? chapter.halfway
-        : chapterComplete(frame.game) && frame.storyGain
+        : chapterComplete(frame.game) && (frame.storyGain || frame.reveals.length)
         ? `${chapter.task} готовы! +${frame.points} очков`
-        : `${frame.combo > 1 ? `Каскад ×${frame.combo}. ` : ''}+${frame.points} очков${frame.storyGain ? ` · ${chapter.task} +${frame.storyGain}` : ''}${frame.creations.length ? ' · Бонус!' : ''}`;
+        : `${frame.combo > 1 ? `Каскад ×${frame.combo}. ` : ''}+${frame.points} очков${frame.storyGain ? ` · ${chapter.task} +${frame.storyGain}` : ''}${frame.reveals.length ? ` · Открыто ящиков: ${frame.reveals.length}` : ''}${frame.creations.length ? ' · Бонус!' : ''}`;
     }
     if (frame.kind === 'reject') message = 'Здесь нет тройки. Ход сохранён.';
     if (frame.kind === 'shuffle') message = 'Новых ходов нет. Перемешиваем бесплатно.';
@@ -52,6 +52,7 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
   };
   const move = (a, b, token) => {
     if (!allowed(token) || snapshot.busy) return false;
+    if (snapshot.game.covers?.includes(a) || snapshot.game.covers?.includes(b)) { emit({ selected: null, message: 'Закрытая клетка откроется после совпадения рядом.' }); return false; }
     const resolved = resolveMove(snapshot.game, a, b);
     if (!resolved.frames.length) return false;
     queue = resolved.frames.slice(); result = resolved.game;
@@ -86,6 +87,7 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
     move,
     select(index, token) {
       if (!allowed(token) || snapshot.busy) return;
+      if (snapshot.game.covers?.includes(index)) { emit({ selected: null, message: 'Собери тройку рядом с закрытой клеткой, чтобы открыть её.' }); return; }
       const selected = snapshot.selected;
       if (selected === index) { emit({ selected: null }); return; }
     if (selected != null && Math.abs(Math.floor(selected / MATCH_TUNING.size) - Math.floor(index / MATCH_TUNING.size)) + Math.abs(selected % MATCH_TUNING.size - index % MATCH_TUNING.size) === 1) move(selected, index, token);
@@ -93,7 +95,7 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
     },
     hint(token) {
       if (!allowed(token) || snapshot.busy) return;
-      emit({ hint: legalMoves(snapshot.game.board)[0] || null, selected: null, message: 'Поменяй местами подсвеченные предметы' });
+      emit({ hint: legalMoves(snapshot.game.board, snapshot.game.covers)[0] || null, selected: null, message: 'Поменяй местами подсвеченные предметы' });
     },
     toggleSound() { emit({ sound: !snapshot.sound }); },
   };

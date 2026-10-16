@@ -344,7 +344,7 @@ test('три игры доступны тестовому клиенту и ск
   const cells = await page.locator('.match-tile.is-hint').evaluateAll(els => els.map(el => el.dataset.cell));
   for (const at of cells) await page.locator(`[data-cell="${at}"]`).click();
   await page.waitForFunction(() => document.querySelector('.match-game')?.dataset.busy === 'false');
-  assert.equal(await page.locator('[data-match=moves]').innerText(), '11');
+  assert.equal(await page.locator('[data-match=moves]').innerText(), '19');
   mkdirSync(join(ROOT, 'reports/match'), { recursive: true });
   await page.screenshot({ path: join(ROOT, 'reports/match/app-playing-390.png'), fullPage: true });
   await page.getByRole('button', { name: 'Закрыть игру', exact: true }).click();

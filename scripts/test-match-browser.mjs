@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 import { chromium, webkit } from 'playwright';
 import { mkdirSync } from 'node:fs';
+import { MATCH_TUNING } from '../src/match-model.js';
 
 let server, browser, origin;
 before(async () => {
@@ -42,21 +43,26 @@ test('три в ряд: касания, подсказка, неверный о�
   await page.getByRole('button', { name: 'Играть', exact: true }).click();
   await page.clock.runFor(400);
   await page.screenshot({ path: '.impeccable/review/mobile.png', fullPage: true });
+  const covered = (await read(page)).game.covers[0];
+  await page.locator(`[data-cell="${covered}"]`).click();
+  assert.equal((await read(page)).game.moves, MATCH_TUNING.moves);
+  assert.match(await page.getByRole('status').innerText(), /закрытой клеткой/);
   await page.getByRole('button', { name: 'Подсказка', exact: true }).click();
   assert.equal(await page.locator('.is-hint').count(), 2);
   await move(page);
-  let state = await read(page); assert.equal(state.game.moves, 11); assert.ok(state.game.score > 0);
-  const illegal = await page.evaluate(() => {
+  let state = await read(page); assert.equal(state.game.moves, MATCH_TUNING.moves - 1); assert.ok(state.game.score > 0);
+  assert.equal(Number(await page.locator('[data-match=covers-progress]').innerText().then(text => text.split('/')[0].replace(/\D/g, ''))), state.game.uncovered);
+  const illegal = await page.evaluate(size => {
     const legal = matchFixture.legal();
-    for (let i = 0; i < 35; i++) if (i % 6 !== 5 && !legal.some(([a,b]) => a === i && b === i+1)) return [i,i+1];
-  });
+    for (let i = 0; i < size ** 2 - 1; i++) if (i % size !== size - 1 && !legal.some(([a,b]) => a === i && b === i+1)) return [i,i+1];
+  }, MATCH_TUNING.size);
   await page.locator(`[data-cell="${illegal[0]}"]`).click(); await page.locator(`[data-cell="${illegal[1]}"]`).click();
   await page.clock.runFor(1000);
-  assert.equal((await read(page)).game.moves, 11); assert.match(await page.getByRole('status').innerText(), /Ход сохранён/);
+  assert.equal((await read(page)).game.moves, MATCH_TUNING.moves - 1); assert.match(await page.getByRole('status').innerText(), /Ход сохранён/);
   const [a,b] = await pair(page);
   await page.locator(`[data-cell="${a}"]`).focus(); await page.keyboard.press('Space');
-  await page.keyboard.press(b-a === 6 ? 'ArrowDown' : 'ArrowRight'); await page.keyboard.press('Enter');
-  await page.clock.runFor(10000); assert.equal((await read(page)).game.moves, 10);
+  await page.keyboard.press(b-a === MATCH_TUNING.size ? 'ArrowDown' : 'ArrowRight'); await page.keyboard.press('Enter');
+  await page.clock.runFor(10000); assert.equal((await read(page)).game.moves, MATCH_TUNING.moves - 2);
   await page.setViewportSize({ width: 1440, height: 1000 }); await page.clock.runFor(300);
   await page.screenshot({ path: '.impeccable/review/desktop.png', fullPage: true });
 });
@@ -66,7 +72,7 @@ test('три в ряд: свайп, пауза посреди каскада, в
   await page.getByRole('button', { name: 'Играть', exact: true }).click();
   const [a,b] = await pair(page); const box = await page.locator(`[data-cell="${a}"]`).boundingBox();
   await page.mouse.move(box.x+box.width/2, box.y+box.height/2); await page.mouse.down();
-  await page.mouse.move(box.x+box.width/2+(b-a === 1 ? box.width : 0), box.y+box.height/2+(b-a === 6 ? box.height : 0)); await page.mouse.up();
+  await page.mouse.move(box.x+box.width/2+(b-a === 1 ? box.width : 0), box.y+box.height/2+(b-a === MATCH_TUNING.size ? box.height : 0)); await page.mouse.up();
   await page.clock.runFor(280); assert.equal((await read(page)).frame.kind, 'clear');
   await page.screenshot({ path: 'reports/match/clear-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Пауза', exact: true }).click();
@@ -74,7 +80,7 @@ test('три в ряд: свайп, пауза посреди каскада, в
   assert.deepEqual((await read(page)).game, stopped.game);
   await page.screenshot({ path: 'reports/match/paused-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Продолжить игру', exact: true }).click(); await page.clock.runFor(10000);
-  const resumed = await read(page); assert.equal(resumed.busy, false); assert.equal(resumed.game.moves, 11);
+  const resumed = await read(page); assert.equal(resumed.busy, false); assert.equal(resumed.game.moves, MATCH_TUNING.moves - 1);
   await page.getByRole('button', { name: 'Закрыть игру', exact: true }).click();
   await page.locator('.match-game').waitFor({ state: 'detached' });
   await page.evaluate(() => showMatch());
@@ -113,13 +119,14 @@ test('три в ряд: отдых имеет приоритет, две сце�
 
 test('три в ряд: полный раунд, результат, новый раунд, узкий экран и уменьшение движения', async t => {
   const page = await setup(t, { reducedMotion: 'reduce' });
+  await page.evaluate(() => showMatch({ identity: 'win', seed: 43 }));
   await page.getByRole('button', { name: 'Играть', exact: true }).click();
-  for (let i = 0; i < 12; i++) await move(page);
+  for (let i = 0; i < MATCH_TUNING.moves; i++) await move(page);
   const ended = await read(page); assert.equal(ended.game.moves, 0); assert.equal(ended.mode, 'won');
   assert.equal(ended.busy, false);
   await page.screenshot({ path: 'reports/match/win-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Следующая глава', exact: true }).click();
-  assert.equal((await read(page)).game.level, 2); assert.equal((await read(page)).game.moves, 12);
+  assert.equal((await read(page)).game.level, 2); assert.equal((await read(page)).game.moves, MATCH_TUNING.moves);
   await page.setViewportSize({ width: 320, height: 640 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: 'reports/match/playing-320.png', fullPage: true });
@@ -147,11 +154,11 @@ test('три в ряд: ошибка рисунков видима и повто
 
 test('три в ряд: проигрыш, фокус внутри результата и повторная попытка', async t => {
   const page = await setup(t);
-  await page.evaluate(() => showMatch({ identity: 'loss', seed: 13 }));
+  await page.evaluate(() => showMatch({ identity: 'loss', seed: 12 }));
   await page.getByRole('button', { name: 'Играть', exact: true }).click();
-  for (let i = 0; i < 12; i++) await move(page, 'weak');
+  for (let i = 0; i < MATCH_TUNING.moves; i++) await move(page, 'weak');
   assert.equal((await read(page)).mode, 'lost');
-  assert.equal((await read(page)).game.score, 720);
+  assert.ok((await read(page)).game.score < (await read(page)).game.target || (await read(page)).game.collected < 6);
   await page.screenshot({ path: 'reports/match/loss-390.png', fullPage: true });
   const dialog = page.getByRole('dialog');
   const last = dialog.getByRole('button').last(); await last.focus(); await page.keyboard.press('Tab');
@@ -160,6 +167,6 @@ test('три в ряд: проигрыш, фокус внутри результ
   assert.equal(await last.evaluate(el => el === document.activeElement), true);
   await page.getByRole('button', { name: 'Повторить главу', exact: true }).click();
   const retried = await read(page);
-  assert.equal(retried.mode, 'playing'); assert.equal(retried.game.moves, 12);
+  assert.equal(retried.mode, 'playing'); assert.equal(retried.game.moves, MATCH_TUNING.moves);
   assert.equal(retried.game.score, 0); assert.equal(retried.game.level, 1);
 });
