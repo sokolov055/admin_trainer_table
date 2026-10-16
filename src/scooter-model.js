@@ -1,11 +1,11 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
 export const TUNING = Object.freeze({ distance: 900, duration: 60, penalty: 4, bonus: 2,
-  startSpeed: 12, speedGain: 14, firstObstacle: 78, rowGap: 34, laneResponse: 15,
+  startSpeed: 12, speedGain: 14, firstObstacle: 78, rowGap: 34, laneResponse: 8,
   collisionHalfWidth: .53, collisionDepth: 1.8, grace: 1.4, slowDuration: .85, slowFactor: .45 });
 export const DISTANCE = TUNING.distance;
 export const DURATION = TUNING.duration;
 export const HIT_PENALTY = TUNING.penalty;
-export const TYPES = ['runner', 'robot', 'curb', 'grandma', 'athlete', 'kid'];
+export const TYPES = ['taxi', 'runner', 'barrier', 'courier', 'robot', 'car'];
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export function randomGenerator(seed = 563) {
@@ -25,15 +25,15 @@ export function createRoute(seed = 563) {
     safe = clamp(safe + Math.floor(random() * 3) - 1, 0, 2);
     const occupied = [0, 1, 2].filter(lane => lane !== safe);
     if (row < 3 || row % 3 !== 2) occupied.splice(Math.floor(random() * 2), 1);
-    for (const lane of occupied) objects.push({ id: `o${row}-${lane}`, at, lane, type: TYPES[row % TYPES.length], passed: false });
-    if (row % 4 === 2) objects.push({ id: `b${row}`, at, lane: safe, type: 'bottle', passed: false });
+    for (const lane of occupied) objects.push({ id: `o${row}-${lane}`, row, at, lane, type: TYPES[row % TYPES.length], passed: false });
+    if (row % 4 === 2) objects.push({ id: `b${row}`, row, at, lane: safe, type: 'bottle', passed: false });
   }
   return objects;
 }
 
 export function createGame(seed = 563) {
   return { phase: 'ready', resumePhase: 'playing', countdown: 3, distance: 0, remaining: DURATION, elapsed: 0,
-    lane: 1, x: 1, speed: 0, hits: 0, bottles: 0, dodged: 0, invincible: 0, slow: 0,
+    lane: 1, x: 1, speed: 0, hits: 0, bottles: 0, dodged: 0, score: 0, combo: 0, bestCombo: 0, invincible: 0, slow: 0,
     event: null, eventSerial: 0, route: createRoute(seed), seed };
 }
 
@@ -86,10 +86,12 @@ function tick(game, dt) {
       object.passed = true;
       if (object.type === 'bottle') {
         game.bottles++;
+        game.score += 25;
         game.remaining += TUNING.bonus;
         emit(game, 'bonus', 'Вода в дорогу! +2 сек');
       } else if (!game.invincible) {
         game.hits++;
+        game.combo = 0;
         game.remaining = Math.max(0, game.remaining - HIT_PENALTY);
         game.invincible = TUNING.grace;
         game.slow = TUNING.slowDuration;
@@ -97,7 +99,13 @@ function tick(game, dt) {
       }
     } else if (object.at < game.distance - TUNING.collisionDepth) {
       object.passed = true;
-      if (object.type !== 'bottle') game.dodged++;
+      if (object.type !== 'bottle') {
+        game.dodged++;
+        game.combo++;
+        game.bestCombo = Math.max(game.bestCombo, game.combo);
+        game.score += 10 + Math.min(40, game.combo * 2);
+        if (game.combo > 0 && game.combo % 5 === 0) emit(game, 'streak', `Серия ${game.combo}! +${10 + Math.min(40, game.combo * 2)}`);
+      }
     }
   }
   if (game.distance >= DISTANCE && game.remaining > 0) {

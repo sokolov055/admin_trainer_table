@@ -326,15 +326,22 @@ test('три игры доступны тестовому клиенту и ск
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /На самокате до зала/ }).click();
   await page.locator('.menu__item').first().waitFor({ state: 'hidden' });
+  const shell = await page.locator('.game-shell--scooter').evaluate(el => {
+    const box = el.getBoundingClientRect();
+    const header = document.querySelector('.app__header');
+    return { position: getComputedStyle(el).position, width: box.width, height: box.height, locked: document.documentElement.classList.contains('game-is-open'), backgroundInert: header?.inert, backgroundHidden: header?.getAttribute('aria-hidden') };
+  });
+  assert.deepEqual(shell, { position: 'fixed', width: VIEWPORT.width, height: VIEWPORT.height, locked: true, backgroundInert: true, backgroundHidden: 'true' });
   mkdirSync(join(ROOT, 'reports/scooter'), { recursive: true });
   await page.screenshot({ path: join(ROOT, 'reports/scooter/app-ready.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Поехали!', exact: true }).click();
+  await page.getByRole('button', { name: 'В путь', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[data-scooter=viewport]')?.dataset.phase === 'playing');
   await page.getByRole('button', { name: 'Влево', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[data-scooter=viewport]')?.dataset.lane === '0', null, { timeout: 3000 });
   await page.waitForFunction(() => Number(document.querySelector('[data-scooter=progress]').value) > 30);
   await page.screenshot({ path: join(ROOT, 'reports/scooter/app-playing.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Закрыть игру', exact: true }).click();
+  await page.getByRole('button', { name: 'Свернуть игру', exact: true }).click();
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains('game-is-open') || document.querySelector('.app__header').inert), false);
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /Три в ряд/ }).click();

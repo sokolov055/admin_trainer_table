@@ -35,6 +35,8 @@ import Tour from './Tour.jsx';
 import { forgetFocus, GoalBanner } from './focus.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
+import GameShell from '../GameShell.jsx';
+import { IconPlankGame, IconScooterGame, IconMatchGame } from '../game-icons.jsx';
 
 /**
  * Панель клиента.
@@ -69,9 +71,9 @@ const TABS = [
  * зашедший включить уведомления не должен листать свой рост и телефон.
  */
 const MENU = [
-  { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlan },
-  { id: 'scooter-game', label: 'На самокате до зала', note: 'Успей к тренировке за минуту', Icon: IconPlan },
-  { id: 'match-game', label: 'Три в ряд', note: 'Собери свой лучший каскад', Icon: IconPlan },
+  { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlankGame, game: true },
+  { id: 'scooter-game', label: 'На самокате до зала', note: 'Городская гонка на одну минуту', Icon: IconScooterGame, game: true },
+  { id: 'match-game', label: 'Три в ряд', note: 'Собери свой лучший каскад', Icon: IconMatchGame, game: true },
   // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
@@ -332,7 +334,7 @@ export default function ClientApp({ me, clientRow, preview }) {
             return (
               <button
                 key={m.id}
-                className={'menu__item' + (active ? ' menu__item--active' : '')}
+                className={'menu__item' + (m.game ? ' menu__item--game' : '') + (active ? ' menu__item--active' : '')}
                 onClick={() => (m.action ? (setMenuOpen(false), m.action()) : go(m.id))}
                 aria-current={active ? 'page' : undefined}
               >
@@ -396,9 +398,9 @@ export default function ClientApp({ me, clientRow, preview }) {
 
       {!onTab && (
       <main className="app__body" key={view}>
-        {view === 'plank-game' && plankEnabled && <PlankGame onClose={() => go(lastTab)} />}
-        {view === 'scooter-game' && plankEnabled && <ScooterGame onClose={() => go(lastTab)} />}
-        {view === 'match-game' && plankEnabled && <MatchGame onClose={() => go(lastTab)} />}
+        {view === 'plank-game' && plankEnabled && <GameShell kind="plank"><PlankGame onClose={() => go(lastTab)} /></GameShell>}
+        {view === 'scooter-game' && plankEnabled && <GameShell kind="scooter"><ScooterGame immersive onClose={() => go(lastTab)} /></GameShell>}
+        {view === 'match-game' && plankEnabled && <GameShell kind="match"><MatchGame onClose={() => go(lastTab)} /></GameShell>}
         {view === 'profile' && (
           <>
             <p className="small muted">

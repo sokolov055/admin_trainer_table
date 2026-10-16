@@ -1,7 +1,7 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
 import { DISTANCE } from './scooter-model.js';
 
-const C = { road: '#647a78', line: '#dce6ca', sidewalk: '#e4dfcc', ink: '#24463c', shadow: '#153b3626' };
+const C = { road: '#506765', line: '#eef2dd', sidewalk: '#d8d4bf', ink: '#24463c', shadow: '#102f2b36' };
 const palette = ['#dbac86', '#eac590', '#97bfb4', '#c6ad9c', '#afc7a3'];
 
 function shape(ctx, points, color) {
@@ -23,7 +23,19 @@ function shadow(ctx, x, y, rx, ry) { oval(ctx, x + 7, y + 7, rx, ry, C.shadow); 
 
 export function drawObject(ctx, type, x, y, size = 1, time = 0) {
   ctx.save(); ctx.translate(x, y); ctx.scale(size, size);
-  if (type === 'robot') {
+  if (type === 'taxi' || type === 'car' || type === 'courier') {
+    const body = type === 'taxi' ? '#e7ad3f' : type === 'courier' ? '#c95d42' : '#5d8fa1';
+    shadow(ctx, 0, 2, 25, 42);
+    rect(ctx, -24, -40, 48, 82, '#263d3a', 13);
+    rect(ctx, -22, -38, 44, 76, body, 12);
+    rect(ctx, -17, -25, 34, 19, '#9bb9b5', 6);
+    rect(ctx, -16, 8, 32, 16, '#85a5a3', 5);
+    rect(ctx, -19, -34, 9, 4, '#f8eccd', 2); rect(ctx, 10, -34, 9, 4, '#f8eccd', 2);
+    rect(ctx, -19, 31, 9, 4, '#b43f33', 2); rect(ctx, 10, 31, 9, 4, '#b43f33', 2);
+    line(ctx, [[-22, 0], [22, 0]], '#24453f4f', 2);
+    if (type === 'taxi') { rect(ctx, -10, -5, 20, 10, '#f8efd4', 3); rect(ctx, -7, -3, 14, 6, '#314b45', 2); }
+    if (type === 'courier') { rect(ctx, -13, -3, 26, 12, '#f2e9cf', 3); line(ctx, [[-6, 3], [6, 3]], '#b64f38', 2); }
+  } else if (type === 'robot') {
     shadow(ctx, 0, 2, 22, 21);
     for (const side of [-1, 1]) for (const at of [-13, 0, 13]) rect(ctx, side * 20 - 3, at - 4, 6, 8, '#253e37', 3);
     rect(ctx, -20, -21, 40, 43, '#b4c9c2', 10);
@@ -33,7 +45,7 @@ export function drawObject(ctx, type, x, y, size = 1, time = 0) {
     rect(ctx, -12, -4, 24, 12, '#e59a56', 3);
     line(ctx, [[8, -21], [11, -38]], '#476656', 2);
     shape(ctx, [[11, -38], [22, -35], [11, -31]], '#e89d58');
-  } else if (type === 'curb') {
+  } else if (type === 'curb' || type === 'barrier') {
     rect(ctx, -28, -10, 62, 29, C.shadow, 5);
     rect(ctx, -30, -16, 60, 29, '#7c8d82', 5);
     rect(ctx, -30, -19, 60, 24, '#e1c395', 5);
@@ -99,7 +111,7 @@ function building(ctx, x, y, width, height, index, right = false) {
 }
 
 function scooter(ctx, x, y, lean, hit, time, reduced) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(reduced ? 0 : lean * .09);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(reduced ? 0 : lean * .15);
   shadow(ctx, 0, 0, 24, 45);
   rect(ctx, -4, -42, 8, 19, '#183e38', 4); rect(ctx, -4, 33, 8, 19, '#183e38', 4);
   rect(ctx, -7, -29, 14, 71, '#1d6957', 6); rect(ctx, -4, -26, 8, 60, '#87cf97', 4);
@@ -151,6 +163,7 @@ export class StreetRenderer {
     const offset = game.distance * metresToPixels;
     rect(ctx, 0, 0, w, h, C.sidewalk);
     rect(ctx, 78, 0, w - 156, h, C.road);
+    for (let y = (offset % 96) - 96; y < h; y += 96) rect(ctx, 81, y, w - 162, 1, '#f6f1d410');
     rect(ctx, 72, 0, 6, h, '#fbf0d0'); rect(ctx, w - 78, 0, 6, h, '#fbf0d0');
     rect(ctx, 78, 0, 3, h, '#35554b50'); rect(ctx, w - 83, 0, 5, h, '#35554b38');
     for (let y = (offset % 48) - 48; y < h; y += 48) {
@@ -158,7 +171,7 @@ export class StreetRenderer {
       line(ctx, [[350, y], [376, y]], '#c9c5ae', 1);
     }
     for (let y = (offset % 75) - 75; y < h; y += 75) {
-      rect(ctx, 164, y, 3, 28, '#d5dfc367', 1); rect(ctx, 252, y, 3, 28, '#d5dfc367', 1);
+      rect(ctx, 164, y, 3, 30, '#eef2dd9e', 1); rect(ctx, 252, y, 3, 30, '#eef2dd9e', 1);
     }
     for (let y = (offset % 460) - 460; y < h; y += 460) {
       for (const laneX of [122, 210, 298]) {
@@ -194,7 +207,7 @@ export class StreetRenderer {
       const dy = object.at - game.distance;
       const y = playerY - dy * metresToPixels;
       if (y < -70 || y > h + 70 || (object.passed && object.type === 'bottle')) continue;
-      const size = object.type === 'curb' ? .95 : 1;
+      const size = object.type === 'curb' || object.type === 'barrier' ? .95 : 1;
       drawObject(ctx, object.type, 122 + object.lane * 88, y, size, reduced ? 0 : game.elapsed);
     }
     const leaning = game.lane - game.x;

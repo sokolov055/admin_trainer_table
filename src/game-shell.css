@@ -1,0 +1,41 @@
+html.game-is-open,
+html.game-is-open body { overflow: hidden; overscroll-behavior: none; }
+
+.game-shell {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: #173c34;
+}
+
+html.game-is-open .rest-pill { z-index: 85; }
+
+.game-shell > * {
+  min-height: 100dvh;
+  border-radius: 0;
+}
+
+.game-shell--plank {
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  background: #e7ede2;
+}
+
+.game-shell--plank .plank-game,
+.game-shell--match .match-game {
+  max-width: 640px;
+  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  margin: 0 auto;
+  border-radius: 0;
+}
+
+.game-shell--match {
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  background: #173e34;
+}
+
+@media (min-width: 700px) {
+  .game-shell--plank,
+  .game-shell--match { padding-inline: 24px; }
+}

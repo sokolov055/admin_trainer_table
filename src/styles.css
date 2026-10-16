@@ -843,6 +843,25 @@ button { font-family: inherit; }
 
 .menu__item--active .menu__icon { color: inherit; }
 
+.menu__item--game {
+  min-height: 64px;
+  padding-block: 6px;
+}
+
+.menu__item--game .menu__icon {
+  width: 48px;
+  height: 48px;
+}
+
+.menu__item--game .game-menu-icon {
+  display: block;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.menu__item--game.menu__item--active .game-menu-icon {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
 .menu__text {
   display: flex;
   flex-direction: column;

@@ -8,9 +8,9 @@ const bundle = async () => (await build({ bundle: true, write: false, format: 'i
 import React from 'react'; import {createRoot} from 'react-dom/client';
 import ScooterGame from './src/ScooterGame.jsx'; import {ScooterSessionProvider,useScooterSession} from './src/ScooterSession.jsx';
 import {PlankSessionProvider} from './src/PlankSession.jsx'; import {RestScreen} from './src/RestScreen.jsx';
-function Fixture({menu=true,rest=false,until=Infinity,now=Date.now(),allowed=true}) {
+function Fixture({menu=true,rest=false,until=Infinity,now=Date.now(),allowed=true,immersive=true}) {
  const session=useScooterSession(); window.readRide=()=>structuredClone(session.game);
- return <>{menu&&<ScooterGame/>}{rest&&<RestScreen until={until} now={now} total={30000} allowGame={allowed} onStop={()=>window.show({menu:false})}/>}</>;
+ return <>{menu&&<ScooterGame immersive={immersive}/>} {rest&&<RestScreen until={until} now={now} total={30000} allowGame={allowed} onStop={()=>window.show({menu:false})}/>}</>;
 }
 const root=createRoot(document.getElementById('root'));
 window.show=props=>root.render(<ScooterSessionProvider><PlankSessionProvider><Fixture {...props}/></PlankSessionProvider></ScooterSessionProvider>);
@@ -23,7 +23,7 @@ async function setup(t) {
   const css=['styles.css','rest.css','scooter.css'].map(f=>readFileSync('src/'+f,'utf8')).join('\n');
   await page.setContent('<style>'+css+'</style><div id="root"></div>');
   await page.addScriptTag({content:await bundle()});
-  await page.getByRole('button',{name:'Поехали!',exact:true}).waitFor();
+  await page.getByRole('button',{name:'В путь',exact:true}).waitFor();
   await page.clock.install(); await page.clock.pauseAt(new Date(Date.now()+100));
   t.after(()=>assert.deepEqual(errors,[]));
   return page;
@@ -31,7 +31,10 @@ async function setup(t) {
 
 test('самокат: кнопки, свайп, пауза, повторный монтаж и единственный владелец поездки', async t=>{
   const page=await setup(t);
-  await page.getByRole('button',{name:'Поехали!',exact:true}).click(); await page.clock.runFor(4200);
+  mkdirSync('reports/scooter',{recursive:true});
+  await page.screenshot({path:'reports/scooter/immersive-start-390.png',fullPage:true});
+  await page.getByRole('button',{name:'В путь',exact:true}).click(); await page.clock.runFor(4200);
+  await page.screenshot({path:'reports/scooter/immersive-playing-390.png',fullPage:true});
   await page.keyboard.press('ArrowLeft');
   assert.equal((await page.evaluate(()=>readRide())).lane,0);
   await page.getByRole('button',{name:'Вправо',exact:true}).click();
@@ -62,7 +65,7 @@ test('самокат: конец отдыха, сохранение поездк
   const page=await setup(t); const at=await page.evaluate(()=>Date.now());
   await page.evaluate(at=>show({menu:false,rest:true,until:at+6000,now:at}),at);
   await page.getByRole('button',{name:'На самокате до зала',exact:true}).click();
-  await page.getByRole('button',{name:'Поехали!',exact:true}).click(); await page.clock.runFor(6100);
+  await page.getByRole('button',{name:'В путь',exact:true}).click(); await page.clock.runFor(6100);
   const stopped=await page.evaluate(()=>readRide()); assert.equal(stopped.phase,'paused');
   await page.evaluate(at=>show({menu:false,rest:true,until:at+6000,now:at+6100}),at);
   await page.getByRole('dialog',{name:'Отдых окончен',exact:true}).waitFor();
@@ -77,8 +80,9 @@ test('самокат: конец отдыха, сохранение поездк
   await page.screenshot({path:'reports/scooter/rest-playing.png',fullPage:true});
   await page.getByRole('button',{name:'Пауза',exact:true}).click();
   await page.setViewportSize({width:320,height:640});
+  await page.clock.runFor(300);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-  assert.equal(await page.locator('.speed').isVisible(),false);
+  assert.equal(await page.locator('[data-scooter=speed]').first().innerText(),'0');
   await page.screenshot({path:'reports/scooter/rest-paused-320.png',fullPage:true});
   await page.evaluate(()=>show({menu:false,rest:true,until:Date.now()+30000,allowed:false}));
   assert.equal(await page.locator('.scooter-game').count(),0);
@@ -93,7 +97,7 @@ test('самокат: наклон, отказ, уход в фон и очист
     window.tilt=gamma=>window.dispatchEvent(Object.assign(new Event('deviceorientation'),{gamma,beta:0}));
   });
   await page.getByRole('button',{name:'Наклон телефона',exact:true}).click(); await page.evaluate(()=>tilt(0));
-  await page.getByRole('button',{name:'Поехали!',exact:true}).click(); await page.clock.runFor(3200);
+  await page.getByRole('button',{name:'В путь',exact:true}).click(); await page.clock.runFor(3200);
   await page.evaluate(()=>tilt(-20)); assert.equal((await page.evaluate(()=>readRide())).lane,0);
   await page.evaluate(()=>tilt(20)); assert.equal((await page.evaluate(()=>readRide())).lane,2);
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
@@ -103,6 +107,9 @@ test('самокат: наклон, отказ, уход в фон и очист
   await page.getByRole('button',{name:'Продолжить поездку',exact:true}).click();
   await page.evaluate(()=>tilt(-20)); assert.equal((await page.evaluate(()=>readRide())).lane,2,'удалённый датчик не рулит новой сценой');
   await page.evaluate(()=>DeviceOrientationEvent.requestPermission=async()=> 'denied');
+  await page.setViewportSize({width:320,height:640});
   await page.getByRole('button',{name:'Наклон телефона',exact:true}).click();
-  assert.match(await page.locator('[data-scooter=sensor-status]').innerText(),/не разрешён/);
+  const sensor=page.locator('[data-scooter=sensor-status]');
+  assert.equal(await sensor.isVisible(),true);
+  assert.match(await sensor.innerText(),/не разрешён/);
 });

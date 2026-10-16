@@ -13,7 +13,7 @@ const on = (target, type, handler) => target.addEventListener(type, event => {
   handler(event);
 }, { signal: controller.signal });
 const $ = id => root.querySelector('[data-scooter="' + id + '"]');
-const elements = Object.fromEntries(['time', 'distance', 'speed', 'progress', 'progress-label', 'pause', 'left', 'right',
+const elements = Object.fromEntries(['time', 'distance', 'speed', 'score', 'combo', 'progress', 'progress-label', 'pause', 'left', 'right',
   'overlay', 'overlay-title', 'overlay-copy', 'overlay-hint', 'start', 'restart', 'result-stats', 'countdown', 'toast',
   'buttons-mode', 'tilt-mode', 'sensor-status', 'steering-hint'].map(id => [id, $(id)]));
 const renderer = new StreetRenderer($('scene'));
@@ -133,20 +133,22 @@ on(window, 'pageshow', () => { previousTime = null; });
 
 function renderUI() {
   const remaining = Math.ceil(game.remaining);
+  const active = game.phase === 'playing' || game.phase === 'countdown';
   elements.time.textContent = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
   elements.time.parentElement.classList.toggle('urgent', remaining <= 10);
-  elements.distance.textContent = `До зала ${Math.ceil(DISTANCE - game.distance)} м`;
-  elements.speed.textContent = String(Math.round(game.speed * 3.6));
+  elements.distance.textContent = `Зал через ${Math.ceil(DISTANCE - game.distance)} м`;
+  elements.speed.textContent = active ? String(Math.round(game.speed * 3.6)) : '0';
+  elements.score.textContent = String(game.score);
   elements.progress.value = game.distance;
   elements['progress-label'].textContent = `${Math.floor(game.distance / DISTANCE * 100)}%`;
-  const active = game.phase === 'playing' || game.phase === 'countdown';
-  elements.speed.parentElement.hidden = !active;
+  elements.combo.hidden = !active || game.combo < 2;
+  elements.combo.textContent = `Серия ${game.combo}`;
   elements.pause.disabled = !active;
   elements.left.disabled = !active;
   elements.right.disabled = !active;
   elements.countdown.hidden = game.phase !== 'countdown';
   elements.countdown.textContent = Math.max(1, Math.ceil(game.countdown));
-  elements['steering-hint'].textContent = game.phase === 'playing' ? 'Найди свободную полосу' : 'Объезжай препятствия';
+  elements['steering-hint'].textContent = game.phase === 'playing' ? 'Найди свободную полосу' : 'Выбери свободную полосу';
   if (game.event && game.event.until > game.elapsed && game.phase === 'playing') {
     if (game.event.serial !== previousEvent) {
       elements.toast.replaceChildren(Object.assign(document.createElement('span'), { textContent: game.event.text }));
@@ -168,10 +170,10 @@ function renderUI() {
       elements['overlay-hint'].textContent = 'Вернёшься к игре с того же места';
     } else if (game.phase === 'won' || game.phase === 'lost') {
       const won = game.phase === 'won';
-      elements['overlay-title'].textContent = won ? 'Успел! Теперь в зал.' : 'Тренер уже начал';
-      elements['overlay-copy'].textContent = won ? `Ты у входа за ${Math.ceil(game.remaining)} сек до тренировки. Хорошая разминка для реакции!` : `До зала осталось ${Math.ceil(DISTANCE - game.distance)} м. Ещё попытка? Держись свободной полосы.`;
+      elements['overlay-title'].textContent = won ? 'Успел. Зал открыт!' : 'Тренировка началась';
+      elements['overlay-copy'].textContent = won ? `Ты у входа за ${Math.ceil(game.remaining)} сек до старта. Маршрут пройден чисто и быстро.` : `До зала осталось ${Math.ceil(DISTANCE - game.distance)} м. Ещё попытка? Смотри дальше по дороге и держись свободной полосы.`;
       elements.start.textContent = 'Ещё заезд';
-      elements['result-stats'].innerHTML = `<div><strong>${Math.round(game.distance)}</strong><span>метров</span></div><div><strong>${game.hits}</strong><span>столкновений</span></div><div><strong>${game.bottles}</strong><span>бутылок воды</span></div>`;
+      elements['result-stats'].innerHTML = `<div><strong>${game.score}</strong><span>очков</span></div><div><strong>${game.bestCombo}</strong><span>лучшая серия</span></div><div><strong>${game.hits}</strong><span>столкновений</span></div>`;
     }
     if (game.phase !== 'ready') {
       if (!active && owns() && !blocked()) elements.start.focus({ preventScroll: true });

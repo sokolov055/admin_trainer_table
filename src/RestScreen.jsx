@@ -11,6 +11,7 @@ import { alarmRings, alarmClosed } from './native-rest.js';
 import { ringOnce, stopVibration } from './rest-alarm.js';
 import { isNativeApp } from './native-bridge.js';
 import { IconDelta, IconChevron } from './icons.jsx';
+import { IconPlankGame, IconScooterGame, IconMatchGame } from './game-icons.jsx';
 import './rest.css';
 
 /**
@@ -134,9 +135,11 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
       )}
       {over && allowGame && (activeRound(plank.round) || scooterActive || matchActive) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
       {!over && allowGame && <>
-        <button type="button" className="button" onClick={() => { setGameKind('plank'); setGameUntil(until); }}>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</button>
-        <button type="button" className="button" onClick={() => { setGameKind('scooter'); setGameUntil(until); }}>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</button>
-        <button type="button" className="button" onClick={() => { setGameKind('match'); setGameUntil(until); }}>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</button>
+        <div className="rest-screen__games" aria-label="Игры на отдыхе">
+          <button type="button" onClick={() => { setGameKind('plank'); setGameUntil(until); }}><IconPlankGame size={44} /><span>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</span></button>
+          <button type="button" onClick={() => { setGameKind('scooter'); setGameUntil(until); }}><IconScooterGame size={44} /><span>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</span></button>
+          <button type="button" onClick={() => { setGameKind('match'); setGameUntil(until); }}><IconMatchGame size={44} /><span>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</span></button>
+        </div>
       </>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>
         {over

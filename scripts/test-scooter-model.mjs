@@ -43,6 +43,20 @@ test('перестроение действительно позволяет о�
   const g = playing(); g.route = [{ at: 14, lane: 1, type: 'curb' }];
   steer(g, -1); advance(g, 2);
   assert.equal(g.hits, 0); assert.equal(g.dodged, 1); assert.ok(g.x < .01);
+  assert.ok(g.score > 10); assert.equal(g.combo, 1);
+});
+
+test('серия объездов растит счёт, столкновение обнуляет серию', () => {
+  const g = playing();
+  g.route = [
+    { at: 3, lane: 0, type: 'car' },
+    { at: 8, lane: 0, type: 'taxi' },
+    { at: 14, lane: 1, type: 'barrier' },
+  ];
+  setLane(g, 2); advance(g, 1);
+  assert.equal(g.combo, 2); assert.equal(g.bestCombo, 2); assert.ok(g.score >= 26);
+  setLane(g, 1); advance(g, 1);
+  assert.equal(g.hits, 1); assert.equal(g.combo, 0); assert.equal(g.bestCombo, 2);
 });
 
 test('бутылка прибавляет две секунды один раз', () => {
