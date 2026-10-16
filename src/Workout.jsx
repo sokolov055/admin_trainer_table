@@ -26,6 +26,7 @@ import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { ExerciseMachines } from './trainer/MachinesEditor.jsx';
+import { HistoryPick } from './trainer/HistoryMove.jsx';
 
 /** У тренажёра есть что раскрыть: фото или где регулировки */
 function machineHasDetails(m) {
@@ -1629,6 +1630,26 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const autoMachine = useRef(new Set());
   // Какое упражнение сейчас меняют на замену — список раскрыт у него
   const [swapping, setSwapping] = useState(null);
+  // У какого упражнения тренер открыл «делал под другим названием?» — пока
+  // открыто, блок не прячется, даже когда веса уже подтянулись («Отменить»)
+  const [historyPick, setHistoryPick] = useState(null);
+  // Историю перенесли (HistoryMove) — веса неотмеченных подходов и
+  // настройка — заново, уже по этому упражнению
+  const reloadHistory = async (ei) => {
+    const current = state.current && state.current.session.exercises[ei];
+    if (!current) return;
+    try {
+      const plan = replacementPlan(current);
+      const history = await apiPublic('workout.exercise.history', {
+        ...params, name: current.name, exerciseId: current.exerciseId || null, sets: plan.sets, reps: plan.reps,
+        ...(current.machine ? { machineUid: current.machine.uid } : {}),
+      });
+      updateExercise(ei, (ex) => (ex.id !== current.id ? ex : withMachine(ex, history.machine || ex.machine || null, history)));
+    } catch (error) {
+      setMessage('Историю не удалось загрузить: ' + error.message);
+    }
+    setSetupsTick((t) => t + 1);
+  };
   useEffect(() => {
     if (!editable) return;
     s.exercises.forEach((ex, ei) => {
@@ -1781,6 +1802,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {/* Замена (владелец, 16.10.2026: понятнее и удобнее): клиент меняет
           упражнение, а не тренажёр — одной кнопкой, со списком и пояснением.
           Связь в обе стороны (сервер), поэтому вернуться — тем же списком */}
+      {/* Только тренеру (владелец, 16.10.2026): то же упражнение под старым
+          названием — перенести веса и настройку из журнала клиента */}
+      {!asClient && clientRow && editable && ex.exerciseId && !started
+        && ((!ex.prevWeight && !ex.lastRun) || historyPick === ex.id) && (
+        <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
+          onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)} />
+      )}
       {alts.length > 0 && editable && (started
         ? <p className="small muted workout__alts-later">Заменить упражнение можно до первого подхода.</p>
         : <div className="workout__alts">

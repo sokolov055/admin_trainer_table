@@ -814,6 +814,30 @@ test('тренажёр сменился: веса по нулям, подска�
   assert.equal(withMachine(ex, { uid: 'd1', name: 'Тяга с дисками' }, { lastWeight: '50' }).otherRun, undefined, 'на прежнем — подсказки нет');
 });
 
+test('«делал под другим названием?» — только тренеру и только без истории (16.10.2026)', async () => {
+  data.clear();
+  exerciseSetupResponse = { setups: { 90: { name: 'Подтягивания узким хватом с резиновой петлёй', setup: '', notes: '', machines: [], alternatives: [],
+    noteKey: 'e:подтягивания', muscles: { primary: [], secondary: [] }, media: null } }, notes: {} };
+  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Клиент делал это под другим названием?');
+  let local;
+  try {
+    for (const [clientRow, seen] of [[undefined, false], [3, true]]) {
+      await act(async () => {
+        local = renderer.create(React.createElement(Workout, { clientRow, launch: { block: {
+          title: 'Спина', exercises: [{ name: 'Подтягивания узким хватом с резиновой петлёй', exerciseId: 90, sets: '4', reps: '12' }],
+        }, month: 'Октябрь 2026' }, onClose() {} }));
+        await delay();
+      });
+      assert.equal(has(local), seen, clientRow ? 'тренер видит' : 'клиент не видит');
+      local.unmount();
+      local = null;
+    }
+  } finally {
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
+});
+
 /**
  * Кардио: поля режима и выбранных метрик подписаны, недостающую метрику
  * можно добавить, интервалы — с таймером, отрезок отмечается по итогу.
