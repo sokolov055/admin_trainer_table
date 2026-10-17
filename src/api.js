@@ -33,6 +33,13 @@
 import { getInitData } from './telegram.js';
 import { getToken, clearToken } from './session.js';
 import { loadApiConfig, currentApiUrl, fallbackApiUrl } from './apiConfig.js';
+import { isNativeApp, iosApp } from './native-bridge.js';
+import { appPlatform } from './rights.js';
+
+// Платформа — для прав по тарифу (FT-545): на iPhone сервер не разрешит
+// показывать продажу цифрового. Своё имя (appPlatform), чтобы не спорить с
+// platform уведомлений и отчёта о телефоне
+const platform = () => appPlatform({ isNativeApp, iosApp });
 
 /** Сколько данные из localStorage считаются пригодными для показа.
  *  Не «свежими» — именно пригодными: их всё равно тут же обновляют. */
@@ -327,7 +334,7 @@ export async function apiPrimary(action, params = {}) {
 
   const initData = getInitData();
   const token = initData ? '' : getToken();
-  const payload = { action, initData, ...(token ? { token } : {}), ...params };
+  const payload = { action, initData, appPlatform: platform(), ...(token ? { token } : {}), ...params };
 
   let body;
   try {
@@ -395,7 +402,7 @@ async function request(action, params, { read = false } = {}) {
   // лежит свежая подпись. Поэтому ключ едет, лишь когда подписи нет.
   const token = initData ? '' : getToken();
 
-  const payload = { action, initData, ...(token ? { token } : {}), ...params };
+  const payload = { action, initData, appPlatform: platform(), ...(token ? { token } : {}), ...params };
 
   const timeout = requestTimeout();
   // Тихий режим (сервер только что молчал) — одна короткая попытка, как раньше

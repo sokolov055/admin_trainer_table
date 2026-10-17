@@ -38,6 +38,10 @@ const output = await build({
       // Экран рациона подменён намеренно: проверяется не он, а то, открылся
       // он вообще или нет.
       bundle.onResolve({ filter: /Ration\.jsx$/ }, () => ({ path: 'ration', namespace: 'stub' }));
+      bundle.onResolve({ filter: /RationSummary\.jsx$/ }, () => ({ path: 'ration-summary', namespace: 'stub' }));
+      // Права по тарифу — из globalThis.__rights; правила hasPlus/isPro
+      // проверяются отдельно, на настоящем rights.js (внизу)
+      bundle.onResolve({ filter: /\/rights\.js$/ }, () => ({ path: 'rights', namespace: 'stub' }));
       bundle.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
       bundle.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => {
         if (args.path === 'useData') return {
@@ -50,6 +54,16 @@ const output = await build({
         if (args.path === 'charts') return {
           loader: 'jsx',
           contents: `import React from 'react'; const C = () => <div />; export const LineChart = C; export const Sparkline = C; export const BarChart = C; export default C;`,
+        };
+        if (args.path === 'ration-summary') return {
+          loader: 'jsx',
+          contents: `import React from 'react'; export default () => <div>ration-summary</div>;`,
+        };
+        if (args.path === 'rights') return {
+          contents: `export const useRights = () => globalThis.__rights || null;
+            export const hasPlus = (r) => !r || r.plus !== false;
+            export const isPro = (r) => !r || r.pro !== false;
+            export const setRights = (r) => { globalThis.__rights = r; };`,
         };
         if (args.path === 'workout') return {
           loader: 'jsx',
@@ -132,4 +146,62 @@ test('в режиме «глазами клиента» раздел виден,
   await act(async () => button(tree, 'Попробовать — пробный режим').props.onClick());
   assert.ok(whole(tree).includes('ration-screen'), 'проба не открылась');
   tree.unmount();
+});
+
+/* --------------------------------------------------------------------------
+ * Тарифы (FT-545): рацион — в «Плюсе» клиента и на платной ступени тренера.
+ * Сервер отказывает сам; экран не должен вести к отказу.
+ * -------------------------------------------------------------------------- */
+
+test('без «Плюса» — вместо «Собрать рацион» пробный период, без цены и оплаты', async () => {
+  globalThis.__rights = { on: true, plus: false, canTrial: true, trialDays: 14 };
+  const tree = await render({});
+  const shown = whole(tree);
+  assert.equal(button(tree, 'Собрать рацион'), undefined, 'кнопка ведёт к отказу API');
+  assert.ok(shown.includes('входит в «Плюс»'));
+  assert.ok(button(tree, 'Попробовать «Плюс» — 14 дней бесплатно'), 'пробного нет');
+  // «докупить» в тексте про список покупок — не продажа
+  assert.ok(!/₽|(^|[^а-яё])купить|оплат|подписк/i.test(shown), 'на iPhone цена и оплата запрещены (3.1.1)');
+  tree.unmount();
+
+  globalThis.__rights = { on: true, plus: false, canTrial: false, trialDays: 14 };
+  const used = await render({});
+  assert.equal(used.root.findAllByType('button').filter((b) => /Попробовать «Плюс»/.test(text(b))).length, 0, 'пробный — один раз');
+  used.unmount();
+  globalThis.__rights = null;
+});
+
+test('с «Плюсом» и без прав от сервера — как было', async () => {
+  for (const rights of [{ on: true, plus: true }, null]) {
+    globalThis.__rights = rights;
+    const tree = await render({});
+    assert.ok(button(tree, 'Собрать рацион'), JSON.stringify(rights));
+    tree.unmount();
+  }
+});
+
+test('тренер на «Старте» не видит рацион клиента, проба остаётся', async () => {
+  globalThis.__rights = { on: true, pro: false };
+  const tree = await render({ clientRow: 17 });
+  assert.ok(!whole(tree).includes('ration-summary'), 'сводка ведёт к отказу API');
+  assert.ok(button(tree, 'Попробовать — пробный режим'));
+  tree.unmount();
+
+  globalThis.__rights = { on: true, pro: true };
+  const paid = await render({ clientRow: 17 });
+  assert.ok(whole(paid).includes('ration-summary'));
+  paid.unmount();
+  globalThis.__rights = null;
+});
+
+test('rights.js: нет прав — открыто; платформа для сервера', async () => {
+  const r = await import('../src/rights.js');
+  assert.equal(r.hasPlus(null), true);
+  assert.equal(r.hasPlus({ plus: false }), false);
+  assert.equal(r.isPro({ pro: false }), false);
+  assert.equal(r.isPro({}), true);
+  assert.equal(r.appPlatform(null), 'web');
+  assert.equal(r.appPlatform({ isNativeApp: () => false, iosApp: () => false }), 'web');
+  assert.equal(r.appPlatform({ isNativeApp: () => true, iosApp: () => true }), 'ios');
+  assert.equal(r.appPlatform({ isNativeApp: () => true, iosApp: () => false }), 'android');
 });
