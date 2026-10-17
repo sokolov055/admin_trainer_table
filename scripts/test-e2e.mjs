@@ -551,7 +551,7 @@ test('замер записывается, а пустая форма объяс
  * объясняет себя.
  */
 test('профиль сохраняется и объясняет опечатку', async () => {
-  await page.getByRole('button', { name: 'Меню' }).click();
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /Мои данные/ }).click();
   await page.getByRole('textbox', { name: 'Рост, см' }).waitFor({ timeout: 10000 });
 
@@ -600,7 +600,7 @@ test('клиент: журнала в меню нет, свободная тре
   const free = page.getByRole('button', { name: 'Свободная тренировка' });
   await free.waitFor({ timeout: 20000 });
 
-  await page.getByRole('button', { name: 'Меню' }).click();
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /Мои данные/ }).waitFor({ timeout: 10000 });
   assert.equal(await page.getByRole('button', { name: /Журнал тренировок/ }).count(), 0, 'в меню журнала нет');
 
@@ -620,7 +620,7 @@ test('клиент: журнала в меню нет, свободная тре
  */
 test('клиент: «Как пользоваться» открывается из меню', async () => {
   await page.goto(origin);
-  await page.getByRole('button', { name: 'Меню' }).click();
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.locator('.menu__item').filter({ hasText: 'Как пользоваться' }).click();
   const viewer = page.locator('.story');
   await assert.doesNotReject(viewer.getByText('Как пользоваться Fit Track').waitFor({ timeout: 10000 }));
@@ -721,7 +721,7 @@ test('смахнуть вправо возвращает из «Моих дан�
     await phone.locator('#root .app__subtitle', { hasText: 'Обзор' }).waitFor({ timeout: 10000 });
 
     // Назад: из экрана меню пальцем вправо — на вкладку, откуда пришли
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Мои данные/ }).click();
     await phone.locator('#root .app__title', { hasText: 'Мои данные' }).waitFor({ timeout: 5000 });
     // Меню закрывается с анимацией — пока оно в DOM, жесты выключены
@@ -806,7 +806,7 @@ test('смахнуть вправо возвращает из «Моих дан�
 
     // Короткое движение без скорости «назад» не делает: экран пружиной
     // возвращается на место
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Настройки/ }).click();
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
     // На экране бокового меню нижнее меню уезжает, а не висит пустым
@@ -882,7 +882,7 @@ test('глазами клиента — из карточки, и обратно
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
 
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     assert.equal(await phone.getByRole('button', { name: /Клиентская версия/ }).count(), 0, 'в меню пункта нет');
     await phone.goto(origin + '/?mockRole=trainer');
 
@@ -926,7 +926,7 @@ test('FT-567: видимый «назад» и Back браузера на экр
   const title = () => phone.locator('#root .app__title').first().textContent();
   const subtitle = () => phone.locator('#root .app__subtitle').first().textContent();
   const menu = async (item) => {
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: item }).click();
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
   };
@@ -1049,7 +1049,7 @@ test('журнал тренировок открывается из меню п�
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
 
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Журнал тренировок/ }).click();
     await phone.getByText('Выберите клиента — откроются все его занятия').waitFor({ timeout: 10000 });
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
@@ -1080,7 +1080,7 @@ test('мои тренировки: программа, прогресс, пит�
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
 
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
     // Правка программы — прямо в тренировках (03.10.2026): «+» нового месяца
     await phone.getByRole('button', { name: 'Новый месяц' }).waitFor({ timeout: 10000 });
@@ -1135,7 +1135,7 @@ test('мои тренировки: программа, прогресс, пит�
       }
     }
 
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Журнал тренировок/ }).click();
     await phone.getByText('Я · Константин').click();
     await phone.getByRole('button', { name: 'К списку клиентов' }).waitFor({ timeout: 10000 });
@@ -1157,7 +1157,7 @@ test('карта мышц: тренировка, программа, итоги 
     await phone.goto(origin + '/?mockRole=trainer');
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
 
     const firstBlock = phone.locator('#root main:not([hidden]) .plan__block').first();
@@ -1634,7 +1634,7 @@ test('отдых, свёрнутый у тренера, доживает до к
     await phone.goto(origin + '/?mockRole=trainer');
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
-    await phone.getByRole('button', { name: 'Меню' }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 20000 });
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
     const sec = phone.locator('#root main:not([hidden]) .section', { has: phone.getByRole('heading', { name: 'Тренировка 1 — верх' }) });
     await sec.getByRole('button', { name: 'Начать тренировку' }).click({ timeout: 20000 });
@@ -1654,7 +1654,7 @@ test('отдых, свёрнутый у тренера, доживает до к
     await phone.locator('.rest-pill').click();
     await phone.getByRole('button', { name: 'Свернуть таймер' }).click({ timeout: 5000 });
     // Из «Моих тренировок» — в другой раздел бокового меню: экран тренировки закрывается
-    await phone.getByRole('button', { name: 'Меню' }).click();
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Журнал тренировок/ }).click();
     await phone.locator('.rest-pill').waitFor({ timeout: 5000 });
     if (process.env.SHOT_REST_PILL) await phone.screenshot({ path: process.env.SHOT_REST_PILL });
@@ -1678,7 +1678,7 @@ test('тренировка в программе переносится удер
     await phone.goto(origin + '/?mockRole=trainer');
     await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
     await phone.goto(origin + '/?mockRole=trainer');
-    await phone.getByRole('button', { name: 'Меню' }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 20000 });
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
     const titles = () => phone.locator('#root main:not([hidden]) .plan__block .section__title').allInnerTexts();
     const blocks = phone.locator('#root main:not([hidden]) .plan__block');
@@ -1766,7 +1766,7 @@ test('в карточке клиента тренировки выбираютс
       }]));
     });
     await phone.goto(origin + '/?mockRole=trainer');
-    await phone.getByRole('button', { name: 'Меню' }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 20000 });
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
 
     const blocks = phone.locator('#root main:not([hidden]) .plan__block');

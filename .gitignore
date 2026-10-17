@@ -12,3 +12,5 @@ dist-ft551/
 ft551-tests.log
 reports-ft551-access.log
 debug.log
+
+ft551-browser.log
