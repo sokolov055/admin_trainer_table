@@ -4,6 +4,9 @@ import { haptic } from '../telegram.js';
 import { useReveal } from '../reveal.js';
 
 /**
+ * Подписи — безличные (17.10.2026): та же кнопка и в «Моих тренировках»
+ * тренера, где «клиент» — он сам.
+ *
  * «Это то же упражнение, переименованное?» (владелец, 16.10.2026). Пока база
  * заполняется, тренер заводит новые карточки упражнений, а клиент старое
  * уже делал — меняя упражнение в его программе, тренер одним касанием
@@ -45,7 +48,7 @@ export default function HistoryMove({ clientRow, from, to, onClose, onMoved, aft
     return <div className="history-move" role="status" ref={ref}>
       <p className="history-move__text">{result.moveId
         ? `Перенесено на «${to.name}»: ${result.sessions} ${plural(result.sessions)}${result.notes ? ' и настройка' : ''}.${after ? ' ' + after : ''}`
-        : `Переносить нечего: в журнале клиента нет «${from.name}».`}</p>
+        : `Переносить нечего: в журнале нет «${from.name}».`}</p>
       {error && <p className="small danger">{error}</p>}
       <div className="history-move__actions">
         {result.moveId && <button type="button" className="history-move__link" onClick={undo}>Отменить</button>}
@@ -55,7 +58,7 @@ export default function HistoryMove({ clientRow, from, to, onClose, onMoved, aft
   }
   const busy = step === 'busy';
   return <div className="history-move" ref={ref}>
-    <p className="history-move__text">Клиент уже делал «{from.name}». Это то же упражнение, только под новым названием?</p>
+    <p className="history-move__text">Уже делали «{from.name}». Это то же упражнение, только под новым названием?</p>
     <p className="small muted">Тогда его веса, «Было» и рекорды перейдут на «{to.name}». У других клиентов ничего не поменяется.</p>
     {error && <p className="small danger">{error}</p>}
     <div className="history-move__actions">
@@ -102,19 +105,19 @@ export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '
 
   if (from) return <HistoryMove clientRow={clientRow} from={from} to={to} onClose={close} onMoved={onMoved} after={after} />;
   if (!open) {
-    return <button type="button" className="history-move__link" onClick={show}>Клиент делал это под другим названием?</button>;
+    return <button type="button" className="history-move__link" onClick={show}>Это упражнение делали под другим названием?</button>;
   }
   const words = query.trim().toLowerCase();
   const items = (list || [])
     .filter((x) => !(x.exerciseId && x.exerciseId === to.id) && x.name !== to.name)
     .filter((x) => !words || x.name.toLowerCase().includes(words));
   return <div className="history-move" ref={ref}>
-    <p className="history-move__text">Что из журнала клиента — это «{to.name}»?</p>
+    <p className="history-move__text">Что из журнала — это «{to.name}»?</p>
     {error && <p className="small danger">{error}</p>}
     {!list && !error && <p className="small muted">Загружаю журнал…</p>}
     {list && list.length > 8 && <input className="field__input" type="search" placeholder="Найти по названию" aria-label="Найти упражнение в журнале"
       value={query} onChange={(e) => setQuery(e.target.value)} />}
-    {list && !items.length && <p className="small muted">{words ? 'Ничего не нашлось.' : 'В журнале клиента других упражнений нет.'}</p>}
+    {list && !items.length && <p className="small muted">{words ? 'Ничего не нашлось.' : 'В журнале других упражнений нет.'}</p>}
     {items.slice(0, 40).map((x) => (
       <button type="button" key={(x.exerciseId || '') + x.name} className="workout__alts-item" onClick={() => setFrom({ id: x.exerciseId, name: x.name })}>
         {x.name}<span className="small muted">{'  ·  ' + dayText(x.date) + (x.sessions > 1 ? ', ' + x.sessions + ' ' + plural(x.sessions) : '')}</span>

@@ -877,7 +877,7 @@ test('«делал под другим названием?» — только т
   data.clear();
   exerciseSetupResponse = { setups: { 90: { name: 'Подтягивания узким хватом с резиновой петлёй', setup: '', notes: '', machines: [], alternatives: [],
     noteKey: 'e:подтягивания', muscles: { primary: [], secondary: [] }, media: null } }, notes: {} };
-  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Клиент делал это под другим названием?');
+  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Это упражнение делали под другим названием?');
   let local;
   try {
     for (const [clientRow, seen] of [[undefined, false], [3, true]]) {
@@ -901,7 +901,7 @@ test('«делал под другим названием?» — и в идущ�
   data.clear();
   exerciseSetupResponse = { setups: { 90: { name: 'Жим над головой в тренажёре с дисками', setup: '', notes: '', machines: [], alternatives: [],
     noteKey: 'e:жим', muscles: { primary: [], secondary: [] }, media: null } }, notes: {} };
-  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Клиент делал это под другим названием?');
+  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Это упражнение делали под другим названием?');
   let local;
   try {
     await act(async () => {

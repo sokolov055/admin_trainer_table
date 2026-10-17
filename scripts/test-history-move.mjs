@@ -52,7 +52,7 @@ test('вопрос → перенос → «Отменить» → отменё�
     }));
   });
   const button = (label) => tree.root.findAllByType('button').find((b) => text(b) === label);
-  assert.match(text(tree.root.findAllByType('p')[0]), /уже делал «Жим лёжа»/);
+  assert.match(text(tree.root.findAllByType('p')[0]), /Уже делали «Жим лёжа»/);
   assert.ok(tree.root.findAllByType('p').some((p) => /У других клиентов ничего не поменяется/.test(text(p))));
 
   await act(async () => { button('Да, перенести силовые').props.onClick(); await delay(); });
@@ -78,7 +78,7 @@ test('в занятии тренер выбирает упражнение из 
     }));
   });
   const button = (label) => tree.root.findAllByType('button').find((b) => text(b).startsWith(label));
-  await act(async () => { button('Клиент делал это под другим названием?').props.onClick(); await delay(); });
+  await act(async () => { button('Это упражнение делали под другим названием?').props.onClick(); await delay(); });
   assert.equal(button('Подтягивания узким хватом с резиновой петлёй'), undefined, 'само упражнение в списке не предлагаем');
   assert.ok(text(button('Подтягивания с резинкой узким хватом')).includes('15.10, 4 занятия'));
   await act(async () => { button('Подтягивания с резинкой узким хватом').props.onClick(); await delay(); });

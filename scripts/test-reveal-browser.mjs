@@ -76,7 +76,7 @@ test('перенос истории: выбрали внизу длинного 
   const browser = await chromium.launch();
   try {
     const { p, errors } = await page(browser);
-    const link = p.getByRole('button', { name: 'Клиент делал это под другим названием?' });
+    const link = p.getByRole('button', { name: 'Это упражнение делали под другим названием?' });
     await link.scrollIntoViewIfNeeded();
     await link.click();
     await p.getByRole('button', { name: /Упражнение 30/ }).waitFor();
