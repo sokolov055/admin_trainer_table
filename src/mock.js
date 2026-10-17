@@ -61,11 +61,89 @@ let hiddenMonths = ['Июль 2026'];
 let mockTrainers = [
   { id: 1, email: 'owner@fittrack.demo', name: 'Константин Соколов', status: 'active', owner: true, clients: 23, appliedAt: null,
     tier: 'owner', tierTitle: 'Владелец', activeClients: 23, clientLimit: null, lastSeenAt: daysAgo(0), workouts30: 64, sessions30: 81 },
-  { id: 2, email: 'maria@fittrack.demo', name: 'Мария Ковалёва', status: 'pending', owner: false, clients: 0, appliedAt: daysAgo(0),
+  { id: 2, email: 'maria@fittrack.demo', name: 'Мария Ковалёва', status: 'pending', stage: 'test_sent', owner: false, clients: 0, appliedAt: daysAgo(2),
     lastSeenAt: null, workouts30: 0, sessions30: 0 },
   { id: 3, email: 'igor@fittrack.demo', name: 'Игорь Власов', status: 'active', owner: false, clients: 6, appliedAt: daysAgo(12),
-    tier: 'start', tierTitle: 'Старт', activeClients: 4, clientLimit: 3, overLimit: true, lastSeenAt: daysAgo(3), workouts30: 9, sessions30: 12 },
+    tier: 'start', tierTitle: 'Старт', activeClients: 4, clientLimit: 3, overLimit: true, lastSeenAt: daysAgo(3), workouts30: 9, sessions30: 12,
+    profileReview: 'pending', profilePublished: false, profileHidden: false, openReports: 0 },
 ];
+
+/* Отбор тренеров и профили (FT-548): справочники и демо-данные как у сервера */
+const MOCK_DICTS = {
+  specialties: ['Снижение веса', 'Набор мышечной массы', 'Сила', 'Выносливость', 'Функциональный тренинг', 'Для начинающих', 'Подготовка к соревнованиям'],
+  formats: { gym: 'В зале', online: 'Онлайн', outdoor: 'На улице' },
+  reportReasons: { fake: 'Неправда о себе, чужие фото', unsafe: 'Опасные советы, обещания вылечить', rude: 'Грубость, оскорбления', spam: 'Реклама, спам, мошенничество', other: 'Другое' },
+};
+let mockTest = {
+  passPercent: 80,
+  questions: [
+    { id: 'q1', kind: 'choice', text: 'Клиент во время приседа жалуется на резкую боль в колене. Что делаете?', options: ['Снижаю вес и продолжаем', 'Останавливаю упражнение, выясняю характер боли; при острой боли — советую обратиться к врачу', 'Делаем растяжку и продолжаем'], correct: 1 },
+    { id: 'q2', kind: 'choice', text: 'Оценка усилия RPE 8 означает:', options: ['8 повторений', 'В запасе остаётся примерно 2 повторения', '80 % от максимума'], correct: 1 },
+    { id: 'o1', kind: 'open', text: 'Как проходит ваша первая встреча с новым клиентом?' },
+  ],
+};
+const mockProfileOf = (name, city) => ({
+  name, photo: '', city, formats: ['gym', 'online'], gyms: 'X-Fit Сокол', experience: 6, specialties: ['Сила', 'Снижение веса'],
+  about: 'Тренирую шесть лет. Ставлю технику, подбираю нагрузку под график и не обещаю чудес за месяц.', priceFrom: 2500,
+});
+const mockEmptyProfile = { review: 'none', reviewNote: '', docsChecked: false, hidden: false, hiddenReason: '' };
+let mockProfiles = {
+  1: { ...mockEmptyProfile, draft: mockProfileOf('Константин Соколов', 'Москва'), published: mockProfileOf('Константин Соколов', 'Москва'), docsChecked: true },
+  2: { ...mockEmptyProfile, draft: mockProfileOf('Мария Ковалёва', 'Казань'), published: null },
+  3: { ...mockEmptyProfile, draft: mockProfileOf('Игорь Власов', 'Москва'), published: null, review: 'pending' },
+};
+let mockApplications = {
+  2: {
+    decisionNote: '', anketaAt: daysAgo(2), ownerNote: '',
+    private: { phone: '+7 900 123-45-67', callTime: 'будни после 18:00', education: 'КГАФКСиТ', certificates: 'FPA, 2021', workplace: 'X-Fit', clientsNow: 9, why: 'Хочу вести клиентов онлайн', links: '' },
+    test: { at: daysAgo(1), score: 1, total: 2, passPercent: 80, passed: false, items: [
+      { id: 'q1', kind: 'choice', text: mockTest.questions[0].text, options: mockTest.questions[0].options, correct: 1, picked: 1, right: true },
+      { id: 'q2', kind: 'choice', text: mockTest.questions[1].text, options: mockTest.questions[1].options, correct: 1, picked: 2, right: false },
+      { id: 'o1', kind: 'open', text: mockTest.questions[2].text, answer: 'Знакомимся, спрашиваю о цели, опыте и травмах, смотрю базовые движения: присед, наклон, отжимание.' },
+    ] },
+  },
+};
+let mockReports = [
+  { id: 1, trainerId: 1, trainerName: 'Константин Соколов', from: 'client', reason: 'spam', reasonTitle: 'Реклама, спам, мошенничество', text: 'Проверка жалобы в демо', status: 'open', createdAt: daysAgo(0), resolvedAt: null },
+];
+
+function mockProfileState(id) {
+  const p = mockProfiles[id] || { ...mockEmptyProfile, draft: mockProfileOf('', ''), published: null };
+  return { ...p, gaps: [], changed: !!p.published && JSON.stringify(p.published) !== JSON.stringify(p.draft), ...MOCK_DICTS };
+}
+
+function mockOwnerTrainer(id) {
+  const t = mockTrainers.find((x) => x.id === Number(id));
+  const app = mockApplications[t.id] || { decisionNote: '', anketaAt: null, ownerNote: '', private: {}, test: null };
+  return {
+    id: t.id, name: t.name, email: t.email, status: t.status,
+    application: { ...app, stage: t.stage || null, profile: mockProfileState(t.id).draft },
+    profile: mockProfileState(t.id),
+    reports: mockReports.filter((r) => r.trainerId === t.id),
+    ...MOCK_DICTS,
+  };
+}
+
+let mockCandidateState = {
+  stage: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('mockStage') || 'anketa',
+  profile: { ...mockProfileOf('Мария Ковалёва', ''), about: '', specialties: [] },
+  private: { phone: '', callTime: '', education: '', certificates: '', workplace: '', clientsNow: null, why: '', links: '' },
+};
+
+function mockCandidate() {
+  const s = mockCandidateState;
+  return {
+    status: 'pending', stage: s.stage, name: 'Мария Ковалёва', email: 'maria@fittrack.demo', note: '',
+    profile: s.profile, private: s.private, anketaAt: null, testAt: null,
+    ...(s.stage === 'test' ? { test: { questions: mockTest.questions.map(({ correct, ...q }) => q) } } : {}),
+    ...MOCK_DICTS,
+  };
+}
+
+/** Фото профиля в демо — data-URL сразу в черновик (library.js, uploadProfilePhoto) */
+export function mockProfilePhoto(url) {
+  mockProfiles[1] = { ...mockProfiles[1], draft: { ...mockProfiles[1].draft, photo: url } };
+}
 
 // Панель «Управление» (Admin.jsx): тарифы, флаги и аналитика демо-сервера
 let mockTariffSettings = {
@@ -991,7 +1069,10 @@ const MOCK = {
   'auth.logout': () => ({ ok: true, revoked: 1 }),
 
   'scooter.board': () => ({ profile: { enabled: false }, entries: [] }),
-  'me': (params) => ({
+  // ?mockRole=candidate — кандидат в тренеры на отборе (FT-548, CandidateApp.jsx)
+  'me': (params) => (params.__role === 'candidate' ? {
+    role: 'candidate', candidate: true, name: 'Мария Ковалёва', email: 'maria@fittrack.demo', chatId: '', identityType: 'email', accountId: '',
+  } : {
     role: params.__role === 'trainer' ? 'trainer' : 'client',
     name: params.__role === 'trainer' ? 'Константин' : 'Анна Морозова',
     chatId: '11111',
@@ -1008,6 +1089,11 @@ const MOCK = {
     // ?mockCoach=1 — тренер со своими клиентами, не владелец сервиса
     owner: new URLSearchParams(window.location.search).get('mockCoach') !== '1',
   }),
+  // Кандидат: ?mockStage=test — сразу тест; иначе анкета
+  'candidate.get': () => mockCandidate(),
+  'candidate.anketa.save': (p) => { mockCandidateState = { ...mockCandidateState, profile: { ...mockCandidateState.profile, ...p.profile }, private: { ...mockCandidateState.private, ...p.private } }; return mockCandidate(); },
+  'candidate.anketa.submit': (p) => { mockCandidateState = { ...mockCandidateState, profile: { ...mockCandidateState.profile, ...p.profile }, private: { ...mockCandidateState.private, ...p.private }, stage: 'anketa_sent' }; return mockCandidate(); },
+  'candidate.test.submit': () => { mockCandidateState = { ...mockCandidateState, stage: 'test_sent' }; return mockCandidate(); },
   'consent.accept': () => ({ version: '2026-09-26', givenAt: new Date().toISOString() }),
   // Вход тренера и заявка на кабинет: новый адрес — имя и согласия, потом
   // «ждёт одобрения»; адрес owner@… — сразу кабинет
@@ -1022,6 +1108,49 @@ const MOCK = {
     mockTrainers = mockTrainers.map((t) => (t.id === p.id ? { ...t, status: next } : t));
     return { trainers: mockTrainers };
   },
+  'owner.trainer.get': (p) => mockOwnerTrainer(p.id),
+  'owner.trainer.advance': (p) => {
+    const next = { anketa_sent: 'test', test_sent: 'call' };
+    mockTrainers = mockTrainers.map((t) => (t.id === p.id && next[t.stage] ? { ...t, stage: next[t.stage] } : t));
+    return mockOwnerTrainer(p.id);
+  },
+  'owner.trainer.note': (p) => {
+    mockApplications[p.id] = { ...(mockApplications[p.id] || {}), ownerNote: String(p.note || '') };
+    return mockOwnerTrainer(p.id);
+  },
+  'owner.trainer.test': () => ({ test: mockTest, defaults: mockTest }),
+  'owner.trainer.test.save': (p) => { mockTest = p.test; return { test: mockTest, defaults: mockTest }; },
+  'owner.profile.review': (p) => {
+    const cur = mockProfiles[p.id];
+    mockProfiles[p.id] = p.decision === 'publish'
+      ? { ...cur, published: cur.draft, review: 'none', docsChecked: !!p.docsChecked }
+      : { ...cur, review: 'rejected', reviewNote: String(p.note || '') };
+    mockTrainers = mockTrainers.map((t) => (t.id === p.id ? { ...t, profileReview: mockProfiles[p.id].review, profilePublished: !!mockProfiles[p.id].published } : t));
+    return mockOwnerTrainer(p.id);
+  },
+  'owner.profile.hide': (p) => {
+    mockProfiles[p.id] = { ...mockProfiles[p.id], hidden: p.hide !== false, hiddenReason: p.hide !== false ? String(p.reason || '') : '' };
+    return mockOwnerTrainer(p.id);
+  },
+  'owner.reports': () => ({ reports: mockReports.filter((r) => r.status === 'open') }),
+  'owner.report.resolve': (p) => {
+    mockReports = mockReports.map((r) => (r.id === p.id ? { ...r, status: p.decision === 'uphold' ? 'upheld' : 'dismissed', resolvedAt: new Date().toISOString() } : r));
+    return { reports: mockReports.filter((r) => r.status === 'open') };
+  },
+  'trainer.profile.get': () => mockProfileState(1),
+  'trainer.profile.save': (p) => { mockProfiles[1] = { ...mockProfiles[1], draft: { ...mockProfiles[1].draft, ...p.profile } }; return mockProfileState(1); },
+  'trainer.profile.submit': (p) => {
+    if (p.consent !== true) throw new Error('Отметьте согласие на публикацию профиля.');
+    mockProfiles[1] = { ...mockProfiles[1], draft: { ...mockProfiles[1].draft, ...(p.profile || {}) }, review: 'pending', reviewNote: '' };
+    return mockProfileState(1);
+  },
+  'trainer.profile.withdraw': () => { mockProfiles[1] = { ...mockProfiles[1], published: null, review: 'none' }; return mockProfileState(1); },
+  'trainer.profile.view': (p) => {
+    const prof = mockProfiles[p.trainerId];
+    if (!prof || !prof.published || prof.hidden) throw new Error('Профиль тренера не найден.');
+    return { profile: { trainerId: Number(p.trainerId), ...prof.published, docsChecked: prof.docsChecked }, ...MOCK_DICTS };
+  },
+  'trainer.profile.report': () => ({ reported: true }),
   'owner.stats': () => mockStats(),
   'owner.flags': () => mockFlagState(),
   'owner.flag.set': (p) => {
@@ -1126,7 +1255,7 @@ const MOCK = {
   'account.export': () => ({ url: 'data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><meta charset="utf-8"><h1>Мои данные в Fit Track</h1><p>Демо: здесь будет выгрузка.</p>'), expiresAt: new Date(Date.now() + 600000).toISOString() }),
   'account.get': () => (new URLSearchParams(window.location.search).get('mockUnlinked') === '1'
     ? { publicId: 'FT-7K2QM4', trainer: null, requests: [{ id: 1, trainerName: 'Константин Соколов', createdAt: daysAgo(0) }] }
-    : { publicId: 'FT-A3B9CD', trainer: { name: 'Константин Соколов' }, requests: [] }),
+    : { publicId: 'FT-A3B9CD', trainer: { name: 'Константин Соколов', profileId: 1 }, requests: [] }),
   'account.link.answer': (p) => ({ linked: !!p.accept }),
   'account.link.join': () => ({ linked: true, trainerName: 'Константин Соколов' }),
   'trainer.link.byid': (p) => {

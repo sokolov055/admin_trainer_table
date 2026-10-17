@@ -31,6 +31,7 @@ const output = await build({
       stub(/stories\.jsx$/, 'stories');
       stub(/AuthTransfer\.jsx$/, 'transfer');
       stub(/Invites\.jsx$/, 'invites');
+      stub(/TrainerProfile\.jsx$/, 'trainer-profile');
       stub(/version\.js$/, 'version');
       stub(/ui\.jsx$/, 'ui');
       stub(/useData\.js$/, 'data');
@@ -77,6 +78,7 @@ const output = await build({
         if (args.path === 'stories') return { loader: 'jsx', contents: `export const Stories=()=>null;` };
         if (args.path === 'transfer') return { loader: 'jsx', contents: `export const TelegramTransferCard=()=>null;` };
         if (args.path === 'invites') return { loader: 'jsx', contents: `export const Invites=()=>null;` };
+        if (args.path === 'trainer-profile') return { loader: 'jsx', contents: `export default () => null;` };
         if (args.path === 'version') return { contents: `export const APP_VERSION='test';` };
         if (args.path === 'data') return { contents: `export const useData=()=>({loading:false,data:{clients:[]},error:null,reload(){}});` };
         if (args.path === 'telegram') return { contents: `export const haptic=()=>{};` };

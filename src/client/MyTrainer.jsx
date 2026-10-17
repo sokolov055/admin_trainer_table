@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Section, Panel, Loading, ErrorState } from '../ui.jsx';
 import { IconCopy, IconCheck } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import { useData } from '../useData.js';
+import { ProfileCard, ReportForm } from '../trainer/ProfileParts.jsx';
 import {
   accountState, answerRequest, pendingTrainerLink, inspectTrainerLink, joinTrainer, forgetTrainerLink,
 } from '../trainer-link.js';
@@ -33,12 +35,15 @@ export default function MyTrainer({ onChanged }) {
 
   if (data.trainer) {
     return (
-      <Section title="Мой тренер">
-        <Panel pad>
-          <p className="my-trainer__name">{data.trainer.name}</p>
-          <p className="small muted">Тренер ведёт вашу программу и видит ваш прогресс.</p>
-        </Panel>
-      </Section>
+      <>
+        <Section title="Мой тренер">
+          <Panel pad>
+            <p className="my-trainer__name">{data.trainer.name}</p>
+            <p className="small muted">Тренер ведёт вашу программу и видит ваш прогресс.</p>
+          </Panel>
+        </Section>
+        {data.trainer.profileId && <TrainerPublicProfile trainerId={data.trainer.profileId} />}
+      </>
     );
   }
 
@@ -162,6 +167,31 @@ export function LinkOffers({ requests = [], onChanged }) {
         </Panel>
       ))}
       {problem && <p className="small muted" role="alert">{problem}</p>}
+    </Section>
+  );
+}
+
+/**
+ * Профиль тренера, проверенный владельцем (FT-548), и жалоба на него
+ * (App Store 1.2). Тот же вид будет в каталоге тренеров (FT-553).
+ */
+export function TrainerPublicProfile({ trainerId }) {
+  const { data, error } = useData('trainer.profile.view', { trainerId }, [trainerId]);
+  const [reporting, setReporting] = useState(false);
+  if (error || !data) return null;
+  return (
+    <Section title="Профиль тренера">
+      <Panel pad>
+        <ProfileCard profile={data.profile} formats={data.formats} onReport={reporting ? null : () => setReporting(true)} />
+        {reporting && (
+          <ReportForm
+            trainerId={trainerId}
+            reasons={data.reportReasons}
+            onDone={() => setReporting(false)}
+            onCancel={() => setReporting(false)}
+          />
+        )}
+      </Panel>
     </Section>
   );
 }

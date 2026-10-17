@@ -110,6 +110,41 @@ export async function uploadMachinePhoto(exerciseId, uid, blob) {
   return body.data;
 }
 
+/**
+ * Фото профиля тренера (FT-548) — тренер или кандидат на анкете. Сервер
+ * сам кладёт его в черновик профиля; клиенты увидят после проверки.
+ */
+export async function uploadProfilePhoto(blob) {
+  if (import.meta.env.VITE_MOCK === '1') {
+    const url = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(blob);
+    });
+    const { mockProfilePhoto } = await import('./mock.js');
+    mockProfilePhoto(url);
+    return { url };
+  }
+
+  await loadApiConfig();
+  const base = String(currentApiUrl() || '').replace(/\/$/, '');
+  if (!base) throw new Error('Не задан адрес сервера.');
+  const headers = { 'Content-Type': blob.type || 'image/jpeg' };
+  const initData = getInitData();
+  if (initData) headers['X-Init-Data'] = initData;
+  else headers.Authorization = 'Bearer ' + getToken();
+
+  let res;
+  try {
+    res = await fetch(base + '/media/profile-photo', { method: 'POST', headers, body: blob });
+  } catch (_) {
+    throw new Error('Не получилось загрузить фото. Проверьте связь.');
+  }
+  const body = await res.json().catch(() => null);
+  if (!body || !body.ok) throw new Error((body && body.error) || (res.status === 413 ? 'Фото больше 10 МБ.' : 'Сервер не принял фото.'));
+  return body.data;
+}
+
 /** Адрес видео с сервера — относительный, к нему нужен адрес API */
 export function mediaUrl(url) {
   if (!url) return '';

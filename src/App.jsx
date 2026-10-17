@@ -20,11 +20,14 @@ const TrainerApp = lazyPage(() => import('./trainer/TrainerApp.jsx'));
 const LoginScreen = lazyPage(() => import('./LoginScreen.jsx'));
 const AccessLogin = lazyPage(() => import('./AccessLogin.jsx'));
 const InviteRegistration = lazyPage(() => import('./InviteRegistration.jsx'));
+// Кандидат в тренеры на отборе (FT-548): анкета, тест, этап — без кабинета
+const CandidateApp = lazyPage(() => import('./trainer/CandidateApp.jsx'));
 
 /** Что роли понадобится дальше — догружаем в фоне, чтобы работало и без сети */
 const LATER = {
   client: [{ preload: () => import('./Workout.jsx') }, { preload: () => import('./nutrition/Ration.jsx') }],
   trainer: [TrainerApp, { preload: () => import('./Workout.jsx') }, { preload: () => import('./trainer/PlanEditor.jsx') }],
+  candidate: [],
 };
 
 /** Пока часть грузится — тот же скелет, что и при загрузке данных */
@@ -92,7 +95,8 @@ export default function App() {
   // позже и отдельными частями: первому экрану они не нужны
   const known = state.me;
   useEffect(() => {
-    if (!known || !known.role) return undefined;
+    // Кандидату без кабинета нечего хранить без сети
+    if (!known || !known.role || known.role === 'candidate') return undefined;
     setOfflineAccount(known);
     const timer = setTimeout(() => {
       Promise.all([import('./workout-outbox.js'), import('./offline-prefetch.js')])
@@ -256,7 +260,9 @@ export default function App() {
     <ScooterSessionProvider>
     <MatchSessionProvider>
       <Deferred fallback={waitingPage}>
-        {me.role === 'trainer' ? <TrainerApp me={me} /> : <ClientApp me={me} />}
+        {me.role === 'trainer' ? <TrainerApp me={me} />
+          : me.role === 'candidate' ? <CandidateApp me={me} onApproved={load} />
+            : <ClientApp me={me} />}
       </Deferred>
       <Gestures />
       <RestLayer allowGame={me.role === 'client' && me.plankGameEnabled === true} />

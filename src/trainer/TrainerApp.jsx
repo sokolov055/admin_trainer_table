@@ -30,6 +30,7 @@ import { Deferred } from '../lazy.js';
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Admin, { ADMIN_PANES } from './Admin.jsx';
+import TrainerProfile from './TrainerProfile.jsx';
 import { screensNote } from '../native-bridge.js';
 import { useSelfCard, selfPick } from './selfCard.js';
 
@@ -88,6 +89,8 @@ const MENU = [
   { id: 'my-workouts', label: 'Мои тренировки', note: 'Своя программа, прогресс и питание', Icon: IconPlan, owner: true },
   { id: 'journal', label: 'Журнал тренировок', note: 'Все занятия клиента', Icon: IconProgress },
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
+  // Профиль для каталога (FT-548): клиенты видят его после проверки владельцем
+  { id: 'profile', label: 'Мой профиль', note: 'Как вас увидят клиенты в каталоге', Icon: IconUsers },
   // «Клиентская версия» — не в меню, а кнопкой в карточке каждого клиента
   // (решение владельца 01.10.2026): заходят в неё через карточку
   // Панель владельца сервиса (FT-562): аналитика, тренеры, тарифы, флаги,
@@ -402,6 +405,7 @@ export default function TrainerApp({ me }) {
         {view === 'my-workouts' && <MyWorkouts />}
         {view === 'journal' && <JournalScreen owner={owner} />}
         {view === 'expenses' && <Expenses />}
+        {view === 'profile' && <TrainerProfile />}
         {view === 'admin' && owner && <div key={adminPane}><Admin pane={adminPane} /></div>}
         {view === 'settings' && <Settings owner={owner} />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
