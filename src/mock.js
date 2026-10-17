@@ -68,6 +68,13 @@ let mockTrainers = [
     profileReview: 'pending', profilePublished: false, profileHidden: false, openReports: 0 },
 ];
 
+// Доступ к играм выбранным клиентам — «Управление → Игры» (Games.jsx)
+let mockGameClients = [
+  { row: 3, name: 'Анна Морозова', trainer: 'Константин Соколов', test: false, games: true },
+  { row: 4, name: 'Олег Смирнов', trainer: 'Константин Соколов', test: false, games: false },
+  { row: 9, name: 'Тестовый клиент', trainer: 'Константин Соколов', test: true, games: true },
+];
+
 /* Отбор тренеров и профили (FT-548): справочники и демо-данные как у сервера */
 const MOCK_DICTS = {
   specialties: ['Снижение веса', 'Набор мышечной массы', 'Сила', 'Выносливость', 'Функциональный тренинг', 'Для начинающих', 'Подготовка к соревнованиям'],
@@ -1107,6 +1114,11 @@ const MOCK = {
     const next = { approve: 'active', reject: 'rejected', block: 'blocked', unblock: 'active' }[p.decision];
     mockTrainers = mockTrainers.map((t) => (t.id === p.id ? { ...t, status: next } : t));
     return { trainers: mockTrainers };
+  },
+  'owner.games': () => ({ clients: mockGameClients }),
+  'owner.games.set': (p) => {
+    mockGameClients = mockGameClients.map((c) => (c.row === p.row ? { ...c, games: !!p.on } : c));
+    return { clients: mockGameClients };
   },
   'owner.trainer.get': (p) => mockOwnerTrainer(p.id),
   'owner.trainer.advance': (p) => {
