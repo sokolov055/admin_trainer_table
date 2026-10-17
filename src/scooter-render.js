@@ -1,5 +1,5 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
-import { DISTANCE, TUNING } from './scooter-model.js';
+import { TUNING } from './scooter-model.js';
 
 const C = { road: '#3f5755', line: '#f4f2dc', sidewalk: '#d8d4bf', ink: '#183d34', shadow: '#102f2b4a' };
 const palette = ['#dbac86', '#eac590', '#97bfb4', '#c6ad9c', '#afc7a3'];
@@ -222,7 +222,7 @@ export class StreetRenderer {
         rect(ctx, 50, y + 69, 8, 8, '#c19568', 2);
       }
     }
-    const finishY = playerY - (DISTANCE - game.distance) * metresToPixels;
+    const finishY = playerY - (game.goalDistance - game.distance) * metresToPixels;
     if (finishY > -150) finish(ctx, finishY, w);
     for (const object of game.route) {
       const dy = object.at - game.distance;
@@ -233,7 +233,7 @@ export class StreetRenderer {
     }
     const leaning = game.lane - game.x;
     if (game.nitro > 0) nitroTrail(ctx, 122 + game.x * 88, playerY, game.elapsed, reduced);
-    scooter(ctx, 122 + game.x * 88, playerY, leaning, game.invincible > 0, game.elapsed, reduced);
+    scooter(ctx, 122 + game.x * 88, playerY, leaning, false, game.elapsed, reduced);
     if (game.phase === 'won') {
       ctx.textAlign = 'center'; ctx.font = '800 13px Manrope, sans-serif'; ctx.fillStyle = '#fff6d5';
       ctx.fillText('ПРИПАРКОВАЛИСЬ. ПОРА В ЗАЛ!', w / 2, h - 98);

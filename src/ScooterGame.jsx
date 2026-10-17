@@ -33,15 +33,15 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
           </div>
           <button type="button" className="icon-button" data-scooter="pause" aria-label="Пауза" disabled><span className="pause-icon" aria-hidden="true" /></button>
         </div>
-        <div className="route-status"><div><span data-scooter="distance">Зал через 900 м</span><span data-scooter="progress-label">0%</span></div><progress data-scooter="progress" defaultValue="0" max="900" aria-label="Путь до зала" /></div>
+        <div className="route-status"><div><span data-scooter="distance">Уровень 1 · зал через 1200 м</span><span data-scooter="progress-label">0%</span></div><progress data-scooter="progress" defaultValue="0" max="1200" aria-label="Путь до зала" /></div>
         <div className="combo" data-scooter="combo" hidden>Серия 0</div>
         <p className="toast" data-scooter="toast" role="status" aria-live="polite" />
         <div className="countdown" data-scooter="countdown" hidden aria-live="off">3</div>
         <section className="overlay" data-scooter="overlay" aria-labelledby={title}>
           <div className="overlay-body">
-            <span className="overlay-kicker">60 секунд · 900 метров</span>
+            <span className="overlay-kicker" data-scooter="overlay-kicker">Уровень 1 · 55 секунд · 1200 метров</span>
             <h2 id={title} data-scooter="overlay-title">Рывок до зала</h2>
-            <p data-scooter="overlay-copy">Скорость растёт по дороге. Собирай воду и предтрен: заряд появится на кнопке нитро. Столкновение −4 сек.</p>
+            <p data-scooter="overlay-copy">Скорость растёт по дороге. Собирай воду и предтрен: заряд появится на кнопке нитро. Одно столкновение завершит заезд.</p>
             <div className="result-stats" data-scooter="result-stats" hidden />
             <button type="button" className="primary" data-scooter="start">В путь</button>
             <button type="button" className="secondary" data-scooter="restart" hidden>Начать заново</button>

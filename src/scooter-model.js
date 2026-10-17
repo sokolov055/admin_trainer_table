@@ -1,12 +1,16 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
-export const TUNING = Object.freeze({ distance: 900, duration: 60, penalty: 4, bonus: 2,
-  startSpeed: 13, speedGain: 22, speedExponent: 1.7, roadPixelsPerMetre: 7.2,
-  firstObstacle: 78, rowGap: 34, laneResponse: 8,
-  collisionHalfWidth: .53, collisionDepth: 1.8, grace: 1.4, slowDuration: .85, slowFactor: .45,
-  nitroDuration: 3.2, nitroMultiplier: 1.75, nitroMax: 2 });
-export const DISTANCE = TUNING.distance;
-export const DURATION = TUNING.duration;
-export const HIT_PENALTY = TUNING.penalty;
+export const TUNING = Object.freeze({ bonus: 2,
+  startSpeed: 17, speedGain: 44, speedExponent: 1.55, roadPixelsPerMetre: 7.2,
+  firstObstacle: 78, rowGap: 42, laneResponse: 8,
+  collisionHalfWidth: .53, collisionDepth: 1.8,
+  nitroDuration: 3.2, nitroMultiplier: 1.45, nitroMax: 2 });
+export const LEVELS = Object.freeze([
+  Object.freeze({ number: 1, name: 'Разминка', distance: 1200, duration: 55 }),
+  Object.freeze({ number: 2, name: 'Час пик', distance: 1800, duration: 75 }),
+  Object.freeze({ number: 3, name: 'Финишный рывок', distance: 2600, duration: 105 }),
+]);
+export const DISTANCE = LEVELS[0].distance;
+export const DURATION = LEVELS[0].duration;
 export const TYPES = ['taxi', 'runner', 'barrier', 'courier', 'robot', 'car'];
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -19,11 +23,11 @@ export function randomGenerator(seed = 563) {
 }
 
 // Между рядами всегда есть время перестроиться; в каждом остаётся свободная полоса.
-export function createRoute(seed = 563) {
+export function createRoute(seed = 563, distance = DISTANCE) {
   const random = randomGenerator(seed);
   const objects = [];
   let safe = 1;
-  for (let row = 0, at = TUNING.firstObstacle; at < DISTANCE - 35; row++, at += TUNING.rowGap) {
+  for (let row = 0, at = TUNING.firstObstacle; at < distance - 35; row++, at += TUNING.rowGap) {
     safe = clamp(safe + Math.floor(random() * 3) - 1, 0, 2);
     const occupied = [0, 1, 2].filter(lane => lane !== safe);
     if (row < 3 || row % 3 !== 2) occupied.splice(Math.floor(random() * 2), 1);
@@ -34,11 +38,14 @@ export function createRoute(seed = 563) {
   return objects;
 }
 
-export function createGame(seed = 563) {
-  return { phase: 'ready', resumePhase: 'playing', countdown: 3, distance: 0, remaining: DURATION, elapsed: 0,
+export function createGame(seed = 563, level = 1) {
+  const config = LEVELS[clamp(Math.round(level) - 1, 0, LEVELS.length - 1)];
+  return { phase: 'ready', resumePhase: 'playing', countdown: 3, level: config.number,
+    levelName: config.name, goalDistance: config.distance, duration: config.duration,
+    distance: 0, remaining: config.duration, elapsed: 0,
     lane: 1, x: 1, speed: 0, hits: 0, bottles: 0, preworkouts: 0, nitroCharges: 0, nitro: 0,
-    dodged: 0, score: 0, combo: 0, bestCombo: 0, invincible: 0, slow: 0,
-    event: null, eventSerial: 0, route: createRoute(seed), seed };
+    dodged: 0, score: 0, combo: 0, bestCombo: 0, crashed: false,
+    event: null, eventSerial: 0, route: createRoute(seed, config.distance), seed };
 }
 
 export function begin(game) {
@@ -67,7 +74,7 @@ export function activateNitro(game) {
   if (game.phase !== 'playing' || game.nitroCharges < 1 || game.nitro > 0) return false;
   game.nitroCharges--;
   game.nitro = TUNING.nitroDuration;
-  emit(game, 'nitro', 'Нитро! Скорость ×1,75');
+  emit(game, 'nitro', 'Нитро! Скорость ×1,45');
   return true;
 }
 
@@ -85,15 +92,13 @@ function tick(game, dt) {
   const interval = Math.min(dt, game.remaining);
   game.elapsed += interval;
   game.remaining = Math.max(0, game.remaining - interval);
-  game.invincible = Math.max(0, game.invincible - interval);
-  game.slow = Math.max(0, game.slow - interval);
   game.nitro = Math.max(0, game.nitro - interval);
   game.x += (game.lane - game.x) * (1 - Math.exp(-TUNING.laneResponse * interval));
-  const progress = game.distance / DISTANCE;
+  const progress = game.distance / game.goalDistance;
   const baseSpeed = TUNING.startSpeed + TUNING.speedGain * Math.pow(progress, TUNING.speedExponent);
-  game.speed = baseSpeed * (game.slow > 0 ? TUNING.slowFactor : 1) * (game.nitro > 0 ? TUNING.nitroMultiplier : 1);
+  game.speed = baseSpeed * (game.nitro > 0 ? TUNING.nitroMultiplier : 1);
   const previous = game.distance;
-  game.distance = Math.min(DISTANCE, game.distance + game.speed * interval);
+  game.distance = Math.min(game.goalDistance, game.distance + game.speed * interval);
   for (const object of game.route) {
     if (object.passed || object.at > game.distance + TUNING.collisionDepth || object.at < previous - 2) continue;
     const touching = Math.abs(game.x - object.lane) < TUNING.collisionHalfWidth;
@@ -111,13 +116,14 @@ function tick(game, dt) {
           game.nitroCharges++;
           emit(game, 'preworkout', 'Предтрен готов! Жми нитро');
         } else emit(game, 'preworkout', 'Запас нитро полный! +50');
-      } else if (!game.invincible) {
+      } else {
         game.hits++;
         game.combo = 0;
-        game.remaining = Math.max(0, game.remaining - HIT_PENALTY);
-        game.invincible = TUNING.grace;
-        game.slow = TUNING.slowDuration;
-        emit(game, 'hit', 'Притормозили! −4 сек');
+        game.crashed = true;
+        game.phase = 'lost';
+        game.speed = 0;
+        emit(game, 'hit', 'Столкновение! Заезд окончен');
+        return;
       }
     } else if (object.at < game.distance - TUNING.collisionDepth) {
       object.passed = true;
@@ -130,7 +136,7 @@ function tick(game, dt) {
       }
     }
   }
-  if (game.distance >= DISTANCE && game.remaining > 0) {
+  if (game.distance >= game.goalDistance && game.remaining > 0) {
     game.phase = 'won'; game.speed = 0;
   } else if (game.remaining <= 0) {
     game.phase = 'lost'; game.speed = 0;

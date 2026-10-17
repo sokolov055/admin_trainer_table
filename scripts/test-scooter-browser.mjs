@@ -119,3 +119,21 @@ test('самокат: наклон, отказ, уход в фон и очист
   assert.equal(await sensor.isVisible(),true);
   assert.match(await sensor.innerText(),/не разрешён/);
 });
+
+test('самокат: чистый финиш открывает длинный уровень, столкновение завершает попытку', async t=>{
+  const page=await setup(t);
+  await page.getByRole('button',{name:'В путь',exact:true}).click(); await page.clock.runFor(3100);
+  await page.evaluate(()=>{ ride.route=[]; ride.distance=ride.goalDistance-1; });
+  await page.clock.runFor(120);
+  assert.equal((await page.evaluate(()=>readRide())).phase,'won');
+  await page.getByRole('button',{name:'Уровень 2',exact:true}).click();
+  const second=await page.evaluate(()=>readRide());
+  assert.equal(second.level,2); assert.equal(second.goalDistance,1800);
+  await page.clock.runFor(3100);
+  await page.evaluate(()=>{ ride.route=[{id:'crash',at:ride.distance+2,lane:ride.lane,type:'robot',passed:false}]; });
+  await page.clock.runFor(250);
+  const crashed=await page.evaluate(()=>readRide());
+  assert.equal(crashed.phase,'lost'); assert.equal(crashed.crashed,true);
+  await page.getByRole('heading',{name:'Столкновение!',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Повторить уровень',exact:true}).isVisible(),true);
+});

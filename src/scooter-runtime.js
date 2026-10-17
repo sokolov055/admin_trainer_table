@@ -1,4 +1,4 @@
-import { createGame, begin, advance, steer, setLane, pause, resume, activateNitro, laneFromTilt, tiltAxis, DISTANCE } from './scooter-model.js';
+import { createGame, begin, advance, steer, setLane, pause, resume, activateNitro, laneFromTilt, tiltAxis, LEVELS } from './scooter-model.js';
 import { StreetRenderer } from './scooter-render.js';
 
 export function mountScooter(root, session, blocked = () => false) {
@@ -14,7 +14,7 @@ const on = (target, type, handler) => target.addEventListener(type, event => {
 }, { signal: controller.signal });
 const $ = id => root.querySelector('[data-scooter="' + id + '"]');
 const elements = Object.fromEntries(['time', 'distance', 'speed', 'score', 'combo', 'progress', 'progress-label', 'pause', 'left', 'right', 'nitro', 'nitro-count',
-  'overlay', 'overlay-title', 'overlay-copy', 'overlay-hint', 'start', 'restart', 'result-stats', 'countdown', 'toast',
+  'overlay', 'overlay-kicker', 'overlay-title', 'overlay-copy', 'overlay-hint', 'start', 'restart', 'result-stats', 'countdown', 'toast',
   'buttons-mode', 'tilt-mode', 'sensor-status', 'steering-hint'].map(id => [id, $(id)]));
 const renderer = new StreetRenderer($('scene'));
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -81,15 +81,16 @@ async function enableTilt() {
   }
 }
 
-function reset() {
-  Object.assign(game, createGame(game.seed + 1)); previousTime = null; previousEvent = -1;
+function reset(level = game.level) {
+  Object.assign(game, createGame(game.seed + 1, level)); previousTime = null; previousEvent = -1;
   begin(game); renderUI();
 }
 
 function primaryAction() {
   if (game.phase === 'ready') begin(game);
   else if (game.phase === 'paused') { resume(game); previousTime = null; }
-  else if (game.phase === 'won' || game.phase === 'lost') reset();
+  else if (game.phase === 'won') reset(game.level < LEVELS.length ? game.level + 1 : 1);
+  else if (game.phase === 'lost') reset(game.level);
   renderUI();
 }
 
@@ -141,11 +142,12 @@ function renderUI() {
   const active = game.phase === 'playing' || game.phase === 'countdown';
   elements.time.textContent = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
   elements.time.parentElement.classList.toggle('urgent', remaining <= 10);
-  elements.distance.textContent = `Зал через ${Math.ceil(DISTANCE - game.distance)} м`;
+  elements.distance.textContent = `Уровень ${game.level} · зал через ${Math.ceil(game.goalDistance - game.distance)} м`;
   elements.speed.textContent = active ? String(Math.round(game.speed * 3.6)) : '0';
   elements.score.textContent = String(game.score);
+  elements.progress.max = game.goalDistance;
   elements.progress.value = game.distance;
-  elements['progress-label'].textContent = `${Math.floor(game.distance / DISTANCE * 100)}%`;
+  elements['progress-label'].textContent = `${Math.floor(game.distance / game.goalDistance * 100)}%`;
   elements.combo.hidden = !active || game.combo < 2;
   elements.combo.textContent = `Серия ${game.combo}`;
   elements.pause.disabled = !active;
@@ -172,16 +174,25 @@ function renderUI() {
     elements.restart.hidden = game.phase !== 'paused';
     elements['result-stats'].hidden = game.phase !== 'won' && game.phase !== 'lost';
     elements['overlay-hint'].hidden = game.phase === 'won' || game.phase === 'lost';
-    if (game.phase === 'paused') {
+    elements['overlay-kicker'].textContent = `Уровень ${game.level} · ${game.levelName} · ${game.duration} секунд · ${game.goalDistance} метров`;
+    if (game.phase === 'ready') {
+      elements['overlay-title'].textContent = game.level === 1 ? 'Рывок до зала' : `Уровень ${game.level}`;
+      elements['overlay-copy'].textContent = 'Скорость растёт по дороге. Собирай предтрен для нитро. Одно столкновение завершит заезд.';
+      elements.start.textContent = 'В путь';
+      elements['overlay-hint'].textContent = 'Стрелки, свайп или наклон телефона';
+    } else if (game.phase === 'paused') {
       elements['overlay-title'].textContent = 'Переведём дух';
       elements['overlay-copy'].textContent = 'Самокат припаркован. Время не идёт, можно спокойно продолжить.';
       elements.start.textContent = 'Продолжить поездку';
       elements['overlay-hint'].textContent = 'Вернёшься к игре с того же места';
     } else if (game.phase === 'won' || game.phase === 'lost') {
       const won = game.phase === 'won';
-      elements['overlay-title'].textContent = won ? 'Успел. Зал открыт!' : 'Тренировка началась';
-      elements['overlay-copy'].textContent = won ? `Ты у входа за ${Math.ceil(game.remaining)} сек до старта. Маршрут пройден чисто и быстро.` : `До зала осталось ${Math.ceil(DISTANCE - game.distance)} м. Ещё попытка? Смотри дальше по дороге и держись свободной полосы.`;
-      elements.start.textContent = 'Ещё заезд';
+      const hasNext = won && game.level < LEVELS.length;
+      elements['overlay-title'].textContent = won ? (hasNext ? `Уровень ${game.level} пройден!` : 'Все уровни пройдены!') : (game.crashed ? 'Столкновение!' : 'Тренировка началась');
+      elements['overlay-copy'].textContent = won
+        ? (hasNext ? `До старта ещё ${Math.ceil(game.remaining)} сек. Следующая трасса длиннее: ${LEVELS[game.level].distance} м.` : `Ты прошёл финальную трассу за ${Math.ceil(game.remaining)} сек до старта.`)
+        : (game.crashed ? `До финиша оставалось ${Math.ceil(game.goalDistance - game.distance)} м. На скорости ошибка завершает попытку.` : `До зала осталось ${Math.ceil(game.goalDistance - game.distance)} м. Попробуй этот уровень ещё раз.`);
+      elements.start.textContent = won ? (hasNext ? `Уровень ${game.level + 1}` : 'С первого уровня') : 'Повторить уровень';
       elements['result-stats'].innerHTML = `<div><strong>${game.score}</strong><span>очков</span></div><div><strong>${game.bestCombo}</strong><span>лучшая серия</span></div><div><strong>${game.hits}</strong><span>столкновений</span></div>`;
     }
     if (game.phase !== 'ready') {
