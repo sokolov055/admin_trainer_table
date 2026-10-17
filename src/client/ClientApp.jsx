@@ -72,7 +72,7 @@ const TABS = [
  */
 const MENU = [
   { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlankGame, game: true },
-  { id: 'scooter-game', label: 'На самокате до зала', note: 'Городская гонка на одну минуту', Icon: IconScooterGame, game: true },
+  { id: 'scooter-game', label: 'На самокате до зала', note: 'Бесконечный заезд и рейтинг игроков', Icon: IconScooterGame, game: true },
   { id: 'match-game', label: 'Три в ряд', note: 'Собери свой лучший каскад', Icon: IconMatchGame, game: true },
   // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
@@ -338,7 +338,7 @@ export default function ClientApp({ me, clientRow, preview }) {
                 onClick={() => (m.action ? (setMenuOpen(false), m.action()) : go(m.id))}
                 aria-current={active ? 'page' : undefined}
               >
-                <span className="menu__icon"><Icon size={20} /></span>
+                <span className="menu__icon"><Icon size={m.game ? 64 : 20} /></span>
                 <span className="menu__text">
                   <span className="menu__label">{m.label}</span>
                   <span className="menu__note">{m.note}</span>

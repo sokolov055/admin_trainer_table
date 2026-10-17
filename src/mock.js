@@ -893,6 +893,7 @@ const MOCK = {
 
   'auth.logout': () => ({ ok: true, revoked: 1 }),
 
+  'scooter.board': () => ({ profile: { enabled: false }, entries: [] }),
   'me': (params) => ({
     role: params.__role === 'trainer' ? 'trainer' : 'client',
     name: params.__role === 'trainer' ? 'Константин' : 'Анна Морозова',

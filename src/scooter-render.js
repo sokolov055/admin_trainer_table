@@ -1,7 +1,28 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
 import { TUNING } from './scooter-model.js';
+import trafficUrl from './assets/scooter-traffic-v3.png';
+import alleyUrl from './assets/scooter-alley-v3.png';
 
-const C = { road: '#3f5755', line: '#f4f2dc', sidewalk: '#d8d4bf', ink: '#183d34', shadow: '#102f2b4a' };
+const traffic = typeof Image === 'undefined' ? null : new Image();
+const people = typeof Image === 'undefined' ? null : new Image();
+if (traffic) traffic.src = trafficUrl;
+if (people) people.src = alleyUrl;
+const SPRITES = { grandma: [0, 0], athlete: [1, 0], runner: [2, 0], robot: [0, 1], barrier: [1, 1], rider: [2, 1] };
+function sprite(ctx, type, x, y, time = 0, size = 1, direction = 1) {
+  const vehicle = type === 'car' || type === 'taxi';
+  const atlas = vehicle ? traffic : people;
+  if (!atlas?.complete || !atlas.naturalWidth || (!vehicle && !SPRITES[type])) return false;
+  const [column, row] = vehicle ? [type === 'taxi' ? 0 : 2, 0] : SPRITES[type];
+  const cw = atlas.naturalWidth / 3, ch = atlas.naturalHeight / 2;
+  const dimensions = vehicle ? [140, 140] : type === 'barrier' ? [96, 96] : type === 'athlete' ? [98, 98] : type === 'rider' ? [94, 104] : [86, 90];
+  const bob = ['grandma', 'athlete', 'runner'].includes(type) ? Math.sin(time * (type === 'runner' ? 9 : 3) + column) * .6 : 0;
+  ctx.save(); ctx.translate(x, y + bob);
+  if (vehicle) ctx.rotate(direction * Math.PI / 2);
+  ctx.drawImage(atlas, column * cw, row * ch, cw, ch, -dimensions[0] * size / 2, -dimensions[1] * size / 2, dimensions[0] * size, dimensions[1] * size);
+  ctx.restore(); return true;
+}
+
+const C = { road: '#bcb7a2', line: '#f4f2dc', sidewalk: '#688b55', ink: '#183d34', shadow: '#102f2b4a' };
 const palette = ['#dbac86', '#eac590', '#97bfb4', '#c6ad9c', '#afc7a3'];
 
 function shape(ctx, points, color) {
@@ -22,6 +43,7 @@ function line(ctx, points, color, width = 2) {
 function shadow(ctx, x, y, rx, ry) { oval(ctx, x + 7, y + 7, rx, ry, C.shadow); }
 
 export function drawObject(ctx, type, x, y, size = 1, time = 0) {
+  if (sprite(ctx, type, x, y, time, size)) return;
   ctx.save(); ctx.translate(x, y); ctx.scale(size, size);
   if (type === 'taxi' || type === 'car' || type === 'courier') {
     const body = type === 'taxi' ? '#e7ad3f' : type === 'courier' ? '#c95d42' : '#5d8fa1';
@@ -143,16 +165,28 @@ function scooter(ctx, x, y, lean, hit, time, reduced) {
   ctx.restore();
 }
 
-function nitroTrail(ctx, x, y, time, reduced) {
-  if (reduced) return;
+function rideContact(ctx, x, y, game, reduced) {
+  const moving = game.phase === 'playing' && game.speed > 0;
+  // Контакт остаётся на покрытии: тень не качается вместе с телом и рулём.
+  oval(ctx, x + 2, y + 3, 19, 32, '#18372b38');
+  oval(ctx, x, y - 32, 3, 5, '#142b2866');
+  oval(ctx, x, y + 37, 3, 5, '#142b2877');
+  if (!moving || reduced) return;
   ctx.save();
-  ctx.globalAlpha = .75;
-  for (let index = -3; index <= 3; index++) {
-    const spread = index * 17 + Math.sin(time * 16 + index) * 5;
-    const length = 54 + ((index + 4) % 3) * 24;
-    line(ctx, [[x + spread, y + 42], [x + spread * 1.35, y + 42 + length]], index % 2 ? '#d9ff8b' : '#fff7cf', index === 0 ? 5 : 3);
+  // Короткий след колеса и пыль движутся назад по плитке, без сияния под фигуркой.
+  line(ctx, [[x, y + 41], [x, y + 54]], '#47533e30', 2);
+  const crossing = 450 + Math.round((game.distance - 450) / 500) * 500;
+  if (Math.abs(game.distance - crossing) > 17) {
+    for (let i = 0; i < 4; i++) {
+      const age = (game.distance * .16 + i / 4) % 1;
+      ctx.globalAlpha = (1 - age) * .18;
+      oval(ctx, x + (i % 2 ? 1 : -1) * (4 + age * 7), y + 39 + age * 24, 1 + age * 2, 1 + age * 1.2, '#e9dec1');
+    }
   }
-  oval(ctx, x, y + 39, 28, 16, '#9ff06f');
+  if (game.nitro > 0) {
+    ctx.globalAlpha = .55;
+    for (const side of [-1, 1]) line(ctx, [[x + side * 7, y + 38], [x + side * 12, y + 83]], '#d8ff84', 2);
+  }
   ctx.restore();
 }
 
@@ -173,7 +207,8 @@ export class StreetRenderer {
     const bounds = this.canvas.getBoundingClientRect();
     const ratio = Math.min(window.devicePixelRatio || 1, 3);
     this.canvas.width = Math.round(bounds.width * ratio); this.canvas.height = Math.round(bounds.height * ratio);
-    this.ctx.imageSmoothingEnabled = false;
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = 'high';
     this.width = 420; this.height = bounds.height * 420 / bounds.width;
   }
   draw(game, reduced = false) {
@@ -184,30 +219,27 @@ export class StreetRenderer {
     const offset = game.distance * metresToPixels;
     rect(ctx, 0, 0, w, h, C.sidewalk);
     rect(ctx, 78, 0, w - 156, h, C.road);
-    for (let y = (offset % 96) - 96; y < h; y += 96) rect(ctx, 81, y, w - 162, 1, '#f6f1d410');
-    rect(ctx, 72, 0, 6, h, '#fbf0d0'); rect(ctx, w - 78, 0, 6, h, '#fbf0d0');
-    rect(ctx, 78, 0, 3, h, '#35554b50'); rect(ctx, w - 83, 0, 5, h, '#35554b38');
+    for (let y = (offset % 44) - 44; y < h; y += 44) {
+      line(ctx, [[80, y], [340, y]], '#918e7e', .7);
+      for (let x = 80; x < 340; x += 44) line(ctx, [[x + ((Math.floor(y / 44) % 2) ? 22 : 0), y], [x + ((Math.floor(y / 44) % 2) ? 22 : 0), y + 44]], '#a19d89', .6);
+    }
+    rect(ctx, 72, 0, 6, h, '#e0d9bc'); rect(ctx, w - 78, 0, 6, h, '#e0d9bc');
+    rect(ctx, 78, 0, 3, h, '#666f5140'); rect(ctx, w - 83, 0, 5, h, '#666f5140');
     for (let y = (offset % 48) - 48; y < h; y += 48) {
       line(ctx, [[45, y], [70, y]], '#c9c5ae', 1);
       line(ctx, [[350, y], [376, y]], '#c9c5ae', 1);
-    }
-    for (let y = (offset % 75) - 75; y < h; y += 75) {
-      rect(ctx, 164, y, 3, 30, '#eef2dd9e', 1); rect(ctx, 252, y, 3, 30, '#eef2dd9e', 1);
-    }
-    for (let y = (offset % 460) - 460; y < h; y += 460) {
-      for (const laneX of [122, 210, 298]) {
-        shape(ctx, [[laneX - 3, y + 40], [laneX + 3, y + 40], [laneX + 3, y + 20], [laneX + 10, y + 20], [laneX, y + 7], [laneX - 10, y + 20], [laneX - 3, y + 20]], '#cad8be36');
-      }
-      oval(ctx, 317, y + 180, 11, 14, '#506c65'); oval(ctx, 317, y + 180, 8, 11, '#607d71');
-      for (let i = -5; i <= 5; i += 5) line(ctx, [[312, y + 180 + i], [322, y + 180 + i]], '#476159', 1);
     }
     const block = 158;
     const base = Math.floor(offset / block);
     for (let i = -1; i < Math.ceil(h / block) + 1; i++) {
       const y = i * block + offset % block;
       const idx = ((i - base) % 5 + 5) % 5;
-      building(ctx, -23, y, 65, 131, idx);
-      building(ctx, 379, y - 49, 65, 136, (idx + 2) % 5, true);
+      rect(ctx, 0, y + 8, 36, 76, '#527849', 13);
+      rect(ctx, 386, y + 31, 34, 73, '#527849', 13);
+      for (let n = 0; n < 6; n++) {
+        oval(ctx, 10 + n % 2 * 14, y + 20 + n * 9, 3, 4, n % 2 ? '#e8d58d' : '#d89579');
+        oval(ctx, 395 + n % 2 * 14, y + 42 + n * 9, 3, 4, n % 2 ? '#f2e3ac' : '#e3bda1');
+      }
       tree(ctx, 57, y + 145, idx % 2);
       tree(ctx, 363, y + 98, (idx + 1) % 2);
       if (idx % 2 === 0) {
@@ -222,21 +254,42 @@ export class StreetRenderer {
         rect(ctx, 50, y + 69, 8, 8, '#c19568', 2);
       }
     }
-    const finishY = playerY - (game.goalDistance - game.distance) * metresToPixels;
-    if (finishY > -150) finish(ctx, finishY, w);
+    const firstCross = Math.max(450, 450 + Math.floor((game.distance - 450 - 40) / 500) * 500);
+    for (let at = firstCross; at < game.distance + 220; at += 500) {
+      const y = playerY - (at - game.distance) * metresToPixels;
+      rect(ctx, 0, y - 95, w, 190, '#3e5351');
+      line(ctx, [[0, y], [78, y]], '#e8e4b8', 2);
+      line(ctx, [[342, y], [420, y]], '#e8e4b8', 2);
+      for (let stripe = 0; stripe < 10; stripe++) rect(ctx, 87, y - 86 + stripe * 18, 246, 10, '#f2eddb', 1);
+      rect(ctx, 40, y - 145, 27, 31, '#346cab', 3);
+      shape(ctx, [[44, y-118], [63, y-118], [54, y-140]], '#f7f3e5');
+      oval(ctx, 54, y - 134, 2, 2, '#26463e');
+      line(ctx, [[54, y-131], [52, y-125], [49, y-121]], '#26463e', 1.7);
+      line(ctx, [[52, y-125], [58, y-122]], '#26463e', 1.7);
+    }
+    const actors = [];
     for (const object of game.route) {
       const dy = object.at - game.distance;
       const y = playerY - dy * metresToPixels;
-      if (y < -70 || y > h + 70 || (object.passed && object.type === 'bottle')) continue;
-      const size = object.type === 'curb' || object.type === 'barrier' ? .95 : 1;
-      drawObject(ctx, object.type, 122 + object.lane * 88, y, size, reduced ? 0 : game.elapsed);
+      if (y < -80 || y > h + 80 || (object.passed && ['bottle', 'preworkout'].includes(object.type))) continue;
+      actors.push({ object, y });
     }
-    const leaning = game.lane - game.x;
-    if (game.nitro > 0) nitroTrail(ctx, 122 + game.x * 88, playerY, game.elapsed, reduced);
-    scooter(ctx, 122 + game.x * 88, playerY, leaning, false, game.elapsed, reduced);
-    if (game.phase === 'won') {
-      ctx.textAlign = 'center'; ctx.font = '800 13px Manrope, sans-serif'; ctx.fillStyle = '#fff6d5';
-      ctx.fillText('ПРИПАРКОВАЛИСЬ. ПОРА В ЗАЛ!', w / 2, h - 98);
+    actors.push({ y: playerY });
+    // Общая глубина для игрока и НПС: самокат не рисуется поверх всех голов.
+    for (const { object, y } of actors.sort((a, b) => a.y - b.y)) {
+      if (object) {
+        const x = 122 + object.lane * 88;
+        if (object.crossing) sprite(ctx, object.type, x, y, 0, 1, object.direction);
+        else drawObject(ctx, object.type, x, y, 1, reduced || object.waiting ? 0 : game.elapsed);
+      } else {
+        const x = 122 + game.x * 88, leaning = game.lane - game.x;
+        rideContact(ctx, x, playerY, game, reduced);
+        // Микровибрация привязана к пройденной плитке, а не к течению времени.
+        const vibration = !reduced && game.phase === 'playing' ? Math.sin(game.distance * 1.04) * .35 : 0;
+        ctx.save(); ctx.translate(x, playerY + vibration); ctx.rotate(reduced ? 0 : leaning * .16);
+        if (!sprite(ctx, 'rider', 0, 0)) { ctx.scale(.74, .74); scooter(ctx, 0, 0, leaning, false, game.elapsed, reduced); }
+        ctx.restore();
+      }
     }
   }
 }

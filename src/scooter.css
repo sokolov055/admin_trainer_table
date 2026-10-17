@@ -1,166 +1,89 @@
 .scooter-game {
-  --sg-ink: #173c34;
-  --sg-paper: #fffdf2;
-  --sg-accent: #67d17b;
-  --sg-ease: cubic-bezier(.23, 1, .32, 1);
-  width: 100%;
-  max-width: 520px;
-  margin: auto;
-  color: var(--sg-ink);
-  font-family: Manrope, sans-serif;
-  line-height: 1.45;
-  text-align: left;
+  --sg-ink: #173c34; --sg-paper: #fffdf2; --sg-accent: #9bea72;
+  position: relative; width: 100%; height: 100dvh; min-height: 0;
+  margin: 0; color: var(--sg-ink); font-family: Manrope, sans-serif;
+  color-scheme: light; text-align: left; isolation: isolate;
 }
-
 .scooter-game *, .scooter-game *::before, .scooter-game *::after { box-sizing: border-box; }
-.scooter-game button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: transform 140ms var(--sg-ease), background-color 160ms ease; }
-.scooter-game button:active:not(:disabled) { transform: scale(.96); }
-.scooter-game button:disabled { cursor: default; opacity: .45; }
-.scooter-game button:focus-visible { outline: 3px solid #9ee7ff; outline-offset: 3px; }
 .scooter-game [hidden] { display: none !important; }
-
-.scooter-game .game {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  width: 100%;
-  height: min(760px, 100svh);
-  min-height: 560px;
-  overflow: hidden;
-  border-radius: 20px;
-  background: #e8ecdc;
-  color-scheme: light;
-}
-
-.scooter-game--immersive { max-width: 520px; min-height: 100dvh; }
-.scooter-game--immersive .game { height: 100dvh; min-height: 540px; border-radius: 0; }
-
-.scooter-game .game-header {
-  position: relative;
-  z-index: 20;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 8px;
-  min-height: 54px;
-  padding: 5px 12px;
-  background: #f7f7ea;
-  border-bottom: 1px solid #ccd5c7;
-}
-
-.scooter-game--immersive .game-header { padding-top: calc(5px + env(safe-area-inset-top)); min-height: calc(54px + env(safe-area-inset-top)); }
-.scooter-game .game-header button { justify-self: start; display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #294f43; font-size: 13px; font-weight: 750; }
-.scooter-game .game-header > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 820; }
-.scooter-game .test-label { justify-self: end; padding: 3px 7px; border: 1px solid #afc1b3; border-radius: 6px; color: #466358; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-
-.scooter-game .viewport { position: relative; min-height: 0; overflow: hidden; isolation: isolate; touch-action: none; background: #b8ddd9; }
-.scooter-game [data-scooter="scene"] { display: block; width: 100%; height: 100%; }
-
-.scooter-game .hud { position: absolute; z-index: 4; top: 14px; left: 14px; right: 14px; display: grid; grid-template-columns: auto 1fr 44px; align-items: start; gap: 8px; pointer-events: none; }
-.scooter-game .timer, .scooter-game .ride-stats, .scooter-game .icon-button { background: #fffdf2f2; border: 1px solid #d3dccf; box-shadow: 0 5px 15px #173c3426; }
-.scooter-game .timer { min-width: 104px; padding: 7px 11px 8px; border-radius: 13px; }
-.scooter-game .timer span { display: block; color: #537066; font-size: 10px; font-weight: 760; text-transform: uppercase; letter-spacing: .06em; }
-.scooter-game .timer strong { display: block; margin-top: 1px; font-size: 28px; line-height: 1; font-weight: 850; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
-.scooter-game .timer.urgent { color: #9b351f; background: #fff0d8; border-color: #e7b07d; }
-.scooter-game .ride-stats { justify-self: stretch; display: flex; align-items: center; justify-content: center; gap: 11px; min-height: 44px; padding: 7px 9px; border-radius: 13px; color: #49665b; font-size: 9px; font-weight: 730; text-transform: uppercase; letter-spacing: .03em; }
-.scooter-game .ride-stats span { display: grid; text-align: center; line-height: 1.15; }
-.scooter-game .ride-stats b { color: var(--sg-ink); font-size: 15px; font-weight: 850; font-variant-numeric: tabular-nums; }
-.scooter-game .icon-button { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; border: 1px solid #d3dccf; pointer-events: auto; }
-.scooter-game .pause-icon { display: block; width: 13px; height: 17px; border-left: 4px solid #244e40; border-right: 4px solid #244e40; border-radius: 1px; }
-
-.scooter-game .route-status { position: absolute; z-index: 4; top: 78px; left: 14px; right: 14px; padding: 7px 10px 8px; border: 1px solid #d3dccf; border-radius: 11px; background: #fffdf2ed; box-shadow: 0 4px 12px #173c341c; font-size: 10px; font-weight: 800; }
-.scooter-game .route-status > div { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 5px; }
-.scooter-game .route-status progress { display: block; width: 100%; height: 6px; overflow: hidden; appearance: none; border: 0; border-radius: 5px; background: #dfe6d9; }
-.scooter-game .route-status progress::-webkit-progress-bar { background: #dfe6d9; }
-.scooter-game .route-status progress::-webkit-progress-value { border-radius: 5px; background: #286749; }
-.scooter-game .route-status progress::-moz-progress-bar { border-radius: 5px; background: #286749; }
-
-.scooter-game .combo { position: absolute; z-index: 5; top: 119px; left: 50%; transform: translateX(-50%); padding: 6px 11px; border-radius: 9px; background: #173c34; color: #fff9df; font-size: 12px; font-weight: 850; box-shadow: 0 4px 13px #173c3442; animation: scooter-combo-in 220ms var(--sg-ease) both; }
-.scooter-game .toast { position: absolute; z-index: 6; top: 151px; left: 16px; right: 16px; margin: 0; text-align: center; pointer-events: none; opacity: 0; }
+.scooter-game button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: transform 140ms cubic-bezier(.23,1,.32,1), background-color 140ms ease; }
+.scooter-game button:active:not(:disabled) { transform: scale(.96); }
+.scooter-game button:disabled { opacity: .5; cursor: default; }
+.scooter-game button:focus-visible, .scooter-game a:focus-visible { outline: 3px solid #137b9a; outline-offset: 3px; }
+.scooter-game ::selection { background: #b9f29c; color: #173c34; }
+.scooter-game .game, .scooter-game .viewport { width: 100%; height: 100%; overflow: hidden; background: #354c49; }
+.scooter-game .viewport { position: relative; isolation: isolate; touch-action: none; }
+.scooter-game canvas { display: block; width: 100%; height: 100%; }
+.scooter-game .hud { position: absolute; z-index: 4; top: calc(12px + env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); display: flex; align-items: flex-start; gap: 12px; pointer-events: none; color: #fffdf2; text-shadow: 0 2px 6px #0b2924; }
+.scooter-game .viewport::before { content: ''; position: absolute; z-index: 3; inset: 0 0 auto; height: calc(125px + env(safe-area-inset-top)); background: linear-gradient(#173c34e6, #173c3400); pointer-events: none; }
+.scooter-game .distance-counter { display: flex; flex-direction: column; line-height: 1; }
+.scooter-game .distance-counter strong { font-size: clamp(28px, 7vw, 40px); letter-spacing: -.035em; font-weight: 850; font-variant-numeric: tabular-nums; }
+.scooter-game .distance-counter span { font-size: 11px; margin-top: 5px; font-weight: 700; }
+.scooter-game .ride-stats { display: flex; gap: 16px; padding-top: 3px; font-size: 10px; line-height: 1.25; }
+.scooter-game .ride-stats span { display: flex; flex-direction: column; }
+.scooter-game .ride-stats b { font-size: 20px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.scooter-game .icon-button { margin-left: auto; flex: 0 0 46px; width: 46px; height: 46px; border: 0; border-radius: 15px; background: #fffdf2; color: #173c34; box-shadow: 0 5px 16px #102f2b38; pointer-events: auto; }
+.scooter-game .icon-button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.scooter-game .combo { position: absolute; z-index: 4; top: calc(88px + env(safe-area-inset-top)); left: 18px; color: #d9ffae; font-size: 12px; font-weight: 850; text-shadow: 0 2px 5px #0b2924; }
+.scooter-game .crossing-warning { position: absolute; z-index: 4; top: calc(145px + env(safe-area-inset-top)); left: 16px; right: 16px; padding: 8px 10px; border-radius: 12px; background: #244d40; text-align: center; color: #fff9c5; font-size: 12px; font-weight: 800; }
+.scooter-game .toast[data-kind="bark"] span { background: #fff6d7; border-radius: 14px 14px 14px 3px; }
+.scooter-game .voice-choice { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; font-size: 13px; }
+.scooter-game .toast { position: absolute; z-index: 5; top: calc(112px + env(safe-area-inset-top)); left: 12px; right: 12px; margin: 0; text-align: center; opacity: 0; pointer-events: none; }
 .scooter-game .toast.visible { opacity: 1; }
-.scooter-game .toast span { display: inline-block; padding: 8px 13px; border: 1px solid #d0dacb; border-radius: 10px; background: #fffdf2; color: #173c34; box-shadow: 0 5px 16px #173c3430; font-size: 12px; font-weight: 800; }
-.scooter-game .toast[data-kind="hit"] span { border-color: #e4aa7c; background: #fff0dc; color: #8d351d; }
-.scooter-game .toast[data-kind="bonus"] span { border-color: #9bc67d; background: #e3f4ca; }
-.scooter-game .toast[data-kind="preworkout"] span, .scooter-game .toast[data-kind="nitro"] span { border-color: #82cf64; background: #dfffad; color: #173c34; }
-.scooter-game .toast[data-kind="streak"] span { background: #173c34; color: #fff9df; border-color: #173c34; }
-
-.scooter-game .countdown { position: absolute; z-index: 7; inset: 0; display: grid; place-items: center; color: #fffbea; font-size: clamp(88px, 28vw, 126px); font-weight: 850; text-shadow: 0 5px 0 #244f43, 0 12px 30px #173c3466; pointer-events: none; }
-
-.scooter-game .overlay { position: absolute; z-index: 10; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px; background: #173c342e; pointer-events: none; }
-.scooter-game .overlay-body { width: 100%; max-width: 390px; padding: 23px 22px 16px; border: 1px solid #d2dacd; border-radius: 22px; background: #fffdf2; box-shadow: 0 18px 48px #102e2a66; text-align: left; pointer-events: auto; animation: scooter-panel-in 240ms var(--sg-ease) both; }
-.scooter-game .overlay-kicker { display: block; margin-bottom: 7px; color: #5d766d; font-size: 10px; font-weight: 850; text-transform: uppercase; letter-spacing: .1em; }
-.scooter-game .overlay h2 { margin: 0 0 9px; max-width: 11ch; color: var(--sg-ink); font-size: clamp(30px, 9vw, 42px); line-height: .98; letter-spacing: -.045em; font-weight: 850; }
-.scooter-game .overlay p { margin: 0 0 16px; color: #526b62; font-size: 13px; line-height: 1.5; }
-.scooter-game .primary { width: 100%; min-height: 54px; border: 0; border-radius: 13px; background: var(--sg-accent); color: #102715; font-size: 17px; font-weight: 850; }
-.scooter-game .secondary { width: 100%; min-height: 44px; margin-top: 4px; border: 0; border-radius: 10px; background: transparent; color: #466358; font-size: 12px; font-weight: 750; }
-.scooter-game .overlay .overlay-hint { margin: 11px 0 0; text-align: center; font-size: 11px; }
-.scooter-game .result-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 2px 0 15px; }
-.scooter-game .result-stats > div { padding: 8px 4px; border-radius: 10px; background: #e9eee3; text-align: center; }
-.scooter-game .result-stats strong { display: block; font-size: 20px; font-weight: 850; font-variant-numeric: tabular-nums; }
-.scooter-game .result-stats span { display: block; color: #5d746b; font-size: 9px; line-height: 1.2; }
-
-.scooter-game .nitro-button { position: absolute; z-index: 5; right: 14px; bottom: 88px; display: grid; grid-template-columns: 21px auto 20px; align-items: center; gap: 5px; min-height: 48px; padding: 6px 8px; border: 2px solid #173c34; border-radius: 13px; background: #dfff83; color: #173c34; box-shadow: 0 7px 0 #173c34, 0 12px 20px #173c3440; font-size: 11px; font-weight: 850; text-transform: uppercase; letter-spacing: .035em; }
-.scooter-game .nitro-button svg { width: 21px; height: 24px; fill: currentColor; }
-.scooter-game .nitro-button b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #173c34; color: #f7ffd9; font-size: 10px; font-variant-numeric: tabular-nums; }
-.scooter-game .nitro-button:disabled { opacity: .58; filter: saturate(.55); box-shadow: 0 4px 0 #173c34, 0 8px 14px #173c342b; }
-.scooter-game .nitro-button.active { background: #9af06c; box-shadow: 0 4px 0 #173c34, 0 0 0 5px #dfff8399, 0 11px 22px #173c3447; transform: translateY(3px); }
-.scooter-game .nitro-button.active:disabled { opacity: 1; filter: none; }
-
-.scooter-game .steering { position: absolute; z-index: 4; left: 14px; right: 14px; bottom: 14px; display: grid; grid-template-columns: 68px 1fr 68px; align-items: center; gap: 8px; }
-.scooter-game .steering button { width: 68px; height: 62px; display: grid; place-items: center; border: 1px solid #d3dccf; border-radius: 16px; background: #fffdf2f2; box-shadow: 0 6px 16px #173c3435; }
-.scooter-game .steering > span { max-width: 150px; justify-self: center; color: #fffdf2; font-size: 11px; line-height: 1.35; font-weight: 800; text-align: center; text-shadow: 0 2px 6px #173c34; }
+.scooter-game .toast span { display: inline-block; background: #dfffad; color: #173c34; padding: 9px 14px; border-radius: 12px; box-shadow: 0 5px 18px #0b292438; font-size: 12px; font-weight: 800; }
+.scooter-game .countdown { position: absolute; z-index: 8; inset: 0; display: grid; place-items: center; color: #fffdf2; font-size: 112px; font-weight: 850; text-shadow: 0 5px 24px #0b2924; pointer-events: none; }
+.scooter-game .overlay { position: absolute; z-index: 10; inset: 0; display: flex; align-items: flex-end; padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); background: #102f2b45; overflow-y: auto; }
+.scooter-game .overlay-body { width: min(100%, 470px); margin: auto auto 0; padding: 26px; border-radius: 24px; background: #fffdf2; box-shadow: 0 18px 50px #0b29244d; }
+.scooter-game h2 { margin: 0 0 12px; font-size: clamp(30px, 8vw, 44px); line-height: 1.03; font-weight: 850; letter-spacing: -.035em; text-wrap: balance; }
+.scooter-game p { font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+.scooter-game .overlay-copy { color: #49665b; }
+.scooter-game .primary, .scooter-game .secondary { display: block; width: 100%; min-height: 50px; padding: 12px 15px; border: 0; border-radius: 14px; font-size: 14px; font-weight: 800; }
+.scooter-game .primary { background: #80dc87; color: #123c2c; }
+.scooter-game .secondary { background: #e8eee2; color: #214a3b; margin-top: 8px; }
+.scooter-game .difficulty-picker { display: flex; gap: 5px; margin: 20px 0; }
+.scooter-game .difficulty-picker button { flex: 1; min-width: 0; min-height: 62px; padding: 9px 3px; border: 1px solid #c8d6c6; border-radius: 12px; color: #254f40; background: #f2f4e8; font-size: 11px; font-weight: 850; }
+.scooter-game .difficulty-picker button[aria-pressed="true"] { background: #244d40; border-color: #244d40; color: #f1f7df; }
+.scooter-game .difficulty-picker small { display: block; margin-top: 4px; font-size: 9px; font-weight: 600; }
+.scooter-game .menu-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 12px; margin-top: 6px; }
+.scooter-game .menu-links button, .scooter-game .text-button { min-height: 44px; border: 0; background: transparent; color: #315c4c; font-size: 11px; font-weight: 750; padding: 8px 0; text-decoration: underline; text-underline-offset: 4px; }
+.scooter-game .rank-status { color: #315c4c; font-size: 12px; margin: 8px 0 0; overflow-wrap: anywhere; }
+.scooter-game .rank-status:empty { display: none; }
+.scooter-game .result-stats { display: flex; gap: 12px; margin: 18px 0; }
+.scooter-game .result-stats > div { flex: 1; min-width: 0; }
+.scooter-game .result-stats strong { display: block; font-size: 25px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.scooter-game .result-stats span { display: block; font-size: 10px; color: #49665b; }
+.scooter-game .nitro-button { position: absolute; z-index: 5; right: max(18px, env(safe-area-inset-right)); bottom: calc(96px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 10px 15px; border: 0; border-radius: 16px; background: #d3ff85; color: #173c34; box-shadow: 0 7px 22px #0b29244d; font-size: 12px; font-weight: 850; text-transform: uppercase; }
+.scooter-game .nitro-button svg { width: 20px; height: 25px; fill: currentColor; }
+.scooter-game .nitro-button b { min-width: 22px; font-variant-numeric: tabular-nums; }
+.scooter-game .nitro-button.active { background: #b3ff6e; }
+.scooter-game .nitro-button.active:disabled { opacity: 1; }
+.scooter-game .steering { position: absolute; z-index: 4; left: max(18px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; justify-content: space-between; pointer-events: none; }
+.scooter-game .steering button { width: 68px; height: 62px; display: grid; place-items: center; border: 0; border-radius: 18px; background: #fffdf2e8; box-shadow: 0 6px 20px #0b292438; pointer-events: auto; }
 .scooter-game .arrow { display: block; width: 18px; height: 18px; margin-left: -7px; border-top: 3px solid #284f40; border-right: 3px solid #284f40; transform: rotate(45deg); }
 .scooter-game .left-arrow { margin-left: 7px; transform: rotate(-135deg); }
-
-.scooter-game .game-footer { padding: 9px 14px 10px; border-top: 1px solid #ccd5c7; background: #f7f7ea; }
-.scooter-game--immersive .game-footer { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-.scooter-game .modes { display: grid; grid-template-columns: 1fr 1.35fr; gap: 3px; padding: 3px; border-radius: 11px; background: #e2e8dd; }
-.scooter-game .modes button { min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: #526a60; font-size: 11px; font-weight: 760; }
-.scooter-game .modes button[aria-pressed="true"] { background: #fffdf4; color: #1e4838; box-shadow: 0 2px 5px #1d44301a; }
-.scooter-game .game-footer > p { min-height: 15px; margin: 6px 0 0; color: #587066; font-size: 10px; line-height: 1.4; text-align: center; }
-
+.scooter-game .settings-panel, .scooter-game .leaderboard-panel { position: absolute; z-index: 30; inset: 0; overflow-y: auto; padding: calc(26px + env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) calc(26px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #fffdf2; scrollbar-color: #799b83 #e9eee2; touch-action: pan-y; }
+.scooter-game .settings-panel { display: flex; flex-direction: column; justify-content: center; }
+.scooter-game .modes { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #e8eee2; margin: 12px 0; }
+.scooter-game .modes button { flex: 1; min-height: 44px; border: 0; border-radius: 9px; color: #315c4c; background: transparent; font-size: 12px; font-weight: 750; }
+.scooter-game .modes button[aria-pressed="true"] { background: #244d40; color: #f3f9e5; }
+.scooter-game .board-heading { display: flex; gap: 15px; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.scooter-game .board-heading .secondary { width: auto; margin: 0; min-width: 90px; }
+.scooter-game .rank-join { padding: 16px 0; }
+.scooter-game .rank-join label { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.5; margin-bottom: 14px; }
+.scooter-game .rank-join label > span { flex: 1; min-width: 0; }
+.scooter-game input { accent-color: #244d40; width: 20px; height: 20px; flex: 0 0 20px; }
+.scooter-game a { color: #245c45; text-underline-offset: 3px; }
+.scooter-game .leaderboard-list { padding: 0; margin: 20px 0; list-style: none; }
+.scooter-game .leaderboard-list li { display: flex; align-items: center; gap: 14px; min-height: 64px; border-bottom: 1px solid #d1ddcc; }
+.scooter-game .leaderboard-list li > b { width: 22px; }
+.scooter-game .leaderboard-list li > span { flex: 1; font-size: 13px; }
+.scooter-game .leaderboard-list small { display: block; font-size: 10px; color: #49665b; }
+.scooter-game .leaderboard-list strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.scooter-game .leaderboard-list .mine { color: #15522f; background: #e7f7d9; }
 .rest-screen--scooter { display: block; padding: 0; overflow: hidden; cursor: default !important; background: #173c34; }
-.rest-screen--scooter .scooter-game, .rest-screen--scooter .game { height: 100%; min-height: 100%; border-radius: 0; }
-.rest-screen--scooter .game-header { padding-top: calc(5px + env(safe-area-inset-top)); min-height: calc(54px + env(safe-area-inset-top)); }
-.rest-screen--scooter .game-footer { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-
-@keyframes scooter-panel-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }
-@keyframes scooter-combo-in { from { opacity: 0; transform: translate(-50%, 7px) scale(.94); } }
-
-@media (hover: hover) and (pointer: fine) {
-  .scooter-game .primary:hover { background: #82df92; }
-  .scooter-game .secondary:hover, .scooter-game .game-header button:hover { background: #e9eee2; }
-  .scooter-game .steering button:hover, .scooter-game .icon-button:hover { background: #e5f2d9; }
-  .scooter-game .modes button:hover { background: #edf1e8; }
-}
-
-@media (max-height: 690px) {
-  .scooter-game .hud { top: 9px; }
-  .scooter-game .timer { padding-block: 5px; }
-  .scooter-game .timer strong { font-size: 24px; }
-  .scooter-game .route-status { top: 67px; }
-  .scooter-game .combo { top: 107px; }
-  .scooter-game .toast { top: 134px; }
-  .scooter-game .overlay-body { padding: 17px 18px 12px; }
-  .scooter-game .overlay h2 { font-size: 29px; }
-  .scooter-game .overlay p { margin-bottom: 11px; font-size: 11px; }
-  .scooter-game .overlay .overlay-hint { display: none; }
-  .scooter-game .steering { bottom: 9px; }
-  .scooter-game .steering button { height: 52px; }
-  .scooter-game .nitro-button { right: 9px; bottom: 70px; min-height: 43px; padding-block: 4px; }
-  .scooter-game .game-footer { padding-top: 6px; }
-  .scooter-game .game-footer > p { min-height: 13px; margin-top: 3px; font-size: 9px; }
-}
-
-@media (max-width: 350px) {
-  .scooter-game .hud { left: 9px; right: 9px; gap: 5px; }
-  .scooter-game .ride-stats { gap: 5px; padding-inline: 5px; }
-  .scooter-game .route-status { left: 9px; right: 9px; }
-  .scooter-game .steering { left: 9px; right: 9px; grid-template-columns: 62px 1fr 62px; }
-  .scooter-game .steering button { width: 62px; }
-  .scooter-game .nitro-button { right: 9px; grid-template-columns: 19px auto 18px; gap: 3px; font-size: 10px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .scooter-game *, .scooter-game *::before, .scooter-game *::after { animation: none !important; transition: none !important; }
-  .scooter-game button:active:not(:disabled) { transform: none; }
-}
+.rest-screen--scooter .scooter-game { height: 100%; }
+@media (hover: hover) and (pointer: fine) { .scooter-game .primary:hover { background: #97e49b; } .scooter-game .menu-links button:hover { color: #123c2c; } }
+@media (max-height: 650px) { .scooter-game .overlay { padding: 12px; } .scooter-game .overlay-body { padding: 18px; } .scooter-game h2 { font-size: 29px; } .scooter-game .difficulty-picker { margin-block: 12px; } .scooter-game .difficulty-picker button { min-height: 52px; } .scooter-game .menu-links { gap: 0 10px; } }
+@media (min-width: 700px) { .scooter-game .overlay-body { margin-block: auto; } .scooter-game .settings-panel, .scooter-game .leaderboard-panel { padding-inline: max(24px, calc((100% - 520px) / 2)); } }
+@media (min-width: 700px) { .scooter-game { background: #3a6049; } .scooter-game .game { max-width: 640px; margin-inline: auto; } }
+@media (prefers-reduced-motion: reduce) { .scooter-game *, .scooter-game *::before, .scooter-game *::after { animation: none !important; transition: none !important; } .scooter-game button:active:not(:disabled) { transform: none; } }

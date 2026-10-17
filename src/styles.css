@@ -844,13 +844,13 @@ button { font-family: inherit; }
 .menu__item--active .menu__icon { color: inherit; }
 
 .menu__item--game {
-  min-height: 64px;
+  min-height: 80px;
   padding-block: 6px;
 }
 
 .menu__item--game .menu__icon {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
 }
 
 .menu__item--game .game-menu-icon {

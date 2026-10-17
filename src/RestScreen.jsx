@@ -136,9 +136,9 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
       {over && allowGame && (activeRound(plank.round) || scooterActive || matchActive) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
       {!over && allowGame && <>
         <div className="rest-screen__games" aria-label="Игры на отдыхе">
-          <button type="button" onClick={() => { setGameKind('plank'); setGameUntil(until); }}><IconPlankGame size={44} /><span>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</span></button>
-          <button type="button" onClick={() => { setGameKind('scooter'); setGameUntil(until); }}><IconScooterGame size={44} /><span>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</span></button>
-          <button type="button" onClick={() => { setGameKind('match'); setGameUntil(until); }}><IconMatchGame size={44} /><span>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</span></button>
+          <button type="button" onClick={() => { setGameKind('plank'); setGameUntil(until); }}><IconPlankGame size={64} /><span>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</span></button>
+          <button type="button" onClick={() => { setGameKind('scooter'); setGameUntil(until); }}><IconScooterGame size={64} /><span>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</span></button>
+          <button type="button" onClick={() => { setGameKind('match'); setGameUntil(until); }}><IconMatchGame size={64} /><span>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</span></button>
         </div>
       </>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>
