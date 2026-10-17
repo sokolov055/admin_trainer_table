@@ -1,18 +1,18 @@
 // FT-563: детерминированные правила бесконечного заезда. Та же версия проверяет рейтинг на сервере.
-export const RULES_VERSION = 2;
+export const RULES_VERSION = 3;
 export const TUNING = Object.freeze({ roadPixelsPerMetre: 7.2, laneResponse: 10,
   collisionHalfWidth: .48, collisionDepth: 9.5, firstObstacle: 100,
   nitroDuration: 3.2, nitroMultiplier: 1.45, nitroMax: 2 });
 export const DIFFICULTIES = Object.freeze({
-  easy: Object.freeze({ name: 'Разминка', start: 17, max: 61, ramp: 1800, gap: 46, minGap: 34, doubles: .25 }),
-  medium: Object.freeze({ name: 'Час пик', start: 21, max: 76, ramp: 1100, gap: 35, minGap: 24, doubles: .65 }),
-  extreme: Object.freeze({ name: 'Предел', start: 26, max: 94, ramp: 750, gap: 28, minGap: 18, doubles: .9 }),
+  easy: Object.freeze({ name: 'Разминка', start: 17, max: 61, ramp: 1800, gap: 46, minGap: 34, doubles: .25, density: 1 }),
+  medium: Object.freeze({ name: 'Час пик', start: 21, max: 76, ramp: 1100, gap: 35, minGap: 24, doubles: .65, density: .85 }),
+  extreme: Object.freeze({ name: 'Предел', start: 26, max: 94, ramp: 750, gap: 28, minGap: 18, doubles: .9, density: .85 }),
 });
 export const TYPES = ['runner', 'grandma', 'athlete', 'robot', 'barrier'];
 export const BARKS = Object.freeze({
-  grandma: ['Куда летишь, внучек?!', 'Я тебе не кегля!', 'А пешком уже не модно?'],
-  athlete: ['У меня вчера были ноги!', 'Брат, я после приседа!', 'Полегче, чемпион!'],
-  runner: ['Тут вообще-то бегают!', 'Держи дистанцию!', 'Оставь мне дорожку!'],
+  grandma: ['Эй! Куда летишь, внучек?!', 'Я тебе не кегля!', 'Бабушку побереги!'],
+  athlete: ['Эй! У меня вчера были ноги!', 'Брат, я после приседа!', 'Куда прёшь, чемпион?!'],
+  runner: ['Эй! Тут вообще-то бегают!', 'Держи дистанцию!', 'Оставь мне дорожку!'],
   robot: ['Доставка не пострадала.', 'Пожалуйста, объезжайте справа.'],
 });
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -39,7 +39,7 @@ function extendRoute(game, until) {
     if (row % 6 === 1) game.route.push({ id: 'p'+row, row, at, lane: game.safe, type: 'preworkout', passed: false });
     else if (row % 5 === 2) game.route.push({ id: 'b'+row, row, at, lane: game.safe, type: 'bottle', passed: false });
     const pressure = clamp(at / 3500, 0, 1);
-    game.nextAt += config.gap + (config.minGap - config.gap) * pressure;
+    game.nextAt += (config.gap + (config.minGap - config.gap) * pressure) / config.density;
   }
   while (game.nextCrossing < until) {
     const at = game.nextCrossing;
@@ -71,7 +71,7 @@ export function pause(game) {
   game.resumePhase = game.phase; game.phase = 'paused';
 }
 export function resume(game) { if (game.phase === 'paused') game.phase = game.resumePhase; }
-function emit(game, kind, text) { game.event = { kind, text, until: game.elapsed + 1.6, serial: ++game.eventSerial }; }
+function emit(game, kind, text, speaker) { game.event = { kind, text, speaker, until: game.elapsed + 1.8, serial: ++game.eventSerial }; }
 export function activateNitro(game) {
   if (game.phase !== 'playing' || game.nitroCharges < 1 || game.nitro > 0) return false;
   game.nitroCharges--; game.nitro = TUNING.nitroDuration;
@@ -134,6 +134,12 @@ function tick(game) {
   extendRoute(game, game.distance + 300);
   moveTraffic(game, dt);
   for (const object of game.route) {
+    const beside = Math.abs(game.x - object.lane);
+    const phrases = BARKS[object.type];
+    if (phrases && !object.barked && Math.abs(object.at - game.distance) < 4 && beside >= TUNING.collisionHalfWidth && beside < 1.35 && game.elapsed - game.lastBark > 2.5) {
+      object.barked = true; game.lastBark = game.elapsed;
+      emit(game, 'bark', phrases[(object.row || 0) % phrases.length], object.type);
+    }
     const depth = object.crossing ? 10.5 : ['bottle', 'preworkout'].includes(object.type) ? 4 : TUNING.collisionDepth;
     if (object.passed || object.at > game.distance + depth || object.at < previous - depth - 2) continue;
     if (Math.abs(game.x - object.lane) < (object.crossing ? .88 : TUNING.collisionHalfWidth)) {
@@ -153,10 +159,6 @@ function tick(game) {
       if (object.type !== 'bottle' && object.type !== 'preworkout') {
         game.dodged++; game.combo++; game.bestCombo = Math.max(game.bestCombo, game.combo);
         game.score += 10 + Math.min(40, game.combo * 2);
-        const phrases = BARKS[object.type];
-        if (phrases && game.elapsed - game.lastBark > 4 && Math.abs(game.x - object.lane) < 1.3) {
-          game.lastBark = game.elapsed; emit(game, 'bark', phrases[object.row % phrases.length]);
-        }
       }
     }
   }

@@ -2,23 +2,39 @@
 import { TUNING } from './scooter-model.js';
 import trafficUrl from './assets/scooter-traffic-v3.png';
 import alleyUrl from './assets/scooter-alley-v3.png';
+import walkUrl from './assets/scooter-walk-v4.png';
+import { pavingRows, walkingFrame } from './scooter-motion.js';
 
 const traffic = typeof Image === 'undefined' ? null : new Image();
 const people = typeof Image === 'undefined' ? null : new Image();
+const walking = typeof Image === 'undefined' ? null : new Image();
 if (traffic) traffic.src = trafficUrl;
 if (people) people.src = alleyUrl;
+if (walking) walking.src = walkUrl;
 const SPRITES = { grandma: [0, 0], athlete: [1, 0], runner: [2, 0], robot: [0, 1], barrier: [1, 1], rider: [2, 1] };
 function sprite(ctx, type, x, y, time = 0, size = 1, direction = 1) {
   const vehicle = type === 'car' || type === 'taxi';
-  const atlas = vehicle ? traffic : people;
+  const animated = ['grandma', 'athlete', 'runner'].includes(type) && walking?.complete && walking.naturalWidth;
+  const atlas = vehicle ? traffic : animated ? walking : people;
   if (!atlas?.complete || !atlas.naturalWidth || (!vehicle && !SPRITES[type])) return false;
-  const [column, row] = vehicle ? [type === 'taxi' ? 0 : 2, 0] : SPRITES[type];
-  const cw = atlas.naturalWidth / 3, ch = atlas.naturalHeight / 2;
-  const dimensions = vehicle ? [140, 140] : type === 'barrier' ? [96, 96] : type === 'athlete' ? [98, 98] : type === 'rider' ? [94, 104] : [86, 90];
-  const bob = ['grandma', 'athlete', 'runner'].includes(type) ? Math.sin(time * (type === 'runner' ? 9 : 3) + column) * .6 : 0;
-  ctx.save(); ctx.translate(x, y + bob);
+  const [column, row] = vehicle ? [type === 'taxi' ? 0 : 2, 0] : animated ? [SPRITES[type][0], walkingFrame(type, time, Math.floor(x / 88))] : SPRITES[type];
+  const cw = atlas.naturalWidth / 3, ch = atlas.naturalHeight / (animated ? 4 : 2);
+  // Фактический шаг рядов сгенерированного атласа: исключает край следующей головы.
+  const sourceY = animated ? (20 + row * 344) / 1448 * atlas.naturalHeight : row * ch;
+  const sourceHeight = animated ? 352 / 1448 * atlas.naturalHeight : ch;
+  const dimensions = vehicle ? [140, 140] : type === 'barrier' ? [96, 96] : type === 'athlete' ? [88, 88] : type === 'rider' ? [94, 104] : animated ? [78, 82] : [86, 90];
+  ctx.save(); ctx.translate(x, y);
   if (vehicle) ctx.rotate(direction * Math.PI / 2);
-  ctx.drawImage(atlas, column * cw, row * ch, cw, ch, -dimensions[0] * size / 2, -dimensions[1] * size / 2, dimensions[0] * size, dimensions[1] * size);
+  ctx.drawImage(atlas, column * cw, sourceY, cw, sourceHeight, -dimensions[0] * size / 2, -dimensions[1] * size / 2, dimensions[0] * size, dimensions[1] * size);
+  if (type === 'rider') for (const wheelY of [-45, 45]) rect(ctx, -1.7, wheelY - 3 + (time * 4) % 5, 3.4, 1, '#c1c7aa');
+  if (type === 'robot') {
+    ctx.scale(size, size);
+    for (const side of [-1, 1]) for (const axle of [-18, 0, 18]) {
+      ctx.save(); ctx.beginPath(); ctx.rect(side * 21 - 2, axle - 5, 4, 10); ctx.clip();
+      for (let i = -1; i < 4; i++) rect(ctx, side * 21 - 2, axle - 7 + i * 5 + (time * 22) % 5, 4, 1.2, '#b2b3a57a');
+      ctx.restore();
+    }
+  }
   ctx.restore(); return true;
 }
 
@@ -173,6 +189,11 @@ function rideContact(ctx, x, y, game, reduced) {
   oval(ctx, x, y + 37, 3, 5, '#142b2877');
   if (!moving || reduced) return;
   ctx.save();
+  // Протектор прокатывается по двум пятнам контакта колёс.
+  for (const wheelY of [-32, 37]) {
+    const tread = (game.distance * 4) % 6;
+    line(ctx, [[x - 1.8, y + wheelY - 3 + tread], [x + 1.8, y + wheelY - 3 + tread]], '#b0bca5', 1);
+  }
   // Короткий след колеса и пыль движутся назад по плитке, без сияния под фигуркой.
   line(ctx, [[x, y + 41], [x, y + 54]], '#47533e30', 2);
   const crossing = 450 + Math.round((game.distance - 450) / 500) * 500;
@@ -211,17 +232,17 @@ export class StreetRenderer {
     this.ctx.imageSmoothingQuality = 'high';
     this.width = 420; this.height = bounds.height * 420 / bounds.width;
   }
-  draw(game, reduced = false) {
+  draw(game, reduced = false, training = false) {
     const ctx = this.ctx, w = this.width, h = this.height;
     ctx.setTransform(this.canvas.width / w, 0, 0, this.canvas.height / h, 0, 0);
-    const playerY = h - 154;
+    const playerY = h - (training ? 205 : 154);
     const metresToPixels = Math.min(TUNING.roadPixelsPerMetre, (playerY - 40) / 72);
     const offset = game.distance * metresToPixels;
     rect(ctx, 0, 0, w, h, C.sidewalk);
     rect(ctx, 78, 0, w - 156, h, C.road);
-    for (let y = (offset % 44) - 44; y < h; y += 44) {
+    for (const { y, shift } of pavingRows(offset, h)) {
       line(ctx, [[80, y], [340, y]], '#918e7e', .7);
-      for (let x = 80; x < 340; x += 44) line(ctx, [[x + ((Math.floor(y / 44) % 2) ? 22 : 0), y], [x + ((Math.floor(y / 44) % 2) ? 22 : 0), y + 44]], '#a19d89', .6);
+      for (let x = 80 + shift; x < 340; x += 44) line(ctx, [[x, y], [x, y + 44]], '#a19d89', .6);
     }
     rect(ctx, 72, 0, 6, h, '#e0d9bc'); rect(ctx, w - 78, 0, 6, h, '#e0d9bc');
     rect(ctx, 78, 0, 3, h, '#666f5140'); rect(ctx, w - 83, 0, 5, h, '#666f5140');
@@ -287,7 +308,7 @@ export class StreetRenderer {
         // Микровибрация привязана к пройденной плитке, а не к течению времени.
         const vibration = !reduced && game.phase === 'playing' ? Math.sin(game.distance * 1.04) * .35 : 0;
         ctx.save(); ctx.translate(x, playerY + vibration); ctx.rotate(reduced ? 0 : leaning * .16);
-        if (!sprite(ctx, 'rider', 0, 0)) { ctx.scale(.74, .74); scooter(ctx, 0, 0, leaning, false, game.elapsed, reduced); }
+        if (!sprite(ctx, 'rider', 0, 0, reduced ? 0 : game.distance)) { ctx.scale(.74, .74); scooter(ctx, 0, 0, leaning, false, game.elapsed, reduced); }
         ctx.restore();
       }
     }

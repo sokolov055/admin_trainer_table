@@ -13,6 +13,21 @@
 .scooter-game ::selection { background: #b9f29c; color: #173c34; }
 .scooter-game .game, .scooter-game .viewport { width: 100%; height: 100%; overflow: hidden; background: #354c49; }
 .scooter-game .viewport { position: relative; isolation: isolate; touch-action: none; }
+.scooter-game .scooter-tutorial { position: absolute; z-index: 35; inset: 0; display: flex; flex-direction: column; color: #fffdf2; background: #173c3452; }
+.scooter-game .tutorial-heading { padding: calc(28px + env(safe-area-inset-top)) 24px 14px; background: #173c34ed; }
+.scooter-game .tutorial-heading h2 { font-size: 30px; }
+.scooter-game .tutorial-heading p { margin: 0; min-height: 40px; }
+.scooter-game .tutorial-halves { display: flex; flex: 1; min-height: 150px; }
+.scooter-game .tutorial-halves button { width: 50%; border: 0; border-radius: 0; background: #173c3424; color: #fffdf2; display: flex; align-items: center; justify-content: flex-start; padding: 24px 8px; flex-direction: column; gap: 8px; text-shadow: 0 2px 6px #173c34; }
+.scooter-game .tutorial-halves button + button { border-left: 1px dashed #fffdf299; }
+.scooter-game .tutorial-halves button.tried { background: #92df6e30; }
+.scooter-game .tutorial-halves button:active { transform: none; background: #92df6e55; }
+.scooter-game .tutorial-halves svg { width: 38px; height: 46px; fill: #fffdf2; stroke: #173c34; stroke-width: 1.5; }
+.scooter-game .tutorial-halves b { font-size: 15px; }
+.scooter-game .tutorial-halves span { font-size: 11px; }
+.scooter-game .tutorial-label { display: flex; flex-direction: column; gap: 6px; padding: 10px 8px; border-radius: 10px; background: #173c34; text-shadow: none; }
+.scooter-game .tutorial-footer { padding: 14px 24px calc(20px + env(safe-area-inset-bottom)); background: #173c34ed; }
+.scooter-game .tutorial-footer p { margin-bottom: 10px; font-size: 11px; }
 .scooter-game canvas { display: block; width: 100%; height: 100%; }
 .scooter-game .hud { position: absolute; z-index: 4; top: calc(12px + env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); display: flex; align-items: flex-start; gap: 12px; pointer-events: none; color: #fffdf2; text-shadow: 0 2px 6px #0b2924; }
 .scooter-game .viewport::before { content: ''; position: absolute; z-index: 3; inset: 0 0 auto; height: calc(125px + env(safe-area-inset-top)); background: linear-gradient(#173c34e6, #173c3400); pointer-events: none; }
@@ -57,10 +72,6 @@
 .scooter-game .nitro-button b { min-width: 22px; font-variant-numeric: tabular-nums; }
 .scooter-game .nitro-button.active { background: #b3ff6e; }
 .scooter-game .nitro-button.active:disabled { opacity: 1; }
-.scooter-game .steering { position: absolute; z-index: 4; left: max(18px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; justify-content: space-between; pointer-events: none; }
-.scooter-game .steering button { width: 68px; height: 62px; display: grid; place-items: center; border: 0; border-radius: 18px; background: #fffdf2e8; box-shadow: 0 6px 20px #0b292438; pointer-events: auto; }
-.scooter-game .arrow { display: block; width: 18px; height: 18px; margin-left: -7px; border-top: 3px solid #284f40; border-right: 3px solid #284f40; transform: rotate(45deg); }
-.scooter-game .left-arrow { margin-left: 7px; transform: rotate(-135deg); }
 .scooter-game .settings-panel, .scooter-game .leaderboard-panel { position: absolute; z-index: 30; inset: 0; overflow-y: auto; padding: calc(26px + env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) calc(26px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #fffdf2; scrollbar-color: #799b83 #e9eee2; touch-action: pan-y; }
 .scooter-game .settings-panel { display: flex; flex-direction: column; justify-content: center; }
 .scooter-game .modes { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #e8eee2; margin: 12px 0; }

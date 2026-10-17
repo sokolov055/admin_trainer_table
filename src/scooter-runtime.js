@@ -1,5 +1,6 @@
 import { createGame, begin, advance, steer, setLane, pause, resume, activateNitro, laneFromTilt, tiltAxis, DIFFICULTIES } from './scooter-model.js';
 import { StreetRenderer } from './scooter-render.js';
+import { createScooterVoice } from './scooter-voice.js';
 
 export function mountScooter(root, session, blocked = () => false) {
 const controller = new AbortController();
@@ -13,12 +14,14 @@ const on = (target, type, handler) => target.addEventListener(type, event => {
   handler(event);
 }, { signal: controller.signal });
 const $ = id => root.querySelector('[data-scooter="' + id + '"]');
-const elements = Object.fromEntries(['time', 'distance', 'distance-unit', 'speed', 'combo', 'pause', 'left', 'right', 'nitro', 'nitro-count',
+const elements = Object.fromEntries(['time', 'distance', 'distance-unit', 'speed', 'combo', 'pause', 'nitro', 'nitro-count',
   'overlay', 'overlay-title', 'overlay-copy', 'start', 'restart', 'result-stats', 'countdown', 'toast', 'difficulty-picker',
-  'buttons-mode', 'tilt-mode', 'sensor-status', 'steering', 'crossing-warning'].map(id => [id, $(id)]));
+  'buttons-mode', 'tilt-mode', 'sensor-status', 'crossing-warning', 'tutorial', 'tutorial-copy', 'tutorial-start', 'tutorial-left', 'tutorial-right'].map(id => [id, $(id)]));
 const renderer = new StreetRenderer($('scene'));
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const game = session.game;
+const voice = createScooterVoice();
+const tried = new Set();
 let previousTime = null;
 let previousPhase = '';
 let previousEvent = -1;
@@ -30,7 +33,7 @@ let sensorAttempt = 0;
 let gestureStart = null;
 
 function setStatus(message) { elements['sensor-status'].textContent = message; }
-function buttonsMode(message = 'Свайпай или нажимай стрелки ← →') {
+function buttonsMode(message = 'Нажми на левую или правую половину экрана — самокат сместится на одну полосу.') {
   sensorAttempt++;
   sensorMode = false;
   calibration = null;
@@ -60,8 +63,8 @@ async function enableTilt() {
   pause(game); renderUI();
   const attempt = ++sensorAttempt;
   try {
-    if (!window.isSecureContext) { buttonsMode('Для наклона нужен HTTPS. Пока используй кнопки.'); return; }
-    if (typeof window.DeviceOrientationEvent === 'undefined') { buttonsMode('Датчик наклона недоступен. Используй кнопки.'); return; }
+    if (!window.isSecureContext) { buttonsMode('Для наклона нужен HTTPS. Пока нажимай на половины экрана.'); return; }
+    if (typeof window.DeviceOrientationEvent === 'undefined') { buttonsMode('Датчик наклона недоступен. Нажимай на половины экрана.'); return; }
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       const permission = await DeviceOrientationEvent.requestPermission();
       if (!alive || attempt !== sensorAttempt) return;
@@ -97,6 +100,10 @@ async function reset() {
 }
 
 function primaryAction() {
+  if (session.voice) voice.unlock();
+  if (game.phase === 'ready' && !session.tutorialSeen) {
+    session.training = true; game.route = []; renderUI(); elements['tutorial-left'].focus({ preventScroll: true }); return;
+  }
   if (game.phase === 'ready') {
     const scene = root.closest('.game-shell') || root.closest('.rest-screen');
     if (!document.fullscreenElement && scene?.requestFullscreen) scene.requestFullscreen().catch(() => {});
@@ -108,6 +115,12 @@ function primaryAction() {
 }
 
 on(elements.start, 'click', primaryAction);
+on(elements['tutorial-start'], 'click', () => { session.completeTutorial(); primaryAction(); });
+for (const [name, direction] of [['tutorial-left', -1], ['tutorial-right', 1]]) on(elements[name], 'click', () => {
+  tried.add(direction); game.lane = Math.max(0, Math.min(2, game.lane + direction));
+  elements[name].classList.add('tried');
+  elements['tutorial-copy'].textContent = tried.size === 2 ? 'Получилось! В заезде каждое касание меняет одну полосу.' : direction < 0 ? 'Отлично. Теперь нажми на правую половину.' : 'Отлично. Теперь нажми на левую половину.';
+});
 on(elements.restart, 'click', reset);
 for (const button of root.querySelectorAll('[data-difficulty]')) on(button, 'click', () => {
   if (session.loading) return;
@@ -115,13 +128,12 @@ for (const button of root.querySelectorAll('[data-difficulty]')) on(button, 'cli
   previousPhase = ''; renderUI(); session.notify();
 });
 on(elements.pause, 'click', () => { pause(game); renderUI(); });
-on(elements.left, 'click', () => steer(game, -1));
-on(elements.right, 'click', () => steer(game, 1));
 on(elements.nitro, 'click', () => { activateNitro(game); renderUI(); });
 on(elements['buttons-mode'], 'click', () => buttonsMode());
 on(elements['tilt-mode'], 'click', enableTilt);
 
 on(window, 'keydown', event => {
+  if (session.training) return;
   if (event.altKey || event.metaKey || event.ctrlKey) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     event.preventDefault(); if (!event.repeat) steer(game, event.key === 'ArrowLeft' ? -1 : 1);
@@ -138,6 +150,8 @@ on(window, 'keydown', event => {
 });
 
 on($('scene'), 'pointerdown', event => {
+  if (!event.isPrimary || event.button > 0) return;
+  if (session.voice) voice.unlock();
   gestureStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
   $('scene').setPointerCapture(event.pointerId);
 });
@@ -145,6 +159,9 @@ on($('scene'), 'pointerup', event => {
   if (!gestureStart || gestureStart.id !== event.pointerId) return;
   const dx = event.clientX - gestureStart.x, dy = event.clientY - gestureStart.y;
   if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy)) steer(game, Math.sign(dx));
+  else if (Math.hypot(dx, dy) < 14 && !sensorMode) {
+    const bounds = $('scene').getBoundingClientRect(); steer(game, event.clientX < bounds.left + bounds.width / 2 ? -1 : 1);
+  }
   gestureStart = null;
 });
 on($('scene'), 'pointercancel', () => { gestureStart = null; });
@@ -166,15 +183,15 @@ function renderUI() {
   elements.combo.textContent = `Серия ${game.combo}`;
   elements.pause.disabled = !active;
   elements.start.disabled = session.loading;
-  elements.left.disabled = !active;
-  elements.right.disabled = !active;
   elements.nitro.disabled = game.phase !== 'playing' || game.nitroCharges < 1 || game.nitro > 0;
   elements.nitro.classList.toggle('active', game.nitro > 0);
   elements.nitro.setAttribute('aria-label', game.nitro > 0 ? `Нитро включено, ${game.nitro.toFixed(1)} секунды` : `Включить нитро, зарядов ${game.nitroCharges}`);
   elements['nitro-count'].textContent = game.nitro > 0 ? game.nitro.toFixed(1) : String(game.nitroCharges);
   elements.countdown.hidden = game.phase !== 'countdown';
   elements.countdown.textContent = Math.max(1, Math.ceil(game.countdown));
-  elements.steering.hidden = !active || sensorMode;
+  elements.tutorial.hidden = !session.training;
+  elements.overlay.inert = session.training;
+  elements.overlay.hidden = active || session.training;
   elements.nitro.hidden = !active;
   const crossingAt = 450 + Math.max(0, Math.ceil((game.distance - 450) / 500)) * 500;
   elements['crossing-warning'].hidden = game.phase !== 'playing' || crossingAt - game.distance > 140;
@@ -182,20 +199,14 @@ function renderUI() {
     if (game.event.serial !== previousEvent) {
       elements.toast.replaceChildren(Object.assign(document.createElement('span'), { textContent: game.event.text }));
       elements.toast.dataset.kind = game.event.kind;
-      if (game.event.kind === 'bark' && session.voice && window.speechSynthesis) {
-        const voice = speechSynthesis.getVoices().find(v => v.localService && v.lang.startsWith('ru'));
-        if (voice && typeof SpeechSynthesisUtterance !== 'undefined') {
-          const speech = new SpeechSynthesisUtterance(game.event.text); speech.voice = voice; speech.lang = voice.lang; speech.rate = 1.12;
-          speechSynthesis.cancel(); speechSynthesis.speak(speech);
-        }
-      }
+      if (game.event.kind === 'bark' && session.voice && !voice.speak(game.event)) setStatus('Русский голос не установлен. Реплики пока видны текстом.');
       previousEvent = game.event.serial;
     }
     elements.toast.classList.add('visible');
   } else elements.toast.classList.remove('visible');
 
   if (game.phase !== previousPhase) {
-    if (game.phase !== 'playing' && owns()) window.speechSynthesis?.cancel();
+    if (game.phase !== 'playing' && owns()) voice.cancel();
     elements.overlay.hidden = active;
     elements.restart.hidden = game.phase !== 'paused';
     elements['result-stats'].hidden = game.phase !== 'lost';
@@ -238,14 +249,15 @@ function frame(now) {
     else advance(game, Math.min(delta, .1));
   }
   previousTime = now;
-  renderUI(); renderer.draw(game, reducedMotion.matches);
+  if (session.training && owns()) game.x += (game.lane - game.x) * .15;
+  renderUI(); renderer.draw(game, reducedMotion.matches, session.training);
   raf = requestAnimationFrame(frame);
 }
 
-const resize = new ResizeObserver(() => { renderer.resize(); renderer.draw(game, reducedMotion.matches); });
+const resize = new ResizeObserver(() => { renderer.resize(); renderer.draw(game, reducedMotion.matches, session.training); });
 resize.observe($('viewport'));
-renderer.resize(); renderUI(); renderer.draw(game, reducedMotion.matches);
+renderer.resize(); renderUI(); renderer.draw(game, reducedMotion.matches, session.training);
 raf = requestAnimationFrame(frame);
 
-return () => { alive = false; sensorAttempt++; clearTimeout(sensorTimeout); controller.abort(); window.removeEventListener('deviceorientation', onOrientation); cancelAnimationFrame(raf); resize.disconnect(); release(); };
+return () => { alive = false; sensorAttempt++; if (owns()) voice.cancel(); clearTimeout(sensorTimeout); controller.abort(); window.removeEventListener('deviceorientation', onOrientation); cancelAnimationFrame(raf); resize.disconnect(); release(); };
 }

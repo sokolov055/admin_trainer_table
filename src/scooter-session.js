@@ -6,8 +6,15 @@ export function createScooterSession() {
   const game = createGame(), owners = [], listeners = new Set();
   let run = null, boardRequest = 0;
   const sending = new Set();
+  let tutorialSeen = false;
+  try { tutorialSeen = localStorage.getItem('ft.scooter.tutorial.v1') === 'done'; } catch {}
   const session = {
-    game, profile: null, board: [], rankStatus: '', loading: false, voice: false,
+    game, profile: null, board: [], rankStatus: '', loading: false, voice: true,
+    tutorialSeen, training: false,
+    completeTutorial() {
+      session.tutorialSeen = true; session.training = false;
+      try { localStorage.setItem('ft.scooter.tutorial.v1', 'done'); } catch {}
+    },
     owner: () => owners.at(-1), pause: () => pause(game),
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     notify() { listeners.forEach(fn => fn()); },

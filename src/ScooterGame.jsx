@@ -70,18 +70,22 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 1 5.8 13h5.1L9.8 23 18.5 9.7h-5.1L14.2 1Z" /></svg>
           <span>Нитро</span><b data-scooter="nitro-count">0</b>
         </button>
-        <div className="steering" data-scooter="steering" aria-label="Управление самокатом">
-          <button type="button" data-scooter="left" aria-label="Влево" disabled><span className="arrow left-arrow" aria-hidden="true" /></button>
-          <button type="button" data-scooter="right" aria-label="Вправо" disabled><span className="arrow" aria-hidden="true" /></button>
-        </div>
+        <section className="scooter-tutorial" data-scooter="tutorial" role="dialog" aria-modal="true" aria-label="Обучение управлению" hidden>
+          <div className="tutorial-heading"><h2>Как управлять</h2><p data-scooter="tutorial-copy">Нажми на левую или правую половину экрана. Попробуй обе.</p></div>
+          <div className="tutorial-halves">
+            <button type="button" data-scooter="tutorial-left" aria-label="Попробовать влево"><svg viewBox="0 0 40 48" aria-hidden="true"><path d="M17 27V8a4 4 0 0 1 8 0v15l2-2 6 3 2 6-4 14H16L6 31a4 4 0 0 1 6-5l5 5"/></svg><span className="tutorial-label"><b>Нажми слева</b><span>На полосу влево</span></span></button>
+            <button type="button" data-scooter="tutorial-right" aria-label="Попробовать вправо"><svg viewBox="0 0 40 48" aria-hidden="true"><path d="M17 27V8a4 4 0 0 1 8 0v15l2-2 6 3 2 6-4 14H16L6 31a4 4 0 0 1 6-5l5 5"/></svg><span className="tutorial-label"><b>Нажми справа</b><span>На полосу вправо</span></span></button>
+          </div>
+          <div className="tutorial-footer"><p>Дорога свободна — здесь можно потренироваться.</p><button type="button" className="primary" data-scooter="tutorial-start">Поехали</button></div>
+        </section>
         <section className="settings-panel" data-scooter="settings" hidden={panel !== 'settings'} aria-label="Настройки управления">
-          <h2>Управление</h2><p>Свайпай по дороге, нажимай стрелки или наклоняй телефон.</p>
+          <h2>Управление</h2><p>Нажми на левую половину экрана, чтобы сместиться влево, или на правую — вправо. Одно касание — одна полоса. Можно также свайпать.</p>
           <div className="modes" role="group" aria-label="Способ управления">
-            <button type="button" data-scooter="buttons-mode" aria-pressed="true">Кнопки</button>
+            <button type="button" data-scooter="buttons-mode" aria-pressed="true">Касания экрана</button>
             <button type="button" data-scooter="tilt-mode" aria-pressed="false">Наклон телефона</button>
           </div>
-          <p data-scooter="sensor-status" aria-live="polite">Свайпай или нажимай стрелки ← →</p>
-          <label className="voice-choice"><input type="checkbox" checked={session.voice} onChange={e => { session.voice = e.target.checked; session.notify(); }} />Озвучивать реплики персонажей</label>
+          <p data-scooter="sensor-status" aria-live="polite">Левая половина — влево. Правая — вправо.</p>
+          <label className="voice-choice"><input type="checkbox" checked={session.voice} onChange={e => { session.voice = e.target.checked; if (!e.target.checked) window.speechSynthesis?.cancel(); session.notify(); }} />Озвучивать реплики персонажей</label>
           <p>Текстовые реплики видны всегда. Для голоса используется установленный русский голос телефона.</p>
           <button type="button" className="primary" onClick={() => setPanel(null)}>К игре</button>
         </section>

@@ -73,3 +73,20 @@ test('бегун сохраняет дистанцию за медленной �
  g.route=[{at:100,lane:0,type:'runner'},{at:114,lane:0,type:'grandma'}];advance(g,1);
  assert.ok(g.route[1].at-g.route[0].at>=14-1e-8);assert.ok(g.route[0].at>100);
 });
+test('средняя и максимальная сложности дают на 15% меньше рядов без снижения скорости',()=>{
+ for(const difficulty of ['medium','extreme']){
+  const c=DIFFICULTIES[difficulty];assert.equal(c.density,.85);
+  const g=playing(563,difficulty), expected=(c.gap+(c.minGap-c.gap)*(100/3500))/.85;
+  assert.ok(Math.abs(g.route.find(o=>o.row===1).at-100-expected)<.01);
+ }
+ assert.equal(DIFFICULTIES.easy.density,1);
+});
+test('бабушка, качок и бегун кричат в момент близкого объезда, дальний объезд молчит',()=>{
+ for(const type of ['grandma','athlete','runner']){
+  const g=playing();g.lane=0;g.x=0;g.nextAt=2000;g.nextCrossing=2450;
+  g.route=[{at:g.distance+2,lane:1,type,row:0}];advance(g,1/60);
+  assert.equal(g.event.kind,'bark');assert.equal(g.event.speaker,type);
+  const serial=g.event.serial;advance(g,.1);assert.equal(g.event.serial,serial);
+  const far=playing();far.lane=0;far.x=0;far.route=[{at:far.distance+2,lane:2,type,row:0}];advance(far,1/60);assert.equal(far.event,null);
+ }
+});

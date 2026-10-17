@@ -335,8 +335,9 @@ test('три игры доступны тестовому клиенту и ск
   mkdirSync(join(ROOT, 'reports/scooter'), { recursive: true });
   await page.screenshot({ path: join(ROOT, 'reports/scooter/app-ready.png'), fullPage: true });
   await page.getByRole('button', { name: 'В путь', exact: true }).click();
+    if (await page.getByRole('button', { name: 'Поехали', exact: true }).isVisible()) await page.getByRole('button', { name: 'Поехали', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[data-scooter=viewport]')?.dataset.phase === 'playing');
-  await page.getByRole('button', { name: 'Влево', exact: true }).click();
+  await page.locator('[data-scooter=scene]').click({ position: { x: 40, y: 420 } });
   await page.waitForFunction(() => document.querySelector('[data-scooter=viewport]')?.dataset.lane === '0', null, { timeout: 3000 });
   await page.waitForFunction(() => Number(document.querySelector('[data-scooter=distance]').textContent.replace(/\s/g, '')) > 30);
   await page.screenshot({ path: join(ROOT, 'reports/scooter/app-playing.png'), fullPage: true });
