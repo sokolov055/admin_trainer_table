@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
-import { Empty, ErrorState, Loading, Panel, Section } from '../ui.jsx';
+import { Empty, ErrorState, Loading, Panel, Section, Tag, relativeDays } from '../ui.jsx';
 import { IconKey } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 
 /**
- * Тренеры сервиса — экран владельца.
+ * Тренеры сервиса — экран владельца, вкладка панели «Управление» (Admin.jsx).
  *
  * Тренер подаёт заявку сам (почта, код, имя, согласие — LoginScreen.jsx),
  * кабинет открывается после «Одобрить». Решение действует сразу:
@@ -71,10 +71,22 @@ export default function Trainers() {
         <span>{trainer.email}</span>
         <span>
           {trainer.owner ? 'Владелец сервиса' : STATUS[trainer.status] || trainer.status}
-          {trainer.clients ? ` · клиентов: ${trainer.clients}` : ''}
+          {trainer.tierTitle && !trainer.owner ? ` · «${trainer.tierTitle}»` : ''}
+          {trainer.activeClients !== undefined
+            ? ` · клиентов ${trainer.activeClients}${trainer.clientLimit ? ' из ' + trainer.clientLimit : ''}`
+            : trainer.clients ? ` · клиентов: ${trainer.clients}` : ''}
           {trainer.status === 'pending' && trainer.appliedAt
             ? ` · заявка ${new Date(trainer.appliedAt).toLocaleDateString('ru-RU')}` : ''}
         </span>
+        {/* Чем занят тренер — по нему решают, продлить ли ступень и не
+            пора ли написать: входа давно не было и клиенты не тренируются */}
+        {trainer.status === 'active' && trainer.workouts30 !== undefined && (
+          <span>
+            {trainer.lastSeenAt ? `Последний вход — ${relativeDays(trainer.lastSeenAt)}` : 'Входов ещё не было'}
+            {` · за 30 дней тренировок у клиентов ${trainer.workouts30}, занятий ${trainer.sessions30 || 0}`}
+          </span>
+        )}
+        {trainer.overLimit && <Tag tone="warn">клиентов больше, чем позволяет ступень</Tag>}
       </div>
       {!trainer.owner && (ACTIONS[trainer.status] || []).length > 0 && (
         <div className="trainer-row__actions">

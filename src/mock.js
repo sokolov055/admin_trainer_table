@@ -59,10 +59,107 @@ let hiddenMonths = ['Июль 2026'];
 
 // Тренеры сервиса: владелец, одна заявка и работающий тренер
 let mockTrainers = [
-  { id: 1, email: 'owner@fittrack.demo', name: 'Константин Соколов', status: 'active', owner: true, clients: 23, appliedAt: null },
-  { id: 2, email: 'maria@fittrack.demo', name: 'Мария Ковалёва', status: 'pending', owner: false, clients: 0, appliedAt: daysAgo(0) },
-  { id: 3, email: 'igor@fittrack.demo', name: 'Игорь Власов', status: 'active', owner: false, clients: 6, appliedAt: daysAgo(12) },
+  { id: 1, email: 'owner@fittrack.demo', name: 'Константин Соколов', status: 'active', owner: true, clients: 23, appliedAt: null,
+    tier: 'owner', tierTitle: 'Владелец', activeClients: 23, clientLimit: null, lastSeenAt: daysAgo(0), workouts30: 64, sessions30: 81 },
+  { id: 2, email: 'maria@fittrack.demo', name: 'Мария Ковалёва', status: 'pending', owner: false, clients: 0, appliedAt: daysAgo(0),
+    lastSeenAt: null, workouts30: 0, sessions30: 0 },
+  { id: 3, email: 'igor@fittrack.demo', name: 'Игорь Власов', status: 'active', owner: false, clients: 6, appliedAt: daysAgo(12),
+    tier: 'start', tierTitle: 'Старт', activeClients: 4, clientLimit: 3, overLimit: true, lastSeenAt: daysAgo(3), workouts30: 9, sessions30: 12 },
 ];
+
+// Панель «Управление» (Admin.jsx): тарифы, флаги и аналитика демо-сервера
+let mockTariffSettings = {
+  tiers: [
+    { key: 'start', title: 'Старт', upTo: 3, price: 0 },
+    { key: 'growth', title: 'Рост', upTo: 15, price: 490 },
+    { key: 'pro', title: 'Про', upTo: 50, price: 990 },
+    { key: 'studio', title: 'Студия', upTo: 150, price: 1990 },
+  ],
+  overPerClient: 10, plusPrice: 299, plusTrialDays: 14, programSwitchDays: 28, catalogFeePercent: 10, catalogFeeMonths: 3,
+};
+const FLAG_TEXT = {
+  trainerSignup: {
+    env: 'TRAINER_SIGNUP', title: 'Регистрация тренеров', riskyTo: true,
+    on: 'Тренеры подают заявку сами на странице входа, кабинет — после вашего одобрения',
+    off: 'Входят только тренеры из TRAINER_EMAILS и уже одобренные',
+    caution: 'Новый тренер — новый участник обработки данных клиентов: включать после юридической проверки (docs/legal).',
+  },
+  tariffs: {
+    env: 'TARIFFS', title: 'Тарифы', riskyTo: true,
+    on: 'Лимит активных клиентов по ступени тренера, рацион — в «Плюсе»',
+    off: 'Открыто всё, как до тарифов; ступени только считаются',
+    caution: 'Включать одним днём с оплатами и сборкой iPhone (FT-559): без оплат тренеру нечем снять лимит.',
+  },
+  pushOff: {
+    env: 'PUSH_OFF', title: 'Пауза push-уведомлений', riskyTo: false,
+    on: 'Уведомления не уходят: ни Google, ни Apple данных не получают',
+    off: 'Уведомления уходят через Google (Android, Chrome) и Apple',
+    caution: 'Снимать паузу — только после ответа Роскомнадзора по трансграничной передаче (ст. 12 152-ФЗ).',
+  },
+};
+const mockFlags = {
+  trainerSignup: { value: false, envValue: false },
+  tariffs: { value: false, envValue: false },
+  pushOff: { value: true, envValue: true },
+};
+const mockFlagHistory = [];
+const mockFlagState = () => ({
+  flags: Object.keys(FLAG_TEXT).map((key) => ({
+    key,
+    ...FLAG_TEXT[key],
+    value: mockFlags[key].value,
+    envValue: mockFlags[key].envValue,
+    overridden: !!mockFlags[key].setAt,
+    setBy: mockFlags[key].setAt ? 'owner@fittrack.demo' : null,
+    setAt: mockFlags[key].setAt || null,
+  })),
+  history: mockFlagHistory.slice(0, 10),
+});
+const mockTariffs = () => ({
+  on: mockFlags.tariffs.value,
+  settings: mockTariffSettings,
+  trainers: mockTrainers.filter((t) => t.status === 'active').map((t) => ({
+    id: t.id, email: t.email, name: t.name, owner: t.owner, tier: t.tier, title: t.tierTitle, paidUntil: t.paidUntil || null,
+    activeClients: t.activeClients, clientLimit: t.clientLimit, overLimit: !!t.overLimit,
+    needed: t.owner ? { key: 'pro', title: 'Про', price: 990 } : { key: 'growth', title: 'Рост', price: 490 },
+  })),
+});
+const mockStats = () => ({
+  at: new Date().toISOString(),
+  people: { clients: { withTrainer: 27, selfOnly: 5, archived: 9 }, trainers: { owner: 1, active: 1, pending: 1 } },
+  seen: { clients: { day: 9, week: 21, month: 29 }, trainers: { day: 1, week: 2, month: 2 } },
+  training: {
+    week: { workouts: 18, sets: 342, clients: 11, withTrainer: 24 },
+    month: { workouts: 71, sets: 1388, clients: 19, withTrainer: 93 },
+  },
+  growth: [3, 1, 4, 2, 6, 3, 5, 4].map((clients, i) => {
+    const end = Date.now() - (7 - i) * 7 * 86400000;
+    const link = Math.floor(clients / 3);
+    const trainer = Math.ceil(clients / 2);
+    return {
+      from: new Date(end - 7 * 86400000).toISOString().slice(0, 10),
+      to: new Date(end - 1).toISOString().slice(0, 10),
+      clients,
+      bySource: { trainer, link, self: clients - trainer - link },
+      trainers: i === 6 ? 1 : 0,
+    };
+  }),
+  retention: {
+    ever: 34,
+    active: 21,
+    cohorts: ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']
+      .map((month, i) => ({ month, started: [4, 3, 5, 6, 9, 7][i], active: [2, 1, 3, 4, 6, 5][i] })),
+  },
+  versions: [
+    { platform: 'ios', devices: 12, latest: '1.5 (20)', outdated: 3, versions: [
+      { version: '1.5 (20)', devices: 9, latest: true }, { version: '1.4 (18)', devices: 3, latest: false }] },
+    { platform: 'android', devices: 6, latest: '1.5 (8)', outdated: 0, versions: [{ version: '1.5 (8)', devices: 6, latest: true }] },
+  ],
+  errors: [
+    { message: 'Не удалось отправить письмо', error: 'Connection timeout', where: 'POST /', fatal: false, count: 2, firstAt: daysAgo(1), lastAt: daysAgo(0) },
+  ],
+  alerts: { on: true, sentToday: 1, lastAt: daysAgo(0), lastError: null },
+});
 
 const mockEmpty = () => new URLSearchParams(window.location.search).has('mockEmpty');
 
@@ -925,6 +1022,44 @@ const MOCK = {
     mockTrainers = mockTrainers.map((t) => (t.id === p.id ? { ...t, status: next } : t));
     return { trainers: mockTrainers };
   },
+  'owner.stats': () => mockStats(),
+  'owner.flags': () => mockFlagState(),
+  'owner.flag.set': (p) => {
+    const f = mockFlags[p.key];
+    if (!f) throw new Error('Такой флаг из панели не переключается.');
+    const label = (v) => (v ? 'вкл' : 'выкл');
+    const before = f.value;
+    if (p.reset) { f.value = f.envValue; delete f.setAt; } else { f.value = !!p.value; f.setAt = new Date().toISOString(); }
+    const how = p.reset ? `как в .env (${label(f.value)})` : label(f.value);
+    mockFlagHistory.unshift({ at: new Date().toISOString(), text: `${FLAG_TEXT[p.key].env}: ${label(before)} → ${how} · owner@fittrack.demo` });
+    return mockFlagState();
+  },
+  'owner.tariffs': () => mockTariffs(),
+  'owner.tariffs.save': (p) => {
+    const s = p.settings || {};
+    const ints = Object.entries(s).filter(([k, v]) => k !== 'tiers' && Number.isInteger(v));
+    mockTariffSettings = {
+      ...mockTariffSettings,
+      ...Object.fromEntries(ints),
+      tiers: mockTariffSettings.tiers.map((t) => {
+        const x = (s.tiers || []).find((y) => y.key === t.key) || {};
+        return { ...t, upTo: Number.isInteger(x.upTo) ? x.upTo : t.upTo, price: Number.isInteger(x.price) ? x.price : t.price };
+      }),
+    };
+    return mockTariffs();
+  },
+  'owner.trainer.tariff': (p) => {
+    const tiers = mockTariffSettings.tiers;
+    const i = tiers.findIndex((t) => t.key === p.tier);
+    const last = i === tiers.length - 1;
+    mockTrainers = mockTrainers.map((t) => (t.id === p.trainerId ? {
+      ...t, tier: p.tier, tierTitle: tiers[i].title, paidUntil: p.until || null,
+      clientLimit: last ? null : tiers[i].upTo,
+      overLimit: !last && t.activeClients > tiers[i].upTo,
+    } : t));
+    return mockTariffs();
+  },
+  'owner.client.plus': (p) => ({ publicId: p.publicId, name: 'Анна Морозова', plus: !p.revoke, source: 'owner', until: p.until || null }),
   // Сверка денег таблица ↔ сервер (LedgerCheck.jsx): одно расхождение
   'trainer.ledger': () => ({
     state: { open: true, since: daysAgo(4), clients: 5, matched: 4, off: 1 },

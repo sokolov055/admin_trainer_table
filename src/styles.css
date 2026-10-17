@@ -2537,6 +2537,30 @@ th.sticky, td.sticky {
   .trainer-row__actions .button { flex: 1; }
 }
 
+/* Панель владельца «Управление» (Admin.jsx, FT-562) */
+.admin-list { display: grid; gap: var(--space-2); }
+.admin-block { display: grid; gap: var(--space-2); margin-bottom: var(--space-2); }
+.admin-block__head,
+.admin-flag__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.admin-error { display: grid; gap: 3px; }
+.admin-error strong { font-size: var(--text-sm); overflow-wrap: anywhere; }
+.admin-error span { color: var(--text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.admin-tier { display: grid; gap: var(--space-2); }
+.admin-tier__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); }
+.admin-tier__fields > .trainer-row__actions,
+.admin-tier__fields > .note,
+.admin-tier__fields > .state { grid-column: 1 / -1; }
+.admin-tier__fields > .trainer-row__actions { justify-content: flex-end; }
+.admin-save { margin-top: var(--space-3); width: 100%; }
+.admin-trainer,
+.admin-trainer__edit { display: grid; gap: var(--space-3); }
+.admin-trainer > .trainer-row__actions { justify-content: flex-end; }
+.trainer-row__copy .tag { justify-self: start; }
+.admin-trainer__edit .trainer-row__actions,
+.admin-flag .trainer-row__actions { justify-content: flex-end; }
+.admin-flag { display: grid; gap: var(--space-2); }
+.admin-flag__text { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+
 .transfer-card {
   margin: 0 var(--space-4) var(--space-5);
   padding: var(--space-4);

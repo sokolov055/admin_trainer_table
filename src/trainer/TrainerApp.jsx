@@ -29,7 +29,7 @@ import { WorkoutJournal } from '../client/screens.jsx';
 import { Deferred } from '../lazy.js';
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
-import Trainers from './Trainers.jsx';
+import Admin, { ADMIN_PANES } from './Admin.jsx';
 import { screensNote } from '../native-bridge.js';
 import { useSelfCard, selfPick } from './selfCard.js';
 
@@ -90,7 +90,9 @@ const MENU = [
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
   // «Клиентская версия» — не в меню, а кнопкой в карточке каждого клиента
   // (решение владельца 01.10.2026): заходят в неё через карточку
-  { id: 'trainers', label: 'Тренеры', note: 'Заявки на кабинет тренера', Icon: IconKey, owner: true },
+  // Панель владельца сервиса (FT-562): аналитика, тренеры, тарифы, флаги.
+  // Заявки тренеров теперь здесь же — вкладкой «Тренеры»
+  { id: 'admin', label: 'Управление', note: 'Аналитика, тренеры, тарифы, флаги', Icon: IconKey, owner: true },
   { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog, owner: true },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
@@ -134,15 +136,16 @@ const CLIENT_VIEWS = [
 
 export default function TrainerApp({ me }) {
   const owner = isOwner(me);
-  // «Тренеры» — только когда сервер сам сказал owner: true: старый сервер
+  // «Управление» — только когда сервер сам сказал owner: true: старый сервер
   // этих действий не знает, и пункт отвечал бы ошибкой
-  const MENU_ITEMS = forRole(MENU, owner).filter((m) => m.id !== 'trainers' || (me && me.owner === true));
+  const MENU_ITEMS = forRole(MENU, owner).filter((m) => m.id !== 'admin' || (me && me.owner === true));
   const VIEWS = TABS.concat(MENU_ITEMS);
   const DASH = forRole(DASH_PANES, owner);
   const [view, setView] = useState('clients');
   const [clientPane, setClientPane] = useState('active');
   const [dashPane, setDashPane] = useState(DASH[0].value);
   const [libPane, setLibPane] = useState('program');
+  const [adminPane, setAdminPane] = useState(ADMIN_PANES[0].value);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openClient, setOpenClient] = useState(null);
   // С какого раздела открыть карточку: из расписания — сразу «Тренировки»
@@ -196,6 +199,7 @@ export default function TrainerApp({ me }) {
   useViewMotion(clientPane, { direction: byOrder(CLIENT_PANES.map((p) => p.value)), target: paneTarget });
   useViewMotion(dashPane, { direction: byOrder(DASH.map((p) => p.value)), target: paneTarget });
   useViewMotion(libPane, { direction: byOrder(LIBRARY_PANES.map((p) => p.value)), target: paneTarget });
+  useViewMotion(adminPane, { direction: byOrder(ADMIN_PANES.map((p) => p.value)), target: paneTarget });
   const [scheduleRevision, setScheduleRevision] = useState(0);
   const scheduleRequest = useRef(null);
 
@@ -319,6 +323,11 @@ export default function TrainerApp({ me }) {
             <Chips items={LIBRARY_PANES} value={libPane} onChange={switchPane(setLibPane)} variant="nav" />
           </SubNav>
         )}
+        {view === 'admin' && (
+          <SubNav>
+            <Chips items={ADMIN_PANES} value={adminPane} onChange={switchPane(setAdminPane)} variant="nav" />
+          </SubNav>
+        )}
       </header>
 
       {/* «Клиенты» и «Сводка» — свои страницы, и посещённая не
@@ -395,7 +404,7 @@ export default function TrainerApp({ me }) {
         {view === 'journal' && <JournalScreen owner={owner} />}
         {view === 'expenses' && <Expenses />}
         {view === 'logs' && owner && <Logs />}
-        {view === 'trainers' && owner && <Trainers />}
+        {view === 'admin' && owner && <div key={adminPane}><Admin pane={adminPane} /></div>}
         {view === 'settings' && <Settings owner={owner} />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
       </main>

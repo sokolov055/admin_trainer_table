@@ -27,6 +27,7 @@ const output = await build({
       stub(/client[\\/]screens\.jsx$/, 'client-screens');
       stub(/Payments\.jsx$/, 'payments');
       stub(/Library\.jsx$/, 'library');
+      stub(/Admin\.jsx$/, 'admin');
       stub(/stories\.jsx$/, 'stories');
       stub(/AuthTransfer\.jsx$/, 'transfer');
       stub(/Invites\.jsx$/, 'invites');
@@ -66,6 +67,7 @@ const output = await build({
             export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I;`,
         };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
+        if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }];` };
         if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Processes=()=>null;` };
         if (args.path === 'schedule') return { loader: 'jsx', contents: `export default () => null;` };
         if (args.path === 'expenses') return { loader: 'jsx', contents: `export const Expenses=()=>null;` };
@@ -143,7 +145,7 @@ test('тренер не владелец: календарь не пересчи
     .map((node) => node.children.join(''));
   assert.ok(labels.includes('Расходы'));
   assert.ok(!labels.includes('Логи'));
-  assert.ok(!labels.includes('Тренеры'));
+  assert.ok(!labels.includes('Управление'), 'панели владельца у тренера нет');
 
   tree.unmount();
 
@@ -152,7 +154,7 @@ test('тренер не владелец: календарь не пересчи
   });
   const ownerLabels = tree.root.findAll((node) => node.props && node.props.className === 'menu__label')
     .map((node) => node.children.join(''));
-  assert.ok(ownerLabels.includes('Тренеры') && ownerLabels.includes('Логи'), 'у владельца — есть');
+  assert.ok(ownerLabels.includes('Управление') && ownerLabels.includes('Логи'), 'у владельца — есть');
   tree.unmount();
   delete globalThis.__calendarRefreshHarness;
 });
