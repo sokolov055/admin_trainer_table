@@ -154,7 +154,9 @@ test('тренер не владелец: календарь не пересчи
   });
   const ownerLabels = tree.root.findAll((node) => node.props && node.props.className === 'menu__label')
     .map((node) => node.children.join(''));
-  assert.ok(ownerLabels.includes('Управление') && ownerLabels.includes('Логи'), 'у владельца — есть');
+  assert.ok(ownerLabels.includes('Управление'), 'у владельца — есть');
+  // Логи — вкладкой в «Управлении», отдельного пункта меню нет (FT-562)
+  assert.ok(!ownerLabels.includes('Логи'));
   tree.unmount();
   delete globalThis.__calendarRefreshHarness;
 });

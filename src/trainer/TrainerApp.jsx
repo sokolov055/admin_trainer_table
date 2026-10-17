@@ -1,7 +1,7 @@
 import ScheduleStats from './ScheduleStats.jsx';
 import { useReturnScroll } from '../scroll.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clients, Lost, Logs, Settings, ClientCard } from './screens.jsx';
+import { Clients, Lost, Settings, ClientCard } from './screens.jsx';
 import { Finance, Processes } from './Metrics.jsx';
 import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
@@ -22,7 +22,7 @@ import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
-  IconUsers, IconChart, IconLog, IconSliders, IconMenu, IconClose, IconPhone, IconSearch, IconMoney,
+  IconUsers, IconChart, IconSliders, IconMenu, IconClose, IconPhone, IconSearch, IconMoney,
   IconPlan, IconCalendar, IconKey, IconProgress,
 } from '../icons.jsx';
 import { WorkoutJournal } from '../client/screens.jsx';
@@ -76,7 +76,7 @@ const TABS = [
 ];
 
 /*
- * owner — только владельцу сервиса. Логи и заявки тренеров — его хозяйство;
+ * owner — только владельцу сервиса. «Управление» (логи, тренеры) — его хозяйство;
  * другой тренер получил бы на них отказ сервера (api/routes.js, owner).
  */
 const MENU = [
@@ -90,10 +90,9 @@ const MENU = [
   { id: 'expenses', label: 'Расходы', note: 'Аренда, реклама — всё, что съедает прибыль', Icon: IconMoney },
   // «Клиентская версия» — не в меню, а кнопкой в карточке каждого клиента
   // (решение владельца 01.10.2026): заходят в неё через карточку
-  // Панель владельца сервиса (FT-562): аналитика, тренеры, тарифы, флаги.
-  // Заявки тренеров теперь здесь же — вкладкой «Тренеры»
-  { id: 'admin', label: 'Управление', note: 'Аналитика, тренеры, тарифы, флаги', Icon: IconKey, owner: true },
-  { id: 'logs', label: 'Логи', note: 'Платежи, пересчёты, переносы', Icon: IconLog, owner: true },
+  // Панель владельца сервиса (FT-562): аналитика, тренеры, тарифы, флаги,
+  // логи. Заявки тренеров и журнал действий теперь здесь же — вкладками
+  { id: 'admin', label: 'Управление', note: 'Аналитика, тренеры, тарифы, флаги, логи', Icon: IconKey, owner: true },
   { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
 ];
 
@@ -403,7 +402,6 @@ export default function TrainerApp({ me }) {
         {view === 'my-workouts' && <MyWorkouts />}
         {view === 'journal' && <JournalScreen owner={owner} />}
         {view === 'expenses' && <Expenses />}
-        {view === 'logs' && owner && <Logs />}
         {view === 'admin' && owner && <div key={adminPane}><Admin pane={adminPane} /></div>}
         {view === 'settings' && <Settings owner={owner} />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
