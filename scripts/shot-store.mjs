@@ -92,6 +92,10 @@ if (SCENES.includes('client')) {
     await shot('c-rest');
     await page.getByRole('button', { name: 'Свернуть таймер' }).click();
     await shot('c-workout-after');
+    // Кнопки оценки поднять над свёрнутым таймером: вырезка для карточки
+    // «Было легко» — без плашки «Отдых» поверх
+    await page.evaluate(() => window.scrollBy(0, 400));
+    await shot('c-workout-after-up');
   });
   await page.close();
 }
