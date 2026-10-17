@@ -40,10 +40,10 @@ export function ConsentChecks({ value, onChange, disabled }) {
 }
 
 /**
- * Заявка тренера (LoginScreen.jsx). Свои условия: тренер — не клиент, он
- * ведёт в сервисе данные своих клиентов. Текст — trainer-terms.html, по
- * итогам юридической проверки; до неё регистрация на сервере выключена
- * (TRAINER_SIGNUP), и сюда никто не попадает.
+ * Заявка тренера (LoginScreen.jsx). Свои документы: тренер — не клиент.
+ * Согласие — trainer-consent.html (анкета, тест, созвон, кабинет; FT-548),
+ * условия — trainer-terms.html (отбор, профиль, данные его клиентов). До
+ * включения TRAINER_SIGNUP сюда никто не попадает.
  */
 export function TrainerConsentChecks({ value, onChange, disabled }) {
   const set = (key) => (event) => onChange({ ...value, [key]: event.target.checked });
@@ -52,7 +52,8 @@ export function TrainerConsentChecks({ value, onChange, disabled }) {
       <label className="consent__line">
         <input type="checkbox" checked={!!value.consent} onChange={set('consent')} disabled={disabled} />
         <span>
-          Даю <a href={BASE + 'consent.html'} target="_blank" rel="noopener noreferrer">согласие на обработку персональных данных</a>
+          Даю <a href={BASE + 'trainer-consent.html'} target="_blank" rel="noopener noreferrer">согласие на обработку персональных данных</a> для
+          отбора и работы в кабинете тренера
         </span>
       </label>
       <label className="consent__line">
