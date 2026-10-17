@@ -38,6 +38,7 @@ const output = await build({
       // Экран рациона подменён намеренно: проверяется не он, а то, открылся
       // он вообще или нет.
       bundle.onResolve({ filter: /Ration\.jsx$/ }, () => ({ path: 'ration', namespace: 'stub' }));
+      bundle.onResolve({ filter: /\/Diary\.jsx$/ }, () => ({ path: 'diary', namespace: 'stub' }));
       bundle.onResolve({ filter: /RationSummary\.jsx$/ }, () => ({ path: 'ration-summary', namespace: 'stub' }));
       // Права по тарифу — из globalThis.__rights; правила hasPlus/isPro
       // проверяются отдельно, на настоящем rights.js (внизу)
@@ -69,6 +70,7 @@ const output = await build({
           loader: 'jsx',
           contents: `import React from 'react'; export default () => <div>workout</div>;`,
         };
+        if (args.path === 'diary') return { loader: 'jsx', contents: `import React from 'react'; export default () => <div>diary-screen</div>;` };
         return {
           loader: 'jsx',
           contents: `import React from 'react'; export default () => <div>ration-screen</div>;`,
@@ -183,13 +185,13 @@ test('с «Плюсом» и без прав от сервера — как бы
 test('тренер на «Старте» не видит рацион клиента, проба остаётся', async () => {
   globalThis.__rights = { on: true, pro: false };
   const tree = await render({ clientRow: 17 });
-  assert.ok(!whole(tree).includes('ration-summary'), 'сводка ведёт к отказу API');
+  assert.ok(!whole(tree).includes('diary-screen'), 'сводка ведёт к отказу API');
   assert.ok(button(tree, 'Попробовать — пробный режим'));
   tree.unmount();
 
   globalThis.__rights = { on: true, pro: true };
   const paid = await render({ clientRow: 17 });
-  assert.ok(whole(paid).includes('ration-summary'));
+  assert.ok(whole(paid).includes('diary-screen'));
   paid.unmount();
   globalThis.__rights = null;
 });

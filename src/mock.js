@@ -19,6 +19,7 @@ import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.
 import { workoutMock } from './workout-mock.js';
 import { onboardingMock, firstStepsMock, focusMock } from './onboarding-mock.js';
 import { isoDay } from './online.js';
+import { diaryMock } from './nutrition/diary-mock.js';
 
 const daysAgo = (n) => {
   const d = new Date();
@@ -2131,7 +2132,8 @@ function setDemoLoginRole(role) {
 
 export function mockApi(action, params) {
   const role = new URLSearchParams(window.location.search).get('mockRole') || demoLoginRole() || 'client';
-  const handler = action.includes('.onboarding.') ? p => onboardingMock(action, p, mockCompute)
+  const handler = action.startsWith('diary.') || action === 'food.add' ? p => diaryMock(action, p)
+    : action.includes('.onboarding.') ? p => onboardingMock(action, p, mockCompute)
     : action === 'client.focus' ? () => focusMock(nutrition, mockCompute)
     : action.startsWith('client.firstSteps.') ? p => firstStepsMock(action, p)
     : action.startsWith('workout.') ? p => workoutMock(action, p) : MOCK[action];

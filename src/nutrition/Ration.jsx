@@ -10,6 +10,8 @@ import {
   portionWeight, per100, extraTotals, remainingTarget, addTotals,
 } from './match.js';
 import Extras from './Extras.jsx';
+import { DiaryEntryForm } from './Diary.jsx';
+import { mealFromRecipe } from './diary-model.js';
 import { EGG_SIZES, getEggSize, saveEggSize, pieceLabel, mlLabel } from './pieces.js';
 
 /** Размер яиц, выбранный человеком: по нему «110 г» показываются как «2 яйца» */
@@ -577,14 +579,14 @@ function Bar({ label, value, goal, unit }) {
   );
 }
 
-function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSize, onOther, onRestart, onPantry }) {
+function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSize, onOther, onRestart, onPantry, onEat }) {
   // Своё может закрыть норму целиком — тогда блюд не остаётся, и это не ошибка
   const plan = variants.length ? variants[index % variants.length] : { dishes: [], totals: { kcal: 0, protein: 0, fat: 0, carbs: 0 } };
   const list = useMemo(() => shoppingList(plan.dishes, pantry), [plan, pantry]);
   const groups = useMemo(foodByGroup, []);
 
   // Итог дня — блюда плюс своё; с нормой сравнивается всё вместе
-  const totals = addTotals(plan.totals, eaten);
+  const totals = onEat ? plan.totals : addTotals(plan.totals, eaten);
   const shortfall = totals.kcal - Math.round(targets.kcal);
   const badly = targets.kcal > 0 && Math.abs(shortfall) / targets.kcal > OFF_TARGET;
 
@@ -605,11 +607,11 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
         <Panel pad>
           <div className="day__lead">
             <span className="day__kcal">{formatNumber(totals.kcal)}</span>
-            <span className="day__unit">ккал за день</span>
+            <span className="day__unit">{onEat ? 'ккал в оставшемся плане' : 'ккал за день'}</span>
           </div>
           {eaten.kcal > 0 && (
             <p className="small muted" style={{ margin: '0 0 var(--space-2)' }}>
-              из них своё — {formatNumber(eaten.kcal)} ккал, блюда подобраны под остаток
+              {onEat ? 'Уже записано съеденным: ' : 'из них своё — '}{formatNumber(eaten.kcal)} ккал, блюда подобраны под остаток
             </p>
           )}
           <Bar label="Белки" value={totals.protein} goal={targets.protein} unit=" г" />
@@ -664,6 +666,7 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
                       {dish.servings !== 1 && <span className="day__servings">{servingLabel(dish.servings)}</span>}
                     </p>
                     <Recipe recipe={dish.recipe} />
+                    {onEat && <button type="button" className="button button--primary diary-plan-eat" onClick={() => onEat(dish.recipe, dish.servings)}>Съел — записать порцию</button>}
                   </div>
                 </div>
               );
@@ -756,7 +759,19 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
 
 // trial — тренер пробует раздел: всё то же, но на своём устройстве и
 // без записи в общую базу продуктов
-export default function Ration({ targets, onClose, trial = false }) {
+export default function Ration({ targets: calculatedTargets, onClose, trial = false, diaryDay, consumed }) {
+  const diaryMode = !trial && !!diaryDay;
+  const [diaryTotals, setDiaryTotals] = useState(consumed);
+  const [diaryTargets, setDiaryTargets] = useState(null);
+  const targets = diaryMode && diaryTargets ? diaryTargets : calculatedTargets;
+  const [recordMeal, setRecordMeal] = useState(null);
+  const [diaryMessage, setDiaryMessage] = useState('');
+  useEffect(() => {
+    if (!diaryMode) return undefined;
+    let alive = true;
+    apiPublic('diary.get', { day: diaryDay }).then(data => { if (alive) { setDiaryTotals(data.totals); setDiaryTargets(data.targets); } }).catch(error => { if (alive) setDiaryMessage('Не удалось загрузить дневник: ' + error.message + ' Подбор пока рассчитан на полную норму.'); });
+    return () => { alive = false; };
+  }, [diaryMode, diaryDay]);
   const key = trial ? TRIAL_STORE : STORE;
   const saved = useMemo(() => load(key), [key]);
   const [pantry, setPantry] = useState(() => saved.pantry || defaultPantry());
@@ -839,7 +854,7 @@ export default function Ration({ targets, onClose, trial = false }) {
     return () => clearTimeout(timer);
   }, [pantry, liked, seen, synced, trial]);
 
-  const eaten = useMemo(() => extraTotals(extras), [extras]);
+  const eaten = useMemo(() => diaryMode ? diaryTotals || { kcal: 0, protein: 0, fat: 0, carbs: 0 } : extraTotals(extras), [extras, diaryTotals, diaryMode]);
   const rest = useMemo(() => remainingTarget(targets, eaten), [targets, eaten]);
 
   const addExtra = ({ product, grams, pieces }) => {
@@ -922,6 +937,8 @@ export default function Ration({ targets, onClose, trial = false }) {
   return (
     <EggContext.Provider value={eggSize}>
     <div className="ration">
+      {diaryMessage && <Note tone="info">{diaryMessage}</Note>}
+      {recordMeal && <DiaryEntryForm product={{ ...recordMeal.recipe.per, kind: 'dish', id: recordMeal.recipe.id, name: recordMeal.recipe.name, unit: 'portion', source: 'Рецепт тренера · одна порция' }} amount={recordMeal.servings} meal={mealFromRecipe(recordMeal.recipe.meal)} day={diaryDay} onClose={() => setRecordMeal(null)} onSaved={async (message) => { setRecordMeal(null); setDiaryMessage(typeof message === 'string' ? message : 'Порция записана в дневник.'); try { const fresh = await apiPublic('diary.get', { day: diaryDay }); setDiaryTotals(fresh.totals); } catch { setDiaryMessage('Порция сохранена. Откройте дневник для обновлённых итогов.'); } }} />}
       <div className="ration__head">
         <button
           type="button"
@@ -998,12 +1015,13 @@ export default function Ration({ targets, onClose, trial = false }) {
         <Day
           variants={variants}
           index={variant}
-          targets={targets}
+          targets={diaryMode ? rest : targets}
           pantry={pantry}
           eaten={eaten}
           eggSize={eggSize}
           onEggSize={pickEggs}
-          extras={(
+          onEat={diaryMode ? (recipe, servings) => setRecordMeal({ recipe, servings }) : undefined}
+          extras={diaryMode ? null : (
             <Extras extras={extras} products={products} onAdd={addExtra} onRemove={removeExtra} trial={trial} />
           )}
           onOther={() => setVariant((n) => n + 1)}

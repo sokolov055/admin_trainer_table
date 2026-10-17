@@ -13,7 +13,7 @@ import { extraTotals } from './match.js';
  * что у него дома и какие блюда ему нравятся. Только чтение — рацион
  * меняет сам клиент.
  */
-export default function RationSummary({ clientRow }) {
+export default function RationSummary({ clientRow, plannerOnly = false }) {
   const { loading, data: raw } = useData('ration.summary', { clientRow }, [clientRow]);
   // Названия блюд — из каталога сервера (там и новые); встроенный — запасной
   const catalog = useCatalogData('dishes.list', {}, []);
@@ -41,7 +41,7 @@ export default function RationSummary({ clientRow }) {
 
   return (
     <>
-      <Section title="Сверх плана сегодня" note={data.extras.length ? formatNumber(eaten.kcal) + ' ккал' : undefined}>
+      {!plannerOnly && <Section title="Сверх плана сегодня" note={data.extras.length ? formatNumber(eaten.kcal) + ' ккал' : undefined}>
         <Panel>
           {data.extras.length
             ? (
@@ -56,9 +56,9 @@ export default function RationSummary({ clientRow }) {
             )
             : <p className="small muted" style={{ margin: 0, padding: 'var(--space-4)' }}>Сегодня ничего сверх подобранного.</p>}
         </Panel>
-      </Section>
+      </Section>}
 
-      {data.frequent.length > 0 && (
+      {!plannerOnly && data.frequent.length > 0 && (
         <Section title="Что ест чаще" note="за 30 дней">
           <Panel>
             <Rows>
