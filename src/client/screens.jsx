@@ -39,6 +39,7 @@ import { useRights, hasPlus, isPro, setRights } from '../rights.js';
 // редактор программы и шаблоны — только тренеру
 export const WorkoutJournal = lazyPage(() => import('../Workout.jsx'));
 export const Ration = lazyPage(() => import('../nutrition/Ration.jsx'));
+const NutritionDiary = lazyPage(() => import('../nutrition/Diary.jsx'));
 export const PlanEditor = lazyPage(() => import('../trainer/PlanEditor.jsx'));
 const TemplateApply = lazyPage(() => import('../trainer/Library.jsx'), 'TemplateApply');
 const SaveAsTemplate = lazyPage(() => import('../trainer/Library.jsx'), 'SaveAsTemplate');
@@ -2172,6 +2173,7 @@ export function Nutrition({ clientRow, clientView = false }) {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(null);
   const [ration, setRation] = useState(false);
+  const [diaryPlan, setDiaryPlan] = useState(null);
   // Проба тренера: тот же раздел, но на своём устройстве (см. Ration trial)
   const [trial, setTrial] = useState(false);
   // Рацион — в «Плюсе» клиента и на платной ступени тренера (FT-545)
@@ -2231,8 +2233,8 @@ export function Nutrition({ clientRow, clientView = false }) {
   // В режиме просмотра он не открывается совсем (см. ниже про clientView):
   // открытый, он показал бы тренеру его собственный холодильник под именем
   // клиента.
-  if (ration && configured && !clientView && !byTrainer) {
-    return <Deferred fallback={waiting}><Ration targets={targets} onClose={() => setRation(false)} /></Deferred>;
+  if (ration && (configured || diaryPlan?.targets?.kcal) && !clientView && !byTrainer) {
+    return <Deferred fallback={waiting}><Ration targets={diaryPlan?.targets || targets} onClose={() => setRation(false)} diaryDay={diaryPlan?.day || new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10)} consumed={diaryPlan?.totals} /></Deferred>;
   }
   if (trial && configured) {
     return <Deferred fallback={waiting}><Ration targets={targets} trial onClose={() => setTrial(false)} /></Deferred>;
@@ -2250,9 +2252,10 @@ export function Nutrition({ clientRow, clientView = false }) {
   return (
     <>
       <GoalBanner clientRow={clientRow} clientView={clientView} section="nutrition" />
+      {!editing && (clientRow ? isPro(rights) : hasPlus(rights)) && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow} preview={clientView} targets={targets} onPlan={!clientRow && hasPlus(rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
       {configured && (
         <Lead
-          label="Суточная норма"
+          label="Расчёт по анкете"
           value={formatNumber(targets.kcal) + ' ккал'}
           hint={survey && survey.goalLabel ? survey.goalLabel : undefined}
           facts={[
@@ -2311,7 +2314,8 @@ export function Nutrition({ clientRow, clientView = false }) {
           но не открывается. Открытый, он брал бы продукты и выбор блюд с
           устройства ТРЕНЕРА и показывал их как рацион клиента: экран из
           чужой еды, посчитанный под чужую норму. */}
-      {!editing && byTrainer && isPro(rights) && <RationSummary clientRow={clientRow} />}
+
+      {!editing && byTrainer && isPro(rights) && <RationSummary clientRow={clientRow} plannerOnly />}
 
       {configured && !editing && byTrainer && (
         <Section title="Как это видит клиент">

@@ -471,6 +471,8 @@ async function tryEndpoint(url, payload, timeoutMs) {
     return await postJson(url, payload, timeoutMs);
   } catch (error) {
     if (error && error.name === 'AbortError') return TIMED_OUT;
+    // Дневник содержит данные о питании и комментарии: в URL их не переносим.
+    if (String(payload.action || '').startsWith('diary.') || (Array.isArray(payload.requests) && payload.requests.some(r => String(r.action || '').startsWith('diary.')))) return null;
     try {
       return await getJson(url, payload, timeoutMs);
     } catch (_) {
@@ -592,7 +594,7 @@ function notifyMutated() {
 }
 
 /** Программы, журнал, библиотека и семья — только основной сервер */
-const TRAINING_ACTION = /^(client\.plan|workout\.|plan\.|library\.|family\.)/;
+const TRAINING_ACTION = /^(client\.plan|workout\.|plan\.|library\.|family\.|diary\.)/;
 
 function trainingAction(action, params) {
   if (TRAINING_ACTION.test(action)) return true;

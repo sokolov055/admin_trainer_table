@@ -20,6 +20,11 @@ import { dbDelete, dbGet, dbList, dbPut } from './offline-db.js';
 import { offlineAccount } from './offline-account.js';
 
 const KINDS = {
+  diaryEntry: {
+    action: 'diary.entry.save',
+    key: (p) => 'diary:' + String(p.requestId),
+    merge: (_old, next) => next,
+  },
   measure: {
     action: 'measure.create',
     key: (p) => 'm:' + String(p.sheetName || '') + ':' + String(p.date || ''),
