@@ -979,7 +979,7 @@ test('FT-567: видимый «назад» и Back браузера на экр
     await phone.locator('text=Тренировок в неделю').locator('xpath=..').getByText('3', { exact: true }).first().click();
     await phone.getByText('Похудение', { exact: true }).first().click();
     await phone.getByRole('button', { name: 'Посчитать норму' }).click();
-    const build = phone.getByRole('button', { name: 'Собрать рацион' });
+    const build = phone.getByRole('button', { name: 'План меню', exact: true });
     await build.waitFor({ timeout: 10000 });
     {
       await build.click();
