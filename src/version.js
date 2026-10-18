@@ -13,4 +13,4 @@
  * Правило номера — рядом с TOPICS в stories.jsx: обычная функция поднимает
  * вторую цифру, большое обновление — первую.
  */
-export const APP_VERSION = '4.0';
+export const APP_VERSION = '4.1';
