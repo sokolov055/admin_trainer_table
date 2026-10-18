@@ -837,7 +837,7 @@ function Exercises() {
           </div>
           <div className="item__meta">
             {[e.muscle, e.equipment].filter(Boolean).length > 0 && <span>{[e.muscle, e.equipment].filter(Boolean).join(' · ')}</span>}
-            {e.media && <Tag>{e.media.kind === 'animation' ? 'анимация' : 'видео'}</Tag>}
+            {e.media && <Tag>{e.media.kind === 'animation' ? 'анимация' : e.media.kind === 'clip' ? 'ролик 3D' : 'видео'}</Tag>}
             {e.setup && (e.setupOk ? <Tag>настройка</Tag> : data.owner && <Tag tone="warn">настройка на проверке</Tag>)}
             {e.machines && e.machines.length > 0 && <Tag>{e.machines.length + ' ' + plural(e.machines.length, 'тренажёр', 'тренажёра', 'тренажёров')}</Tag>}
           </div>
@@ -1274,7 +1274,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
 
         {/* Видео показывается само; правка — касанием по подписи */}
         {e.media && <Media media={e.media} />}
-        {row('media', 'Видео', e.media ? (e.media.kind === 'link' ? e.media.url : e.media.kind === 'file' ? 'Своё видео' : 'Анимация') : null,
+        {row('media', 'Видео', e.media ? (e.media.kind === 'link' ? e.media.url : e.media.kind === 'file' ? 'Своё видео' : e.media.kind === 'clip' ? 'Ролик с манекеном' : 'Анимация') : null,
           () => ({ link: e.media?.kind === 'link' ? e.media.url : '' }), () => <>
             <Field label="Ссылка" inputMode="url" value={draft.link} onChange={(v) => set({ link: v })} placeholder="https://…" hint="Клиент увидит кнопку «Открыть видео». Чтобы видео играло прямо в приложении, загрузите файл." />
             <label className="field">

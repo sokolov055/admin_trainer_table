@@ -5918,3 +5918,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .alt-chip__x { border: 0; border-left: 1px solid var(--border); background: none; color: var(--text-muted); font-size: 18px; line-height: 1; width: 40px; flex: none; cursor: pointer; }
 .alt-chip__name:focus-visible, .alt-chip__x:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Ролик с манекеном: квадрат 540×540 на белом фоне, крутится сам */
+.library__clip { position: relative; display: block; width: 100%; max-width: 420px; margin: 0 auto; aspect-ratio: 1 / 1; border: 0; padding: 0; border-radius: var(--radius); overflow: hidden; background: #fff; cursor: pointer; }
+.library__clip video { width: 100%; height: 100%; object-fit: contain; display: block; }

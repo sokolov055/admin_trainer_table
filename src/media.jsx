@@ -62,6 +62,7 @@ export function Animation({ id }) {
 export function Media({ media }) {
   if (!media) return null;
   if (media.kind === 'animation') return <Animation id={media.url} />;
+  if (media.kind === 'clip') return <Clip url={media.url} />;
   if (media.kind === 'file') return <FileVideo url={media.url} />;
   // Чужой плеер (YouTube и др.) не встраиваем (14.10.2026): он грузится сам
   // при открытии карточки и передаёт адрес клиента за рубеж без его действия.
@@ -69,6 +70,28 @@ export function Media({ media }) {
   return <a className="button button--block" href={media.url} target="_blank" rel="noreferrer">Открыть видео</a>;
 }
 
+
+/**
+ * Ролик техники с 3D-манекеном на тренажёре (18.10.2026): короткий, без
+ * звука, крутится сам, как анимация. Касание — пауза. Тем, кто просил
+ * систему меньше двигать, сам не запускается.
+ */
+function Clip({ url }) {
+  const [still] = useState(prefersStill);
+  const [paused, setPaused] = useState(still);
+  const toggle = (e) => {
+    const v = e.currentTarget.querySelector('video');
+    if (!v) return;
+    if (v.paused) { v.play().catch(() => {}); setPaused(false); } else { v.pause(); setPaused(true); }
+    haptic();
+  };
+  return (
+    <button type="button" className="library__clip" aria-label={paused ? 'Показать движение' : 'Остановить ролик'} onClick={toggle}>
+      <video src={mediaUrl(url)} autoPlay={!still} muted loop playsInline preload="auto" disablePictureInPicture />
+      {paused && <span className="library__anim-note">Нажмите — покажу движение</span>}
+    </button>
+  );
+}
 
 /** Видео-файл с сервера; скачанное заранее — с телефона, без сети тоже (FT-566) */
 function FileVideo({ url }) {
