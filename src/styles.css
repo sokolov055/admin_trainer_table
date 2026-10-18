@@ -3267,48 +3267,13 @@ code {
   line-height: 1.4;
 }
 
-.access-link__more { margin-top: var(--space-3); }
-
-.access-link__more > summary {
-  display: flex;
-  align-items: center;
-  min-height: 36px;
-  cursor: pointer;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-}
-
-.access-link__more[open] > summary { margin-bottom: var(--space-3); }
-
 .access-link__row {
   display: flex;
   align-items: stretch;
   gap: var(--space-2);
 }
 
-.access-link__url {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken, var(--fill));
-  color: var(--text);
-  font: inherit;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-}
-
 .access-link__copy { flex: none; min-height: 44px; }
-
-.access-link__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
 
 .access-link__hint {
   margin: var(--space-3) 0 0;
@@ -4091,7 +4056,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .manage .access-link__invite,
 .manage .access-link__copy { flex: 1 1 12rem; width: auto; min-height: 44px; }
 .manage .access-link__state { margin: var(--space-2) 0 0; }
-.manage .access-link__url { width: 100%; }
 
 /* «?» у связи по ID: подсказка раскрывается касанием, наведения на телефоне нет */
 .link-existing__head { display: flex; align-items: center; gap: var(--space-1); }

@@ -7,8 +7,9 @@ import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 
 /**
- * Ссылка доступа клиента — поле с кнопкой «Копировать» (владелец,
- * 16.10.2026): касание выделяет весь адрес, кнопка кладёт его в буфер.
+ * Ссылка доступа клиента: «Отправить приглашение» и одна «Скопировать
+ * ссылку» (FT-614 — раскрытия «Ссылка и доступ» с полем адреса нет).
+ * Текст приглашения — по шагам, ссылка внутри текста.
  */
 
 // В Node старше 21 глобального navigator нет (компонент читает navigator.share)
@@ -39,16 +40,15 @@ const { ClientInviteLink } = mod.exports;
 const text = (node) => (typeof node === 'string' ? node : (node.children || []).map(text).join(''));
 const delay = () => new Promise((r) => setTimeout(r, 10));
 
-test('ссылка — поле только для чтения с выделением и кнопкой «Скопировать ссылку»', async () => {
+test('FT-614: одна «Скопировать ссылку», без раскрытия и поля с адресом', async () => {
   let tree;
   await act(async () => { tree = renderer.create(React.createElement(ClientInviteLink, { client: { row: 5, name: 'Никита' } })); await delay(); });
-  const field = tree.root.findByProps({ 'aria-label': 'Ссылка для входа' });
-  assert.equal(field.type, 'input');
-  assert.equal(field.props.value, URL_);
-  assert.equal(field.props.readOnly, true);
-  let selected = 0;
-  field.props.onFocus({ currentTarget: { select: () => { selected += 1; } } });
-  assert.equal(selected, 1, 'касание выделяет весь адрес');
+  assert.equal(tree.root.findAllByType('details').length, 0, 'раскрытия «Ссылка и доступ» нет');
+  assert.equal(tree.root.findAllByType('input').length, 0, 'поля с адресом нет');
+  const labels = tree.root.findAllByType('button').map(text);
+  assert.equal(labels.filter((l) => /Скопировать ссылку/.test(l)).length, 1, 'копирует одна кнопка');
+  assert.ok(!labels.some((l) => /Новая ссылка|Отозвать/.test(l)), 'перевыпуска и отзыва здесь нет');
+  assert.ok(text(tree.root).includes('Входов: 3 из 5'), 'строка состояния под кнопками');
 
   const button = () => tree.root.findAllByType('button').find((b) => /Скопировать ссылку|Скопировано/.test(text(b)));
   assert.equal(text(button()), 'Скопировать ссылку');
@@ -80,4 +80,28 @@ test('FT-613: «Скопировать ссылку» и до приглашен
     globalThis.__access.shareAccessLink = savedShare;
     if (tree) tree.unmount();
   }
+});
+
+test('FT-614: приглашение — по шагам, на «ты», ссылка внутри текста', async () => {
+  const { inviteMessage, shareAccessLink, APP_STORE_URL, ANDROID_APK_URL } = await import('../src/access.js');
+  const message = inviteMessage(URL_);
+  assert.ok(message.startsWith('Твой личный кабинет в Fit Track'), 'без приветствия');
+  assert.ok(!/Здравствуйте|вас|ваш/.test(message), 'на «ты»');
+  const steps = [APP_STORE_URL, ANDROID_APK_URL, URL_, 'Ссылка личная'].map((part) => message.indexOf(part));
+  assert.ok(steps.every((at) => at >= 0), 'App Store, APK, ссылка и предупреждение — в тексте');
+  assert.deepEqual([...steps].sort((a, b) => a - b), steps, 'по порядку: установить, потом ссылка');
+  assert.ok(inviteMessage(URL_, 'Светлана').startsWith('Светлана, это твой личный кабинет'), 'у сплита — имя участника');
+
+  let shared;
+  const result = await shareAccessLink(URL_, '', { share: async (data) => { shared = data; } });
+  assert.equal(result, 'shared');
+  assert.equal(shared.url, undefined, 'адрес не отдельным полем — мессенджер не переставит шаги');
+  assert.equal(shared.text, message);
+
+  let clip;
+  // copyText берёт document параметром по умолчанию — в Node его нет
+  if (typeof document === 'undefined') globalThis.document = {};
+  const copiedResult = await shareAccessLink(URL_, '', { clipboard: { writeText: async (t) => { clip = t; } } });
+  assert.equal(copiedResult, 'copied');
+  assert.equal(clip, message, 'на компьютере в буфер — всё сообщение, ссылка уже внутри');
 });

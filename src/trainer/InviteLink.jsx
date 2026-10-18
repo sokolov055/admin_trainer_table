@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
-import { copyText, createClientLink, fetchClientLink, revokeClientLink, shareAccessLink } from '../access.js';
-import { formatDate } from '../ui.jsx';
+import { copyText, createClientLink, fetchClientLink, shareAccessLink } from '../access.js';
 import { haptic } from '../telegram.js';
-import { IconAlert, IconCheck, IconCopy, IconRefresh, IconSend, IconTrash } from '../icons.jsx';
+import { IconAlert, IconCheck, IconCopy, IconRefresh, IconSend } from '../icons.jsx';
 
 /**
  * Приглашение клиента в приложение — прямо из его карточки.
@@ -17,18 +16,14 @@ import { IconAlert, IconCheck, IconCopy, IconRefresh, IconSend, IconTrash } from
  * переписку, отправляет клиенту ровно то, что отправлял раньше, и старая
  * ссылка не перестаёт работать у того, кто её уже получил.
  *
- * Выданная ссылка свёрнута. Карточка открывается ради тренировок, оплат и
- * замеров, а адрес на три строки, три кнопки и строка состояния стояли
- * поверх всего этого при каждом заходе — при том что отправляют ссылку
- * один раз. Снаружи остаётся то, ради чего сюда возвращаются: «Отправить»
- * и короткая строка о том, дошло ли до человека. Сам адрес, перевыпуск и
- * отзыв — под раскрытием: читать адрес глазами незачем, а перевыпускать и
- * отзывать случайным касанием тем более.
+ * Здесь только две кнопки и строка о том, дошло ли до человека.
+ * «Скопировать ссылку» — отдельной кнопкой и всегда на виду (FT-613):
+ * бывает, что нужна только ссылка — вставить в свою переписку, — без
+ * текста приглашения. Ссылки ещё нет — кнопка её выпустит и скопирует.
  *
- * «Скопировать ссылку» — отдельной кнопкой рядом с приглашением и всегда
- * на виду (FT-613): бывает, что нужна только ссылка — вставить в свою
- * переписку, — без текста приглашения. Ссылки ещё нет — кнопка её
- * выпустит и скопирует.
+ * Раскрытия «Ссылка и доступ» больше нет (FT-614): поле с адресом
+ * повторяло «Скопировать ссылку», отзыв ссылки делает «Закрыть все
+ * входы», а новую ссылку после него выпускает само приглашение.
  */
 
 // member/memberName — ссылка для одного участника сплита: вход в кабинет
@@ -37,8 +32,6 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
   const [state, setState] = useState({ loading: true, link: null, error: null });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
-  const [confirmRevoke, setConfirmRevoke] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   // Адрес скопирован кнопкой рядом с ним — подпись держится пару секунд
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -75,25 +68,13 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
   const create = (then = 'send') => run(async () => {
     const data = await createClientLink(client.row, {}, member);
     setState({ loading: false, link: data.link, error: null });
-    setConfirmRevoke(false);
     haptic('success');
     if (then === 'copy') {
       await copyText(data.link.url);
       setCopied(true);
       return;
     }
-    // Только что выпущенную ссылку показываем развёрнутой: тренер сам её
-    // и запросил, и первое, что он захочет, — убедиться, что она есть.
-    setExpanded(true);
     await send(data.link);
-  });
-
-  const revoke = () => run(async () => {
-    await revokeClientLink(client.row, {}, member);
-    setState({ loading: false, link: null, error: null });
-    setConfirmRevoke(false);
-    setNote('Ссылка отозвана. Уже открытые кабинеты остались — их закрывает «Закрыть все входы».');
-    haptic();
   });
 
   const copy = (link) => run(async () => {
@@ -163,46 +144,6 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
             {copyButton(() => copy(link))}
           </div>
           <p className="access-link__state">{describeUses(link)}</p>
-
-          <details
-            className="access-link__more"
-            open={expanded}
-            onToggle={(event) => setExpanded(event.currentTarget.open)}
-          >
-            <summary>Ссылка и доступ</summary>
-
-            {/* Поле, а не текст (владелец, 16.10.2026): касание выделяет весь
-                адрес. Копирует его кнопка «Скопировать ссылку» выше — она
-                на виду всегда (FT-613) */}
-            <input
-              className="access-link__url"
-              type="text"
-              readOnly
-              value={link.url}
-              aria-label="Ссылка для входа"
-              onFocus={(event) => event.currentTarget.select()}
-            />
-
-            <div className="access-link__actions">
-              <button className="button" onClick={() => create('send')} disabled={busy}>
-                <IconRefresh size={16} />
-                Новая ссылка
-              </button>
-              <button
-                className={'button' + (confirmRevoke ? ' button--critical' : '')}
-                onClick={() => (confirmRevoke ? revoke() : setConfirmRevoke(true))}
-                disabled={busy}
-              >
-                <IconTrash size={16} />
-                {confirmRevoke ? 'Подтвердить' : 'Отозвать'}
-              </button>
-            </div>
-
-            <p className="access-link__hint">
-              Действует до {formatDate(link.expiresAt)}
-              {link.lastUsedAt ? ` · последний вход ${formatDate(link.lastUsedAt)}` : ''}
-            </p>
-          </details>
         </>
       )}
 

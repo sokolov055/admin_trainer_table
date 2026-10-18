@@ -94,21 +94,39 @@ export async function createClient(name, deps = {}) {
   return result;
 }
 
+export const APP_STORE_URL = 'https://apps.apple.com/ru/app/id6816619723';
+export const ANDROID_APK_URL = 'https://api.fitness100.ru/android/fit-track.apk';
+
 /**
- * Текст приглашения (FT-613, владелец 18.10.2026: прежнее «Ваш кабинет с
- * тренировками» ничего не объясняло). Сказать, что это, что внутри и что
- * делать: открыть ссылку — пароль не нужен. И что ссылка личная: по ней
- * входят без пароля, пересланная — вход для другого человека.
+ * Текст приглашения — инструкция по шагам (FT-614, владелец 19.10.2026):
+ * без приветствия, на «ты». Сначала поставить приложение, потом открыть
+ * ссылку — она откроет приложение сразу в кабинете клиента (applinks на
+ * iPhone, autoVerify на Android). И что ссылка личная: по ней входят без
+ * пароля, пересланная — вход для другого человека.
+ *
+ * Ссылка — внутри текста, последней строкой перед предупреждением, а не
+ * отдельным полем «Поделиться»: мессенджеры сами решают, куда приклеить
+ * отдельный адрес, и шаги шли бы не по порядку.
  *
  * Имя — только у участника сплита: там у каждого своя ссылка, и важно,
- * кому какая. Полное ФИО из карточки в обращении звучит как повестка,
- * поэтому одиночному клиенту — просто «Здравствуйте!».
+ * кому какая.
  */
-export function inviteMessage(memberName) {
-  return (memberName ? memberName + ', здравствуйте!' : 'Здравствуйте!')
-    + ' Приглашаю вас в Fit Track — там ваша программа, записи тренировок и прогресс.'
-    + ' Откройте ссылку: кабинет откроется сразу, пароль не нужен.'
-    + ' Ссылка личная — не пересылайте её.';
+export function inviteMessage(url, memberName) {
+  const lead = memberName
+    ? memberName + ', это твой личный кабинет в Fit Track'
+    : 'Твой личный кабинет в Fit Track';
+  return [
+    lead + ': программа тренировок, записи подходов и прогресс.',
+    '',
+    '1. Установи приложение.',
+    'iPhone — из App Store: ' + APP_STORE_URL,
+    'Android — скачай файл и открой его: ' + ANDROID_APK_URL,
+    '2. Вернись к этому сообщению и нажми на ссылку ниже — приложение откроется сразу в твоём кабинете, пароль не нужен.',
+    '',
+    url,
+    '',
+    'Ссылка личная — не пересылай её.',
+  ].join('\n');
 }
 
 /**
@@ -120,17 +138,17 @@ export function inviteMessage(memberName) {
  * именно произошло: подпись у кнопки должна совпадать с реальностью.
  */
 export async function shareAccessLink(url, memberName, navigatorObject = navigator) {
-  const text = inviteMessage(memberName);
+  const text = inviteMessage(url, memberName);
   if (navigatorObject.share) {
     try {
-      await navigatorObject.share({ title: 'Приглашение в Fit Track', text, url });
+      await navigatorObject.share({ title: 'Приглашение в Fit Track', text });
       return 'shared';
     } catch (error) {
       if (error && error.name === 'AbortError') return 'cancelled';
     }
   }
 
-  await copyText(text + ' ' + url, navigatorObject);
+  await copyText(text, navigatorObject);
   return 'copied';
 }
 
