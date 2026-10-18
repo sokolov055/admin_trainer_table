@@ -490,6 +490,8 @@ function Export() {
   const [failure, setFailure] = useState(null);
   const [ready, setReady] = useState(null);
   const [copied, setCopied] = useState(false);
+  // Какие упражнения: все, активные (что видно в библиотеке), убранные, свои
+  const [filter, setFilter] = useState('all');
 
   if (loading) return <Loading lead={false} rows={4} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -502,10 +504,11 @@ function Export() {
     setFailure(null);
     setCopied(false);
     try {
-      const result = await apiOnce('owner.export', { sections: chosen });
+      const result = await apiOnce('owner.export', { sections: chosen, exercises: filter });
       const text = JSON.stringify(result, null, 1);
       const day = new Date().toISOString().slice(0, 10);
-      setReady({ text, name: `fittrack-${chosen.join('-')}-${day}.json`, size: new Blob([text]).size });
+      const tag = chosen.map((k) => (k === 'exercises' && filter !== 'all' ? k + '-' + filter : k)).join('-');
+      setReady({ text, name: `fittrack-${tag}-${day}.json`, size: new Blob([text]).size });
       haptic('success');
     } catch (err) {
       setFailure(err);
@@ -544,10 +547,17 @@ function Export() {
         <div className="library__form">
           <p className="small muted">Файл JSON с выбранными разделами — его можно переслать разработчику. Данных клиентов (занятия, замеры, питание, оплаты) в выгрузке нет.</p>
           {sections.map((s) => (
-            <label key={s.key} className="library__check">
-              <input type="checkbox" checked={chosen.includes(s.key)} onChange={() => toggle(s.key)} />
-              <span><strong>{s.title}</strong> · {formatNumber(s.rows)} {plural(s.rows, 'строка', 'строки', 'строк')}<br /><span className="small muted">{s.hint}</span></span>
-            </label>
+            <React.Fragment key={s.key}>
+              <label className="library__check">
+                <input type="checkbox" checked={chosen.includes(s.key)} onChange={() => toggle(s.key)} />
+                <span><strong>{s.title}</strong> · {formatNumber(s.rows)} {plural(s.rows, 'строка', 'строки', 'строк')}<br /><span className="small muted">{s.hint}</span></span>
+              </label>
+              {s.filters && chosen.includes(s.key) && <>
+                <Segmented items={s.filters.map((f) => ({ value: f.value, label: `${f.label} · ${formatNumber(f.count)}` }))}
+                  value={filter} onChange={(v) => { setFilter(v); setReady(null); haptic(); }} label="Какие упражнения" wrap />
+                <p className="small muted">У каждого упражнения в файле есть пометки: общее или своё, убрано ли у вас, заменено ли вашей версией.</p>
+              </>}
+            </React.Fragment>
           ))}
           {failure && <Note tone="critical">{failure.message}</Note>}
           <button type="button" className="button button--primary" disabled={busy || !chosen.length} onClick={build}>{busy ? 'Собираю…' : 'Выгрузить'}</button>
