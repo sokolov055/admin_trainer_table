@@ -183,6 +183,13 @@ const FLAG_TEXT = {
     caution: 'Снимать паузу — только после ответа Роскомнадзора по трансграничной передаче (ст. 12 152-ФЗ).',
   },
 };
+const mockStories = { topics: null, at: null, history: [] };
+const mockStoriesState = () => ({
+  topics: mockStories.topics, updatedAt: mockStories.at, updatedBy: mockStories.at ? 'owner@fittrack.demo' : null,
+  limits: { topics: 8, frames: 24, label: 24, caption: 80, heading: 90, body: 700, date: 30 },
+  history: mockStories.history.slice(0, 10),
+});
+
 const mockFlags = {
   trainerSignup: { value: false, envValue: false },
   tariffs: { value: false, envValue: false },
@@ -1169,6 +1176,23 @@ const MOCK = {
     { key: 'exercises', title: 'Упражнения', hint: 'общая база и упражнения тренеров', rows: demoExercises.length, filters: [{ value: 'all', label: 'Все', count: demoExercises.length }, { value: 'active', label: 'Активные', count: demoExercises.length }, { value: 'hidden', label: 'Убранные', count: 0 }, { value: 'mine', label: 'Свои', count: 0 }] },
     { key: 'foods', title: 'Продукты и блюда', hint: 'справочник продуктов', rows: 0 } ] }),
   'owner.export': (p) => ({ app: 'Fit Track', exportedAt: new Date().toISOString(), sections: Object.fromEntries((p.sections || []).map((k) => [k, k === 'exercises' ? { exercises: demoExercises } : { foods: [] }])) }),
+  // Истории из панели (FT-615): в демо — в памяти страницы, null — вшитые
+  'app.stories': () => ({ topics: mockStories.topics, at: mockStories.at }),
+  'owner.stories': () => mockStoriesState(),
+  'owner.stories.save': (p) => {
+    if (!Array.isArray(p.topics) || !p.topics.length) throw new Error('Нужна хотя бы одна тема.');
+    p.topics.forEach((t) => (t.frames || []).forEach((f) => { if (!String(f.heading || '').trim()) throw new Error(`«${t.label}»: заголовок кадра не заполнен.`); }));
+    mockStories.topics = JSON.parse(JSON.stringify(p.topics));
+    mockStories.at = new Date().toISOString();
+    mockStories.history.unshift({ at: mockStories.at, text: 'Сохранены · owner@fittrack.demo' });
+    return mockStoriesState();
+  },
+  'owner.stories.reset': () => {
+    mockStories.topics = null;
+    mockStories.at = null;
+    mockStories.history.unshift({ at: new Date().toISOString(), text: 'Возвращены встроенные · owner@fittrack.demo' });
+    return mockStoriesState();
+  },
   'owner.flags': () => mockFlagState(),
   'owner.flag.set': (p) => {
     const f = mockFlags[p.key];

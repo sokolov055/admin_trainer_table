@@ -351,7 +351,7 @@ export default function TrainerApp({ me }) {
                 заводится из своей карточки персональной ссылкой. Страница,
                 на которую ведут уже разосланные приглашения
                 (InviteRegistration.jsx), никуда не делась. */}
-            {clientPane === 'active' && <Stories />}
+            {clientPane === 'active' && <Stories role="trainer" />}
             {clientPane === 'active' && (
               <Clients
                 onOpenClient={(client) => openCard(client)}

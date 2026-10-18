@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { apiStale } from './api.js';
+import { prepareTopics as prepareRaw } from './story-topics.js';
+import { mediaUrl } from './library.js';
 import { haptic } from './telegram.js';
 import { ART, COVERS } from './storyArt.jsx';
 import { IconClose, IconDelta } from './icons.jsx';
@@ -37,9 +40,12 @@ const NEWS_VERSION = '3.9';
  * Тренер видит те же темы, что и клиенты, и намеренно: он должен знать, о
  * чём приложение сейчас им рассказывает, не заходя в чужую роль.
  *
- * Текст лежит здесь, а не в таблице. Новость про функцию рождается вместе
- * с самой функцией и едет тем же релизом — разъехаться они не могут по
- * устройству. Цена — правка текста требует коммита; она того стоит.
+ * Набор ниже — вшитый. С FT-615 владелец правит истории в «Управлении →
+ * Истории», сервер отдаёт их данными (app.stories), и приложение показывает
+ * их вместо вшитых — без сборки. Сервер ничего не сохранял или не ответил,
+ * а на телефоне ничего не запомнено — показывается этот набор. С сервера
+ * приходят только тексты, порядок и имена готовых картинок: на iPhone
+ * экраны меняются только сборкой (правило Apple 2.5.2).
  * ==========================================================================
  */
 
@@ -210,18 +216,39 @@ export const TOPICS = [
   },
 ];
 
-/**
- * Кадры под устройство: на iPhone — без кадров «только Android», не на
- * iPhone — без кадров «только iPhone» (Apple Watch), и с текстом
- * для iPhone там, где он свой (bodyIos). Один раз при загрузке: дальше лента
- * работает с готовым списком, как раньше.
- */
 const IOS = detectBrowser().platform === 'ios';
-TOPICS.forEach((topic) => {
-  topic.frames = topic.frames
-    .filter((frame) => !(IOS && frame.only === 'android') && !(!IOS && frame.only === 'ios'))
-    .map((frame) => (IOS && frame.bodyIos ? { ...frame, body: frame.bodyIos } : frame));
-});
+
+/** Темы под человека и это устройство (story-topics.js) */
+export function prepareTopics(raw, { role = 'client', ios = IOS } = {}) {
+  return prepareRaw(raw, { role, ios });
+}
+
+// Последний набор с сервера на эту загрузку страницы: следующий экран с
+// историями сразу рисует его, а не мигает вшитым
+let remoteTopics = null;
+
+/**
+ * Истории для показа (FT-615): набор из панели владельца или вшитый.
+ * Сначала — запомненный на телефоне ответ (без связи тоже), тут же свежий
+ * с сервера. null с сервера — владелец вернул встроенные.
+ */
+export function useStoryTopics(role = 'client') {
+  const [raw, setRaw] = useState(remoteTopics);
+  useEffect(() => {
+    let alive = true;
+    const apply = (data) => {
+      remoteTopics = data && Array.isArray(data.topics) && data.topics.length ? data.topics : null;
+      if (alive) setRaw(remoteTopics);
+    };
+    try {
+      const { data, promise } = apiStale('app.stories');
+      if (data) apply(data);
+      promise.then(apply).catch(() => {});
+    } catch (_) {}
+    return () => { alive = false; };
+  }, []);
+  return useMemo(() => prepareTopics(raw || TOPICS, { role }), [raw, role]);
+}
 
 /* ==========================================================================
    Личные истории: «Моя неделя» и «Итоги месяца» (FT-493)
@@ -279,9 +306,11 @@ export function summaryTopics(stories) {
    Ряд кружков
    ========================================================================== */
 
-// personal — личные темы (summaryTopics), первыми в ряду
-export function Stories({ personal = [] }) {
-  const topics = personal.length ? personal.concat(TOPICS) : TOPICS;
+// personal — личные темы (summaryTopics), первыми в ряду; role — кому
+// показывать темы из панели (клиентам или тренерам)
+export function Stories({ personal = [], role = 'client' }) {
+  const shared = useStoryTopics(role);
+  const topics = personal.length ? personal.concat(shared) : shared;
   const [seen, setSeen] = useState(readSeen);
   const [at, setAt] = useState(null);
 
@@ -348,20 +377,42 @@ export function Stories({ personal = [] }) {
  * кружков на «Обзоре», но открывается когда угодно — прокрутил кружки раз и
  * потерял, а вернуться было некуда.
  */
-export function GuideViewer({ onClose }) {
-  const topics = TOPICS.filter((t) => t.id === 'guide');
+// topics — из useStoryTopics: та же инструкция, что в ряду кружков
+export function GuideViewer({ topics, onClose }) {
+  const guide = (topics || prepareTopics(TOPICS)).filter((t) => t.id === 'guide');
   const [at, setAt] = useState({ topic: 0, frame: 0 });
   const markSeen = useCallback((id) => {
     const seen = readSeen();
     if (seen.indexOf(id) === -1) writeSeen(seen.concat(id));
   }, []);
-  return <StoryViewer topics={topics} at={at} onAt={setAt} onSeen={markSeen} onClose={onClose} />;
+  if (!guide.length) return null;
+  return <StoryViewer topics={guide} at={at} onAt={setAt} onSeen={markSeen} onClose={onClose} />;
+}
+
+/** Есть ли инструкция: владелец мог скрыть все её кадры (FT-615) */
+export function hasGuide(topics) {
+  return (topics || []).some((t) => t.id === 'guide');
 }
 
 /** Подпись пункта меню: часы — только там, где в инструкции есть кадр про них */
-export function guideNote() {
-  const guide = TOPICS.find((t) => t.id === 'guide');
-  return guide && guide.frames.some((f) => f.id === 'guide-watch') ? 'Приложение и Apple Watch' : 'Что где находится';
+export function guideNote(topics) {
+  const guide = (topics || prepareTopics(TOPICS)).find((t) => t.id === 'guide');
+  return guide && guide.frames.some((f) => f.only === 'ios' || f.id === 'guide-watch') ? 'Приложение и Apple Watch' : 'Что где находится';
+}
+
+/**
+ * Просмотр из панели владельца (FT-615): как увидят клиенты, с текущего
+ * кадра, без отметок «просмотрено» — превью не должно гасить кружок у
+ * самого владельца. Кадры «только iPhone / Android» видны на любом
+ * устройстве: владелец проверяет то, что только что написал.
+ */
+export function StoryPreview({ topic, frame = 0, role = 'client', onClose }) {
+  const all = { ...topic, audience: 'all', frames: (topic.frames || []).map(({ only, ...f }) => f) };
+  const topics = prepareTopics([all], { role });
+  const [at, setAt] = useState({ topic: 0, frame: Math.max(0, Math.min(frame, ((topics[0] || {}).frames || []).length - 1)) });
+  const noop = useCallback(() => {}, []);
+  if (!topics.length) return null;
+  return <StoryViewer topics={topics} at={at} onAt={setAt} onSeen={noop} onClose={onClose} />;
 }
 
 /* ==========================================================================
@@ -584,7 +635,12 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
           иначе смена текста на месте читается как опечатка, а не как
           следующая новость */}
       <div className="story__frame" key={topic.id + ':' + frame.id}>
-        {Picture && (
+        {/* Своя картинка из панели владельца (FT-615) — вместо рисунка */}
+        {frame.image ? (
+          <div className="story__art-box">
+            <img className="story__image" src={mediaUrl(frame.image)} alt="" draggable="false" />
+          </div>
+        ) : Picture && (
           <div className="story__art-box">
             <Picture />
           </div>

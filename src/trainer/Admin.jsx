@@ -11,6 +11,7 @@ import { IconCheck } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import Trainers from './Trainers.jsx';
 import Games from './Games.jsx';
+import AdminStories from './AdminStories.jsx';
 import { Logs } from './screens.jsx';
 import {
   PLATFORM_NAMES, flagStatus, growthPoints, monthName, needsConfirm, percent, sourceTotals,
@@ -34,6 +35,8 @@ export const ADMIN_PANES = [
   { value: 'tariffs', label: 'Тарифы' },
   { value: 'games', label: 'Игры' },
   { value: 'flags', label: 'Флаги' },
+  // «Что нового» и «Инструкция» у всех пользователей — без сборки (FT-615)
+  { value: 'stories', label: 'Истории' },
   // Журнал действий: платежи, пересчёты, переносы, переключения флагов
   { value: 'logs', label: 'Логи' },
   // Справочные разделы базы файлом — переслать разработчику (18.10.2026)
@@ -45,6 +48,7 @@ export default function Admin({ pane }) {
   if (pane === 'tariffs') return <Tariffs />;
   if (pane === 'games') return <Games />;
   if (pane === 'flags') return <Flags />;
+  if (pane === 'stories') return <AdminStories />;
   if (pane === 'logs') return <Logs />;
   if (pane === 'export') return <Export />;
   return <Stats />;

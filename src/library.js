@@ -51,7 +51,8 @@ export async function uploadVideo(exerciseId, file, onProgress = () => {}) {
  * по мобильной сети, а пересохранение выбрасывает метаданные снимка — в
  * том числе место съёмки, которое серверу знать незачем.
  */
-export async function shrinkPhoto(file, max = 1600) {
+// type — во что пересохранить: PNG держит прозрачность (картинки историй, FT-615)
+export async function shrinkPhoto(file, max = 1600, type = 'image/jpeg') {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
@@ -65,7 +66,7 @@ export async function shrinkPhoto(file, max = 1600) {
     canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
     canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, 0.85));
     if (!blob) throw new Error('Не получилось подготовить фото.');
     return blob;
   } finally {
@@ -142,6 +143,39 @@ export async function uploadProfilePhoto(blob) {
   }
   const body = await res.json().catch(() => null);
   if (!body || !body.ok) throw new Error((body && body.error) || (res.status === 413 ? 'Фото больше 10 МБ.' : 'Сервер не принял фото.'));
+  return body.data;
+}
+
+/**
+ * Картинка кадра истории (FT-615) — только владелец. Сервер возвращает
+ * адрес /media/…; в кадр он попадает, когда истории сохранят.
+ */
+export async function uploadStoryImage(blob) {
+  if (import.meta.env.VITE_MOCK === '1') {
+    const url = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(blob);
+    });
+    return { url };
+  }
+
+  await loadApiConfig();
+  const base = String(currentApiUrl() || '').replace(/\/$/, '');
+  if (!base) throw new Error('Не задан адрес сервера.');
+  const headers = { 'Content-Type': blob.type || 'image/jpeg' };
+  const initData = getInitData();
+  if (initData) headers['X-Init-Data'] = initData;
+  else headers.Authorization = 'Bearer ' + getToken();
+
+  let res;
+  try {
+    res = await fetch(base + '/media/story-image', { method: 'POST', headers, body: blob });
+  } catch (_) {
+    throw new Error('Не получилось загрузить картинку. Проверьте связь.');
+  }
+  const body = await res.json().catch(() => null);
+  if (!body || !body.ok) throw new Error((body && body.error) || (res.status === 413 ? 'Картинка больше 10 МБ.' : 'Сервер не принял картинку.'));
   return body.data;
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Overview, Plan, Progress, Nutrition, WorkoutJournal } from './screens.jsx';
 import { Deferred } from '../lazy.js';
-import { Stories, GuideViewer, guideNote, summaryTopics } from '../stories.jsx';
+import { Stories, GuideViewer, guideNote, hasGuide, summaryTopics, useStoryTopics } from '../stories.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../gestures.jsx';
 import TabBar from '../TabBar.jsx';
@@ -161,7 +161,9 @@ export default function ClientApp({ me, clientRow, preview }) {
   useEffect(() => { if (hintPlan) setView((v) => (v === 'overview' ? 'plan' : v)); }, [hintPlan]);
   // «Как пользоваться» (FT-495) — инструкция из меню, а не только кружком на «Обзоре»
   const [guideOpen, setGuideOpen] = useState(false);
-  const guide = { id: 'guide', label: 'Как пользоваться', note: guideNote(), Icon: IconGuide, action: () => setGuideOpen(true) };
+  // Инструкция — та же, что в кружках: из панели владельца или вшитая (FT-615)
+  const storyTopics = useStoryTopics('client');
+  const guide = { id: 'guide', label: 'Как пользоваться', note: guideNote(storyTopics), Icon: IconGuide, action: () => setGuideOpen(true) };
 
   // Личные истории «Моя неделя» и «Итоги месяца» (FT-493) — в кабинете
   // клиента и у тренера «глазами клиента»: режим для того и есть, чтобы
@@ -180,7 +182,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   }, [mine, clientRow]);
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['plank-game', 'scooter-game', 'match-game'].includes(m.id) || plankEnabled), guide, ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['plank-game', 'scooter-game', 'match-game'].includes(m.id) || plankEnabled), ...(hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -351,7 +353,7 @@ export default function ClientApp({ me, clientRow, preview }) {
         <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
 
-      {guideOpen && <GuideViewer onClose={() => setGuideOpen(false)} />}
+      {guideOpen && <GuideViewer topics={storyTopics} onClose={() => setGuideOpen(false)} />}
 
       {tour && onTab && !guideOpen && (
         <Tour unlinked={!!(me && me.unlinked)} action={fs.action} app={isNativeApp()}
