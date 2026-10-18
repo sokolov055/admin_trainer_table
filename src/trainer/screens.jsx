@@ -11,7 +11,7 @@ import {
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, usePullRefresh, captureScreen } from '../gestures.jsx';
-import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck, IconPhone } from '../icons.jsx';
+import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck, IconChevron, IconSliders, IconExit } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
@@ -401,8 +401,8 @@ function AddClient({ onCreated }) {
         </div>
 
         <p className="add-client__hint">
-          Дальше в карточке будет кнопка «Пригласить в приложение» — она даст
-          ссылку, по которой клиент войдёт в свой кабинет.
+          Карточка откроется сама: внизу «Обзора» — «Пригласить в приложение»,
+          она даст ссылку, по которой клиент войдёт в свой кабинет.
         </p>
       </form>
     </Panel>
@@ -716,29 +716,123 @@ function ClientFamily({ client }) {
 }
 
 /* ==================================================================
- * Шапка карточки клиента
+ * Управление карточкой клиента (FT-613)
  * ================================================================== */
 
-const CARD_OPEN_KEY = 'client_card_open_v1';
+/**
+ * Всё, что тренер делает с карточкой, а не с занятиями, — в конце
+ * «Обзора», двумя пунктами: «Доступ в приложение» и «Изменить карточку».
+ *
+ * До 18.10.2026 это была панель над вкладками, одинаковая во всех
+ * разделах: баланс, цена, ключ, флажки, приглашение, сброс доступа —
+ * двенадцать вещей вперемешку, и над «Оплатами» и «Тренировками» она
+ * съедала первый экран. Баланс и цена теперь в «Оплатах» (и главной
+ * цифрой «Обзора»), «Глазами клиента» — значок в шапке, остальное
+ * разложено по смыслу: кто и как входит — отдельно от того, что за
+ * клиент.
+ *
+ * Раскрывается на месте, а не окном (impeccable: модальное окно — не
+ * первая мысль): пункт за раз, второй закрывает первый. Не приглашённому
+ * клиенту «Доступ» открыт сразу — у новой карточки это первое дело.
+ */
+export function ClientManage({ client }) {
+  const invited = !!(client.chatId || client.invited);
+  const [open, setOpen] = useState(invited ? '' : 'access');
+  const toggle = (id) => { setOpen((cur) => (cur === id ? '' : id)); haptic(); };
+  const split = client.members && client.members.length > 1;
 
-function readCardOpen() {
-  try { return localStorage.getItem(CARD_OPEN_KEY) === '1'; } catch (_) { return false; }
+  return (
+    <Section title="Связь и настройки">
+      <Panel className="manage">
+        <ClientContacts clientRow={client.row} />
+
+        <ManageGroup
+          id={'manage-access-' + client.row}
+          Icon={IconKey}
+          title="Доступ в приложение"
+          status={invited ? 'ссылка, привязка, выход со всех устройств' : <Badge kind="warn">не приглашён</Badge>}
+          open={open === 'access'}
+          onToggle={() => toggle('access')}
+        >
+          {/* У сплита ссылка у каждого: свой кабинет, свои веса и замеры */}
+          {split
+            ? client.members.map((m, i) => <ClientInviteLink key={m} client={client} member={i} memberName={m} quiet={i > 0} />)
+            : <ClientInviteLink client={client} />}
+
+          {/* Скачал приложение и зарегистрировался сам — связать с этой карточкой */}
+          {!split && <LinkExisting client={client} />}
+
+          <CloseAccess client={client} />
+        </ManageGroup>
+
+        <ManageGroup
+          id={'manage-edit-' + client.row}
+          Icon={IconSliders}
+          title="Изменить карточку"
+          status={cardSummary(client)}
+          open={open === 'edit'}
+          onToggle={() => toggle('edit')}
+        >
+          <ClientEdit client={client} />
+
+          <div className="manage__part">
+            <OnlineFlag client={client} />
+            <TestFlag client={client} />
+            {client.family && <ClientFamily client={client} />}
+            {client.splitOf ? <SplitMember client={client} /> : <ClientSplit client={client} />}
+          </div>
+
+          <div className="manage__part">
+            <ArchiveButton client={client} />
+            <p className="manage__tech">
+              {client.clientKey && <>Ключ <code>{client.clientKey}</code> · </>}
+              строка {client.row}
+            </p>
+          </div>
+        </ManageGroup>
+      </Panel>
+    </Section>
+  );
+}
+
+/** Что у карточки особенного — строкой под «Изменить карточку» */
+function cardSummary(client) {
+  const marks = [
+    client.online && 'онлайн-ведение',
+    (client.splitOf || (client.members && client.members.length > 1)) && 'сплит',
+    client.payer && 'платит ' + client.payer,
+    client.test && 'тестовый',
+  ].filter(Boolean);
+  return marks.length ? marks.join(' · ') : 'имя, цена, пакет, онлайн, сплит, архив';
 }
 
 /**
- * Шапка сворачивается: баланс и цена видны всегда, а ключ, контакты,
- * правка и доступ — по кнопке. Нужны они редко, а место над «Оплачено
- * вперёд» — самое дорогое на экране. Выбор тренера запоминается на
- * устройстве и действует для всех карточек.
+ * Пункт с раскрытием. Кнопка — вся строка: попасть пальцем легко, а
+ * стрелка показывает, раскрыт ли пункт, без слов «Подробнее»/«Свернуть».
  */
-export function ClientCard({ client, onPreview }) {
-  const [expanded, setExpanded] = useState(readCardOpen);
-  const toggle = () => {
-    const next = !expanded;
-    setExpanded(next);
-    try { localStorage.setItem(CARD_OPEN_KEY, next ? '1' : '0'); } catch (_) { /* не запомнили — не беда */ }
-  };
+function ManageGroup({ id, Icon, title, status, open, onToggle, children }) {
+  return (
+    <div className={'manage__group' + (open ? ' manage__group--open' : '')}>
+      <button type="button" className="manage__row" aria-expanded={open} aria-controls={id} onClick={onToggle}>
+        <span className="manage__icon"><Icon size={20} /></span>
+        <span className="manage__text">
+          <span className="manage__title">{title}</span>
+          {status && <span className="manage__status">{status}</span>}
+        </span>
+        <IconChevron size={18} className="manage__chevron" />
+      </button>
+      {open && <div className="manage__body" id={id}>{children}</div>}
+    </div>
+  );
+}
 
+/**
+ * «Закрыть все входы» — было «Сбросить доступ», и из названия не было
+ * понятно, что случится. Теперь сказано до нажатия: когда это нужно и что
+ * останется. Подтверждение — на месте, а не окном: окно подтверждают не
+ * читая, а здесь перед глазами, что именно закроется.
+ */
+function CloseAccess({ client }) {
   const [access, setAccess] = useState({
     confirming: false,
     unlinkTelegram: false,
@@ -748,7 +842,7 @@ export function ClientCard({ client, onPreview }) {
     linked: !!client.chatId,
   });
 
-  const resetAccess = async () => {
+  const run = async () => {
     if (access.busy) return;
     setAccess((s) => ({ ...s, busy: true, error: null, done: null }));
 
@@ -763,122 +857,56 @@ export function ClientCard({ client, onPreview }) {
         linked: s.unlinkTelegram ? false : s.linked,
         unlinkTelegram: false,
       }));
+      haptic('success');
     } catch (error) {
       setAccess((s) => ({ ...s, busy: false, error, done: null }));
     }
   };
 
   return (
-    <Panel pad className="enter">
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px', alignItems: 'center' }}>
-        {/* За клиента платит другой человек — свой нулевой баланс ничего не
-            говорит, и «Баланс 0 ₽» только пугал. Долг показываем всегда. */}
-        {/* Участник сплита: деньги — пары, общие; своя цена — за занятие без пары */}
-        {client.splitOf ? (
-          <>
-            <Badge kind={client.splitBalance < 0 ? 'bad' : client.splitBalance > 0 ? 'good' : undefined}>
-              Сплит: {formatMoney(client.splitBalance)}
-              {client.splitTrainingsLeft !== null && client.splitTrainingsLeft !== undefined ? ' · осталось ' + client.splitTrainingsLeft : ''}
-            </Badge>
-            <Badge>платит {client.splitPayerName}</Badge>
-            <Badge>{formatMoney(client.price)} — одному</Badge>
-          </>
-        ) : (
-          <>
-            {!(client.payer && client.balance === 0) && (
-              <Badge kind={client.balance < 0 ? 'bad' : client.balance > 0 ? 'good' : undefined}>
-                Баланс {formatMoney(client.balance)}
-              </Badge>
-            )}
-            {/* Онлайн-ведение (FT-530) оплачивается месяцем */}
-            <Badge>{formatMoney(client.price)} {client.online ? 'в месяц' : 'за тренировку'}</Badge>
-            {client.payer && <Badge>платит {client.payer}</Badge>}
-          </>
-        )}
-        {/* Клиентская версия кабинета — глазами этого клиента (01.10.2026:
-            из бокового меню сюда) */}
-        {onPreview && (
-          <button type="button" className="button button--ghost client-card__preview" onClick={onPreview}>
-            <IconPhone size={15} />
-            Глазами клиента
-          </button>
-        )}
-        <button
-          type="button"
-          className="button button--ghost client-card__toggle"
-          aria-expanded={expanded}
-          aria-controls={'client-card-more-' + client.row}
-          onClick={toggle}
-        >
-          {expanded ? 'Свернуть' : 'Подробнее'}
-          <IconBack size={14} className="client-card__chevron" />
-        </button>
-      </div>
-
-      {expanded && (
-      <div className="client-card__more" id={'client-card-more-' + client.row}>
-      <div className="small muted" style={{ marginTop: 10 }}>
-        {client.clientKey && <>Ключ <code>{client.clientKey}</code> · </>}
-        строка {client.row}
-      </div>
-
-      <ClientContacts clientRow={client.row} />
-
-      <OnlineFlag client={client} />
-      <TestFlag client={client} />
-      <ClientEdit client={client} />
-
-      {/* Приглашение стоит выше сброса доступа намеренно: выдать вход —
-          повседневное действие, отобрать — редкое. */}
-      {/* У сплита ссылка у каждого: свой кабинет, свои веса и замеры */}
-      {client.members && client.members.length > 1
-        ? client.members.map((m, i) => <ClientInviteLink key={m} client={client} member={i} memberName={m} quiet={i > 0} />)
-        : <ClientInviteLink client={client} />}
-
-      {/* Скачал приложение и зарегистрировался сам — связать с этой карточкой */}
-      {!(client.members && client.members.length > 1) && <LinkExisting client={client} />}
-
-      {client.family && <ClientFamily client={client} />}
-
-      {client.splitOf ? <SplitMember client={client} /> : <ClientSplit client={client} />}
+    <div className="manage__part">
+      <strong className="manage__label">Выход со всех устройств</strong>
+      <p className="manage__hint">
+        Если телефон потерян или ссылку переслали не тому: ссылка входа перестанет работать,
+        все телефоны и браузеры выйдут из кабинета. Тренировки, замеры и оплаты останутся —
+        потом выдайте клиенту новую ссылку.
+      </p>
 
       {access.done && (
         <div className="access-reset__result" role="status">
-          Доступ сброшен. Все устройства выйдут при следующем запросе.
-          {access.done.revokedLinks > 0 && ' Ссылка входа отозвана — выдайте новую, когда понадобится.'}
+          Все входы закрыты: устройства выйдут при следующем открытии.
+          {access.done.revokedLinks > 0 && ' Ссылка отозвана — выдайте новую, когда понадобится.'}
           {access.done.unlinked && ' Telegram отвязан.'}
         </div>
       )}
 
       {access.error && (
         <div className="access-reset__error" role="alert">
-          Не получилось сбросить доступ: {access.error.message || 'сервер не ответил'}
+          Не получилось закрыть входы: {access.error.message || 'сервер не ответил'}
         </div>
       )}
 
-      {/* Кнопка доступна всегда: войти можно не только через Telegram, а
-          закрыть надо уметь любой вход — и ссылку, и открытые кабинеты. */}
+      {/* Кнопка доступна всегда: закрыть надо уметь любой вход — и ссылку,
+          и уже открытые кабинеты */}
       {!access.confirming && (
         <button
           className="button button--ghost access-reset__trigger"
           onClick={() => setAccess((s) => ({ ...s, confirming: true, error: null, done: null }))}
           disabled={access.busy}
         >
-          <IconKey size={16} />
-          Сбросить доступ
+          <IconExit size={16} />
+          Закрыть все входы
         </button>
       )}
 
       {access.confirming && (
         <div className="access-reset">
           <div className="small">
-            Ссылка входа перестанет работать, все открытые браузеры и ярлыки
-            выйдут из кабинета. Тренировки, замеры и оплаты останутся без
-            изменений.
+            Клиент выйдет на всех устройствах, ссылка входа перестанет работать.
+            Данные останутся без изменений.
           </div>
 
-          {/* Отвязка нужна только тем, у кого Telegram вообще привязан:
-              остальные заходят по ссылке, и галочка им ничего не даёт. */}
+          {/* Отвязка нужна только тем, у кого Telegram вообще привязан */}
           {access.linked && (
             <label className={'access-reset__option' + (!client.clientKey ? ' access-reset__option--disabled' : '')}>
               <input
@@ -899,8 +927,8 @@ export function ClientCard({ client, onPreview }) {
           )}
 
           <div className="access-reset__actions">
-            <button className="button button--critical" onClick={resetAccess} disabled={access.busy}>
-              {access.busy ? 'Сбрасываю…' : 'Да, сбросить'}
+            <button className="button button--critical" onClick={run} disabled={access.busy}>
+              {access.busy ? 'Закрываю…' : 'Да, закрыть входы'}
             </button>
             <button
               className="button button--ghost"
@@ -912,9 +940,7 @@ export function ClientCard({ client, onPreview }) {
           </div>
         </div>
       )}
-      </div>
-      )}
-    </Panel>
+    </div>
   );
 }
 
@@ -925,16 +951,15 @@ export function ClientCard({ client, onPreview }) {
 /**
  * Правка карточки: имя, цена, размер пакета, плательщик, архив.
  *
- * Последнее, ради чего тренер открывал таблицу с телефона. Форма
- * свёрнута: открывают её редко, а карточку читают постоянно, и
- * развёрнутый набор полей отодвинул бы вниз всё, ради чего заходят.
+ * Последнее, ради чего тренер открывал таблицу с телефона. Свёрнут весь
+ * пункт «Изменить карточку» (FT-613), поэтому сама форма внутри открыта
+ * сразу — второй кнопки «Изменить» за первой не нужно.
  *
  * Отправляем только изменённое. Это не экономия запроса: на той стороне
  * отсутствующее поле значит «не трогай», и форма, где поправили одну
  * цену, не должна обнулить остальное.
  */
 function ClientEdit({ client }) {
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -977,13 +1002,7 @@ function ClientEdit({ client }) {
     }
   };
 
-  if (!open) {
-    return (
-      <div className="client-edit__toggle">
-        <button className="button button--ghost" onClick={() => setOpen(true)}>Изменить карточку</button>
-      </div>
-    );
-  }
+  const dirty = Object.keys(initial).some((field) => String(form[field]).trim() !== String(initial[field]).trim());
 
   return (
     <div className="client-edit">
@@ -1005,12 +1024,14 @@ function ClientEdit({ client }) {
       {saved && !failure && <Note tone="good" icon={IconCheck}>Сохранено. Изменения появятся в карточке через несколько секунд.</Note>}
 
       <div className="client-edit__actions">
-        <button className="button button--primary" onClick={save} disabled={busy}>
+        <button className="button button--primary" onClick={save} disabled={busy || !dirty}>
           {busy ? 'Сохраняю…' : 'Сохранить'}
         </button>
-        <button className="button" onClick={() => { setOpen(false); setForm(initial); setFailure(null); }} disabled={busy}>
-          Отмена
-        </button>
+        {dirty && (
+          <button className="button" onClick={() => { setForm(initial); setFailure(null); }} disabled={busy}>
+            Вернуть как было
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1056,7 +1077,7 @@ function OnlineFlag({ client }) {
   const left = onlineDaysLeft(until);
 
   return (
-    <div className="client-online" style={{ marginTop: 12 }}>
+    <div className="client-online">
       <label className="library__check">
         <input type="checkbox" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
         <span>Онлайн-ведение</span>
@@ -1106,14 +1127,13 @@ function TestFlag({ client }) {
   };
 
   return (
-    <div className="client-test" style={{ marginTop: 12 }}>
+    <div className="client-test">
       <label className="library__check">
         <input type="checkbox" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
         <span>Тестовый клиент</span>
       </label>
       <div className="small muted">Уходит из списка и статистики; найти — фильтр «Тестовые».</div>
       {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
-      <ArchiveButton client={client} />
     </div>
   );
 }
@@ -1146,14 +1166,21 @@ function ArchiveButton({ client }) {
   if (done) return <Note tone="good" icon={IconCheck}>В архиве — из списка клиентов уберётся после обновления.</Note>;
 
   return (
-    <div className="client-edit__actions" style={{ marginTop: 12 }}>
+    <div className="client-archive">
+      <strong className="manage__label">Архив</strong>
+      <p className="manage__hint">
+        Клиент уйдёт из списка, история занятий и оплат останется. Вернуть — «Клиенты» → «Ушедшие».
+      </p>
       {ask ? (
-        <>
+        <div className="client-edit__actions" style={{ marginTop: 12 }}>
           <button className="button button--primary" onClick={run} disabled={busy}>{busy ? 'Убираю…' : 'Да, в архив'}</button>
           <button className="button" onClick={() => setAsk(false)} disabled={busy}>Отмена</button>
-        </>
+        </div>
       ) : (
-        <button className="button button--ghost" onClick={() => setAsk(true)}>В архив</button>
+        <button className="button button--ghost access-reset__trigger" onClick={() => setAsk(true)}>
+          <IconDeparted size={16} />
+          В архив
+        </button>
       )}
       {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
     </div>

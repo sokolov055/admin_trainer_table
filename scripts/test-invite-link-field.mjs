@@ -39,7 +39,7 @@ const { ClientInviteLink } = mod.exports;
 const text = (node) => (typeof node === 'string' ? node : (node.children || []).map(text).join(''));
 const delay = () => new Promise((r) => setTimeout(r, 10));
 
-test('ссылка — поле только для чтения с выделением и кнопкой «Копировать»', async () => {
+test('ссылка — поле только для чтения с выделением и кнопкой «Скопировать ссылку»', async () => {
   let tree;
   await act(async () => { tree = renderer.create(React.createElement(ClientInviteLink, { client: { row: 5, name: 'Никита' } })); await delay(); });
   const field = tree.root.findByProps({ 'aria-label': 'Ссылка для входа' });
@@ -50,10 +50,34 @@ test('ссылка — поле только для чтения с выделе
   field.props.onFocus({ currentTarget: { select: () => { selected += 1; } } });
   assert.equal(selected, 1, 'касание выделяет весь адрес');
 
-  const button = () => tree.root.findAllByType('button').find((b) => /Копировать|Скопировано/.test(text(b)));
-  assert.equal(text(button()), 'Копировать');
+  const button = () => tree.root.findAllByType('button').find((b) => /Скопировать ссылку|Скопировано/.test(text(b)));
+  assert.equal(text(button()), 'Скопировать ссылку');
   await act(async () => { button().props.onClick(); await delay(); });
   assert.deepEqual(copied, [URL_], 'в буфер ушёл весь адрес');
   assert.equal(text(button()), 'Скопировано', 'подтверждение на кнопке');
   tree.unmount();
+});
+
+test('FT-613: «Скопировать ссылку» и до приглашения — выпускает ссылку и копирует только адрес', async () => {
+  const saved = globalThis.__access.fetchClientLink;
+  let shared = 0;
+  const savedShare = globalThis.__access.shareAccessLink;
+  globalThis.__access.fetchClientLink = async () => ({ link: null });
+  globalThis.__access.shareAccessLink = async () => { shared += 1; return 'shared'; };
+  copied.length = 0;
+  let tree;
+  try {
+    await act(async () => { tree = renderer.create(React.createElement(ClientInviteLink, { client: { row: 6, name: 'Оля' } })); await delay(); });
+    const labels = tree.root.findAllByType('button').map(text);
+    assert.ok(labels.includes('Пригласить в приложение'), 'приглашение на месте');
+    const copyBtn = tree.root.findAllByType('button').find((b) => text(b) === 'Скопировать ссылку');
+    assert.ok(copyBtn, 'копирование — отдельной кнопкой');
+    await act(async () => { copyBtn.props.onClick(); await delay(); });
+    assert.deepEqual(copied, [URL_], 'в буфере только адрес');
+    assert.equal(shared, 0, 'окно «Поделиться» не открывалось');
+  } finally {
+    globalThis.__access.fetchClientLink = saved;
+    globalThis.__access.shareAccessLink = savedShare;
+    if (tree) tree.unmount();
+  }
 });

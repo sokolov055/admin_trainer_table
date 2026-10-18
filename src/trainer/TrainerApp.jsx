@@ -1,7 +1,7 @@
 import ScheduleStats from './ScheduleStats.jsx';
 import { useReturnScroll } from '../scroll.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clients, Lost, Settings, ClientCard } from './screens.jsx';
+import { Clients, Lost, Settings, ClientManage } from './screens.jsx';
 import { Finance, Processes } from './Metrics.jsx';
 import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
@@ -23,7 +23,7 @@ import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconSliders, IconMenu, IconClose, IconPhone, IconSearch, IconMoney,
-  IconPlan, IconCalendar, IconKey, IconProgress,
+  IconPlan, IconCalendar, IconKey, IconProgress, IconEye,
 } from '../icons.jsx';
 import { WorkoutJournal } from '../client/screens.jsx';
 import { Deferred } from '../lazy.js';
@@ -637,14 +637,28 @@ function ClientDetail({ client: opened, initialView = 'overview', backLabel = '�
     <div className="app">
       <header className="app__header">
         <BackButton label={backLabel} onClick={onBack} />
-        <h1 className="app__title">{client.name}</h1>
-        <p className="app__subtitle">Карточка клиента · {current.label}</p>
+        <div className="app__bar">
+          <div className="app__headline">
+            <h1 className="app__title">{client.name}</h1>
+            <p className="app__subtitle">Карточка клиента · {current.label}</p>
+          </div>
+          {/* «Глазами клиента» — значок рядом с именем (FT-613): шапка общая
+              у всех разделов, и вход в просмотр не пропадает при переходе */}
+          <button
+            type="button"
+            className="icon-button client-card__preview"
+            onClick={() => onPreview(client)}
+            aria-label="Глазами клиента"
+            title="Глазами клиента"
+          >
+            <IconEye size={22} />
+          </button>
+        </div>
       </header>
 
       <main className="app__body app__body--plain">
-        {/* Сначала — кто это и сколько на балансе, потом разделы: бар
-            стоит прямо над тем, что он переключает */}
-        <ClientCard client={client} onPreview={() => onPreview(client)} />
+        {/* Баланс — главной цифрой «Обзора» и в «Оплатах», связь и
+            настройки — в конце «Обзора» (FT-613): над разделами только бар */}
         <SubNav className="card-bar">
           <NavTabs ref={barRef} items={CLIENT_VIEWS} value={view} onChange={open} />
         </SubNav>
@@ -658,7 +672,12 @@ function ClientDetail({ client: opened, initialView = 'overview', backLabel = '�
             style={{ marginTop: 'var(--space-4)' }}
           >
             {v.value === 'overview'
-              ? <Overview clientRow={client.row} trainerClient={client} trainerClients={list.data?.clients} />
+              ? (
+                <>
+                  <Overview clientRow={client.row} trainerClient={client} trainerClients={list.data?.clients} />
+                  <ClientManage client={client} />
+                </>
+              )
               : v.value === 'payments'
               ? <Payments client={client} />
               : <v.Screen clientRow={client.row} />}

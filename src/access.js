@@ -95,27 +95,59 @@ export async function createClient(name, deps = {}) {
 }
 
 /**
- * Отправить ссылку так, как удобно на этом устройстве.
+ * Текст приглашения (FT-613, владелец 18.10.2026: прежнее «Ваш кабинет с
+ * тренировками» ничего не объясняло). Сказать, что это, что внутри и что
+ * делать: открыть ссылку — пароль не нужен. И что ссылка личная: по ней
+ * входят без пароля, пересланная — вход для другого человека.
+ *
+ * Имя — только у участника сплита: там у каждого своя ссылка, и важно,
+ * кому какая. Полное ФИО из карточки в обращении звучит как повестка,
+ * поэтому одиночному клиенту — просто «Здравствуйте!».
+ */
+export function inviteMessage(memberName) {
+  return (memberName ? memberName + ', здравствуйте!' : 'Здравствуйте!')
+    + ' Приглашаю вас в Fit Track — там ваша программа, записи тренировок и прогресс.'
+    + ' Откройте ссылку: кабинет откроется сразу, пароль не нужен.'
+    + ' Ссылка личная — не пересылайте её.';
+}
+
+/**
+ * Отправить приглашение так, как удобно на этом устройстве.
  *
  * На телефоне это системное «Поделиться» — сразу в нужный чат. На
- * компьютере такого окна нет, и остаётся буфер обмена. Возвращаем, что
+ * компьютере такого окна нет, и остаётся буфер обмена: туда кладём всё
+ * сообщение со ссылкой, чтобы вставить его целиком. Возвращаем, что
  * именно произошло: подпись у кнопки должна совпадать с реальностью.
  */
-export async function shareAccessLink(url, name, navigatorObject = navigator) {
+export async function shareAccessLink(url, memberName, navigatorObject = navigator) {
+  const text = inviteMessage(memberName);
   if (navigatorObject.share) {
     try {
-      await navigatorObject.share({
-        title: 'Личный кабинет',
-        text: name ? `${name}, ваш кабинет с тренировками` : 'Ваш кабинет с тренировками',
-        url,
-      });
+      await navigatorObject.share({ title: 'Приглашение в Fit Track', text, url });
       return 'shared';
     } catch (error) {
       if (error && error.name === 'AbortError') return 'cancelled';
     }
   }
 
-  await copyText(url);
+  await copyText(text + ' ' + url, navigatorObject);
+  return 'copied';
+}
+
+/**
+ * Отправить готовый текст: «Поделиться» на телефоне, буфер обмена на
+ * компьютере. Для инструкции клиенту, где ссылки нет (FT-613).
+ */
+export async function shareText(text, navigatorObject = navigator) {
+  if (navigatorObject.share) {
+    try {
+      await navigatorObject.share({ text });
+      return 'shared';
+    } catch (error) {
+      if (error && error.name === 'AbortError') return 'cancelled';
+    }
+  }
+  await copyText(text, navigatorObject);
   return 'copied';
 }
 

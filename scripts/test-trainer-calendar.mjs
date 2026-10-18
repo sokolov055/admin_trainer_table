@@ -45,7 +45,7 @@ const output = await build({
           contents: `import React from 'react';
             export const Clients = ({ onRefresh, refreshRevision }) => <div data-clients data-revision={String(refreshRevision)}><span>Список клиентов</span><button onClick={onRefresh}>Потянуть вниз</button></div>;
             export const Lost=()=>null;
-            export const Logs=()=>null; export const Sheets=()=>null; export const Settings=()=>null; export const ClientCard=()=>null;`,
+            export const Logs=()=>null; export const Sheets=()=>null; export const Settings=()=>null; export const ClientManage=()=>null;`,
         };
         // apiPublic нужен не этой проверке, а настройке уведомлений,
         // которая приехала в меню тренера. Заглушка отдаёт пустоту: пуши
@@ -65,7 +65,7 @@ const output = await build({
           contents: `import React from 'react'; const I=()=> <i />;
             export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
-            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I;`,
+            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I; export const IconEye=I;`,
         };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }];` };

@@ -858,7 +858,7 @@ test('игра на отдыхе у тестового клиента глаза
     assert.equal(await phone.getByRole('button', { name: /Тренер в планке/ }).count(), 0);
     await phone.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
     await phone.getByRole('button', { name: 'К карточке', exact: true }).click();
-    await phone.getByRole('button', { name: 'Подробнее', exact: true }).click();
+    await phone.getByRole('button', { name: /Изменить карточку/ }).click();
     await phone.getByLabel('Тестовый клиент', { exact: true }).check();
     await phone.waitForFunction(() => !document.querySelector('.client-test input').disabled);
     await phone.getByRole('button', { name: 'Глазами клиента' }).click();

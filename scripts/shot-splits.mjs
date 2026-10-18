@@ -32,7 +32,7 @@ for (const scheme of ['light', 'dark']) {
   await page.screenshot({ path: `${DEST}-${scheme}.png` });
   await group.locator('.item').nth(1).click();
   await page.waitForTimeout(600);
-  const more = page.getByRole('button', { name: 'Подробнее' });
+  const more = page.getByRole('button', { name: /Изменить карточку/ });
   if (await more.count()) await more.first().click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${DEST}-card-${scheme}.png`, fullPage: false });

@@ -22,6 +22,52 @@ import { IconMoney, IconCheck, IconClose, IconAlert } from '../icons.jsx';
  *   месте. Показать то, что мы думаем, вместо того, что записалось, —
  *   способ однажды не заметить расхождения.
  */
+/**
+ * Баланс и цена — здесь, а не над всеми разделами карточки (FT-613).
+ * Сюда переехали и особые случаи из прежней шапки: у участника сплита
+ * деньги общие у пары и своя цена — за занятие без пары; за клиента может
+ * платить другой человек; онлайн-ведение оплачивается месяцем.
+ */
+function BalanceLead({ client }) {
+  if (client.splitOf) {
+    const money = client.splitBalance;
+    const left = client.splitTrainingsLeft;
+    return (
+      <Lead
+        label="Баланс пары"
+        value={formatMoney(money)}
+        tone={money < 0 ? 'critical' : money > 0 ? 'good' : undefined}
+        hint={'платит ' + client.splitPayerName + (left !== null && left !== undefined ? ' · осталось ' + left + ' ' + plural(left, 'тренировка', 'тренировки', 'тренировок') : '')}
+        facts={[
+          { label: 'Цена одному', value: formatMoney(client.price) },
+          { label: 'В пакете', value: formatNumber(client.count) },
+        ]}
+      />
+    );
+  }
+
+  const per = client.online ? 'в месяц' : 'за тренировку';
+  let hint;
+  if (client.payer) hint = 'платит ' + client.payer;
+  else if (client.price > 0 && client.balance > 0 && !client.online) {
+    const ahead = Math.floor(client.balance / client.price);
+    hint = `≈ ${ahead} ${plural(ahead, 'тренировка', 'тренировки', 'тренировок')} вперёд`;
+  } else hint = client.balance < 0 ? 'клиент должен' : 'оплат нет';
+
+  return (
+    <Lead
+      label="Баланс клиента"
+      value={formatMoney(client.balance)}
+      tone={client.balance < 0 ? 'critical' : client.balance > 0 ? 'good' : undefined}
+      hint={hint}
+      facts={[
+        { label: 'Цена ' + per, value: formatMoney(client.price) },
+        ...(client.online ? [] : [{ label: 'В пакете', value: formatNumber(client.count) }]),
+      ]}
+    />
+  );
+}
+
 export function Payments({ client }) {
   const [price, setPrice] = useState(String(client.price || ''));
   const [count, setCount] = useState(String(client.count || ''));
@@ -74,20 +120,7 @@ export function Payments({ client }) {
 
   return (
     <>
-      <Lead
-        label="Баланс клиента"
-        value={formatMoney(client.balance)}
-        tone={client.balance < 0 ? 'critical' : client.balance > 0 ? 'good' : undefined}
-        hint={
-          client.price > 0 && client.balance > 0
-            ? `≈ ${Math.floor(client.balance / client.price)} ${plural(Math.floor(client.balance / client.price), 'тренировка', 'тренировки', 'тренировок')} вперёд`
-            : client.balance < 0 ? 'клиент должен' : 'оплат нет'
-        }
-        facts={[
-          { label: 'Цена за тренировку', value: formatMoney(client.price) },
-          { label: 'В пакете', value: formatNumber(client.count) },
-        ]}
-      />
+      <BalanceLead client={client} />
 
       {/* ---------- проведение оплаты ---------- */}
       <Section title="Провести оплату" note="цена и количество подставлены из карточки">

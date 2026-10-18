@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { copyText, createClientLink, fetchClientLink, revokeClientLink, shareAccessLink } from '../access.js';
 import { formatDate } from '../ui.jsx';
 import { haptic } from '../telegram.js';
-import { IconAlert, IconCheck, IconCopy, IconKey, IconRefresh, IconSend, IconTrash } from '../icons.jsx';
+import { IconAlert, IconCheck, IconCopy, IconRefresh, IconSend, IconTrash } from '../icons.jsx';
 
 /**
  * Приглашение клиента в приложение — прямо из его карточки.
@@ -24,6 +24,11 @@ import { IconAlert, IconCheck, IconCopy, IconKey, IconRefresh, IconSend, IconTra
  * и короткая строка о том, дошло ли до человека. Сам адрес, перевыпуск и
  * отзыв — под раскрытием: читать адрес глазами незачем, а перевыпускать и
  * отзывать случайным касанием тем более.
+ *
+ * «Скопировать ссылку» — отдельной кнопкой рядом с приглашением и всегда
+ * на виду (FT-613): бывает, что нужна только ссылка — вставить в свою
+ * переписку, — без текста приглашения. Ссылки ещё нет — кнопка её
+ * выпустит и скопирует.
  */
 
 // member/memberName — ссылка для одного участника сплита: вход в кабинет
@@ -65,14 +70,21 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
     }
   };
 
-  const create = () => run(async () => {
+  // then — что сделать с только что выпущенной ссылкой: отправить
+  // приглашение или просто скопировать
+  const create = (then = 'send') => run(async () => {
     const data = await createClientLink(client.row, {}, member);
     setState({ loading: false, link: data.link, error: null });
     setConfirmRevoke(false);
+    haptic('success');
+    if (then === 'copy') {
+      await copyText(data.link.url);
+      setCopied(true);
+      return;
+    }
     // Только что выпущенную ссылку показываем развёрнутой: тренер сам её
     // и запросил, и первое, что он захочет, — убедиться, что она есть.
     setExpanded(true);
-    haptic('success');
     await send(data.link);
   });
 
@@ -80,7 +92,7 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
     await revokeClientLink(client.row, {}, member);
     setState({ loading: false, link: null, error: null });
     setConfirmRevoke(false);
-    setNote('Ссылка отозвана. Уже открытые кабинеты остались — их закрывает «Сбросить доступ».');
+    setNote('Ссылка отозвана. Уже открытые кабинеты остались — их закрывает «Закрыть все входы».');
     haptic();
   });
 
@@ -91,9 +103,9 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
   });
 
   const send = async (link) => {
-    const result = await shareAccessLink(link.url, memberName || client.name);
+    const result = await shareAccessLink(link.url, memberName);
     if (result === 'cancelled') return;
-    setNote(result === 'shared' ? 'Отправлено' : 'Ссылка скопирована — вставьте её в любой мессенджер');
+    setNote(result === 'shared' ? 'Отправлено' : 'Приглашение со ссылкой скопировано — вставьте его в любой мессенджер');
     haptic('success');
   };
 
@@ -108,6 +120,13 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
 
   const link = state.link;
 
+  const copyButton = (onClick) => (
+    <button type="button" className="button access-link__copy" onClick={onClick} disabled={busy}>
+      {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+      {copied ? 'Скопировано' : 'Скопировать ссылку'}
+    </button>
+  );
+
   return (
     <div className="access-link">
       {state.error && (
@@ -118,10 +137,13 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
 
       {!link && (
         <>
-          <button className="button button--primary access-link__invite" onClick={create} disabled={busy}>
-            {busy ? <IconRefresh size={16} /> : <IconKey size={16} />}
-            {busy ? 'Готовим ссылку…' : memberName ? 'Пригласить: ' + memberName : 'Пригласить в приложение'}
-          </button>
+          <div className="access-link__lead">
+            <button className="button button--primary access-link__invite" onClick={() => create('send')} disabled={busy}>
+              {busy ? <IconRefresh size={16} /> : <IconSend size={16} />}
+              {busy ? 'Готовим ссылку…' : memberName ? 'Пригласить: ' + memberName : 'Пригласить в приложение'}
+            </button>
+            {copyButton(() => create('copy'))}
+          </div>
           {!quiet && (
             <p className="access-link__hint">
               Появится ссылка: отправьте её клиенту любым способом. Он откроет её
@@ -134,12 +156,13 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
       {link && (
         <>
           <div className="access-link__lead">
-            <button className="button button--primary" onClick={() => run(() => send(link))} disabled={busy}>
-              {navigator.share ? <IconSend size={16} /> : <IconCopy size={16} />}
-              {navigator.share ? 'Отправить' : 'Скопировать'}{memberName ? ': ' + memberName : ''}
+            <button className="button button--primary access-link__invite" onClick={() => run(() => send(link))} disabled={busy}>
+              <IconSend size={16} />
+              {navigator.share ? 'Отправить приглашение' : 'Скопировать приглашение'}{memberName ? ': ' + memberName : ''}
             </button>
-            <span className="access-link__state">{describeUses(link)}</span>
+            {copyButton(() => copy(link))}
           </div>
+          <p className="access-link__state">{describeUses(link)}</p>
 
           <details
             className="access-link__more"
@@ -149,24 +172,19 @@ export function ClientInviteLink({ client, member, memberName, quiet = false }) 
             <summary>Ссылка и доступ</summary>
 
             {/* Поле, а не текст (владелец, 16.10.2026): касание выделяет весь
-                адрес, а «Копировать» кладёт его в буфер одним нажатием */}
-            <div className="access-link__row">
-              <input
-                className="access-link__url"
-                type="text"
-                readOnly
-                value={link.url}
-                aria-label="Ссылка для входа"
-                onFocus={(event) => event.currentTarget.select()}
-              />
-              <button type="button" className="button access-link__copy" onClick={() => copy(link)} disabled={busy}>
-                {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                {copied ? 'Скопировано' : 'Копировать'}
-              </button>
-            </div>
+                адрес. Копирует его кнопка «Скопировать ссылку» выше — она
+                на виду всегда (FT-613) */}
+            <input
+              className="access-link__url"
+              type="text"
+              readOnly
+              value={link.url}
+              aria-label="Ссылка для входа"
+              onFocus={(event) => event.currentTarget.select()}
+            />
 
             <div className="access-link__actions">
-              <button className="button" onClick={create} disabled={busy}>
+              <button className="button" onClick={() => create('send')} disabled={busy}>
                 <IconRefresh size={16} />
                 Новая ссылка
               </button>
