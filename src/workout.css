@@ -746,6 +746,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .guide__avoid li::before { content: "×"; font-weight: 800; font-size: 15px; line-height: 1.25; }
 .guide__muscles { display: grid; gap: var(--space-2); border-top: 1px solid var(--border); padding-top: var(--space-3); }
 .guide__muscles-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.guide__figure { display: flex; justify-content: center; padding: var(--space-2) 0; }
 .guide__link { border: 0; background: none; padding: 6px 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .guide__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 

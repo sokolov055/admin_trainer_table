@@ -65,12 +65,9 @@ export default function WorkoutGuidance({ info, trainer = false }) {
           <h4 className="guide__h">Мышцы</h4>
           <button type="button" className="guide__link" aria-expanded={figure} onClick={() => setFigure(!figure)}>{figure ? 'Скрыть схему' : 'Схема'}</button>
         </div>
-        {figure
-          ? <div className="muscles muscles--block">
-            <MuscleFigure primary={g.muscles.primary} secondary={g.muscles.secondary} size="sm" />
-            <MuscleNames primary={g.muscles.primary} secondary={g.muscles.secondary} max={20} />
-          </div>
-          : <MuscleNames primary={g.muscles.primary} secondary={g.muscles.secondary} max={20} />}
+        {/* Схема крупно, по центру (владелец: «мелковата») — подписи под ней */}
+        {figure && <div className="guide__figure"><MuscleFigure primary={g.muscles.primary} secondary={g.muscles.secondary} size="lg" captions /></div>}
+        <MuscleNames primary={g.muscles.primary} secondary={g.muscles.secondary} max={20} />
       </section>}
     </div>}
   </details>;
