@@ -253,3 +253,13 @@ test('кардио: фазы интервалов — сколько угодн�
   // Время не у всех фаз — итог времени не сосчитать; калории — 4 × 20
   assert.deepEqual(planSet({ cardio: plan }, tt), { kcal: '80' });
 });
+
+test('FT-570: вес помощи хранится отдельно от отягощения, история сохраняет смысл', () => {
+  const track = trackOf({ track: { kind: 'bodyweight', weightMode: 'assistance' } });
+  assert.equal(rowFields(track)[0].head, 'Вес помощи, кг');
+  assert.equal(rowFields(track)[0].key, 'assist');
+  assert.equal(setText({ assist: '35', reps: '10' }, track), 'помощь 35 кг × 10');
+  assert.equal(volumeOf({ assist: '35', reps: '10' }, track), 0);
+  assert.equal(rowFields(trackOf({ track: { kind: 'bodyweight' } }))[0].key, 'weight');
+  assert.equal(setText({ weight: '10', reps: '8' }, bw), '+10 кг × 8');
+});

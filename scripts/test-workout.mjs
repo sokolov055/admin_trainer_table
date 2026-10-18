@@ -739,9 +739,9 @@ test('FT-570: регулировки тренажёра раскрываются
   exerciseSetupResponse = { setups: { 42: {
     name: 'Жим от плеч',
     setup: 'Сиденье — рукоятки на уровне плеч.\nОшибка: не отрывайте спину от спинки.',
-    notes: 'Сиденье — рукоятки на уровне плеч.\nПрижмите спину к спинке. Выжимайте рукоятки вверх и плавно опускайте.',
+    notes: 'Прижмите спину к спинке. Выжимайте рукоятки вверх и плавно опускайте.\nОшибка: Не раскачивайтесь.', mistakes: 'Не раскачивайтесь.',
     machines: [machine], alternatives: [], noteKey: 'e:жим от плеч',
-    muscles: { primary: ['Дельты'], secondary: [] }, media: { kind: 'animation', url: 'Shoulder_Press' },
+    muscles: { primary: ['front-deltoids'], secondary: ['triceps'] }, media: { kind: 'animation', url: 'Shoulder_Press' },
   } }, notes: {} };
   let local;
   try {
@@ -752,21 +752,23 @@ test('FT-570: регулировки тренажёра раскрываются
       await delay();
     });
 
-    const about = local.root.find(n => n.props.className === 'workout__about');
-    assert.deepEqual(about.findAll(n => n.props.className === 'workout__guide-title').map(text), ['Как настроить', 'Как выполнять']);
-    const details = about.findAllByType('details');
-    assert.equal(details.length, 2, 'у тренажёра своя раскрывашка, у мышц и анимации — своя');
-    assert.equal(text(details[1].findByType('summary')), 'Мышцы и анимация');
-    const musclesIn = (node) => node.findAll(n => n.props.className === 'muscles muscles--block').length;
-    assert.ok(musclesIn(about) === 1 && musclesIn(details[1]) === 1, 'мышцы — внутри раскрывашки, не на виду');
-    assert.equal(text(details[0].findByType('summary')), 'Тренажёр · Technogym');
-    assert.equal(details[0].findAll(n => n.props.className === 'machine__h' && text(n) === 'Как настроить').length, 0,
-      'общая инструкция упражнения не повторяется внутри тренажёра');
-    assert.equal(about.findAll(n => n.props.className === 'workout__technique').length, 1, 'техника показана один раз');
-    assert.ok(!text(about.find(n => n.props.className === 'workout__technique')).includes('Сиденье'), 'строка настройки не повторяется в технике');
-    assert.equal(about.findAll(n => n.props.className === 'setup__mistakes').length, 2,
-      'ошибка тренажёра остаётся внутри раскрывашки, ошибка упражнения — одна после техники');
-    assert.equal(text(about.findAll(n => n.props.className === 'setup__mistakes')[1]), 'Частая ошибкаНе отрывайте спину от спинки.');
+    const about = local.root.find(n => n.type === 'details' && n.props.className === 'workout__setup workout__about');
+    assert.equal(text(about), 'Тренажёр и техника', 'закрыто: только заголовок');
+    assert.equal(about.findAllByType('img').length, 0, 'медиа ещё не смонтированы');
+    const weights = () => local.root.findAllByType('input').filter(n => /подход [123], вес в кг/.test(n.props['aria-label'] || ''));
+    await act(async () => { weights()[0].props.onChange({ target: { value: '37' } }); await delay(); });
+    const before = weights().map(n => n.props.value);
+    await act(async () => { about.props.onToggle({ currentTarget: { open: true } }); });
+    assert.deepEqual(about.findAll(n => n.props.className === 'workout__guide-title').map(text), ['Technogym', 'Настройка оборудования', 'Техника выполнения']);
+    assert.equal(about.findAllByType('details').length, 2, 'общий раздел и вложенные мышцы');
+    assert.ok(!text(about).includes('рукоятки на уровне плеч'), 'резервная инструкция не показана');
+    assert.equal(about.findAll(n => n.props.className === 'workout__technique').length, 1);
+    assert.equal(about.findAll(n => n.props.className === 'setup__mistakes').length, 2, 'ошибки настройки и техники разделены');
+    assert.equal(text(about).split('Не раскачивайтесь.').length - 1, 1, 'ошибка не дублируется');
+    assert.ok(about.findAllByType('img').length >= 3, 'фото и анимация доступны вместе с техникой');
+    await act(async () => { about.props.onToggle({ currentTarget: { open: false } }); });
+    assert.deepEqual(weights().map(n => n.props.value), before, 'введённые веса сохраняются при раскрытии');
+    assert.equal(about.findAllByType('img').length, 0);
   } finally {
     exerciseSetupResponse = null;
     if (local) local.unmount();
@@ -784,7 +786,7 @@ test('тренажёры закрепил тренер: выбора нет, п�
   const bar = { uid: 'bar1', name: 'Гриф', kind: 'equipment' };
   const bench = { uid: 'bench1', name: 'Скамья', kind: 'equipment' };
   exerciseSetupResponse = { setups: { 77: {
-    name: 'Жим лёжа', setup: '', notes: '', machines: [bar, bench], alternatives: [], noteKey: 'e:жим лёжа',
+    name: 'Жим лёжа', setup: '', notes: '', machines: [bar, bench], primaryEquipmentUid: 'bar1', alternatives: [], noteKey: 'e:жим лёжа',
     muscles: { primary: [], secondary: [] }, media: null,
   } }, notes: { 'm:bar1': { text: 'Хват 81', by: 'client', from: 'e:жим лёжа' } } };
   const calls = [];
@@ -804,7 +806,9 @@ test('тренажёры закрепил тренер: выбора нет, п�
     });
     assert.equal(local.root.findAll(n => n.props.role === 'radiogroup').length, 0, 'выбирать тренажёр нечего');
     assert.ok(calls.some(([a, q]) => a === 'workout.exercise.history' && q.machineUid === 'bar1'), 'первый подставлен сам — с весом на нём');
-    assert.equal(text(local.root.find(n => n.props.className === 'small workout__gear')), 'Оборудование · Гриф   Оборудование · Скамья');
+    const about = local.root.find(n => n.type === 'details' && n.props.className === 'workout__setup workout__about');
+    await act(async () => { about.props.onToggle({ currentTarget: { open: true } }); });
+    assert.ok(text(about).includes('Дополнительно: Скамья'));
     assert.deepEqual(local.root.findAll(n => n.props.className === 'machine__note').map(text), ['Ваша настройка · ГрифХват 81']);
     assert.ok(local.root.findAllByType('button').some(b => text(b) === '+ Моя настройка · Скамья'), 'у скамьи своя');
 

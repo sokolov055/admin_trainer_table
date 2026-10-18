@@ -414,21 +414,28 @@ test('суперсет показан одной группой с числом 
   assert.equal(await group.locator('.exercise').count(), 2, 'в группе оба упражнения');
 });
 
-/** FT-570: настройки конкретной модели не повторяют общую инструкцию. */
-test('в активной тренировке тренажёр раскрывается отдельно от инструкции упражнения', async () => {
+/**
+ * FT-570: один раздел «Тренажёр и техника» — свёрнут; внутри по порядку
+ * настройка тренажёра (один источник), техника с ошибкой один раз, мышцы.
+ * Своя настройка клиента — на виду и при свёрнутом разделе.
+ */
+test('в активной тренировке один раздел: настройка, техника, мышцы', async () => {
   await section('Тренировка 2 — низ').getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('heading', { name: 'Тренировка 2 — низ' }).first().waitFor({ timeout: 20000 });
 
   const squat = page.locator('.workout__exercise').filter({ hasText: 'Присед со штангой' });
-  const about = squat.locator('.workout__about');
-  await about.getByRole('heading', { name: 'Как настроить', exact: true }).waitFor({ timeout: 10000 });
+  const about = squat.locator('details.workout__about');
+  await about.first().waitFor({ timeout: 10000 });
+  assert.equal(await about.count(), 1, 'справка — одним разделом');
+  assert.equal(await about.evaluate((d) => d.open), false, 'по умолчанию свёрнут');
+  await squat.getByText('Крюки на 4-й, упоры на 2-й').waitFor({ timeout: 5000 });
+  await about.locator('summary').first().click();
+  await about.getByRole('heading', { name: 'Настройка оборудования', exact: true }).waitFor({ timeout: 5000 });
   assert.equal(await about.locator('.setup__mistakes:visible').count(), 1, 'ошибка упражнения показана один раз');
-
-  const machine = about.locator('details.workout__machine-info');
-  await machine.getByText('Тренажёр · Силовая рама у окна', { exact: true }).click();
-  await machine.getByRole('heading', { name: 'Где регулировки', exact: true }).waitFor({ timeout: 5000 });
-  assert.equal(await machine.getByRole('heading', { name: 'Как настроить', exact: true }).count(), 0,
-    'общая инструкция не вложена в карточку тренажёра');
+  const text = await about.evaluate((d) => d.textContent);
+  assert.ok(text.indexOf('Настройка оборудования') < text.indexOf('Техника выполнения'), 'сначала настройка, потом техника');
+  assert.ok(text.indexOf('Техника выполнения') < text.indexOf('Мышцы'), 'мышцы — после техники');
+  assert.equal(await squat.getByText('Крюки на 4-й, упоры на 2-й').isVisible(), true, 'своя настройка на виду');
 
   await page.getByRole('button', { name: 'Отменить', exact: true }).click();
   await page.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();
@@ -1393,7 +1400,7 @@ test('оборудование создаётся без упражнения и
     await phone.getByRole('tab', { name: 'Тренажёры', exact: true }).click();
     await phone.getByRole('button', { name: 'Новый тренажёр', exact: true }).click();
     await phone.getByRole('radio', { name: 'Оборудование', exact: true }).click();
-    await phone.getByLabel('Название').fill('Разборные гантели');
+    await phone.getByLabel('Клиентское название').fill('Разборные гантели');
     await phone.getByLabel('Настройка').fill('Стойка у окна.');
     await phone.getByRole('button', { name: 'Сохранить', exact: true }).click();
 

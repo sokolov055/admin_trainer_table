@@ -1,3 +1,5 @@
+import { LABELS } from './regions.js';
+export { LABELS } from './regions.js';
 import React from 'react';
 import { Section, Panel } from '../ui.jsx';
 import { FRONT, BACK } from './figure.js';
@@ -14,25 +16,6 @@ import './muscles.css';
  * (MuscleEdit). Здесь только рисунок и подписи.
  */
 
-export const LABELS = {
-  chest: 'Грудь',
-  'front-deltoids': 'Передняя дельта',
-  'back-deltoids': 'Задняя дельта',
-  biceps: 'Бицепс',
-  triceps: 'Трицепс',
-  forearms: 'Предплечья',
-  abs: 'Пресс',
-  obliques: 'Косые мышцы живота',
-  trapezius: 'Трапеция',
-  lats: 'Широчайшие',
-  'lower-back': 'Поясница',
-  glutes: 'Ягодицы',
-  quadriceps: 'Квадрицепс',
-  hamstrings: 'Бицепс бедра',
-  adductors: 'Приводящие бедра',
-  abductors: 'Отводящие бедра',
-  calves: 'Икры',
-};
 const INERT = new Set(['head', 'neck', 'knees']);
 
 /** Крупные группы — для «где пробел»: проработана, если есть основная нагрузка */

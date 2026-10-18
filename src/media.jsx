@@ -1,3 +1,4 @@
+import { instructionParts } from './equipment-guidance.js';
 import React, { useEffect, useState } from 'react';
 import { haptic } from './telegram.js';
 import { apiMutate } from './api.js';
@@ -82,14 +83,7 @@ function FileVideo({ url }) {
  * глаз находил их сразу. Сама инструкция общая, без марок: залы разные,
  * а регулировки у тренажёров одни и те же — сиденье, спинка, валик, упор.
  */
-export function setupParts(text) {
-  if (!text) return { steps: [], mistakes: [] };
-  const lines = String(text).split('\n').map((l) => l.trim()).filter(Boolean);
-  const steps = lines.filter((l) => !/^ошибка:/i.test(l));
-  const cap = (l) => l.charAt(0).toUpperCase() + l.slice(1);
-  const mistakes = lines.filter((l) => /^ошибка:/i.test(l)).map((l) => cap(l.replace(/^ошибка:\s*/i, '')));
-  return { steps, mistakes };
-}
+export const setupParts = instructionParts;
 
 export function SetupMistakes({ mistakes = [] }) {
   if (!mistakes.length) return null;

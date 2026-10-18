@@ -1,3 +1,4 @@
+import { primaryEquipment } from '../equipment-guidance.js';
 import React, { useEffect, useState } from 'react';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
@@ -48,7 +49,7 @@ export function MachinesEditor({ exercise, owner, onChanged }) {
   const first = async (m) => {
     setFailure(null);
     try {
-      const r = await apiMutate('library.exercise.machine.move', { exerciseId: e.id, uids: [m.uid] });
+      const r = await apiMutate('library.exercise.machine.primary', { exerciseId: e.id, uid: m.uid });
       haptic('success');
       onChanged(r.exercise);
     } catch (err) {
@@ -70,10 +71,10 @@ export function MachinesEditor({ exercise, owner, onChanged }) {
             <div className="library__machine-text">
               <strong>{m.name}</strong>
               <span className="small muted">{m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{(m.photos || []).length > 1 ? ' · ' + m.photos.length + ' фото' : ''}</span>
-              <span className="small muted">{m.setup ? m.setup.split('\n')[0] : 'Регулировки не описаны — клиент увидит общий принцип.'}</span>
+              <span className="small muted">{m.setup ? m.setup.split('\n')[0] : 'Инструкция не заполнена. Резервная настройка упражнения не показывается.'}</span>
             </div>
             <div className="library__machine-actions">
-              {i > 0 && <button type="button" className="button button--ghost" onClick={() => first(m)}>Первым</button>}
+              {primaryEquipment(e)?.uid !== m.uid && <button type="button" className="button button--ghost" onClick={() => first(m)}>Основное</button>}
               <button type="button" className="button button--ghost" onClick={() => setEditing(m.uid)}>Изменить</button>
             </div>
           </div>
@@ -101,6 +102,10 @@ export function MachinesEditor({ exercise, owner, onChanged }) {
 export function MachineForm({ exercise = null, machine, onDone, canDelete = true }) {
   const [name, setName] = useState(machine ? machine.name : '');
   const [setup, setSetup] = useState(machine ? machine.setup : '');
+  const [originalName, setOriginalName] = useState(machine?.originalName || '');
+  const [brand, setBrand] = useState(machine?.brand || '');
+  const [muscleGroups, setMuscleGroups] = useState(machine?.muscleGroups || []);
+  const [setupOk, setSetupOk] = useState(machine?.setupOk !== false && !!machine?.setup);
   // Тренажёр или оборудование (владелец, 09.10.2026)
   const [kind, setKind] = useState(machine && machine.kind === 'equipment' ? 'equipment' : 'machine');
   // Фото несколько (09.10.2026): уже сохранённые — убранные удаляются только
@@ -137,7 +142,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     let result = null;
     try {
       const r = await apiMutate(exercise ? 'library.exercise.machine.save' : 'library.machine.save', {
-        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind,
+        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind, originalName, brand, muscleGroups, setupOk,
         ...(dropped.length ? { removePhotoUrls: dropped } : {}),
       });
       result = exercise ? r.exercise : r.machine;
@@ -184,10 +189,16 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         <Segmented label="Что это" items={MACHINE_KIND_ITEMS} value={kind} onChange={setKind} />
       </div>
       <label className="field">
-        <span className="field__label">Название</span>
+        <span className="field__label">Клиентское название</span>
         <input className="field__input" value={name} maxLength={80} autoFocus={!machine}
           onChange={(ev) => setName(ev.target.value)} placeholder={kind === 'equipment' ? 'Гантели, фитбол, степ-платформа…' : 'Hammer у окна, Technogym…'} />
       </label>
+      <label className="field"><span className="field__label">Оригинальное название модели</span><input className="field__input" value={originalName} maxLength={120} onChange={(e) => setOriginalName(e.target.value)} /></label>
+      <label className="field"><span className="field__label">Производитель / бренд</span><input className="field__input" value={brand} maxLength={120} onChange={(e) => setBrand(e.target.value)} /></label>
+      <fieldset className="field"><legend className="field__label">Мышечные группы</legend>
+        {['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Предплечье', 'Пресс', 'Всё тело', 'Кардио'].map((g) => <label className="library__check" key={g}><input type="checkbox" checked={muscleGroups.includes(g)} onChange={(e) => setMuscleGroups(e.target.checked ? [...muscleGroups, g] : muscleGroups.filter((x) => x !== g))} />{g}</label>)}
+      </fieldset>
+      {machine && <p className="small muted">Инструкция изменится во всех упражнениях с этой карточкой оборудования.</p>}
       <div className="field">
         <span className="field__label">Фото{total ? ' · ' + total + ' из ' + MAX_MACHINE_PHOTOS : ''}</span>
         {total > 0 && (
@@ -227,10 +238,11 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       <label className="field">
         <span className="field__label">Настройка</span>
         <textarea className="field__input library__textarea" value={setup} maxLength={1500} rows={4}
-          onChange={(ev) => setSetup(ev.target.value)}
+          onChange={(ev) => { setSetup(ev.target.value); setSetupOk(false); }}
           placeholder={kind === 'equipment' ? 'Где лежит, что взять для разминки…' : 'Спинка — рычаг справа под сиденьем.\nВалик — кнопка слева, тянуть на себя.'} />
         <span className="field__hint">Без цифр: настройка у каждого клиента своя — её записывают в занятии. Шаг — строка.</span>
       </label>
+      <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Инструкция оборудования проверена</label>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       <div className="library__actions">
         <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>

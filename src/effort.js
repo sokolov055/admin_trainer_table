@@ -186,6 +186,8 @@ function wasKg(ex, i) {
  */
 export function rateSet(ex, si, effort) {
   const set = ex.sets[si];
+  // Вес помощи не является отягощением: прежнюю прибавку веса к нему не применяем.
+  if (ex.track?.weightMode === 'assistance') return { ex: { ...ex, sets: ex.sets.map((x, i) => i === si ? { ...x, state: 'done', effort } : x) }, raised: false, lowered: false };
   const who = set.who || '';
   const mine = (x) => (x.who || '') === who;
   const cur = num(set.weight);

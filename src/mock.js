@@ -339,7 +339,7 @@ function demoMuscles(name) {
   const [primary, secondary] = DEMO_MUSCLE_MAP[key] || [[], []];
   return { muscles: { primary, secondary } };
 }
-const withDemoMuscles = (blocks) => blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e, ...demoMuscles(e.name) })) }));
+const withDemoMuscles = (blocks) => blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e, ...demoMuscles(e.name), ...(e.muscles ? { muscles: e.muscles } : {}) })) }));
 
 const MONTHS = ['Сентябрь 2026', 'Август 2026', 'Июль 2026', 'Июнь 2026'];
 
@@ -1854,7 +1854,7 @@ const MOCK = {
       .filter((e) => ids.includes(e.id))
       .forEach((e) => { setups[e.id] = { name: e.name, setup: e.setupOk ? e.setup : '', machines: e.machines || [], alternatives: e.alternatives || [], noteKey: 'e:' + e.name.toLowerCase(),
         // Как сервер (exerciseSetupFor): техника, анимация и мышцы
-        notes: e.notes || '', media: e.media || null, ...demoMuscles(e.name) }; });
+        notes: e.notes || '', mistakes: e.mistakes || '', primaryEquipmentUid: e.primaryEquipmentUid || null, media: e.media || null, ...demoMuscles(e.name), ...(e.muscles ? { muscles: e.muscles } : {}) }; });
     return { setups, notes: { ...demoNotes } };
   },
   // Своя настройка тренажёра у клиента — у каждого своя (07.10.2026)
@@ -1880,12 +1880,17 @@ const MOCK = {
     // Как на сервере: вид, фото списком, убрать одно или все
     const drop = [].concat(params.removePhotoUrls || [], params.removePhotoUrl || []);
     const photos = params.removePhoto ? [] : (m.photos || (m.photo ? [m.photo] : [])).filter((u) => !drop.includes(u));
-    Object.assign(m, { name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : (params.kind ? 'machine' : m.kind || 'machine'), photos, photo: photos[0] || '' });
+    Object.assign(m, { originalName: params.originalName ?? m.originalName, brand: params.brand ?? m.brand, muscleGroups: params.muscleGroups ?? m.muscleGroups ?? [], setupOk: params.setupOk ?? false, name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : (params.kind ? 'machine' : m.kind || 'machine'), photos, photo: photos[0] || '' });
     return { exercise: { ...e }, uid: m.uid };
   },
   'library.exercise.machine.delete': (params) => {
     const e = demoEditable(params.exerciseId);
     e.machines = (e.machines || []).filter((x) => x.uid !== params.uid);
+    return { exercise: { ...e } };
+  },
+  'library.exercise.machine.primary': (params) => {
+    const e = demoEditable(params.exerciseId);
+    e.primaryEquipmentUid = params.uid || null;
     return { exercise: { ...e } };
   },
   'library.exercise.machine.move': (params) => {
@@ -1918,7 +1923,7 @@ const MOCK = {
     }
     const drop = [].concat(params.removePhotoUrls || [], params.removePhotoUrl || []);
     const photos = params.removePhoto ? [] : (m.photos || (m.photo ? [m.photo] : [])).filter((u) => !drop.includes(u));
-    Object.assign(m, { name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : 'machine', photos, photo: photos[0] || '' });
+    Object.assign(m, { originalName: params.originalName ?? m.originalName, brand: params.brand ?? m.brand, muscleGroups: params.muscleGroups ?? m.muscleGroups ?? [], setupOk: params.setupOk ?? false, name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : 'machine', photos, photo: photos[0] || '' });
     return { machine: { ...m }, uid: m.uid };
   },
   'library.machine.delete': (params) => {
@@ -1949,12 +1954,14 @@ const MOCK = {
   }),
   'library.exercise.save': (params) => {
     const existing = demoExercises.find((e) => e.id === Number(params.id));
+    const extras = { mistakes: params.mistakes ?? existing?.mistakes ?? '', contentOk: params.contentOk ?? false, setup: params.setup ?? existing?.setup ?? '', setupOk: params.setupOk ?? existing?.setupOk ?? false, primaryEquipmentUid: params.primaryEquipmentUid ?? existing?.primaryEquipmentUid ?? null, track: params.track ?? existing?.track, muscles: params.muscles ?? existing?.muscles, musclesCustom: !!params.muscles, machines: params.machineUids ? params.machineUids.map(uid => demoMachines.find(m => m.uid === uid)).filter(Boolean) : existing?.machines || [] };
     if (existing && existing.mine) {
-      Object.assign(existing, { name: params.name, muscle: params.muscle, equipment: params.equipment, notes: params.notes, media: params.link ? { kind: 'link', url: params.link } : existing.media });
+      Object.assign(existing, extras,
+ { name: params.name, muscle: params.muscle, equipment: params.equipment, notes: params.notes, media: params.link ? { kind: 'link', url: params.link } : existing.media });
       return existing;
     }
     const inherited = existing && existing.media && existing.media.kind === 'animation' ? existing.media : null;
-    const mine = { id: ++demoExerciseSeq, name: params.name, muscle: params.muscle || '', equipment: params.equipment || '', notes: params.notes || '', media: params.link ? { kind: 'link', url: params.link } : inherited, mine: true, common: false };
+    const mine = { ...extras, id: ++demoExerciseSeq, name: params.name, muscle: params.muscle || '', equipment: params.equipment || '', notes: params.notes || '', media: params.link ? { kind: 'link', url: params.link } : inherited, mine: true, common: false };
     demoExercises = [...demoExercises.filter((e) => !(existing && e.id === existing.id)), mine];
     return mine;
   },

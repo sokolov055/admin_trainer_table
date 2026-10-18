@@ -1,3 +1,6 @@
+import EquipmentDraft from './EquipmentDraft.jsx';
+import { primaryEquipment } from '../equipment-guidance.js';
+import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
 import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useState } from 'react';
@@ -707,6 +710,8 @@ function Exercises() {
   const { loading, data, error, reload } = useData('library.exercises', {}, []);
   const [q, setQ] = useState('');
   const [muscle, setMuscle] = useState('');
+  const [loadKind, setLoadKind] = useState('');
+  const [gearKind, setGearKind] = useState('');
   const [open, setOpen] = useState(null);
   const [editing, setEditing] = useState(null);
   const [pruning, setPruning] = useState(false);
@@ -775,6 +780,8 @@ function Exercises() {
   const muscles = [{ value: '', label: 'Все' }, ...data.muscles.map((m) => ({ value: m, label: m })), { value: '—', label: 'Без группы' }];
   const drafts = data.owner ? all.filter((e) => e.setup && !e.setupOk).length : 0;
   const shown = all
+    .filter((e) => !loadKind || (loadKind === 'assistance' ? e.track?.weightMode === 'assistance' : e.track?.kind === loadKind && e.track?.weightMode !== 'assistance'))
+    .filter((e) => !gearKind || (gearKind === 'none' ? !e.machines?.length : gearKind === 'any' ? !!e.machines?.length : e.machines?.some((m) => m.kind === gearKind)))
     .filter((e) => !reviewing || (e.setup && !e.setupOk))
     .filter((e) => !muscle || (muscle === '—' ? !e.muscle : e.muscle === muscle))
     .filter((e) => !q || e.name.toLowerCase().replace(/ё/g, 'е').includes(q.toLowerCase().replace(/ё/g, 'е')));
@@ -791,6 +798,8 @@ function Exercises() {
       </div>
       <Search value={q} onChange={setQ} placeholder="Поиск упражнения" />
       <Chips className="library__filters" items={muscles} value={muscle} onChange={setMuscle} />
+      <label className="field"><span className="field__label">Как учитывать нагрузку</span><select className="field__input" value={loadKind} onChange={(e) => setLoadKind(e.target.value)}><option value="">Все способы</option>{Object.entries(KIND_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}<option value="assistance">Вес помощи и повторения</option></select></label>
+      <label className="field"><span className="field__label">Оборудование</span><select className="field__input" value={gearKind} onChange={(e) => setGearKind(e.target.value)}><option value="">Любое</option><option value="none">Без привязки</option><option value="any">С привязкой</option><option value="machine">Тренажёр</option><option value="equipment">Оборудование</option></select></label>
 
       <div className="library__count">
         <p>{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
@@ -844,6 +853,8 @@ function Machines() {
   const { loading, data, error, reload } = useData('library.machines', {}, []);
   const [q, setQ] = useState('');
   const [kindOf, setKindOf] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState('');
   const [open, setOpen] = useState('');
   const [form, setForm] = useState(null);
   const [exerciseQ, setExerciseQ] = useState('');
@@ -910,6 +921,9 @@ function Machines() {
           </div>
           {machine.mine && <Tag tone="good">своё</Tag>}
         </div>
+        {machine.originalName && <p className="small">Модель: {machine.originalName}</p>}
+        {machine.brand && <p className="small">Производитель: {machine.brand}</p>}
+        {machine.muscleGroups?.length > 0 && <p className="small">Мышцы: {machine.muscleGroups.join(', ')}</p>}
         <MachinePhoto machine={machine} />
         {machine.setup
           ? <><h4 className="setup__title">{machine.kind === 'equipment' ? 'Как использовать' : 'Где регулировки'}</h4><SetupText text={machine.setup} /></>
@@ -945,8 +959,10 @@ function Machines() {
 
   const nq = keyOf(q);
   const shown = list
+    .filter((item) => !brandFilter || (brandFilter === '—' ? !item.brand : item.brand === brandFilter))
+    .filter((item) => !muscleFilter || (item.muscleGroups || []).includes(muscleFilter))
     .filter((item) => !kindOf || item.kind === kindOf)
-    .filter((item) => !nq || keyOf(item.name).includes(nq) || item.uses.some((exercise) => keyOf(exercise.name).includes(nq)));
+    .filter((item) => !nq || keyOf(item.name).includes(nq) || keyOf(item.originalName).includes(nq) || item.uses.some((exercise) => keyOf(exercise.name).includes(nq)));
   const kinds = [{ value: '', label: 'Все' }, { value: 'machine', label: 'Тренажёры' }, { value: 'equipment', label: 'Оборудование' }];
 
   return (
@@ -959,6 +975,8 @@ function Machines() {
       <p className="library__sub">Создавайте тренажёры и оборудование отдельно, затем привязывайте каждую карточку к любому числу упражнений.</p>
       <Search value={q} onChange={setQ} placeholder="Поиск тренажёра или оборудования" />
       <Chips className="library__filters" items={kinds} value={kindOf} onChange={setKindOf} />
+      <label className="field"><span className="field__label">Производитель / бренд</span><select className="field__input" value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}><option value="">Все производители</option><option value="—">Не указан</option>{[...new Set(list.map((m) => m.brand).filter(Boolean))].sort().map((b) => <option key={b} value={b}>{b}</option>)}</select></label>
+      <label className="field"><span className="field__label">Мышечная группа оборудования</span><select className="field__input" value={muscleFilter} onChange={(e) => setMuscleFilter(e.target.value)}><option value="">Все группы</option>{[...new Set(list.flatMap((m) => m.muscleGroups || []))].sort().map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
       {list.length > 0 && <div className="library__count"><p>{shown.length} {plural(shown.length, 'объект', 'объекта', 'объектов')}</p></div>}
       {!list.length && <Empty title="Пока пусто" text="Создайте карточку тренажёра или оборудования. Упражнения можно добавить после сохранения." />}
       {shown.map((item) => (
@@ -1234,9 +1252,10 @@ function SetupEditor({ exercise, canEdit, onSaved }) {
   const [failure, setFailure] = useState(null);
   useEffect(() => { setText(e.setup || ''); setOk(!!e.setupOk); }, [e.id, e.setup, e.setupOk]);
 
+  if (e.machines?.length) return null;
   if (!canEdit) {
     return e.setup && e.setupOk
-      ? <><h3 className="setup__title">Как настроить тренажёр</h3><SetupText text={e.setup} /></>
+      ? <><h3 className="setup__title">Подготовка к упражнению</h3><SetupText text={e.setup} /></>
       : null;
   }
 
@@ -1259,10 +1278,10 @@ function SetupEditor({ exercise, canEdit, onSaved }) {
     <div className="library__form" style={{ marginTop: 'var(--space-3)' }}>
       <label className="field">
         <span className="field__label">
-          Как настроить тренажёр {e.setup && !e.setupOk && <Badge kind="warn">черновик — клиенты не видят</Badge>}
+          Подготовка к упражнению {e.setup && !e.setupOk && <Badge kind="warn">черновик — клиенты не видят</Badge>}
         </span>
         <textarea className="field__input library__textarea" value={text} maxLength={1500} rows={5}
-          onChange={(ev) => setText(ev.target.value)}
+          onChange={(ev) => { setText(ev.target.value); setOk(false); }}
           placeholder={'Сиденье — рукояти на уровне груди.\nСпинка — лопатки прижаты.\nОшибка: локти выше плеч.'} />
         <span className="field__hint">Шаг — строка. «Ошибка: …» клиент увидит отдельно, жёлтым.</span>
       </label>
@@ -1281,7 +1300,7 @@ function SetupEditor({ exercise, canEdit, onSaved }) {
 /** «Кардио · Беговая дорожка», «Силовое · вес с одной стороны» (+ «авто») */
 function trackLine(t) {
   return [
-    KIND_LABELS[t.kind],
+    t.weightMode === 'assistance' ? 'Вес помощи и повторения' : KIND_LABELS[t.kind],
     t.kind === 'cardio' && MACHINE_LABELS[t.machine],
     t.unilateral && 'повторы на сторону',
     t.perSide && 'вес с одной стороны',
@@ -1293,11 +1312,23 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
   const [muscle, setMuscle] = useState(exercise ? exercise.muscle : '');
   const [equipment, setEquipment] = useState(exercise ? exercise.equipment : '');
   const [notes, setNotes] = useState(exercise ? exercise.notes : '');
+  const [mistakes, setMistakes] = useState(exercise?.mistakes || '');
+  const [contentOk, setContentOk] = useState(!!exercise?.contentOk);
+  const [setup, setSetup] = useState(exercise?.setup || '');
+  const [setupOk, setSetupOk] = useState(!!exercise?.setupOk);
+  const [gear, setGear] = useState(exercise?.machines || []);
+  const [primaryUid, setPrimaryUid] = useState(exercise?.primaryEquipmentUid || null);
+  const [muscleMap, setMuscleMap] = useState(exercise?.musclesCustom ? exercise.muscles : null);
+  const [savedId, setSavedId] = useState(null);
+  const tapMuscle = (r) => setMuscleMap((old) => {
+    const v = old || { primary: [], secondary: [] };
+    return { primary: v.primary.filter((x) => x !== r).concat(!v.primary.includes(r) && !v.secondary.includes(r) ? [r] : []), secondary: v.secondary.filter((x) => x !== r).concat(v.primary.includes(r) ? [r] : []) };
+  });
   const [link, setLink] = useState(exercise && exercise.media && exercise.media.kind === 'link' ? exercise.media.url : '');
   // Тип учёта: «авто» — угадывается по названию и инвентарю; остальное —
   // выбор тренера, когда угадано не так
   const known = exercise && exercise.track;
-  const [kind, setKind] = useState(known && !known.auto ? known.kind : 'auto');
+  const [kind, setKind] = useState(known?.weightMode === 'assistance' ? 'assistance' : known && !known.auto ? known.kind : 'auto');
   const [machine] = useState((known && known.machine) || 'treadmill');
   const [unilateral, setUnilateral] = useState(!!(known && known.unilateral));
   const [perSide, setPerSide] = useState(!!(known && known.perSide));
@@ -1316,16 +1347,19 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
     try {
       const saved = await apiMutate('library.exercise.save', {
         // Общее не правится: с его id сервер создаст свою версию
-        id: exercise ? exercise.id : undefined,
+        id: savedId || (exercise ? exercise.id : undefined),
         name: name.trim(),
         muscle,
         equipment,
-        notes,
-        track: kind === 'auto' ? { auto: true } : { kind, machine, unilateral, perSide },
+        notes, mistakes, contentOk, muscles: muscleMap,
+        machineUids: gear.map((m) => m.uid), primaryEquipmentUid: primaryUid || primaryEquipment({ machines: gear })?.uid || null,
+        ...(!gear.length ? { setup, setupOk } : {}),
+        track: kind === 'auto' ? { auto: true } : { kind: kind === 'assistance' ? 'bodyweight' : kind, weightMode: kind === 'assistance' ? 'assistance' : undefined, machine, unilateral, perSide },
         // Ссылку не трогаем, если загружен файл и поле пустое
         ...(link || !keepsMedia ? { link } : {}),
       });
 
+      setSavedId(saved.id);
       if (file) {
         setProgress(0);
         await uploadVideo(saved.id, file, setProgress);
@@ -1353,13 +1387,18 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
             <Chips items={[{ value: '', label: 'Не указана' }, ...muscles.map((m) => ({ value: m, label: m }))]} value={muscle} onChange={setMuscle} />
           </div>
 
-          <Field label="Инвентарь" inputMode="text" value={equipment} onChange={setEquipment} placeholder="Гантели" />
+          {equipment && <Field label="Инвентарь (прежнее значение)" inputMode="text" value={equipment} onChange={setEquipment} />}
+          <EquipmentDraft items={gear} primaryUid={primaryUid} onChange={(items, uid) => { setGear(items); setPrimaryUid(uid); }} />
+          {!gear.length && <>
+            <label className="field"><span className="field__label">Подготовка к упражнению</span><textarea className="field__input library__textarea" rows={4} value={setup} maxLength={1500} onChange={(e) => { setSetup(e.target.value); setSetupOk(false); }} /></label>
+            <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Подготовка проверена</label>
+          </>}
 
           <div>
-            <span className="field__label">Что записывать в подходе</span>
+            <span className="field__label">Как учитывать нагрузку</span>
             <Chips
               items={[{ value: 'auto', label: known && known.auto ? 'Само: ' + KIND_LABELS[known.kind].toLowerCase() : 'Определить само' },
-                ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label }))]}
+                ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })), { value: 'assistance', label: 'Вес помощи и повторения' }]}
               value={kind}
               onChange={setKind}
             />
@@ -1373,15 +1412,25 @@ function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
           )}
 
           <label className="field">
-            <span className="field__label">Техника и подсказки</span>
-            <textarea className="field__input library__textarea" value={notes} maxLength={2000} onChange={(e) => setNotes(e.target.value)} placeholder="На что обратить внимание" />
+            <span className="field__label">Техника выполнения</span>
+            <textarea className="field__input library__textarea" value={notes} maxLength={2000} onChange={(e) => { setNotes(e.target.value); setContentOk(false); }} placeholder="На что обратить внимание" />
           </label>
 
-          <Field label="Видео — ссылка" inputMode="url" value={link} onChange={setLink} placeholder="https://…" hint="Клиент увидит кнопку «Открыть видео» — ролик откроется на том сайте. Чтобы видео играло прямо в приложении, загрузите файл." />
+          <label className="field"><span className="field__label">Частые ошибки выполнения</span><textarea className="field__input library__textarea" value={mistakes} maxLength={1500} onChange={(e) => { setMistakes(e.target.value); setContentOk(false); }} /></label>
+          <label className="library__check"><input type="checkbox" checked={contentOk} onChange={(e) => setContentOk(e.target.checked)} />Техника упражнения проверена</label>
+          <details><summary>Основные и дополнительные мышцы</summary>
+            <p className="small muted">Нажатие: основная, дополнительная, убрать. Без точной разметки используется выбранная группа.</p>
+            <MuscleFigure primary={muscleMap?.primary || []} secondary={muscleMap?.secondary || []} onTap={tapMuscle} />
+            <MuscleNames primary={muscleMap?.primary || []} secondary={muscleMap?.secondary || []} max={20} />
+            <div className="chips chips--wrap">{Object.entries(LABELS).map(([id, label]) => <button className="chip" type="button" key={id} aria-pressed={!!(muscleMap?.primary.includes(id) || muscleMap?.secondary.includes(id))} onClick={() => tapMuscle(id)}>{label}{muscleMap?.primary.includes(id) ? ' · основная' : muscleMap?.secondary.includes(id) ? ' · дополнительная' : ''}</button>)}</div>
+            <button className="button button--ghost" type="button" onClick={() => setMuscleMap(null)}>Использовать группу</button>
+          </details>
+          {kind === 'assistance' && <p className="small muted">Вес помощи, кг: чем он больше, тем легче упражнение. Прежние записи сохраняют свой способ учёта.</p>}
+          <Field label="Видео — ссылка" inputMode="url" value={link} onChange={(v) => { setLink(v); setContentOk(false); }} placeholder="https://…" hint="Клиент увидит кнопку «Открыть видео» — ролик откроется на том сайте. Чтобы видео играло прямо в приложении, загрузите файл." />
 
           <label className="field">
             <span className="field__label">Или файлом с телефона</span>
-            <input type="file" accept="video/mp4,video/quicktime,video/webm,video/x-m4v" onChange={(e) => setFile(e.target.files[0] || null)} />
+            <input type="file" accept="video/mp4,video/quicktime,video/webm,video/x-m4v" onChange={(e) => { setFile(e.target.files[0] || null); setContentOk(false); }} />
             <span className="field__hint">
               {file
                 ? `${file.name} · ${Math.round(file.size / 1024 / 1024)} МБ`

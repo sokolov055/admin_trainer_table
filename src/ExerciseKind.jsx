@@ -35,8 +35,8 @@ export default function ExerciseKind({ track, onChange, disabled = false, classN
   );
   return (
     <div className={'exercise-kind' + (className ? ' ' + className : '')}>
-      <span className="exercise-kind__label">Вид</span>
-      <div className="chips chips--flush chips--wrap exercise-kind__row" role="radiogroup" aria-label="Что записывать">
+      <span className="exercise-kind__label">Как учитывать нагрузку</span>
+      <div className="chips chips--flush chips--wrap exercise-kind__row" role="radiogroup" aria-label="Как учитывать нагрузку">
         {Object.entries(KIND_LABELS).map(([k, v]) => (
           <button
             type="button"
@@ -49,6 +49,8 @@ export default function ExerciseKind({ track, onChange, disabled = false, classN
           >{v}</button>
         ))}
       </div>
+      {track.kind === 'bodyweight' && <label className="library__check"><input type="checkbox" checked={track.weightMode === 'assistance'} disabled={disabled} onChange={(e) => set({ weightMode: e.target.checked ? 'assistance' : undefined })} />Вес помощи и повторения</label>}
+      {track.weightMode === 'assistance' && <p className="small muted">Чем больше вес помощи, тем легче упражнение.</p>}
       {track.kind !== 'cardio' && (
         <div className="chips chips--flush chips--wrap exercise-kind__row">
           {/* Работа: включено — одной стороной (рука, нога по очереди), выключено —
@@ -72,11 +74,11 @@ export default function ExerciseKind({ track, onChange, disabled = false, classN
  * (id может смениться: своя версия или новое).
  */
 export async function saveExerciseTrack({ exerciseId, name, track }) {
-  const { kind, machine, unilateral, perSide } = track;
+  const { kind, machine, unilateral, perSide, weightMode } = track;
   const res = await apiMutate('library.exercise.track', {
     ...(exerciseId ? { exerciseId } : {}),
     name: String(name || '').trim(),
-    track: { kind, machine: machine || '', unilateral: !!unilateral, perSide: !!perSide },
+    track: { kind, weightMode, machine: machine || '', unilateral: !!unilateral, perSide: !!perSide },
   });
   return res && res.exercise ? res.exercise : null;
 }

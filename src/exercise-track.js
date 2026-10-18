@@ -46,6 +46,7 @@ export function trackOf(ex) {
     unilateral: t.kind !== 'cardio' && !!t.unilateral,
     perSide: t.kind === 'strength' && !!t.perSide,
   };
+  if (out.kind === 'bodyweight' && t.weightMode === 'assistance') out.weightMode = 'assistance';
   if (out.kind === 'cardio') {
     const list = (t.metrics && t.metrics.length ? t.metrics : plan && plan.metrics) || [];
     out.goal = cardioGoal({ goal: t.goal || (plan && plan.goal), metrics: list, intervals: plan && plan.intervals });
@@ -341,6 +342,7 @@ export function rowFields(track) {
     return list;
   }
   if (track.kind === 'timed') return [{ ...weight, head: 'Доп. вес', placeholder: 'свой' }, time('с')];
+  if (track.kind === 'bodyweight' && track.weightMode === 'assistance') return [{ ...weight, key: 'assist', head: 'Вес помощи, кг', placeholder: '0' }, reps];
   if (track.kind === 'bodyweight') return [{ ...weight, head: 'Доп. вес, кг', placeholder: 'свой' }, reps];
   return [track.perSide ? { ...weight, head: 'Кг / сторона', unit: 'кг/стор.' } : weight, reps];
 }
@@ -386,6 +388,7 @@ export function timeText(value, track) {
 }
 
 function weightText(set, track) {
+  if (track.kind === 'bodyweight' && track.weightMode === 'assistance') return [set.assist !== '' && set.assist != null ? 'помощь ' + set.assist + ' кг' : '', set.weight ? '+' + set.weight + ' кг' : ''].filter(Boolean).join(' · ');
   if (track.kind === 'bodyweight' || track.kind === 'timed') {
     if (set.weight) return '+' + set.weight + ' кг';
     if (set.assist) return 'поддержка: ' + set.assist;

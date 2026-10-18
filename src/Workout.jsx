@@ -1,3 +1,5 @@
+import { primaryEquipment } from './equipment-guidance.js';
+import WorkoutGuidance from './WorkoutGuidance.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync, createPortal } from 'react-dom';
 import { apiFresh, apiPublic, apiMutate } from './api.js';
@@ -991,7 +993,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const track = trackOf(ex);
     const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
     return <>
-      {(track.kind === 'bodyweight' || track.kind === 'timed') && (
+      {((track.kind === 'bodyweight' && track.weightMode !== 'assistance') || track.kind === 'timed') && (
         <label className="workout__field">Поддержка<input aria-label={`${ex.name}, подход ${si + 1}, поддержка`} placeholder="резинка, гравитрон 20" maxLength={40} value={set.assist || ''} onChange={e => edit('assist', e.target.value)} /></label>
       )}
     </>;
@@ -1708,10 +1710,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       const machines = (setups[ex.exerciseId] && setups[ex.exerciseId].machines) || [];
       if (!machines.length || ex.sets.some((x) => x.who)) return;
       if (ex.machine && machines.some((m) => m.uid === ex.machine.uid)) return;
-      const mark = ex.id + '|' + machines[0].uid;
+      const primary = primaryEquipment(setups[ex.exerciseId]);
+      if (!primary) return;
+      const mark = ex.id + '|' + primary.uid;
       if (autoMachine.current.has(mark)) return;
       autoMachine.current.add(mark);
-      chooseMachine(ei, machines[0]);
+      chooseMachine(ei, primary);
     });
   }, [setups, editable, s && s.exercises]);
 
@@ -1733,7 +1737,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       .filter((w) => clientRow || w in notesBy || !Object.keys(notesBy).length);
     const targets = noteTargetsOf(info);
     return <>
-      {gearLine(machines)}
+
       {whos.map((w) => {
         const own = notesBy[w] || {};
         const canNote = clientRow || w in notesBy;
@@ -1752,7 +1756,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           </div>
         );
       })}
-      {aboutView(info, machines)}
+
     </>;
   };
 
@@ -1776,68 +1780,27 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * источника: один тренажёр используют в разных упражнениях, поэтому его
    * регулировки не должны повторять инструкцию упражнения (FT-570).
    */
-  const aboutView = (info, gear = null, title = '') => {
-    // Тренажёры упражнения — все, что закрепил тренер (штанга, гриф, скамья)
-    const withDetails = (Array.isArray(gear) ? gear : gear ? [gear] : []).filter(machineHasDetails);
-    const machineDetails = withDetails.length > 0;
-    const muscles = info.muscles && ((info.muscles.primary || []).length || (info.muscles.secondary || []).length) ? info.muscles : null;
-    if (!machineDetails && !info.setup && !info.notes && !info.media && !muscles) return null;
-
-    // Техника часто записана тем же текстом, что «Как настроить», — второй
-    // раз не показываем (владелец, 09.10.2026: текст повторялся под шагами)
-    const flat = (t) => String(t || '').toLowerCase().replace(/[^a-zа-яё0-9]+/g, ' ').trim();
-    const notes = info.notes && !(info.setup && (flat(info.setup).includes(flat(info.notes)) || flat(info.notes).includes(flat(info.setup)))) ? info.notes : '';
-    const technique = setupParts(notes);
-    // И построчно: одна и та же строка (пробные повторения, хват) бывает в обоих текстах
-    const setupLines = new Set(setupParts(info.setup).steps.map(flat));
-    technique.steps = technique.steps.filter((l) => !setupLines.has(flat(l)));
-    const mistakes = [...setupParts(info.setup).mistakes, ...technique.mistakes]
-      .filter((mistake, index, all) => all.findIndex((item) => flat(item) === flat(mistake)) === index);
-    return <div className="workout__about">
-      {title && <h4 className="workout__about-name">{title}</h4>}
-      {withDetails.map((m) => <details className="workout__setup workout__machine-info" key={m.uid}>
-        <summary>{(m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + m.name}</summary>
-        <MachineInfo machine={m} />
-      </details>)}
-      {info.setup && <section className="workout__guide">
-        <h4 className="workout__guide-title">Как настроить</h4>
-        <SetupText text={info.setup} showMistakes={false} />
-      </section>}
-      {technique.steps.length > 0 && <section className="workout__guide">
-        <h4 className="workout__guide-title">Как выполнять</h4>
-        <p className="workout__technique">{technique.steps.join('\n')}</p>
-      </section>}
-      <SetupMistakes mistakes={mistakes} />
-      {/* Мышцы и анимация — одним касанием (владелец, 09.10.2026): на виду
-          они отодвигали подходы на экран вниз */}
-      {(muscles || info.media) && <details className="workout__setup workout__extra">
-        <summary>{[muscles && 'Мышцы', info.media && (info.media.kind === 'animation' ? 'анимация' : 'видео')].filter(Boolean).join(' и ').replace(/^./, (c) => c.toUpperCase())}</summary>
-        {muscles && <div className="muscles muscles--block">
-          <MuscleFigure primary={muscles.primary || []} secondary={muscles.secondary || []} size="sm" />
-          <MuscleNames primary={muscles.primary || []} secondary={muscles.secondary || []} max={4} />
-        </div>}
-        <Media media={info.media} />
-      </details>}
-    </div>;
-  };
-
   const extrasView = (ex, ei, info) => {
     const machines = info.machines || [];
     const split = ex.sets.some((x) => x.who);
-    const primary = (ex.machine && machines.find((m) => m.uid === ex.machine.uid)) || machines[0] || null;
+    // Основное не отмечено, а занятие уже знает тренажёр (закрепил тренер или
+    // взят по истории, exercise-history.js) — настройка этого тренажёра
+    const pinned = ex.machine && ex.machine.uid && machines.some((m) => m.uid === ex.machine.uid);
+    const guide = !info.primaryEquipmentUid && pinned ? { ...info, primaryEquipmentUid: ex.machine.uid } : info;
+    const primary = primaryEquipment(guide);
     const alts = (info.alternatives || []).filter((a) => a.id !== Number(ex.exerciseId));
     const started = ex.sets.some((x) => x.state === 'done');
     return <>
       {/* Тренажёр закрепил тренер (16.10.2026) — клиент его не выбирает */}
       {machines.length > 0 && !split && (
         <div className="workout__machines">
-          {gearLine(machines)}
           {primary && editable && !ex.prevWeight && !ex.lastRun && trackOf(ex).kind === 'strength'
             && ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim()) && (
             <p className="small muted">{otherMachineText(ex.otherRun) || 'Здесь ещё не делали — впишите вес, дальше он запомнится.'}</p>
           )}
         </div>
       )}
+      <WorkoutGuidance info={guide} trainer={!asClient} />
       {/* Своя настройка — у каждого клиента своя, на виду, а не в
           раскрывашке: ради неё в зале и смотрят. У каждого тренажёра своя */}
       {!split && noteTargetsOf(info).map(({ target, label }) => (
@@ -1850,7 +1813,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           })} />
       ))}
       {split && splitView(ex, ei, info)}
-      {!split && aboutView(info, machines)}
       {/* Замена (владелец, 16.10.2026: понятнее и удобнее): клиент меняет
           упражнение, а не тренажёр — одной кнопкой, со списком и пояснением.
           Связь в обе стороны (сервер), поэтому вернуться — тем же списком */}
