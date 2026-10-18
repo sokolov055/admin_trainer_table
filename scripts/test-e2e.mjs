@@ -430,11 +430,12 @@ test('в активной тренировке один раздел: настр
   assert.equal(await about.evaluate((d) => d.open), false, 'по умолчанию свёрнут');
   await squat.getByText('Крюки на 4-й, упоры на 2-й').waitFor({ timeout: 5000 });
   await about.locator('summary').first().click();
-  await about.getByRole('heading', { name: 'Настройка оборудования', exact: true }).waitFor({ timeout: 5000 });
-  assert.equal(await about.locator('.setup__mistakes:visible').count(), 1, 'ошибка упражнения показана один раз');
+  await about.getByRole('heading', { name: 'Подготовка', exact: true }).waitFor({ timeout: 5000 });
+  assert.equal(await about.locator('.guide__avoid').count(), 1, 'ошибки — одним блоком');
   const text = await about.evaluate((d) => d.textContent);
-  assert.ok(text.indexOf('Настройка оборудования') < text.indexOf('Техника выполнения'), 'сначала настройка, потом техника');
-  assert.ok(text.indexOf('Техника выполнения') < text.indexOf('Мышцы'), 'мышцы — после техники');
+  assert.ok(text.indexOf('Подготовка') < text.indexOf('Движение'), 'сначала подготовка, потом движение');
+  assert.ok(text.indexOf('Движение') < text.indexOf('Чего избегать'), 'ошибки — после шагов');
+  assert.ok(text.indexOf('Чего избегать') < text.indexOf('Мышцы'), 'мышцы — в конце');
   assert.equal(await squat.getByText('Крюки на 4-й, упоры на 2-й').isVisible(), true, 'своя настройка на виду');
 
   await page.getByRole('button', { name: 'Отменить', exact: true }).click();

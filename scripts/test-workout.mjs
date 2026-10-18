@@ -730,7 +730,7 @@ test('другой тренажёр: веса неотмеченных — с п
   assert.deepEqual(none.sets, press.sets, 'без ответа сервера веса не меняются');
 });
 
-test('FT-570: регулировки тренажёра раскрываются отдельно, инструкция упражнения не дублируется', async () => {
+test('FT-570, вариант А: шаги одной нумерацией, ошибки одним блоком, повторов нет', async () => {
   data.clear();
   const machine = {
     uid: 'shoulder-press', name: 'Technogym', kind: 'machine', photo: '/machine.jpg',
@@ -753,17 +753,19 @@ test('FT-570: регулировки тренажёра раскрываются
     });
 
     const about = local.root.find(n => n.type === 'details' && n.props.className === 'workout__setup workout__about');
-    assert.equal(text(about), 'Тренажёр и техника', 'закрыто: только заголовок');
+    assert.equal(text(about), 'Тренажёр и техникаTechnogym · 2 шага · видео', 'закрыто: заголовок и что внутри');
     assert.equal(about.findAllByType('img').length, 0, 'медиа ещё не смонтированы');
     const weights = () => local.root.findAllByType('input').filter(n => /подход [123], вес в кг/.test(n.props['aria-label'] || ''));
     await act(async () => { weights()[0].props.onChange({ target: { value: '37' } }); await delay(); });
     const before = weights().map(n => n.props.value);
     await act(async () => { about.props.onToggle({ currentTarget: { open: true } }); });
-    assert.deepEqual(about.findAll(n => n.props.className === 'workout__guide-title').map(text), ['Technogym', 'Настройка оборудования', 'Техника выполнения']);
-    assert.equal(about.findAllByType('details').length, 2, 'общий раздел и вложенные мышцы');
+    assert.equal(text(about.find(n => n.props.className === 'guide__machine-name')), 'Technogym');
+    assert.deepEqual(about.findAll(n => n.props.className === 'guide__h').map(text), ['Подготовка', 'Движение', 'Чего избегать', 'Мышцы']);
+    assert.equal(about.findAllByType('details').length, 1, 'мышцы — без вложенной раскрывашки');
     assert.ok(!text(about).includes('рукоятки на уровне плеч'), 'резервная инструкция не показана');
-    assert.equal(about.findAll(n => n.props.className === 'workout__technique').length, 1);
-    assert.equal(about.findAll(n => n.props.className === 'setup__mistakes').length, 2, 'ошибки настройки и техники разделены');
+    assert.equal(about.findAll(n => n.props.className === 'guide__steps').length, 2, 'подготовка и движение — одним видом');
+    assert.equal(about.findAll(n => n.props.className === 'guide__avoid').length, 1, 'ошибки настройки и техники — одним блоком');
+    assert.ok(text(about).includes('Не тяните рычаг под нагрузкой.'), 'ошибка тренажёра в общем блоке');
     assert.equal(text(about).split('Не раскачивайтесь.').length - 1, 1, 'ошибка не дублируется');
     assert.ok(about.findAllByType('img').length >= 3, 'фото и анимация доступны вместе с техникой');
     await act(async () => { about.props.onToggle({ currentTarget: { open: false } }); });
