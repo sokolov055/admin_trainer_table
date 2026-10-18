@@ -1,0 +1,12 @@
+.food-scan { margin-block: 16px; padding-block: 16px; border-block: 1px solid var(--border); }
+.food-scan .diary-inline-actions { flex-wrap: wrap; }
+.food-scan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.food-scan-head h3 { margin: 0; }
+.food-scan-file { display: none; }
+.food-scan-preview { display: block; width: 100%; max-height: 320px; object-fit: contain; margin-block: 16px; background: #fff; }
+.food-scan-result { margin-top: 16px; }
+.food-scan-values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-block: 16px; font-variant-numeric: tabular-nums; }
+.food-scan-values dt { font-size: 12px; color: var(--text-muted); }
+.food-scan-values dd { margin: 4px 0 0; font-weight: 600; }
+.food-scan-text { margin-block: 16px; }
+.food-scan-text pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; }

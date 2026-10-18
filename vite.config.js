@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { localOcrAssets } from './scripts/ocr-assets.mjs';
 
 // base: './' — приложение должно работать и в подпапке (GitHub Pages отдаёт
 // его по адресу вида /trainer-automation/), и с корня домена. Относительные
 // пути к ассетам покрывают оба случая без пересборки под конкретный хостинг.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), localOcrAssets()],
   base: './',
   build: {
     outDir: 'dist',
