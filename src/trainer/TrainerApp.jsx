@@ -322,7 +322,7 @@ export default function TrainerApp({ me }) {
         )}
         {view === 'library' && (
           <SubNav>
-            <Chips items={LIBRARY_PANES} value={libPane} onChange={switchPane(setLibPane)} variant="nav" />
+            <Chips items={LIBRARY_PANES.filter(p => p.value !== 'foods' || owner)} value={libPane} onChange={switchPane(setLibPane)} variant="nav" />
           </SubNav>
         )}
         {view === 'admin' && (

@@ -2174,6 +2174,7 @@ export function Nutrition({ clientRow, clientView = false }) {
   const [saved, setSaved] = useState(null);
   const [ration, setRation] = useState(false);
   const [diaryPlan, setDiaryPlan] = useState(null);
+  const [diaryTab, setDiaryTab] = useState('diary');
   // Проба тренера: тот же раздел, но на своём устройстве (см. Ration trial)
   const [trial, setTrial] = useState(false);
   // Рацион — в «Плюсе» клиента и на платной ступени тренера (FT-545)
@@ -2193,6 +2194,7 @@ export function Nutrition({ clientRow, clientView = false }) {
     setEditing(false);
     setRation(false);
     setTrial(false);
+    setDiaryTab('diary');
   }, [clientRow]);
 
   if (loading) return <Loading rows={3} />;
@@ -2225,6 +2227,7 @@ export function Nutrition({ clientRow, clientView = false }) {
   }
 
   const showForm = editing || !configured;
+  const diaryEnabled = clientRow ? isPro(rights) : hasPlus(rights);
 
   // Экран рациона занимает всё место: это отдельная работа в три шага, и
   // норма над ней превратилась бы в шапку, которую человек прокручивает
@@ -2251,8 +2254,9 @@ export function Nutrition({ clientRow, clientView = false }) {
 
   return (
     <>
-      <GoalBanner clientRow={clientRow} clientView={clientView} section="nutrition" />
-      {!editing && (clientRow ? isPro(rights) : hasPlus(rights)) && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow} preview={clientView} targets={targets} onPlan={!clientRow && hasPlus(rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {(!diaryEnabled || diaryTab === 'diary') && <GoalBanner clientRow={clientRow} clientView={clientView} section="nutrition" />}
+      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow} preview={clientView} targets={targets} onPlan={!clientRow && hasPlus(rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {(!diaryEnabled || diaryTab === 'settings' || editing || (!configured && diaryTab === 'diary')) && <>
       {configured && (
         <Lead
           label="Расчёт по анкете"
@@ -2317,7 +2321,7 @@ export function Nutrition({ clientRow, clientView = false }) {
 
       {!editing && byTrainer && isPro(rights) && <RationSummary clientRow={clientRow} plannerOnly />}
 
-      {configured && !editing && byTrainer && (
+      {configured && !editing && (byTrainer || clientView) && (
         <Section title="Как это видит клиент">
           <Panel pad>
             <p className="small muted" style={{ marginTop: 0 }}>
@@ -2331,7 +2335,7 @@ export function Nutrition({ clientRow, clientView = false }) {
         </Section>
       )}
 
-      {configured && !editing && !byTrainer && (
+      {configured && !editing && !byTrainer && !diaryEnabled && (
         <Section>
           <Panel pad>
             <h3 style={{ margin: '0 0 6px', fontSize: 'var(--text-md)', fontWeight: 640 }}>
@@ -2438,6 +2442,7 @@ export function Nutrition({ clientRow, clientView = false }) {
           />
         </Section>
       )}
+      </>}
     </>
   );
 }

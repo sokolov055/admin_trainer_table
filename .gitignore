@@ -14,3 +14,6 @@ reports-ft551-access.log
 debug.log
 
 ft551-browser.log
+
+# Локальные логи проверки каталога FT-551
+ft551-catalog-*.log

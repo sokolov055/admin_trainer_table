@@ -21,7 +21,7 @@ export function diaryMock(action, p = {}) {
   let result;
   if (action === 'diary.get') result = present(day);
   else if (action === 'diary.catalog') {
-    let all = catalog().filter(f => f.name.toLowerCase().includes(String(p.q || '').toLowerCase()));
+    let all = catalog().filter(f => (f.name + ' ' + (f.brand || '') + ' ' + (f.barcode || '')).toLowerCase().includes(String(p.q || '').toLowerCase()));
     if (p.scope === 'favorites') all = all.filter(f => f.liked);
     if (p.scope === 'recent') { const ids = new Set(Object.values(s.days).flatMap(d => d.entries.map(e => e.product.kind + ':' + e.product.id))); all = all.filter(f => ids.has(f.kind + ':' + f.id)); }
     result = { products: all, ownRecipes: s.recipes };
@@ -59,9 +59,18 @@ export function diaryMock(action, p = {}) {
     if (p.id && (!old || old.revision !== p.revision)) fail(409, 'Рецепт изменился. Обновите список.');
     const recipe = { kind: 'recipe', id, name: p.name, ingredients, outputGrams: Number(p.outputGrams), revision: (old?.revision || 0) + 1, unit: 'g', source: 'Ваш рецепт · готовый вес', ...Object.fromEntries(Object.entries(total).map(([k, v]) => [k, v * 100 / Number(p.outputGrams)])) };
     s.recipes = s.recipes.filter(r => r.id !== id); s.recipes.push(recipe); s.likes.push('recipe:' + id); result = recipe;
+  } else if (action === 'food.search') {
+    result = { foods: s.foods.filter(f => (!p.reviewStatus || (f.reviewStatus || 'unverified') === p.reviewStatus) && (f.name + ' ' + (f.brand || '') + ' ' + (f.barcode || '')).toLowerCase().includes(String(p.q || '').toLowerCase())) };
+  } else if (action === 'food.review') {
+    const old = s.foods.find(f => f.id === p.id);
+    if (!old) fail(404, 'Продукт не найден.');
+    Object.assign(old, p, { source: 'Этикетка проверена тренером', revision: (old.revision || 1) + 1, reviewStatus: 'verified' });
+    result = { food: old };
+  } else if (action === 'food.hide') {
+    s.foods = s.foods.filter(f => f.id !== p.id); result = { hidden: p.id };
   } else if (action === 'food.add') {
-    const old = s.foods.find(f => f.name.toLowerCase() === p.name.toLowerCase());
-    const product = old || { id: Date.now(), kind: 'food', name: p.name, unit: 'g', source: 'Демо: данные с этикетки', ...Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, Number(p[k])])) };
+    const old = s.foods.find(f => f.name.toLowerCase() === p.name.toLowerCase() && (f.brand || '') === (p.brand || ''));
+    const product = old || { id: Date.now(), kind: 'food', name: p.name, brand: p.brand || '', barcode: p.barcode || '', preparation: p.preparation || 'as_sold', revision: 1, reviewStatus: 'unverified', unit: 'g', source: 'Демо: данные с этикетки', ...Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, Number(p[k])])) };
     if (!old) s.foods.push(product); result = { food: product, existed: !!old };
   } else fail(404, 'Нет демо-данных для ' + action);
   if (p.requestId) s.operations[p.requestId] = copy(result);

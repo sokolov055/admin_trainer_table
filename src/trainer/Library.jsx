@@ -7,6 +7,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
 import Dishes from './Dishes.jsx';
+import FoodCatalog from './FoodCatalog.jsx';
 import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
 import {
   Section, Panel, Loading, ErrorState, Empty, Badge, Tag, Chips, Search, Segmented, Field, Note, plural,
@@ -40,6 +41,7 @@ export const LIBRARY_PANES = [
   { value: 'machines', label: 'Тренажёры' },
   // Блюда для рациона клиентов: черновики на проверку, публикация, правка
   { value: 'dishes', label: 'Блюда' },
+  { value: 'foods', label: 'Продукты' },
 ];
 
 export { MACHINE_KIND_ITEMS } from './MachinesEditor.jsx';
@@ -90,6 +92,7 @@ const LEVELS = [
 ];
 
 export default function Library({ pane, owner = false }) {
+  if (pane === 'foods') return owner ? <FoodCatalog /> : <Note>Общий справочник проверяет владелец сервиса.</Note>;
   if (pane === 'dishes') return <Dishes />;
   if (pane === 'machines') return <Machines />;
   return pane === 'exercises' ? <Exercises /> : <Templates key={pane} kind={pane} owner={owner} />;

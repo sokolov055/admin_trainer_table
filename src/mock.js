@@ -2132,7 +2132,7 @@ function setDemoLoginRole(role) {
 
 export function mockApi(action, params) {
   const role = new URLSearchParams(window.location.search).get('mockRole') || demoLoginRole() || 'client';
-  const handler = action.startsWith('diary.') || action === 'food.add' ? p => diaryMock(action, p)
+  const handler = action.startsWith('diary.') || ['food.add', 'food.search', 'food.review', 'food.hide'].includes(action) ? p => diaryMock(action, p)
     : action.includes('.onboarding.') ? p => onboardingMock(action, p, mockCompute)
     : action === 'client.focus' ? () => focusMock(nutrition, mockCompute)
     : action.startsWith('client.firstSteps.') ? p => firstStepsMock(action, p)

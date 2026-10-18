@@ -70,7 +70,7 @@ const output = await build({
           loader: 'jsx',
           contents: `import React from 'react'; export default () => <div>workout</div>;`,
         };
-        if (args.path === 'diary') return { loader: 'jsx', contents: `import React from 'react'; export default () => <div>diary-screen</div>;` };
+        if (args.path === 'diary') return { loader: 'jsx', contents: `import React from 'react'; export default (p) => <div>diary-screen<button onClick={() => p.onTabChange?.('settings')}>Норма и анкета</button><button onClick={() => p.onTabChange?.('learn')}>Подсказки</button>{p.onPlan && <button onClick={() => p.onPlan({ targets:p.targets, day:'2026-10-18', totals:{} })}>План меню</button>}</div>;` };
         return {
           loader: 'jsx',
           contents: `import React from 'react'; export default () => <div>ration-screen</div>;`,
@@ -118,16 +118,17 @@ const button = (tree, label) => tree.root.findAllByType('button').find((node) =>
 
 test('клиент открывает подбор рациона', async () => {
   const tree = await render({});
-  assert.ok(whole(tree).includes('Что приготовить из того, что дома'));
-  assert.ok(button(tree, 'Собрать рацион'), 'кнопки нет');
+  assert.ok(!whole(tree).includes('Что приготовить из того, что дома'));
+  assert.ok(button(tree, 'План меню'), 'кнопки нет');
 
-  await act(async () => button(tree, 'Собрать рацион').props.onClick());
+  await act(async () => button(tree, 'План меню').props.onClick());
   assert.ok(whole(tree).includes('ration-screen'), 'экран не открылся');
   tree.unmount();
 });
 
 test('в карточке клиента у тренера — не рацион клиента, а проба', async () => {
   const tree = await render({ clientRow: 17 });
+  await act(async () => button(tree, 'Норма и анкета').props.onClick());
   assert.ok(!whole(tree).includes('Что приготовить из того, что дома'));
   assert.equal(button(tree, 'Собрать рацион'), undefined, 'рацион клиента с устройства тренера');
   assert.ok(button(tree, 'Попробовать — пробный режим'), 'пробы нет');
@@ -136,10 +137,11 @@ test('в карточке клиента у тренера — не рацион
 
 test('в режиме «глазами клиента» раздел виден, открывается только проба', async () => {
   const tree = await render({ clientRow: 17, clientView: true });
+  await act(async () => button(tree, 'Норма и анкета').props.onClick());
   const shown = whole(tree);
 
   // Виден: тренер должен знать, что у клиента здесь есть раздел.
-  assert.ok(shown.includes('Что приготовить из того, что дома'));
+  assert.ok(!shown.includes('Что приготовить из того, что дома'));
   // Клиентская кнопка не открывается у тренера: за ней стояли бы продукты
   // с устройства тренера под именем клиента. Вместо неё — проба.
   assert.equal(button(tree, 'Собрать рацион'), undefined, 'кнопка вернулась');
@@ -177,7 +179,7 @@ test('с «Плюсом» и без прав от сервера — как бы
   for (const rights of [{ on: true, plus: true }, null]) {
     globalThis.__rights = rights;
     const tree = await render({});
-    assert.ok(button(tree, 'Собрать рацион'), JSON.stringify(rights));
+    assert.ok(button(tree, 'План меню'), JSON.stringify(rights));
     tree.unmount();
   }
 });
@@ -206,4 +208,19 @@ test('rights.js: нет прав — открыто; платформа для �
   assert.equal(r.appPlatform({ isNativeApp: () => false, iosApp: () => false }), 'web');
   assert.equal(r.appPlatform({ isNativeApp: () => true, iosApp: () => true }), 'ios');
   assert.equal(r.appPlatform({ isNativeApp: () => true, iosApp: () => false }), 'android');
+});
+
+
+test('подсказки не содержат норму, анкету и подбор; анкета доступна отдельно', async () => {
+  globalThis.__rights = { on: true, plus: true };
+  const tree = await render({});
+  await act(async () => button(tree, 'Подсказки').props.onClick());
+  assert.ok(!whole(tree).includes('Расчёт по анкете'));
+  assert.equal(button(tree, 'Заполнить заново'), undefined);
+  assert.equal(button(tree, 'Собрать рацион'), undefined);
+  await act(async () => button(tree, 'Норма и анкета').props.onClick());
+  assert.ok(whole(tree).includes('Расчёт по анкете'));
+  assert.ok(button(tree, 'Заполнить заново'));
+  tree.unmount();
+  globalThis.__rights = null;
 });

@@ -21,7 +21,7 @@ before(async () => {
 after(async () => { await browser?.close(); if (server) await new Promise(resolve => server.close(resolve)); });
 
 test('FT-551: любимые, приёмы, порции, история, рецепты и очередь без дублей', { timeout: 180000 }, async () => {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
   await page.goto(origin);
@@ -122,6 +122,58 @@ test('FT-551: план меню становится фактом только �
   await page.close();
 });
 
+
+test('FT-551: собственный каталог, бренд, этикетка и проверка тренером', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Свой продукт', exact: true }).click();
+  const form = page.getByRole('dialog');
+  await form.getByLabel('Название продукта', { exact: true }).fill('Творог 5%');
+  await form.getByLabel('Бренд (необязательно)').fill('Тестовая этикетка');
+  await form.getByLabel('В каком виде взвешиваете').selectOption('as_sold');
+  await form.getByLabel('Штрихкод (необязательно)').fill('4601234567893');
+  for (const [label, value] of [['Ккал', '120'], ['Белки, г', '16'], ['Жиры, г', '5'], ['Углеводы, г', '3']]) await form.getByLabel(label, { exact: true }).fill(value);
+  await form.screenshot({ path: join(shots, 'food-label-390.png') });
+  assert.ok(await form.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+  await form.getByRole('button', { name: 'Создать продукт', exact: true }).click();
+  await page.getByRole('dialog').getByRole('heading', { name: 'Творог 5% · Тестовая этикетка' }).waitFor();
+  await page.getByLabel('Количество, г', { exact: true }).fill('150');
+  await page.getByRole('button', { name: 'Записать в дневник', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByText('180 ккал', { exact: true }).first().waitFor();
+  await page.getByRole('button', { name: 'Подсказки', exact: true }).click();
+  assert.equal(await page.getByText('Расчёт по анкете', { exact: true }).count(), 0);
+  assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Собрать рацион', exact: true }).count(), 0);
+  assert.equal(await page.getByLabel('Дата дневника').count(), 0);
+  await page.getByRole('heading', { name: 'Разобраться за пару минут' }).waitFor();
+  await page.screenshot({ path: join(shots, 'nutrition-tips-390.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
+  await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Дневник', exact: true }).click();
+
+  await page.goto(origin + '/?mockRole=trainer');
+  await page.getByRole('button', { name: 'Библиотека', exact: true }).click();
+  await page.getByRole('tab', { name: 'Продукты', exact: true }).click();
+  await page.getByLabel('Найти продукт, бренд или штрихкод').fill('4601234567893');
+  await page.getByRole('button').filter({ hasText: 'Творог 5% · Тестовая этикетка' }).click();
+  await page.getByLabel('Источник: производитель или проверенная этикетка').fill('Этикетка, тест 18.10.2026');
+  await page.getByLabel('Ккал', { exact: true }).fill('125');
+  await page.getByRole('button', { name: 'Сохранить проверенную карточку', exact: true }).click();
+  await page.getByLabel('Карточки', { exact: true }).selectOption('');
+  await page.getByText(/125 ккал \/ 100 г/).waitFor();
+  await page.screenshot({ path: join(shots, 'food-catalog-390.png') });
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.screenshot({ path: join(shots, 'food-catalog-1024.png') });
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByText('180 ккал', { exact: true }).first().waitFor();
+  assert.deepEqual(errors, []);
+  await page.close();
+});
 
 test('FT-551: тренер назначает цель и оставляет комментарий, клиент видит результат', { timeout: 90000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
