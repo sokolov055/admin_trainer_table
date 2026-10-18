@@ -5899,3 +5899,14 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .owner-test__wrong { color: var(--critical-text) !important; }
 .owner-test__dot { display: inline-block; width: 14px; }
 .owner-test__answer { margin: 0; white-space: pre-line; line-height: 1.5; }
+
+/* Карточка упражнения правится касанием по полю (18.10.2026) */
+.card-field { border-top: 1px solid var(--border); padding: var(--space-3) 0; }
+.card-field:first-child { border-top: 0; padding-top: 0; }
+.card-field__view { display: grid; gap: 4px; width: 100%; border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.card-field__view:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.card-field__label { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.card-field__value { font-size: var(--text-base); line-height: 1.45; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.card-field__value--empty { color: var(--accent); font-size: var(--text-sm); font-weight: 600; }
+.card-field__text { white-space: pre-wrap; }
+.card-field--open { background: var(--surface-sunken); margin: 0 calc(-1 * var(--space-3)); padding: var(--space-3); border-radius: var(--radius); border-top-color: transparent; }

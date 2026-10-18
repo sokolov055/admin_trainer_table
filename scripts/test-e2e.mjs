@@ -1366,9 +1366,12 @@ test('шаблон назначается клиенту, общий копир�
     const frame = tab.locator('.library__anim img').first();
     await frame.waitFor({ timeout: 5000 });
     assert.ok(await frame.evaluate((img) => img.complete && img.naturalWidth > 0), 'кадр анимации загрузился');
-    await tab.getByRole('button', { name: 'Сделать свою версию' }).click();
+    // Правка касанием по полю (18.10.2026): у общего сохранение создаёт свою версию
+    await tab.getByRole('button', { name: 'Изменить: Техника выполнения' }).click();
+    await tab.getByLabel('Техника выполнения').fill('Корпус — одна линия.');
     await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
+    await assert.doesNotReject(tab.locator('.library__meta', { hasText: 'своё' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
+    await assert.doesNotReject(tab.getByText('Корпус — одна линия.').waitFor({ timeout: 5000 }), 'техника на месте');
     await assert.doesNotReject(tab.locator('.library__anim').waitFor({ timeout: 5000 }), 'у своей версии та же анимация');
 
     // Общее убирается у себя и возвращается

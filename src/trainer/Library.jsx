@@ -1,5 +1,3 @@
-import EquipmentDraft from './EquipmentDraft.jsx';
-import { primaryEquipment } from '../equipment-guidance.js';
 import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
 import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
@@ -752,8 +750,7 @@ function Exercises() {
 
   if (editing) {
     return (
-      <ExerciseEditor
-        exercise={editing.new ? null : editing}
+      <NewExercise
         muscles={data.muscles}
         onCancel={() => setEditing(null)}
         onSaved={(saved) => { setEditing(null); setOpen(saved.id); reload(); }}
@@ -769,8 +766,8 @@ function Exercises() {
         all={all}
         onSetup={reload}
         onChanged={(saved) => { setOpen(saved.id); reload(); }}
+        muscles={data.muscles}
         onBack={() => setOpen(null)}
-        onEdit={() => setEditing(current)}
         onDeleted={() => { setOpen(null); reload(); }}
         onRemove={() => { remove(current); setOpen(null); }}
       />
@@ -1179,38 +1176,188 @@ function HiddenExercises({ onBack }) {
   );
 }
 
-function ExerciseView({ exercise, owner, all, onSetup, onChanged, onBack, onEdit, onDeleted, onRemove }) {
-  const [failure, setFailure] = useState(null);
+/**
+ * Карточка упражнения правится касанием по полю (владелец, 18.10.2026):
+ * отдельного экрана «Изменить» больше нет — все его поля здесь же.
+ * Открыто одно поле за раз. Общее упражнение при сохранении становится
+ * своей версией (сервер копирует тренажёры, замены, настройку и видео);
+ * подготовку общего владелец правит прямо в базе.
+ */
+function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBack, onDeleted, onRemove }) {
   const e = exercise;
+  const [edit, setEdit] = useState('');
+  const [draft, setDraft] = useState({});
+  const [file, setFile] = useState(null);
+  const [progress, setProgress] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  useEffect(() => { setEdit(''); }, [e.id]);
+
+  const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  const open = (key, values) => { setEdit(key); setDraft(values); setFile(null); setFailure(null); haptic(); };
+  const close = () => { setEdit(''); setFailure(null); };
+  const known = e.track;
+  const directSetup = e.mine || (e.common && owner);
+  const hasFile = e.mine && e.media?.kind === 'file';
+
+  const save = async (patch, upload = null) => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      const { setupOnly, ...rest } = patch;
+      let saved = e;
+      if (setupOnly && directSetup) {
+        await apiMutate('library.exercise.setup', { id: e.id, setup: rest.setup, ok: rest.setupOk });
+      } else {
+        // Название и технику сервер переписывает всегда — шлём текущие, если правят другое поле
+        saved = await apiMutate('library.exercise.save', { id: e.id, name: e.name, muscle: e.muscle || '', notes: e.notes || '', ...rest });
+      }
+      if (upload) {
+        setProgress(0);
+        await uploadVideo(saved.id, upload, setProgress);
+      }
+      haptic('success');
+      setEdit('');
+      if (saved === e) onSetup(); else onChanged(saved);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  };
+
+  const actions = (patch, ok = true, upload = null) => (
+    <>
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+      <div className="library__actions">
+        <button className="button button--primary" disabled={busy || !ok} onClick={() => save(patch, upload)}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+        <button className="button" disabled={busy} onClick={close}>Отмена</button>
+      </div>
+    </>
+  );
+
+  // Поле карточки: касание открывает правку только его
+  const row = (key, label, value, start, editor, empty = 'Не заполнено') => (
+    <div className={'card-field' + (edit === key ? ' card-field--open' : '')} key={key}>
+      {edit === key
+        ? <div className="library__form"><span className="card-field__label">{label}</span>{editor()}</div>
+        : (
+          <button type="button" className="card-field__view" aria-label={'Изменить: ' + label} onClick={() => open(key, start())}>
+            <span className="card-field__label">{label}</span>
+            {value ? <span className="card-field__value">{value}</span> : <span className="card-field__value card-field__value--empty">{empty}</span>}
+          </button>
+        )}
+    </div>
+  );
+
+  const kindOf = () => ({ kind: known?.weightMode === 'assistance' ? 'assistance' : known && !known.auto ? known.kind : 'auto', unilateral: !!known?.unilateral, perSide: !!known?.perSide });
+  const flip = (map, r) => {
+    const v = map || { primary: [], secondary: [] };
+    return { primary: v.primary.filter((x) => x !== r).concat(!v.primary.includes(r) && !v.secondary.includes(r) ? [r] : []), secondary: v.secondary.filter((x) => x !== r).concat(v.primary.includes(r) ? [r] : []) };
+  };
 
   return (
     <>
       <Back onClick={onBack} />
       <Panel pad>
-        <h2 className="library__title">{e.name}</h2>
-        <div className="item__meta library__meta">
-          {e.muscle && <Tag>{e.muscle}</Tag>}
-          <span>{[e.equipment, e.mine ? 'своё' : 'общее'].filter(Boolean).join(' · ')}</span>
-        </div>
+        {row('name', 'Название', <span className="library__title">{e.name}</span>, () => ({ name: e.name }), () => <>
+          <Field label="Название" inputMode="text" value={draft.name} onChange={(v) => set({ name: v })} />
+          {actions({ name: (draft.name || '').trim() }, (draft.name || '').trim().length >= 2)}
+        </>)}
+        <div className="item__meta library__meta"><span>{e.mine ? 'своё' : 'общее'}</span></div>
+        {!e.mine && <p className="small muted">Общее упражнение: сохранение любого поля создаст вашу версию с теми же тренажёрами и заменами — общая не изменится.</p>}
 
-        {e.media
-          ? <Media media={e.media} />
-          : (
-            <div className="library__placeholder">
-              {e.mine ? 'Видео нет — его можно приложить в «Изменить».' : 'Анимации для этого упражнения пока нет — приложите своё видео в своей версии.'}
-            </div>
+        {/* Видео показывается само; правка — касанием по подписи */}
+        {e.media && <Media media={e.media} />}
+        {row('media', 'Видео', e.media ? (e.media.kind === 'link' ? e.media.url : e.media.kind === 'file' ? 'Своё видео' : 'Анимация') : null,
+          () => ({ link: e.media?.kind === 'link' ? e.media.url : '' }), () => <>
+            <Field label="Ссылка" inputMode="url" value={draft.link} onChange={(v) => set({ link: v })} placeholder="https://…" hint="Клиент увидит кнопку «Открыть видео». Чтобы видео играло прямо в приложении, загрузите файл." />
+            <label className="field">
+              <span className="field__label">Или файлом с телефона</span>
+              <input type="file" accept="video/mp4,video/quicktime,video/webm,video/x-m4v" onChange={(ev) => setFile(ev.target.files[0] || null)} />
+              <span className="field__hint">{file ? `${file.name} · ${Math.round(file.size / 1024 / 1024)} МБ` : hasFile ? 'Загружено своё видео — новый файл заменит его' : 'До 500 МБ'}</span>
+            </label>
+            {progress !== null && (
+              <div className="library__progress" role="progressbar" aria-valuenow={Math.round(progress * 100)}>
+                <span style={{ transform: `scaleX(${progress})` }} />
+                <em>Загружаю видео… {Math.round(progress * 100)}%</em>
+              </div>
+            )}
+            {/* Пустая ссылка не стирает загруженный файл и анимацию */}
+            {actions({ ...(draft.link || e.media?.kind === 'link' || !e.media ? { link: draft.link || '' } : {}), contentOk: false }, true, file)}
+          </>, 'Нет — коснитесь, чтобы приложить')}
+
+        {row('muscle', 'Группа мышц', e.muscle, () => ({ muscle: e.muscle || '' }), () => <>
+          <Chips items={[{ value: '', label: 'Не указана' }, ...muscles.map((m) => ({ value: m, label: m }))]} value={draft.muscle} onChange={(v) => set({ muscle: v })} />
+          {actions({ muscle: draft.muscle })}
+        </>, 'Не указана')}
+
+        {row('load', 'Как учитывать нагрузку', known ? trackLine(known) : 'Определить само', kindOf, () => <>
+          <Chips
+            items={[{ value: 'auto', label: known && known.auto ? 'Само: ' + KIND_LABELS[known.kind].toLowerCase() : 'Определить само' },
+              ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })), { value: 'assistance', label: 'Вес помощи и повторения' }]}
+            value={draft.kind} onChange={(v) => set({ kind: v })} />
+          {/* Тренажёр у кардио не выбирают (09.10.2026): настройки — в программе */}
+          {draft.kind !== 'auto' && draft.kind !== 'cardio' && (
+            <label className="library__check"><input type="checkbox" checked={draft.unilateral} onChange={(ev) => set({ unilateral: ev.target.checked })} />Повторы на каждую сторону (выпады, тяга одной рукой)</label>
           )}
+          {draft.kind === 'strength' && (
+            <label className="library__check"><input type="checkbox" checked={draft.perSide} onChange={(ev) => set({ perSide: ev.target.checked })} />Вес с одной стороны (гантели, Смит, рычажные)</label>
+          )}
+          {draft.kind === 'assistance' && <p className="small muted">Вес помощи, кг: чем он больше, тем легче упражнение. Прежние записи сохраняют свой способ учёта.</p>}
+          {actions({ track: draft.kind === 'auto' ? { auto: true } : { kind: draft.kind === 'assistance' ? 'bodyweight' : draft.kind, weightMode: draft.kind === 'assistance' ? 'assistance' : undefined, machine: known?.machine || 'treadmill', unilateral: draft.unilateral, perSide: draft.perSide } })}
+        </>)}
 
-        {e.track && <p className="small muted">Записывается: {trackLine(e.track)}</p>}
+        {e.equipment && row('equipment', 'Инвентарь (прежнее значение)', e.equipment, () => ({ equipment: e.equipment }), () => <>
+          <Field label="Инвентарь" inputMode="text" value={draft.equipment} onChange={(v) => set({ equipment: v })} />
+          {actions({ equipment: draft.equipment })}
+        </>)}
 
-        {e.notes && <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{e.notes}</p>}
-
-        <SetupEditor exercise={e} canEdit={e.mine || (e.common && owner)} onSaved={onSetup} />
         <MachinesEditor exercise={e} owner={owner} onChanged={onChanged} />
+
+        {/* Подготовка — только без тренажёра: с ним клиент видит настройку тренажёра */}
+        {!e.machines?.length && row('setup', 'Подготовка к упражнению',
+          e.setup ? <>{!e.setupOk && <Badge kind="warn">черновик — клиенты не видят</Badge>}<SetupText text={e.setup} /></> : null,
+          () => ({ setup: e.setup || '', setupOk: !!e.setupOk }), () => <>
+            <textarea className="field__input library__textarea" aria-label="Подготовка к упражнению" value={draft.setup} maxLength={1500} rows={5}
+              onChange={(ev) => set({ setup: ev.target.value, setupOk: false })}
+              placeholder={'Сиденье — рукояти на уровне груди.\nСпинка — лопатки прижаты.\nОшибка: локти выше плеч.'} />
+            <span className="field__hint">Шаг — строка. Клиент видит её, пока к упражнению не привязан тренажёр.</span>
+            <label className="library__check"><input type="checkbox" checked={draft.setupOk} disabled={!draft.setup.trim()} onChange={(ev) => set({ setupOk: ev.target.checked })} />Проверено — показывать клиентам</label>
+            {actions({ setupOnly: true, setup: draft.setup, setupOk: draft.setupOk })}
+          </>)}
+
+        {row('notes', 'Техника выполнения', e.notes ? <span className="card-field__text">{e.notes}</span> : null, () => ({ notes: e.notes || '' }), () => <>
+          <textarea className="field__input library__textarea" aria-label="Техника выполнения" value={draft.notes} maxLength={2000} rows={6} onChange={(ev) => set({ notes: ev.target.value })} placeholder="Шаг — строка: исходное положение, движение, дыхание" />
+          {actions({ notes: draft.notes })}
+        </>)}
+
+        {row('mistakes', 'Частые ошибки', e.mistakes ? <span className="card-field__text">{e.mistakes}</span> : null, () => ({ mistakes: e.mistakes || '' }), () => <>
+          <textarea className="field__input library__textarea" aria-label="Частые ошибки" value={draft.mistakes} maxLength={1500} rows={4} onChange={(ev) => set({ mistakes: ev.target.value })} placeholder="Ошибка — строка" />
+          {actions({ mistakes: draft.mistakes })}
+        </>)}
+
+        <label className="library__check">
+          <input type="checkbox" checked={!!e.contentOk} disabled={busy} onChange={(ev) => save({ contentOk: ev.target.checked })} />
+          Техника и видео проверены
+        </label>
+
+        {row('muscles', 'Основные и дополнительные мышцы',
+          e.musclesCustom ? <MuscleNames primary={e.muscles?.primary || []} secondary={e.muscles?.secondary || []} max={20} /> : null,
+          () => ({ map: e.musclesCustom ? e.muscles : null }), () => <>
+            <p className="small muted">Нажатие: основная, дополнительная, убрать. Без точной разметки используется группа мышц.</p>
+            <MuscleFigure primary={draft.map?.primary || []} secondary={draft.map?.secondary || []} onTap={(r) => set({ map: flip(draft.map, r) })} />
+            <MuscleNames primary={draft.map?.primary || []} secondary={draft.map?.secondary || []} max={20} />
+            <div className="chips chips--wrap">{Object.entries(LABELS).map(([id, label]) => <button className="chip" type="button" key={id} aria-pressed={!!(draft.map?.primary.includes(id) || draft.map?.secondary.includes(id))} onClick={() => set({ map: flip(draft.map, id) })}>{label}{draft.map?.primary.includes(id) ? ' · основная' : draft.map?.secondary.includes(id) ? ' · дополнительная' : ''}</button>)}</div>
+            <button className="button button--ghost" type="button" onClick={() => set({ map: null })}>Использовать группу</button>
+            {actions({ muscles: draft.map })}
+          </>, 'По группе мышц')}
+
         <AlternativesEditor exercise={e} owner={owner} all={all} onChanged={onChanged} />
 
+        {!edit && failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
         <div className="library__actions">
-          <button className="button" onClick={onEdit}>{e.mine ? 'Изменить' : 'Сделать свою версию'}</button>
           {e.mine && (
             <button className="button button--ghost danger" onClick={async () => {
               if (!window.confirm(`Удалить «${e.name}»? В программах клиентов оно останется.`)) return;
@@ -1226,74 +1373,46 @@ function ExerciseView({ exercise, owner, all, onSetup, onChanged, onBack, onEdit
             <button className="button button--ghost danger" onClick={onRemove}>Убрать у себя</button>
           )}
         </div>
-        {!e.mine && (
-          <p className="small muted">
-            Своя версия видна только вам: с вашей техникой, подсказками и видео. Общая при этом не меняется.
-          </p>
-        )}
-        {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       </Panel>
     </>
   );
 }
 
-/**
- * «Как настроить тренажёр» (01.10.2026) — инструкция клиенту без марок:
- * сиденье, спинка, валик, упор. Черновики к общей базе написаны заранее и
- * клиенту не видны, пока владелец не отметит «Проверено». Общую правит
- * только владелец, прямо в базе; тренер — в своей версии упражнения.
- * Сохраняется отдельно от «Изменить»: там правка общего создаёт свою версию.
- */
-function SetupEditor({ exercise, canEdit, onSaved }) {
-  const e = exercise;
-  const [text, setText] = useState(e.setup || '');
-  const [ok, setOk] = useState(!!e.setupOk);
+/** Новое своё упражнение: название и группа — остальное в карточке касанием */
+function NewExercise({ muscles, onSaved, onCancel }) {
+  const [name, setName] = useState('');
+  const [muscle, setMuscle] = useState('');
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
-  useEffect(() => { setText(e.setup || ''); setOk(!!e.setupOk); }, [e.id, e.setup, e.setupOk]);
-
-  if (e.machines?.length) return null;
-  if (!canEdit) {
-    return e.setup && e.setupOk
-      ? <><h3 className="setup__title">Подготовка к упражнению</h3><SetupText text={e.setup} /></>
-      : null;
-  }
-
-  const changed = text.trim() !== (e.setup || '') || ok !== !!e.setupOk;
-  const save = async () => {
+  const create = async () => {
     setBusy(true);
     setFailure(null);
     try {
-      await apiMutate('library.exercise.setup', { id: e.id, setup: text, ok });
+      const saved = await apiMutate('library.exercise.save', { name: name.trim(), muscle, notes: '', track: { auto: true } });
       haptic('success');
-      onSaved();
+      onSaved(saved);
     } catch (err) {
       setFailure(err);
     } finally {
       setBusy(false);
     }
   };
-
   return (
-    <div className="library__form" style={{ marginTop: 'var(--space-3)' }}>
-      <label className="field">
-        <span className="field__label">
-          Подготовка к упражнению {e.setup && !e.setupOk && <Badge kind="warn">черновик — клиенты не видят</Badge>}
-        </span>
-        <textarea className="field__input library__textarea" value={text} maxLength={1500} rows={5}
-          onChange={(ev) => { setText(ev.target.value); setOk(false); }}
-          placeholder={'Сиденье — рукояти на уровне груди.\nСпинка — лопатки прижаты.\nОшибка: локти выше плеч.'} />
-        <span className="field__hint">Шаг — строка. «Ошибка: …» клиент увидит отдельно, жёлтым.</span>
-      </label>
-      <label className="library__check">
-        <input type="checkbox" checked={ok} disabled={!text.trim()} onChange={(ev) => setOk(ev.target.checked)} />
-        Проверено — показывать клиентам
-      </label>
-      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      {changed && (
-        <button className="button" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить инструкцию'}</button>
-      )}
-    </div>
+    <>
+      <Back onClick={onCancel}>Отмена</Back>
+      <Panel pad>
+        <div className="library__form">
+          <Field label="Название" inputMode="text" value={name} onChange={setName} placeholder="Жим гантелей лёжа" />
+          <div>
+            <span className="field__label">Группа мышц</span>
+            <Chips items={[{ value: '', label: 'Не указана' }, ...muscles.map((m) => ({ value: m, label: m }))]} value={muscle} onChange={setMuscle} />
+          </div>
+          <p className="small muted">Технику, видео, тренажёры и замены добавите в карточке — касанием по полю.</p>
+          {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+          <button className="button button--primary" disabled={busy || name.trim().length < 2} onClick={create}>{busy ? 'Создаю…' : 'Создать'}</button>
+        </div>
+      </Panel>
+    </>
   );
 }
 
@@ -1305,156 +1424,4 @@ function trackLine(t) {
     t.unilateral && 'повторы на сторону',
     t.perSide && 'вес с одной стороны',
   ].filter(Boolean).join(' · ') + (t.auto ? ' (определено само)' : '');
-}
-
-function ExerciseEditor({ exercise, muscles, onSaved, onCancel }) {
-  const [name, setName] = useState(exercise ? exercise.name : '');
-  const [muscle, setMuscle] = useState(exercise ? exercise.muscle : '');
-  const [equipment, setEquipment] = useState(exercise ? exercise.equipment : '');
-  const [notes, setNotes] = useState(exercise ? exercise.notes : '');
-  const [mistakes, setMistakes] = useState(exercise?.mistakes || '');
-  const [contentOk, setContentOk] = useState(!!exercise?.contentOk);
-  const [setup, setSetup] = useState(exercise?.setup || '');
-  const [setupOk, setSetupOk] = useState(!!exercise?.setupOk);
-  const [gear, setGear] = useState(exercise?.machines || []);
-  const [primaryUid, setPrimaryUid] = useState(exercise?.primaryEquipmentUid || null);
-  const [muscleMap, setMuscleMap] = useState(exercise?.musclesCustom ? exercise.muscles : null);
-  const [savedId, setSavedId] = useState(null);
-  const tapMuscle = (r) => setMuscleMap((old) => {
-    const v = old || { primary: [], secondary: [] };
-    return { primary: v.primary.filter((x) => x !== r).concat(!v.primary.includes(r) && !v.secondary.includes(r) ? [r] : []), secondary: v.secondary.filter((x) => x !== r).concat(v.primary.includes(r) ? [r] : []) };
-  });
-  const [link, setLink] = useState(exercise && exercise.media && exercise.media.kind === 'link' ? exercise.media.url : '');
-  // Тип учёта: «авто» — угадывается по названию и инвентарю; остальное —
-  // выбор тренера, когда угадано не так
-  const known = exercise && exercise.track;
-  const [kind, setKind] = useState(known?.weightMode === 'assistance' ? 'assistance' : known && !known.auto ? known.kind : 'auto');
-  const [machine] = useState((known && known.machine) || 'treadmill');
-  const [unilateral, setUnilateral] = useState(!!(known && known.unilateral));
-  const [perSide, setPerSide] = useState(!!(known && known.perSide));
-  const [file, setFile] = useState(null);
-  const [progress, setProgress] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState(null);
-
-  const hasFile = exercise && exercise.mine && exercise.media && exercise.media.kind === 'file';
-  // Пустое поле ссылки не стирает загруженный файл и анимацию
-  const keepsMedia = hasFile || (exercise && exercise.media && exercise.media.kind === 'animation');
-
-  const save = async () => {
-    setBusy(true);
-    setFailure(null);
-    try {
-      const saved = await apiMutate('library.exercise.save', {
-        // Общее не правится: с его id сервер создаст свою версию
-        id: savedId || (exercise ? exercise.id : undefined),
-        name: name.trim(),
-        muscle,
-        equipment,
-        notes, mistakes, contentOk, muscles: muscleMap,
-        machineUids: gear.map((m) => m.uid), primaryEquipmentUid: primaryUid || primaryEquipment({ machines: gear })?.uid || null,
-        ...(!gear.length ? { setup, setupOk } : {}),
-        track: kind === 'auto' ? { auto: true } : { kind: kind === 'assistance' ? 'bodyweight' : kind, weightMode: kind === 'assistance' ? 'assistance' : undefined, machine, unilateral, perSide },
-        // Ссылку не трогаем, если загружен файл и поле пустое
-        ...(link || !keepsMedia ? { link } : {}),
-      });
-
-      setSavedId(saved.id);
-      if (file) {
-        setProgress(0);
-        await uploadVideo(saved.id, file, setProgress);
-      }
-
-      haptic('success');
-      onSaved(saved);
-    } catch (err) {
-      setFailure(err);
-    } finally {
-      setBusy(false);
-      setProgress(null);
-    }
-  };
-
-  return (
-    <>
-      <Back onClick={onCancel}>Отмена</Back>
-      <Panel pad>
-        <div className="library__form">
-          <Field label="Название" inputMode="text" value={name} onChange={setName} placeholder="Жим гантелей лёжа" />
-
-          <div>
-            <span className="field__label">Группа мышц</span>
-            <Chips items={[{ value: '', label: 'Не указана' }, ...muscles.map((m) => ({ value: m, label: m }))]} value={muscle} onChange={setMuscle} />
-          </div>
-
-          {equipment && <Field label="Инвентарь (прежнее значение)" inputMode="text" value={equipment} onChange={setEquipment} />}
-          <EquipmentDraft items={gear} primaryUid={primaryUid} onChange={(items, uid) => { setGear(items); setPrimaryUid(uid); }} />
-          {!gear.length && <>
-            <label className="field"><span className="field__label">Подготовка к упражнению</span><textarea className="field__input library__textarea" rows={4} value={setup} maxLength={1500} onChange={(e) => { setSetup(e.target.value); setSetupOk(false); }} /></label>
-            <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Подготовка проверена</label>
-          </>}
-
-          <div>
-            <span className="field__label">Как учитывать нагрузку</span>
-            <Chips
-              items={[{ value: 'auto', label: known && known.auto ? 'Само: ' + KIND_LABELS[known.kind].toLowerCase() : 'Определить само' },
-                ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })), { value: 'assistance', label: 'Вес помощи и повторения' }]}
-              value={kind}
-              onChange={setKind}
-            />
-          </div>
-          {/* Тренажёр у кардио не выбирают (09.10.2026): настройки — в программе */}
-          {kind !== 'auto' && kind !== 'cardio' && (
-            <label className="library__check"><input type="checkbox" checked={unilateral} onChange={(e) => setUnilateral(e.target.checked)} />Повторы на каждую сторону (выпады, тяга одной рукой)</label>
-          )}
-          {kind === 'strength' && (
-            <label className="library__check"><input type="checkbox" checked={perSide} onChange={(e) => setPerSide(e.target.checked)} />Вес с одной стороны (гантели, Смит, рычажные)</label>
-          )}
-
-          <label className="field">
-            <span className="field__label">Техника выполнения</span>
-            <textarea className="field__input library__textarea" value={notes} maxLength={2000} onChange={(e) => { setNotes(e.target.value); setContentOk(false); }} placeholder="На что обратить внимание" />
-          </label>
-
-          <label className="field"><span className="field__label">Частые ошибки выполнения</span><textarea className="field__input library__textarea" value={mistakes} maxLength={1500} onChange={(e) => { setMistakes(e.target.value); setContentOk(false); }} /></label>
-          <label className="library__check"><input type="checkbox" checked={contentOk} onChange={(e) => setContentOk(e.target.checked)} />Техника упражнения проверена</label>
-          <details><summary>Основные и дополнительные мышцы</summary>
-            <p className="small muted">Нажатие: основная, дополнительная, убрать. Без точной разметки используется выбранная группа.</p>
-            <MuscleFigure primary={muscleMap?.primary || []} secondary={muscleMap?.secondary || []} onTap={tapMuscle} />
-            <MuscleNames primary={muscleMap?.primary || []} secondary={muscleMap?.secondary || []} max={20} />
-            <div className="chips chips--wrap">{Object.entries(LABELS).map(([id, label]) => <button className="chip" type="button" key={id} aria-pressed={!!(muscleMap?.primary.includes(id) || muscleMap?.secondary.includes(id))} onClick={() => tapMuscle(id)}>{label}{muscleMap?.primary.includes(id) ? ' · основная' : muscleMap?.secondary.includes(id) ? ' · дополнительная' : ''}</button>)}</div>
-            <button className="button button--ghost" type="button" onClick={() => setMuscleMap(null)}>Использовать группу</button>
-          </details>
-          {kind === 'assistance' && <p className="small muted">Вес помощи, кг: чем он больше, тем легче упражнение. Прежние записи сохраняют свой способ учёта.</p>}
-          <Field label="Видео — ссылка" inputMode="url" value={link} onChange={(v) => { setLink(v); setContentOk(false); }} placeholder="https://…" hint="Клиент увидит кнопку «Открыть видео» — ролик откроется на том сайте. Чтобы видео играло прямо в приложении, загрузите файл." />
-
-          <label className="field">
-            <span className="field__label">Или файлом с телефона</span>
-            <input type="file" accept="video/mp4,video/quicktime,video/webm,video/x-m4v" onChange={(e) => { setFile(e.target.files[0] || null); setContentOk(false); }} />
-            <span className="field__hint">
-              {file
-                ? `${file.name} · ${Math.round(file.size / 1024 / 1024)} МБ`
-                : hasFile ? 'Загружено своё видео — новый файл заменит его' : 'До 500 МБ'}
-            </span>
-          </label>
-
-          {progress !== null && (
-            <div className="library__progress" role="progressbar" aria-valuenow={Math.round(progress * 100)}>
-              <span style={{ transform: `scaleX(${progress})` }} />
-              <em>Загружаю видео… {Math.round(progress * 100)}%</em>
-            </div>
-          )}
-
-          {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-
-          <div className="library__actions">
-            <button className="button button--primary" disabled={busy || name.trim().length < 2} onClick={save}>
-              {busy ? 'Сохраняю…' : 'Сохранить'}
-            </button>
-            <button className="button" disabled={busy} onClick={onCancel}>Отмена</button>
-          </div>
-        </div>
-      </Panel>
-    </>
-  );
 }
