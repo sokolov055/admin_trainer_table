@@ -13,7 +13,7 @@ export default function FoodCatalog() {
     let alive = true;
     const timer = setTimeout(() => {
       setResource({ loading: true });
-      apiPublic('food.search', { q, reviewStatus: status }).then(data => { if (alive) setResource({ data }); })
+      apiPublic('food.search', { q, reviewStatus: status, separateBrand: true }).then(data => { if (alive) setResource({ data }); })
         .catch(error => { if (alive) setResource({ error }); });
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
