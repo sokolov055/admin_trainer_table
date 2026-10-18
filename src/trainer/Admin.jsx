@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { apiMutate } from '../api.js';
+import { apiMutate, apiOnce } from '../api.js';
 import { useData } from '../useData.js';
 import {
   DataTable, Empty, ErrorState, Field, Lead, Loading, Note, Panel, Row, Rows, Section, Segmented, Tag,
@@ -36,6 +36,8 @@ export const ADMIN_PANES = [
   { value: 'flags', label: 'Флаги' },
   // Журнал действий: платежи, пересчёты, переносы, переключения флагов
   { value: 'logs', label: 'Логи' },
+  // Справочные разделы базы файлом — переслать разработчику (18.10.2026)
+  { value: 'export', label: 'Выгрузка' },
 ];
 
 export default function Admin({ pane }) {
@@ -44,6 +46,7 @@ export default function Admin({ pane }) {
   if (pane === 'games') return <Games />;
   if (pane === 'flags') return <Flags />;
   if (pane === 'logs') return <Logs />;
+  if (pane === 'export') return <Export />;
   return <Stats />;
 }
 
@@ -467,5 +470,95 @@ function Flags() {
         </Section>
       )}
     </>
+  );
+}
+
+/* ==========================================================================
+ * Выгрузка
+ * ========================================================================== */
+
+/**
+ * Справочные разделы базы файлом JSON (владелец, 18.10.2026): «чтобы я мог
+ * присылать их, если надо». Только содержание сервиса — данных клиентов
+ * сервер не отдаёт (lib/owner-export.js). На телефоне — «Поделиться»
+ * (файл сразу в мессенджер или чат), где его нет — скачать или скопировать.
+ */
+function Export() {
+  const { data, loading, error, reload } = useData('owner.export.sections', {}, []);
+  const [picked, setPicked] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const [ready, setReady] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  if (loading) return <Loading lead={false} rows={4} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+  const sections = data.sections || [];
+  const chosen = picked || sections.map((s) => s.key);
+  const toggle = (key) => { setReady(null); setPicked(chosen.includes(key) ? chosen.filter((k) => k !== key) : [...chosen, key]); haptic(); };
+
+  const build = async () => {
+    setBusy(true);
+    setFailure(null);
+    setCopied(false);
+    try {
+      const result = await apiOnce('owner.export', { sections: chosen });
+      const text = JSON.stringify(result, null, 1);
+      const day = new Date().toISOString().slice(0, 10);
+      setReady({ text, name: `fittrack-${chosen.join('-')}-${day}.json`, size: new Blob([text]).size });
+      haptic('success');
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const file = () => new File([ready.text], ready.name, { type: 'application/json' });
+  let canShare = false;
+  try { canShare = !!(ready && navigator.canShare && navigator.canShare({ files: [file()] })); } catch (_) {}
+  const share = async () => { try { await navigator.share({ files: [file()], title: ready.name }); } catch (_) {} };
+  const download = () => {
+    const url = URL.createObjectURL(file());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = ready.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(ready.text);
+      setCopied(true);
+      haptic('success');
+    } catch (_) {
+      setFailure(new Error('Не удалось скопировать — скачайте файл.'));
+    }
+  };
+
+  return (
+    <Section title="Выгрузка базы">
+      <Panel pad>
+        <div className="library__form">
+          <p className="small muted">Файл JSON с выбранными разделами — его можно переслать разработчику. Данных клиентов (занятия, замеры, питание, оплаты) в выгрузке нет.</p>
+          {sections.map((s) => (
+            <label key={s.key} className="library__check">
+              <input type="checkbox" checked={chosen.includes(s.key)} onChange={() => toggle(s.key)} />
+              <span><strong>{s.title}</strong> · {formatNumber(s.rows)} {plural(s.rows, 'строка', 'строки', 'строк')}<br /><span className="small muted">{s.hint}</span></span>
+            </label>
+          ))}
+          {failure && <Note tone="critical">{failure.message}</Note>}
+          <button type="button" className="button button--primary" disabled={busy || !chosen.length} onClick={build}>{busy ? 'Собираю…' : 'Выгрузить'}</button>
+          {ready && <>
+            <p className="small">{ready.name} · {formatNumber(Math.max(1, Math.round(ready.size / 1024)))} КБ</p>
+            {canShare && <button type="button" className="button button--primary" onClick={share}>Поделиться файлом</button>}
+            <button type="button" className="button" onClick={download}>Скачать файл</button>
+            <button type="button" className="button" onClick={copy}>{copied ? 'Скопировано' : 'Скопировать текст'}</button>
+          </>}
+        </div>
+      </Panel>
+    </Section>
   );
 }

@@ -213,6 +213,11 @@ export async function apiFresh(action, params = {}) {
   }
 }
 
+/** Разовое чтение без кэша и без записи на телефон: большие ответы (выгрузка базы) */
+export function apiOnce(action, params = {}) {
+  return request(action, params, { read: true });
+}
+
 /** Когда получен сохранённый на телефоне ответ (мс) или 0 */
 export function apiStoredAt(action, params = {}) {
   const old = readStored(cacheKey(action, params), true);

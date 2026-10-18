@@ -1165,6 +1165,10 @@ const MOCK = {
   },
   'trainer.profile.report': () => ({ reported: true }),
   'owner.stats': () => mockStats(),
+  'owner.export.sections': () => ({ sections: [
+    { key: 'exercises', title: 'Упражнения', hint: 'общая база и упражнения тренеров', rows: demoExercises.length },
+    { key: 'foods', title: 'Продукты и блюда', hint: 'справочник продуктов', rows: 0 } ] }),
+  'owner.export': (p) => ({ app: 'Fit Track', exportedAt: new Date().toISOString(), sections: Object.fromEntries((p.sections || []).map((k) => [k, k === 'exercises' ? { exercises: demoExercises } : { foods: [] }])) }),
   'owner.flags': () => mockFlagState(),
   'owner.flag.set': (p) => {
     const f = mockFlags[p.key];
