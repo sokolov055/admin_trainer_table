@@ -48,7 +48,7 @@ export const Search=({value,onChange,placeholder})=>React.createElement('input',
   } }] });
 const mod = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0].text + '\n})')(createRequire(import.meta.url), mod, mod.exports);
-const { ExerciseMachines } = mod.exports;
+const { ExerciseMachines, AlternativesEditor } = mod.exports;
 
 const text = (node) => (typeof node === 'string' ? node : (node.children || []).map(text).join(''));
 const delay = () => new Promise((r) => setTimeout(r, 10));
@@ -85,5 +85,18 @@ test('прикрепить замену из базы и убрать её', asy
     await delay();
   });
   assert.deepEqual(calls[1], ['library.exercise.alternatives', { exerciseId: 10, ids: [21] }]);
+  tree.unmount();
+});
+
+test('в базе касание названия замены открывает её карточку, не убирает', async () => {
+  calls.length = 0;
+  alternatives = [{ id: 20, name: 'Тяга гантели одной рукой' }];
+  const opened = [];
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(AlternativesEditor, { exercise: exercises[0], owner: false, all: exercises, onChanged() {}, onOpen: (id) => opened.push(id) })); });
+  const name = tree.root.findAllByType('button').find((b) => text(b) === 'Тяга гантели одной рукой');
+  await act(async () => { name.props.onClick(); await delay(); });
+  assert.deepEqual(opened, [20], 'перешли к карточке замены');
+  assert.equal(calls.length, 0, 'замена не убрана');
   tree.unmount();
 });

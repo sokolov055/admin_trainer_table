@@ -303,7 +303,7 @@ function MachinePicker({ exercise, attached, onDone }) {
  * занятии одним касанием меняет упражнение на одно из этих. У общего
  * упражнения в общей базе — замены тоже из общей базы
  */
-export function AlternativesEditor({ exercise, owner, all, onChanged }) {
+export function AlternativesEditor({ exercise, owner, all, onChanged, onOpen = null }) {
   const e = exercise;
   const alts = e.alternatives || [];
   const [adding, setAdding] = useState(false);
@@ -343,12 +343,16 @@ export function AlternativesEditor({ exercise, owner, all, onChanged }) {
         {alts.length ? extrasHint(e, owner) : 'Чем заменить, если тренажёр занят или упражнение не подходит: клиент поменяет его в занятии одним касанием, а вес подтянется с прошлого раза. Связь работает в обе стороны.'}
       </p>
       {alts.length > 0 && (
-        <div className="chips chips--flush chips--wrap">
+        <div className="alt-chips">
+          {/* Касание названия — к карточке замены, убирает только крестик (владелец, 18.10.2026) */}
           {alts.map((a) => (
-            <button key={a.id} type="button" className="chip" disabled={busy} aria-label={`Убрать замену «${a.name}»`}
-              onClick={() => save(alts.filter((x) => x.id !== a.id).map((x) => x.id))}>
-              {a.name} ×
-            </button>
+            <span key={a.id} className="alt-chip">
+              {onOpen
+                ? <button type="button" className="alt-chip__name" onClick={() => { haptic(); onOpen(a.id); }}>{a.name}</button>
+                : <span className="alt-chip__name">{a.name}</span>}
+              <button type="button" className="alt-chip__x" disabled={busy} aria-label={`Убрать замену «${a.name}»`}
+                onClick={() => save(alts.filter((x) => x.id !== a.id).map((x) => x.id))}>×</button>
+            </span>
           ))}
         </div>
       )}

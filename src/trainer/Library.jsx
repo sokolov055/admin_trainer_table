@@ -711,6 +711,8 @@ function Exercises() {
   const [loadKind, setLoadKind] = useState('');
   const [gearKind, setGearKind] = useState('');
   const [open, setOpen] = useState(null);
+  // Переход на карточку замены — «Назад» возвращает к предыдущей карточке
+  const [trail, setTrail] = useState([]);
   const [editing, setEditing] = useState(null);
   const [pruning, setPruning] = useState(false);
   // Владелец: только упражнения с черновиком «Как настроить» — пройти и проверить
@@ -722,7 +724,8 @@ function Exercises() {
   useBackGesture(() => setShowSimilar(false), !editing && showSimilar);
   useBackGesture(() => setEditing(null), !!editing);
   useBackGesture(() => setShowHidden(false), !editing && showHidden);
-  useBackGesture(() => setOpen(null), !editing && !showHidden && !!open);
+  const back = () => { if (trail.length) { setOpen(trail[trail.length - 1]); setTrail(trail.slice(0, -1)); } else setOpen(null); };
+  useBackGesture(back, !editing && !showHidden && !!open);
   useReturnScroll(!!(editing || showHidden || open));
 
   // Смахнули или нажали в правке списка — пропадает сразу, на сервер через
@@ -767,7 +770,8 @@ function Exercises() {
         onSetup={reload}
         onChanged={(saved) => { setOpen(saved.id); reload(); }}
         muscles={data.muscles}
-        onBack={() => setOpen(null)}
+        onBack={back}
+        onOpen={(id) => { setTrail([...trail, open]); setOpen(id); window.scrollTo?.(0, 0); }}
         onDeleted={() => { setOpen(null); reload(); }}
         onRemove={() => { remove(current); setOpen(null); }}
       />
@@ -1183,7 +1187,7 @@ function HiddenExercises({ onBack }) {
  * своей версией (сервер копирует тренажёры, замены, настройку и видео);
  * подготовку общего владелец правит прямо в базе.
  */
-function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBack, onDeleted, onRemove }) {
+function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBack, onDeleted, onRemove, onOpen }) {
   const e = exercise;
   const [edit, setEdit] = useState('');
   const [draft, setDraft] = useState({});
@@ -1354,7 +1358,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
             {actions({ muscles: draft.map })}
           </>, 'По группе мышц')}
 
-        <AlternativesEditor exercise={e} owner={owner} all={all} onChanged={onChanged} />
+        <AlternativesEditor exercise={e} owner={owner} all={all} onChanged={onChanged} onOpen={onOpen} />
 
         {!edit && failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
         <div className="library__actions">
