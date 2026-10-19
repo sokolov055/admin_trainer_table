@@ -1399,7 +1399,7 @@ const MOCK = {
       // приходит полуночью по UTC и длится сутки
       if (k % 7 === 4) {
         const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(k).padStart(2, '0')}`;
-        events.push({ id: 'demo-all-' + k, clientRow: null, clientName: '', title: 'День рождения',
+        events.push({ id: 'demo-all-' + day, clientRow: null, clientName: '', title: 'День рождения',
           startsAt: day + 'T00:00:00.000Z', endsAt: new Date(Date.parse(day + 'T00:00:00.000Z') + 86400000).toISOString(), done: false });
       }
       plan.forEach(([h, m, mins, row], j) => {
@@ -1408,7 +1408,9 @@ const MOCK = {
         const c = CLIENTS.find((x) => x.row === row);
         const unknown = j === 2 && k % 5 === 0;
         events.push({
-          id: 'demo-ev-' + k + '-' + j,
+          // В номере — вся дата: расписание копит занятия нескольких месяцев,
+          // и 28 сентября не должно затирать 28 октября
+          id: 'demo-ev-' + d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + k + '-' + j,
           clientRow: unknown ? null : c.row,
           clientName: unknown ? '' : c.name,
           title: unknown ? 'Массаж' : c.name,

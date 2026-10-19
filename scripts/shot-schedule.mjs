@@ -28,11 +28,18 @@ for (const scheme of ['light', 'dark']) {
   await page.goto(origin + '/?mockRole=trainer');
   await page.getByRole('button', { name: 'Расписание' }).first().click({ timeout: 10000 });
   await page.waitForTimeout(800);
-  for (const v of ['3 дня', 'Неделя', 'Месяц', 'День']) {
-    await page.getByRole('tab', { name: v }).click();
+  for (const v of ['3 дня', 'Неделя', 'Месяц', 'День', 'Список']) {
+    await page.locator('.cal-viewpick__button').click();
+    await page.getByRole('menuitemradio', { name: v }).click();
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${DEST}-${v.replace(/\s/g, '')}-${scheme}.png` });
   }
+  // Компьютер: широкое окно, стрелки вместо листания
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await page.locator('.cal-viewpick__button').click();
+  await page.getByRole('menuitemradio', { name: 'Неделя' }).click();
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `${DEST}-desktop-${scheme}.png` });
   await page.close();
 }
 await browser.close();

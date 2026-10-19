@@ -370,7 +370,11 @@ export default function TrainerApp({ me }) {
           hidden={view !== 'schedule'}
           data-kept={tabs.kept('schedule') ? '' : undefined}
         >
-          <Schedule onOpenClient={(client, at) => openCard(client, at, 'К занятию')} />
+          <Schedule
+            active={view === 'schedule' && !openClient}
+            onMenu={() => { setMenuOpen(true); haptic(); }}
+            onOpenClient={(client, at) => openCard(client, at, 'К занятию')}
+          />
         </main>
       )}
 

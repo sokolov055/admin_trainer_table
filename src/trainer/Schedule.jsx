@@ -1,23 +1,34 @@
 import { useReturnScroll } from '../scroll.js';
-import { useBackGesture } from '../gestures.jsx';
+import { useBackGesture, onPullRefresh } from '../gestures.jsx';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal, flushSync } from 'react-dom';
 import { useData } from '../useData.js';
-import { apiMutate } from '../api.js';
+import { apiMutate, apiStale, onMutated } from '../api.js';
 import { reloadWidgets } from '../native-widget.js';
 import { haptic } from '../telegram.js';
-import { Section, Panel, Loading, ErrorState, Note, Field, Options, Chips } from '../ui.jsx';
-import { IconAlert, IconBack, IconCopy, IconPlus } from '../icons.jsx';
-import { gridDropStart, monthDropStart, moveRequest } from './calendar-move.js';
+import { Panel, Note, Field, Options, ErrorState } from '../ui.jsx';
+import { IconAlert, IconBack, IconCheck, IconChevron, IconCopy, IconMenu, IconPlus } from '../icons.jsx';
+import {
+  addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
+  rangeOf, sameTimeOn, shifted, startOfDay,
+} from './calendar-move.js';
 
 /**
- * Расписание тренера хранится в Fit Track.
- * Вид: сетка по
- * часам на 1 день, 3 дня или неделю и сетка месяца. Нажатие на пустое место
- * сетки — новое занятие на это время, на событие — правка, на день в
- * месяце или шапке — этот день крупно. Выбранный вид помнится на телефоне.
+ * Расписание тренера — по образцу Google Календаря (переделано 19.10.2026).
+ *
+ * Экран целиком отдан календарю: одна строка сверху (месяц — он же выбор
+ * даты, «Сегодня», вид, меню), под ней сетка до нижнего меню, без прокрутки
+ * страницы. Виды: список, день, 3 дня, неделя, месяц; выбранный помнится.
+ *
+ * Листание вбок — ровно на экран (день, три дня, неделя, месяц), сетка едет
+ * за пальцем, по вертикали остаётся на том же часе. Событие переносится
+ * удержанием: оно приподнимается, ведётся пальцем с шагом 15 минут, у края
+ * сетка перелистывается сама. Личное событие переносится сразу (с «Вернуть»),
+ * у занятия с клиентом спрашиваем, чей это перенос, — от этого зависит
+ * статистика. Нажатие на пустое место ставит заготовку, второе — открывает
+ * новое событие на это время.
  */
 
-const DAY = 86400000;
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const MONTHS_TITLE = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
@@ -39,93 +50,164 @@ const savedHour = () => {
 /** С какого часа открывается сетка: ночь есть, но её пролистывают */
 const FIRST_HOUR = 7;
 
+// keys — сочетания клавиш на компьютере, латиница и та же клавиша в русской раскладке
 const VIEWS = [
-  { value: 'day', label: 'День', days: 1 },
-  { value: '3day', label: '3 дня', days: 3 },
-  { value: 'week', label: 'Неделя', days: 7 },
-  { value: 'month', label: 'Месяц' },
+  { value: 'list', label: 'Список', keys: ['a', 'ф'] },
+  { value: 'day', label: 'День', keys: ['d', 'в'] },
+  { value: '3day', label: '3 дня', keys: ['x', 'ч'] },
+  { value: 'week', label: 'Неделя', keys: ['w', 'ц'] },
+  { value: 'month', label: 'Месяц', keys: ['m', 'ь'] },
 ];
 const VIEW_KEY = 'schedule_view_v1';
 
 /** Отмена позже этого срока до начала — поздняя (как на сервере) */
 const LATE_HOURS = 24;
 
-const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-const mondayOf = (d) => addDays(startOfDay(d), -((d.getDay() + 6) % 7));
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
 const hm = (iso) => new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 const pad = (n) => String(n).padStart(2, '0');
-const dateValue = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const clock = (minutes) => pad(Math.floor(minutes / 60) % 24) + ':' + pad(minutes % 60);
 const weekdayOf = (d) => WEEKDAYS[(d.getDay() + 6) % 7];
+const keyDate = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
+/** «ср 21 окт, 10:15» — куда перенесли */
+const whenShort = (d) => weekdayOf(d).toLowerCase() + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3) + ', ' + clock(d.getHours() * 60 + d.getMinutes());
 
 function readView() {
   try { const v = localStorage.getItem(VIEW_KEY); return VIEWS.some((x) => x.value === v) ? v : '3day'; } catch (_) { return '3day'; }
 }
 
-/** Первый день и число дней на экране для вида и опорной даты */
-function rangeOf(view, anchor) {
-  if (view === 'week') return { start: mondayOf(anchor), days: 7 };
-  if (view === 'month') {
-    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-    return { start: mondayOf(first), days: 42 };
-  }
-  return { start: startOfDay(anchor), days: view === '3day' ? 3 : 1 };
-}
-
-/** Шаг «вперёд/назад»: на весь экран; у месяца — на месяц */
-function shifted(view, anchor, dir) {
-  if (view === 'month') return new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1);
-  const step = view === 'week' ? 7 : view === '3day' ? 3 : 1;
-  return addDays(anchor, dir * step);
-}
-
-/** «Сентябрь 2026» или «Сентябрь – октябрь 2026» для сетки на стыке месяцев */
+/** «Октябрь», «Январь 2027» или «Окт – нояб» для сетки на стыке месяцев */
 function titleOf(view, anchor, start, days) {
-  if (view === 'month') return MONTHS_TITLE[anchor.getMonth()] + ' ' + anchor.getFullYear();
+  const year = (d) => (d.getFullYear() === new Date().getFullYear() ? '' : ' ' + d.getFullYear());
+  if (view === 'month' || view === 'list') return MONTHS_TITLE[anchor.getMonth()] + year(anchor);
   const end = addDays(start, days - 1);
-  if (start.getMonth() === end.getMonth()) return MONTHS_TITLE[start.getMonth()] + ' ' + start.getFullYear();
-  // На стыке месяцев — коротко, чтобы заголовок не переносился
-  return MONTHS_TITLE[start.getMonth()].slice(0, 3) + ' - ' + MONTHS_TITLE[end.getMonth()].slice(0, 3).toLowerCase() + ' ' + end.getFullYear();
+  if (start.getMonth() === end.getMonth()) return MONTHS_TITLE[start.getMonth()] + year(start);
+  return MONTHS_TITLE[start.getMonth()].slice(0, 3) + ' – ' + MONTHS_TITLE[end.getMonth()].slice(0, 4).toLowerCase() + year(end);
 }
 
-// onOpenClient(client, раздел) — к карточке клиента занятия (FT-567)
-export default function Schedule({ onOpenClient = null }) {
+/** Короткий отклик пальцу: в Telegram — его вибрация, на Android — своя */
+function buzz() {
+  haptic('medium');
+  try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* нет вибрации */ }
+}
+
+// onOpenClient(client, раздел) — к карточке клиента занятия (FT-567);
+// onMenu — боковое меню приложения: шапки над календарём нет, кнопка в его строке
+export default function Schedule({ onOpenClient = null, onMenu = null, active = true }) {
   const [view, setViewState] = useState(readView);
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [editing, setEditing] = useState(null); // null | {} — новое | событие
   const [preset, setPreset] = useState(null); // время нового занятия из сетки
-  const [movedEvents, setMovedEvents] = useState({});
-  const [moveFailure, setMoveFailure] = useState(null);
+  // Прокрутка по часам ставится заново только по этому счётчику: открыли,
+  // сменили вид, «Сегодня», выбрали дату. Листание её не трогает
+  const [scrollKey, setScrollKey] = useState(0);
+  const [picker, setPicker] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [moves, setMoves] = useState({}); // id → новое время, пока сервер не ответил
+  const [ask, setAsk] = useState(null); // перенос занятия ждёт ответа «чей»
+  const [undo, setUndo] = useState(null);
+  const [failure, setFailure] = useState(null);
+  const [agendaDays, setAgendaDays] = useState(28);
   useReturnScroll(!!editing);
   // Запись открыта поверх сетки: смахнуть вправо, Back Android и браузера —
   // к расписанию, как кнопка «Расписание» над формой (FT-567)
   useBackGesture(() => { setEditing(null); setPreset(null); }, !!editing);
 
   const setView = (v) => {
+    // Смена вида — с того же места: сегодня, если оно на экране, иначе
+    // с первого видимого дня (из месяца — с первого числа)
+    const { start: s0, days: n0 } = rangeOf(view, anchor);
+    const first = view === 'month' ? new Date(anchor.getFullYear(), anchor.getMonth(), 1) : s0;
+    const last = view === 'month' ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) : addDays(s0, view === 'list' ? agendaDays : n0);
+    const now = new Date();
+    setAnchor(now >= first && now < last ? startOfDay(now) : first);
     setViewState(v);
+    setMenu(false);
+    setScrollKey((k) => k + 1);
     try { localStorage.setItem(VIEW_KEY, v); } catch (_) { /* не запомнили — не беда */ }
     haptic();
   };
 
   const { start, days } = rangeOf(view, anchor);
-  // Сетке по часам — с соседними днями по обе стороны: они видны, пока
-  // сетку тянут пальцем, и после пролистывания уже с занятиями
-  const around = view === 'month' ? 0 : days;
-  const params = useMemo(() => ({
-    from: addDays(start, -around).toISOString(),
-    to: addDays(start, days + around).toISOString(),
-  }), [start.getTime(), days, around]);
-  const { loading, data, error, reload } = useData('trainer.schedule', params, [params.from, params.to]);
-  // Виджеты iPhone «Занятия сегодня»: расписание перечитали (в том числе
-  // после правки) — пусть и они перечитают сейчас, а не через полчаса
-  useEffect(() => { if (data) reloadWidgets(); }, [data]);
-  useEffect(() => { if (data && data.events) setMovedEvents({}); }, [data]);
-  // Пока грузится новый период, показываем уже известное — а не пустую
-  // сетку: после пролистывания большинство занятий уже загружено
-  const known = useRef([]);
-  if (data && data.events) known.current = data.events;
+  const shownDays = view === 'list' ? agendaDays : days;
+
+  // Загруженные занятия копятся (mergeRange): вернулись на прошлую неделю —
+  // она на месте сразу, а не пустая до ответа сервера
+  const [cache, setCache] = useState(() => new Map());
+  const [load, setLoad] = useState({ loading: true, error: null });
+  const [tick, setTick] = useState(0);
+  const loaded = useRef(new Set());
+  const ranges = fetchRanges(view, anchor, agendaDays).map((r) => [r.from.toISOString(), r.to.toISOString()]);
+  const rangesKey = ranges.map((r) => r.join('|')).join(',');
+  useEffect(() => {
+    let alive = true;
+    let left = ranges.length;
+    setLoad((s) => ({ loading: true, error: s.error }));
+    ranges.forEach(([fromIso, toIso]) => {
+      const key = fromIso + '|' + toIso;
+      const { data, promise } = apiStale('trainer.schedule', { from: fromIso, to: toIso });
+      // Сохранённое прежде — только для промежутка, который ещё не видели
+      // свежим: после переноса оно старое и вернуло бы событие на старое место
+      if (data && data.events && !loaded.current.has(key)) setCache((c) => mergeRange(c, fromIso, toIso, data.events));
+      promise
+        .then((fresh) => {
+          loaded.current.add(key);
+          setCache((c) => mergeRange(c, fromIso, toIso, fresh && fresh.events));
+          left -= 1;
+          if (alive && !left) {
+            setLoad({ loading: false, error: null });
+            // Виджеты iPhone «Занятия сегодня» перечитают сейчас, а не через полчаса
+            reloadWidgets();
+          }
+        })
+        .catch((error) => { if (alive) setLoad({ loading: false, error }); });
+    });
+    return () => { alive = false; };
+  }, [rangesKey, tick]);
+  // Любая запись (в том числе своя форма) — перечитать тихо
+  useEffect(() => onMutated(() => setTick((t) => t + 1)), []);
+  // «Потянуть вниз» за строку месяца — перечитать
+  useEffect(() => onPullRefresh(() => { setTick((t) => t + 1); return new Promise((r) => setTimeout(r, 700)); }), []);
+
   const clients = useData('trainer.clients', {}, []);
+
+  const events = useMemo(() => [...cache.values()].map((e) => (moves[e.id] ? { ...e, ...moves[e.id], moving: true } : e)), [cache, moves]);
+
+  function shift(dir) { setAnchor((a) => shifted(view, a, dir)); setPicker(false); haptic(); }
+  function today() { setAnchor(startOfDay(new Date())); setScrollKey((k) => k + 1); setPicker(false); haptic(); }
+  const jump = (d) => { setAnchor(startOfDay(d)); setScrollKey((k) => k + 1); setPicker(false); haptic(); };
+  const openDay = (d) => { setAnchor(startOfDay(d)); setView('day'); };
+  const openEvent = (e) => { if (!e.moving) { setEditing(e); haptic(); } };
+
+  // Сочетания клавиш на компьютере — как в Google: ←/→, T — сегодня, D/X/W/M/A — вид
+  const keyRef = useRef(null);
+  keyRef.current = (e) => {
+    if (!active || editing || ask || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (document.querySelector('.drawer--open, [role="dialog"][aria-modal="true"]')) return;
+    const k = String(e.key || '').toLowerCase();
+    if (e.key === 'ArrowLeft' || k === 'k' || k === 'л') shift(-1);
+    else if (e.key === 'ArrowRight' || k === 'j' || k === 'о') shift(1);
+    else if (k === 't' || k === 'е') today();
+    else {
+      const v = VIEWS.find((x) => x.keys.includes(k));
+      if (!v) return;
+      setView(v.value);
+    }
+    e.preventDefault();
+  };
+  useEffect(() => {
+    const on = (e) => keyRef.current && keyRef.current(e);
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, []);
+
+  useEffect(() => {
+    if (!undo) return undefined;
+    const t = setTimeout(() => setUndo(null), 6000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   if (editing) {
     return (
@@ -145,138 +227,257 @@ export default function Schedule({ onOpenClient = null }) {
         }}
         clients={(clients.data && clients.data.clients) || []}
         onOpenClient={onOpenClient}
-        onDone={() => { setEditing(null); setPreset(null); reload(); }}
+        onDone={() => { setEditing(null); setPreset(null); setTick((t) => t + 1); }}
         onCancel={() => { setEditing(null); setPreset(null); }}
       />
     );
   }
 
-  const events = ((data && data.events) || known.current).map((e) => movedEvents[e.id]
-    ? { ...e, startsAt: movedEvents[e.id].startsAt, endsAt: movedEvents[e.id].endsAt }
-    : e);
-  const create = (when) => { setPreset(when || { date: startOfDay(anchor), minutes: 10 * 60 }); setEditing({}); haptic(); };
-  const openDay = (d) => { setAnchor(startOfDay(d)); setView('day'); };
-  const moveEvent = async (event, nextStart) => {
-    if (event.cancelledCharged) return;
-    const request = moveRequest(event, nextStart);
-    const duration = request.minutes;
-    const nextEnd = new Date(nextStart.getTime() + duration * 60000);
-    setMoveFailure(null);
-    setMovedEvents((old) => ({ ...old, [event.id]: { startsAt: nextStart.toISOString(), endsAt: nextEnd.toISOString() } }));
+
+  // Новое событие: из сетки — на нажатое время; кнопкой «+» — на ближайший
+  // целый час сегодня, если сегодня на экране, иначе на 10:00 первого дня
+  const create = (when) => {
+    let at = when;
+    if (!at) {
+      const now = new Date();
+      const todayShown = view !== 'month' && now >= start && now < addDays(start, shownDays);
+      at = todayShown && now.getHours() < 23
+        ? { date: startOfDay(now), minutes: (now.getHours() + 1) * 60 }
+        : { date: view === 'month' ? startOfDay(anchor) : start, minutes: 10 * 60 };
+    }
+    setPreset(at);
+    setEditing({});
+    haptic();
+  };
+
+  const times = (event, next) => ({
+    startsAt: next.toISOString(),
+    endsAt: new Date(next.getTime() + durationOf(event) * 60000).toISOString(),
+  });
+  const forget = (id) => setMoves((m) => { const n = { ...m }; delete n[id]; return n; });
+
+  // Сохранить перенос; на экране событие уже стоит на новом месте
+  const commitMove = async (event, next, change) => {
+    const at = times(event, next);
+    setMoves((m) => ({ ...m, [event.id]: at }));
+    setFailure(null);
     try {
-      await apiMutate('trainer.schedule.save', request);
+      await apiMutate('trainer.schedule.save', moveRequest(event, next, change));
+      setCache((c) => {
+        const n = new Map(c);
+        const old = n.get(event.id);
+        if (old) n.set(event.id, { ...old, ...at });
+        return n;
+      });
       haptic('success');
-      reload();
+      return true;
     } catch (err) {
-      setMovedEvents((old) => { const next = { ...old }; delete next[event.id]; return next; });
-      setMoveFailure(err);
+      setFailure(err);
+      return false;
+    } finally {
+      forget(event.id);
     }
   };
 
+  const drop = (event, next) => {
+    if (next.getTime() === new Date(event.startsAt).getTime()) return;
+    setUndo(null);
+    if (event.personal) {
+      const back = new Date(event.startsAt);
+      commitMove(event, next).then((ok) => {
+        if (ok) setUndo({ event: { ...event, ...times(event, next) }, back, text: 'Перенесено на ' + whenShort(next) });
+      });
+      return;
+    }
+    // Занятие с клиентом: показываем на новом месте и спрашиваем, чей
+    // это перенос, — без ответа сервер его не примет, а статистика соврёт
+    setMoves((m) => ({ ...m, [event.id]: times(event, next) }));
+    setAsk({ event, next });
+  };
+
+  const answer = (change) => {
+    const a = ask;
+    setAsk(null);
+    if (!change) { forget(a.event.id); haptic(); return; }
+    commitMove(a.event, a.next, change);
+  };
+
+  const title = titleOf(view, anchor, start, days);
+  const viewLabel = (VIEWS.find((v) => v.value === view) || VIEWS[0]).label;
+  const nowDate = new Date();
+
   return (
-    <>
-      <div className="cal-bar">
-        <strong className="cal-bar__title">{titleOf(view, anchor, start, days)}</strong>
-        <div className="cal-bar__nav">
-          <button className="button button--ghost cal-bar__today" onClick={() => { setAnchor(startOfDay(new Date())); haptic(); }}>Сегодня</button>
-          <button className="icon-button" aria-label="Назад" onClick={() => { setAnchor(shifted(view, anchor, -1)); haptic(); }}><IconBack size={18} /></button>
-          <button className="icon-button cal-bar__next" aria-label="Вперёд" onClick={() => { setAnchor(shifted(view, anchor, 1)); haptic(); }}><IconBack size={18} /></button>
+    <div className="cal-screen">
+      <div className="cal-top">
+        <button type="button" className="cal-top__title" aria-expanded={picker} aria-label={title + ', выбрать дату'}
+          onClick={() => { setPicker((p) => !p); setMenu(false); haptic(); }}>
+          <span>{title}</span>
+          <IconChevron size={18} className={picker ? 'cal-top__chev cal-top__chev--open' : 'cal-top__chev'} />
+        </button>
+        <div className="cal-top__actions">
+          <button type="button" className="icon-button cal-top__arrow" aria-label="Назад" onClick={() => shift(-1)}><IconBack size={18} /></button>
+          <button type="button" className="icon-button cal-top__arrow cal-top__arrow--next" aria-label="Вперёд" onClick={() => shift(1)}><IconBack size={18} /></button>
+          <button type="button" className="cal-today" aria-label="Сегодня" title="Сегодня (T)" onClick={today}>
+            <span>{nowDate.getDate()}</span>
+          </button>
+          <div className="cal-viewpick">
+            <button type="button" className="cal-viewpick__button" aria-haspopup="menu" aria-expanded={menu}
+              onClick={() => { setMenu((m) => !m); setPicker(false); haptic(); }}>
+              {viewLabel}<IconChevron size={16} />
+            </button>
+            {menu && (
+              <>
+                <div className="cal-viewpick__scrim" onClick={() => setMenu(false)} aria-hidden="true" />
+                <div className="cal-viewpick__menu" role="menu" aria-label="Вид календаря">
+                  {VIEWS.map((v) => (
+                    <button key={v.value} type="button" role="menuitemradio" aria-checked={v.value === view}
+                      className={'cal-viewpick__item' + (v.value === view ? ' cal-viewpick__item--on' : '')}
+                      onClick={() => setView(v.value)}>
+                      <span>{v.label}</span>
+                      {v.value === view && <IconCheck size={16} />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          {onMenu && (
+            <button type="button" className="icon-button cal-top__menu" aria-label="Меню" onClick={onMenu}><IconMenu size={22} /></button>
+          )}
         </div>
+        <span className={'cal-top__busy' + (load.loading ? ' cal-top__busy--on' : '')} aria-hidden="true" />
       </div>
 
-      <div className="cal-views">
-        <Chips variant="nav" items={VIEWS.map((v) => ({ value: v.value, label: v.label }))} value={view} onChange={setView} />
+      {picker && (
+        <MiniMonth anchor={anchor} start={start} days={view === 'month' ? 0 : view === 'list' ? 1 : days} events={events}
+          onPick={jump} />
+      )}
+
+      {failure && (
+        <div className="cal-note">
+          <Note tone="critical" icon={IconAlert}>Не удалось перенести: {failure.message || 'повторите ещё раз'}</Note>
+        </div>
+      )}
+      {load.error && !events.length && (
+        <div className="cal-note"><ErrorState error={load.error} onRetry={() => setTick((t) => t + 1)} /></div>
+      )}
+
+      <div className="cal-main">
+        {view === 'month' ? (
+          <MonthPager anchor={anchor} events={events} onDay={openDay} onEvent={openEvent} onShift={shift} onDrop={drop} />
+        ) : view === 'list' ? (
+          <Agenda start={start} days={agendaDays} events={events} loading={load.loading}
+            onEvent={openEvent} onDay={openDay} onMore={() => setAgendaDays((n) => n + 28)} />
+        ) : (
+          <TimeGrid start={start} days={days} events={events} scrollKey={scrollKey}
+            onDay={openDay} onEvent={openEvent} onCreate={create} onShift={shift} onDrop={drop} />
+        )}
       </div>
 
       {/* Новое событие — плавающей кнопкой, как в Google: сетка занимает
           экран, а кнопка всегда под пальцем над нижним меню */}
-      <button className="cal-fab" aria-label="Добавить событие" onClick={() => create()}><IconPlus size={24} /></button>
+      <button type="button" className="cal-fab" aria-label="Добавить событие" onClick={() => create()}><IconPlus size={24} /></button>
 
-      {error && <ErrorState error={error} onRetry={reload} />}
-      {moveFailure && <Note tone="critical" icon={IconAlert}>Не удалось перенести событие: {moveFailure.message || 'повторите ещё раз'}</Note>}
-
-      {!error && (loading && !data && !known.current.length ? <Loading lead={false} rows={4} /> : view === 'month' ? (
-        <SwipePager onShift={(dir) => { setAnchor(shifted(view, anchor, dir)); haptic(); }}>
-          <MonthGrid start={start} anchor={anchor} events={events} onDay={openDay} onEvent={setEditing} onMove={moveEvent} />
-        </SwipePager>
-      ) : (
-        <TimeGrid start={start} days={days} events={events} onDay={openDay} onEvent={setEditing} onSlot={create} onMove={moveEvent}
-          onShift={(n) => { setAnchor(addDays(anchor, n)); haptic(); }} />
-      ))}
-
-    </>
-  );
-}
-
-/**
- * Пролистывание вбок, как в Google Календаре: сетка едет за пальцем, и
- * если протянули дальше порога — уезжает целиком, а на её место приходит
- * соседний период (onShift). Вертикальную прокрутку сетки не трогаем:
- * направление решается по первым 10 px движения. От левого края экрана
- * жест не берём — там «назад» приложения.
- */
-const SWIPE_EDGE = 24;
-const SWIPE_LOCK = 10;
-
-function SwipePager({ onShift, children }) {
-  const box = useRef(null);
-  const g = useRef(null);
-  const reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const move = (x, animate) => {
-    const el = box.current;
-    if (!el) return;
-    el.style.transition = animate && !reduce ? 'transform 200ms cubic-bezier(0.23, 1, 0.32, 1)' : 'none';
-    el.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
-  };
-
-  const onTouchStart = (e) => {
-    const t = e.touches[0];
-    g.current = t.clientX < SWIPE_EDGE || e.touches.length > 1 ? null : { x: t.clientX, y: t.clientY, mode: null, dx: 0 };
-  };
-  const onTouchMove = (e) => {
-    const s = g.current;
-    if (!s) return;
-    const t = e.touches[0];
-    const dx = t.clientX - s.x;
-    const dy = t.clientY - s.y;
-    if (!s.mode) {
-      if (Math.abs(dx) < SWIPE_LOCK && Math.abs(dy) < SWIPE_LOCK) return;
-      s.mode = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-    }
-    if (s.mode !== 'x') return;
-    s.dx = dx;
-    move(dx, false);
-  };
-  const onTouchEnd = () => {
-    const s = g.current;
-    g.current = null;
-    if (!s || s.mode !== 'x') return;
-    const width = (box.current && box.current.offsetWidth) || 360;
-    if (Math.abs(s.dx) > width * 0.22) {
-      const dir = s.dx < 0 ? 1 : -1;
-      // Уезжает целиком, соседний период въезжает с другой стороны
-      move(-dir * width, true);
-      setTimeout(() => {
-        onShift(dir);
-        move(dir * width * 0.35, false);
-        requestAnimationFrame(() => move(0, true));
-      }, reduce ? 0 : 180);
-    } else {
-      move(0, true);
-    }
-  };
-
-  return (
-    // data-no-swipe: жесты приложения (листание вкладок, «назад») над сеткой
-    // не работают — иначе вбок листалась страница, а не календарь (gestures.jsx)
-    <div className="cal-swipe" data-no-swipe="" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
-      <div ref={box} className="cal-swipe__page">{children}</div>
+      {ask && <MoveAsk ask={ask} onAnswer={answer} />}
+      {undo && typeof document !== 'undefined' && createPortal(
+        <div className="undo-bar" role="status">
+          <span>{undo.text}</span>
+          <button type="button" className="button button--ghost" onClick={() => {
+            const u = undo;
+            setUndo(null);
+            commitMove(u.event, u.back);
+          }}>Вернуть</button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
 
-/** Название события в сетке: клиент, иначе название из календаря */
+/**
+ * Чей перенос. Сервер без ответа занятие не перенесёт: в статистику идут
+ * переносы клиента и тренера отдельно, а исправление ошибки — никуда.
+ */
+function MoveAsk({ ask, onAnswer }) {
+  const { event, next } = ask;
+  const from = new Date(event.startsAt);
+  useBackGesture(() => onAnswer(null), true);
+  return createPortal(
+    <div className="cal-sheet" role="dialog" aria-modal="true" aria-label="Перенос занятия">
+      <div className="cal-sheet__scrim" onClick={() => onAnswer(null)} aria-hidden="true" />
+      <div className="cal-sheet__panel">
+        <strong className="cal-sheet__title">Перенести занятие?</strong>
+        <p className="cal-sheet__text">
+          {labelOf(event)}<br />
+          <span className="muted">{whenShort(from)}</span> → <b>{whenShort(next)}</b>
+        </p>
+        <div className="cal-sheet__options">
+          <button type="button" className="button button--primary" onClick={() => onAnswer('client')}>Попросил клиент</button>
+          <button type="button" className="button" onClick={() => onAnswer('trainer')}>По моей инициативе</button>
+          <button type="button" className="button" onClick={() => onAnswer('fix')}>Исправление — неверно записал</button>
+          <button type="button" className="button button--ghost" onClick={() => onAnswer(null)}>Не переносить</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Выбор даты под строкой месяца, как в Google: месяц сеткой, точки под
+ * днями с занятиями, выделены дни на экране. Месяцы — стрелками и смахиванием.
+ */
+function MiniMonth({ anchor, start, days, events, onPick }) {
+  const [month, setMonth] = useState(() => new Date(anchor.getFullYear(), anchor.getMonth(), 1));
+  const swipe = useRef(null);
+  const first = mondayOf(month);
+  const cells = Array.from({ length: 42 }, (_, i) => addDays(first, i));
+  const busy = useMemo(() => {
+    const s = new Set();
+    events.forEach((e) => { if (!e.cancelledCharged) s.add(dateValue(new Date(e.startsAt))); });
+    return s;
+  }, [events]);
+  const now = new Date();
+  const end = addDays(start, days);
+  const step = (n) => { setMonth((m) => new Date(m.getFullYear(), m.getMonth() + n, 1)); haptic(); };
+  return (
+    <div className="cal-mini" data-no-gestures=""
+      onTouchStart={(e) => { const t = e.touches[0]; swipe.current = { x: t.clientX, y: t.clientY }; }}
+      onTouchEnd={(e) => {
+        const s = swipe.current;
+        swipe.current = null;
+        const t = e.changedTouches[0];
+        if (!s || !t) return;
+        const dx = t.clientX - s.x;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(t.clientY - s.y)) step(dx < 0 ? 1 : -1);
+      }}>
+      <div className="cal-mini__head">
+        <button type="button" className="icon-button" aria-label="Предыдущий месяц" onClick={() => step(-1)}><IconBack size={16} /></button>
+        <strong>{MONTHS_TITLE[month.getMonth()]} {month.getFullYear()}</strong>
+        <button type="button" className="icon-button cal-top__arrow--next" aria-label="Следующий месяц" onClick={() => step(1)}><IconBack size={16} /></button>
+      </div>
+      <div className="cal-mini__grid">
+        {WEEKDAYS.map((w) => <span key={w} className="cal-mini__wd">{w}</span>)}
+        {cells.map((d) => {
+          const inView = days > 0 && d >= start && d < end;
+          const cls = 'cal-mini__day'
+            + (d.getMonth() !== month.getMonth() ? ' cal-mini__day--other' : '')
+            + (sameDay(d, now) ? ' cal-mini__day--today' : '')
+            + (inView ? ' cal-mini__day--in' : '');
+          return (
+            <button key={d.getTime()} type="button" className={cls} onClick={() => onPick(d)}
+              aria-label={d.getDate() + ' ' + MONTHS[d.getMonth()]}>
+              <span>{d.getDate()}</span>
+              {busy.has(dateValue(d)) && <i aria-hidden="true" />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Название события в сетке: клиент, иначе название */
 const labelOf = (e) => e.clientName || e.title || 'Без названия';
 /** В узких колонках недели и месяца — только имя, как в Google на телефоне */
 const shortLabelOf = (e) => labelOf(e).split(/\s+/)[0];
@@ -285,121 +486,275 @@ function eventClass(e) {
   return 'cal-event'
     + (e.cancelledCharged ? ' cal-event--cancelled' : '')
     + (e.personal ? ' cal-event--personal' : '')
-    + (e.done && !e.cancelledCharged ? ' cal-event--done' : '');
+    + (e.done && !e.cancelledCharged ? ' cal-event--done' : '')
+    + (e.moving ? ' cal-event--moving' : '');
 }
 
-// iPhone позволяет отменить прокрутку только слушателю touchmove, который уже
-// существовал в момент начала касания. Поэтому он зарегистрирован заранее, а
-// блокировка включается лишь после удержания события.
-let calendarTouchDragging = false;
+/* ------------------------------------------------------------------------
+   Жесты сетки: листание вбок, перенос удержанием, щипок
+   ------------------------------------------------------------------------ */
+
+/** Палец сдвинулся меньше — ещё не жест, а нажатие или удержание */
+const SLOP = 8;
+/** Удержание, после которого событие приподнимается (Google — около 300 мс) */
+const LIFT_MS = 320;
+/** Быстрый взмах листает, даже если протянули мало, px/мс */
+const FLICK = 0.35;
+const PAGE_MS = 260;
+/** Полоса у края сетки: держим там событие — сетка листается сама */
+const EDGE = 22;
+const EDGE_MS = 600;
+
+// iPhone отменяет прокрутку только слушателю touchmove, который уже был в
+// момент касания. Поэтому он стоит на документе заранее, а блокировка
+// включается, лишь когда событие приподнято.
+let touchLock = false;
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('touchmove', (event) => {
-    if (calendarTouchDragging) event.preventDefault();
+    if (touchLock && event.cancelable) event.preventDefault();
   }, { passive: false });
 }
 
+const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /**
- * Событие можно перенести указателем без промежуточной формы. Координаты
- * меняются прямо у DOM-элемента, чтобы движение не перерисовывало всю сетку.
- * Короткое касание остаётся обычным открытием карточки.
+ * Один обработчик касаний на всю сетку — раньше их было три (лента, событие,
+ * документ), они спорили за палец, и на телефоне перенос не срабатывал.
+ *
+ * api.current: width() и tracks() — что двигать при листании; onPage(dir);
+ * canLift(target) и lift(target, x, y) → { move(x, y), drop(), cancel() };
+ * необязательные pinchStart/pinchMove/pinchEnd.
+ *
+ * Слушатели движения ставятся и на сам элемент под пальцем: если при
+ * листании во время переноса он уйдёт из разметки, касание всё равно
+ * доходит до него, а до сетки — уже нет.
  */
-function CalendarEventButton({ event, className, style, onOpen, onMove, resolveDrop, children, ariaLabel }) {
-  const button = useRef(null);
-  const drag = useRef(null);
-  const suppressClick = useRef(false);
-  const disabled = !!event.cancelledCharged || (!event.personal && !event.clientRow);
+function useCalendarGestures(rootRef, api) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    let g = null;
+    let pinching = false;
+    let settle = null;
+    let last = null;
 
-  useEffect(() => () => {
-    const current = drag.current;
-    if (!current) return;
-    clearTimeout(current.timer);
-    if (current.ready && current.touch) calendarTouchDragging = false;
+    const setX = (x, animate) => {
+      api.current.tracks().forEach((el) => {
+        if (!el) return;
+        el.style.transition = animate && !reduceMotion() ? `transform ${PAGE_MS}ms cubic-bezier(0.23, 1, 0.32, 1)` : 'none';
+        el.style.setProperty('--dx', x + 'px');
+      });
+    };
+    const commitSettle = () => {
+      if (!settle) return;
+      const s = settle;
+      settle = null;
+      clearTimeout(s.timer);
+      flushSync(() => api.current.onPage(s.dir));
+      setX(0, false);
+    };
+    const page = (dir) => {
+      setX(-dir * api.current.width(), true);
+      settle = { dir, timer: setTimeout(commitSettle, reduceMotion() ? 0 : PAGE_MS) };
+    };
+
+    const detach = (cur) => {
+      if (!cur || !cur.target) return;
+      cur.target.removeEventListener('touchmove', move);
+      cur.target.removeEventListener('touchend', end);
+      cur.target.removeEventListener('touchcancel', end);
+    };
+    const abandon = () => {
+      if (!g) return;
+      clearTimeout(g.timer);
+      detach(g);
+      if (g.mode === 'drag') { touchLock = false; g.drag.cancel(); }
+      if (g.mode === 'x') setX(0, true);
+      g = null;
+    };
+
+    function start(e) {
+      commitSettle();
+      if (e.touches.length === 2 && api.current.pinchStart) {
+        abandon();
+        pinching = true;
+        api.current.pinchStart(e.touches);
+        return;
+      }
+      if (e.touches.length !== 1 || pinching) { abandon(); return; }
+      const t = e.touches[0];
+      const target = e.target;
+      const cur = { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, mode: null, t: performance.now(), v: 0, dx: 0, target, timer: null, drag: null };
+      g = cur;
+      if (api.current.canLift && api.current.canLift(target)) {
+        cur.timer = setTimeout(() => {
+          if (g !== cur || cur.mode) return;
+          const session = api.current.lift(target, cur.x, cur.y);
+          if (!session) return;
+          cur.mode = 'drag';
+          cur.drag = session;
+          touchLock = true;
+          buzz();
+        }, LIFT_MS);
+      }
+      target.addEventListener('touchmove', move, { passive: false });
+      target.addEventListener('touchend', end, { passive: false });
+      target.addEventListener('touchcancel', end, { passive: false });
+    }
+
+    function move(e) {
+      if (e === last) return;
+      last = e;
+      if (pinching) {
+        if (e.touches.length >= 2) {
+          if (e.cancelable) e.preventDefault();
+          api.current.pinchMove(e.touches);
+        }
+        return;
+      }
+      const cur = g;
+      if (!cur) return;
+      const t = e.touches[0];
+      cur.x = t.clientX;
+      cur.y = t.clientY;
+      if (cur.mode === 'drag') {
+        if (e.cancelable) e.preventDefault();
+        cur.drag.move(cur.x, cur.y);
+        return;
+      }
+      const dx = cur.x - cur.x0;
+      const dy = cur.y - cur.y0;
+      if (!cur.mode) {
+        if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
+        clearTimeout(cur.timer);
+        cur.mode = api.current.width && Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      }
+      if (cur.mode !== 'x') return;
+      if (e.cancelable) e.preventDefault();
+      const now = performance.now();
+      cur.v = (dx - cur.dx) / Math.max(1, now - cur.t);
+      cur.t = now;
+      cur.dx = dx;
+      setX(dx, false);
+    }
+
+    function end(e) {
+      if (e === last) return;
+      last = e;
+      if (pinching) {
+        if (e.touches.length) return;
+        pinching = false;
+        api.current.pinchEnd();
+        return;
+      }
+      const cur = g;
+      if (!cur || e.touches.length) return;
+      g = null;
+      detach(cur);
+      clearTimeout(cur.timer);
+      if (cur.mode === 'drag') {
+        touchLock = false;
+        // Без нажатия после отпускания: иначе открылась бы форма события
+        if (e.cancelable) e.preventDefault();
+        if (e.type === 'touchcancel') cur.drag.cancel(); else cur.drag.drop();
+        return;
+      }
+      if (cur.mode === 'x') {
+        const w = api.current.width();
+        let dir = 0;
+        if (Math.abs(cur.dx) > w * 0.25) dir = cur.dx < 0 ? 1 : -1;
+        else if (Math.abs(cur.v) > FLICK && Math.abs(cur.dx) > 24 && Math.sign(cur.v) === Math.sign(cur.dx)) dir = cur.v < 0 ? 1 : -1;
+        if (dir) page(dir); else setX(0, true);
+      }
+    }
+
+    // Мышь: перенос сразу, без удержания — как в Google на компьютере
+    function down(e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      if (!api.current.canLift || !api.current.canLift(e.target)) return;
+      const m = { x0: e.clientX, y0: e.clientY, target: e.target, drag: null };
+      const mm = (ev) => {
+        if (!m.drag) {
+          if (Math.hypot(ev.clientX - m.x0, ev.clientY - m.y0) < 5) return;
+          m.drag = api.current.lift(m.target, m.x0, m.y0);
+          if (!m.drag) { up(); return; }
+        }
+        m.drag.move(ev.clientX, ev.clientY);
+      };
+      const up = (ev) => {
+        window.removeEventListener('pointermove', mm);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        if (!m.drag) return;
+        if (ev && ev.type === 'pointerup') m.drag.drop(); else m.drag.cancel();
+        // Отпустили над событием — следом придёт нажатие, оно не должно открыть форму
+        const stop = (c) => { c.stopPropagation(); c.preventDefault(); };
+        root.addEventListener('click', stop, { capture: true, once: true });
+        setTimeout(() => root.removeEventListener('click', stop, { capture: true }), 0);
+      };
+      window.addEventListener('pointermove', mm);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    }
+
+    // Долгое нажатие на Android открывает меню и выделение — не здесь
+    const menuOff = (e) => e.preventDefault();
+
+    root.addEventListener('touchstart', start, { passive: true });
+    root.addEventListener('touchmove', move, { passive: false });
+    root.addEventListener('touchend', end, { passive: false });
+    root.addEventListener('touchcancel', end, { passive: false });
+    root.addEventListener('pointerdown', down);
+    root.addEventListener('contextmenu', menuOff);
+    return () => {
+      abandon();
+      if (settle) { clearTimeout(settle.timer); settle = null; }
+      touchLock = false;
+      root.removeEventListener('touchstart', start);
+      root.removeEventListener('touchmove', move);
+      root.removeEventListener('touchend', end);
+      root.removeEventListener('touchcancel', end);
+      root.removeEventListener('pointerdown', down);
+      root.removeEventListener('contextmenu', menuOff);
+    };
   }, []);
+}
 
-  const reset = () => {
-    const el = button.current;
-    if (!el) return;
-    el.classList.remove('is-dragging');
-    el.style.removeProperty('transform');
-    el.style.removeProperty('transition');
-  };
-
-  const down = (e) => {
-    if (disabled || (e.button !== undefined && e.button !== 0)) return;
-    const touch = e.pointerType === 'touch' || e.pointerType === 'pen';
-    const state = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0, active: false, ready: !touch, touch, timer: null };
-    if (touch) state.timer = setTimeout(() => {
-      if (drag.current === state) {
-        state.ready = true;
-        calendarTouchDragging = true;
-      }
-    }, 260);
-    drag.current = state;
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* старый WebView */ }
-  };
-  const move = (e) => {
-    const g = drag.current;
-    if (!g || g.id !== e.pointerId) return;
-    g.dx = e.clientX - g.x;
-    g.dy = e.clientY - g.y;
-    if (!g.ready) {
-      // На телефоне перенос начинается после короткого удержания: обычное
-      // касание и начатая прокрутка не должны случайно сдвигать событие.
-      if (Math.hypot(g.dx, g.dy) >= 7) {
-        clearTimeout(g.timer);
-        drag.current = null;
-        suppressClick.current = true;
-        setTimeout(() => { suppressClick.current = false; }, 0);
-      }
-      return;
+/**
+ * Пока событие тянут: у верхнего и нижнего края сетка прокручивается сама,
+ * у левого и правого — перелистывается на экран (как в Google).
+ */
+function edgeLoop({ scroller, viewport, point, onFrame, onEdge }) {
+  let raf = 0;
+  let edgeDir = 0;
+  let edgeTimer = null;
+  const frame = () => {
+    const p = point();
+    const sc = scroller && scroller();
+    if (sc) {
+      const r = sc.getBoundingClientRect();
+      const zone = 56;
+      let dy = 0;
+      if (p.y < r.top + zone) dy = -(r.top + zone - p.y) / 4;
+      else if (p.y > r.bottom - zone) dy = (p.y - (r.bottom - zone)) / 4;
+      if (dy) sc.scrollTop += Math.max(-16, Math.min(16, dy));
     }
-    if (!g.active && Math.hypot(g.dx, g.dy) < 7) return;
-    g.active = true;
-    suppressClick.current = true;
-    const el = button.current;
-    if (!el) return;
-    el.classList.add('is-dragging');
-    el.style.transition = 'none';
-    el.style.transform = `translate3d(${g.dx}px, ${g.dy}px, 0)`;
-  };
-  const finish = (e) => {
-    const g = drag.current;
-    if (!g || g.id !== e.pointerId) return;
-    clearTimeout(g.timer);
-    drag.current = null;
-    if (g.ready && g.touch) calendarTouchDragging = false;
-    reset();
-    if (!g.active || e.type === 'pointercancel') {
-      if (e.type === 'pointercancel') suppressClick.current = false;
-      return;
+    const vp = viewport().getBoundingClientRect();
+    const edge = p.x < vp.left + EDGE ? -1 : p.x > vp.right - EDGE ? 1 : 0;
+    if (edge !== edgeDir) {
+      edgeDir = edge;
+      clearTimeout(edgeTimer);
+      if (edge) {
+        const flip = () => { onEdge(edgeDir); buzz(); edgeTimer = setTimeout(flip, 900); };
+        edgeTimer = setTimeout(flip, EDGE_MS);
+      }
     }
-    const next = resolveDrop(g.dx, g.dy);
-    if (next && next.getTime() !== new Date(event.startsAt).getTime()) onMove(event, next);
-    setTimeout(() => { suppressClick.current = false; }, 0);
+    onFrame();
+    raf = requestAnimationFrame(frame);
   };
-  const touchMove = (e) => {
-    const g = drag.current;
-    // До срабатывания удержания браузер и сетка получают обычный жест
-    // прокрутки. После — движение принадлежит переносу события.
-    if (!g || !g.ready) return;
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  return (
-    <button ref={button} className={className} style={style} aria-label={ariaLabel}
-      onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}
-      onTouchMove={touchMove}
-      onTouchEnd={(e) => { if (drag.current?.ready) e.stopPropagation(); }}
-      onTouchCancel={(e) => { if (drag.current?.ready) e.stopPropagation(); }}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (suppressClick.current) { suppressClick.current = false; return; }
-        onOpen(event);
-      }}>
-      {children}
-    </button>
-  );
+  raf = requestAnimationFrame(frame);
+  return () => { cancelAnimationFrame(raf); clearTimeout(edgeTimer); };
 }
 
 /**
@@ -433,43 +788,34 @@ function layoutDay(list) {
   return out;
 }
 
-/** Событие на весь день (день рождения, отпуск): в Google у него дата без
- *  времени, к нам оно приходит сутками и больше. В сетку по часам его не
- *  ставим — оно легло бы блоком через весь день — а показываем строкой под
- *  датами, как Google */
+/** Событие на весь день (день рождения, отпуск) приходит сутками и больше.
+ *  В сетку по часам его не ставим, а показываем строкой под датами */
 const isAllDay = (e) => new Date(e.endsAt) - new Date(e.startsAt) >= 20 * 3600000;
-
-/** Быстрый взмах листает, даже если протянули мало (порог направления —
- *  SWIPE_LOCK выше, общий с пролистыванием месяца) */
-const FLICK = 0.35; // px/мс — быстрый взмах листает, даже если протянули мало
 
 /**
  * Сетка по часам на 1, 3 или 7 дней — как в Google Календаре.
  *
- * Колонки дней лежат лентой: по обе стороны от видимых — ещё столько же
- * дней, уже с занятиями. Смахивание двигает только ленту (шапку дней,
- * строку «весь день» и колонки), колонка часов стоит на месте. Отпустили —
- * лента доезжает до ближайшего дня (у недели — до соседней недели), и
- * тогда меняется опорная дата: onShift(на сколько дней). Вертикальная
- * прокрутка решается по первым 10 px движения и сетку вбок не трогает.
+ * Колонки дней лежат лентой: экран и по экрану с каждой стороны, уже с
+ * занятиями. Смахивание двигает ленту (шапку дней, строку «весь день» и
+ * колонки), колонка часов стоит на месте; отпустили — лента доезжает до
+ * соседнего экрана целиком, прокрутка по часам остаётся.
  */
-function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove }) {
+function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, onShift, onDrop }) {
+  const root = useRef(null);
   const scroller = useRef(null);
   const viewport = useRef(null);
+  const headTrack = useRef(null);
+  const allTrack = useRef(null);
+  const bodyTrack = useRef(null);
   const [now, setNow] = useState(() => new Date());
-  const [drag, setDrag] = useState({ x: 0, animate: false });
-  const gesture = useRef(null);
-  const settling = useRef(null);
-  // Высота часа — щипком. pinch: расстояние между пальцами и время под ними
-  // в начале жеста; после перерисовки сетки это время остаётся под пальцами
+  const [ghost, setGhost] = useState(null); // приподнятое событие: { id, key, minutes, duration }
+  const [draft, setDraft] = useState(null); // заготовка нового: { key, minutes }
+  // Высота часа — щипком; время между пальцами остаётся на месте
   const [hour, setHour] = useState(savedHour);
   const pinch = useRef(null);
   const keepScroll = useRef(null);
-  const reduce = typeof window !== 'undefined' && window.matchMedia
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const settleMs = reduce ? 0 : 220;
 
-  // Лента: N дней до, N видимых, N после
+  // Лента: экран до, экран, экран после
   const strip = Array.from({ length: days * 3 }, (_, i) => addDays(start, i - days));
   const visibleDays = strip.slice(days, days * 2);
   const timed = events.filter((e) => !isAllDay(e));
@@ -481,23 +827,36 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove
     const k = dateValue(d);
     return allDay.filter((e) => utcKey(e.startsAt) <= k && utcKey(new Date(e.endsAt).getTime() - 1) >= k);
   };
-  // Строка «весь день» — когда такие события есть в видимых днях; пустой
-  // полосы ради соседей за краем не держим
   const hasAllDay = visibleDays.some((d) => allDayOf(d).length);
 
+  const byDay = useMemo(() => {
+    const m = new Map();
+    timed.forEach((e) => {
+      const k = dateValue(new Date(e.startsAt));
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(e);
+    });
+    return m;
+  }, [events]);
+
   // Открываем с самого раннего занятия на экране (на полчаса раньше), без
-  // занятий — с утра. С текущего часа вечером утреннее занятие завтрашнего
-  // дня уходило за верх сетки, и тренер решал, что его нет (30.09.2026)
-  const earliest = timed
-    .filter((e) => visibleDays.some((d) => sameDay(new Date(e.startsAt), d)))
-    .reduce((m, e) => { const s = new Date(e.startsAt); return Math.min(m, s.getHours() * 60 + s.getMinutes()); }, FIRST_HOUR * 60);
+  // занятий — с утра (30.09.2026). Только при открытии, смене вида,
+  // «Сегодня» и выборе даты — листание прокрутку не трогает
+  const visibleEvents = visibleDays.flatMap((d) => byDay.get(dateValue(d)) || []);
+  const earliest = visibleEvents.reduce((m, e) => { const s = new Date(e.startsAt); return Math.min(m, s.getHours() * 60 + s.getMinutes()); }, FIRST_HOUR * 60);
+  const placed = useRef(null);
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = Math.max(0, (earliest - 30) / 60 * hour);
-  }, [start.getTime(), days]);
+    if (!el) return;
+    const k = scrollKey + ':' + days;
+    const p = placed.current;
+    // Занятия пришли позже сетки — поставить ещё раз, если сетку не трогали
+    if (p && p.k === k && (p.withData || p.touched || !visibleEvents.length)) return;
+    el.scrollTop = Math.max(0, (earliest - 30) / 60 * hour);
+    placed.current = { k, withData: visibleEvents.length > 0, touched: false };
+  });
+  const touched = () => { if (placed.current) placed.current.touched = true; };
 
-  // Щипок поменял высоту часа — прокрутка так, чтобы время между пальцами
-  // осталось на том же месте экрана
   useLayoutEffect(() => {
     const el = scroller.current;
     const k = keepScroll.current;
@@ -510,112 +869,120 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove
     const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
-  useEffect(() => () => clearTimeout(settling.current), []);
+  // Пролистали или сменили вид — заготовка нового события уходит
+  useEffect(() => { setDraft(null); }, [start.getTime(), days]);
 
-  const width = () => (viewport.current && viewport.current.offsetWidth) || 320;
-
-  const pinchGap = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  const pinchMid = (t) => (t[0].clientY + t[1].clientY) / 2;
-
-  const onTouchStart = (e) => {
-    // Два пальца — щипок: высота часа, а не листание дней
-    if (e.touches.length === 2 && scroller.current) {
-      gesture.current = null;
-      setDrag({ x: 0, animate: true });
-      const rect = scroller.current.getBoundingClientRect();
-      const y = pinchMid(e.touches) - rect.top;
-      pinch.current = {
-        gap: Math.max(20, pinchGap(e.touches)),
-        hour,
-        y,
-        minute: ((scroller.current.scrollTop + y) / hour) * 60,
+  const live = useRef(null);
+  live.current = { days, hour, events, onShift, onDrop };
+  const api = useRef(null);
+  api.current = {
+    width: () => (viewport.current && viewport.current.offsetWidth) || 320,
+    tracks: () => [headTrack.current, allTrack.current, bodyTrack.current],
+    onPage: (dir) => { live.current.onShift(dir); setDraft(null); },
+    canLift: (target) => {
+      const el = target.closest && target.closest('[data-cal-event]');
+      return !!el && el.dataset.movable === '1';
+    },
+    lift: (target, x, y) => {
+      const el = target.closest('[data-cal-event]');
+      const ev = el && live.current.events.find((e) => e.id === el.dataset.calEvent);
+      if (!ev || !movable(ev) || isAllDay(ev) || ev.moving) return null;
+      setDraft(null);
+      touched();
+      const rect = el.getBoundingClientRect();
+      const duration = durationOf(ev);
+      const grab = Math.max(0, Math.min(duration, ((y - rect.top) / live.current.hour) * 60));
+      let point = { x, y };
+      let spot = null;
+      const locate = () => {
+        const body = bodyTrack.current;
+        const vp = viewport.current;
+        if (!body || !vp) return;
+        const v = vp.getBoundingClientRect();
+        const cx = Math.max(v.left + 1, Math.min(v.right - 1, point.x));
+        for (const col of body.children) {
+          const r = col.getBoundingClientRect();
+          if (cx >= r.left && cx < r.right) {
+            const next = { key: col.dataset.calDay, minutes: dropMinutes(point.y - r.top, live.current.hour, grab, duration) };
+            if (!spot || spot.key !== next.key || spot.minutes !== next.minutes) {
+              if (spot) haptic('light');
+              spot = next;
+              setGhost({ id: ev.id, duration, ...next });
+            }
+            return;
+          }
+        }
       };
-      return;
-    }
-    if (e.touches.length > 1 || settling.current) { gesture.current = null; return; }
-    const t = e.touches[0];
-    gesture.current = { x: t.clientX, y: t.clientY, t: performance.now(), mode: null, dx: 0, v: 0 };
-  };
-  const onTouchMove = (e) => {
-    const pz = pinch.current;
-    if (pz) {
-      if (e.touches.length < 2) return;
-      const next = Math.round(Math.max(HOUR_MIN, Math.min(HOUR_MAX, pz.hour * (pinchGap(e.touches) / pz.gap))));
-      if (next !== hour) {
+      locate();
+      const stop = edgeLoop({
+        scroller: () => scroller.current,
+        viewport: () => viewport.current,
+        point: () => point,
+        onFrame: locate,
+        onEdge: (dir) => flushSync(() => live.current.onShift(dir)),
+      });
+      return {
+        move: (nx, ny) => { point = { x: nx, y: ny }; },
+        drop: () => {
+          stop();
+          setGhost(null);
+          if (!spot) return;
+          const d = keyDate(spot.key);
+          live.current.onDrop(ev, new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(spot.minutes / 60), spot.minutes % 60));
+        },
+        cancel: () => { stop(); setGhost(null); },
+      };
+    },
+    pinchStart: (touches) => {
+      if (!scroller.current) return;
+      touched();
+      const rect = scroller.current.getBoundingClientRect();
+      const y = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
+      const gap = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+      pinch.current = { gap: Math.max(20, gap), hour: live.current.hour, y, minute: ((scroller.current.scrollTop + y) / live.current.hour) * 60 };
+    },
+    pinchMove: (touches) => {
+      const pz = pinch.current;
+      if (!pz) return;
+      const gap = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+      const next = Math.round(Math.max(HOUR_MIN, Math.min(HOUR_MAX, pz.hour * (gap / pz.gap))));
+      if (next !== live.current.hour) {
         keepScroll.current = { minute: pz.minute, y: pz.y };
         setHour(next);
       }
-      return;
-    }
-    const g = gesture.current;
-    if (!g) return;
-    const t = e.touches[0];
-    const dx = t.clientX - g.x;
-    const dy = t.clientY - g.y;
-    if (!g.mode) {
-      if (Math.abs(dx) < SWIPE_LOCK && Math.abs(dy) < SWIPE_LOCK) return;
-      g.mode = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-    }
-    if (g.mode !== 'x') return;
-    const nowT = performance.now();
-    g.v = (dx - g.dx) / Math.max(1, nowT - g.t);
-    g.t = nowT;
-    g.dx = dx;
-    setDrag({ x: dx, animate: false });
-  };
-  const onTouchEnd = (e) => {
-    if (pinch.current) {
-      // Подняли оба пальца — масштаб запомнить; один ещё на экране — ждём
-      if (e && e.touches && e.touches.length) return;
+    },
+    pinchEnd: () => {
       pinch.current = null;
-      try { localStorage.setItem(HOUR_KEY, String(hour)); } catch (_) {}
-      return;
-    }
-    const g = gesture.current;
-    gesture.current = null;
-    if (!g || g.mode !== 'x') return;
-    const col = width() / days;
-    // Сколько дней проехали: до ближайшего дня; быстрый взмах — хотя бы на
-    // один. Неделя листается неделями
-    let shift = Math.round(-g.dx / col);
-    if (!shift && Math.abs(g.v) > FLICK) shift = g.v < 0 ? 1 : -1;
-    if (days === 7 && shift) shift = shift > 0 ? 7 : -7;
-    shift = Math.max(-days, Math.min(days, shift));
-    setDrag({ x: -shift * col, animate: true });
-    settling.current = setTimeout(() => {
-      settling.current = null;
-      if (shift) onShift(shift);
-      setDrag({ x: 0, animate: false });
-    }, settleMs);
+      try { localStorage.setItem(HOUR_KEY, String(live.current.hour)); } catch (_) { /* не запомнили */ }
+    },
   };
+  useCalendarGestures(root, api);
 
+  // Нажатие на пустое место: первое ставит заготовку на 15-минутку под
+  // пальцем (с округлением до получаса вниз), второе по ней — новое событие
   const slot = (d, ev) => {
     const rect = ev.currentTarget.getBoundingClientRect();
-    const minutes = Math.floor(((ev.clientY - rect.top) / hour) * 2) * 30;
-    onSlot({ date: d, minutes: Math.max(0, Math.min(minutes, 23 * 60 + 30)) });
-  };
-
-  // Лента втрое шире окна; в покое видна средняя треть
-  const track = {
-    width: '300%',
-    transform: `translate3d(calc(-100% / 3 + ${drag.x}px), 0, 0)`,
-    transition: drag.animate && !reduce ? 'transform 220ms cubic-bezier(0.23, 1, 0.32, 1)' : 'none',
-    gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))`,
+    const minutes = Math.max(0, Math.min(Math.floor(((ev.clientY - rect.top) / hour) * 2) * 30, 23 * 60));
+    const key = dateValue(d);
+    touched();
+    if (draft && draft.key === key && draft.minutes === minutes) { onCreate({ date: d, minutes }); return; }
+    setDraft({ key, minutes });
+    haptic();
   };
 
   return (
-    // data-no-swipe: жесты приложения (листание вкладок, «назад») над сеткой
-    // не работают — иначе вбок листалась страница, а не календарь (gestures.jsx)
-    <div className={'cal-grid cal-grid--' + days} data-no-swipe=""
-      onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+    // data-no-gestures: жесты приложения (листание вкладок, «назад»,
+    // «потянуть вниз») над сеткой не работают — палец принадлежит календарю
+    <div ref={root} className={'cal-grid cal-grid--' + days} data-no-gestures="" data-no-swipe="">
       <div className="cal-grid__row cal-grid__head">
         <span className="cal-grid__gutter" />
         <div className="cal-grid__viewport" ref={viewport}>
-          <div className="cal-grid__track" style={track}>
+          <div className="cal-grid__track" ref={headTrack} style={{ gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))` }}>
             {strip.map((d) => {
               const today = sameDay(d, now);
               return (
-                <button key={d.getTime()} className={'cal-grid__day' + (today ? ' cal-grid__day--today' : '')} onClick={() => onDay(d)}>
+                <button type="button" key={d.getTime()} className={'cal-grid__day' + (today ? ' cal-grid__day--today' : '')} onClick={() => onDay(d)}
+                  aria-label={weekdayOf(d) + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()]}>
                   <span>{weekdayOf(d)}</span>
                   <strong>{d.getDate()}</strong>
                 </button>
@@ -629,14 +996,13 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove
         <div className="cal-grid__row cal-grid__allday">
           <span className="cal-grid__gutter" />
           <div className="cal-grid__viewport">
-            <div className="cal-grid__track" style={track}>
+            <div className="cal-grid__track" ref={allTrack} style={{ gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))` }}>
               {strip.map((d) => (
                 <div key={d.getTime()} className="cal-grid__allcell">
                   {allDayOf(d).map((e) => (
-                    <CalendarEventButton key={e.id} event={e} className={eventClass(e) + ' cal-event--chip'} onOpen={onEvent} onMove={onMove}
-                      resolveDrop={(dx) => new Date(new Date(e.startsAt).getTime() + Math.round(dx / (width() / days)) * DAY)}>
+                    <button type="button" key={e.id} className={eventClass(e) + ' cal-event--chip'} onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
                       {labelOf(e)}
-                    </CalendarEventButton>
+                    </button>
                   ))}
                 </div>
               ))}
@@ -645,7 +1011,7 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove
         </div>
       )}
 
-      <div className="cal-grid__scroll" ref={scroller}>
+      <div className="cal-grid__scroll" ref={scroller} onWheel={touched} onMouseDown={touched}>
         <div className="cal-grid__row" style={{ height: 24 * hour, '--hour': hour + 'px' }}>
           <div className="cal-grid__gutter cal-grid__hours" aria-hidden="true">
             {Array.from({ length: 24 }, (_, h) => (
@@ -653,32 +1019,55 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove
             ))}
           </div>
           <div className="cal-grid__viewport">
-            <div className="cal-grid__track cal-grid__body" style={{ ...track, height: 24 * hour }}>
+            <div className="cal-grid__track cal-grid__body" ref={bodyTrack}
+              style={{ height: 24 * hour, gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))` }}>
               {strip.map((d) => {
-                const ofDay = timed.filter((e) => sameDay(new Date(e.startsAt), d));
+                const key = dateValue(d);
+                const ofDay = byDay.get(key) || [];
                 const today = sameDay(d, now);
                 return (
-                  // Пустое место дня — «новое занятие на это время»
-                  <div key={d.getTime()} className="cal-grid__col" onClick={(ev) => slot(d, ev)} role="presentation">
+                  <div key={d.getTime()} className={'cal-grid__col' + (today ? ' cal-grid__col--today' : '')} data-cal-day={key}
+                    onClick={(ev) => slot(d, ev)} role="presentation">
                     {layoutDay(ofDay).map(({ e, s, f, col, cols }) => {
                       const from = new Date(s);
                       const top = (from.getHours() * 60 + from.getMinutes()) / 60 * hour;
                       const height = Math.max(((f - s) / 3600000) * hour - 2, 14);
+                      const lifted = ghost && ghost.id === e.id;
                       return (
-                        <CalendarEventButton
+                        <button
+                          type="button"
                           key={e.id}
-                          event={e}
-                          className={eventClass(e)}
+                          data-cal-event={e.id}
+                          data-movable={movable(e) && !e.moving ? '1' : '0'}
+                          className={eventClass(e) + (lifted ? ' is-lifted' : '')}
                           style={{ top, height, left: `calc(${(col / cols) * 100}% + 1px)`, width: `calc(${100 / cols}% - 3px)` }}
-                          onOpen={onEvent}
-                          onMove={onMove}
-                          resolveDrop={(dx, dy) => gridDropStart(s, dx, dy, width() / days, hour)}
+                          aria-label={hm(e.startsAt) + '–' + hm(e.endsAt) + ' ' + labelOf(e)}
+                          onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}
                         >
-                          <span className="cal-event__name">{days === 7 ? shortLabelOf(e) : labelOf(e)}</span>
-                          {days < 7 && height >= 34 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
-                        </CalendarEventButton>
+                          {/* Неделя на телефоне — только имя, как в Google; на широком экране — целиком */}
+                          {days === 7 && <span className="cal-event__name cal-event__short">{shortLabelOf(e)}</span>}
+                          <span className={'cal-event__name' + (days === 7 ? ' cal-event__full' : '')}>{labelOf(e)}</span>
+                          {height >= 30 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
+                        </button>
                       );
                     })}
+                    {ghost && ghost.key === key && (() => {
+                      const ev = events.find((x) => x.id === ghost.id);
+                      const height = Math.max((ghost.duration / 60) * hour - 2, 18);
+                      return (
+                        <div className={(ev ? eventClass(ev) : 'cal-event') + ' cal-event--ghost'} aria-hidden="true"
+                          style={{ top: (ghost.minutes / 60) * hour, height, left: 1, width: 'calc(100% - 3px)' }}>
+                          {days < 7 && ev && <span className="cal-event__name">{labelOf(ev)}</span>}
+                          <span className="cal-event__time cal-event__time--strong">{clock(ghost.minutes)}{days < 7 ? '–' + clock(ghost.minutes + ghost.duration) : ''}</span>
+                        </div>
+                      );
+                    })()}
+                    {draft && draft.key === key && (
+                      <button type="button" className="cal-draft" style={{ top: (draft.minutes / 60) * hour, height: Math.max(hour - 2, 22) }}
+                        onClick={(ev) => { ev.stopPropagation(); onCreate({ date: d, minutes: draft.minutes }); }}>
+                        <IconPlus size={14} /><span>{clock(draft.minutes)}</span>
+                      </button>
+                    )}
                     {today && (
                       <span className="cal-grid__now" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * hour }} aria-hidden="true" />
                     )}
@@ -693,48 +1082,194 @@ function TimeGrid({ start, days, events, onDay, onEvent, onSlot, onShift, onMove
   );
 }
 
-/** Сетка месяца: 6 недель, в дне — до трёх занятий, остальное «ещё N» */
-function MonthGrid({ start, anchor, events, onDay, onEvent, onMove }) {
+/**
+ * Месяц: шесть недель на весь экран, листается вбок ровно на месяц — лента
+ * из прошлого, текущего и следующего месяца, все уже с занятиями. Сколько
+ * событий помещается в день — по высоте ячейки, остальное «ещё N».
+ * Событие тоже переносится удержанием — в другой день, время то же.
+ */
+function MonthPager({ anchor, events, onDay, onEvent, onShift, onDrop }) {
+  const root = useRef(null);
+  const track = useRef(null);
+  const ghostEl = useRef(null);
+  const [fit, setFit] = useState(3);
+  const [hover, setHover] = useState(null);
+  const [lifted, setLifted] = useState(null);
+  const months = [-1, 0, 1].map((i) => new Date(anchor.getFullYear(), anchor.getMonth() + i, 1));
   const now = new Date();
-  const cells = Array.from({ length: 42 }, (_, i) => addDays(start, i));
+
+  const byDay = useMemo(() => {
+    const m = new Map();
+    events.forEach((e) => {
+      const k = dateValue(new Date(e.startsAt));
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(e);
+    });
+    m.forEach((list) => list.sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt))));
+    return m;
+  }, [events]);
+
+  // Сколько строк-событий влезает в ячейку текущей высоты
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => {
+      const cell = el.querySelector('.cal-month__page--current .cal-month__cell');
+      if (!cell) return;
+      setFit(Math.max(1, Math.floor((cell.clientHeight - 24) / 17)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const live = useRef(null);
+  live.current = { events, onShift, onDrop };
+  const api = useRef(null);
+  api.current = {
+    width: () => (root.current && root.current.offsetWidth) || 320,
+    tracks: () => [track.current],
+    onPage: (dir) => live.current.onShift(dir),
+    canLift: (target) => {
+      const el = target.closest && target.closest('[data-cal-event]');
+      return !!el && el.dataset.movable === '1';
+    },
+    lift: (target, x, y) => {
+      const el = target.closest('[data-cal-event]');
+      const ev = el && live.current.events.find((e) => e.id === el.dataset.calEvent);
+      if (!ev || !movable(ev) || ev.moving) return null;
+      let point = { x, y };
+      let key = null;
+      setLifted({ id: ev.id, label: shortLabelOf(ev) + ' ' + hm(ev.startsAt) });
+      const place = () => {
+        const g = ghostEl.current;
+        if (g) g.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -120%)`;
+        const hit = document.elementFromPoint(point.x, point.y);
+        const cell = hit && hit.closest && hit.closest('.cal-month__page--current [data-cal-day]');
+        const next = cell ? cell.dataset.calDay : key;
+        if (next !== key) { key = next; setHover(next); haptic('light'); }
+      };
+      place();
+      const stop = edgeLoop({
+        viewport: () => root.current,
+        point: () => point,
+        onFrame: place,
+        onEdge: (dir) => flushSync(() => live.current.onShift(dir)),
+      });
+      const end = () => { stop(); setHover(null); setLifted(null); };
+      return {
+        move: (nx, ny) => { point = { x: nx, y: ny }; },
+        drop: () => { end(); if (key) live.current.onDrop(ev, sameTimeOn(ev.startsAt, keyDate(key))); },
+        cancel: end,
+      };
+    },
+  };
+  useCalendarGestures(root, api);
+
   return (
-    <div className="cal-month">
+    <div className="cal-month" data-no-gestures="" data-no-swipe="">
       <div className="cal-month__head">
         {WEEKDAYS.map((w) => <span key={w}>{w}</span>)}
       </div>
-      <div className="cal-month__grid">
-        {cells.map((d) => {
-          const ofDay = events.filter((e) => sameDay(new Date(e.startsAt), d))
-            .sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)));
-          const other = d.getMonth() !== anchor.getMonth();
-          return (
-            <div
-              key={d.getTime()}
-              className={'cal-month__cell' + (other ? ' cal-month__cell--other' : '') + (sameDay(d, now) ? ' cal-month__cell--today' : '')}
-              onClick={() => onDay(d)}
-              role="button"
-              tabIndex={0}
-              aria-label={d.getDate() + ' ' + MONTHS[d.getMonth()] + (ofDay.length ? ', занятий: ' + ofDay.length : '')}
-              onKeyDown={(ev) => { if (ev.key === 'Enter') onDay(d); }}
-            >
-              <span className="cal-month__date">{d.getDate()}</span>
-              {ofDay.slice(0, 3).map((e) => (
-                <CalendarEventButton key={e.id} event={e} className={eventClass(e) + ' cal-event--chip'} ariaLabel={hm(e.startsAt) + ' ' + labelOf(e)}
-                  onOpen={onEvent} onMove={onMove}
-                  resolveDrop={(dx, dy) => {
-                    const grid = document.querySelector('.cal-month__grid');
-                    const cell = grid && grid.querySelector('.cal-month__cell');
-                    if (!grid || !cell) return new Date(e.startsAt);
-                    return monthDropStart(e.startsAt, dx, dy, grid.clientWidth / 7, cell.getBoundingClientRect().height);
-                  }}>
-                  {shortLabelOf(e)}
-                </CalendarEventButton>
-              ))}
-              {ofDay.length > 3 && <span className="cal-month__more">ещё {ofDay.length - 3}</span>}
-            </div>
-          );
-        })}
+      <div className="cal-month__viewport" ref={root}>
+        <div className="cal-month__track" ref={track}>
+          {months.map((first, i) => {
+            const cells = Array.from({ length: 42 }, (_, j) => addDays(mondayOf(first), j));
+            return (
+              <div key={first.getTime()}
+                className={'cal-month__page' + (i === 1 ? ' cal-month__page--current' : '')} aria-hidden={i !== 1 || undefined}>
+                {cells.map((d) => {
+                  const k = dateValue(d);
+                  const list = byDay.get(k) || [];
+                  const shown = list.length > fit ? Math.max(0, fit - 1) : list.length;
+                  const other = d.getMonth() !== first.getMonth();
+                  return (
+                    <div
+                      key={d.getTime()}
+                      data-cal-day={k}
+                      className={'cal-month__cell' + (other ? ' cal-month__cell--other' : '') + (sameDay(d, now) ? ' cal-month__cell--today' : '') + (hover === k ? ' cal-month__cell--drop' : '')}
+                      onClick={() => onDay(d)}
+                      role="button"
+                      tabIndex={i === 1 ? 0 : -1}
+                      aria-label={d.getDate() + ' ' + MONTHS[d.getMonth()] + (list.length ? ', событий: ' + list.length : '')}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter') onDay(d); }}
+                    >
+                      <span className="cal-month__date">{d.getDate()}</span>
+                      {list.slice(0, shown).map((e) => (
+                        <button type="button" key={e.id} data-cal-event={e.id} data-movable={movable(e) && !e.moving ? '1' : '0'}
+                          className={eventClass(e) + ' cal-event--chip' + (lifted && lifted.id === e.id ? ' is-lifted' : '')}
+                          aria-label={hm(e.startsAt) + ' ' + labelOf(e)} tabIndex={i === 1 ? 0 : -1}
+                          onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
+                          {shortLabelOf(e)}
+                        </button>
+                      ))}
+                      {list.length > shown && <span className="cal-month__more">ещё {list.length - shown}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
+      {lifted && createPortal(
+        <div ref={ghostEl} className="cal-event cal-event--chip cal-month__ghost" aria-hidden="true">{lifted.label}</div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+/**
+ * Список, как «Расписание» в Google: дни подряд, в дне — занятия по
+ * времени. Пустые дни не показываем, сегодня — всегда, даже пустое.
+ */
+function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
+  const now = new Date();
+  const list = [];
+  for (let i = 0; i < days; i += 1) {
+    const d = addDays(start, i);
+    const k = dateValue(d);
+    const ofDay = events
+      .filter((e) => dateValue(new Date(e.startsAt)) === k)
+      .sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)));
+    if (ofDay.length || sameDay(d, now) || i === 0) list.push({ d, ofDay });
+  }
+  const empty = !list.some((x) => x.ofDay.length);
+  return (
+    <div className="cal-agenda">
+      {list.map(({ d, ofDay }) => {
+        const today = sameDay(d, now);
+        return (
+          <section key={d.getTime()} className={'cal-agenda__day' + (today ? ' cal-agenda__day--today' : '')}>
+            <button type="button" className="cal-agenda__date" onClick={() => onDay(d)}
+              aria-label={'Открыть ' + d.getDate() + ' ' + MONTHS[d.getMonth()]}>
+              <span>{weekdayOf(d)}</span>
+              <strong>{d.getDate()}</strong>
+            </button>
+            <div className="cal-agenda__items">
+              {!ofDay.length && (
+                <p className="cal-agenda__empty">
+                  {loading ? 'Загружаю…' : empty ? 'Занятий нет до ' + addDays(start, days - 1).getDate() + ' ' + MONTHS[addDays(start, days - 1).getMonth()] : today ? 'Сегодня занятий нет' : 'Занятий нет'}
+                </p>
+              )}
+              {ofDay.map((e) => (
+                <button type="button" key={e.id} className={eventClass(e) + ' cal-agenda__item'} onClick={() => onEvent(e)}>
+                  <span className="cal-event__name">{labelOf(e)}</span>
+                  <span className="cal-event__time">
+                    {isAllDay(e) ? 'Весь день' : hm(e.startsAt) + '–' + hm(e.endsAt)}
+                    {e.cancelledCharged ? ' · отменено, списано' : e.personal ? ' · личное' : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+      <button type="button" className="button button--ghost cal-agenda__more" onClick={onMore}>
+        Показать дальше — до {addDays(start, days + 27).getDate()} {MONTHS[addDays(start, days + 27).getMonth()]}
+      </button>
     </div>
   );
 }

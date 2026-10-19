@@ -1012,8 +1012,9 @@ test('FT-567: видимый «назад» и Back браузера на экр
     await menu(/Расходы/);
     assert.equal(await title(), 'Расходы');
     await phone.getByRole('button', { name: 'Назад: Расписание' }).click();
-    await phone.locator('#root .app__title', { hasText: 'Расписание' }).waitFor({ timeout: 5000 });
-    assert.match(await subtitle(), /^Панель тренера/);
+    // У расписания своей шапки нет (19.10.2026): строка месяца и сетка на весь экран
+    await phone.locator('.cal-screen .cal-top__title').waitFor({ timeout: 5000 });
+    assert.equal(await phone.locator('#root .app__header').first().isVisible(), false, 'шапка приложения над календарём не стоит');
 
     // Расписание → занятие → сразу программа этого клиента
     await openTabOn(phone, 'Расписание');
