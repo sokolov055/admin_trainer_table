@@ -3,6 +3,9 @@ import { StreetRenderer } from './scooter-render.js';
 import { createScooterVoice } from './scooter-voice.js';
 import { buzz, enterFullscreen } from './game-feel.js';
 
+// «1 метр», «3 метра», «5 метров»; дробные километры — «10,5 километра»
+const plural = (n, one, few, many) => !Number.isInteger(n) ? few : n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
+
 export function mountScooter(root, session, blocked = () => false) {
 const controller = new AbortController();
 const owner = Symbol('scooter');
@@ -175,7 +178,7 @@ function renderUI() {
   const elapsed = Math.floor(game.elapsed);
   elements.time.textContent = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
   elements.distance.textContent = game.distance >= 10000 ? (game.distance / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) : Math.floor(game.distance).toLocaleString('ru-RU');
-  elements['distance-unit'].textContent = game.distance >= 10000 ? 'километров' : 'метров';
+  elements['distance-unit'].textContent = game.distance >= 10000 ? plural(Math.round(game.distance / 100) / 10, 'километр', 'километра', 'километров') : plural(Math.floor(game.distance), 'метр', 'метра', 'метров');
   elements.speed.textContent = active ? String(Math.round(game.speed * 3.6)) : '0';
   elements.combo.hidden = !active || game.combo < 2;
   elements.combo.textContent = `Серия ${game.combo}`;
@@ -223,7 +226,7 @@ function renderUI() {
       elements['overlay-copy'].textContent = DIFFICULTIES[game.difficulty].name + '. Одна ошибка — новый старт. Побьёшь свой рекорд?';
       elements.start.textContent = 'Ещё заезд';
       if (previousPhase === 'playing' && owns()) buzz('crash');
-      elements['result-stats'].innerHTML = `<div><strong>${Math.floor(game.distance)}</strong><span>метров</span></div><div><strong>${elapsed}</strong><span>секунд</span></div><div><strong>${game.bestCombo}</strong><span>лучшая серия</span></div>`;
+      elements['result-stats'].innerHTML = `<div><strong>${Math.floor(game.distance)}</strong><span>${plural(Math.floor(game.distance), 'метр', 'метра', 'метров')}</span></div><div><strong>${elapsed}</strong><span>${plural(elapsed, 'секунда', 'секунды', 'секунд')}</span></div><div><strong>${game.bestCombo}</strong><span>лучшая серия</span></div>`;
       session.finish();
       // Итог для задания карьеры (CareerMission.jsx)
       if (owns()) { session.lastRun = { serial: (session.lastRun?.serial || 0) + 1, difficulty: game.difficulty, distance: Math.floor(game.distance) }; session.notify(); }
