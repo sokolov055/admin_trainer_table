@@ -243,7 +243,7 @@ export function rubberband(distance, dimension, constant = 0.55) {
  * response — как быстро доходит до цели, в секундах. Стартует с текущего
  * значения и текущей скорости: перехват на лету не даёт рывка.
  */
-function spring({ from, to, velocity = 0, damping = 1, response = 0.34, onFrame, onDone }) {
+export function spring({ from, to, velocity = 0, damping = 1, response = 0.34, onFrame, onDone }) {
   const stiffness = Math.pow((2 * Math.PI) / response, 2);
   const friction = (4 * Math.PI * damping) / response;
 

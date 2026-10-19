@@ -23,14 +23,14 @@ function finger(cdp) {
   });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   return {
-    async drag(from, to, { hold = 0, steps = 12, pause = 16 } = {}) {
+    async drag(from, to, { hold = 0, steps = 12, pause = 16, rest = 60 } = {}) {
       await send('touchStart', from.x, from.y);
       if (hold) await wait(hold);
       for (let i = 1; i <= steps; i += 1) {
         await send('touchMove', from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
         await wait(pause);
       }
-      await wait(60);
+      await wait(rest);
       await send('touchEnd');
     },
   };
@@ -84,7 +84,7 @@ test('расписание: экран, виды, листание и перен
     const box = await page.locator('.cal-grid__scroll').boundingBox();
     const mid = { x: box.x + box.width / 2 + 60, y: box.y + box.height / 2 };
     await touch.drag(mid, { x: mid.x - 220, y: mid.y + 6 });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     const after = await firstDay();
     assert.notEqual(after, before);
     const dayNum = (s) => Number(s.match(/(\d+)/)[1]);
@@ -93,7 +93,7 @@ test('расписание: экран, виды, листание и перен
     assert.equal(await page.locator('.cal-grid__scroll').evaluate((el) => el.scrollTop), 400, 'прокрутка по часам осталась');
     // и обратно
     await touch.drag({ x: mid.x - 120, y: mid.y }, { x: mid.x + 120, y: mid.y - 4 });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     assert.equal(await firstDay(), before, 'вернулись на исходные три дня');
 
     // Новое личное событие: заготовка по первому нажатию, форма — по второму
@@ -144,8 +144,36 @@ test('расписание: экран, виды, листание и перен
     // Без удержания то же движение — прокрутка, событие на месте
     const eb2 = await page.getByRole('button', { name: /Массаж QA/ }).first().boundingBox();
     await touch.drag({ x: eb2.x + eb2.width / 2, y: eb2.y + 8 }, { x: eb2.x + eb2.width / 2, y: eb2.y + 8 - 120 }, { steps: 8 });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     assert.ok(await page.getByRole('button', { name: /^11:00–12:00 Массаж QA/ }).count(), 'быстрое движение не переносит');
+
+    // Перенос к краю: сетка листается сама — плавно, пружиной, а не одним
+    // кадром (запись владельца 19.10.2026). Ловим положение ленты по кадрам
+    const eb3 = await page.getByRole('button', { name: /Массаж QA/ }).first().boundingBox();
+    const vpBox = await page.locator('.cal-grid__scroll .cal-grid__viewport').boundingBox();
+    const grab3 = { x: eb3.x + eb3.width / 2, y: eb3.y + 8 };
+    // Счётчик кадров ставим в самой странице заранее, читаем после жеста
+    await page.evaluate(() => {
+      const track = document.querySelector('.cal-grid__body');
+      window.__dx = [];
+      const tick = () => {
+        window.__dx.push(parseFloat(track.style.getPropertyValue('--dx')) || 0);
+        if (window.__dx.length < 600) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await touch.drag(grab3, { x: vpBox.x + vpBox.width - 6, y: grab3.y }, { hold: 450, steps: 10, rest: 1300 });
+    const frames = await page.evaluate(() => window.__dx);
+    const width = vpBox.width;
+    const between = new Set(frames.filter((x) => x < -4 && x > -width + 4).map((x) => Math.round(x)));
+    assert.ok(between.size >= 8, 'лента ехала через промежуточные положения, а не прыгнула: ' + [...new Set(frames.map(Math.round))].slice(0, 30).join(', ') + ' кадров ' + frames.length);
+    await page.waitForTimeout(900);
+    await page.getByRole('status').filter({ hasText: 'Перенесено' }).waitFor();
+    await page.getByRole('button', { name: 'Вернуть' }).click();
+    await page.waitForTimeout(400);
+    // обратно на исходные три дня — стрелкой нельзя (на телефоне их нет), пальцем
+    await touch.drag({ x: mid.x - 120, y: mid.y }, { x: mid.x + 140, y: mid.y - 4 });
+    await page.waitForTimeout(900);
 
     // Занятие с клиентом: после переноса — вопрос, чей он
     // Только видимые три дня (лента — с соседями по бокам), не прошедшее
@@ -176,7 +204,7 @@ test('расписание: экран, виды, листание и перен
     await page.screenshot({ path: join(REVIEW, 'schedule-month.png') });
     const vp = await page.locator('.cal-month__viewport').boundingBox();
     await touch.drag({ x: vp.x + vp.width - 40, y: vp.y + 200 }, { x: vp.x + 60, y: vp.y + 210 });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     assert.notEqual(await page.locator('.cal-top__title').innerText(), monthTitle, 'месяц перелистнулся');
 
     await page.getByRole('button', { name: /^Месяц/ }).click();

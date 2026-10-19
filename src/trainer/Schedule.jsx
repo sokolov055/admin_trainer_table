@@ -1,5 +1,5 @@
 import { useReturnScroll } from '../scroll.js';
-import { useBackGesture, onPullRefresh } from '../gestures.jsx';
+import { useBackGesture, onPullRefresh, rubberband, spring } from '../gestures.jsx';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { useData } from '../useData.js';
@@ -91,6 +91,24 @@ function buzz() {
   try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* нет вибрации */ }
 }
 
+/**
+ * Слой уходит не одним кадром, а своей анимацией: значение пропало — ещё
+ * ms держим последнее и помечаем «уходит» (меню видов, лист «чей перенос»,
+ * «Вернуть», выбор даты).
+ */
+function useLeaving(value, ms = 220) {
+  const [kept, setKept] = useState(value || null);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (value) { setKept(value); setLeaving(false); return undefined; }
+    if (!kept) return undefined;
+    setLeaving(true);
+    const t = setTimeout(() => { setKept(null); setLeaving(false); }, reduceMotion() ? 0 : ms);
+    return () => clearTimeout(t);
+  }, [value]);
+  return [value || kept, !value && !!kept];
+}
+
 // onOpenClient(client, раздел) — к карточке клиента занятия (FT-567);
 // onMenu — боковое меню приложения: шапки над календарём нет, кнопка в его строке
 export default function Schedule({ onOpenClient = null, onMenu = null, active = true }) {
@@ -108,6 +126,12 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   const [undo, setUndo] = useState(null);
   const [failure, setFailure] = useState(null);
   const [agendaDays, setAgendaDays] = useState(28);
+  // Лента сетки или месяца: листнуть пружиной и «въехать» после прыжка
+  const pager = useRef(null);
+  const [menuShown, menuLeaving] = useLeaving(menu, 160);
+  const [pickerShown, pickerLeaving] = useLeaving(picker, 300);
+  const [askShown, askLeaving] = useLeaving(ask, 260);
+  const [undoShown, undoLeaving] = useLeaving(undo, 200);
   useReturnScroll(!!editing);
   // Запись открыта поверх сетки: смахнуть вправо, Back Android и браузера —
   // к расписанию, как кнопка «Расписание» над формой (FT-567)
@@ -173,9 +197,26 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
 
   const events = useMemo(() => [...cache.values()].map((e) => (moves[e.id] ? { ...e, ...moves[e.id], moving: true } : e)), [cache, moves]);
 
-  function shift(dir) { setAnchor((a) => shifted(view, a, dir)); setPicker(false); haptic(); }
-  function today() { setAnchor(startOfDay(new Date())); setScrollKey((k) => k + 1); setPicker(false); haptic(); }
-  const jump = (d) => { setAnchor(startOfDay(d)); setScrollKey((k) => k + 1); setPicker(false); haptic(); };
+  // Смена экрана без анимации — её делает лента (палец, пружина)
+  function shift(dir) { setAnchor((a) => shifted(view, a, dir)); setPicker(false); }
+  // Стрелки и клавиши — та же пружина, что у пальца; в списке ленты нет
+  function step(dir) {
+    haptic();
+    if (view !== 'list' && pager.current) pager.current.page(dir);
+    else shift(dir);
+  }
+  // Прыжок на дату: новое ставим сразу, лента въезжает с той стороны,
+  // где эта дата относительно прежней
+  const leap = (d) => {
+    const target = startOfDay(d);
+    const next = rangeOf(view, target).start;
+    const dir = next > start ? 1 : next < start ? -1 : 0;
+    flushSync(() => { setAnchor(target); setScrollKey((k) => k + 1); setPicker(false); });
+    if (dir && pager.current) pager.current.enter(dir);
+    haptic();
+  };
+  function today() { leap(new Date()); }
+  const jump = (d) => leap(d);
   const openDay = (d) => { setAnchor(startOfDay(d)); setView('day'); };
   const openEvent = (e) => { if (!e.moving) { setEditing(e); haptic(); } };
 
@@ -187,8 +228,8 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     if (document.querySelector('.drawer--open, [role="dialog"][aria-modal="true"]')) return;
     const k = String(e.key || '').toLowerCase();
-    if (e.key === 'ArrowLeft' || k === 'k' || k === 'л') shift(-1);
-    else if (e.key === 'ArrowRight' || k === 'j' || k === 'о') shift(1);
+    if (e.key === 'ArrowLeft' || k === 'k' || k === 'л') step(-1);
+    else if (e.key === 'ArrowRight' || k === 'j' || k === 'о') step(1);
     else if (k === 't' || k === 'е') today();
     else {
       const v = VIEWS.find((x) => x.keys.includes(k));
@@ -211,6 +252,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
 
   if (editing) {
     return (
+      <div className="cal-form">
       <EventForm
         key={editing.id || editing.copyKey || 'new'}
         event={editing}
@@ -230,6 +272,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
         onDone={() => { setEditing(null); setPreset(null); setTick((t) => t + 1); }}
         onCancel={() => { setEditing(null); setPreset(null); }}
       />
+      </div>
     );
   }
 
@@ -297,6 +340,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
 
   const answer = (change) => {
     const a = ask;
+    if (!a) return;
     setAsk(null);
     if (!change) { forget(a.event.id); haptic(); return; }
     commitMove(a.event, a.next, change);
@@ -315,8 +359,8 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
           <IconChevron size={18} className={picker ? 'cal-top__chev cal-top__chev--open' : 'cal-top__chev'} />
         </button>
         <div className="cal-top__actions">
-          <button type="button" className="icon-button cal-top__arrow" aria-label="Назад" onClick={() => shift(-1)}><IconBack size={18} /></button>
-          <button type="button" className="icon-button cal-top__arrow cal-top__arrow--next" aria-label="Вперёд" onClick={() => shift(1)}><IconBack size={18} /></button>
+          <button type="button" className="icon-button cal-top__arrow" aria-label="Назад" onClick={() => step(-1)}><IconBack size={18} /></button>
+          <button type="button" className="icon-button cal-top__arrow cal-top__arrow--next" aria-label="Вперёд" onClick={() => step(1)}><IconBack size={18} /></button>
           <button type="button" className="cal-today" aria-label="Сегодня" title="Сегодня (T)" onClick={today}>
             <span>{nowDate.getDate()}</span>
           </button>
@@ -325,10 +369,10 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
               onClick={() => { setMenu((m) => !m); setPicker(false); haptic(); }}>
               {viewLabel}<IconChevron size={16} />
             </button>
-            {menu && (
+            {menuShown && (
               <>
-                <div className="cal-viewpick__scrim" onClick={() => setMenu(false)} aria-hidden="true" />
-                <div className="cal-viewpick__menu" role="menu" aria-label="Вид календаря">
+                {!menuLeaving && <div className="cal-viewpick__scrim" onClick={() => setMenu(false)} aria-hidden="true" />}
+                <div className={'cal-viewpick__menu' + (menuLeaving ? ' cal-viewpick__menu--leaving' : '')} role="menu" aria-label="Вид календаря">
                   {VIEWS.map((v) => (
                     <button key={v.value} type="button" role="menuitemradio" aria-checked={v.value === view}
                       className={'cal-viewpick__item' + (v.value === view ? ' cal-viewpick__item--on' : '')}
@@ -348,9 +392,11 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
         <span className={'cal-top__busy' + (load.loading ? ' cal-top__busy--on' : '')} aria-hidden="true" />
       </div>
 
-      {picker && (
-        <MiniMonth anchor={anchor} start={start} days={view === 'month' ? 0 : view === 'list' ? 1 : days} events={events}
-          onPick={jump} />
+      {pickerShown && (
+        <div className={'cal-mini-wrap' + (pickerLeaving ? ' cal-mini-wrap--leaving' : '')}>
+          <MiniMonth anchor={anchor} start={start} days={view === 'month' ? 0 : view === 'list' ? 1 : days} events={events}
+            onPick={jump} />
+        </div>
       )}
 
       {failure && (
@@ -363,13 +409,15 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
       )}
 
       <div className="cal-main">
+        {/* key — вид: сменили вид — новый проявляется (cal-view-in), а не
+            подменяет прежний одним кадром */}
         {view === 'month' ? (
-          <MonthPager anchor={anchor} events={events} onDay={openDay} onEvent={openEvent} onShift={shift} onDrop={drop} />
+          <MonthPager key="month" pager={pager} anchor={anchor} events={events} onDay={openDay} onEvent={openEvent} onShift={shift} onDrop={drop} />
         ) : view === 'list' ? (
-          <Agenda start={start} days={agendaDays} events={events} loading={load.loading}
+          <Agenda key="list" start={start} days={agendaDays} events={events} loading={load.loading}
             onEvent={openEvent} onDay={openDay} onMore={() => setAgendaDays((n) => n + 28)} />
         ) : (
-          <TimeGrid start={start} days={days} events={events} scrollKey={scrollKey}
+          <TimeGrid key={view} pager={pager} start={start} days={days} events={events} scrollKey={scrollKey}
             onDay={openDay} onEvent={openEvent} onCreate={create} onShift={shift} onDrop={drop} />
         )}
       </div>
@@ -378,12 +426,13 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
           экран, а кнопка всегда под пальцем над нижним меню */}
       <button type="button" className="cal-fab" aria-label="Добавить событие" onClick={() => create()}><IconPlus size={24} /></button>
 
-      {ask && <MoveAsk ask={ask} onAnswer={answer} />}
-      {undo && typeof document !== 'undefined' && createPortal(
-        <div className="undo-bar" role="status">
-          <span>{undo.text}</span>
-          <button type="button" className="button button--ghost" onClick={() => {
+      {askShown && <MoveAsk ask={askShown} leaving={askLeaving} onAnswer={answer} />}
+      {undoShown && typeof document !== 'undefined' && createPortal(
+        <div className={'undo-bar' + (undoLeaving ? ' undo-bar--leaving' : '')} role="status">
+          <span>{undoShown.text}</span>
+          <button type="button" className="button button--ghost" disabled={undoLeaving} onClick={() => {
             const u = undo;
+            if (!u) return;
             setUndo(null);
             commitMove(u.event, u.back);
           }}>Вернуть</button>
@@ -398,12 +447,12 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
  * Чей перенос. Сервер без ответа занятие не перенесёт: в статистику идут
  * переносы клиента и тренера отдельно, а исправление ошибки — никуда.
  */
-function MoveAsk({ ask, onAnswer }) {
+function MoveAsk({ ask, leaving, onAnswer }) {
   const { event, next } = ask;
   const from = new Date(event.startsAt);
-  useBackGesture(() => onAnswer(null), true);
+  useBackGesture(() => onAnswer(null), !leaving);
   return createPortal(
-    <div className="cal-sheet" role="dialog" aria-modal="true" aria-label="Перенос занятия">
+    <div className={'cal-sheet' + (leaving ? ' cal-sheet--leaving' : '')} role="dialog" aria-modal="true" aria-label="Перенос занятия">
       <div className="cal-sheet__scrim" onClick={() => onAnswer(null)} aria-hidden="true" />
       <div className="cal-sheet__panel">
         <strong className="cal-sheet__title">Перенести занятие?</strong>
@@ -439,7 +488,8 @@ function MiniMonth({ anchor, start, days, events, onPick }) {
   }, [events]);
   const now = new Date();
   const end = addDays(start, days);
-  const step = (n) => { setMonth((m) => new Date(m.getFullYear(), m.getMonth() + n, 1)); haptic(); };
+  const [slide, setSlide] = useState(0);
+  const step = (n) => { setSlide(n); setMonth((m) => new Date(m.getFullYear(), m.getMonth() + n, 1)); haptic(); };
   return (
     <div className="cal-mini" data-no-gestures=""
       onTouchStart={(e) => { const t = e.touches[0]; swipe.current = { x: t.clientX, y: t.clientY }; }}
@@ -456,7 +506,7 @@ function MiniMonth({ anchor, start, days, events, onPick }) {
         <strong>{MONTHS_TITLE[month.getMonth()]} {month.getFullYear()}</strong>
         <button type="button" className="icon-button cal-top__arrow--next" aria-label="Следующий месяц" onClick={() => step(1)}><IconBack size={16} /></button>
       </div>
-      <div className="cal-mini__grid">
+      <div key={month.getTime()} className={'cal-mini__grid' + (slide > 0 ? ' cal-mini__grid--next' : slide < 0 ? ' cal-mini__grid--prev' : '')}>
         {WEEKDAYS.map((w) => <span key={w} className="cal-mini__wd">{w}</span>)}
         {cells.map((d) => {
           const inView = days > 0 && d >= start && d < end;
@@ -500,7 +550,13 @@ const SLOP = 8;
 const LIFT_MS = 320;
 /** Быстрый взмах листает, даже если протянули мало, px/мс */
 const FLICK = 0.35;
-const PAGE_MS = 260;
+/**
+ * Пружина листания — как UIScrollView с постраничной прокруткой: без
+ * перелёта (damping 1), доезжает примерно за 0,35–0,5 с и подхватывает скорость
+ * пальца. До 19.10.2026 был CSS-переход 260 мс, а листание у края при
+ * переносе события и стрелки сменяли экран одним кадром.
+ */
+const PAGE_SPRING = { damping: 1, response: 0.36 };
 /** Полоса у края сетки: держим там событие — сетка листается сама */
 const EDGE = 22;
 const EDGE_MS = 600;
@@ -526,38 +582,74 @@ const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
  * canLift(target) и lift(target, x, y) → { move(x, y), drop(), cancel() };
  * необязательные pinchStart/pinchMove/pinchEnd.
  *
+ * handle.current получает { page(dir), enter(dir) }: листнуть пружиной
+ * (стрелки, клавиши, край при переносе) и «въехать» после прыжка на дату.
+ *
+ * Лента едет пружиной, и её можно поймать пальцем на лету — как в iOS:
+ * жест продолжается с того места, где лента была, без рывка.
+ *
  * Слушатели движения ставятся и на сам элемент под пальцем: если при
  * листании во время переноса он уйдёт из разметки, касание всё равно
  * доходит до него, а до сетки — уже нет.
  */
-function useCalendarGestures(rootRef, api) {
+function useCalendarGestures(rootRef, api, handle) {
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return undefined;
     let g = null;
     let pinching = false;
-    let settle = null;
     let last = null;
+    let pos = 0; // где лента сейчас, px от покоя
+    let anim = null; // { stop(), dir } — пружина в пути
 
-    const setX = (x, animate) => {
+    const setX = (x) => {
+      pos = x;
       api.current.tracks().forEach((el) => {
         if (!el) return;
-        el.style.transition = animate && !reduceMotion() ? `transform ${PAGE_MS}ms cubic-bezier(0.23, 1, 0.32, 1)` : 'none';
+        el.style.transition = 'none';
         el.style.setProperty('--dx', x + 'px');
       });
     };
-    const commitSettle = () => {
-      if (!settle) return;
-      const s = settle;
-      settle = null;
-      clearTimeout(s.timer);
-      flushSync(() => api.current.onPage(s.dir));
-      setX(0, false);
+    const stopAnim = () => {
+      if (!anim) return;
+      anim.stop();
+      anim = null;
     };
+    const commit = (dir) => {
+      flushSync(() => api.current.onPage(dir));
+      setX(0);
+    };
+    // Доехать до покоя (dir 0) или до соседнего экрана и сменить дату
+    const go = (dir, velocity = 0) => {
+      stopAnim();
+      const to = -dir * api.current.width();
+      if (reduceMotion()) { if (dir) commit(dir); else setX(0); return; }
+      const run = spring({
+        from: pos, to, velocity, ...PAGE_SPRING,
+        onFrame: setX,
+        onDone: () => { if (anim === run) anim = null; if (dir) commit(dir); },
+      });
+      anim = run;
+      anim.dir = dir;
+    };
+    // Листнуть, пока прошлое листание ещё едет: прошлое засчитать сразу
     const page = (dir) => {
-      setX(-dir * api.current.width(), true);
-      settle = { dir, timer: setTimeout(commitSettle, reduceMotion() ? 0 : PAGE_MS) };
+      if (anim && anim.dir) { const d = anim.dir; stopAnim(); commit(d); }
+      go(dir);
     };
+    // Прыжок на дату («Сегодня», выбор в календарике): новое уже на месте,
+    // лента въезжает с той стороны, откуда пришли, и проявляется
+    const enter = (dir) => {
+      stopAnim();
+      if (!dir || reduceMotion()) { setX(0); return; }
+      const tracks = api.current.tracks().filter(Boolean);
+      tracks.forEach((el) => {
+        el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 320, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+      });
+      setX(dir * Math.min(120, api.current.width() * 0.3));
+      go(0);
+    };
+    if (handle) handle.current = { page, enter };
 
     const detach = (cur) => {
       if (!cur || !cur.target) return;
@@ -570,14 +662,17 @@ function useCalendarGestures(rootRef, api) {
       clearTimeout(g.timer);
       detach(g);
       if (g.mode === 'drag') { touchLock = false; g.drag.cancel(); }
-      if (g.mode === 'x') setX(0, true);
+      if (g.mode === 'x') go(0);
       g = null;
     };
 
     function start(e) {
-      commitSettle();
+      // Поймали ленту на лету — продолжаем с того места, где она была
+      const caught = !!anim;
+      stopAnim();
       if (e.touches.length === 2 && api.current.pinchStart) {
         abandon();
+        if (pos) go(0);
         pinching = true;
         api.current.pinchStart(e.touches);
         return;
@@ -585,11 +680,11 @@ function useCalendarGestures(rootRef, api) {
       if (e.touches.length !== 1 || pinching) { abandon(); return; }
       const t = e.touches[0];
       const target = e.target;
-      const cur = { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, mode: null, t: performance.now(), v: 0, dx: 0, target, timer: null, drag: null };
+      const cur = { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, mode: caught && pos ? 'x' : null, t: performance.now(), v: 0, dx: 0, base: pos, target, timer: null, drag: null };
       g = cur;
-      if (api.current.canLift && api.current.canLift(target)) {
+      if (!cur.mode && api.current.canLift && api.current.canLift(target)) {
         cur.timer = setTimeout(() => {
-          if (g !== cur || cur.mode) return;
+          if (g !== cur || cur.mode || pos) return;
           const session = api.current.lift(target, cur.x, cur.y);
           if (!session) return;
           cur.mode = 'drag';
@@ -629,14 +724,20 @@ function useCalendarGestures(rootRef, api) {
         if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
         clearTimeout(cur.timer);
         cur.mode = api.current.width && Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        // Лента идёт от пальца без скачка на порог в 8 px
+        if (cur.mode === 'x') cur.x0 += Math.sign(dx) * SLOP;
       }
       if (cur.mode !== 'x') return;
       if (e.cancelable) e.preventDefault();
       const now = performance.now();
-      cur.v = (dx - cur.dx) / Math.max(1, now - cur.t);
+      const w = api.current.width();
+      const raw = cur.base + (cur.x - cur.x0);
+      // Дальше соседнего экрана ленты нет — там резина, как у края списка в iOS
+      const over = Math.abs(raw) - w;
+      const next = over > 0 ? Math.sign(raw) * (w + rubberband(over, w)) : raw;
+      cur.v = (next - pos) / Math.max(1, now - cur.t);
       cur.t = now;
-      cur.dx = dx;
-      setX(dx, false);
+      setX(next);
     }
 
     function end(e) {
@@ -662,10 +763,15 @@ function useCalendarGestures(rootRef, api) {
       }
       if (cur.mode === 'x') {
         const w = api.current.width();
+        // Палец давно стоит — скорости нет, решает только где отпустили
+        const v = performance.now() - cur.t > 80 ? 0 : cur.v;
+        // Взмах решает направление; взмах назад отменяет листание, как в iOS
         let dir = 0;
-        if (Math.abs(cur.dx) > w * 0.25) dir = cur.dx < 0 ? 1 : -1;
-        else if (Math.abs(cur.v) > FLICK && Math.abs(cur.dx) > 24 && Math.sign(cur.v) === Math.sign(cur.dx)) dir = cur.v < 0 ? 1 : -1;
-        if (dir) page(dir); else setX(0, true);
+        if (Math.abs(v) > FLICK) dir = !pos || Math.sign(v) === Math.sign(pos) ? (v < 0 ? 1 : -1) : 0;
+        else if (Math.abs(pos) > w * 0.4) dir = pos < 0 ? 1 : -1;
+        go(dir, v * 1000);
+      } else if (pos) {
+        go(0);
       }
     }
 
@@ -709,8 +815,9 @@ function useCalendarGestures(rootRef, api) {
     root.addEventListener('contextmenu', menuOff);
     return () => {
       abandon();
-      if (settle) { clearTimeout(settle.timer); settle = null; }
+      stopAnim();
       touchLock = false;
+      if (handle) handle.current = null;
       root.removeEventListener('touchstart', start);
       root.removeEventListener('touchmove', move);
       root.removeEventListener('touchend', end);
@@ -800,15 +907,20 @@ const isAllDay = (e) => new Date(e.endsAt) - new Date(e.startsAt) >= 20 * 360000
  * колонки), колонка часов стоит на месте; отпустили — лента доезжает до
  * соседнего экрана целиком, прокрутка по часам остаётся.
  */
-function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, onShift, onDrop }) {
+function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCreate, onShift, onDrop }) {
   const root = useRef(null);
+  const ownPager = useRef(null);
+  const handle = pager || ownPager;
+  const settleTimer = useRef(null);
   const scroller = useRef(null);
   const viewport = useRef(null);
   const headTrack = useRef(null);
   const allTrack = useRef(null);
   const bodyTrack = useRef(null);
   const [now, setNow] = useState(() => new Date());
-  const [ghost, setGhost] = useState(null); // приподнятое событие: { id, key, minutes, duration }
+  // Приподнятое событие: { id, key, minutes, duration, left, width, settle } —
+  // рисуется слоем над лентой, чтобы при листании у края оставаться под пальцем
+  const [ghost, setGhost] = useState(null);
   const [draft, setDraft] = useState(null); // заготовка нового: { key, minutes }
   // Высота часа — щипком; время между пальцами остаётся на месте
   const [hour, setHour] = useState(savedHour);
@@ -867,7 +979,7 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); clearTimeout(settleTimer.current); };
   }, []);
   // Пролистали или сменили вид — заготовка нового события уходит
   useEffect(() => { setDraft(null); }, [start.getTime(), days]);
@@ -889,11 +1001,24 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
       if (!ev || !movable(ev) || isAllDay(ev) || ev.moving) return null;
       setDraft(null);
       touched();
+      clearTimeout(settleTimer.current);
       const rect = el.getBoundingClientRect();
+      const s0 = new Date(ev.startsAt);
+      const home = { key: dateValue(s0), minutes: s0.getHours() * 60 + s0.getMinutes() };
       const duration = durationOf(ev);
       const grab = Math.max(0, Math.min(duration, ((y - rect.top) / live.current.hour) * 60));
       let point = { x, y };
       let spot = null;
+      let at = null;
+      // Колонка дня по ключу — где она сейчас на экране относительно окна ленты
+      const place = (key) => {
+        const body = bodyTrack.current;
+        const vp = viewport.current;
+        const col = body && [...body.children].find((c) => c.dataset.calDay === key);
+        if (!col || !vp) return null;
+        const r = col.getBoundingClientRect();
+        return { left: Math.round(r.left - vp.getBoundingClientRect().left), width: Math.round(r.width) };
+      };
       const locate = () => {
         const body = bodyTrack.current;
         const vp = viewport.current;
@@ -904,14 +1029,26 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
           const r = col.getBoundingClientRect();
           if (cx >= r.left && cx < r.right) {
             const next = { key: col.dataset.calDay, minutes: dropMinutes(point.y - r.top, live.current.hour, grab, duration) };
-            if (!spot || spot.key !== next.key || spot.minutes !== next.minutes) {
-              if (spot) haptic('light');
+            const pos = { left: Math.round(r.left - v.left), width: Math.round(r.width) };
+            const moved = !spot || spot.key !== next.key || spot.minutes !== next.minutes;
+            if (moved && spot) haptic('light');
+            // Лента едет (листание у края) — колонка под пальцем тоже: копия
+            // события едет вместе с ней, а не прыгает в конце
+            if (moved || !at || at.left !== pos.left || at.width !== pos.width) {
               spot = next;
-              setGhost({ id: ev.id, duration, ...next });
+              at = pos;
+              setGhost({ id: ev.id, duration, ...next, ...pos });
             }
             return;
           }
         }
+      };
+      // Отпустили: копия опускается на место (или возвращается домой) и
+      // гаснет, под ней уже стоит само событие
+      const settle = (to) => {
+        const pos = to && place(to.key);
+        setGhost((g) => (g ? { ...g, ...(to && pos ? { ...to, ...pos } : {}), settle: true } : g));
+        settleTimer.current = setTimeout(() => setGhost(null), reduceMotion() ? 0 : 260);
       };
       locate();
       const stop = edgeLoop({
@@ -919,18 +1056,19 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
         viewport: () => viewport.current,
         point: () => point,
         onFrame: locate,
-        onEdge: (dir) => flushSync(() => live.current.onShift(dir)),
+        // У края — листнуть той же пружиной, что и пальцем
+        onEdge: (dir) => { if (handle.current) handle.current.page(dir); },
       });
       return {
         move: (nx, ny) => { point = { x: nx, y: ny }; },
         drop: () => {
           stop();
-          setGhost(null);
-          if (!spot) return;
+          if (!spot || (spot.key === home.key && spot.minutes === home.minutes)) { settle(home); return; }
+          settle(null);
           const d = keyDate(spot.key);
           live.current.onDrop(ev, new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(spot.minutes / 60), spot.minutes % 60));
         },
-        cancel: () => { stop(); setGhost(null); },
+        cancel: () => { stop(); settle(home); },
       };
     },
     pinchStart: (touches) => {
@@ -940,6 +1078,8 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
       const y = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
       const gap = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
       pinch.current = { gap: Math.max(20, gap), hour: live.current.hour, y, minute: ((scroller.current.scrollTop + y) / live.current.hour) * 60 };
+      // Пока щиплют — события за пальцами без плавного переезда
+      if (root.current) root.current.classList.add('is-pinching');
     },
     pinchMove: (touches) => {
       const pz = pinch.current;
@@ -953,10 +1093,11 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
     },
     pinchEnd: () => {
       pinch.current = null;
+      if (root.current) root.current.classList.remove('is-pinching');
       try { localStorage.setItem(HOUR_KEY, String(live.current.hour)); } catch (_) { /* не запомнили */ }
     },
   };
-  useCalendarGestures(root, api);
+  useCalendarGestures(root, api, handle);
 
   // Нажатие на пустое место: первое ставит заготовку на 15-минутку под
   // пальцем (с округлением до получаса вниз), второе по ней — новое событие
@@ -1032,7 +1173,7 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
                       const from = new Date(s);
                       const top = (from.getHours() * 60 + from.getMinutes()) / 60 * hour;
                       const height = Math.max(((f - s) / 3600000) * hour - 2, 14);
-                      const lifted = ghost && ghost.id === e.id;
+                      const lifted = ghost && !ghost.settle && ghost.id === e.id;
                       return (
                         <button
                           type="button"
@@ -1051,17 +1192,6 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
                         </button>
                       );
                     })}
-                    {ghost && ghost.key === key && (() => {
-                      const ev = events.find((x) => x.id === ghost.id);
-                      const height = Math.max((ghost.duration / 60) * hour - 2, 18);
-                      return (
-                        <div className={(ev ? eventClass(ev) : 'cal-event') + ' cal-event--ghost'} aria-hidden="true"
-                          style={{ top: (ghost.minutes / 60) * hour, height, left: 1, width: 'calc(100% - 3px)' }}>
-                          {days < 7 && ev && <span className="cal-event__name">{labelOf(ev)}</span>}
-                          <span className="cal-event__time cal-event__time--strong">{clock(ghost.minutes)}{days < 7 ? '–' + clock(ghost.minutes + ghost.duration) : ''}</span>
-                        </div>
-                      );
-                    })()}
                     {draft && draft.key === key && (
                       <button type="button" className="cal-draft" style={{ top: (draft.minutes / 60) * hour, height: Math.max(hour - 2, 22) }}
                         onClick={(ev) => { ev.stopPropagation(); onCreate({ date: d, minutes: draft.minutes }); }}>
@@ -1076,6 +1206,19 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
               })}
             </div>
           </div>
+          {ghost && (() => {
+            const ev = events.find((x) => x.id === ghost.id);
+            const height = Math.max((ghost.duration / 60) * hour - 2, 18);
+            return (
+              <div className="cal-grid__ghosts" aria-hidden="true">
+                <div className={(ev ? eventClass(ev) : 'cal-event') + ' cal-event--ghost' + (ghost.settle ? ' cal-event--settle' : '')}
+                  style={{ top: (ghost.minutes / 60) * hour, height, left: ghost.left + 1, width: ghost.width - 3 }}>
+                  {days < 7 && ev && <span className="cal-event__name">{labelOf(ev)}</span>}
+                  <span className="cal-event__time cal-event__time--strong">{clock(ghost.minutes)}{days < 7 ? '–' + clock(ghost.minutes + ghost.duration) : ''}</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -1088,7 +1231,9 @@ function TimeGrid({ start, days, events, scrollKey, onDay, onEvent, onCreate, on
  * событий помещается в день — по высоте ячейки, остальное «ещё N».
  * Событие тоже переносится удержанием — в другой день, время то же.
  */
-function MonthPager({ anchor, events, onDay, onEvent, onShift, onDrop }) {
+function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) {
+  const ownPager = useRef(null);
+  const handle = pager || ownPager;
   const root = useRef(null);
   const track = useRef(null);
   const ghostEl = useRef(null);
@@ -1155,7 +1300,7 @@ function MonthPager({ anchor, events, onDay, onEvent, onShift, onDrop }) {
         viewport: () => root.current,
         point: () => point,
         onFrame: place,
-        onEdge: (dir) => flushSync(() => live.current.onShift(dir)),
+        onEdge: (dir) => { if (handle.current) handle.current.page(dir); },
       });
       const end = () => { stop(); setHover(null); setLifted(null); };
       return {
@@ -1165,7 +1310,7 @@ function MonthPager({ anchor, events, onDay, onEvent, onShift, onDrop }) {
       };
     },
   };
-  useCalendarGestures(root, api);
+  useCalendarGestures(root, api, handle);
 
   return (
     <div className="cal-month" data-no-gestures="" data-no-swipe="">
