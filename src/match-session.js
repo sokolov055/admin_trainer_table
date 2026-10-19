@@ -38,7 +38,7 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
     let message = snapshot.message;
     if (frame.kind === 'clear') {
       const chapter = chapterFor(frame.game.level);
-      const halfway = Math.ceil(chapter.count / 2);
+      const halfway = Math.ceil((frame.game.storyGoal || chapter.count) / 2);
       message = frame.storyGain && snapshot.game.collected < halfway && frame.game.collected >= halfway
         ? chapter.halfway
         : chapterComplete(frame.game) && (frame.storyGain || frame.reveals.length)
@@ -75,7 +75,16 @@ export function createMatchSession({ seed = Date.now(), now = () => Date.now(), 
       if (token != null && owner()?.token !== token) return;
       if (expired()) return;
       clearTimer(); queue = []; result = null; remaining = 0;
-      emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level), mode: 'playing', frame: null, selected: null, hint: null, busy: false, message: chapterFor(level).task, reason: '', serial: snapshot.serial + 1 });
+      emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level, snapshot.rules), mode: 'playing', frame: null, selected: null, hint: null, busy: false, message: chapterFor(level).task, reason: '', serial: snapshot.serial + 1 });
+    },
+    // Задание карьеры: своя глава и правила; null — вернуться к обычной истории.
+    // Пока правила те же, начатая партия не сбрасывается.
+    mission(rules = null) {
+      const same = JSON.stringify(rules) === JSON.stringify(snapshot.rules || null);
+      if (same) return;
+      clearTimer(); queue = []; result = null; remaining = 0;
+      const level = rules?.chapter || 1;
+      emit({ game: createMatchGame((seed + snapshot.serial * 7919 + 1) >>> 0, level, rules), rules, mode: 'ready', frame: null, selected: null, hint: null, busy: false, message: '', reason: '', serial: snapshot.serial + 1 });
     },
     prepare(level, token) {
       if (token != null && owner()?.token !== token) return;

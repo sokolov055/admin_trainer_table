@@ -80,9 +80,11 @@ function freshBoard(state) {
   return board;
 }
 
-export function createMatchGame(seed = Date.now(), level = 1) {
-  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: MATCH_TUNING.moves, score: 0, collected: 0, uncovered: 0, bestCombo: 0, turns: 0, board: [], covers: [] };
-  game.target = MATCH_TUNING.target + (game.level - 1) * 250;
+// rules — задание карьеры (career-model.js): свои ходы, очки и число сюжетных фигур.
+export function createMatchGame(seed = Date.now(), level = 1, rules = null) {
+  const game = { seed: seed >>> 0, nextId: 0, level: Math.max(1, Math.min(3, level)), moves: rules?.moves || MATCH_TUNING.moves, score: 0, collected: 0, uncovered: 0, bestCombo: 0, turns: 0, board: [], covers: [] };
+  game.target = rules?.target || MATCH_TUNING.target + (game.level - 1) * 250;
+  if (rules?.count) game.storyGoal = rules.count;
   game.board = freshBoard(game);
   const patterns = [
     [19, 20, 28, 29, 51, 52, 60, 61],

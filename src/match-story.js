@@ -32,10 +32,11 @@ export function chapterFor(level) {
 
 export function chapterComplete(game) {
   const chapter = chapterFor(game.level);
-  return (game.collected || 0) >= chapter.count && (game.uncovered || 0) >= chapter.coverGoal;
+  return (game.collected || 0) >= (game.storyGoal || chapter.count) && (game.uncovered || 0) >= chapter.coverGoal;
 }
 
 export function chapterProgress(game) {
   const chapter = chapterFor(game.level);
-  return { collected: Math.min(game.collected || 0, chapter.count), required: chapter.count, uncovered: Math.min(game.uncovered || 0, chapter.coverGoal), coversRequired: chapter.coverGoal };
+  const required = game.storyGoal || chapter.count;
+  return { collected: Math.min(game.collected || 0, required), required, uncovered: Math.min(game.uncovered || 0, chapter.coverGoal), coversRequired: chapter.coverGoal };
 }
