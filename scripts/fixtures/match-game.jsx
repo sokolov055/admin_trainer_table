@@ -8,6 +8,7 @@ import { RestScreen } from '../../src/RestScreen.jsx';
 import { chooseMove } from '../match-policy.mjs';
 import { legalMoves } from '../../src/match-model.js';
 import { setRestHere } from '../../src/rest-here.js';
+import '../../src/game-shell.css';
 import '../../src/match-preview.css';
 
 function Fixture({ menu = true, rest = false, until = Infinity, now = Date.now(), allowed = true }) {
@@ -18,7 +19,7 @@ function Fixture({ menu = true, rest = false, until = Infinity, now = Date.now()
     legal: () => legalMoves(session.getSnapshot().game.board, session.getSnapshot().game.covers),
     setRest: setRestHere,
   };
-  return <>{menu && <main className="match-preview"><MatchGame onClose={() => window.showMatch({ menu: false })} /></main>}{rest && <RestScreen until={until} total={30000} now={now} allowGame={allowed} onStop={() => window.showMatch({ menu: false })} />}</>;
+  return <>{menu && <main className="game-shell game-shell--match"><MatchGame onClose={() => window.showMatch({ menu: false })} /></main>}{rest && <RestScreen until={until} total={30000} now={now} allowGame={allowed} onStop={() => window.showMatch({ menu: false })} />}</>;
 }
 const root = createRoot(document.getElementById('root'));
 window.showMatch = (props = {}) => root.render(<MatchSessionProvider key={props.identity || 'client'} seed={props.seed ?? 42}><PlankSessionProvider><Fixture {...props} /></PlankSessionProvider></MatchSessionProvider>);

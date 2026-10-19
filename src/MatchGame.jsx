@@ -6,6 +6,7 @@ import { createMatchAudio } from './match-audio.js';
 import { restHere, onRestHere } from './rest-here.js';
 import { clock } from './workout-model.js';
 import { IconBack, IconGuide, IconClose, IconCheck } from './icons.jsx';
+import { useGameChrome, buzz, vibrationOn, setVibration } from './game-feel.js';
 import piecesUrl from './assets/match-pieces.png';
 import gymUrl from './assets/match-gym.png';
 import './match-game.css';
@@ -33,7 +34,9 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
   const [assets, setAssets] = useState('loading');
   const [soundError, setSoundError] = useState('');
   const [focusCell, setFocusCell] = useState(0);
+  const [vibration, setVibrationState] = useState(vibrationOn);
   const token = useRef({});
+  const felt = useRef({ serial, mode, selected });
   const audio = useRef(null);
   const deadline = useRef(restUntil); deadline.current = restUntil;
   const root = useRef(null), panel = useRef(null), primary = useRef(null), pointer = useRef(null);
@@ -81,6 +84,21 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
     if (mode === 'playing' && frame?.kind === 'clear') audio.current?.play(frame.combo);
     if (mode === 'won') audio.current?.play(1, true);
   }, [serial, mode, sound, session]);
+
+  useGameChrome(root);
+
+  // Вибрация — по тем же кадрам, что и звук, и только у экрана, который ведёт партию
+  useEffect(() => {
+    const last = felt.current; felt.current = { serial, mode, selected };
+    if (mode === 'paused' || session.owner() !== token.current) return;
+    if (mode === 'won') { if (last.mode !== 'won') buzz('great'); return; }
+    if (mode !== 'playing') return;
+    if (serial !== last.serial && frame) {
+      if (frame.kind === 'reject') buzz('bad');
+      else if (frame.kind === 'swap') buzz('tap');
+      else if (frame.kind === 'clear') buzz(frame.combo > 1 || frame.effects.length ? 'great' : 'good');
+    } else if (selected != null && selected !== last.selected) buzz('tap');
+  }, [serial, mode, selected, frame, session]);
 
   useEffect(() => {
     const animations = root.current?.querySelector('.match-board')?.getAnimations({ subtree: true }) || [];
@@ -139,7 +157,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
   const panelKeys = event => {
     if (event.key === 'Escape') { event.preventDefault(); if (help) setHelp(false); else if (mode === 'playing') session.pause(); else if (mode === 'paused') resume(); }
     if (event.key !== 'Tab' || !shownPanel || !panel.current) return;
-    const buttons = [...panel.current.querySelectorAll('button:not(:disabled)')];
+    const buttons = [...panel.current.querySelectorAll('button:not(:disabled), input:not(:disabled)')];
     if (!buttons.length) return;
     const first = buttons[0], last = buttons.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
@@ -151,15 +169,14 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
   const powerText = power => power ? `, ${POWER_NAMES[power]}` : '';
 
   return <section className={`match-game match-game--${mode}`} aria-label="Три в ряд" data-no-gestures data-phase={mode} data-busy={busy} ref={root} onKeyDown={panelKeys}>
-    <header className="match-toolbar">
-      <button type="button" className="match-icon" onClick={close} aria-label={restLeft == null ? 'Закрыть игру' : 'К отдыху'}><IconBack size={20} /></button>
-      <span>Три в ряд</span>
-      <button type="button" className="match-icon" onClick={toggleSound} aria-label={sound ? 'Выключить звук' : 'Включить звук'} aria-pressed={sound}><Sound enabled={sound} /></button>
-      <button type="button" className="match-icon" onClick={() => session.pause()} disabled={!active} aria-label="Пауза"><span className="match-pause-icon" /></button>
-    </header>
-    {restLeft != null && <div className="match-rest"><span>Отдых</span><strong role="timer">{clock(Math.max(0, restLeft))}</strong><span>Пора к подходу? Игра подождёт.</span></div>}
     <div className="match-scene">
-      <div className="match-brand"><h2>В форме!</h2><span>{chapter.place} · {chapter.title}</span></div>
+      <header className="match-top">
+        <button type="button" className="match-icon match-round" onClick={close} aria-label={restLeft == null ? 'Закрыть игру' : 'К отдыху'}><IconBack size={22} /></button>
+        {restLeft != null && <div className="match-rest" title="Пора к подходу? Игра подождёт."><span>Отдых</span><strong role="timer">{clock(Math.max(0, restLeft))}</strong></div>}
+        <span className="match-top__gap" />
+        <button type="button" className="match-icon match-round" onClick={toggleSound} aria-label={sound ? 'Выключить звук' : 'Включить звук'} aria-pressed={sound}><Sound enabled={sound} /></button>
+        <button type="button" className="match-icon match-round" onClick={() => session.pause()} disabled={!active} aria-label="Пауза"><span className="match-pause-icon" /></button>
+      </header>
       <div className="match-hud">
         <div className={`match-moves${game.moves <= 3 ? ' is-low' : ''}`}><strong data-match="moves">{game.moves}</strong><span>{movesLabel(game.moves)}</span></div>
         <div className="match-score">
@@ -170,9 +187,10 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
       </div>
       <div className={`match-quest${frame?.kind === 'clear' && (frame.storyGain || frame.reveals.length) ? ' is-progressing' : ''}`} key={frame?.kind === 'clear' && (frame.storyGain || frame.reveals.length) ? serial : 'quest'}>
         <Piece type={chapter.type} />
-        <span><small>{chapter.title}</small><strong>{chapter.task}</strong></span>
+        <span><small>Задание</small><strong>{chapter.task}</strong></span>
         <div className="match-quest-progress"><b data-match="story-progress" aria-label={`${chapter.task}: ${progress.collected} из ${progress.required}`}>{progress.collected}<i> / {progress.required}</i></b><em data-match="covers-progress">Ящики {progress.uncovered}/{progress.coversRequired}</em></div>
       </div>
+      <div className="match-stage">
       <div className="match-board-frame">
         <div className={`match-board match-board--${frame?.kind || 'idle'}`} role="group" aria-label={`Игровое поле ${MATCH_TUNING.size} на ${MATCH_TUNING.size}`} aria-describedby={instructions} onPointerDown={down} onPointerUp={up} onPointerCancel={() => { pointer.current = null; }} onLostPointerCapture={() => { pointer.current = null; }}>
           <div className="match-sockets" aria-hidden="true">{Array.from({ length: MATCH_TUNING.size ** 2 }, (_, i) => <span key={i} className={(rowOf(i) + colOf(i)) % 2 ? 'is-alternate' : ''} />)}</div>
@@ -196,6 +214,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           </div>}
         </div>
         {frame?.kind === 'clear' && active && <div className="match-combo" key={serial} aria-hidden="true"><strong>{frame.combo > 1 ? `Каскад ×${frame.combo}` : frame.effects.length ? 'ЗАРЯД!' : frame.creations.length ? 'Суперзаряд!' : 'Попадание!'}</strong><span>+{frame.points}</span></div>}
+      </div>
       </div>
       <div className={`match-feedback${message === chapter.halfway ? ' match-feedback--story' : ''}`} role="status" aria-live="polite">{message === chapter.halfway && <strong>Тренер</strong>}{soundError || message || 'Собирай тройки. Лови каскады.'}</div>
       <footer className="match-footer">
@@ -233,6 +252,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <p>{state.reason === 'rest' ? 'Поле и ходы сохранены. Продолжим на следующем отдыхе.' : 'Твои комбинации подождут. Продолжишь с того же места.'}</p>
           <p className="match-story-pause">{chapter.task}: {progress.collected}/{progress.required} · Ящики: {progress.uncovered}/{progress.coversRequired}</p>
           <div className="match-mission"><span>{game.moves} {movesLabel(game.moves)}</span><span><strong>{number(game.score)}</strong> очков</span></div>
+          <label className="match-toggle"><input type="checkbox" checked={vibration} onChange={event => { setVibration(event.target.checked); setVibrationState(event.target.checked); if (event.target.checked) buzz('tap'); }} />Вибрация</label>
           <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={resume}>{assets === 'ready' ? 'Продолжить игру' : 'Готовим поле…'}</button>
           <button className="match-secondary" onClick={close}>Вернуться {restLeft == null ? 'в приложение' : 'к отдыху'}</button>
         </> : <>
