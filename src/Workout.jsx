@@ -2,7 +2,7 @@ import { primaryEquipment } from './equipment-guidance.js';
 import WorkoutGuidance from './WorkoutGuidance.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync, createPortal } from 'react-dom';
-import { apiFresh, apiPublic, apiMutate } from './api.js';
+import { apiFresh, apiPublic, apiMutate, apiWait } from './api.js';
 import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWorkout, settleClosed } from './workout-outbox.js';
 import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
@@ -350,6 +350,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       }
       if (!current || current.session.id !== r.session.id) return;
       const unchanged = current.edit === r.pending.edit;
+      // Сервер влил это занятие в уже идущее той же тренировки (начали без
+      // связи, а клиент вёл своё, 19.10.2026): дальше ведём идущее.
+      // Отмеченное здесь, пока шёл запрос, досылаем тем же путём — сервер
+      // вольёт и его, повтор безопасен
+      if (result.absorbed && result.session.id !== r.session.id) {
+        store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: Date.now(), pending: null });
+        if (!unchanged) apiMutate('workout.save', { ...params, session: current.session, revision: 0, requestId: uid() }).catch(() => {});
+        if (mounted.current) { setMessage(''); list().catch(() => {}); }
+        return;
+      }
       store({ ...current, session: unchanged ? result.session : {
         ...current.session, startedAt: result.session.startedAt, updatedAt: result.session.updatedAt,
         // Связь с программой и месяц ведёт сервер: переименование тренировки
@@ -477,22 +487,57 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * не мог понять, синхронизируется вообще что-нибудь или нет.
    *
    * Свой несохранённый черновик всегда важнее чужой версии: его негде
-   * взять заново, а чужая доедет следующим чтением.
+   * взять заново, а чужая доедет следующим чтением. Свои правки сервер
+   * сводит с чужими сам (server/src/lib/workout-merge.js) и возвращает
+   * общее — затирать их здесь не нужно.
+   *
+   * С 19.10.2026 экран не опрашивает раз в двадцать секунд, а ждёт:
+   * workout.wait держит запрос, пока занятие не сохранят на другом
+   * устройстве (часы, телефон клиента), и отвечает сразу — отметка
+   * тренера у клиента появляется через секунду.
    */
   useEffect(() => {
     if (!ready) return;
 
+    const take = (session, r) => {
+      if (!mounted.current || !session || state.current?.dirty || state.current?.pending || saving.current
+        || conflictRef.current || state.current?.session.id !== r.session.id) return false;
+      if (session.revision !== r.revision) store({ session, revision: session.revision, serverTitle: session.title, dirty: false, tick: Date.now() });
+      return true;
+    };
     const refresh = async () => {
       const r = state.current;
       if (!r || r.dirty || saving.current || conflictRef.current || document.hidden) return;
       try {
         const result = await apiPublic('workout.get', { ...params, id: r.session.id });
-        if (!mounted.current || state.current?.dirty || state.current?.session.id !== r.session.id) return;
-        if (result.session.revision !== r.revision) store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: Date.now() });
+        take(result.session, r);
       } catch (_) { /* Сбой чтения не должен мешать записи локального подхода. */ }
     };
 
-    const timer = setInterval(refresh, 20000);
+    let alive = true;
+    const pause = ms => new Promise(done => setTimeout(done, ms));
+    (async () => {
+      while (alive) {
+        const r = state.current;
+        // Ждать есть смысл у идущего занятия, уже бывшего на сервере, на
+        // открытом экране
+        if (!r || !['active', 'paused'].includes(r.session.status) || !r.revision || document.hidden || conflictRef.current) {
+          await pause(1000);
+          continue;
+        }
+        try {
+          const result = await apiWait('workout.wait', { ...params, id: r.session.id, revision: r.revision });
+          if (!alive) return;
+          // Здесь несохранённое — его сохранение принесёт общее; не крутить
+          // запросы, пока оно не ушло
+          if (result.session && !take(result.session, r)) await pause(1500);
+        } catch (_) {
+          // Нет связи — пробуем реже; вернулась — refresh по «online»
+          await pause(10000);
+        }
+      }
+    })();
+    const timer = setInterval(refresh, 60000);
     const listen = (target, event) => {
       if (target && target.addEventListener) target.addEventListener(event, refresh);
       return () => { if (target && target.removeEventListener) target.removeEventListener(event, refresh); };
@@ -504,7 +549,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       listen(window, 'online'),
     ];
 
-    return () => { clearInterval(timer); off.forEach(fn => fn()); };
+    return () => { alive = false; clearInterval(timer); off.forEach(fn => fn()); };
   }, [ready]);
 
   /**

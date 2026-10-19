@@ -38,7 +38,7 @@ const output = await build({ entryPoints: ['src/trainer/MachinesEditor.jsx'], bu
     // Подменяем только то, что подключает сам редактор: остальное приложение
     // (ui.jsx тянет за собой полсайта) в проверку не нужно
     b.onResolve({ filter: /^\.\.\/(api|telegram|useData|library|ui)\.jsx?$/ }, (args) => (/MachinesEditor\.jsx$/.test(args.importer) ? { path: args.path, namespace: 'stub' } : undefined));
-    b.onLoad({ filter: /\/api\.js$/, namespace: 'stub' }, () => ({ contents: 'export const apiMutate=(...a)=>globalThis.__api(...a); export const apiPublic=apiMutate;' }));
+    b.onLoad({ filter: /\/api\.js$/, namespace: 'stub' }, () => ({ contents: 'export const apiMutate=(...a)=>globalThis.__api(...a); export const apiWait=()=>new Promise(()=>{}); export const apiPublic=apiMutate;' }));
     b.onLoad({ filter: /\/telegram\.js$/, namespace: 'stub' }, () => ({ contents: 'export const haptic=()=>{};' }));
     b.onLoad({ filter: /\/useData\.js$/, namespace: 'stub' }, () => ({ contents: 'export const useData=(...a)=>globalThis.__data(...a);' }));
     b.onLoad({ filter: /\/library\.js$/, namespace: 'stub' }, () => ({ contents: 'export const shrinkPhoto=async(x)=>x; export const uploadMachinePhoto=async()=>{}; export const mediaUrl=(x)=>x;' }));

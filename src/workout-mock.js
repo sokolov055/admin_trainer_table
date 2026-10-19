@@ -64,6 +64,12 @@ export function workoutMock(action, params) {
     if (!previous) throw new Error('Занятие не найдено');
     return { session: previous };
   }
+  // Демо одно на устройство: ждать нечего — короткая пауза и «ничего нового»
+  if (action === 'workout.wait') {
+    if (!previous) throw new Error('Занятие не найдено');
+    if (previous.revision !== params.revision) return { session: previous };
+    return new Promise(r => setTimeout(() => r({ same: true, revision: params.revision }), Math.min(Number(params.ms) || 25000, 3000)));
+  }
   if (previous?.requestId === params.requestId) return { session: previous };
   if ((previous?.revision || 0) !== params.revision) return { conflict: true, session: previous };
   const s = params.session;

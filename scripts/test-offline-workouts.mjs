@@ -55,7 +55,7 @@ const stubs = {
       if (a instanceof Error) throw a;
       return a || { session: { ...p.session, revision: p.revision + 1, updatedAt: '2026-10-15T10:00:00.000Z' } };
     };
-    export const apiPublic = async (action) => {
+    export const apiWait=()=>new Promise(()=>{}); export const apiPublic = async (action) => {
       if (!f().online) throw offline();
       if (action === 'workout.list') return f().list || { sessions: [] };
       throw Object.assign(new Error('нет'), { code: 404 });

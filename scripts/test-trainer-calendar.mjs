@@ -52,7 +52,7 @@ const output = await build({
         // здесь не проверяются, но и ломать сборку они не должны.
         if (args.path === 'api') return {
           contents: 'export const apiMutate=(action, params)=>globalThis.__calendarRefreshHarness.apiMutate(action, params);'
-            + ' export const apiPublic=async()=>({});',
+            + ' export const apiWait=()=>new Promise(()=>{}); export const apiPublic=async()=>({});',
         };
         if (args.path === 'ui') return {
           loader: 'jsx',

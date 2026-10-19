@@ -45,7 +45,7 @@ const output = await build({
         if (args.path === 'api') return {
           contents: `export const apiMutate = (action, params) => globalThis.__metrics.apiMutate(action, params);
             export const apiPrimary = async () => ({});
-            export const apiPublic = async () => ({});
+            export const apiWait=()=>new Promise(()=>{}); export const apiPublic = async () => ({});
             export const apiFresh = async () => ({ data: {}, offline: false, at: 0 });
             export const apiStoredAt = () => 0;
             export const logout = () => {};

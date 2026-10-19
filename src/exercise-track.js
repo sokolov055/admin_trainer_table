@@ -563,5 +563,9 @@ export function planSet(ex, track) {
   // записывается как сделанное, и неисправленные 12 дали бы ложную прибавку;
   // цель 12 показывается отдельно (repsGoalText)
   const range = reps.trim().match(/^(\d{1,3})\s*[-–—]\s*\d{1,3}$/);
-  return { reps: /^\d+$/.test(reps) ? reps : range ? range[1] : '' };
+  // Число с пояснением — «12(каждой)», «15 на ногу» (19.10.2026): число и
+  // есть повторы. Без него подход с часов уходил без повторов, и сервер
+  // его не принимал
+  const lead = reps.trim().match(/^(\d{1,3})\s*(?:\(|[a-zа-яё])/i);
+  return { reps: /^\d+$/.test(reps) ? reps : range ? range[1] : lead ? lead[1] : '' };
 }

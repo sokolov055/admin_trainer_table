@@ -36,7 +36,7 @@ const stubs = {
     });`,
   api: `
     const f = () => globalThis.__f;
-    export const apiPublic = async (action, p) => { f().calls.push(action + ':' + JSON.stringify(p)); if (!f().server) throw Object.assign(new Error('нет'), { code: 'not_found' }); return { session: f().server }; };
+    export const apiWait=()=>new Promise(()=>{}); export const apiPublic = async (action, p) => { f().calls.push(action + ':' + JSON.stringify(p)); if (!f().server) throw Object.assign(new Error('нет'), { code: 'not_found' }); return { session: f().server }; };
     export const apiMutate = async (action, p) => {
       if (f().saveFails) throw new Error('Нет связи');
       f().saved.push(p);

@@ -119,7 +119,7 @@ const output = await build({
 
       bundle.onLoad({ filter: /.*/, namespace: 'push-test' }, (args) => {
         if (args.path === 'api') return {
-          contents: `export const apiPublic = (action, params) => globalThis.__push.call(action, params);
+          contents: `export const apiWait=()=>new Promise(()=>{}); export const apiPublic = (action, params) => globalThis.__push.call(action, params);
             export const apiMutate = (action, params) => globalThis.__push.call(action, params);`,
         };
         if (args.path === 'session') return { contents: `export const describeDevice = () => 'Android · Chrome';` };

@@ -27,7 +27,7 @@ const output = await build({ entryPoints: ['src/trainer/HistoryMove.jsx'], bundl
   format: 'cjs', platform: 'node', external: ['react'],
   plugins: [{ name: 'test-api', setup(b) {
     b.onResolve({ filter: /\/(api|telegram)\.js$/ }, (args) => ({ path: args.path, namespace: 'test' }));
-    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiMutate=(...a)=>globalThis.__api(...a); export const apiPublic=apiMutate; export const haptic=()=>{};' }));
+    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiMutate=(...a)=>globalThis.__api(...a); export const apiWait=()=>new Promise(()=>{}); export const apiPublic=apiMutate; export const haptic=()=>{};' }));
   } }] });
 const mod = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0].text + '\n})')(createRequire(import.meta.url), mod, mod.exports);

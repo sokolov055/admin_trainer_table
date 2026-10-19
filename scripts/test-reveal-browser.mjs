@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
  * зона нижнего меню (--float-bottom), длинная страница вокруг.
  */
 
-const api = `export const apiMutate = (...a) => globalThis.__api(...a); export const apiPublic = apiMutate;
+const api = `export const apiMutate = (...a) => globalThis.__api(...a); export const apiWait=()=>new Promise(()=>{}); export const apiPublic = apiMutate;
 export const haptic = () => {};`;
 const entry = `
 import React from 'react';

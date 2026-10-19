@@ -382,8 +382,17 @@ export async function logout() {
   import('./native-widget.js').then((m) => m.forgetWidgets()).catch(() => {});
 }
 
+/**
+ * Долгий запрос — ждать изменения занятия (workout.wait, 19.10.2026):
+ * сервер держит его до ms, поэтому свой предел и без «тихого режима» —
+ * ответ «ничего нового» через 25 секунд не значит, что сервер пропал.
+ */
+export function apiWait(action, params = {}, ms = 25000) {
+  return request(action, { ...params, ms }, { wait: ms + 10000 });
+}
+
 /** read — только чтение: его можно повторить, не боясь задвоить (READ_FIRST_TIMEOUT_MS) */
-async function request(action, params, { read = false } = {}) {
+async function request(action, params, { read = false, wait = 0 } = {}) {
   if (import.meta.env.VITE_MOCK === '1') {
     const { mockApi } = await import('./mock.js');
     return mockApi(action, params);
@@ -409,9 +418,9 @@ async function request(action, params, { read = false } = {}) {
 
   const payload = { action, initData, appPlatform: platform(), ...(token ? { token } : {}), ...params };
 
-  const timeout = requestTimeout();
+  const timeout = wait || requestTimeout();
   // Тихий режим (сервер только что молчал) — одна короткая попытка, как раньше
-  const retry = read && Date.now() >= quietUntil;
+  const retry = !wait && read && Date.now() >= quietUntil;
   let body = await tryEndpoint(url, payload, retry ? READ_FIRST_TIMEOUT_MS : timeout);
   if (body === TIMED_OUT && retry) {
     body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS - READ_FIRST_TIMEOUT_MS);
@@ -430,12 +439,12 @@ async function request(action, params, { read = false } = {}) {
   const spare = fallbackApiUrl();
   const spareIsScript = /script\.google/.test(spare || '');
   const scriptWouldLie = spareIsScript && (JSON.stringify(params).includes('"familyRow"') || trainingAction(action, params));
-  if (body === null && spare && spare !== url && !scriptWouldLie) {
+  if (body === null && spare && spare !== url && !scriptWouldLie && !wait) {
     body = await tryEndpoint(spare, payload, timeout);
   }
   if (body === TIMED_OUT) body = null;
   // Не дозвались — пару минут ждём коротко; дозвались — как обычно
-  quietUntil = body === null ? Date.now() + QUIET_FOR_MS : 0;
+  if (!wait || body !== null) quietUntil = body === null ? Date.now() + QUIET_FOR_MS : 0;
 
   if (body === null) {
     throw new ApiError('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);

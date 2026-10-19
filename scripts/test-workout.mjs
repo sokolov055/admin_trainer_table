@@ -73,7 +73,7 @@ const output = await build({ entryPoints: ['src/Workout.jsx'], bundle: true, wri
   loader: { '.png': 'dataurl' },
   plugins: [{ name: 'test-api', setup(b) {
     b.onResolve({ filter: /\/(api|telegram|session)\.js$/ }, args => ({ path: args.path, namespace: 'test' }));
-    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const apiFresh=async(...a)=>({data:await globalThis.__workoutApi(...a),offline:false,at:0}); export const apiStoredAt=()=>0; export const apiStale=()=>({data:{exercises:[]},stale:false,promise:Promise.resolve({exercises:[]})}); export const onMutated=()=>()=>{}; export const getInitData=()=>""; export const getToken=()=>"demo"; export const haptic=()=>{}; export const apiPrimary=apiPublic; export const logout=()=>{}; export const environmentInfo=()=>({}); export const hasToken=()=>true; export const describeDevice=()=>"";' }));
+    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiWait=(...a)=>globalThis.__workoutWait?globalThis.__workoutWait(...a):new Promise(()=>{}); export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const apiFresh=async(...a)=>({data:await globalThis.__workoutApi(...a),offline:false,at:0}); export const apiStoredAt=()=>0; export const apiStale=()=>({data:{exercises:[]},stale:false,promise:Promise.resolve({exercises:[]})}); export const onMutated=()=>()=>{}; export const getInitData=()=>""; export const getToken=()=>"demo"; export const haptic=()=>{}; export const apiPrimary=apiPublic; export const logout=()=>{}; export const environmentInfo=()=>({}); export const hasToken=()=>true; export const describeDevice=()=>"";' }));
     b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
   } }] });
 const module = { exports: {} };
@@ -1243,5 +1243,65 @@ test('клиент не меняет ни названия, ни состава 
     assert.equal(local.root.findAll(n => n.type === 'span' && /· Р$/.test(text(n))).length, 2, 'оба помечены «Р»');
   } finally {
     if (local) local.unmount();
+  }
+});
+
+test('19.10.2026: чужая отметка приходит сама — экран ждёт изменений (workout.wait), не дожидаясь возврата', async () => {
+  data.clear();
+  const asked = [];
+  let release;
+  globalThis.__workoutWait = (action, params) => {
+    asked.push(params.revision);
+    return new Promise(resolve => { release = resolve; });
+  };
+  try {
+    await mount();
+    await saveNow();
+    await act(async () => { await new Promise(r => setTimeout(r, 1300)); });
+    assert.ok(asked.length >= 1, 'экран ждёт изменений');
+    assert.equal(asked[asked.length - 1], 1, 'с версией, которая у него есть');
+
+    const key = 'workout_demo_server:3';
+    const stored = JSON.parse(data.get(key));
+    const remote = JSON.parse(JSON.stringify(stored[stored.length - 1]));
+    remote.exercises[0].sets[0].weight = '77';
+    remote.exercises[0].sets[0].state = 'done';
+    remote.revision += 1;
+    await act(async () => { release({ session: remote }); await delay(); });
+    const weight = tree.root.findAll(n => n.type === 'input' && typeof n.props['aria-label'] === 'string'
+      && n.props['aria-label'].includes('подход 1, вес в кг'))[0];
+    assert.equal(weight.props.value, '77', 'отметка с другого устройства на экране');
+  } finally {
+    globalThis.__workoutWait = null;
+    if (release) release({ same: true });
+  }
+});
+
+test('19.10.2026: сервер влил занятие в идущее (начали без связи, клиент вёл своё) — экран ведёт идущее', async () => {
+  data.clear();
+  await mount();
+  await saveNow();
+  const key = 'workout_demo_server:3';
+  const stored = JSON.parse(data.get(key));
+  const own = stored[stored.length - 1];
+  const twin = { ...JSON.parse(JSON.stringify(own)), id: 'twin-session-0001', title: 'Тренировка клиента', revision: 7 };
+  twin.exercises[0].sets[0].state = 'done';
+  const real = globalThis.__workoutApi;
+  globalThis.__workoutApi = async (action, params) => {
+    if (action === 'workout.save' && params.session.id === own.id) return { session: twin, absorbed: own.id };
+    if (action === 'workout.get' && params.id === twin.id) return { session: twin };
+    return real(action, params);
+  };
+  try {
+    const weightInput = () => tree.root.findAll(n => n.type === 'input' && typeof n.props['aria-label'] === 'string'
+      && n.props['aria-label'].includes('подход 1, вес в кг'))[0];
+    await act(async () => { weightInput().props.onChange({ target: { value: '41' } }); await delay(); });
+    await saveNow();
+    assert.ok(text(tree.root.findByType('h2')).includes('Тренировка клиента'), 'на экране идущее занятие');
+    assert.ok(!tree.root.findAll(n => n.props && n.props.role === 'alert').some(n => text(n).includes('Уже есть текущее занятие')), 'без выбора версии');
+    const draft = Object.entries(Object.fromEntries(data)).find(([k, v]) => k.startsWith('workout_draft') && v.includes('twin-session-0001'));
+    assert.ok(draft, 'черновик — идущего занятия');
+  } finally {
+    globalThis.__workoutApi = real;
   }
 });
