@@ -4108,7 +4108,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   .manage__body { animation: none; }
   .manage__chevron, .manage__row { transition: none; }
 }
-}
 
 /* Выбор показателя в «Прогрессе» — между итогом и графиком */
 .progress__fields { margin-top: var(--space-4); }
