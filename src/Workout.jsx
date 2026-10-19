@@ -7,7 +7,7 @@ import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWor
 import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup } from './workout-model.js';
+import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, editSetField } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
@@ -37,7 +37,7 @@ function machineHasDetails(m) {
 import { useData } from './useData.js';
 import { SetupText, SetupMistakes, setupParts, MachineInfo, MachineNote, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
-import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, otherMachineText, wasSet, scaleTo } from './effort.js';
+import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, otherMachineText, wasSet } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
@@ -719,33 +719,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const fields = rowFields(track);
     // Свой вес — подсказка «подобрано» больше не нужна, и оценки этот
     // подход больше не двигают (own)
-    const edit = (key, value) => updateExercise(ei, x => {
-      const sets = x.sets.map((s, k) => {
-        if (k !== si) return s;
-        const { suggest, ...rest } = s;
-        const next = { ...rest, [key]: value, ...(key !== 'weight' && suggest ? { suggest } : {}), ...(key === 'weight' ? { own: true } : {}) };
-        // Повторы поменяли — вес этого подхода пересчитать от прошлого раза
-        // (тот же подход, его вес и повторы), если вес не вписан руками
-        const was = key === 'reps' && !s.own && wasSet(x, si);
-        if (was && Number(value) > 0 && Number(was.reps) > 0) {
-          const w = scaleTo(x, Number(String(was.weight).replace(',', '.')), Number(was.reps), Number(value));
-          if (w > 0) next.weight = String(Math.round(w * 100) / 100);
-        }
-        return next;
-      });
-      // Вписали вес — следующим подходам без прошлого раза тот же вес
-      // (владелец, 03.10.2026): у них нет своей истории
-      if (key === 'weight') {
-        const old = x.sets[si].weight || '';
-        for (let k = si + 1; k < sets.length; k += 1) {
-          const s = sets[k];
-          if ((s.who || '') !== (x.sets[si].who || '') || s.state !== 'pending' || s.own || wasSet(x, k)) continue;
-          if (s.weight && s.weight !== old) break;
-          sets[k] = { ...s, weight: value };
-        }
-      }
-      return { ...x, sets };
-    });
+    // Вписанный вес — свой; следующим рабочим без прошлого раза тот же, но
+    // не из разминки (FT-620); повторы — пересчёт от прошлого раза
+    // (workout-model.js, editSetField)
+    const edit = (key, value) => updateExercise(ei, x => editSetField(x, si, key, value));
     const was = set.state === 'pending' && wasSet(ex, si);
     const drops = set.drops || [];
     const editDrop = (di, key, value) => updateSet(ei, si, s => ({ ...s, drops: s.drops.map((d, i) => (i === di ? { ...d, [key]: value } : d)) }));
@@ -792,13 +769,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 }} />
                 на сторону
               </label>}
-              {was && <span className="workout__was">было {was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
+              {was && <span className="workout__was">было {was.assist !== undefined ? 'помощь ' + was.assist : was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
             </div>}
             {/* Галочки нет (03.10.2026): под ближайшим подходом упражнения —
                 «Легко / Норм / Тяжело», каждая отмечает подход и запускает
                 отдых. Снять отметку — номер подхода → «Снять отметку» */}
             {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
-              const lack = missing(set, track);
+              // Разминку можно и без веса: свой вес, без нагрузки (FT-620)
+              const lack = missing(set, track, { requireWeight: set.kind !== 'warmup' });
               if (lack) { setMessage(lack); return; }
               updateExercise(ei, x => rateSet(x, si, effort).ex);
               // Последний подход занятия — без отдыха, сразу «Завершить?»
@@ -807,12 +785,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               // время пошло. Длительность — по оценке и по тому, прибавили
               // ли вес (effort.js)
               if (restAfter) startRest(restFor(effort, restBase(), rateSet(ex, si, effort).raised));
-            }, current)}
+            }, current, set.kind === 'warmup')}
             {set.state === 'pending' && set.suggest && (() => {
               // Только у ближайшего: сразу за отмеченным подходом того же человека
               const prev = ex.sets.slice(0, si).filter(x => (x.who || '') === (set.who || '')).pop();
               if (!prev || prev.state !== 'done') return null;
-              const t = suggestText(set, prev);
+              const t = suggestText(set, prev, ex);
               return t ? <p className={'workout__suggest workout__suggest--' + set.suggest}><IconDelta value={t.startsWith('+') ? 1 : -1} />{t}</p> : null;
             })()}
             {/* Дропсет: сбросы идут сразу за подходом, без отдыха, — поэтому
@@ -962,16 +940,21 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * Выбор оценки подхода (круга): три кнопки, каждая отмечает и запускает
    * отдых — короче после «Легко», дольше после «Тяжело» (effort.js)
    */
-  const effortChooser = (onPick, current = true) => (
+  const effortChooser = (onPick, current = true, warmup = false) => (
     <>
       <div className={'workout__effort' + (current ? '' : ' workout__effort--quiet')} role="group" aria-label="Подход сделан — как прошло?">
-        {EFFORTS.map(e => (
+        {/* Разминка (FT-620): оценка ничего не решает — вес она не двигает, —
+            поэтому одна кнопка «Готово», без «Легко / Норм / Тяжело» */}
+        {warmup
+          ? <button type="button" className="workout__effort-btn workout__effort-btn--ok workout__effort-btn--warmup"
+            onClick={() => { haptic(); unlockAlarm(); onPick(''); }}>Готово</button>
+          : EFFORTS.map(e => (
           <button type="button" key={e.key} className={'workout__effort-btn workout__effort-btn--' + e.key}
             onClick={() => { haptic(); unlockAlarm(); onPick(e.key); }}>{e.label}</button>
         ))}
       </div>
       {/* Что значат кнопки — под текущими, пока в занятии нет ни одной оценки */}
-      {current && !rated() && <p className="workout__effort-hint">{EFFORT_HINT}</p>}
+      {current && !warmup && !rated() && <p className="workout__effort-hint">{EFFORT_HINT}</p>}
     </>
   );
 

@@ -106,6 +106,9 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const [brand, setBrand] = useState(machine?.brand || '');
   const [muscleGroups, setMuscleGroups] = useState(machine?.muscleGroups || []);
   const [setupOk, setSetupOk] = useState(machine?.setupOk !== false && !!machine?.setup);
+  // Шаг веса тренажёра, кг (FT-626): «Легко» прибавляет столько, пересчёт
+  // округляет до него; пусто — шаг по группе мышц, как раньше
+  const [weightStep, setWeightStep] = useState(machine?.weightStep ? String(machine.weightStep).replace('.', ',') : '');
   // Тренажёр или оборудование (владелец, 09.10.2026)
   const [kind, setKind] = useState(machine && machine.kind === 'equipment' ? 'equipment' : 'machine');
   // Фото несколько (09.10.2026): уже сохранённые — убранные удаляются только
@@ -142,7 +145,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     let result = null;
     try {
       const r = await apiMutate(exercise ? 'library.exercise.machine.save' : 'library.machine.save', {
-        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind, originalName, brand, muscleGroups, setupOk,
+        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind, originalName, brand, muscleGroups, setupOk, weightStep,
         ...(dropped.length ? { removePhotoUrls: dropped } : {}),
       });
       result = exercise ? r.exercise : r.machine;
@@ -195,6 +198,12 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       </label>
       <label className="field"><span className="field__label">Оригинальное название модели</span><input className="field__input" value={originalName} maxLength={120} onChange={(e) => setOriginalName(e.target.value)} /></label>
       <label className="field"><span className="field__label">Производитель / бренд</span><input className="field__input" value={brand} maxLength={120} onChange={(e) => setBrand(e.target.value)} /></label>
+      {kind === 'machine' && <label className="field">
+        <span className="field__label">Шаг веса, кг</span>
+        <input className="field__input" inputMode="decimal" value={weightStep} maxLength={5} placeholder="например, 5"
+          onChange={(e) => setWeightStep(e.target.value.replace(/[^\d.,]/g, ''))} />
+        <span className="small muted">Сколько весит одна плитка. На столько приложение прибавляет вес после «Легко» и до него округляет. Пусто — по группе мышц.</span>
+      </label>}
       <fieldset className="field"><legend className="field__label">Мышечные группы</legend>
         {['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Предплечье', 'Пресс', 'Всё тело', 'Кардио'].map((g) => <label className="library__check" key={g}><input type="checkbox" checked={muscleGroups.includes(g)} onChange={(e) => setMuscleGroups(e.target.checked ? [...muscleGroups, g] : muscleGroups.filter((x) => x !== g))} />{g}</label>)}
       </fieldset>

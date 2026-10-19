@@ -193,8 +193,9 @@ export function setQueue(s) {
       ...(strength ? { weight: String(set.weight || '').trim() } : {}),
       // Для оценки на часах: шаг колёсика (гантели — 1 кг), шаг прибавки и
       // почему у подхода такой вес
-      ...(strength ? { dumbbell: isDumbbell(ex), step: stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}),
-      ...(strength && suggestText(set, prevOf(ex, set)) ? { suggest: suggestText(set, prevOf(ex, set)) } : {}),
+      // У разминки шага нет: «Легко» на ней вес не прибавляет (FT-620)
+      ...(strength ? { dumbbell: isDumbbell(ex), ...(set.kind !== 'warmup' ? { step: stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}) } : {}),
+      ...(strength && suggestText(set, prevOf(ex, set), ex) ? { suggest: suggestText(set, prevOf(ex, set), ex) } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
       amount: strength ? '' : setText(set, ex),
       exerciseDone: n - 1,

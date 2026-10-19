@@ -924,6 +924,7 @@ function Machines() {
         </div>
         {machine.originalName && <p className="small">Модель: {machine.originalName}</p>}
         {machine.brand && <p className="small">Производитель: {machine.brand}</p>}
+        {machine.weightStep > 0 && <p className="small">Шаг веса: {String(machine.weightStep).replace('.', ',')} кг</p>}
         {machine.muscleGroups?.length > 0 && <p className="small">Мышцы: {machine.muscleGroups.join(', ')}</p>}
         <MachinePhoto machine={machine} />
         {machine.setup

@@ -618,6 +618,8 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__effort-btn:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
 .workout__effort-btn--easy { --c: var(--easy); }
 .workout__effort-btn--hard { --c: var(--hard); }
+/* Разминка (FT-620): одна кнопка «Готово» на всю ширину, спокойнее рабочих */
+.workout__effort-btn--warmup { grid-column: 1 / -1; background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--c); }
 .workout__effort--quiet .workout__effort-btn { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--c); }
 .workout__effort-hint { margin: 0 0 var(--space-2); font-size: 13px; line-height: 1.35; color: var(--text-muted); }
 .workout__effort-next { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-muted); }

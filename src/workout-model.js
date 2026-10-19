@@ -1,4 +1,5 @@
 import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf, planOneSide, missing } from './exercise-track.js';
+import { wasSet, scaleTo, isAssisted } from './effort.js';
 
 export const uid = () => crypto.randomUUID();
 export const blankSet = () => ({ weight: '', reps: '', rpe: '', state: 'pending', kind: 'work' });
@@ -24,7 +25,7 @@ export function fromPlan(block, month, members = []) {
       ...(e.exerciseId ? { exerciseId: e.exerciseId } : {}),
       // Тренажёр, на котором делали в прошлый раз (FT-478): вес — по нему.
       // У пары у каждого свой тренажёр и свой вес на нём (FT-488)
-      ...(e.machine && !split ? { machine: { uid: e.machine.uid, name: e.machine.name || '' } } : {}),
+      ...(e.machine && !split ? { machine: { uid: e.machine.uid, name: e.machine.name || '', ...(e.machine.step > 0 ? { step: e.machine.step } : {}) } } : {}),
       ...(split && e.splitMachines ? { machines: pairMachines(e.splitMachines, doersOf(e, members)) } : {}),
       // Тип учёта — что записывать в подходе; снимок, в занятии правится
       // только для этого занятия
@@ -81,8 +82,13 @@ export function fromPlan(block, month, members = []) {
  */
 export function withMachine(ex, machine, history = null) {
   const out = { ...ex };
-  if (machine) out.machine = { uid: machine.uid, name: machine.name || '' };
+  // Шаг тренажёра (FT-626): у сервера он в machine.step ответа истории
+  const step = Number((history && history.machine && history.machine.step) || (machine && machine.step)) || 0;
+  if (machine) out.machine = { uid: machine.uid, name: machine.name || '', ...(step > 0 ? { step } : {}) };
   else delete out.machine;
+  const { step: _, ...load } = ex.load || {};
+  if (step > 0) out.load = { ...load, step };
+  else if (ex.load) out.load = load;
   if (!history || (ex.sets || []).some((s) => s.who) || trackOf(ex).kind === 'cardio') return out;
 
   out.prevWeight = String(history.lastWeight || '');
@@ -90,14 +96,24 @@ export function withMachine(ex, machine, history = null) {
   else delete out.lastRun;
   if (history.otherRun) out.otherRun = history.otherRun;
   else delete out.otherRun;
+  // Вес помощи (FT-628) — двигается помощь
+  const key = trackOf(ex).weightMode === 'assistance' ? 'assist' : 'weight';
   const starts = (history.startSets || []).filter((s) => s.kind !== 'warmup');
+  const warms = (history.startSets || []).filter((s) => s.kind === 'warmup');
+  // Прошлый раз теперь другой — подходы заново связываются с его подходами
+  // (FT-621): k-й рабочий с k-м рабочим, k-я разминка с k-й разминкой
+  const link = (s, from) => {
+    const { was: _was, ...rest } = s;
+    return from && Number.isInteger(from.was) ? { ...rest, was: from.was } : rest;
+  };
   let work = -1;
+  let warm = -1;
   out.sets = ex.sets.map((s) => {
-    if (s.kind === 'warmup') return s;
+    if (s.kind === 'warmup') { warm += 1; return link(s, warms[warm]); }
     work += 1;
-    if (s.state !== 'pending') return s;
+    if (s.state !== 'pending') return link(s, null);
     const from = starts[Math.min(work, starts.length - 1)];
-    return { ...s, weight: String((from && from.weight) || history.lastWeight || '') };
+    return link({ ...s, [key]: String((from && from[key]) || (key === 'weight' ? history.lastWeight : '') || '') }, work < starts.length ? from : null);
   });
   return out;
 }
@@ -260,7 +276,13 @@ function prescription(e) {
 /** Подходы как в последний раз у клиента (startSets с сервера); нет — null */
 function startSets(e) {
   if (!Array.isArray(e.startSets) || !e.startSets.length || trackOf(e).kind === 'cardio') return null;
-  return e.startSets.slice(0, 20).map(s => ({ ...blankSet(), weight: String(s.weight || ''), reps: String(s.reps || ''), kind: s.kind === 'warmup' ? 'warmup' : 'work' }));
+  return e.startSets.slice(0, 20).map(s => ({
+    ...blankSet(), weight: String(s.weight || ''), reps: String(s.reps || ''), kind: s.kind === 'warmup' ? 'warmup' : 'work',
+    // Вес помощи (FT-628) и какой это подход прошлого раза (FT-621): «было»
+    // не сдвигается от добавленной разминки или удалённого подхода
+    ...(s.assist !== undefined ? { assist: String(s.assist) } : {}),
+    ...(Number.isInteger(s.was) ? { was: s.was } : {}),
+  }));
 }
 
 /** Для оценок подходов: шаг веса (группа, снаряд), план повторов, прошлый раз */
@@ -277,9 +299,16 @@ function pairMachines(all, doers) {
 
 function extrasOf(e, split) {
   return {
-    ...(e.exercise && (e.exercise.muscle || e.exercise.equipment)
-      ? { load: { muscle: e.exercise.muscle || '', equipment: e.exercise.equipment || '' } } : {}),
+    ...((e.exercise && (e.exercise.muscle || e.exercise.equipment)) || (!split && e.machine && e.machine.step > 0)
+      ? { load: {
+        muscle: (e.exercise && e.exercise.muscle) || '', equipment: (e.exercise && e.exercise.equipment) || '',
+        // Шаг тренажёра (FT-626): прибавки по его плиткам
+        ...(!split && e.machine && e.machine.step > 0 ? { step: e.machine.step } : {}),
+      } } : {}),
     ...(/^\d{1,3}/.test(String(e.reps || '')) ? { target: String(e.reps).match(/^\d{1,3}/)[0] } : {}),
+    // План повторов целиком, «8–12» (FT-624): по нему следующий раз отличит
+    // смену схемы тренером от недобора
+    ...(/^\d{1,3}(\s*[-–—]\s*\d{1,3})?$/.test(String(e.reps || '').trim()) ? { planReps: String(e.reps).trim() } : {}),
     ...(!split && e.lastRun ? { lastRun: e.lastRun } : {}),
     // На этом тренажёре ещё не делали — что было на прежнем (16.10.2026)
     ...(!split && e.otherRun ? { otherRun: e.otherRun } : {}),
@@ -324,7 +353,7 @@ export function withWarmup(ex) {
   if (ex.sets.length >= 20 || ex.sets.some(x => x.who)) return ex;
   const found = ex.sets.findIndex(x => x.kind !== 'warmup');
   const at = found < 0 ? ex.sets.length : found;
-  const { effort, suggest, raised, own, drops, closed, ...source } = ex.sets[at] || ex.sets[ex.sets.length - 1] || blankSet();
+  const { effort, suggest, raised, own, drops, closed, was, ...source } = ex.sets[at] || ex.sets[ex.sets.length - 1] || blankSet();
   const set = { ...source, weight: warmupWeight(source.weight), state: 'pending', kind: 'warmup' };
   return { ...ex, sets: [...ex.sets.slice(0, at), set, ...ex.sets.slice(at)] };
 }
@@ -344,6 +373,45 @@ export function newExercise(session) {
 /** Подход в конец с часов тренера (FT-533) — как последний, неотмеченный */
 export function withSet(ex) {
   if (ex.sets.length >= 20 || ex.sets.some(x => x.who)) return ex;
-  const { effort, suggest, raised, closed, ...last } = ex.sets[ex.sets.length - 1] || blankSet();
+  const { effort, suggest, raised, closed, was, ...last } = ex.sets[ex.sets.length - 1] || blankSet();
   return { ...ex, sets: [...ex.sets, { ...last, state: 'pending', kind: 'work' }] };
+}
+
+/**
+ * Правка поля подхода si в занятии (из Workout.jsx, чтобы проверять тестом).
+ *
+ * Вписали вес (у веса помощи — помощь) — он свой (own): оценки этот подход
+ * больше не двигают. Следующим рабочим подходам без прошлого раза — тот же
+ * вес (владелец, 03.10.2026): у них нет своей истории. Но не из разминки и
+ * не в разминку (FT-620, 19.10.2026): разминку делают с пустым грифом или
+ * без веса — это не рабочий вес остальных подходов.
+ *
+ * Поменяли повторы — вес этого подхода пересчитать от прошлого раза (тот же
+ * подход, его вес и повторы), если вес не вписан руками.
+ */
+export function editSetField(ex, si, key, value) {
+  const valueKey = isAssisted(ex) ? 'assist' : 'weight';
+  const source = ex.sets[si];
+  const sets = ex.sets.map((s, k) => {
+    if (k !== si) return s;
+    const { suggest, ...rest } = s;
+    const mine = key === valueKey;
+    const next = { ...rest, [key]: value, ...(!mine && suggest ? { suggest } : {}), ...(mine ? { own: true } : {}) };
+    const was = key === 'reps' && valueKey === 'weight' && !s.own && wasSet(ex, si);
+    if (was && was.weight && Number(value) > 0 && Number(was.reps) > 0) {
+      const w = scaleTo(ex, Number(String(was.weight).replace(',', '.')), Number(was.reps), Number(value));
+      if (w > 0) next.weight = String(Math.round(w * 100) / 100);
+    }
+    return next;
+  });
+  if (key === valueKey && source.kind !== 'warmup') {
+    const old = source[valueKey] || '';
+    for (let k = si + 1; k < sets.length; k += 1) {
+      const s = sets[k];
+      if ((s.who || '') !== (source.who || '') || s.kind === 'warmup' || s.state !== 'pending' || s.own || wasSet(ex, k)) continue;
+      if (s[valueKey] && s[valueKey] !== old) break;
+      sets[k] = { ...s, [valueKey]: value };
+    }
+  }
+  return { ...ex, sets };
 }

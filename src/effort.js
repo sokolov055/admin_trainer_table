@@ -40,8 +40,16 @@
  * упражнении, сдвинутые по оценкам; считает сервер (server/src/lib/
  * effort.js, startPlan), здесь — только подсказка lastRunText.
  *
- * Шаг веса (stepOf) — по группе мышц и снаряду из базы, без них — по
- * названию:
+ * Шаг тренажёра из каталога (load.step, FT-626) важнее всего: плитки по 5 —
+ * шаг 5. Вес помощи (гравитрон, FT-628): двигается помощь, в обратную
+ * сторону — «легко» убирает помощь.
+ *
+ * Общая с сервером часть (stepOf, scaleTo, wasIndex, wasSet, rateSet,
+ * suggestText) — копия server/src/lib/effort.js; одни и те же примеры
+ * проверяют обе копии: scripts/fixtures/effort-cases.json (FT-629).
+ *
+ * Шаг веса (stepOf) без тренажёра — по группе мышц и снаряду из базы, без
+ * них — по названию:
  *   ноги, ягодицы: базовые (присед, жим ногами, тяги, выпады, мост) — 10 кг,
  *                  изолирующие (разгибания, сгибания, отведения) — 5 кг;
  *   спина: 5 кг, изолирующие (пуловер, гиперэкстензия) — 2,5 кг;
@@ -62,15 +70,8 @@ export const EFFORT_WORD = { easy: 'легко', ok: 'нормально', hard:
 export const EFFORT_HINT = 'Легко — мог ещё 3 повтора и больше, норм — 1–2 в запасе, тяжело — на пределе';
 
 /** Сколько прибавок веса за занятие на одно упражнение */
-export const MAX_RAISES = 2;
-
 const num = (v) => Number(String(v ?? '').replace(',', '.'));
-
-const text = (kg) => {
-  const r = Math.round(kg * 100) / 100;
-  return String(r).replace(/\.0+$/, '');
-};
-
+const text = (kg) => String(Math.round(kg * 100) / 100);
 const has = (s, words) => words.some((w) => s.includes(w));
 
 const LEGS = ['присед', 'жим ног', 'жим платформ', 'гакк', 'выпад', 'болгарск', 'становая', 'румынск', 'мост', 'hip thrust', 'зашагив', 'ног', 'носк', 'икр'];
@@ -79,7 +80,9 @@ const CHEST = ['лёжа', 'лежа', 'жим на наклон', 'жим в т
 const ISOLATION = ['разгибан', 'сгибан', 'отведен', 'приведен', 'мах', 'разводк', 'сведени', 'бицепс', 'трицепс', 'икр', 'носки', 'пуловер', 'гиперэкст', 'шраг', 'кроссовер'];
 const DUMBBELL = ['гантел', 'гир'];
 
-/** Группа мышц упражнения: из базы (ex.load.muscle), без неё — по названию */
+/** Шаг помощи, если у тренажёра свой не указан */
+export const ASSIST_STEP = 5;
+
 export function groupOf(ex) {
   const muscle = String((ex.load && ex.load.muscle) || '').toLowerCase();
   if (muscle) {
@@ -89,16 +92,21 @@ export function groupOf(ex) {
     return 'other';
   }
   const name = String(ex.name || '').toLowerCase();
-  // Ноги первыми: тяга бывает становой и румынской, «лёжа» — и сгибание ног
   if (has(name, LEGS) || has(name, ['мёртв', 'мертв'])) return 'legs';
-  // Спина раньше груди: «тяга блока к груди», «пуловер лёжа»
   if (has(name, BACK)) return 'back';
   if (has(name, CHEST)) return 'chest';
   return 'other';
 }
 
-/** Шаг веса для упражнения при текущем весе kg */
+/** Шаг тренажёра из каталога (FT-626): плитки по 5 — шаг 5; нет — 0 */
+export function machineStep(ex) {
+  const v = num(ex && ex.load && ex.load.step);
+  return v > 0 && v <= 50 ? v : 0;
+}
+
 export function stepOf(ex, kg) {
+  const own = machineStep(ex);
+  if (own) return own;
   const name = String(ex.name || '').toLowerCase();
   const equipment = String((ex.load && ex.load.equipment) || '').toLowerCase();
   const group = groupOf(ex);
@@ -108,46 +116,47 @@ export function stepOf(ex, kg) {
   else if (group === 'legs') step = isolation ? 5 : 10;
   else if (group === 'back') step = isolation ? 2.5 : 5;
   else step = 2.5;
-  // Лёгкий вес — шаг вдвое меньше: +10 к 30 кг — треть веса
   if (kg > 0 && kg < step * 4) step = Math.max(1, step / 2);
   return step;
 }
 
-/** Гантели и гири — на часах шаг колёсика 1 кг, остальное — 1,25 */
-export function isDumbbell(ex) {
-  const equipment = String((ex.load && ex.load.equipment) || '').toLowerCase();
-  return has(equipment, DUMBBELL) || has(String(ex.name || '').toLowerCase(), DUMBBELL);
+/** До чего округлять вес: шаг тренажёра, гантели — 1 кг, остальное — 2,5 */
+export function unitOf(ex) {
+  return machineStep(ex) || (isDumbbell(ex) ? 1 : 2.5);
+}
+
+/** Вес помощи (гравитрон): двигается помощь, а не вес (FT-628) */
+export function isAssisted(ex) {
+  return !!(ex && ex.track && ex.track.weightMode === 'assistance');
+}
+
+/** Шаг помощи: шаг тренажёра, нет — 5 кг */
+export function assistStep(ex) {
+  return machineStep(ex) || ASSIST_STEP;
 }
 
 /**
- * Вес на другое число повторов — по Эпли, вниз до 2,5 (гантели — до 1).
- * Копия server/src/lib/effort.js scaleTo
+ * Вес w на from повторов → на to повторов (формула Эпли), вниз до блина
+ * (unitOf)
  */
 export function scaleTo(ex, w, from, to) {
   if (!(w > 0) || !(from > 0) || !(to > 0) || from === to) return w;
   const one = w * (1 + Math.min(30, from) / 30);
   const raw = one / (1 + Math.min(30, to) / 30);
-  const unit = isDumbbell(ex) ? 1 : 2.5;
+  const unit = unitOf(ex);
   return Math.max(unit, Math.floor(raw / unit + 1e-9) * unit);
 }
 
-/**
- * Тот же по счёту подход в прошлый раз (lastRun с сервера): { weight, reps }
- * или null. У пары истории по подходам нет
- */
-export function wasSet(ex, si) {
-  const last = ex && ex.lastRun;
-  const set = ex && ex.sets && ex.sets[si];
-  if (!last || !set || set.who || !Array.isArray(last.weights)) return null;
-  const weight = String(last.weights[si] || '');
-  if (!weight || weight === '—') return null;
-  return { weight, reps: String((last.reps || [])[si] || '') };
-}
+const ASSIST_RE = /^\d+([.,]\d+)?$/;
 
-/** Повторов по плану: «8», «8–12» → нижняя граница; нет плана — 0 */
-export function targetOf(ex) {
-  const m = String(ex.target || '').match(/^(\d{1,3})/);
-  return m ? Number(m[1]) : 0;
+/**
+ * Чем меряем подход: обычное упражнение — весом, с помощью — помощью.
+ * load — «тяжесть» (больше — тяжелее): у помощи это минус помощь
+ */
+function measure(assist) {
+  return assist
+    ? { has: (s) => ASSIST_RE.test(String(s.assist ?? '').trim()), value: (s) => num(s.assist), load: (s) => -num(s.assist), key: 'assist' }
+    : { has: (s) => num(s.weight) > 0, value: (s) => num(s.weight), load: (s) => num(s.weight), key: 'weight' };
 }
 
 /** Отдых после подхода: тяжело — +30 с, легко без прибавки — −30 с */
@@ -169,63 +178,117 @@ export function roundRest(efforts, base, raised = false) {
   return base;
 }
 
-/** Вес подхода в прошлый раз (lastRun с сервера) по номеру: число или 0 */
-function wasKg(ex, i) {
+export const MAX_RAISES = 2;
+
+const EFFORT_SET = ['easy', 'ok', 'hard'];
+export const isEffort = (e) => EFFORT_SET.includes(e);
+
+/** Гантели и гири — на часах шаг колёсика 1 кг, остальное — 1,25 */
+export function isDumbbell(ex) {
+  const equipment = String((ex.load && ex.load.equipment) || '').toLowerCase();
+  return has(equipment, DUMBBELL) || has(String(ex.name || '').toLowerCase(), DUMBBELL);
+}
+
+export function targetOf(ex) {
+  const m = String(ex.target || '').match(/^(\d{1,3})/);
+  return m ? Number(m[1]) : 0;
+}
+
+const kindOf = (s) => (s && s.kind === 'warmup' ? 'warmup' : 'work');
+
+/**
+ * Какой подход прошлого раза (номер в lastRun) соответствует подходу si
+ * (FT-621). Подходы, пришедшие с прошлого раза, знают его сами (set.was):
+ * добавленная разминка или удалённый подход номера не сдвигают. Занятия,
+ * начатые до этого, — по счёту среди подходов того же вида (разминка с
+ * разминкой, рабочий с рабочим). Нет такого — −1
+ */
+export function wasIndex(ex, si) {
   const last = ex && ex.lastRun;
-  const set = ex && ex.sets && ex.sets[i];
-  if (!last || !set || set.who || !Array.isArray(last.weights)) return 0;
-  const w = num(last.weights[i]);
-  return w > 0 ? w : 0;
+  const set = ex && ex.sets && ex.sets[si];
+  if (!last || !set || set.who || !Array.isArray(last.weights)) return -1;
+  if (Number.isInteger(set.was)) return set.was >= 0 && set.was < last.weights.length ? set.was : -1;
+  if (ex.sets.some((s) => Number.isInteger(s.was))) return -1;
+  const kinds = Array.isArray(last.kinds) ? last.kinds : null;
+  if (!kinds) return si < last.weights.length ? si : -1;
+  const kind = kindOf(set);
+  const k = ex.sets.slice(0, si).filter((s) => !s.who && kindOf(s) === kind).length;
+  let n = -1;
+  for (let i = 0; i < kinds.length; i += 1) if (kinds[i] === kind && ++n === k) return i;
+  return -1;
+}
+
+/** Тот же подход в прошлый раз: { weight, reps, assist? } или null */
+export function wasSet(ex, si) {
+  const i = wasIndex(ex, si);
+  if (i < 0) return null;
+  const last = ex.lastRun;
+  if (isAssisted(ex) && Array.isArray(last.assist)) {
+    const assist = String(last.assist[i] || '');
+    return assist && assist !== '—' ? { weight: '', assist, reps: String((last.reps || [])[i] || '') } : null;
+  }
+  const weight = String(last.weights[i] || '');
+  if (!weight || weight === '—') return null;
+  return { weight, reps: String((last.reps || [])[i] || '') };
+}
+
+/** «Тяжесть» подхода прошлого раза по номеру: вес, у помощи — минус помощь; нет — null */
+function wasLoad(ex, i) {
+  const w = wasSet(ex, i);
+  if (!w) return null;
+  return w.assist !== undefined ? -num(w.assist) : num(w.weight) > 0 ? num(w.weight) : null;
 }
 
 /**
- * Подход si отмечен оценкой effort. Возвращает упражнение (у подхода —
- * оценка, у следующих подходов того же человека — новый вес с причиной в
- * suggest) и что сделано с весом: raised / lowered. Вес, вписанный
- * руками (own), и разминку не трогаем.
+ * Подход si отмечен оценкой effort: у подхода — оценка, у следующих
+ * подходов того же человека — новый вес (у помощи — помощь) с причиной в
+ * suggest. Вес, вписанный руками (own), и разминку не трогаем
  */
 export function rateSet(ex, si, effort) {
   const set = ex.sets[si];
-  // Вес помощи не является отягощением: прежнюю прибавку веса к нему не применяем.
-  if (ex.track?.weightMode === 'assistance') return { ex: { ...ex, sets: ex.sets.map((x, i) => i === si ? { ...x, state: 'done', effort } : x) }, raised: false, lowered: false };
+  const assist = isAssisted(ex);
+  const m = measure(assist);
   const who = set.who || '';
   const mine = (x) => (x.who || '') === who;
-  const cur = num(set.weight);
+  const cur = m.load(set);
   const work = set.kind !== 'warmup';
-  const own = ex.sets.filter((x) => mine(x) && x.kind !== 'warmup');
+  const own = ex.sets.filter((x) => mine(x) && x.kind !== 'warmup' && m.has(x));
   const before = ex.sets.slice(0, si).filter((x) => mine(x) && x.state === 'done' && x.kind !== 'warmup');
   const last = before[before.length - 1];
   const raises = before.filter((x) => x.raised).length;
-  // Самый тяжёлый подход упражнения — по нему решаем, прибавлять ли
-  const heaviest = cur > 0 && cur >= Math.max(0, ...own.map((x) => num(x.weight)).filter(Number.isFinite));
+  const heaviest = m.has(set) && cur >= Math.max(...own.map(m.load));
   let dir = 0;
   let suggest = '';
-  if (work && cur > 0) {
+  if (work && m.has(set)) {
     const target = targetOf(ex);
     const short = target > 0 && num(set.reps) > 0 && num(set.reps) < target;
     if (effort === 'easy' && heaviest && raises < MAX_RAISES) { dir = 1; suggest = 'easy'; }
     else if (effort === 'hard' && short) { dir = -1; suggest = 'short'; }
     else if (effort === 'hard' && last && last.effort === 'hard') { dir = -1; suggest = 'hard'; }
   }
+  const step = (load) => (assist ? assistStep(ex) : stepOf(ex, load));
   let changed = false;
   const sets = ex.sets.map((x, i) => {
     if (i === si) return { ...x, state: 'done', effort, ...(dir > 0 ? { raised: true } : {}) };
     if (!dir || i < si || !mine(x) || x.state !== 'pending' || x.kind === 'warmup' || x.own) return x;
-    const w = num(x.weight);
-    if (!(w > 0)) return x;
+    if (!m.has(x)) return x;
+    const w = m.load(x);
     // Отсчёт — от того, что сделано сейчас, а не от веса прошлой тренировки
     // (владелец, 16.10.2026): сделали 60 при прошлых 50·50·50 — следующим
     // 60 ± шаг, а не 50. Лесенка прошлого раза сохраняется: подход, который
     // был тяжелее на столько-то, тяжелее и теперь
-    const was = wasKg(ex, si);
-    const then = wasKg(ex, i);
+    const was = wasLoad(ex, si);
+    const then = wasLoad(ex, i);
     let base;
-    if (was > 0 && then >= was) base = cur + (then - was);
+    if (was !== null && then !== null && then >= was) base = cur + (then - was);
     // Нет истории — как было: не легче этого, лесенка ниже — своя
     else if (w >= cur) base = w;
     else return x;
+    const next = text(assist ? Math.max(0, -(base + dir * step(base))) : Math.max(0, base + dir * step(base)));
+    // Сдвигать некуда (помощь уже 0) — подход как был
+    if (num(next) === num(x[m.key])) return x;
     changed = true;
-    return { ...x, weight: text(Math.max(0, base + dir * stepOf(ex, base))), suggest };
+    return { ...x, [m.key]: next, suggest };
   });
   return { ex: { ...ex, sets }, raised: dir > 0 && changed, lowered: dir < 0 && changed };
 }
@@ -243,15 +306,18 @@ export function unrate(set) {
 
 const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело' };
 
-/** Подпись подобранного веса: «+2,5 кг · было легко» */
-export function suggestText(set, prev) {
+/** Подпись подобранного веса: «+2,5 кг · было легко»; у помощи — «−5 кг помощи · было легко» */
+export function suggestText(set, prev, ex = null) {
   if (!set.suggest || !prev) return '';
-  const b = num(set.weight);
-  const a = prev ? num(prev.weight) : 0;
-  if (!(a > 0) || !(b >= 0) || a === b) return '';
+  const assist = isAssisted(ex);
+  const key = assist ? 'assist' : 'weight';
+  const b = num(set[key]);
+  const a = num(prev[key]);
+  if (assist ? !(a >= 0 && String(prev.assist ?? '') !== '') : !(a > 0)) return '';
+  if (!(b >= 0) || a === b) return '';
   const diff = text(Math.abs(b - a)).replace('.', ',');
   // Без стрелки-символа: направление рисует значок (IconDelta, на часах — SF Symbol)
-  return (b > a ? '+' : '−') + diff + ' кг · ' + (WHY[set.suggest] || '');
+  return (b > a ? '+' : '−') + diff + (assist ? ' кг помощи · ' : ' кг · ') + (WHY[set.suggest] || '');
 }
 
 const plural = (n, one, few, many) => {
@@ -283,20 +349,35 @@ export function otherMachineText(other) {
 
 export function lastRunText(last) {
   if (!last || !Array.isArray(last.weights) || !last.weights.length) return '';
+  // Вес помощи (FT-628): «с помощью 30 · 30 кг», сдвиг — помощи
+  const assist = last.mode === 'assist' && Array.isArray(last.assist);
+  const values = assist ? last.assist : last.weights;
   const reps = Array.isArray(last.reps) ? last.reps : [];
   const same = reps.length && reps.every((r) => r && r === reps[0]);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(last.date || '') ? ' (' + last.date.slice(8, 10) + '.' + last.date.slice(5, 7) + ')' : '';
-  const what = same
-    ? last.weights.join(' · ') + ' кг на ' + reps[0] + ' ' + plural(Number(reps[0]), 'повтор', 'повтора', 'повторов')
-    : last.weights.map((w, i) => w + (reps[i] ? '×' + reps[i] : '')).join(' · ') + ' кг';
+  const what = (assist ? 'с помощью ' : '') + (same
+    ? values.join(' · ') + ' кг на ' + reps[0] + ' ' + plural(Number(reps[0]), 'повтор', 'повтора', 'повторов')
+    : values.map((w, i) => w + (reps[i] ? '×' + reps[i] : '')).join(' · ') + ' кг');
   const felt = last.effort ? ', вам было ' + EFFORT_WORD[last.effort] : '';
   const step = String(last.step || '').replace('.', ',');
+  // Помощь: «up» — меньше помощи, это прогресс
+  const kg = (sign) => (assist ? 'помощь ' + (sign > 0 ? '−' : '+') : sign > 0 ? '+' : '−') + step + ' кг';
+  const lo = parseInt(last.planReps, 10);
+  const weeks = Math.floor(Number(last.gap) / 7);
+  const up = {
+    streak: 'норм ' + last.streak + ' раза подряд — сегодня пробуем ' + kg(1),
+    // Верх диапазона (FT-625): прибавили вес — повторы снова с нижней границы
+    reps: 'повторы дошли до верха — сегодня ' + kg(1) + (lo ? ' и снова с ' + lo + ' ' + plural(lo, 'повтора', 'повторов', 'повторов') : ''),
+  }[last.reason] || (!last.reason && last.effort === 'ok' ? 'норм ' + last.streak + ' раза подряд — сегодня пробуем ' + kg(1) : 'сегодня ' + kg(1));
   const today = {
-    up: last.effort === 'ok' ? 'норм ' + last.streak + ' раза подряд — сегодня пробуем +' + step + ' кг' : 'сегодня +' + step + ' кг',
-    down: 'сегодня −' + step + ' кг',
+    up,
+    // Перерыв (FT-627): давно не делали — легче
+    down: last.reason === 'break'
+      ? 'с тех пор ' + (weeks > 0 ? weeks + ' ' + plural(weeks, 'неделя', 'недели', 'недель') : 'давно') + ' — сегодня ' + kg(-1) + ', втянуться'
+      : 'сегодня ' + kg(-1),
     same: 'сегодня так же',
     // Повторы другие — вес пересчитан в соотношении (сервер, scaleTo)
-    scaled: 'сегодня на ' + (last.planReps || '') + ' ' + plural(Number(last.planReps), 'повтор', 'повтора', 'повторов') + ', это примерно ' + String(last.scaled || '').replace('.', ',') + ' кг',
+    scaled: 'сегодня на ' + (lo || '') + ' ' + plural(lo, 'повтор', 'повтора', 'повторов') + ', это примерно ' + String(last.scaled || '').replace('.', ',') + ' кг',
   }[last.action] || '';
   return 'Последний раз' + date + ' вы делали ' + what + felt + (today ? ' — ' + today : '');
 }
