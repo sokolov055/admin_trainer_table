@@ -1305,3 +1305,42 @@ test('19.10.2026: сервер влил занятие в идущее (нача
     globalThis.__workoutApi = real;
   }
 });
+
+test('19.10.2026: нажали «Легко» вместо «Норм» — оценку можно поменять, прибавленный вес возвращается', async () => {
+  data.clear();
+  await mount();
+  const weightOf = n => tree.root.findAll(x => x.type === 'input' && typeof x.props['aria-label'] === 'string'
+    && x.props['aria-label'].includes(`подход ${n}, вес в кг`))[0].props.value;
+  const dots = () => tree.root.findAll(x => x.props && typeof x.props.className === 'string' && /workout__effort-dot--/.test(x.props.className) && x.type === 'span');
+
+  await click('Легко');
+  assert.equal(weightOf(1), '40');
+  assert.equal(weightOf(2), '50', '«Легко» прибавило вес следующему подходу (шаг приседа — 10)');
+  assert.equal(dots().length, 1);
+  assert.ok(/--easy/.test(dots()[0].props.className));
+
+  // Номер подхода → «Как прошло?»
+  const num = () => tree.root.findAll(x => x.type === 'button' && /подход 1: настройки/.test(x.props['aria-label'] || ''))[0];
+  await act(async () => { await num().props.onClick(); await delay(); });
+  const group = () => tree.root.findAll(x => x.props && x.props['aria-label'] === 'Как прошёл подход')[0];
+  assert.ok(group(), 'у отмеченного подхода есть выбор оценки');
+  const pressed = group().findAll(x => x.type === 'button').filter(b => b.props['aria-pressed']).map(b => text(b));
+  assert.deepEqual(pressed, ['Легко']);
+  const norm = group().findAll(x => x.type === 'button' && text(x) === 'Норм')[0];
+  await act(async () => { await norm.props.onClick(); await delay(); });
+
+  assert.equal(weightOf(2), '40', 'прибавка ушла вместе с прежней оценкой');
+  assert.ok(/--ok/.test(dots()[0].props.className), 'оценка стала «Норм»');
+  assert.ok(!group(), 'панель закрылась');
+
+  // Обратно «Легко» — прибавка снова есть; «Снять отметку» возвращает вес
+  await act(async () => { await num().props.onClick(); await delay(); });
+  const easy = group().findAll(x => x.type === 'button' && text(x) === 'Легко')[0];
+  await act(async () => { await easy.props.onClick(); await delay(); });
+  assert.equal(weightOf(2), '50');
+  await act(async () => { await num().props.onClick(); await delay(); });
+  const snap = tree.root.findAll(x => x.type === 'button' && text(x) === 'Снять отметку')[0];
+  await act(async () => { await snap.props.onClick(); await delay(); });
+  assert.equal(weightOf(2), '40');
+  assert.equal(dots().length, 0);
+});

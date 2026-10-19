@@ -621,6 +621,10 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Разминка (FT-620): одна кнопка «Готово» на всю ширину, спокойнее рабочих */
 .workout__effort-btn--warmup { grid-column: 1 / -1; background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--c); }
 .workout__effort--quiet .workout__effort-btn { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--c); }
+/* Поменять оценку отмеченного подхода: текущая залита, остальные — контуром */
+.workout__effort--quiet .workout__effort-btn--on { background: var(--c); color: #fff; box-shadow: none; }
+.workout__effort-fix { margin-bottom: var(--space-2); }
+.workout__effort-fix-title { margin: 0 0 var(--space-1); font-size: 13px; color: var(--muted, #6b6b6b); }
 .workout__effort-hint { margin: 0 0 var(--space-2); font-size: 13px; line-height: 1.35; color: var(--text-muted); }
 .workout__effort-next { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-muted); }
 .workout__effort-dot { --c: var(--accent); width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px; background: var(--c); }

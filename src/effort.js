@@ -268,6 +268,8 @@ export function rateSet(ex, si, effort) {
   }
   const step = (load) => (assist ? assistStep(ex) : stepOf(ex, load));
   let changed = false;
+  // Что сдвинула эта оценка — чтобы «не то нажал» вернуло веса (unrateAt)
+  const moved = [];
   const sets = ex.sets.map((x, i) => {
     if (i === si) return { ...x, state: 'done', effort, ...(dir > 0 ? { raised: true } : {}) };
     if (!dir || i < si || !mine(x) || x.state !== 'pending' || x.kind === 'warmup' || x.own) return x;
@@ -288,8 +290,10 @@ export function rateSet(ex, si, effort) {
     // Сдвигать некуда (помощь уже 0) — подход как был
     if (num(next) === num(x[m.key])) return x;
     changed = true;
+    moved.push({ i, key: m.key, from: String(x[m.key] ?? ''), to: next, suggest: x.suggest || '' });
     return { ...x, [m.key]: next, suggest };
   });
+  if (moved.length) sets[si] = { ...sets[si], moved };
   return { ex: { ...ex, sets }, raised: dir > 0 && changed, lowered: dir < 0 && changed };
 }
 
@@ -300,8 +304,30 @@ export function applyEffort(ex, si, effort) {
 
 /** Снять отметку: оценка и признак прибавки уходят вместе с ней */
 export function unrate(set) {
-  const { effort, raised, ...rest } = set;
+  const { effort, raised, moved, ...rest } = set;
   return { ...rest, state: 'pending' };
+}
+
+/**
+ * Снять отметку у подхода si упражнения и вернуть то, что сдвинула его
+ * оценка (19.10.2026): нажали «Легко» вместо «Норм» — следующим подходам
+ * прибавили вес, и «снять» оставляло прибавку. Вернуть можно подход, чей
+ * вес с тех пор не трогали руками: вписанный человеком остаётся.
+ */
+export function unrateAt(ex, si) {
+  const moved = (ex.sets[si] && ex.sets[si].moved) || [];
+  return { ...ex, sets: ex.sets.map((x, i) => {
+    if (i === si) return unrate(x);
+    const mv = moved.find((m) => m.i === i);
+    if (!mv || x.state !== 'pending' || x.own || String(x[mv.key] ?? '') !== mv.to) return x;
+    const { suggest, ...rest } = x;
+    return { ...rest, [mv.key]: mv.from, ...(mv.suggest ? { suggest: mv.suggest } : {}) };
+  }) };
+}
+
+/** Поменять оценку уже отмеченного подхода: прежняя снимается вместе с её сдвигом веса */
+export function rerate(ex, si, effort) {
+  return rateSet(unrateAt(ex, si), si, effort);
 }
 
 const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело' };

@@ -37,7 +37,7 @@ function machineHasDetails(m) {
 import { useData } from './useData.js';
 import { SetupText, SetupMistakes, setupParts, MachineInfo, MachineNote, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
-import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, otherMachineText, wasSet, repsGoalText, repsLeftText } from './effort.js';
+import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, lastRunText, otherMachineText, wasSet, repsGoalText, repsLeftText } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
@@ -865,12 +865,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 «Настройки круга» под кругом */}
             {set.state === 'skipped' && !inRound && openSet !== key && <p className="workout__skipped">Пропущен — нажмите номер, чтобы вернуть</p>}
             {!inRound && openSet === key && <div className="workout__set-options">
+              {/* Нажали не ту оценку — поменять: веса следующих подходов, которые сдвинула прежняя, возвращаются (19.10.2026) */}
+              {editable && set.state === 'done' && set.kind !== 'warmup' && effortFix(set.effort, (effort) => {
+                setOpenSet('');
+                updateExercise(ei, x => rerate(x, si, effort).ex);
+              })}
               {setExtras(ex, ei, si)}
               <div className="workout__toolbar">
                 <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
                 {setTools(ex, ei, si)}
                 {set.state === 'done'
-                  ? <button className="button" onClick={() => { setOpenSet(''); updateSet(ei, si, unrate); }}>Снять отметку</button>
+                  ? <button className="button" onClick={() => { setOpenSet(''); updateExercise(ei, x => unrateAt(x, si)); }}>Снять отметку</button>
                   : <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>}
               </div>
             </div>}
@@ -927,10 +932,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         if (restAfter) startRest(restFor(effort, restBase()));
       }, current)}
       {!inRound && openSet === key && <div className="workout__set-options">
+        {editable && set.state === 'done' && effortFix(set.effort, (effort) => { setOpenSet(''); updateSet(ei, si, x => ({ ...x, effort })); })}
         <div className="workout__toolbar">
           <label>Тип<select value={set.kind} onChange={e => updateSet(ei, si, s => ({ ...s, kind: e.target.value }))}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
           {set.state === 'done'
-            ? <button className="button" onClick={() => { setOpenSet(''); updateSet(ei, si, unrate); }}>Снять отметку</button>
+            ? <button className="button" onClick={() => { setOpenSet(''); updateExercise(ei, x => unrateAt(x, si)); }}>Снять отметку</button>
             : <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, state: s.state === 'skipped' ? 'pending' : 'skipped' }))}>{set.state === 'skipped' ? 'Вернуть' : 'Пропустить'}</button>}
         </div>
       </div>}
@@ -1005,6 +1011,23 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     </>
   );
 
+  /**
+   * «Как прошло?» у уже отмеченного подхода: поменять оценку, если нажали
+   * не ту. Текущая — залита, остальные — контуром. Отдых не перезапускается
+   */
+  const effortFix = (current, onPick) => (
+    <div className="workout__effort-fix">
+      <p className="workout__effort-fix-title">Как прошло? Нажали не то — поменяйте</p>
+      <div className="workout__effort workout__effort--quiet" role="group" aria-label="Как прошёл подход">
+        {EFFORTS.map(e => (
+          <button type="button" key={e.key} aria-pressed={current === e.key}
+            className={'workout__effort-btn workout__effort-btn--' + e.key + (current === e.key ? ' workout__effort-btn--on' : '')}
+            onClick={() => { if (current !== e.key) { haptic(); onPick(e.key); } }}>{e.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+
   /** Кардио: добавить метрику, которой нет в плане, — калории с экрана тренажёра, пульс с часов */
   const metricAdd = (ex, ei) => {
     const track = trackOf(ex);
@@ -1059,7 +1082,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const live = members.filter(({ ex: e }) => e.sets[r] && e.sets[r].state !== 'skipped');
     if (set.state === 'done') {
       if (live.every(({ ex: e }) => e.sets[r].state === 'done')) return null;
-      return <button type="button" className="workout__member-done" onClick={() => updateSet(ei, r, unrate)}>
+      return <button type="button" className="workout__member-done" onClick={() => updateExercise(ei, x => unrateAt(x, r))}>
         <span className={'workout__effort-dot workout__effort-dot--' + (set.effort || 'ok')} aria-hidden="true" />
         {(set.effort ? EFFORT_WORD[set.effort] : 'сделано')} · снять
       </button>;
@@ -1108,7 +1131,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const toggle = () => {
       setRoundLack(null);
       change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] && e.sets[r].state === 'done'
-        ? { ...e, sets: e.sets.map((x, i) => (i === r ? unrate(x) : x)) } : e)) }));
+        ? unrateAt(e, r) : e)) }));
     };
     return <>
       {done && <button type="button" className="button button--block workout__round-check workout__round-check--done" aria-pressed onClick={toggle}>

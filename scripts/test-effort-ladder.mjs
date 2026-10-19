@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rateSet } from '../src/effort.js';
+import { rateSet, rerate, unrateAt } from '../src/effort.js';
 
 /**
  * Подсказка веса отсчитывается от того, что сделано сейчас, а не от веса
@@ -56,4 +56,57 @@ test('вписанное руками не трогаем', () => {
   const ex = press([50, 50, 50]);
   ex.sets[1] = { ...ex.sets[1], own: true };
   assert.deepEqual(rate(ex, 0, 'easy', 60), ['60', '50', '62.5']);
+});
+
+/** «Нажал не то» (19.10.2026): оценку можно поменять, прибавка веса возвращается */
+const ws = (ex) => ex.sets.map((s) => s.weight);
+const states = (ex) => ex.sets.map((s) => s.state[0]).join('');
+
+test('«легко» нажали по ошибке → «норм»: веса следующих подходов вернулись', () => {
+  const ex = press([60, 60, 60]);
+  const easy = rateSet(ex, 0, 'easy').ex;
+  assert.deepEqual(ws(easy), ['60', '62.5', '62.5']);
+  const ok = rerate(easy, 0, 'ok').ex;
+  assert.deepEqual(ws(ok), ['60', '60', '60']);
+  assert.equal(ok.sets[0].effort, 'ok');
+  assert.equal(ok.sets[0].state, 'done');
+  assert.ok(!ok.sets[0].raised && !ok.sets[0].moved);
+  assert.ok(ok.sets.slice(1).every((s) => !s.suggest), 'подсказка «было легко» ушла');
+});
+
+test('«норм» → «легко»: прибавка появилась', () => {
+  const ok = rateSet(press([60, 60, 60]), 0, 'ok').ex;
+  assert.deepEqual(ws(ok), ['60', '60', '60']);
+  assert.deepEqual(ws(rerate(ok, 0, 'easy').ex), ['60', '62.5', '62.5']);
+});
+
+test('«снять отметку» возвращает прибавленный вес', () => {
+  const easy = rateSet(press([60, 60, 60]), 0, 'easy').ex;
+  const back = unrateAt(easy, 0);
+  assert.deepEqual(ws(back), ['60', '60', '60']);
+  assert.equal(states(back), 'ppp');
+  assert.ok(!back.sets[0].effort && !back.sets[0].moved);
+});
+
+test('вес, который человек успел поменять руками, при возврате не трогаем', () => {
+  const easy = rateSet(press([60, 60, 60]), 0, 'easy').ex;
+  const edited = { ...easy, sets: easy.sets.map((s, i) => (i === 1 ? { ...s, weight: '70' } : s)) };
+  assert.deepEqual(ws(unrateAt(edited, 0)), ['60', '70', '60']);
+});
+
+test('следующий подход уже сделан — его вес не возвращаем', () => {
+  const easy = rateSet(press([60, 60, 60]), 0, 'easy').ex;
+  const next = { ...easy, sets: easy.sets.map((s, i) => (i === 1 ? { ...s, state: 'done', effort: 'ok' } : s)) };
+  // Сделанный второй остаётся как есть, ещё не сделанный третий — возвращается
+  assert.deepEqual(ws(unrateAt(next, 0)), ['60', '62.5', '60']);
+});
+
+test('смена оценки у второго подхода не трогает первый', () => {
+  let ex = rateSet(press([60, 60, 60]), 0, 'ok').ex;
+  ex = rateSet(ex, 1, 'easy').ex;
+  assert.deepEqual(ws(ex), ['60', '60', '62.5']);
+  ex = rerate(ex, 1, 'hard').ex;
+  assert.equal(ex.sets[0].effort, 'ok');
+  assert.equal(ex.sets[1].effort, 'hard');
+  assert.deepEqual(ws(ex).slice(0, 2), ['60', '60']);
 });
