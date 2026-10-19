@@ -343,7 +343,9 @@ export async function apiPrimary(action, params = {}) {
 
   let body;
   try {
-    body = await postJson(url, payload, Date.now() < quietUntil ? QUIET_TIMEOUT_MS : PRIMARY_TIMEOUT_MS);
+    // Тоже по одному, пока соединение не открыто (throughLink): вход и
+    // проверка ссылки идут первыми — им и открывать
+    body = await throughLink(() => postJson(url, payload, Date.now() < quietUntil ? QUIET_TIMEOUT_MS : PRIMARY_TIMEOUT_MS), (b) => !!b);
   } catch (_) {
     // Частая причина — VPN: через него сервер нередко недоступен, а
     // приложение из кеша при этом открывается и выглядит сломанным.
@@ -421,9 +423,11 @@ async function request(action, params, { read = false, wait = 0 } = {}) {
   const timeout = wait || requestTimeout();
   // Тихий режим (сервер только что молчал) — одна короткая попытка, как раньше
   const retry = !wait && read && Date.now() >= quietUntil;
-  let body = await tryEndpoint(url, payload, retry ? READ_FIRST_TIMEOUT_MS : timeout);
+  // Долгий запрос не ведёт за собой остальных: иначе они ждали бы его 25 с
+  const lead = !wait;
+  let body = await tryEndpoint(url, payload, retry ? READ_FIRST_TIMEOUT_MS : timeout, lead);
   if (body === TIMED_OUT && retry) {
-    body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS - READ_FIRST_TIMEOUT_MS);
+    body = await tryEndpoint(url, payload, REQUEST_TIMEOUT_MS - READ_FIRST_TIMEOUT_MS, lead);
   }
 
   // Запасной адрес: основной не соединился — идём на запасной. С
@@ -440,7 +444,7 @@ async function request(action, params, { read = false, wait = 0 } = {}) {
   const spareIsScript = /script\.google/.test(spare || '');
   const scriptWouldLie = spareIsScript && (JSON.stringify(params).includes('"familyRow"') || trainingAction(action, params));
   if (body === null && spare && spare !== url && !scriptWouldLie && !wait) {
-    body = await tryEndpoint(spare, payload, timeout);
+    body = await tryEndpoint(spare, payload, timeout, lead);
   }
   if (body === TIMED_OUT) body = null;
   // Не дозвались — пару минут ждём коротко; дозвались — как обычно
@@ -476,11 +480,59 @@ async function request(action, params, { read = false, wait = 0 } = {}) {
 const TIMED_OUT = Symbol('timed-out');
 
 /**
+ * Одно рукопожатие за раз (FT-507, 20.10.2026).
+ *
+ * Захват на сервере с телефона на мобильном интернете: одиночное соединение
+ * проходит, а 5–6 соединений, открытых экраном разом (за доли секунды),
+ * «замерзают» посреди TLS-рукопожатия — и следующие минуту-две не проходит
+ * ни одно новое. Так ведёт себя фильтр оператора (ТСПУ) к подсетям
+ * хостингов: залп параллельных рукопожатий к одному домену для него — признак
+ * прокси. Сервер отвечает по HTTP/2, но браузер открывает несколько сокетов,
+ * пока первый ещё не договорился.
+ *
+ * Поэтому, пока соединение не подтверждено ответом, запросы идут по одному:
+ * первый открывает соединение, остальные ждут его и затем идут все сразу —
+ * по тому же соединению, без новых рукопожатий. Не ответил (обрыв, предел) —
+ * снова по одному: повторы иначе были бы тем же залпом.
+ *
+ * lead = false — запрос ждёт открывающего, но сам соединение не «ведёт»
+ * (workout.wait держится сервером до 25 с — остальные ждать его не должны).
+ */
+let linkOpen = false;
+let linkOpening = null;
+
+async function throughLink(fn, opened, lead = true) {
+  while (!linkOpen && linkOpening) {
+    try { await linkOpening; } catch (_) {}
+  }
+  if (linkOpen || !lead) {
+    const out = await fn();
+    if (!opened(out)) linkOpen = false;
+    return out;
+  }
+  linkOpening = (async () => {
+    try {
+      const out = await fn();
+      linkOpen = opened(out);
+      return out;
+    } finally {
+      linkOpening = null;
+    }
+  })();
+  return linkOpening;
+}
+
+/** Один адрес с очередью рукопожатий (throughLink) */
+function tryEndpoint(url, payload, timeoutMs, lead = true) {
+  return throughLink(() => tryEndpointNow(url, payload, timeoutMs), (body) => body !== null && body !== TIMED_OUT, lead);
+}
+
+/**
  * Один адрес: сначала POST, при сбое — GET. null, если не отозвался вовсе.
  * Не дождались ответа — GET не пробуем: запрос мог дойти до сервера, и
  * повтор записи (оплата, занятие) задвоил бы её.
  */
-async function tryEndpoint(url, payload, timeoutMs) {
+async function tryEndpointNow(url, payload, timeoutMs) {
   try {
     return await postJson(url, payload, timeoutMs);
   } catch (error) {
