@@ -49,11 +49,13 @@ export const rankOf = state => CAREER[Math.min(state.rank, CAREER.length - 1)];
 export const priceOf = (state, item) => Math.round(ITEMS[item].price * (1 + .2 * Math.min(state.rank, CAREER.length - 1)) / 10) * 10;
 export const rankComplete = state => GAMES.every(game => state.done[game]);
 
+const plural = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
+
 /** Цель задания простыми словами — одна строка для карточки и игры. */
 export function goalText(game, goal) {
   if (game === 'scooter') return `Проехать ${goal.metres.toLocaleString('ru-RU')} м в режиме «${{ easy: 'Разминка', medium: 'Час пик', extreme: 'Предел' }[goal.difficulty]}»`;
-  if (game === 'plank') return `${goal.streak} верных ответов подряд · ${['Все уровни', 'Новичок', 'Любитель', 'Продвинутый', 'Профи'][goal.level]}`;
-  return `Пройти главу ${goal.chapter} за ${goal.moves} ходов · ${goal.target.toLocaleString('ru-RU')} очков`;
+  if (game === 'plank') return `${goal.streak} ${plural(goal.streak, 'верный ответ', 'верных ответа', 'верных ответов')} подряд · ${['Все уровни', 'Новичок', 'Любитель', 'Продвинутый', 'Профи'][goal.level]}`;
+  return `Пройти главу ${goal.chapter} за ${goal.moves} ${plural(goal.moves, 'ход', 'хода', 'ходов')} · ${goal.target.toLocaleString('ru-RU')} очков`;
 }
 
 /** Выполнено ли задание: заезд — метры, планка — верные ответы подряд, три в ряд — победа в главе. */

@@ -32,17 +32,20 @@ export function createScooterSession() {
       await apiPrimary('scooter.leave'); run = null;
       session.profile = null; session.board = []; session.rankStatus = ''; session.notify();
     },
+    // Энергетик карьеры: действует на каждый заезд, пока игрок не вернётся в карьеру
+    boost: false,
     async start(difficulty = game.difficulty) {
       session.loading = true; session.notify();
       try {
         let seed = (Math.random() * 4294967296) >>> 0;
+        const boost = session.boost;
         run = null; session.rankStatus = '';
         if (session.profile?.enabled) {
-          run = await apiPrimary('scooter.start', { difficulty });
+          run = await apiPrimary('scooter.start', { difficulty, boost });
           if (run.rules !== RULES_VERSION) { run = null; throw new Error('Правила игры обновились. Закрой и заново открой приложение.'); }
           seed = run.seed;
         }
-        Object.assign(game, createGame(seed, difficulty));
+        Object.assign(game, createGame(seed, difficulty, boost));
       } finally { session.loading = false; session.notify(); }
     },
     async finish() {

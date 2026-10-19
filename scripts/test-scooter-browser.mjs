@@ -13,7 +13,7 @@ function Fixture({menu=true,rest=false,until=Infinity,now=Date.now(),allowed=tru
 }
 let joined=false;window.gameApi=async(action,params)=>{if(action==='scooter.join')joined=true;if(action==='scooter.leave')joined=false;
  if(action==='scooter.board')return {profile:{enabled:joined,alias:'Райдер ТЕСТ'},entries:[]};
- if(action==='scooter.start')return {id:'test',seed:563,rules:3};return {enabled:joined,alias:'Райдер ТЕСТ'};};
+ if(action==='scooter.start')return {id:'test',seed:563,rules:4};return {enabled:joined,alias:'Райдер ТЕСТ'};};
 const root=createRoot(document.getElementById('root'));window.show=props=>root.render(<ScooterSessionProvider><PlankSessionProvider><Fixture {...props}/></PlankSessionProvider></ScooterSessionProvider>);window.showIcons=()=>root.render(<div style={{padding:24,background:'#fffdf2',height:'100vh',color:'#173c34',fontFamily:'Manrope,sans-serif'}}><h2>Игры</h2><div style={{display:'flex',gap:18}}>{[[IconScooterGame,'Самокат'],[IconPlankGame,'Викторина'],[IconMatchGame,'Три в ряд']].map(([Icon,label])=><div key={label} style={{width:96,textAlign:'center',fontSize:12,fontWeight:800}}><Icon size={96}/><p>{label}</p></div>)}</div></div>);window.show({});`},
 plugins:[{name:'stubs',setup(b){
  b.onResolve({filter:/^\.\/api\.js$/},a=>a.importer.endsWith('scooter-session.js')?{path:a.path,namespace:'gameapi'}:undefined);

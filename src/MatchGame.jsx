@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useMatchSession } from './MatchSession.jsx';
 import { MATCH_TUNING, PIECES, POWER_NAMES, earnedStars, rowOf, colOf } from './match-model.js';
 import { chapterFor, chapterProgress } from './match-story.js';
@@ -7,6 +7,7 @@ import { restHere, onRestHere } from './rest-here.js';
 import { clock } from './workout-model.js';
 import { IconBack, IconGuide, IconClose, IconCheck } from './icons.jsx';
 import { useGameChrome, buzz, vibrationOn, setVibration } from './game-feel.js';
+import { useMission, MissionNote } from './CareerMission.jsx';
 import piecesUrl from './assets/match-pieces.png';
 import gymUrl from './assets/match-gym.png';
 import './match-game.css';
@@ -26,9 +27,19 @@ function Piece({ type, power, className = '' }) {
   </span>;
 }
 
-export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
+export default function MatchGame({ onClose, restLeft, restUntil = Infinity, career = false }) {
   const [state, session] = useMatchSession();
   const { game, mode, frame, selected, hint, busy, message, sound, serial } = state;
+  const { mission, outcome, report } = useMission('match', career);
+  const reported = useRef(null);
+  // Задание карьеры — своя глава и правила, протеин даёт +3 хода; без задания — обычная история
+  useLayoutEffect(() => {
+    session.mission(mission ? { ...mission.goal, moves: mission.goal.moves + (mission.boost ? 3 : 0) } : null);
+  }, [mission, session]);
+  useEffect(() => {
+    if (!mission || !state.rules || !['won', 'lost'].includes(mode) || reported.current === game) return;
+    reported.current = game; report({ won: mode === 'won' });
+  }, [mission, mode, game, state.rules, report]);
   const [help, setHelp] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [assets, setAssets] = useState('loading');
@@ -171,7 +182,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
   return <section className={`match-game match-game--${mode}`} aria-label="Три в ряд" data-no-gestures data-phase={mode} data-busy={busy} ref={root} onKeyDown={panelKeys}>
     <div className="match-scene">
       <header className="match-top">
-        <button type="button" className="match-icon match-round" onClick={close} aria-label={restLeft == null ? 'Закрыть игру' : 'К отдыху'}><IconBack size={22} /></button>
+        <button type="button" className="match-icon match-round" onClick={close} aria-label={mission ? 'К карьере' : restLeft == null ? 'Закрыть игру' : 'К отдыху'}><IconBack size={22} /></button>
         {restLeft != null && <div className="match-rest" title="Пора к подходу? Игра подождёт."><span>Отдых</span><strong role="timer">{clock(Math.max(0, restLeft))}</strong></div>}
         <span className="match-top__gap" />
         <button type="button" className="match-icon match-round" onClick={toggleSound} aria-label={sound ? 'Выключить звук' : 'Включить звук'} aria-pressed={sound}><Sound enabled={sound} /></button>
@@ -243,6 +254,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <button className="match-primary" ref={primary} onClick={() => { setHelp(false); if (mode === 'paused') resume(); }}>Понятно</button>
         </> : mode === 'ready' ? <>
           <div className="match-story-intro"><div className="match-story-portrait" aria-hidden="true" /><div><span>{chapter.place}</span><h3 id={title}>{chapter.title}</h3><p>{chapter.intro}</p></div></div>
+          <MissionNote game="match" mission={mission} />
           <div className="match-mission match-mission--story"><span>{game.moves} {movesLabel(game.moves)}</span><span>{number(game.target)} очков</span><span><Piece type={chapter.type} /> ×{progress.required}</span><span>Ящики ×{chapter.coverGoal}</span></div>
           <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={() => start(game.level)}>{assets === 'ready' ? 'Играть' : 'Готовим поле…'}</button>
           <button className="match-secondary" onClick={openHelp}>Как играть</button>
@@ -263,8 +275,11 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity }) {
           <div className="match-result-score"><strong>{number(game.score)}</strong><span>очков за партию</span></div>
           <p className="match-result-quest">{chapter.task}: {progress.collected}/{progress.required} · Ящики: {progress.uncovered}/{progress.coversRequired}</p>
           <p className="match-panel__fine">Лучший каскад ×{Math.max(1, game.bestCombo)}</p>
-          <button className="match-primary" ref={primary} onClick={() => mode === 'won' ? session.prepare(game.level < 3 ? game.level + 1 : 1, token.current) : start(game.level)}>{mode === 'won' ? (game.level < 3 ? 'Следующая глава' : 'Начать историю заново') : 'Повторить главу'}</button>
-          <button className="match-secondary" onClick={close}>Вернуться {restLeft == null ? 'в приложение' : 'к отдыху'}</button>
+          <MissionNote game="match" mission={mission} outcome={outcome} />
+          {mission ? <button className="match-primary" ref={primary} onClick={() => mode === 'won' ? close() : start(game.level)}>{mode === 'won' ? 'К карьере' : 'Повторить задание'}</button>
+            : <button className="match-primary" ref={primary} onClick={() => mode === 'won' ? session.prepare(game.level < 3 ? game.level + 1 : 1, token.current) : start(game.level)}>{mode === 'won' ? (game.level < 3 ? 'Следующая глава' : 'Начать историю заново') : 'Повторить главу'}</button>}
+          {mission && mode === 'won' ? <button className="match-secondary" onClick={() => start(game.level)}>Сыграть ещё раз</button>
+            : <button className="match-secondary" onClick={close}>{mission ? 'Вернуться в карьеру' : `Вернуться ${restLeft == null ? 'в приложение' : 'к отдыху'}`}</button>}
           {mode === 'won' && <div className="match-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <i key={i} style={{ '--x': `${(i * 29 + 5) % 100}%`, '--delay': `${i * 35}ms`, '--turn': `${i * 47}deg`, background: PIECES[i % 6].color }} />)}</div>}
         </>}
       </div>

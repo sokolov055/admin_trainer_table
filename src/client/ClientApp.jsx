@@ -36,7 +36,9 @@ import { forgetFocus, GoalBanner } from './focus.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
 import GameShell from '../GameShell.jsx';
-import { IconPlankGame, IconScooterGame, IconMatchGame } from '../game-icons.jsx';
+import { IconPlankGame, IconScooterGame, IconMatchGame, IconCareerGame } from '../game-icons.jsx';
+import CareerHub from '../CareerHub.jsx';
+import { useCareer } from '../CareerSession.jsx';
 
 /**
  * Панель клиента.
@@ -71,6 +73,8 @@ const TABS = [
  * зашедший включить уведомления не должен листать свой рост и телефон.
  */
 const MENU = [
+  // Карьера связывает три игры сюжетом (FT-563, 19.10.2026)
+  { id: 'career', label: 'Карьера в фитнесе', note: 'От турника во дворе до своей сети клубов', Icon: IconCareerGame, game: true },
   { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlankGame, game: true },
   { id: 'scooter-game', label: 'На самокате до зала', note: 'Бесконечный заезд и рейтинг игроков', Icon: IconScooterGame, game: true },
   { id: 'match-game', label: 'Три в ряд', note: 'Собери свой лучший каскад', Icon: IconMatchGame, game: true },
@@ -92,6 +96,7 @@ const TRAINER = { id: 'trainer', label: 'Мой тренер', note: 'ID и пр
 
 export default function ClientApp({ me, clientRow, preview }) {
   const plankEnabled = usePlankAccess();
+  const career = useCareer();
   const [view, setView] = useState('overview');
 
   // Семья — в своём кабинете и в «смотрю как клиент» (тренер проверяет,
@@ -182,7 +187,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   }, [mine, clientRow]);
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['plank-game', 'scooter-game', 'match-game'].includes(m.id) || plankEnabled), ...(hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['career', 'plank-game', 'scooter-game', 'match-game'].includes(m.id) || plankEnabled), ...(hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -406,6 +411,11 @@ export default function ClientApp({ me, clientRow, preview }) {
 
       {!onTab && (
       <main className="app__body" key={view}>
+        {view === 'career' && plankEnabled && <GameShell kind="career"><CareerHub onClose={() => { career.leave(); go(lastTab); }} onPlay={(game) => go('career-' + game)} /></GameShell>}
+        {/* Задание карьеры: та же игра, но с целью ступени; выход — обратно в карьеру */}
+        {view === 'career-plank' && plankEnabled && <GameShell kind="plank"><PlankGame career onClose={() => go('career')} /></GameShell>}
+        {view === 'career-scooter' && plankEnabled && <GameShell kind="scooter"><ScooterGame immersive career onClose={() => go('career')} /></GameShell>}
+        {view === 'career-match' && plankEnabled && <GameShell kind="match"><MatchGame career onClose={() => go('career')} /></GameShell>}
         {view === 'plank-game' && plankEnabled && <GameShell kind="plank"><PlankGame onClose={() => go(lastTab)} /></GameShell>}
         {view === 'scooter-game' && plankEnabled && <GameShell kind="scooter"><ScooterGame immersive onClose={() => go(lastTab)} /></GameShell>}
         {view === 'match-game' && plankEnabled && <GameShell kind="match"><MatchGame onClose={() => go(lastTab)} /></GameShell>}

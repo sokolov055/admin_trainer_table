@@ -366,11 +366,39 @@ test('три игры доступны тестовому клиенту и ск
     assert.equal(await normal.getByRole('button', { name: /Тренер в планке/ }).count(), 0);
     assert.equal(await normal.getByRole('button', { name: /На самокате до зала/ }).count(), 0);
     assert.equal(await normal.getByRole('button', { name: /Три в ряд/ }).count(), 0);
+    assert.equal(await normal.getByRole('button', { name: /Карьера в фитнесе/ }).count(), 0);
   } finally { await normalContext.close(); }
   } catch (error) {
     console.error('Game QA:', error, await page.locator('[data-scooter=viewport]').evaluateAll(els => els.map(el => ({ phase: el.dataset.phase, lane: el.dataset.lane }))));
     throw error;
   }
+});
+
+test('карьера в фитнесе: ступень, задание в игре с целью и возврат в карьеру', async () => {
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /Карьера в фитнесе/ }).click();
+  await page.getByText('Ступень 1 из 10').waitFor();
+  await page.getByRole('heading', { name: 'Тренировки на улице' }).waitFor();
+  assert.equal(await page.locator('.career-ladder li').count(), 10);
+  // Без зарплаты бонусы не купить
+  assert.equal(await page.getByRole('button', { name: /^Купить Протеин/ }).isDisabled(), true);
+  await page.locator('.career-mission', { hasText: 'Три в ряд' }).getByRole('button', { name: 'Играть' }).click();
+  await page.locator('.career-note', { hasText: 'Пройти главу 1 за 24 хода' }).waitFor();
+  assert.equal(await page.locator('[data-match=moves]').innerText(), '24', 'ходы из задания первой ступени');
+  await page.getByRole('button', { name: 'Выйти из игры', exact: true }).click();
+  await page.getByText('Ступень 1 из 10').waitFor();
+  await page.locator('.career-mission', { hasText: 'На самокате до зала' }).getByRole('button', { name: 'Играть' }).click();
+  await page.locator('.career-note', { hasText: 'Проехать 200 м' }).waitFor();
+  assert.equal(await page.locator('.difficulty-picker').isVisible(), false, 'режим задан заданием');
+  await page.getByRole('button', { name: 'К карьере', exact: true }).click();
+  await page.getByRole('button', { name: 'Свернуть карьеру', exact: true }).click();
+  await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
+  // Обычная игра из меню — снова без задания
+  await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /Три в ряд/ }).click();
+  assert.equal(await page.locator('.career-note').count(), 0);
+  assert.equal(await page.locator('[data-match=moves]').innerText(), '20');
+  await page.getByRole('button', { name: 'Выйти из игры', exact: true }).click();
 });
 
 /**

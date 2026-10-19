@@ -3,6 +3,7 @@ import { QUESTIONS, ROUND_MS, CATEGORIES, LEVELS, activeRound } from './plank-ga
 import { usePlankSession } from './PlankSession.jsx';
 import { createPlankAudio } from './plank-audio.js';
 import { useGameChrome, buzz, vibrationOn, setVibration } from './game-feel.js';
+import { useMission, MissionNote } from './CareerMission.jsx';
 import coachAtlas from './assets/plank-coach-v2.png';
 import './plank-game.css';
 
@@ -23,9 +24,26 @@ const DROP = 'M8 0C12 7 16 12 16 17a8 8 0 0 1-16 0C0 12 4 7 8 0z';
 const GRUMBLES = ['Опять правильно?! Я вообще-то устал!', 'Твои знания — мой день ног. Только для рук.', 'Ладно, засчитано. Но я всё запомнил.', 'Руки дрожат. Мой авторитет — пока нет.', 'Ты точно клиент? Может, поменяемся?', 'Ещё один верный ответ. Ещё одна вечность…', 'Я хотел лёгкую разминку. Не вот это всё!', 'Моя планка уже длиннее твоего плейлиста.'];
 const Icon = ({ kind }) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{kind === 'pause' ? <><path d="M8 5v14M16 5v14" /></> : kind === 'back' ? <path d="m14 5-7 7 7 7" /> : kind === 'sound' ? <><path d="m11 4-6 5H2v6h3l6 5zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" /></> : kind === 'mute' ? <><path d="m11 4-6 5H2v6h3l6 5zM16 9l6 6M22 9l-6 6" /></> : kind === 'play' ? <path d="m8 4 12 8-12 8z" /> : kind === 'check' ? <path d="m5 12 4 4 10-10" /> : kind === 'cup' ? <><path d="M7 3h10v7a5 5 0 0 1-10 0zM12 15v6M8 21h8M7 5H3v3a4 4 0 0 0 4 4M17 5h4v3a4 4 0 0 1-4 4" /></> : kind === 'down' ? <path d="m6 9 6 6 6-6" /> : kind === 'menu' ? <path d="M5 7h14M5 12h14M5 17h14" /> : <><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></>}</svg>;
 
-export default function PlankGame({ onClose, restLeft, restUntil = Infinity, allowPhoto = false }) {
+export default function PlankGame({ onClose, restLeft, restUntil = Infinity, allowPhoto = false, career = false }) {
   const [state, session] = usePlankSession();
   const { round, category, level, effects, music, best } = state;
+  const { mission, outcome, report } = useMission('plank', career);
+  const reported = useRef(null);
+  // Шпаргалка карьеры: один раз за визит убирает неверный ответ текущего вопроса
+  const [cheat, setCheat] = useState(null);
+  // Задание карьеры: все темы, уровень из задания; чужая незавершённая партия сбрасывается
+  useLayoutEffect(() => {
+    if (!mission) return;
+    const now = session.getSnapshot();
+    if (now.category === 'all' && now.level === mission.goal.level) return;
+    if (now.round) session.home();
+    session.configure({ category: 'all', level: mission.goal.level });
+  }, [mission, session]);
+  useEffect(() => {
+    if (!mission || !round || reported.current === round.deck) return;
+    const reached = round.score >= mission.goal.streak;
+    if (reached || ['lost', 'won'].includes(round.status)) { reported.current = round.deck; report({ streak: round.score }); }
+  }, [mission, round, report]);
   const [now, setNow] = useState(Date.now());
   const [hidden, setHidden] = useState(document.hidden);
   const [audioError, setAudioError] = useState('');
@@ -161,7 +179,7 @@ export default function PlankGame({ onClose, restLeft, restUntil = Infinity, all
   return <section ref={rootRef} className={'plank-game' + (round ? ' plank-game--question' : '') + (paused ? ' plank-game--paused' : '') + (question?.image || question?.picture ? ' plank-game--media' : '') + (standing ? ' plank-game--standing' : '') + (timed ? ' plank-game--timed' : '') + (menu ? ' plank-game--menu' : '')} aria-label="Тренер в планке">
     <div className={'plank-game__scene' + (intense ? ' plank-game__scene--intense' : '')}>
       <div className="plank-game__hud">
-        {onClose && <button type="button" className="plank-game__icon-button" aria-label={inRest ? 'К отдыху' : 'Свернуть игру'} onClick={onClose}><Icon kind="down" /></button>}
+        {onClose && <button type="button" className="plank-game__icon-button" aria-label={mission ? 'К карьере' : inRest ? 'К отдыху' : 'Свернуть игру'} onClick={onClose}><Icon kind="down" /></button>}
         <div className="plank-game__score">
           <strong>{round ? round.points : best || 0}</strong>
           <span>{round ? `очков · ${round.score} ${rightWord(round.score)}` : best ? 'рекорд сессии' : 'очков'}</span>
@@ -203,7 +221,7 @@ export default function PlankGame({ onClose, restLeft, restUntil = Infinity, all
         {!round ? <>
           <h2 className="plank-game__title">Тренер в планке</h2>
           <p className="plank-game__rules">10 секунд на ответ. Верно — тренер держится, ошибка — он сдаётся.</p>
-          <div className="plank-game__choices"><label>Тема<select aria-label="Категория" value={category} onChange={e => session.configure({ category: e.target.value })}><option value="all">Всё вперемешку</option>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Сложность<select aria-label="Сложность" value={level} onChange={e => session.configure({ level: Number(e.target.value) })}>{LEVELS.map((name, i) => <option key={name} value={i}>{name}</option>)}</select></label></div>
+          {mission ? <MissionNote game="plank" mission={mission} outcome={outcome} /> : <div className="plank-game__choices"><label>Тема<select aria-label="Категория" value={category} onChange={e => session.configure({ category: e.target.value })}><option value="all">Всё вперемешку</option>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Сложность<select aria-label="Сложность" value={level} onChange={e => session.configure({ level: Number(e.target.value) })}>{LEVELS.map((name, i) => <option key={name} value={i}>{name}</option>)}</select></label></div>}
           <button type="button" className="plank-game__primary" onClick={start}><Icon kind="play" />Поставить тренера в планку</button>
           <p className="plank-game__note">В подборке {pool.length} вопросов · новых {fresh}. {fresh === 0 ? 'Подборка пройдена — перемешаем её заново.' : 'Сначала идут ещё не показанные.'}</p>
         </> : <>
@@ -214,11 +232,12 @@ export default function PlankGame({ onClose, restLeft, restUntil = Infinity, all
             {question.image && <img className="plank-game__question-image" src={`${import.meta.env?.BASE_URL || '/'}anim/${question.image}/0.jpg`} alt="Упражнение для вопроса" />}
             {question.picture && <div role="img" aria-label="Продукт для вопроса" className={'plank-game__food plank-game__food--' + question.picture} />}
             {question.audio && <div className="plank-game__listen"><button type="button" disabled={listening} onClick={listenQuestion}><Icon kind="sound" />{listening ? 'Слушаем…' : status === 'listening' ? 'Слушать задание' : 'Послушать ещё'}</button><span className={'plank-game__wave' + (listening ? ' is-playing' : '')} aria-hidden="true">{Array.from({ length: 9 }, (_, i) => <i key={i} style={{ animationDelay: `${i * .06}s`, height: `${9 + (i % 4) * 5}px` }} />)}</span>{status === 'listening' && <small>10 секунд начнутся после фрагмента.</small>}</div>}
-            <div className="plank-game__answers">{question.answers.map((text, i) => <button type="button" disabled={status === 'listening'} key={text} onClick={() => answer(i)}><span aria-hidden="true">{['А', 'Б', 'В'][i]}</span>{text}</button>)}</div>
+            <div className="plank-game__answers">{question.answers.map((text, i) => cheat?.id === question.id && cheat.index === i ? null : <button type="button" disabled={status === 'listening'} key={text} onClick={() => answer(i)}><span aria-hidden="true">{['А', 'Б', 'В'][i]}</span>{text}</button>)}</div>
+            {mission?.boost && !cheat && status === 'playing' && <button type="button" className="plank-game__text-button" onClick={() => { const wrong = question.answers.map((_, i) => i).filter(i => i !== question.correct); setCheat({ id: question.id, index: wrong[Math.floor(Math.random() * wrong.length)] }); buzz('tap'); }}>Шпаргалка: убрать неверный ответ</button>}
           </>}
-          {status === 'feedback' && owned && <div className="plank-game__result"><div className="plank-game__result-mark"><Icon kind="check" /></div><h3>{round.score % 5 === 0 ? `${round.score} подряд. Вот это серия!` : 'Верно! Продолжаем?'}</h3><p>{question.why}</p><button type="button" className="plank-game__primary" onClick={() => { const time = Date.now(); setNow(time); session.tick(time, restUntil); session.next(time); }}>{round.score === round.deck.length ? 'Забрать победу' : 'Следующий вопрос'}<Icon kind="play" /></button></div>}
+          {status === 'feedback' && owned && <div className="plank-game__result"><div className="plank-game__result-mark"><Icon kind="check" /></div><h3>{round.score % 5 === 0 ? `${round.score} подряд. Вот это серия!` : 'Верно! Продолжаем?'}</h3>{outcome?.met && round.score === mission.goal.streak && <MissionNote game="plank" mission={mission} outcome={outcome} />}<p>{question.why}</p><button type="button" className="plank-game__primary" onClick={() => { const time = Date.now(); setNow(time); session.tick(time, restUntil); session.next(time); }}>{round.score === round.deck.length ? 'Забрать победу' : 'Следующий вопрос'}<Icon kind="play" /></button></div>}
           {paused && <div className="plank-game__result"><h3>Игра на паузе</h3><p>{round.pauseReason === 'rest' ? 'Отдых окончен. Сделай подход, а потом продолжим с этого места.' : 'Вопрос, счёт и оставшееся время сохранены. Продолжим, когда будешь готов.'}</p><p className="plank-game__note">{round.pausedFrom === 'playing' ? `На ответ осталось ${seconds} с.` : round.pausedFrom === 'feedback' ? 'Ответ уже засчитан.' : 'Звуковой фрагмент можно прослушать заново.'} Партия хранится до перезагрузки приложения.</p><button type="button" className="plank-game__primary" disabled={hidden || Date.now() >= restUntil} onClick={resume}><Icon kind="play" />Продолжить игру</button></div>}
-          {standing && <div className="plank-game__result"><h3>{status === 'won' ? 'Ты победил!' : 'Игра окончена'}</h3><p className="plank-game__final-score">{round.points}<span>очков · {round.score} {answersWord(round.score)}</span></p>{status === 'lost' && <><p>{round.reason === 'timeout' ? 'Не успел ответить.' : 'Ответ неверный.'} Правильный ответ: <strong>{question.answers[question.correct]}</strong></p><p>{question.why}</p></>}<button type="button" className="plank-game__primary" onClick={start}>Сыграть ещё<Icon kind="play" /></button><button type="button" className="plank-game__text-button" onClick={pickCategory}>Другая тема</button></div>}
+          {standing && <div className="plank-game__result"><h3>{status === 'won' ? 'Ты победил!' : 'Игра окончена'}</h3><p className="plank-game__final-score">{round.points}<span>очков · {round.score} {answersWord(round.score)}</span></p>{status === 'lost' && <><p>{round.reason === 'timeout' ? 'Не успел ответить.' : 'Ответ неверный.'} Правильный ответ: <strong>{question.answers[question.correct]}</strong></p><p>{question.why}</p></>}{mission && <MissionNote game="plank" mission={mission} outcome={outcome} />}<button type="button" className="plank-game__primary" onClick={start}>Сыграть ещё<Icon kind="play" /></button>{mission ? <button type="button" className="plank-game__text-button" onClick={onClose}>К карьере</button> : <button type="button" className="plank-game__text-button" onClick={pickCategory}>Другая тема</button>}</div>}
         </>}
         {audioError && <p className="plank-game__error" role="alert">{audioError}</p>}
       </div>
@@ -234,7 +253,7 @@ export default function PlankGame({ onClose, restLeft, restUntil = Infinity, all
           <label className="plank-game__check"><input type="checkbox" checked={vibrate} onChange={e => { setVibration(e.target.checked); setVibrate(e.target.checked); if (e.target.checked) buzz('tap'); }} />Вибрация</label>
           <p className="plank-game__note">Музыка затихает во время звуковых заданий. На паузе всё беззвучно. Вибрация работает на Android; на iPhone браузер её не поддерживает.</p>
         </div>
-        {round && <button type="button" className="plank-game__secondary" onClick={pickCategory}>Выбрать другую категорию</button>}
+        {round && !mission && <button type="button" className="plank-game__secondary" onClick={pickCategory}>Выбрать другую категорию</button>}
         {changing && <div className="plank-game__confirm" role="group" aria-label="Начать новую партию"><p>Новая тема начнёт новую партию. Текущий счёт сбросится.</p><button type="button" onClick={() => { session.home(); setChanging(false); setMenu(false); }}>Сбросить партию</button><button type="button" onClick={() => setChanging(false)}>Оставить текущую</button></div>}
         {allowPhoto && <div className="plank-game__photo"><label>Примерить фото тренера<input type="file" accept="image/jpeg,image/png,image/webp" onChange={choosePhoto} /></label>{avatar && <button type="button" className="plank-game__text-button" onClick={() => { URL.revokeObjectURL(avatarRef.current); avatarRef.current = ''; setAvatar(''); }}>Убрать фото</button>}<p className="plank-game__note">Фото только для примерки, на сервер не отправляется.</p>{photoError && <p role="alert">{photoError}</p>}</div>}
         <button type="button" className="plank-game__primary" onClick={closeMenu}>К игре</button>

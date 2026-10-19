@@ -44,6 +44,7 @@ import { PlankAccess } from './plank-access.js';
 import { PlankSessionProvider } from './PlankSession.jsx';
 import { ScooterSessionProvider } from './ScooterSession.jsx';
 import { MatchSessionProvider } from './MatchSession.jsx';
+import { CareerProvider } from './CareerSession.jsx';
 
 /**
  * Корень приложения: спрашивает сервер «кто я» и по ответу показывает
@@ -259,6 +260,7 @@ export default function App() {
     <PlankSessionProvider key={[me.identityType, me.chatId, me.email, me.role, me.member, me.plankGameEnabled].join(':')}>
     <ScooterSessionProvider>
     <MatchSessionProvider>
+    <CareerProvider key={[me.identityType, me.chatId, me.email, me.member].join(':')} id={[me.identityType, me.chatId || me.email || '', me.member || ''].join(':')}>
       <Deferred fallback={waitingPage}>
         {me.role === 'trainer' ? <TrainerApp me={me} />
           : me.role === 'candidate' ? <CandidateApp me={me} onApproved={load} />
@@ -280,6 +282,7 @@ export default function App() {
       {canOpenInApp()
         ? <AppHint active={!initData} />
         : <InstallHint active={!initData} installReady={installReady} />}
+    </CareerProvider>
     </MatchSessionProvider>
     </ScooterSessionProvider>
     </PlankSessionProvider>

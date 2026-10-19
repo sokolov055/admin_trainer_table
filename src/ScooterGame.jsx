@@ -1,13 +1,29 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useScooterSession } from './ScooterSession.jsx';
 import { mountScooter } from './scooter-runtime.js';
-import { pause, DIFFICULTIES } from './scooter-model.js';
+import { pause, createGame, DIFFICULTIES } from './scooter-model.js';
+import { useMission, MissionNote } from './CareerMission.jsx';
 import { restHere } from './rest-here.js';
 import { useGameChrome, vibrationOn, setVibration } from './game-feel.js';
 import './scooter.css';
 
-export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, immersive = false }) {
+export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, immersive = false, career = false }) {
   const root = useRef(null), session = useScooterSession(), deadline = useRef(restUntil);
+  const { mission, outcome, report } = useMission('scooter', career);
+  const seenRun = useRef(session.lastRun?.serial);
+  // Задание карьеры: режим задан, выбора сложности нет; энергетик — на каждый заезд визита
+  useLayoutEffect(() => {
+    if (!mission) return undefined;
+    const { difficulty } = mission.goal;
+    session.boost = mission.boost;
+    if (session.game.difficulty !== difficulty || !['ready', 'lost'].includes(session.game.phase)) Object.assign(session.game, createGame(session.game.seed, difficulty));
+    return () => { session.boost = false; };
+  }, [mission, session]);
+  useEffect(() => {
+    const last = session.lastRun;
+    if (!mission || !last || last.serial === seenRun.current) return;
+    seenRun.current = last.serial; report({ difficulty: last.difficulty, distance: last.distance });
+  });
   deadline.current = restUntil;
   const title = useId(), [panel, setPanel] = useState(null), [, refresh] = useState(0);
   const [error, setError] = useState(''), [loading, setLoading] = useState(false), [accept, setAccept] = useState(false);
@@ -31,7 +47,7 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
     console.warn('Игровой рейтинг:', err); if (id === requestId.current) setError(err.message || 'Не удалось загрузить рейтинг. Попробуй ещё раз.');
   } finally { if (id === requestId.current) setLoading(false); } };
   const openBoard = () => { pause(session.game); setPanel('board'); request(() => session.leaderboard(boardMode)); };
-  return <section className={'scooter-game' + (immersive ? ' scooter-game--immersive' : '')} aria-label="На самокате до зала" role={immersive ? 'dialog' : undefined} aria-modal={immersive || undefined} data-no-gestures>
+  return <section className={'scooter-game' + (immersive ? ' scooter-game--immersive' : '') + (mission ? ' scooter-game--mission' : '')} aria-label="На самокате до зала" role={immersive ? 'dialog' : undefined} aria-modal={immersive || undefined} data-no-gestures>
     <div className="game" ref={root}>
       <div className="viewport" data-scooter="viewport">
         <canvas data-scooter="scene" aria-label="Бесконечная городская трасса с тремя полосами" />
@@ -48,6 +64,7 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
           <div className="overlay-body">
             <h2 id={title} data-scooter="overlay-title">На самокате<br/>до зала</h2>
             <p data-scooter="overlay-copy">Город не заканчивается. Проедь дальше всех. Одно столкновение — конец заезда.</p>
+            <MissionNote game="scooter" mission={mission} outcome={outcome} />
             <div className="difficulty-picker" data-scooter="difficulty-picker" role="group" aria-label="Сложность заезда">
               {Object.entries(DIFFICULTIES).map(([key, config]) => <button type="button" key={key} data-difficulty={key} aria-pressed={session.game.difficulty === key}>{config.name}<small>{key === 'easy' ? 'Легко' : key === 'medium' ? 'Тяжело' : 'Почти невозможно'}</small></button>)}
             </div>
@@ -57,7 +74,7 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
             <p className="rank-status" role="status">{session.loading ? 'Готовим трассу…' : session.rankStatus}</p>
             {session.rankStatus.includes('Сохранить ещё раз') && <button className="secondary" type="button" onClick={() => session.finish()}>Сохранить ещё раз</button>}
             <div className="menu-links"><button type="button" onClick={openBoard}>Рейтинг игроков</button><button type="button" onClick={() => { pause(session.game); setPanel('settings'); }}>Управление</button>
-              <button type="button" onClick={onClose}>{restLeft == null ? 'Свернуть игру' : 'К отдыху'}</button></div>
+              <button type="button" onClick={onClose}>{mission ? 'К карьере' : restLeft == null ? 'Свернуть игру' : 'К отдыху'}</button></div>
           </div>
         </section>
         <button type="button" className="nitro-button" data-scooter="nitro" aria-label="Включить нитро, зарядов 0" disabled>

@@ -6,7 +6,7 @@ const code=(await build({bundle:true,write:false,format:'iife',globalName:'Ride'
 function session(mockApi){const context={mockApi,console};vm.runInNewContext(code,context);return context.Ride.createScooterSession();}
 test('ответ старого заезда не стирает текущий серверный старт',async()=>{
  let count=0,resolve;const s=session(async action=>{
-  if(action==='scooter.start')return {id:String(++count),seed:count,rules:3};
+  if(action==='scooter.start')return {id:String(++count),seed:count,rules:4};
   if(action==='scooter.finish'&&count===1)return new Promise(r=>{resolve=r;});
   if(action==='scooter.finish')return {profile:{enabled:true},rank:1,improved:true};
  });

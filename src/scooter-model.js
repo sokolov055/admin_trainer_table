@@ -1,5 +1,5 @@
 // FT-563: детерминированные правила бесконечного заезда. Та же версия проверяет рейтинг на сервере.
-export const RULES_VERSION = 3;
+export const RULES_VERSION = 4;
 export const TUNING = Object.freeze({ roadPixelsPerMetre: 7.2, laneResponse: 10,
   collisionHalfWidth: .48, collisionDepth: 9.5, firstObstacle: 100,
   nitroDuration: 3.2, nitroMultiplier: 1.45, nitroMax: 2 });
@@ -49,11 +49,13 @@ function extendRoute(game, until) {
     game.nextCrossing += 500;
   }
 }
-export function createGame(seed = 563, difficulty = 'medium') {
+// boost — энергетик из карьеры (FT-563, 19.10.2026): один заряд нитро на старте.
+// Входит в правила, чтобы сервер воспроизводил такой заезд для рейтинга.
+export function createGame(seed = 563, difficulty = 'medium', boost = false) {
   const mode = DIFFICULTIES[difficulty] ? difficulty : 'medium';
   const game = { phase: 'ready', resumePhase: 'playing', countdown: 3, difficulty: mode,
     distance: 0, elapsed: 0, ticks: 0, accumulator: 0, lane: 1, x: 1, speed: 0,
-    hits: 0, bottles: 0, preworkouts: 0, nitroCharges: 0, nitro: 0,
+    hits: 0, bottles: 0, preworkouts: 0, nitroCharges: boost ? 1 : 0, nitro: 0, boost: !!boost,
     dodged: 0, score: 0, combo: 0, bestCombo: 0, crashed: false,
     event: null, eventSerial: 0, seed: seed >>> 0, random: seed >>> 0,
     nextAt: TUNING.firstObstacle, nextCrossing: 450, row: 0, safe: 1, lastBark: -5, route: [], inputs: [] };

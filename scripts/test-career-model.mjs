@@ -11,6 +11,10 @@ test('десять ступеней от улицы до собственник�
   assert.equal(CAREER[0].title, 'Тренировки на улице');
   assert.equal(CAREER.at(-1).title, 'Собственник сети');
   for (const rank of CAREER) for (const game of GAMES) assert.ok(goalText(game, rank[game]).length > 10);
+  assert.equal(goalText('match', CAREER[0].match), 'Пройти главу 1 за 24 хода · 1 700 очков');
+  assert.equal(goalText('match', CAREER[3].match), 'Пройти главу 2 за 18 ходов · 2 400 очков');
+  assert.match(goalText('plank', CAREER[0].plank), /^3 верных ответа подряд/);
+  assert.match(goalText('plank', CAREER[1].plank), /^5 верных ответов подряд/);
 });
 
 test('чем выше ступень, тем сложнее: ни одно задание не становится легче', () => {

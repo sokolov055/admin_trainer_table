@@ -225,6 +225,8 @@ function renderUI() {
       if (previousPhase === 'playing' && owns()) buzz('crash');
       elements['result-stats'].innerHTML = `<div><strong>${Math.floor(game.distance)}</strong><span>метров</span></div><div><strong>${elapsed}</strong><span>секунд</span></div><div><strong>${game.bestCombo}</strong><span>лучшая серия</span></div>`;
       session.finish();
+      // Итог для задания карьеры (CareerMission.jsx)
+      if (owns()) { session.lastRun = { serial: (session.lastRun?.serial || 0) + 1, difficulty: game.difficulty, distance: Math.floor(game.distance) }; session.notify(); }
     }
     if (game.phase !== 'ready') {
       if (!active && owns() && !blocked()) elements.start.focus({ preventScroll: true });
