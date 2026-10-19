@@ -3,7 +3,8 @@
 // три задания, по одному в каждой игре; ступень закрыта, когда выполнены все три.
 // Сложность только растёт: дальше заезд и строже режим, больше верных ответов
 // подряд на более трудных вопросах, меньше ходов и выше цели в «Три в ряд».
-// Зарплата за задание растёт со ступенью, на неё покупаются бонусы.
+// Зарплата за задание растёт со ступенью, на неё покупаются бонусы. Валюта —
+// игровые монеты, не рубли: рядом настоящие тарифы, путать нельзя (App Store 3.1.1).
 // Чистые функции без React; состояние хранится только на устройстве.
 
 export const CAREER = Object.freeze([
@@ -40,6 +41,9 @@ export const ITEMS = Object.freeze({
 });
 
 /** Действие бонуса внутри фразы: «Протеин: +3 хода в задании «Три в ряд»» — название игры не теряет заглавную. */
+/** «1 250 монет» — неразрывный пробел, чтобы слово не уезжало от числа. */
+export const coins = n => n.toLocaleString('ru-RU') + '\u00a0' + plural(n, 'монета', 'монеты', 'монет');
+
 export const itemEffect = item => item.effect.charAt(0).toLowerCase() + item.effect.slice(1);
 
 export const VERSION = 1;
@@ -52,13 +56,17 @@ export const rankOf = state => CAREER[Math.min(state.rank, CAREER.length - 1)];
 export const priceOf = (state, item) => Math.round(ITEMS[item].price * (1 + .2 * Math.min(state.rank, CAREER.length - 1)) / 10) * 10;
 export const rankComplete = state => GAMES.every(game => state.done[game]);
 
-const plural = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
+// Сюжетные фигуры глав «Три в ряд» (match-story.js): гантели, яблоки, диски
+const PIECE_WORDS = { 1: ['гантель', 'гантели', 'гантелей'], 2: ['яблоко', 'яблока', 'яблок'], 3: ['диск', 'диска', 'дисков'] };
+export const plural = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
 
 /** Цель задания простыми словами — одна строка для карточки и игры. */
-export function goalText(game, goal) {
+export function goalText(game, goal, boost = false) {
   if (game === 'scooter') return `Проехать ${goal.metres.toLocaleString('ru-RU')} м в режиме «${{ easy: 'Разминка', medium: 'Час пик', extreme: 'Предел' }[goal.difficulty]}»`;
   if (game === 'plank') return `${goal.streak} ${plural(goal.streak, 'верный ответ', 'верных ответа', 'верных ответов')} подряд · ${['Все уровни', 'Новичок', 'Любитель', 'Продвинутый', 'Профи'][goal.level]}`;
-  return `Пройти главу ${goal.chapter} за ${goal.moves} ${plural(goal.moves, 'ход', 'хода', 'ходов')} · ${goal.target.toLocaleString('ru-RU')} очков`;
+  // Победа в главе — очки, сюжетные фигуры и ящики: в цели всё, без чего её нет
+  const moves = goal.moves + (boost ? 3 : 0), piece = PIECE_WORDS[goal.chapter] || PIECE_WORDS[1];
+  return `Глава ${goal.chapter}: ${moves} ${plural(moves, 'ход', 'хода', 'ходов')}, ${goal.target.toLocaleString('ru-RU')} очков, ${goal.count} ${plural(goal.count, ...piece)}, 6 ящиков`;
 }
 
 /** Выполнено ли задание: заезд — метры, планка — верные ответы подряд, три в ряд — победа в главе. */

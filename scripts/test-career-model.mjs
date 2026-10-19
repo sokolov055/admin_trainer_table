@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAREER, GAMES, createCareer, recordResult, promote, buy, useItem, priceOf, rankComplete, missionMet, restoreCareer, goalText, itemEffect, ITEMS } from '../src/career-model.js';
+import { CAREER, GAMES, createCareer, recordResult, promote, buy, useItem, priceOf, rankComplete, missionMet, restoreCareer, goalText, coins, itemEffect, ITEMS } from '../src/career-model.js';
 import { createMatchGame } from '../src/match-model.js';
 import { chapterComplete, chapterProgress } from '../src/match-story.js';
 
@@ -11,8 +11,10 @@ test('десять ступеней от улицы до собственник�
   assert.equal(CAREER[0].title, 'Тренировки на улице');
   assert.equal(CAREER.at(-1).title, 'Собственник сети');
   for (const rank of CAREER) for (const game of GAMES) assert.ok(goalText(game, rank[game]).length > 10);
-  assert.equal(goalText('match', CAREER[0].match), 'Пройти главу 1 за 24 хода · 1 700 очков');
-  assert.equal(goalText('match', CAREER[3].match), 'Пройти главу 2 за 18 ходов · 2 400 очков');
+  assert.equal(goalText('match', CAREER[0].match), 'Глава 1: 24 хода, 1 700 очков, 10 гантелей, 6 ящиков');
+  assert.equal(goalText('match', CAREER[0].match, true), 'Глава 1: 27 ходов, 1 700 очков, 10 гантелей, 6 ящиков', 'протеин +3 хода');
+  assert.equal(coins(1), '1 монета'); assert.equal(coins(1250), '1 250 монет'); assert.equal(coins(102), '102 монеты');
+  assert.equal(goalText('match', CAREER[3].match), 'Глава 2: 18 ходов, 2 400 очков, 15 яблок, 6 ящиков');
   assert.match(goalText('plank', CAREER[0].plank), /^3 верных ответа подряд/);
   assert.match(goalText('plank', CAREER[1].plank), /^5 верных ответов подряд/);
 });

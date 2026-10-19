@@ -63,7 +63,8 @@
 .career-restart p { margin: 0 0 8px; }
 .career-restart button { min-height: 44px; margin: 3px; padding: 8px 14px; border: 1px solid #fffdf259; border-radius: 12px; background: transparent; color: var(--cr-paper); font-weight: 750; }
 .career-restart .career-text { border: 0; text-decoration: underline; text-underline-offset: 4px; color: #c5e7c4; }
-.career-overlay { position: absolute; z-index: 20; inset: 0; display: flex; align-items: flex-end; padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: #0b2924a6; }
+/* fixed: на широком экране затемнение — на весь экран, а не на колонку 640 px */
+.career-overlay { position: fixed; z-index: 20; inset: 0; display: flex; align-items: flex-end; padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: #0b2924a6; }
 .career-panel { position: relative; width: 100%; padding: 28px 24px 22px; border-radius: 26px; background: var(--cr-paper); color: var(--cr-ink); text-align: center; overflow: hidden; box-shadow: 0 18px 50px #0b29246b; animation: career-in 260ms var(--cr-ease) both; }
 .career-panel h2 { margin-top: 14px; }
 .career-panel p { margin: 0 0 14px; color: var(--cr-muted); font-size: 14px; line-height: 1.5; }

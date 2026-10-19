@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { CAREER, GAMES, ITEMS, goalText, itemEffect, priceOf, rankComplete, rankOf } from './career-model.js';
+import { CAREER, GAMES, ITEMS, coins, goalText, itemEffect, priceOf, rankComplete, rankOf } from './career-model.js';
 import { useCareer } from './CareerSession.jsx';
 import { useGameChrome, buzz } from './game-feel.js';
 import { IconPlankGame, IconScooterGame, IconMatchGame } from './game-icons.jsx';
@@ -10,8 +10,6 @@ const GAME = {
   plank: { name: 'Тренер в планке', Icon: IconPlankGame, item: 'cheat' },
   match: { name: 'Три в ряд', Icon: IconMatchGame, item: 'protein' },
 };
-// Неразрывный пробел: «₽» не уезжает на следующую строку от суммы
-const money = value => value.toLocaleString('ru-RU') + '\u00a0₽';
 
 function Coin() {
   return <svg className="career-coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 7.5h4.2a2.6 2.6 0 0 1 0 5.2H9m0-5.2v9m-1.5-3.3h5" /></svg>;
@@ -49,7 +47,7 @@ export default function CareerHub({ onClose, onPlay }) {
   return <section className="career" ref={root} aria-label="Карьера в фитнесе" data-no-gestures>
     <header className="career-top">
       <button type="button" className="career-icon" onClick={onClose} aria-label="Свернуть карьеру"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
-      <div className="career-wallet" aria-label={'Заработано: ' + money(state.coins)}><Coin /><strong>{money(state.coins)}</strong></div>
+      <div className="career-wallet" aria-label={'Заработано: ' + coins(state.coins)}><Coin /><strong>{state.coins.toLocaleString('ru-RU')}</strong></div>
     </header>
 
     <div className="career-scroll">
@@ -57,7 +55,7 @@ export default function CareerHub({ onClose, onPlay }) {
         <span className="career-step">Ступень {state.rank + 1} из {CAREER.length}</span>
         <h2>{state.finished ? 'Собственник сети' : rank.title}</h2>
         <p className="career-place">{rank.place}</p>
-        <p className="career-story">{state.finished ? 'Ты прошёл путь от турника во дворе до собственной сети клубов. Можно играть в любые игры просто так — или начать карьеру заново.' : rank.story}</p>
+        <p className="career-story">{state.finished ? 'Путь пройден: от турника во дворе до собственной сети клубов. Можно играть в любые игры просто так — или начать карьеру заново.' : rank.story}</p>
         <ol className="career-ladder" aria-label="Карьерная лестница">
           {CAREER.map((r, i) => <li key={r.title} className={i < state.rank || state.finished ? 'is-done' : i === state.rank ? 'is-current' : ''} aria-current={i === state.rank ? 'step' : undefined}><span className="career-sr">{r.title}</span></li>)}
         </ol>
@@ -74,14 +72,14 @@ export default function CareerHub({ onClose, onPlay }) {
               <div className="career-mission__text">
                 <strong>{name}</strong>
                 <span>{goalText(game, rank[game])}</span>
-                <small>{done ? 'Выполнено' : `Зарплата +${money(rank.salary)}`}</small>
+                <small>{done ? 'Выполнено' : `Зарплата +${coins(rank.salary)}`}</small>
                 {!done && owned > 0 && <label className="career-boost"><input type="checkbox" checked={!!boost[game]} onChange={e => setBoost(b => ({ ...b, [game]: e.target.checked }))} />{ITEMS[item].name} ({owned}): {itemEffect(ITEMS[item])}</label>}
               </div>
               <button type="button" className={done ? 'career-again' : 'career-play'} onClick={() => play(game)}>{done ? 'Ещё раз' : 'Играть'}</button>
             </li>;
           })}
         </ul>
-        {complete && <button type="button" className="career-promote" onClick={getPromotion}>Получить повышение · +{money(rank.salary * 2)}</button>}
+        {complete && <button type="button" className="career-promote" onClick={getPromotion}>Получить повышение · +{coins(rank.salary * 2)}</button>}
       </>}
 
       {/* Бонусы действуют только в заданиях — после финала их некуда взять */}
@@ -93,7 +91,7 @@ export default function CareerHub({ onClose, onPlay }) {
             const price = priceOf(state, id);
             return <li key={id}>
               <div><strong>{item.name}</strong><span>{item.effect}</span><small>{GAME[item.game].name} · есть {state.items[id]}</small></div>
-              <button type="button" disabled={state.coins < price} onClick={() => { if (career.buy(id).ok) buzz('good'); }} aria-label={`Купить ${item.name} за ${money(price)}`}><Coin />{money(price)}</button>
+              <button type="button" disabled={state.coins < price} onClick={() => { if (career.buy(id).ok) buzz('good'); }} aria-label={`Купить ${item.name} за ${coins(price)}`}><Coin />{coins(price)}</button>
             </li>;
           })}
         </ul>
@@ -110,8 +108,8 @@ export default function CareerHub({ onClose, onPlay }) {
         <div className="career-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <i key={i} style={{ '--x': `${(i * 29 + 7) % 100}%`, '--d': `${i * 40}ms`, '--r': `${i * 53}deg` }} />)}</div>
         <span className="career-step">{promoted.last ? 'Карьера пройдена' : 'Повышение'}</span>
         <h2 id="career-promoted">{promoted.last ? 'Своя сеть клубов!' : promoted.to.title}</h2>
-        <p>{promoted.last ? 'От турника во дворе до собственника сети. Это было мощно.' : promoted.to.story}</p>
-        <p className="career-bonus"><Coin />Премия +{money(promoted.bonus)}</p>
+        <p>{promoted.last ? 'Путь пройден: от турника во дворе до своей сети клубов. Это было мощно!' : promoted.to.story}</p>
+        <p className="career-bonus"><Coin />Премия +{coins(promoted.bonus)}</p>
         <button type="button" className="career-play" autoFocus onClick={() => setPromoted(null)}>{promoted.last ? 'Ура!' : 'К новым задачам'}</button>
       </div>
     </div>}

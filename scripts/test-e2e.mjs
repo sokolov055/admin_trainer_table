@@ -383,7 +383,7 @@ test('карьера в фитнесе: ступень, задание в игр
   // Без зарплаты бонусы не купить
   assert.equal(await page.getByRole('button', { name: /^Купить Протеин/ }).isDisabled(), true);
   await page.locator('.career-mission', { hasText: 'Три в ряд' }).getByRole('button', { name: 'Играть' }).click();
-  await page.locator('.career-note', { hasText: 'Пройти главу 1 за 24 хода' }).waitFor();
+  await page.locator('.career-note', { hasText: 'Глава 1: 24 хода' }).waitFor();
   assert.equal(await page.locator('[data-match=moves]').innerText(), '24', 'ходы из задания первой ступени');
   await page.getByRole('button', { name: 'Выйти из игры', exact: true }).click();
   await page.getByText('Ступень 1 из 10').waitFor();
@@ -421,7 +421,7 @@ test('карьера: бонус в задании, пауза ведёт в к�
     await open({});
     const card = p.locator('.career-mission', { hasText: 'Три в ряд' });
     assert.match(await card.locator('.career-boost').innerText(), /Протеин \(1\): \+3 хода в задании «Три в ряд»/, 'название игры не теряет заглавную');
-    assert.equal(await card.locator('small').innerText(), 'Зарплата +300 ₽', '«₽» не отрывается от суммы на узком экране');
+    assert.equal(await card.locator('small').innerText(), 'Зарплата +300 монет', '«монет» не отрывается от суммы на узком экране');
     assert.equal(await card.getByRole('button', { name: 'Играть' }).evaluate(el => getComputedStyle(el).fontWeight), '850', 'сброс шрифта не перебивает кнопку');
     await card.locator('input[type=checkbox]').check();
     await card.getByRole('button', { name: 'Играть' }).click();
