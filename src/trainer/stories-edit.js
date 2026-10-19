@@ -1,32 +1,44 @@
+import { CANVAS_LIMITS, GRADIENTS, emptyCanvas, framesForEditor, legacyFields } from '../story-canvas.js';
+
 /**
  * Правка историй в «Управлении → Истории» (FT-615) — без React, чтобы её
  * проверял тест (scripts/test-stories-edit.mjs). Хранит и проверяет набор
  * сервер (server/src/lib/stories.js); здесь — черновик на экране.
  *
  * Тем всегда две — «Что нового» и «Инструкция» (владелец, 19.10.2026):
- * правятся кадры, а не сами темы. Картинку к кадру владелец вставляет
- * готовую (её рисует Claude) — или оставляет встроенный рисунок.
+ * правятся кадры, а не сами темы.
  *
- * Черновик — массив тем того же вида, что TOPICS в stories.jsx. Все
- * изменения возвращают новый массив: экран сравнивает его с сохранённым,
- * чтобы «Сохранить» горела только когда есть что сохранять.
+ * С шага 2 каждый кадр черновика — холст из слоёв (story-canvas.js),
+ * правится в редакторе как в Instagram (StoryEditor.jsx). Старые кадры
+ * переводятся в холст при открытии панели — одинаково каждый раз, поэтому
+ * «Сохранить» не загорается от одного открытия. Заголовок и текст для
+ * старых сборок собираются из слоёв при отправке (toPayload).
+ *
+ * Все изменения возвращают новый массив: экран сравнивает его с
+ * сохранённым, чтобы «Сохранить» горела только когда есть что сохранять.
  */
 
 /** Те же пределы, что на сервере: подсказать до отправки, а не отказом после */
-export const LIMITS = { topics: 8, frames: 24, label: 24, caption: 80, heading: 90, body: 700, date: 30 };
+export const LIMITS = { topics: 8, frames: 24, label: 24, caption: 80, date: 30, ...CANVAS_LIMITS };
 
 export const DEVICES = [
   { value: '', label: 'Везде' },
   { value: 'ios', label: 'Только iPhone' },
-  { value: 'android', label: 'Только Android' },
+  { value: 'android', label: 'Кроме iPhone' },
 ];
-
-/** Цвета кадров — те, что уже есть во вшитых историях */
-export const TINTS = ['#f5c65c', '#8ec0f5', '#7fd97f', '#c9a4f0', '#f0a4a4', '#ffa24c'];
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-/** Вшитые темы → черновик: только данные, «кому» явно */
+function draftFrame(f) {
+  const out = { id: f.id };
+  ['date', 'only'].forEach((k) => { if (f[k]) out[k] = f[k]; });
+  if (f.hidden) out.hidden = true;
+  // Слой без id (сохранён не редактором) — свой id: по нему держится жест
+  out.canvas = { ...f.canvas, layers: f.canvas.layers.map((l, k) => (l.id ? l : { ...l, id: 'l' + k })) };
+  return out;
+}
+
+/** Темы (вшитые или с сервера) → черновик: у каждого кадра холст, «кому» явно */
 export function draftFrom(topics) {
   return clone(topics || []).map((t) => ({
     id: t.id,
@@ -34,22 +46,33 @@ export function draftFrom(topics) {
     caption: t.caption || '',
     ...(t.cover ? { cover: t.cover } : {}),
     audience: t.audience || 'all',
-    frames: (t.frames || []).map((f) => {
-      const out = { id: f.id, heading: f.heading || '', body: f.body || '' };
-      ['bodyIos', 'date', 'image', 'art', 'tint', 'only'].forEach((k) => { if (f[k]) out[k] = f[k]; });
-      if (f.hidden) out.hidden = true;
-      return out;
-    }),
+    frames: framesForEditor(t.frames).map(draftFrame),
   }));
 }
 
-/** То же, что уйдёт на сервер: пустые поля не отправляются */
+/** Холст без лишнего: так его примет сервер */
+function cleanCanvas(canvas) {
+  const out = { bg: canvas.bg, layers: canvas.layers.map((l) => {
+    const layer = { ...l };
+    if (layer.type === 'text') layer.text = String(layer.text || '').trim();
+    return layer;
+  }).filter((l) => l.type !== 'text' || l.text) };
+  if (canvas.image) out.image = canvas.image;
+  return out;
+}
+
+/** То же, что уйдёт на сервер: с заголовком и текстом для старых сборок */
 export function toPayload(draft) {
-  return draftFrom(draft).map((t) => ({
+  return clone(draft).map((t) => ({
     ...t,
     frames: t.frames.map((f) => {
-      const out = { ...f, heading: f.heading.trim(), body: f.body.trim() };
-      ['bodyIos', 'date'].forEach((k) => { if (out[k] !== undefined && !String(out[k]).trim()) delete out[k]; });
+      const canvas = cleanCanvas(f.canvas);
+      const out = { id: f.id, ...legacyFields(canvas, t.caption) };
+      const date = String(f.date || '').trim();
+      if (date) out.date = date;
+      if (f.only) out.only = f.only;
+      if (f.hidden) out.hidden = true;
+      out.canvas = canvas;
       return out;
     }),
   }));
@@ -71,7 +94,7 @@ export function newId(prefix, taken, now = Date.now()) {
   return id;
 }
 
-const frameIds = (draft) => draft.flatMap((t) => t.frames.map((f) => f.id));
+export const frameIds = (draft) => draft.flatMap((t) => t.frames.map((f) => f.id));
 
 export function updateTopic(draft, ti, patch) {
   return draft.map((t, i) => (i === ti ? { ...t, ...patch } : t));
@@ -83,41 +106,51 @@ export function updateFrame(draft, ti, fi, patch) {
     frames: t.frames.map((f, j) => {
       if (j !== fi) return f;
       const next = { ...f, ...patch };
-      // Пустое значение — поля нет: «везде», «без даты», «без картинки»
+      // Пустое значение — поля нет: «везде», «без даты», «не скрыт»
       Object.keys(patch).forEach((k) => { if (patch[k] === '' || patch[k] === false || patch[k] === null) delete next[k]; });
-      if (next.heading === undefined) next.heading = '';
-      if (next.body === undefined) next.body = '';
       return next;
     }),
   }));
 }
 
 /**
- * Новый кадр — первым в теме: в «Что нового» свежая новость идёт первой,
- * а в инструкции владелец передвинет его стрелками. Возвращает и номер,
- * чтобы экран сразу раскрыл его для правки.
+ * Новый кадр — сразу за текущим (at), фон — следующий градиент после
+ * соседнего, чтобы кадры не сливались. Возвращает и номер нового кадра.
  */
-export function addFrame(draft, ti, now = Date.now()) {
+export function addFrame(draft, ti, now = Date.now(), at = 0) {
   const id = newId('f', frameIds(draft), now);
-  const tint = TINTS[draft[ti].frames.length % TINTS.length];
+  const frames = draft[ti].frames;
+  const prev = frames[Math.min(at, frames.length) - 1] || frames[0];
+  const gi = prev && prev.canvas.bg.kind === 'gradient' ? GRADIENTS.findIndex((g) => g.id === prev.canvas.bg.value) : -1;
+  // Светлый «paper» — последний в списке: новый кадр по кругу его не берёт
+  const bg = GRADIENTS[(gi + 1) % (GRADIENTS.length - 1)].id;
+  const pos = Math.max(0, Math.min(at, frames.length));
   return {
-    draft: draft.map((t, i) => (i !== ti ? t : { ...t, frames: [{ id, heading: '', body: '', tint }, ...t.frames] })),
-    frame: 0,
+    draft: draft.map((t, i) => (i !== ti ? t : { ...t, frames: [...frames.slice(0, pos), { id, canvas: emptyCanvas(bg) }, ...frames.slice(pos)] })),
+    frame: pos,
   };
+}
+
+/** Копия кадра сразу за ним: новый id у кадра и у слоёв */
+export function duplicateFrame(draft, ti, fi, now = Date.now()) {
+  const src = draft[ti].frames[fi];
+  const copy = clone(src);
+  copy.id = newId('f', frameIds(draft), now);
+  copy.canvas.layers.forEach((l, k) => { l.id = (l.id + 'c' + k).slice(-16); });
+  return draft.map((t, i) => (i !== ti ? t : { ...t, frames: [...t.frames.slice(0, fi + 1), copy, ...t.frames.slice(fi + 1)] }));
 }
 
 export function removeFrame(draft, ti, fi) {
   return draft.map((t, i) => (i !== ti ? t : { ...t, frames: t.frames.filter((_, j) => j !== fi) }));
 }
 
-/** Сдвинуть кадр на delta; за край — не двигается */
-export function moveFrame(draft, ti, fi, delta) {
-  const to = fi + delta;
-  if (to < 0 || to >= draft[ti].frames.length) return draft;
+/** Переставить кадр с места from на место to */
+export function moveFrame(draft, ti, from, to) {
+  if (to < 0 || to >= draft[ti].frames.length || to === from) return draft;
   return draft.map((t, i) => {
     if (i !== ti) return t;
     const frames = t.frames.slice();
-    const [f] = frames.splice(fi, 1);
+    const [f] = frames.splice(from, 1);
     frames.splice(to, 0, f);
     return { ...t, frames };
   });
@@ -140,23 +173,22 @@ export function problems(draft) {
     if (t.frames.length > LIMITS.frames) out.push(`${name}: кадров больше ${LIMITS.frames}.`);
     t.frames.forEach((f, j) => {
       const at = `${name}, кадр ${j + 1}`;
-      if (!f.heading.trim()) out.push(`${at}: нет заголовка.`);
-      if (f.heading.trim().length > LIMITS.heading) out.push(`${at}: заголовок длиннее ${LIMITS.heading} знаков.`);
-      if (f.body.trim().length > LIMITS.body) out.push(`${at}: текст длиннее ${LIMITS.body} знаков.`);
-      if ((f.bodyIos || '').trim().length > LIMITS.body) out.push(`${at}: текст для iPhone длиннее ${LIMITS.body} знаков.`);
+      if (String(f.date || '').trim().length > LIMITS.date) out.push(`${at}: дата длиннее ${LIMITS.date} знаков.`);
+      if (f.canvas.layers.length > LIMITS.layers) out.push(`${at}: слоёв больше ${LIMITS.layers}.`);
+      if (f.canvas.layers.some((l) => l.type === 'text' && String(l.text || '').trim().length > LIMITS.text)) {
+        out.push(`${at}: текст длиннее ${LIMITS.text} знаков — разбейте на два.`);
+      }
     });
   });
   return out;
 }
 
-/** Строка-сводка под заголовком кадра в списке */
+/** Строка-сводка кадра: скрыт, где показывать, дата */
 export function frameNote(frame) {
   const parts = [];
   if (frame.hidden) parts.push('скрыт');
   if (frame.only === 'ios') parts.push('только iPhone');
-  if (frame.only === 'android') parts.push('только Android');
-  if (frame.image) parts.push('своя картинка');
+  if (frame.only === 'android') parts.push('кроме iPhone');
   if (frame.date) parts.push(frame.date);
-  if (frame.bodyIos) parts.push('свой текст для iPhone');
   return parts.join(' · ');
 }

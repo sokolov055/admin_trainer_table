@@ -1234,6 +1234,37 @@ button { font-family: inherit; }
   color: color-mix(in srgb, var(--story-fg) 58%, transparent);
 }
 
+/* Кадр из редактора (FT-615, шаг 2): холст 9:16 на весь экран — по ширине
+   на телефоне, по высоте на компьютере. Фон кадра продолжается до краёв
+   экрана (style на .story), полоски и подпись темы лежат поверх, а под
+   ними — лёгкое затемнение, чтобы они читались и на светлом фоне. */
+.story--canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(120px + env(safe-area-inset-top));
+  z-index: 1;
+  background: linear-gradient(rgba(0, 0, 0, 0.38), transparent);
+  pointer-events: none;
+}
+.story--canvas .story__bars,
+.story--canvas .story__top { position: relative; z-index: 2; }
+.story--canvas .story__caption { color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); }
+.story--canvas .story__close { color: #fff; }
+.story__caption-date { margin-left: var(--space-2); font-weight: 450; color: rgba(255, 255, 255, 0.7); }
+.story__frame--canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.story__canvas { width: min(100cqw, 56.25cqh); height: auto; }
+@media (min-width: 620px) {
+  .story__canvas { border-radius: 16px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .story { transform: none; }
   .story--in { transform: none; }
@@ -6017,3 +6048,13 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .story__image { display: block; max-width: 100%; max-height: min(260px, 30vh); width: auto; height: auto; object-fit: contain; border-radius: 16px; user-select: none; -webkit-user-drag: none; }
 .admin-stories__art--upload { gap: 2px; color: var(--accent); border-style: dashed; }
 .admin-stories__art img { max-width: 100%; max-height: 60px; object-fit: contain; border-radius: 6px; }
+
+/* «Управление → Истории», шаг 2: миниатюры кадров — касание открывает редактор */
+.admin-stories__thumbs { display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; padding: 4px 2px 6px; }
+.admin-stories__thumbs::-webkit-scrollbar { display: none; }
+.admin-stories__thumb { position: relative; flex: 0 0 auto; width: 72px; padding: 0; border: 0; border-radius: 10px; background: none; cursor: pointer; }
+.admin-stories__thumb .sc { width: 100%; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.admin-stories__thumb--hidden .sc { opacity: 0.4; }
+.admin-stories__thumb-note { position: absolute; left: 4px; right: 4px; bottom: 4px; padding: 2px 4px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 9.5px; font-weight: 700; line-height: 1.2; text-align: center; }
+.admin-stories__thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.se-loading { position: fixed; inset: 0; z-index: 65; background: #0c0b0e; }

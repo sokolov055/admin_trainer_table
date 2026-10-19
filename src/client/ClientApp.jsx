@@ -249,6 +249,12 @@ export default function ClientApp({ me, clientRow, preview }) {
   };
   goRef.current = go;
 
+  // Кнопка раздела в истории (FT-615): вкладка, «Мои данные» или инструкция
+  const openFromStory = (section) => {
+    if (section === 'guide') { setGuideOpen(true); return; }
+    if (TABS.some((t) => t.id === section) || section === 'profile') go(section);
+  };
+
   // Здесь, после всех хуков: ранний выход выше сломал бы их порядок
   if (me && me.consentNeeded && own && !consented) {
     return <ConsentGate onDone={() => setConsented(true)} />;
@@ -353,7 +359,7 @@ export default function ClientApp({ me, clientRow, preview }) {
         <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
 
-      {guideOpen && <GuideViewer topics={storyTopics} onClose={() => setGuideOpen(false)} />}
+      {guideOpen && <GuideViewer topics={storyTopics} onClose={() => setGuideOpen(false)} onOpen={openFromStory} />}
 
       {tour && onTab && !guideOpen && (
         <Tour unlinked={!!(me && me.unlinked)} action={fs.action} app={isNativeApp()}
@@ -385,7 +391,7 @@ export default function ClientApp({ me, clientRow, preview }) {
               карточки клиента, и сторис оттуда читались бы как что-то,
               относящееся к этому клиенту. */}
           {t.id === 'overview' && own && ((me && me.unlinked) || pendingTrainerLink()) && <OverviewOffers />}
-          {t.id === 'overview' && personal && <Stories personal={personal} />}
+          {t.id === 'overview' && personal && <Stories personal={personal} onOpen={openFromStory} />}
           {/* Цель — сразу под историями: первое, что видно на «Обзоре» (FT-577).
               Тренер в карточке клиента видит её внутри самого Overview */}
           {t.id === 'overview' && (!clientRow || preview) && <GoalBanner clientRow={clientRow} clientView={!!preview} section="overview" />}

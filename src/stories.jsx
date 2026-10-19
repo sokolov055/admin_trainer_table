@@ -4,6 +4,8 @@ import { prepareTopics as prepareRaw } from './story-topics.js';
 import { mediaUrl } from './library.js';
 import { haptic } from './telegram.js';
 import { ART, COVERS } from './storyArt.jsx';
+import StoryCanvas from './StoryCanvas.jsx';
+import { bgCss } from './story-canvas.js';
 import { IconClose, IconDelta } from './icons.jsx';
 import { detectBrowser } from './browser.js';
 import { rangeText, monthText, metricRows, recordText, verdict } from './client/summaryText.js';
@@ -307,8 +309,9 @@ export function summaryTopics(stories) {
    ========================================================================== */
 
 // personal — личные темы (summaryTopics), первыми в ряду; role — кому
-// показывать темы из панели (клиентам или тренерам)
-export function Stories({ personal = [], role = 'client' }) {
+// показывать темы из панели (клиентам или тренерам); onOpen(section) —
+// кнопка раздела в кадре (FT-615): открыть вкладку или инструкцию
+export function Stories({ personal = [], role = 'client', onOpen }) {
   const shared = useStoryTopics(role);
   const topics = personal.length ? personal.concat(shared) : shared;
   const [seen, setSeen] = useState(readSeen);
@@ -366,6 +369,7 @@ export function Stories({ personal = [], role = 'client' }) {
           onAt={setAt}
           onSeen={markSeen}
           onClose={() => setAt(null)}
+          onOpen={onOpen}
         />
       )}
     </>
@@ -378,7 +382,7 @@ export function Stories({ personal = [], role = 'client' }) {
  * потерял, а вернуться было некуда.
  */
 // topics — из useStoryTopics: та же инструкция, что в ряду кружков
-export function GuideViewer({ topics, onClose }) {
+export function GuideViewer({ topics, onClose, onOpen }) {
   const guide = (topics || prepareTopics(TOPICS)).filter((t) => t.id === 'guide');
   const [at, setAt] = useState({ topic: 0, frame: 0 });
   const markSeen = useCallback((id) => {
@@ -386,7 +390,7 @@ export function GuideViewer({ topics, onClose }) {
     if (seen.indexOf(id) === -1) writeSeen(seen.concat(id));
   }, []);
   if (!guide.length) return null;
-  return <StoryViewer topics={guide} at={at} onAt={setAt} onSeen={markSeen} onClose={onClose} />;
+  return <StoryViewer topics={guide} at={at} onAt={setAt} onSeen={markSeen} onClose={onClose} onOpen={onOpen} />;
 }
 
 /** Есть ли инструкция: владелец мог скрыть все её кадры (FT-615) */
@@ -406,20 +410,20 @@ export function guideNote(topics) {
  * самого владельца. Кадры «только iPhone / Android» видны на любом
  * устройстве: владелец проверяет то, что только что написал.
  */
-export function StoryPreview({ topic, frame = 0, role = 'client', onClose }) {
+export function StoryPreview({ topic, frame = 0, role = 'client', onClose, onOpen }) {
   const all = { ...topic, audience: 'all', frames: (topic.frames || []).map(({ only, ...f }) => f) };
   const topics = prepareTopics([all], { role });
   const [at, setAt] = useState({ topic: 0, frame: Math.max(0, Math.min(frame, ((topics[0] || {}).frames || []).length - 1)) });
   const noop = useCallback(() => {}, []);
   if (!topics.length) return null;
-  return <StoryViewer topics={topics} at={at} onAt={setAt} onSeen={noop} onClose={onClose} />;
+  return <StoryViewer topics={topics} at={at} onAt={setAt} onSeen={noop} onClose={onClose} onOpen={onOpen} />;
 }
 
 /* ==========================================================================
    Полноэкранный просмотр
    ========================================================================== */
 
-function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
+function StoryViewer({ topics, at, onAt, onSeen, onClose, onOpen }) {
   const rootRef = useRef(null);
   const gestureRef = useRef(null);
   const holdRef = useRef(null);
@@ -525,7 +529,9 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
     // Нажатие на кнопку закрытия — не жест по кадру
     if (e.target.closest && e.target.closest('.story__close')) return;
 
-    gestureRef.current = { x: e.clientX, y: e.clientY, held: false };
+    // Кнопка раздела в кадре из слоёв — касание открывает раздел
+    const link = e.target.closest && e.target.closest('[data-section]');
+    gestureRef.current = { x: e.clientX, y: e.clientY, held: false, section: link ? link.dataset.section : null };
     holdRef.current = setTimeout(() => {
       if (gestureRef.current) gestureRef.current.held = true;
       setPaused(true);
@@ -564,6 +570,10 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
     if (dropped > SWIPE_PX) { closeRef.current(); return; }
 
     const dx = e.clientX - st.x;
+    if (st.section && Math.abs(dx) < SWIPE_PX) {
+      if (onOpen) { closeRef.current(); onOpen(st.section); haptic(); }
+      return;
+    }
     if (dx < -SWIPE_PX) { go(1); return; }
     if (dx > SWIPE_PX) { go(-1); return; }
 
@@ -576,10 +586,11 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
 
   const Picture = ART[frame.art];
   const reduced = prefersReducedMotion();
+  const canvas = frame.canvas;
 
   return (
     <div
-      className={'story' + (shown ? ' story--in' : '')}
+      className={'story' + (shown ? ' story--in' : '') + (canvas ? ' story--canvas' : '')}
       ref={rootRef}
       role="dialog"
       aria-modal="true"
@@ -587,6 +598,8 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
       tabIndex={-1}
       style={{
         '--tint': frame.tint,
+        // Кадр из слоёв: фон продолжается за края кадра 9:16 до краёв экрана
+        ...(canvas ? { background: canvas.image ? '#000' : bgCss(canvas.bg) } : null),
         ...(dragY ? { transform: 'translateY(' + dragY + 'px)', transition: 'none' } : null),
       }}
       onPointerDown={onPointerDown}
@@ -620,7 +633,10 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
       {/* Шапка темы: что это за подборка. Стоит над кадром и не меняется,
           пока листаются кадры, — так видно, что это одна история. */}
       <div className="story__top">
-        <p className="story__caption">{topic.caption}</p>
+        <p className="story__caption">
+          {topic.caption}
+          {canvas && frame.date && <span className="story__caption-date">{frame.date}</span>}
+        </p>
         <button
           type="button"
           className="story__close"
@@ -634,6 +650,13 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
       {/* key на кадре: содержимое въезжает заново при каждом переходе,
           иначе смена текста на месте читается как опечатка, а не как
           следующая новость */}
+      {/* Кадр из редактора (FT-615, шаг 2): слои на холсте 9:16 по центру
+          экрана, полоски и подпись темы — поверх */}
+      {canvas ? (
+        <div className="story__frame story__frame--canvas" key={topic.id + ':' + frame.id}>
+          <StoryCanvas canvas={canvas} className="story__canvas" bare={!canvas.image} />
+        </div>
+      ) : (
       <div className="story__frame" key={topic.id + ':' + frame.id}>
         {/* Своя картинка из панели владельца (FT-615) — вместо рисунка */}
         {frame.image ? (
@@ -652,10 +675,13 @@ function StoryViewer({ topics, at, onAt, onSeen, onClose }) {
         {frame.records && <StoryRecords records={frame.records} more={frame.more} />}
         {frame.body && <p className="story__body">{frame.body}</p>}
       </div>
+      )}
 
-      <p className="story__hint">
-        {reduced ? 'Касанием — вперёд' : 'Придержите, чтобы дочитать'}
-      </p>
+      {!canvas && (
+        <p className="story__hint">
+          {reduced ? 'Касанием — вперёд' : 'Придержите, чтобы дочитать'}
+        </p>
+      )}
     </div>
   );
 }
