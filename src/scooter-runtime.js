@@ -1,6 +1,7 @@
 import { createGame, begin, advance, steer, setLane, pause, resume, activateNitro, laneFromTilt, tiltAxis, DIFFICULTIES } from './scooter-model.js';
 import { StreetRenderer } from './scooter-render.js';
 import { createScooterVoice } from './scooter-voice.js';
+import { buzz, enterFullscreen } from './game-feel.js';
 
 export function mountScooter(root, session, blocked = () => false) {
 const controller = new AbortController();
@@ -104,10 +105,7 @@ function primaryAction() {
   if (game.phase === 'ready' && !session.tutorialSeen) {
     session.training = true; game.route = []; renderUI(); elements['tutorial-left'].focus({ preventScroll: true }); return;
   }
-  if (game.phase === 'ready') {
-    const scene = root.closest('.game-shell') || root.closest('.rest-screen');
-    if (!document.fullscreenElement && scene?.requestFullscreen) scene.requestFullscreen().catch(() => {});
-  }
+  if (game.phase === 'ready') enterFullscreen(root);
   if (game.phase === 'ready') reset();
   else if (game.phase === 'paused') { resume(game); previousTime = null; }
   else if (game.phase === 'lost') reset();
@@ -128,7 +126,7 @@ for (const button of root.querySelectorAll('[data-difficulty]')) on(button, 'cli
   previousPhase = ''; renderUI(); session.notify();
 });
 on(elements.pause, 'click', () => { pause(game); renderUI(); });
-on(elements.nitro, 'click', () => { activateNitro(game); renderUI(); });
+on(elements.nitro, 'click', () => { activateNitro(game); buzz('good'); renderUI(); });
 on(elements['buttons-mode'], 'click', () => buttonsMode());
 on(elements['tilt-mode'], 'click', enableTilt);
 
@@ -158,9 +156,9 @@ on($('scene'), 'pointerdown', event => {
 on($('scene'), 'pointerup', event => {
   if (!gestureStart || gestureStart.id !== event.pointerId) return;
   const dx = event.clientX - gestureStart.x, dy = event.clientY - gestureStart.y;
-  if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy)) steer(game, Math.sign(dx));
+  if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy)) { steer(game, Math.sign(dx)); if (game.phase === 'playing') buzz('tap'); }
   else if (Math.hypot(dx, dy) < 14 && !sensorMode) {
-    const bounds = $('scene').getBoundingClientRect(); steer(game, event.clientX < bounds.left + bounds.width / 2 ? -1 : 1);
+    const bounds = $('scene').getBoundingClientRect(); steer(game, event.clientX < bounds.left + bounds.width / 2 ? -1 : 1); if (game.phase === 'playing') buzz('tap');
   }
   gestureStart = null;
 });
@@ -224,6 +222,7 @@ function renderUI() {
       elements['overlay-title'].textContent = 'Заезд окончен';
       elements['overlay-copy'].textContent = DIFFICULTIES[game.difficulty].name + '. Одна ошибка — новый старт. Побьёшь свой рекорд?';
       elements.start.textContent = 'Ещё заезд';
+      if (previousPhase === 'playing' && owns()) buzz('crash');
       elements['result-stats'].innerHTML = `<div><strong>${Math.floor(game.distance)}</strong><span>метров</span></div><div><strong>${elapsed}</strong><span>секунд</span></div><div><strong>${game.bestCombo}</strong><span>лучшая серия</span></div>`;
       session.finish();
     }

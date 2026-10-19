@@ -1,41 +1,31 @@
 html.game-is-open,
 html.game-is-open body { overflow: hidden; overscroll-behavior: none; }
 
+/* Общая сцена трёх игр: весь экран, без прокрутки страницы, без системных
+   жестов поверх поля — выделения текста, лупы и меню долгого нажатия. */
 .game-shell {
   position: fixed;
   z-index: 80;
   inset: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: #173c34;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
+
+.game-shell > * { height: 100%; }
+.game-shell input, .game-shell select, .game-shell textarea { -webkit-user-select: auto; user-select: auto; }
 
 html.game-is-open .rest-pill { z-index: 85; }
 
-.game-shell > * {
-  min-height: 100dvh;
-  border-radius: 0;
-}
+.game-shell--plank { background: #e7ede2; }
+.game-shell--match { background: #173e34; }
 
-.game-shell--plank {
-  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
-  background: #e7ede2;
-}
-
-.game-shell--plank .plank-game,
-.game-shell--match .match-game {
-  max-width: 640px;
-  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  margin: 0 auto;
-  border-radius: 0;
-}
-
-.game-shell--match {
-  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
-  background: #173e34;
-}
-
-@media (min-width: 700px) {
-  .game-shell--plank,
-  .game-shell--match { padding-inline: 24px; }
-}
+/* Те же игры на отдыхе: экран отдыха уже на весь экран, игра занимает его целиком */
+.rest-screen.rest-screen--game { display: block; padding: 0; overflow: hidden; overscroll-behavior: none; touch-action: none; cursor: default !important; background: #e7ede2; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; animation: none; }
+.rest-screen.rest-screen--game > * { height: 100%; }
+.rest-screen.rest-screen--scooter { background: #173c34; }
+.rest-screen.rest-screen--match { background: #173e34; }

@@ -3,7 +3,7 @@ import { useScooterSession } from './ScooterSession.jsx';
 import { mountScooter } from './scooter-runtime.js';
 import { pause, DIFFICULTIES } from './scooter-model.js';
 import { restHere } from './rest-here.js';
-import { plugin } from './native-bridge.js';
+import { useGameChrome, vibrationOn, setVibration } from './game-feel.js';
 import './scooter.css';
 
 export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, immersive = false }) {
@@ -26,13 +26,7 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
     const until = Math.min(deadline.current, restHere()?.until ?? Infinity);
     return Date.now() >= until;
   }), [session]);
-  useEffect(() => {
-    const bar = plugin('StatusBar');
-    let active = true;
-    // Этот плагин уже входит в обе оболочки. Позднее hide не должно пережить выход.
-    if (bar?.hide) bar.hide().then(() => { if (!active) bar.show?.().catch(() => {}); }).catch(() => {});
-    return () => { active = false; bar?.show?.().catch(() => {}); };
-  }, []);
+  useGameChrome(root);
   const request = async fn => { const id = ++requestId.current; setError(''); setLoading(true); try { await fn(); } catch (err) {
     console.warn('Игровой рейтинг:', err); if (id === requestId.current) setError(err.message || 'Не удалось загрузить рейтинг. Попробуй ещё раз.');
   } finally { if (id === requestId.current) setLoading(false); } };
@@ -87,6 +81,7 @@ export default function ScooterGame({ onClose, restLeft, restUntil = Infinity, i
           <p data-scooter="sensor-status" aria-live="polite">Левая половина — влево. Правая — вправо.</p>
           <label className="voice-choice"><input type="checkbox" checked={session.voice} onChange={e => { session.voice = e.target.checked; if (!e.target.checked) window.speechSynthesis?.cancel(); session.notify(); }} />Озвучивать реплики персонажей</label>
           <p>Текстовые реплики видны всегда. Для голоса используется установленный русский голос телефона.</p>
+          <label className="voice-choice"><input type="checkbox" checked={vibrationOn()} onChange={e => { setVibration(e.target.checked); refresh(value => value + 1); }} />Вибрация при манёврах и столкновении</label>
           <button type="button" className="primary" onClick={() => setPanel(null)}>К игре</button>
         </section>
       </div>

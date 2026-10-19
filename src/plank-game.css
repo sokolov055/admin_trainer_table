@@ -90,7 +90,6 @@
 .plank-game__confetti { position: absolute; inset: 0; pointer-events: none; }
 .plank-game__confetti i { position: absolute; top: 0; width: 7px; height: 13px; background: var(--pg-orange); animation: plank-confetti 1300ms ease-out both; }
 .plank-game__confetti i:nth-child(even) { background: var(--pg-green); }
-.rest-screen.rest-screen--game { display: block; overflow-y: auto; touch-action: pan-y; cursor: auto; background: #e7ede2; padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 16px); }
 .rest-screen__game-paused { font-size: 15px; line-height: 1.5; max-width: 340px; text-align: center; margin: 16px auto; }
 @keyframes plank-breathe { 50% { transform: translateY(2px) rotate(.35deg); } }
 @keyframes plank-shake { from { transform: translateY(1px) rotate(-.3deg); } to { transform: translateY(-1px) rotate(.3deg); } }

@@ -174,9 +174,6 @@
   .match-game .match-panel h3 { font-size: 25px; }
   .match-story-portrait { flex-basis: 85px; width: 85px; }
 }
-.rest-screen.rest-screen--match { display: flex; align-items: center; justify-content: center; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overflow-y: auto; touch-action: pan-y; cursor: default !important; background: #173e34; }
-.rest-screen--match .match-game { margin: auto; flex-shrink: 0; }
-@media (max-width: 500px) { .rest-screen--match .match-game { border-radius: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .match-game *, .match-game *::before, .match-game *::after { animation-duration: .15s !important; transition-duration: .15s !important; }
   .match-fx, .match-confetti { display: none; }

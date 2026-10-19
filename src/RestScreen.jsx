@@ -12,7 +12,9 @@ import { ringOnce, stopVibration } from './rest-alarm.js';
 import { isNativeApp } from './native-bridge.js';
 import { IconDelta, IconChevron } from './icons.jsx';
 import { IconPlankGame, IconScooterGame, IconMatchGame } from './game-icons.jsx';
+import { enterFullscreen } from './game-feel.js';
 import './rest.css';
+import './game-shell.css';
 
 /**
  * Отдых на весь экран (03.10.2026, владелец): крупный таймер, касание по
@@ -81,6 +83,12 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
     const timer = setInterval(() => { n += 1; if (n >= 60) { clearInterval(timer); return; } ringOnce(); }, 2000);
     return () => { clearInterval(timer); stopVibration(); };
   }, [over, until]);
+  // Игра на отдыхе — тоже на весь экран: касание по кнопке и есть жест,
+  // без которого браузер не уберёт адресную строку (19.10.2026)
+  const openGame = (event, kind) => {
+    setGameKind(kind); setGameUntil(until);
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) enterFullscreen(event.currentTarget);
+  };
   const share = over ? 1 : Math.max(0, Math.min(1, left / Math.max(1, total)));
   const R = 120;
   const C = 2 * Math.PI * R;
@@ -136,9 +144,9 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
       {over && allowGame && (activeRound(plank.round) || scooterActive || matchActive) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
       {!over && allowGame && <>
         <div className="rest-screen__games" aria-label="Игры на отдыхе">
-          <button type="button" onClick={() => { setGameKind('plank'); setGameUntil(until); }}><IconPlankGame size={64} /><span>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</span></button>
-          <button type="button" onClick={() => { setGameKind('scooter'); setGameUntil(until); }}><IconScooterGame size={64} /><span>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</span></button>
-          <button type="button" onClick={() => { setGameKind('match'); setGameUntil(until); }}><IconMatchGame size={64} /><span>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</span></button>
+          <button type="button" onClick={(event) => { openGame(event, 'plank'); }}><IconPlankGame size={64} /><span>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</span></button>
+          <button type="button" onClick={(event) => { openGame(event, 'scooter'); }}><IconScooterGame size={64} /><span>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</span></button>
+          <button type="button" onClick={(event) => { openGame(event, 'match'); }}><IconMatchGame size={64} /><span>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</span></button>
         </div>
       </>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>

@@ -91,8 +91,6 @@
 .scooter-game .leaderboard-list small { display: block; font-size: 10px; color: #49665b; }
 .scooter-game .leaderboard-list strong { font-size: 15px; font-variant-numeric: tabular-nums; }
 .scooter-game .leaderboard-list .mine { color: #15522f; background: #e7f7d9; }
-.rest-screen--scooter { display: block; padding: 0; overflow: hidden; cursor: default !important; background: #173c34; }
-.rest-screen--scooter .scooter-game { height: 100%; }
 @media (hover: hover) and (pointer: fine) { .scooter-game .primary:hover { background: #97e49b; } .scooter-game .menu-links button:hover { color: #123c2c; } }
 @media (max-height: 650px) { .scooter-game .overlay { padding: 12px; } .scooter-game .overlay-body { padding: 18px; } .scooter-game h2 { font-size: 29px; } .scooter-game .difficulty-picker { margin-block: 12px; } .scooter-game .difficulty-picker button { min-height: 52px; } .scooter-game .menu-links { gap: 0 10px; } }
 @media (min-width: 700px) { .scooter-game .overlay-body { margin-block: auto; } .scooter-game .settings-panel, .scooter-game .leaderboard-panel { padding-inline: max(24px, calc((100% - 520px) / 2)); } }
