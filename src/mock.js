@@ -1174,8 +1174,12 @@ const MOCK = {
   'owner.stats': () => mockStats(),
   'owner.export.sections': () => ({ sections: [
     { key: 'exercises', title: 'Упражнения', hint: 'общая база и упражнения тренеров', rows: demoExercises.length, filters: [{ value: 'all', label: 'Все', count: demoExercises.length }, { value: 'active', label: 'Активные', count: demoExercises.length }, { value: 'hidden', label: 'Убранные', count: 0 }, { value: 'mine', label: 'Свои', count: 0 }] },
-    { key: 'foods', title: 'Продукты и блюда', hint: 'справочник продуктов', rows: 0 } ] }),
-  'owner.export': (p) => ({ app: 'Fit Track', exportedAt: new Date().toISOString(), sections: Object.fromEntries((p.sections || []).map((k) => [k, k === 'exercises' ? { exercises: demoExercises } : { foods: [] }])) }),
+    { key: 'foods', title: 'Продукты и блюда', hint: 'справочник продуктов', rows: 0 },
+    { key: 'usage', title: 'Где используются упражнения', hint: 'только числа, без клиентов', rows: demoExercises.length } ] }),
+  'owner.export': (p) => ({ app: 'Fit Track', exportedAt: new Date().toISOString(), sections: Object.fromEntries((p.sections || []).map((k) => [k,
+    k === 'exercises' ? { exercises: demoExercises }
+      : k === 'usage' ? { totals: { completed_workouts: 0, plan_rows: 0, templates: 0 }, exercises: demoExercises.map((e) => ({ id: e.id, name: e.name, sessions: 0, sets: 0, clients: 0 })), unlinked: [] }
+      : { foods: [] }])) }),
   // Истории из панели (FT-615): в демо — в памяти страницы, null — вшитые
   'app.stories': () => ({ topics: mockStories.topics, at: mockStories.at }),
   'owner.stories': () => mockStoriesState(),
