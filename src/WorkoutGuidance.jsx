@@ -25,7 +25,8 @@ function stepsWord(n) {
  * «Подготовка» и «Движение» одной нумерацией, одно «Чего избегать», мышцы.
  * Состояние раскрытия изолировано от состояния занятия.
  */
-export default function WorkoutGuidance({ info, trainer = false }) {
+// title — чьё это упражнение: в круге суперсета разделы идут подряд
+export default function WorkoutGuidance({ info, trainer = false, title = '' }) {
   const [open, setOpen] = useState(false);
   const [figure, setFigure] = useState(false);
   const g = resolveGuidance(info);
@@ -36,7 +37,7 @@ export default function WorkoutGuidance({ info, trainer = false }) {
   const meta = [g.primary?.name, total ? total + ' ' + stepsWord(total) : '', g.media ? 'видео' : ''].filter(Boolean).join(' · ');
   return <details className="workout__setup workout__about" onToggle={(e) => setOpen(e.currentTarget.open)}>
     <summary>
-      <span>{info.machines?.length ? 'Тренажёр и техника' : 'Техника выполнения'}</span>
+      <span>{title ? title + ': ' : ''}{info.machines?.length ? (title ? 'тренажёр и техника' : 'Тренажёр и техника') : (title ? 'техника выполнения' : 'Техника выполнения')}</span>
       {!open && meta && <span className="guide__meta">{meta}</span>}
     </summary>
     {open && <div className="guide">

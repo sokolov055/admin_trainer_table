@@ -26,6 +26,7 @@ import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
 import { Media, SetupText, MachineList, PersonalNote } from '../media.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
+import WorkoutBoundary from '../WorkoutBoundary.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
 import { uid } from '../workout-model.js';
@@ -37,7 +38,13 @@ import { useRights, hasPlus, isPro, setRights } from '../rights.js';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
-export const WorkoutJournal = lazyPage(() => import('../Workout.jsx'));
+const WorkoutPage = lazyPage(() => import('../Workout.jsx'));
+// Ошибка на экране занятия — «Не удалось открыть занятие» и «Повторить»,
+// а не серый экран всего приложения (WorkoutBoundary.jsx, 19.10.2026)
+export function WorkoutJournal(props) {
+  return <WorkoutBoundary onClose={props.onClose} backLabel={props.backLabel || 'К программе'}><WorkoutPage {...props} /></WorkoutBoundary>;
+}
+WorkoutJournal.preload = WorkoutPage.preload;
 export const Ration = lazyPage(() => import('../nutrition/Ration.jsx'));
 const NutritionDiary = lazyPage(() => import('../nutrition/Diary.jsx'));
 export const PlanEditor = lazyPage(() => import('../trainer/PlanEditor.jsx'));

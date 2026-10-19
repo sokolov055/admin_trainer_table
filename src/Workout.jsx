@@ -1262,7 +1262,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       ))}
       {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
       {members.map(({ ex }) => ex.exerciseId && setups[ex.exerciseId]
-        ? <React.Fragment key={'about' + ex.id}>{aboutView(setups[ex.exerciseId], null, ex.name)}</React.Fragment> : null)}
+        ? <WorkoutGuidance key={'about' + ex.id} info={setups[ex.exerciseId]} trainer={!asClient} title={ex.name} /> : null)}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>

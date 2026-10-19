@@ -777,6 +777,32 @@ test('FT-570, вариант А: шаги одной нумерацией, ош�
   }
 });
 
+// 19.10.2026: суперсет из упражнений базы падал, как только приходила их
+// техника (ReferenceError: aboutView) — весь экран серый, занятие не
+// сохранялось, и так при каждом открытии
+test('суперсет из упражнений базы с техникой открывается; у каждого — своя «техника выполнения»', async () => {
+  data.clear();
+  const info = name => ({ name, setup: '', notes: 'Спина прямая.', machines: [], alternatives: [], muscles: { primary: ['lower-back'] } });
+  exerciseSetupResponse = { setups: { 51: info('Гиперэкстензия'), 52: info('Отжимания от пола') }, notes: {} };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block: { title: 'Спина', exercises: [
+        { name: 'Гиперэкстензия', exerciseId: 51, sets: '4', reps: '15', supersetGroup: 'g-7-8' },
+        { name: 'Отжимания от пола', exerciseId: 52, sets: '4', reps: '', supersetGroup: 'g-7-8' },
+      ] }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const about = local.root.findAll(n => n.type === 'details' && n.props.className === 'workout__setup workout__about');
+    assert.deepEqual(about.map(n => text(n.findByType('summary').findAllByType('span')[0])),
+      ['Гиперэкстензия: техника выполнения', 'Отжимания от пола: техника выполнения']);
+    assert.ok(local.root.findAllByType('button').some(b => text(b) === 'Завершить'), 'экран занятия на месте');
+  } finally {
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
+});
+
 /**
  * Тренажёр закрепляет тренер (решение владельца 16.10.2026): в занятии
  * выбирать нечего — первый подставлен сам с весом на нём, у каждого
