@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pavingRows, walkingFrame } from '../src/scooter-motion.js';
+import { pavingRows, walkingFrame, walkingGait } from '../src/scooter-motion.js';
 import { createScooterVoice } from '../src/scooter-voice.js';
 
 test('плитка сохраняет раскладку мира при переходе камеры через границу ряда', () => {
@@ -14,6 +14,15 @@ test('шаг каждого НПС проходит четыре позы и о�
   for (const type of ['runner', 'grandma', 'athlete']) {
     const frames = new Set(Array.from({ length: 60 }, (_, i) => walkingFrame(type, i / 30)));
     assert.equal(frames.size, 4);
+  }
+});
+test('походка: кадр и покачивание из одной фазы, вес переходит с ноги на ногу', () => {
+  for (const type of ['runner', 'grandma', 'athlete']) {
+    for (let i = 0; i < 40; i++) assert.equal(walkingGait(type, i / 17, .5).frame, walkingFrame(type, i / 17, .5));
+    // Первая половина цикла (кадры 0–1) — тело в одну сторону, вторая (2–3) — в другую
+    const sides = Array.from({ length: 400 }, (_, i) => walkingGait(type, i / 100, .5)).filter(g => Math.abs(g.dx) > .3).map(g => [g.frame < 2, g.dx > 0]);
+    assert.ok(sides.length > 50 && sides.every(([first, right]) => first === right));
+    assert.deepEqual(walkingGait(type, 0, .5), walkingGait(type, 0, .5), 'на паузе поза не меняется');
   }
 });
 test('гневные голоса различаются по персонажу и не используют сетевой синтез', () => {

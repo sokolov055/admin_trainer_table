@@ -41,6 +41,12 @@ test('полный экран, компактный HUD, меню, настро�
  await page.evaluate(()=>{ride.nitroCharges=1;ride.route=[]});await page.clock.runFor(30);
  await page.getByRole('button',{name:/Включить нитро/}).click();await page.clock.runFor(120);assert.ok((await page.evaluate(()=>readRide())).nitro>3);
  await page.keyboard.press('ArrowLeft');assert.equal((await page.evaluate(()=>readRide())).lane,0);
+ // Нитро внизу не закрывает самокат и на правой полосе (отзыв 17.10.2026)
+ await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');await page.clock.runFor(600);
+ const nitro=await page.locator('.nitro-button').boundingBox(),k=bounds.width/420;
+ const rider={x:(122+2*88-47)*k,y:(bounds.height/k-154-52)*k,w:94*k,h:104*k};
+ assert.ok(nitro.y>=rider.y+rider.h||nitro.x+nitro.width<=rider.x,'нитро не перекрывает игрока: '+JSON.stringify({nitro,rider}));
+ await page.keyboard.press('ArrowLeft');await page.keyboard.press('ArrowLeft');await page.clock.runFor(600);
  await page.screenshot({path:'reports/scooter-v3/playing-390.png',fullPage:true});
  await page.getByRole('button',{name:'Меню игры',exact:true}).click();const paused=await page.evaluate(()=>readRide());
  await page.clock.runFor(5000);assert.equal((await page.evaluate(()=>readRide())).distance,paused.distance);
@@ -116,6 +122,8 @@ test('первое обучение безопасно, пробует обе п
  await page.getByRole('button',{name:'Попробовать влево',exact:true}).click();await page.clock.runFor(200);assert.equal(await page.evaluate(()=>ride.lane),0);
  await page.getByRole('button',{name:'Попробовать вправо',exact:true}).click();await page.clock.runFor(200);assert.equal(await page.evaluate(()=>ride.lane),1);
  await page.screenshot({path:'reports/scooter-v3/tutorial-390.png',fullPage:true});
+ // Игра на сенсорном экране сама уходит во весь экран; размер окна меняется только вне его
+ await page.evaluate(()=>document.fullscreenElement&&document.exitFullscreen());
  await page.setViewportSize({width:320,height:640});await page.clock.runFor(50);await page.screenshot({path:'reports/scooter-v3/tutorial-320.png',fullPage:true});
  await page.setViewportSize({width:1440,height:900});await page.clock.runFor(50);await page.screenshot({path:'reports/scooter-v3/tutorial-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});await page.clock.runFor(50);

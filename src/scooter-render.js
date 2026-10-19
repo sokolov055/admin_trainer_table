@@ -1,9 +1,11 @@
 // FT-563: игра для тестовых клиентов. Параметры проверены в изолированном прототипе.
 import { TUNING } from './scooter-model.js';
-import trafficUrl from './assets/scooter-traffic-v3.png';
-import alleyUrl from './assets/scooter-alley-v3.png';
-import walkUrl from './assets/scooter-walk-v4.png';
-import { pavingRows, walkingFrame } from './scooter-motion.js';
+// Атласы v4/v5 — исходные imagegen-рисунки после scripts/bake-scooter-sprites.py:
+// ярче цвет, кадры шага выровнены и чередуют ноги.
+import trafficUrl from './assets/scooter-traffic-v4.png';
+import alleyUrl from './assets/scooter-alley-v4.png';
+import walkUrl from './assets/scooter-walk-v5.png';
+import { pavingRows, walkingGait } from './scooter-motion.js';
 
 const traffic = typeof Image === 'undefined' ? null : new Image();
 const people = typeof Image === 'undefined' ? null : new Image();
@@ -17,15 +19,15 @@ function sprite(ctx, type, x, y, time = 0, size = 1, direction = 1) {
   const animated = ['grandma', 'athlete', 'runner'].includes(type) && walking?.complete && walking.naturalWidth;
   const atlas = vehicle ? traffic : animated ? walking : people;
   if (!atlas?.complete || !atlas.naturalWidth || (!vehicle && !SPRITES[type])) return false;
-  const [column, row] = vehicle ? [type === 'taxi' ? 0 : 2, 0] : animated ? [SPRITES[type][0], walkingFrame(type, time, Math.floor(x / 88))] : SPRITES[type];
+  const gait = animated ? walkingGait(type, time, Math.floor(x / 88) + .5) : null;
+  const [column, row] = vehicle ? [type === 'taxi' ? 0 : 2, 0] : animated ? [SPRITES[type][0], gait.frame] : SPRITES[type];
+  // Сетка атласа шага ровная (3 × 4): ряды выровнены при подготовке.
   const cw = atlas.naturalWidth / 3, ch = atlas.naturalHeight / (animated ? 4 : 2);
-  // Фактический шаг рядов сгенерированного атласа: исключает край следующей головы.
-  const sourceY = animated ? (20 + row * 344) / 1448 * atlas.naturalHeight : row * ch;
-  const sourceHeight = animated ? 352 / 1448 * atlas.naturalHeight : ch;
   const dimensions = vehicle ? [140, 140] : type === 'barrier' ? [96, 96] : type === 'athlete' ? [88, 88] : type === 'rider' ? [94, 104] : animated ? [78, 82] : [86, 90];
-  ctx.save(); ctx.translate(x, y);
+  ctx.save(); ctx.translate(x + (gait ? gait.dx : 0), y);
   if (vehicle) ctx.rotate(direction * Math.PI / 2);
-  ctx.drawImage(atlas, column * cw, sourceY, cw, sourceHeight, -dimensions[0] * size / 2, -dimensions[1] * size / 2, dimensions[0] * size, dimensions[1] * size);
+  if (gait) { ctx.rotate(gait.twist); ctx.scale(gait.scale, gait.scale); }
+  ctx.drawImage(atlas, column * cw, row * ch, cw, ch, -dimensions[0] * size / 2, -dimensions[1] * size / 2, dimensions[0] * size, dimensions[1] * size);
   if (type === 'rider') for (const wheelY of [-45, 45]) rect(ctx, -1.7, wheelY - 3 + (time * 4) % 5, 3.4, 1, '#c1c7aa');
   if (type === 'robot') {
     ctx.scale(size, size);
@@ -38,7 +40,7 @@ function sprite(ctx, type, x, y, time = 0, size = 1, direction = 1) {
   ctx.restore(); return true;
 }
 
-const C = { road: '#bcb7a2', line: '#f4f2dc', sidewalk: '#688b55', ink: '#183d34', shadow: '#102f2b4a' };
+const C = { road: '#dccfae', line: '#fff8de', sidewalk: '#69b04c', ink: '#183d34', shadow: '#102f2b4a' };
 const palette = ['#dbac86', '#eac590', '#97bfb4', '#c6ad9c', '#afc7a3'];
 
 function shape(ctx, points, color) {
@@ -132,13 +134,13 @@ export function drawObject(ctx, type, x, y, size = 1, time = 0) {
 }
 
 function tree(ctx, x, y, variant = 0) {
-  rect(ctx, x - 18, y - 22, 36, 49, '#c9ceae', 5);
-  oval(ctx, x + 10, y + 7, 25, 29, '#153b3624');
-  rect(ctx, x - 3, y - 1, 6, 22, '#8c7655', 2);
-  oval(ctx, x, y - 8, 21, 24, '#497d58');
-  oval(ctx, x - 6, y - 14, 17, 19, variant ? '#8db471' : '#75a46d');
-  oval(ctx, x + 8, y - 10, 11, 15, '#5d945d');
-  oval(ctx, x - 8, y - 21, 8, 6, '#a3c180');
+  rect(ctx, x - 18, y - 22, 36, 49, '#e6dcb8', 5);
+  oval(ctx, x + 10, y + 7, 25, 29, '#153b3630');
+  rect(ctx, x - 3, y - 1, 6, 22, '#93683f', 2);
+  oval(ctx, x, y - 8, 21, 24, '#2f9348');
+  oval(ctx, x - 6, y - 14, 17, 19, variant ? '#9bd65a' : '#6cc451');
+  oval(ctx, x + 8, y - 10, 11, 15, '#45ad55');
+  oval(ctx, x - 8, y - 21, 8, 6, '#cdf27e');
 }
 
 function building(ctx, x, y, width, height, index, right = false) {
@@ -231,48 +233,55 @@ export class StreetRenderer {
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = 'high';
     this.width = 420; this.height = bounds.height * 420 / bounds.width;
+    // Полоска «домой» iPhone: самокат поднимается над ней, иначе нитро внизу
+    // экрана наезжает на игрока (19.10.2026). Только рисунок — модель в метрах.
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none';
+    document.body.appendChild(probe);
+    this.bottomInset = probe.getBoundingClientRect().height * 420 / Math.max(1, bounds.width);
+    probe.remove();
   }
   draw(game, reduced = false, training = false) {
     const ctx = this.ctx, w = this.width, h = this.height;
     ctx.setTransform(this.canvas.width / w, 0, 0, this.canvas.height / h, 0, 0);
-    const playerY = h - (training ? 205 : 154);
+    const playerY = h - (training ? 205 : 154) - (this.bottomInset || 0);
     const metresToPixels = Math.min(TUNING.roadPixelsPerMetre, (playerY - 40) / 72);
     const offset = game.distance * metresToPixels;
     rect(ctx, 0, 0, w, h, C.sidewalk);
     rect(ctx, 78, 0, w - 156, h, C.road);
     for (const { y, shift } of pavingRows(offset, h)) {
-      line(ctx, [[80, y], [340, y]], '#918e7e', .7);
-      for (let x = 80 + shift; x < 340; x += 44) line(ctx, [[x, y], [x, y + 44]], '#a19d89', .6);
+      line(ctx, [[80, y], [340, y]], '#b19f7d', .7);
+      for (let x = 80 + shift; x < 340; x += 44) line(ctx, [[x, y], [x, y + 44]], '#bba985', .6);
     }
-    rect(ctx, 72, 0, 6, h, '#e0d9bc'); rect(ctx, w - 78, 0, 6, h, '#e0d9bc');
+    rect(ctx, 72, 0, 6, h, '#f6ebc6'); rect(ctx, w - 78, 0, 6, h, '#f6ebc6');
     rect(ctx, 78, 0, 3, h, '#666f5140'); rect(ctx, w - 83, 0, 5, h, '#666f5140');
     for (let y = (offset % 48) - 48; y < h; y += 48) {
-      line(ctx, [[45, y], [70, y]], '#c9c5ae', 1);
-      line(ctx, [[350, y], [376, y]], '#c9c5ae', 1);
+      line(ctx, [[45, y], [70, y]], '#e6f0b5', 1);
+      line(ctx, [[350, y], [376, y]], '#e6f0b5', 1);
     }
     const block = 158;
     const base = Math.floor(offset / block);
     for (let i = -1; i < Math.ceil(h / block) + 1; i++) {
       const y = i * block + offset % block;
       const idx = ((i - base) % 5 + 5) % 5;
-      rect(ctx, 0, y + 8, 36, 76, '#527849', 13);
-      rect(ctx, 386, y + 31, 34, 73, '#527849', 13);
+      rect(ctx, 0, y + 8, 36, 76, '#3f9440', 13);
+      rect(ctx, 386, y + 31, 34, 73, '#3f9440', 13);
       for (let n = 0; n < 6; n++) {
-        oval(ctx, 10 + n % 2 * 14, y + 20 + n * 9, 3, 4, n % 2 ? '#e8d58d' : '#d89579');
-        oval(ctx, 395 + n % 2 * 14, y + 42 + n * 9, 3, 4, n % 2 ? '#f2e3ac' : '#e3bda1');
+        oval(ctx, 10 + n % 2 * 14, y + 20 + n * 9, 3, 4, n % 2 ? '#ffd23f' : '#ff6f61');
+        oval(ctx, 395 + n % 2 * 14, y + 42 + n * 9, 3, 4, n % 2 ? '#fff27a' : '#ff8fb1');
       }
       tree(ctx, 57, y + 145, idx % 2);
       tree(ctx, 363, y + 98, (idx + 1) % 2);
       if (idx % 2 === 0) {
-        rect(ctx, 49, y + 47, 15, 37, '#836d48', 3);
-        for (let n = 0; n < 4; n++) rect(ctx, 50, y + 49 + n * 8, 13, 5, '#c7a16b', 1);
-        rect(ctx, 354, y + 7, 14, 22, '#628b72', 4);
-        oval(ctx, 361, y + 8, 6, 4, '#a3c68b');
+        rect(ctx, 49, y + 47, 15, 37, '#8e5f33', 3);
+        for (let n = 0; n < 4; n++) rect(ctx, 50, y + 49 + n * 8, 13, 5, '#e3a65a', 1);
+        rect(ctx, 354, y + 7, 14, 22, '#2f9c7c', 4);
+        oval(ctx, 361, y + 8, 6, 4, '#95e5b0');
       } else {
-        oval(ctx, 55, y + 58, 11, 11, '#baa980');
-        oval(ctx, 54, y + 56, 10, 10, '#f5e9c8');
-        rect(ctx, 50, y + 38, 8, 8, '#c19568', 2);
-        rect(ctx, 50, y + 69, 8, 8, '#c19568', 2);
+        oval(ctx, 55, y + 58, 11, 11, '#c49a5c');
+        oval(ctx, 54, y + 56, 10, 10, '#fff1cc');
+        rect(ctx, 50, y + 38, 8, 8, '#e07a4f', 2);
+        rect(ctx, 50, y + 69, 8, 8, '#e07a4f', 2);
       }
     }
     const firstCross = Math.max(450, 450 + Math.floor((game.distance - 450 - 40) / 500) * 500);

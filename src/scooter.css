@@ -30,7 +30,7 @@
 .scooter-game .tutorial-footer p { margin-bottom: 10px; font-size: 11px; }
 .scooter-game canvas { display: block; width: 100%; height: 100%; }
 .scooter-game .hud { position: absolute; z-index: 4; top: calc(12px + env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); display: flex; align-items: flex-start; gap: 12px; pointer-events: none; color: #fffdf2; text-shadow: 0 2px 6px #0b2924; }
-.scooter-game .viewport::before { content: ''; position: absolute; z-index: 3; inset: 0 0 auto; height: calc(125px + env(safe-area-inset-top)); background: linear-gradient(#173c34e6, #173c3400); pointer-events: none; }
+.scooter-game .viewport::before { content: ''; position: absolute; z-index: 3; inset: 0 0 auto; height: calc(112px + env(safe-area-inset-top)); background: linear-gradient(#173c34b8, #173c3400); pointer-events: none; }
 .scooter-game .distance-counter { display: flex; flex-direction: column; line-height: 1; }
 .scooter-game .distance-counter strong { font-size: clamp(28px, 7vw, 40px); letter-spacing: -.035em; font-weight: 850; font-variant-numeric: tabular-nums; }
 .scooter-game .distance-counter span { font-size: 11px; margin-top: 5px; font-weight: 700; }
@@ -67,7 +67,7 @@
 .scooter-game .result-stats > div { flex: 1; min-width: 0; }
 .scooter-game .result-stats strong { display: block; font-size: 25px; font-weight: 850; font-variant-numeric: tabular-nums; }
 .scooter-game .result-stats span { display: block; font-size: 10px; color: #49665b; }
-.scooter-game .nitro-button { position: absolute; z-index: 5; right: max(18px, env(safe-area-inset-right)); bottom: calc(96px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 10px 15px; border: 0; border-radius: 16px; background: #d3ff85; color: #173c34; box-shadow: 0 7px 22px #0b29244d; font-size: 12px; font-weight: 850; text-transform: uppercase; }
+.scooter-game .nitro-button { position: absolute; z-index: 5; right: max(18px, env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 10px 15px; border: 0; border-radius: 16px; background: #d3ff85; color: #173c34; box-shadow: 0 7px 22px #0b29244d; font-size: 12px; font-weight: 850; text-transform: uppercase; }
 .scooter-game .nitro-button svg { width: 20px; height: 25px; fill: currentColor; }
 .scooter-game .nitro-button b { min-width: 22px; font-variant-numeric: tabular-nums; }
 .scooter-game .nitro-button.active { background: #b3ff6e; }
