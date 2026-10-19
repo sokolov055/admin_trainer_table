@@ -28,6 +28,31 @@ async function setup(t, options = {}) {
   t.after(() => assert.deepEqual(errors, []));
   return page;
 }
+// Полноэкранная сцена: всё на экране, по порядку сверху вниз, поле квадратное, ничего не листается
+const layout = (page, root) => page.evaluate(root => {
+  const scope = document.querySelector(root);
+  const box = sel => scope.querySelector(sel).getBoundingClientRect();
+  const parts = ['.match-top', '.match-hud', '.match-quest', '.match-board-frame', '.match-feedback', '.match-footer'].map(box);
+  const frame = box('.match-board-frame'), game = scope.matches('.match-game') ? scope : scope.querySelector('.match-game');
+  return {
+    inside: parts.every(r => r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight + .5 && r.right <= innerWidth + .5),
+    ordered: parts.every((r, i) => i === 0 || r.top >= parts[i - 1].bottom - .5),
+    square: Math.abs(frame.width - frame.height) < 1,
+    scrolls: game.scrollHeight > game.clientHeight + 1 || document.documentElement.scrollHeight > innerHeight || document.documentElement.scrollWidth > innerWidth,
+    cell: box('.match-tile').width, column: box('.match-scene').width,
+    rects: parts.map(r => [r.top, r.bottom, r.left, r.right].map(Math.round).join(',')).join(' | '), viewport: [innerWidth, innerHeight].join('×'),
+  };
+}, root);
+const fits = async (page, minCell, root = '.match-game') => {
+  const result = await layout(page, root);
+  assert.deepEqual({ inside: result.inside, ordered: result.ordered, square: result.square, scrolls: result.scrolls }, { inside: true, ordered: true, square: true, scrolls: false }, JSON.stringify(result));
+  assert.ok(result.cell >= minCell, `клетка ${result.cell} px меньше ${minCell}`);
+  return result;
+};
+const listenBuzz = page => page.evaluate(() => {
+  window.buzzes = [];
+  Object.defineProperty(navigator, 'vibrate', { configurable: true, value: pattern => { buzzes.push(JSON.stringify(pattern)); return true; } });
+});
 const read = page => page.evaluate(() => matchFixture.read());
 const pair = (page, strategy = 'greedy') => page.evaluate(strategy => matchFixture.move(strategy), strategy);
 const move = async (page, strategy = 'greedy', scene = page.locator('.match-game')) => {
@@ -39,10 +64,13 @@ const move = async (page, strategy = 'greedy', scene = page.locator('.match-game
 
 test('три в ряд: касания, подсказка, неверный обмен и клавиатура', async t => {
   const page = await setup(t);
+  await listenBuzz(page);
   await page.screenshot({ path: 'reports/match/ready-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Играть', exact: true }).click();
   await page.clock.runFor(400);
   await page.screenshot({ path: '.impeccable/review/mobile.png', fullPage: true });
+  await fits(page, 40);
+  assert.equal(await page.getByText('В форме!', { exact: true }).count(), 0, 'во время партии заголовок не занимает место поля');
   const covered = (await read(page)).game.covers[0];
   assert.equal(await page.locator(`[data-cell="${covered}"]`).getAttribute('aria-disabled'), 'true');
   assert.equal((await page.evaluate(() => matchFixture.legal())).some(pair => pair.includes(covered)), false);
@@ -50,6 +78,9 @@ test('три в ряд: касания, подсказка, неверный о�
   await page.getByRole('button', { name: 'Подсказка', exact: true }).click();
   assert.equal(await page.locator('.is-hint').count(), 2);
   await move(page);
+  let buzzes = await page.evaluate(() => buzzes.splice(0));
+  assert.ok(buzzes.includes('8'), 'выбор и обмен — короткий отклик: ' + buzzes);
+  assert.ok(buzzes.some(p => p === '14' || p === '[14,40,22]'), 'совпадение — вибрация: ' + buzzes);
   let state = await read(page); assert.equal(state.game.moves, MATCH_TUNING.moves - 1); assert.ok(state.game.score > 0);
   assert.equal(Number(await page.locator('[data-match=covers-progress]').innerText().then(text => text.split('/')[0].replace(/\D/g, ''))), state.game.uncovered);
   const illegal = await page.evaluate(size => {
@@ -59,12 +90,15 @@ test('три в ряд: касания, подсказка, неверный о�
   await page.locator(`[data-cell="${illegal[0]}"]`).click(); await page.locator(`[data-cell="${illegal[1]}"]`).click();
   await page.clock.runFor(1000);
   assert.equal((await read(page)).game.moves, MATCH_TUNING.moves - 1); assert.match(await page.getByRole('status').innerText(), /Ход сохранён/);
+  buzzes = await page.evaluate(() => buzzes.splice(0));
+  assert.ok(buzzes.includes('[28,45,28]'), 'неверный обмен — двойной толчок: ' + buzzes);
   const [a,b] = await pair(page);
   await page.locator(`[data-cell="${a}"]`).focus(); await page.keyboard.press('Space');
   await page.keyboard.press(b-a === MATCH_TUNING.size ? 'ArrowDown' : 'ArrowRight'); await page.keyboard.press('Enter');
   await page.clock.runFor(10000); assert.equal((await read(page)).game.moves, MATCH_TUNING.moves - 2);
   await page.setViewportSize({ width: 1440, height: 1000 }); await page.clock.runFor(300);
   await page.screenshot({ path: '.impeccable/review/desktop.png', fullPage: true });
+  const wide = await fits(page, 55); assert.ok(wide.column <= 640, 'на широком экране колонка игры до 640 px');
 });
 
 test('три в ряд: свайп, пауза посреди каскада, выход и сохранённая партия', async t => {
@@ -76,6 +110,10 @@ test('три в ряд: свайп, пауза посреди каскада, в
   await page.clock.runFor(280); assert.equal((await read(page)).frame.kind, 'clear');
   await page.screenshot({ path: 'reports/match/clear-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Пауза', exact: true }).click();
+  const vibration = page.getByRole('checkbox', { name: 'Вибрация', exact: true });
+  assert.equal(await vibration.isChecked(), true);
+  await vibration.uncheck(); assert.equal(await page.evaluate(() => localStorage.getItem('ft.games.vibration')), 'off');
+  await vibration.check(); assert.equal(await page.evaluate(() => localStorage.getItem('ft.games.vibration')), 'on');
   const stopped = await read(page); await page.clock.runFor(30000);
   assert.deepEqual((await read(page)).game, stopped.game);
   await page.screenshot({ path: 'reports/match/paused-390.png', fullPage: true });
@@ -103,6 +141,8 @@ test('три в ряд: отдых имеет приоритет, две сце�
   await scene.getByRole('button', { name: 'Продолжить игру', exact: true }).click();
   assert.deepEqual((await read(page)).game, saved);
   await page.screenshot({ path: 'reports/match/rest-390.png', fullPage: true });
+  assert.match(await scene.getByRole('timer').innerText(), /^\d+:\d\d$/);
+  await fits(page, 40, '.rest-screen--match .match-game');
   await page.clock.runFor(3100); assert.equal((await read(page)).mode, 'paused');
   await page.evaluate(at => showMatch({ menu: true, rest: true, until: at+3000, now: at+3100 }), at);
   await page.getByRole('dialog', { name: 'Отдых окончен', exact: true }).waitFor();
@@ -131,8 +171,11 @@ test('три в ряд: полный раунд, результат, новый 
   assert.match(await page.getByRole('dialog').innerText(), /Зарядить команду/);
   await page.screenshot({ path: 'reports/match/chapter2-intro-390.png', fullPage: true });
   await page.getByRole('button', { name: 'Играть', exact: true }).click();
-  await page.setViewportSize({ width: 320, height: 640 });
+  await page.setViewportSize({ width: 360, height: 740 }); await page.clock.runFor(300);
+  await fits(page, 37);
+  await page.setViewportSize({ width: 320, height: 568 }); await page.clock.runFor(300);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await fits(page, 31);
   await page.screenshot({ path: 'reports/match/playing-320.png', fullPage: true });
   await page.getByRole('button', { name: 'Как играть', exact: true }).click();
   assert.equal((await read(page)).mode, 'paused');
