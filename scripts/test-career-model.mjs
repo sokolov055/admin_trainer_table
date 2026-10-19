@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAREER, GAMES, createCareer, recordResult, promote, buy, useItem, priceOf, rankComplete, missionMet, restoreCareer, goalText } from '../src/career-model.js';
+import { CAREER, GAMES, createCareer, recordResult, promote, buy, useItem, priceOf, rankComplete, missionMet, restoreCareer, goalText, itemEffect, ITEMS } from '../src/career-model.js';
 import { createMatchGame } from '../src/match-model.js';
 import { chapterComplete, chapterProgress } from '../src/match-story.js';
 
@@ -76,6 +76,17 @@ test('испорченная или старая запись начинает �
   const saved = { ...createCareer(), rank: 3, coins: 500, done: { scooter: true } };
   const back = restoreCareer(JSON.stringify(saved));
   assert.equal(back.rank, 3); assert.equal(back.coins, 500); assert.deepEqual(back.done, { scooter: true, plank: false, match: false });
+  // Запись, поправленная руками: ни отрицательных бонусов, ни задания «выполненного» строкой
+  const odd = restoreCareer({ ...createCareer(), rank: 2, coins: '12.7', done: { scooter: 'нет', plank: 1, match: true }, items: { energy: -2, cheat: 1.5, protein: 3 }, finished: 'да' });
+  assert.deepEqual(odd.done, { scooter: false, plank: false, match: true });
+  assert.deepEqual(odd.items, { energy: 0, cheat: 0, protein: 3 });
+  assert.equal(odd.coins, 12); assert.equal(odd.finished, false);
+  assert.deepEqual(restoreCareer({ ...createCareer(), rank: 2, done: null, items: 'x' }).items, createCareer().items);
+});
+
+test('действие бонуса в подписи: со строчной, но «Три в ряд» с заглавной', () => {
+  assert.equal(itemEffect(ITEMS.protein), '+3 хода в задании «Три в ряд»');
+  assert.equal(itemEffect(ITEMS.energy), 'один заряд нитро на старте заезда');
 });
 
 test('правила задания «Три в ряд» меняют ходы, очки и сюжетную цель главы', () => {

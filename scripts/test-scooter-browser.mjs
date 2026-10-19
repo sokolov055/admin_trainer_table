@@ -72,7 +72,13 @@ test('бесконечная аллея, зебра, бабушки, качки 
  await page.evaluate(()=>{ride.route=[{id:'crash',at:ride.distance+2,lane:ride.lane,type:'robot',row:0}];});await page.clock.runFor(120);
  assert.equal((await page.evaluate(()=>readRide())).phase,'lost');await page.getByRole('heading',{name:'Заезд окончен',exact:true}).waitFor();
  await page.screenshot({path:'reports/scooter-v3/result-390.png',fullPage:true});
+ // Итог по-русски: «1 метр», «21 секунда», а не «1 метров» (19.10.2026)
+ const forms=(n,one,few,many)=>n%10===1&&n%100!==11?one:n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?few:many;
+ const stats=await page.locator('[data-scooter=result-stats] > div').evaluateAll(els=>els.map(el=>[Number(el.querySelector('strong').textContent),el.querySelector('span').textContent]));
+ assert.equal(stats[0][1],forms(stats[0][0],'метр','метра','метров'));assert.equal(stats[1][1],forms(stats[1][0],'секунда','секунды','секунд'));
+ assert.equal(await page.locator('[data-scooter=distance-unit]').innerText(),forms(Number((await page.locator('[data-scooter=distance]').innerText()).replace(/\s/g,'')),'метр','метра','метров'));
  await page.getByRole('button',{name:'Ещё заезд',exact:true}).click();assert.equal((await page.evaluate(()=>readRide())).phase,'countdown');
+ await page.evaluate(()=>{ride.distance=1;});await page.clock.runFor(30);assert.equal(await page.locator('[data-scooter=distance-unit]').innerText(),'метр');
 });
 test('приоритет отдыха и продолжение общей поездки',async t=>{
  const page=await setup(t);const at=await page.evaluate(()=>Date.now());

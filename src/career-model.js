@@ -39,6 +39,9 @@ export const ITEMS = Object.freeze({
   protein: Object.freeze({ game: 'match', name: 'Протеин', effect: '+3 хода в задании «Три в ряд»', price: 180 }),
 });
 
+/** Действие бонуса внутри фразы: «Протеин: +3 хода в задании «Три в ряд»» — название игры не теряет заглавную. */
+export const itemEffect = item => item.effect.charAt(0).toLowerCase() + item.effect.slice(1);
+
 export const VERSION = 1;
 
 export function createCareer() {
@@ -105,6 +108,10 @@ export function restoreCareer(raw) {
     const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
     if (!value || value.version !== VERSION || !Number.isInteger(value.rank) || value.rank < 0 || value.rank >= CAREER.length) return createCareer();
     const base = createCareer();
-    return { ...base, ...value, done: { ...base.done, ...value.done }, items: { ...base.items, ...value.items }, coins: Math.max(0, Number(value.coins) || 0) };
+    // Поправленная руками запись не даёт ни «минус двух» бонусов, ни задания, выполненного строкой
+    const count = n => Number.isInteger(n) && n > 0 ? n : 0;
+    const done = Object.fromEntries(GAMES.map(game => [game, value.done?.[game] === true]));
+    const items = Object.fromEntries(Object.keys(base.items).map(item => [item, count(value.items?.[item])]));
+    return { ...base, ...value, done, items, finished: value.finished === true, coins: Math.max(0, Math.floor(Number(value.coins)) || 0), earned: Math.max(0, Math.floor(Number(value.earned)) || 0) };
   } catch (_) { return createCareer(); }
 }
