@@ -1,9 +1,9 @@
 # Сборка и публикация приложения на нашем сервере (app.fitness100.ru).
 #
 # С 14.10.2026 сайт живёт на VPS в России: GitHub (США) больше не получает
-# IP-адреса пользователей. GitHub Pages отдаёт только страницы-указатели на
-# новый адрес (scripts/build-moved-site.mjs) — для старых ссылок и
-# Android-приложений до версии 7.
+# IP-адреса пользователей. GitHub Pages с 19.10.2026 не используется: сюда
+# больше не выкладываются даже страницы-указатели (scripts/build-moved-site.mjs
+# остался на случай возврата).
 #
 # Сборка уезжает на сервер под ключом WEB_DEPLOY_KEY (секрет репозитория).
 # На сервере этот ключ умеет только одно — принять архив сборки
@@ -22,11 +22,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: deploy
   cancel-in-progress: true
 
 jobs:
@@ -53,7 +51,7 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       # Хеш коммита вшивается в готовую страницу. Без него нельзя снаружи
-      # ответить, что именно сейчас лежит на Pages: имя файла сборки зависит
+      # ответить, что именно сейчас лежит на сайте: имя файла сборки зависит
       # от содержимого и о коммите ничего не говорит. По этой метке
       # проверка расхождения в основном репозитории и видит, отстал ли
       # фронтенд от main.
@@ -89,21 +87,3 @@ jobs:
           done
           echo "На app.fitness100.ru не та сборка: '$live'" >&2
           exit 1
-
-      # Старый адрес — только указатели на новый, без приложения
-      - name: Переадресация для GitHub Pages
-        run: node scripts/build-moved-site.mjs dist moved
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: moved
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4

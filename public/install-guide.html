@@ -35,7 +35,7 @@
 <footer><details><summary>Не получается войти?</summary><p>Проверьте, что вы сначала приняли персональное приглашение тренера, а затем подтвердили код с тем же аккаунтом Telegram. Если код истёк, запросите новый в Fit Track. При повторной ошибке отправьте тренеру её текст.</p></details><p style="font-size:16px;margin-bottom:16px">Расположение и названия системных пунктов могут отличаться в зависимости от версии телефона. Иллюстрации — схемы действий.</p><a href="https://support.apple.com/ru-ru/guide/iphone/iphea86e5236/ios" target="_blank" rel="noopener">Справка Apple</a><a href="https://support.google.com/chrome/answer/9658361?hl=ru&co=GENIE.Platform%3DAndroid" target="_blank" rel="noopener">Справка Chrome</a><p id="copy-status" role="status" style="font-size:16px"></p></footer><div class="progress" aria-hidden="true"></div>
 <noscript><p>Чтобы переключаться между инструкциями iPhone и Android, включите JavaScript в браузере.</p><style>[data-branch="android"][hidden]{display:block!important}</style></noscript>
 <script>
-const url='https://sokolov055.github.io/admin_trainer_table/';
+const url='https://app.fitness100.ru/';
 const switches=[...document.querySelectorAll('[data-system]')];
 function choose(system){switches.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.system===system)));document.querySelectorAll('[data-branch]').forEach(b=>b.hidden=b.dataset.branch!==system);document.getElementById('device').textContent=system==='ios'?'iPhone':'Android';window.scrollTo({top:0,behavior:'instant'});updateProgress()}
 switches.forEach(b=>b.addEventListener('click',()=>choose(b.dataset.system)));
