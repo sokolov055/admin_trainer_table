@@ -9,7 +9,8 @@
   isolation: isolate; overflow: hidden;
 }
 .career *, .career *::before, .career *::after { box-sizing: border-box; }
-.career button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: transform 140ms var(--cr-ease), background-color 140ms ease; }
+/* :where — сброс не перебивает толщину и размер шрифта кнопок ниже */
+.career :where(button) { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: transform 140ms var(--cr-ease), background-color 140ms ease; }
 .career button:active:not(:disabled) { transform: scale(.96); }
 .career button:disabled { opacity: .45; cursor: default; }
 .career button:focus-visible, .career input:focus-visible { outline: 3px solid #9fe1ff; outline-offset: 3px; }

@@ -401,6 +401,48 @@ test('карьера в фитнесе: ступень, задание в игр
   await page.getByRole('button', { name: 'Выйти из игры', exact: true }).click();
 });
 
+test('карьера: бонус в задании, пауза ведёт в карьеру, после финала бонусы не продаются', async () => {
+  const context = await browser.newContext({ storageState: await page.context().storageState(), viewport: VIEWPORT, locale: 'ru-RU' });
+  const p = await context.newPage();
+  const errors = []; p.on('pageerror', error => errors.push(String(error)));
+  const open = async state => {
+    await p.goto(origin);
+    // Ключ карьеры строится из кабинета так же, как в App.jsx
+    await p.evaluate(state => {
+      const me = JSON.parse(localStorage.getItem('api_cache_v1:me|{}')).data;
+      localStorage.setItem('ft.career.v1:' + [me.identityType, me.chatId || me.email || '', me.member || ''].join(':'), JSON.stringify({ version: 1, rank: 3, done: { scooter: false, plank: false, match: false }, coins: 5000, items: { energy: 0, cheat: 0, protein: 1 }, finished: false, earned: 0, ...state }));
+    }, state);
+    await p.reload();
+    await p.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 60000 });
+    await p.getByRole('button', { name: /Карьера в фитнесе/ }).click();
+    await p.locator('.career-step').first().waitFor();
+  };
+  try {
+    await open({});
+    const card = p.locator('.career-mission', { hasText: 'Три в ряд' });
+    assert.match(await card.locator('.career-boost').innerText(), /Протеин \(1\): \+3 хода в задании «Три в ряд»/, 'название игры не теряет заглавную');
+    assert.equal(await card.locator('small').innerText(), 'Зарплата +300 ₽', '«₽» не отрывается от суммы на узком экране');
+    assert.equal(await card.getByRole('button', { name: 'Играть' }).evaluate(el => getComputedStyle(el).fontWeight), '850', 'сброс шрифта не перебивает кнопку');
+    await card.locator('input[type=checkbox]').check();
+    await card.getByRole('button', { name: 'Играть' }).click();
+    await p.locator('.career-note', { hasText: 'Протеин: +3 хода в задании «Три в ряд»' }).waitFor();
+    await p.waitForFunction(() => !document.querySelector('.match-primary')?.disabled);
+    await p.locator('.match-primary').click();
+    assert.equal(await p.locator('[data-match=moves]').innerText(), '21', '18 ходов ступени и 3 от протеина');
+    await p.getByRole('button', { name: 'Пауза', exact: true }).click();
+    await p.getByRole('button', { name: 'Вернуться в карьеру', exact: true }).click();
+    await p.getByText('Ступень 4 из 10').waitFor();
+    assert.equal(await p.locator('.career-boost').count(), 0, 'протеин списан при запуске');
+    // Пройденная карьера: заданий нет — и бонусы взять некуда
+    await open({ rank: 9, done: { scooter: true, plank: true, match: true }, finished: true });
+    await p.getByRole('heading', { name: 'Собственник сети' }).waitFor();
+    assert.equal(await p.getByRole('heading', { name: 'Бонусы' }).count(), 0);
+    assert.equal(await p.locator('.career-next').innerText(), 'Карьера пройдена');
+    assert.equal(await p.getByRole('button', { name: 'Начать карьеру заново' }).count(), 1);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
 /**
  * Первое упражнение блока терялось: строка с заголовком «Тренировка»
  * пропускалась целиком, а у части тренеров в ней же стоит первое

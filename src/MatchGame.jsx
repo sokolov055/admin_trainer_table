@@ -266,7 +266,7 @@ export default function MatchGame({ onClose, restLeft, restUntil = Infinity, car
           <div className="match-mission"><span>{game.moves} {movesLabel(game.moves)}</span><span><strong>{number(game.score)}</strong> очков</span></div>
           <label className="match-toggle"><input type="checkbox" checked={vibration} onChange={event => { setVibration(event.target.checked); setVibrationState(event.target.checked); if (event.target.checked) buzz('tap'); }} />Вибрация</label>
           <button className="match-primary" ref={primary} disabled={assets !== 'ready'} onClick={resume}>{assets === 'ready' ? 'Продолжить игру' : 'Готовим поле…'}</button>
-          <button className="match-secondary" onClick={close}>Вернуться {restLeft == null ? 'в приложение' : 'к отдыху'}</button>
+          <button className="match-secondary" onClick={close}>{mission ? 'Вернуться в карьеру' : `Вернуться ${restLeft == null ? 'в приложение' : 'к отдыху'}`}</button>
         </> : <>
           <div className="match-result-stars">{[1, 2, 3].map(n => <Star key={n} filled={stars >= n} className={stars >= n ? 'is-earned' : ''} />)}</div>
           <span className="match-story-chapter">{chapter.place}</span>
