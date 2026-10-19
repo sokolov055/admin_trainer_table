@@ -635,6 +635,9 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__suggest--easy { color: var(--good-text); }
 .workout__suggest--hard, .workout__suggest--short { color: var(--warning-text); }
 .workout__last { margin: var(--space-1) 0 var(--space-2); font-size: 13px; line-height: 1.4; color: var(--text-muted); max-width: 60ch; }
+/* Цель диапазона повторов (19.10.2026): заметнее подсказки «последний раз» */
+.workout__goal { margin: var(--space-1) 0; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text); max-width: 60ch; }
+.workout__goal-left { margin: 2px 0 var(--space-1); font-size: 13px; color: var(--text-muted); }
 
 /* Отдых на весь экран (RestScreen): касание мимо кнопок ничего не делает.
    Появляется коротко, без «прыжка»: прозрачность и масштаб с 0,98 */

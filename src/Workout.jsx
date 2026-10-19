@@ -37,7 +37,7 @@ function machineHasDetails(m) {
 import { useData } from './useData.js';
 import { SetupText, SetupMistakes, setupParts, MachineInfo, MachineNote, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
-import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, otherMachineText, wasSet } from './effort.js';
+import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, unrate, suggestText, lastRunText, otherMachineText, wasSet, repsGoalText, repsLeftText } from './effort.js';
 import { unlockAlarm } from './rest-alarm.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
@@ -771,6 +771,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               </label>}
               {was && <span className="workout__was">было {was.assist !== undefined ? 'помощь ' + was.assist : was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
             </div>}
+            {/* Диапазон «8–12»: сколько не хватило до верхней границы (19.10.2026) */}
+            {repsLeftText(ex, set) && <p className="workout__goal-left">{repsLeftText(ex, set)}</p>}
             {/* Галочки нет (03.10.2026): под ближайшим подходом упражнения —
                 «Легко / Норм / Тяжело», каждая отмечает подход и запускает
                 отдых. Снять отметку — номер подхода → «Снять отметку» */}
@@ -1981,6 +1983,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           </button>}
           {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
+          {/* Цель диапазона — к ней клиент стремится (19.10.2026) */}
+          {repsGoalText(ex) && <p className="workout__goal">{repsGoalText(ex)}</p>}
           {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
           {/* Разминка — сверху, над подходами (FT-532): встаёт перед рабочими */}
           {trackOf(ex).kind !== 'cardio' && !ex.sets.some(x => x.who) && (

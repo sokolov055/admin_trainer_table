@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { editSetField, fromPlan, withWarmup, withMachine } from '../src/workout-model.js';
-import { wasSet, lastRunText } from '../src/effort.js';
+import { wasSet, lastRunText, repsGoalText, repsLeftText } from '../src/effort.js';
 
 /**
  * Вес в занятии — разбор с владельцем 19.10.2026 (FT-620…628).
@@ -63,6 +63,21 @@ test('FT-628: вес помощи — вписанная помощь своя �
   const ex = fromPlan(plan, 'Октябрь 2026').exercises[0];
   assert.equal(ex.sets[0].assist, '25');
   assert.deepEqual(wasSet(ex, 0), { weight: '', assist: '30', reps: '8' });
+});
+
+test('диапазон «8–12»: в поле нижняя граница, цель — верхняя отдельной подсказкой', () => {
+  const ex = fromPlan({ title: 'Т', exercises: [{ name: 'Жим', sets: '2', reps: '8–12' }] }, 'Октябрь 2026').exercises[0];
+  assert.deepEqual(ex.sets.map((s) => s.reps), ['8', '8']);
+  assert.equal(repsGoalText(ex), 'Повторы 8–12: дойдите до 12 во всех подходах — тогда прибавим вес');
+  assert.equal(repsLeftText(ex, { ...ex.sets[0], state: 'done', reps: '10' }), 'до цели 2 повтора');
+  assert.equal(repsLeftText(ex, { ...ex.sets[0], state: 'done', reps: '11' }), 'до цели 1 повтор');
+  assert.equal(repsLeftText(ex, { ...ex.sets[0], state: 'done', reps: '12' }), '');
+  assert.equal(repsLeftText(ex, { ...ex.sets[0], state: 'pending', reps: '10' }), '', 'до отметки — молчим');
+  assert.equal(repsLeftText(ex, { ...ex.sets[0], state: 'done', reps: '6', kind: 'warmup' }), '', 'разминка не в счёт');
+  // Одно число — ни цели, ни подписи
+  const fixed = fromPlan({ title: 'Т', exercises: [{ name: 'Жим', sets: '1', reps: '10' }] }, 'Октябрь 2026').exercises[0];
+  assert.equal(repsGoalText(fixed), '');
+  assert.equal(repsLeftText(fixed, { ...fixed.sets[0], state: 'done', reps: '8' }), '');
 });
 
 test('план повторов целиком уходит в занятие (FT-624)', () => {

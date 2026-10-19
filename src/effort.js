@@ -331,6 +331,32 @@ const plural = (n, one, few, many) => {
  * сегодня как в прошлый раз». Повторы обязательно: 100 кг на 3 и на 12 —
  * разное.
  */
+/** Диапазон повторов программы занятия: «8–12» → { lo, hi }; одно число или нет — null */
+export function repsGoal(ex) {
+  const m = String((ex && ex.planReps) || '').trim().match(/^(\d{1,3})\s*[-–—]\s*(\d{1,3})$/);
+  return m && Number(m[2]) > Number(m[1]) ? { lo: Number(m[1]), hi: Number(m[2]) } : null;
+}
+
+/**
+ * Цель диапазона (владелец, 19.10.2026): клиент стремится к верхней
+ * границе — она и есть условие прибавки веса (сервер, startPlan). В поле
+ * повторов при этом то, что реально делают: неисправленная цель записалась
+ * бы как сделанная
+ */
+export function repsGoalText(ex) {
+  const g = repsGoal(ex);
+  return g ? 'Повторы ' + g.lo + '–' + g.hi + ': дойдите до ' + g.hi + ' во всех подходах — тогда прибавим вес' : '';
+}
+
+/** Под сделанным рабочим подходом: «до цели 2 повтора»; дошли — '' */
+export function repsLeftText(ex, set) {
+  const g = repsGoal(ex);
+  const reps = Number(set && set.reps);
+  if (!g || !set || set.state !== 'done' || set.kind === 'warmup' || !(reps > 0) || reps >= g.hi) return '';
+  const n = g.hi - reps;
+  return 'до цели ' + n + ' ' + plural(n, 'повтор', 'повтора', 'повторов');
+}
+
 /**
  * Тренажёр сменился (владелец, 16.10.2026: другой зал, тренажёр другой
  * фирмы): веса по нулям, но видно, что было на прежнем — сервер, otherRun

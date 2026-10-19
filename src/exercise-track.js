@@ -559,5 +559,9 @@ export function planSet(ex, track) {
     const level = track.machine !== 'other' && numAt(/(\d+(?:\.\d+)?)/);
     return { ...out, ...(level ? { level } : {}) };
   }
-  return { reps: /^\d+$/.test(reps) ? reps : '' };
+  // Диапазон «8–12» — нижняя граница (19.10.2026): подставленное число
+  // записывается как сделанное, и неисправленные 12 дали бы ложную прибавку;
+  // цель 12 показывается отдельно (repsGoalText)
+  const range = reps.trim().match(/^(\d{1,3})\s*[-–—]\s*\d{1,3}$/);
+  return { reps: /^\d+$/.test(reps) ? reps : range ? range[1] : '' };
 }
