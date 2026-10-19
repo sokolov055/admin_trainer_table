@@ -322,7 +322,7 @@ test('три игры доступны тестовому клиенту и ск
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /Тренер в планке/ }).click();
   await page.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
-  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.getByRole('button', { name: 'Свернуть игру', exact: true }).click();
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.getByRole('button', { name: /На самокате до зала/ }).click();
   await page.locator('.menu__item').first().waitFor({ state: 'hidden' });
@@ -865,14 +865,14 @@ test('игра на отдыхе у тестового клиента глаза
     await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Тренер в планке/ }).click();
     await phone.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
-    await phone.getByRole('button', { name: 'Назад', exact: true }).click();
+    await phone.getByRole('button', { name: 'Свернуть игру', exact: true }).click();
     await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
     await phone.getByRole('button', { name: 'Начать тренировку', exact: true }).first().click();
     await phone.getByLabel('Таймер отдыха').selectOption('60');
     if (process.env.SHOT_PREVIEW_GAME) await phone.screenshot({ path: process.env.SHOT_PREVIEW_GAME });
     await phone.getByRole('button', { name: 'Тренер в планке', exact: true }).click();
     await phone.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
-    await phone.getByRole('button', { name: 'Назад', exact: true }).click();
+    await phone.getByRole('button', { name: 'К отдыху', exact: true }).click();
     await phone.getByRole('button', { name: 'Закончить отдых', exact: true }).click();
     await phone.getByRole('button', { name: 'Отменить', exact: true }).click();
     await phone.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();

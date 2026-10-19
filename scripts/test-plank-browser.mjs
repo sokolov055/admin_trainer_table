@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { QUESTIONS } from '../src/plank-game.js';
 
 const buildOptions = { bundle: true, write: false, format: 'iife', loader: { '.css': 'empty', '.png': 'dataurl' }, logLevel: 'silent', define: { 'import.meta.env': '{}', 'process.env.NODE_ENV': '"production"' } };
-const styles = () => readFileSync('src/styles.css', 'utf8') + readFileSync('src/plank-game.css', 'utf8').replace(/url\('\.\/assets\/([^']+)'\)/g, (_, file) => `url('data:image/png;base64,${readFileSync('src/assets/' + file).toString('base64')}')`);
+const styles = () => readFileSync('src/styles.css', 'utf8') + readFileSync('src/game-shell.css', 'utf8') + readFileSync('src/plank-game.css', 'utf8').replace(/url\('\.\/assets\/([^']+)'\)/g, (_, file) => `url('data:image/png;base64,${readFileSync('src/assets/' + file).toString('base64')}')`);
 const capture = process.env.PLANK_CAPTURE === '1';
 
 test('игра: ответы, таймер, повторная партия, пауза, победа, звук, фото, мобильная и широкая сцена', async () => {
@@ -25,12 +25,14 @@ test('игра: ответы, таймер, повторная партия, п�
       await page.locator('.plank-game__answers button').filter({ hasText: q.answers[correct ? q.correct : (q.correct + 1) % 3] }).click();
       return text;
     };
-    await mount(); await page.clock.install(); await choose('muscle', 1); await start();
+    const recordBuzz = () => page.evaluate(() => { window.buzzes = []; navigator.vibrate = pattern => { window.buzzes.push(pattern); return true; }; });
+    await mount(); await page.clock.install(); await recordBuzz(); await choose('muscle', 1); await start();
     const first = await answer(true);
     await page.getByRole('heading', { name: 'Верно! Продолжаем?' }).waitFor();
     await page.getByRole('button', { name: 'Следующий вопрос' }).click(); await answer(false);
     await page.getByRole('heading', { name: 'Игра окончена' }).waitFor();
     assert.equal(await page.locator('.plank-game__coach--standing').count(), 1);
+    assert.deepEqual(await page.evaluate(() => window.buzzes), [8, 14, [28, 45, 28]], 'старт, верный ответ, ошибка');
     await page.getByRole('button', { name: 'Сыграть ещё' }).click();
     assert.notEqual(await page.locator('.plank-game__question-text').innerText(), first);
     await page.clock.runFor(2000);
@@ -41,14 +43,28 @@ test('игра: ответы, таймер, повторная партия, п�
     assert.equal(await page.getByRole('timer').innerText(), remaining);
     await page.clock.runFor(10001); assert.match(await page.locator('.plank-game__result').innerText(), /Не успел ответить/);
 
-    await mount(); await choose('gym', 1); await start();
+    await mount(); await recordBuzz(); await choose('gym', 1); await start();
     for (let i = 0; i < 10; i++) { await answer(true); await page.getByRole('button', { name: i === 9 ? 'Забрать победу' : 'Следующий вопрос', exact: true }).click(); }
     await page.getByRole('heading', { name: 'Ты победил!' }).waitFor();
+    const great = [14, 40, 22];
+    assert.deepEqual(await page.evaluate(() => window.buzzes), [8, 14, 14, 14, 14, great, 14, 14, 14, 14, great], 'каждый пятый верный — сильнее');
+    // Смена темы, звук, вибрация и примерка фото — в меню игры (полноэкранная версия 19.10.2026)
+    await page.getByRole('button', { name: 'Меню игры', exact: true }).click();
     await page.getByRole('button', { name: 'Выбрать другую категорию' }).click();
+    assert.equal(await page.getByRole('dialog', { name: 'Меню игры' }).count(), 0, 'законченная партия — сразу к выбору темы');
+    await page.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
+    await page.getByRole('button', { name: 'Меню игры', exact: true }).click();
     await page.locator('input[type=file]').setInputFiles({ name: 'coach.png', mimeType: 'image/png', buffer: readFileSync('src/assets/plank-coach-v2.png') });
     assert.equal(await page.locator('.plank-game__avatar').count(), 1);
     await page.getByRole('button', { name: 'Убрать фото' }).click();
     assert.equal(await page.locator('.plank-game__avatar').count(), 0);
+    const vibration = page.getByLabel('Вибрация', { exact: true });
+    assert.equal(await vibration.isChecked(), true, 'вибрация включена по умолчанию');
+    await vibration.uncheck(); assert.equal(await vibration.isChecked(), false);
+    await page.evaluate(() => { window.buzzes = []; }); await vibration.check();
+    assert.deepEqual(await page.evaluate(() => window.buzzes), [8], 'включённая вибрация отзывается коротким касанием');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.getByRole('dialog', { name: 'Меню игры' }).count(), 0, 'Esc закрывает меню');
 
     await choose('music', 4);
     await page.evaluate(() => { Math.random = () => .9999; const Original = window.AudioContext; window.audioNodes = 0; window.AudioContext = class extends Original { createOscillator() { window.audioNodes++; return super.createOscillator(); } }; });
@@ -56,6 +72,8 @@ test('игра: ответы, таймер, повторная партия, п�
     await page.getByRole('button', { name: 'Слушать задание' }).click();
     await page.waitForFunction(() => window.audioNodes > 0); await page.clock.runFor(2000);
     await page.getByRole('button', { name: 'Послушать ещё' }).waitFor();
+    // Дальше время идёт только по runFor: проверки остатка не зависят от скорости кликов по меню
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1));
     assert.equal(await page.getByRole('timer').innerText(), '10');
     await page.getByRole('button', { name: 'Пауза', exact: true }).click();
     const nodesBefore = await page.evaluate(() => window.audioNodes);
@@ -67,9 +85,18 @@ test('игра: ответы, таймер, повторная партия, п�
     await page.getByRole('button', { name: 'Включить звук', exact: true }).click();
     await page.getByRole('button', { name: 'Выключить звук', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Выключить звук', exact: true }).click();
-    await page.locator('summary').click();
+    // Во время вопроса справа — «Пауза»; меню открывается с паузы и не снимает её само.
+    assert.equal(await page.getByRole('button', { name: 'Меню игры', exact: true }).count(), 0);
+    await page.getByRole('button', { name: 'Пауза', exact: true }).click();
+    await page.getByRole('button', { name: 'Меню игры', exact: true }).click();
     await page.getByLabel('Фоновая музыка', { exact: true }).check();
     await page.getByLabel('Фоновая музыка', { exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Выбрать другую категорию' }).click();
+    await page.getByRole('group', { name: 'Начать новую партию' }).getByRole('button', { name: 'Оставить текущую' }).click();
+    await page.getByRole('button', { name: 'К игре', exact: true }).click();
+    await page.getByRole('heading', { name: 'Игра на паузе' }).waitFor();
+    await page.getByRole('button', { name: 'Продолжить игру', exact: true }).click();
+    assert.equal(await page.getByRole('timer').innerText(), '10');
 
     // Одна партия сохраняется и после обычного сворачивания приложения.
     await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange')); });
