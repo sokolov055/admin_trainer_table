@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useData } from '../useData.js';
+import { apiMutate } from '../api.js';
 import {
-  Lead, Section, Panel, Rows, Loading, ErrorState, Delta, Segmented,
-  formatNumber, formatMoney, plural,
+  Lead, Section, Panel, Rows, Loading, ErrorState, Delta, Segmented, Field, Sheet,
+  formatNumber, formatMoney, formatDate, plural,
 } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
@@ -273,6 +274,34 @@ export const PROCESS = {
   silentClients: { label: 'Не приходили месяц', aim: -1, chart: false },
 };
 
+/**
+ * Маркетинг — откуда приходят новые. Источник ставит тренер в карточке
+ * клиента («Откуда пришёл»); «не отмечен» — тоже цифра: по ней видно, что
+ * карточки не заполняют. Цель из листов — половина по рекомендации.
+ */
+export const SOURCES = [
+  { value: 'referral', label: 'По рекомендации' },
+  { value: 'gym', label: 'Подошёл в зале' },
+  { value: 'club', label: 'От клуба' },
+  { value: 'social', label: 'Из соцсетей' },
+  { value: 'site', label: 'С сайта или из приложения' },
+  { value: 'other', label: 'Другое' },
+];
+
+export const MARKETING = {
+  newClients: { label: 'Новых клиентов' },
+  referralShare: { label: 'Доля по рекомендации', unit: '%', note: 'источник не отмечен' },
+  ...Object.fromEntries(SOURCES.map((s) => [s.value, { label: s.label }])),
+  unknown: { label: 'Источник не отмечен', aim: -1 },
+};
+
+/** Развитие — часы обучения из журнала и свои тренировки */
+export const DEVELOPMENT = {
+  learningHours: { label: 'Часов обучения', unit: 'ч', digits: 1 },
+  learningEntries: { label: 'Записей в журнале', aim: 0 },
+  ownWorkouts: { label: 'Своих тренировок' },
+};
+
 /** Выбранная для графика цифра — своя у каждой стороны */
 const chosen = { finance: 'profit', clients: 'active', process: 'trainings' };
 
@@ -346,6 +375,7 @@ export function format(value, unit, digits) {
   if (unit === '₽') return formatMoney(value);
   if (unit === '%') return formatNumber(value, digits) + '%';
   if (unit === 'мес.') return formatNumber(value, digits) + ' мес.';
+  if (unit === 'ч') return formatNumber(value, digits) + ' ч';
   return formatNumber(value, digits);
 }
 
@@ -607,6 +637,21 @@ export function Clients() {
         </Panel>
       </Section>
 
+      {/* Маркетинг — откуда пришли новые. Старый сервер стороны не знает */}
+      {data.marketing && data.marketing.now && (
+        <Section title="Откуда приходят новые" note="источник отмечают в карточке клиента">
+          <Panel>
+            <Rows>
+              <Metric id="referralShare" spec={MARKETING.referralShare} now={data.marketing.now} before={data.marketing.before} />
+              {SOURCES.map((s) => (
+                <Metric key={s.value} id={s.value} spec={MARKETING[s.value]} now={data.marketing.now} before={data.marketing.before} />
+              ))}
+              <Metric id="unknown" spec={MARKETING.unknown} now={data.marketing.now} before={data.marketing.before} />
+            </Rows>
+          </Panel>
+        </Section>
+      )}
+
       <p className="small muted metrics__foot">
         Удержание — сколько из тех, кто занимался в прошлом периоде,
         занимались и в этом. Ушёл — был в прошлом периоде, в этом не был и
@@ -717,6 +762,114 @@ export function Processes() {
           Раньше это была отдельная вкладка «Занятия» со своим выбором
           месяца: два разных «этот месяц» на одном экране путали. */}
       <ScheduleStats range={rangeOf(state)} />
+
+      {data.development && data.development.now && (
+        <Development state={state} now={data.development.now} before={data.development.before} />
+      )}
+    </>
+  );
+}
+
+/* ==================================================================
+ * Развитие
+ * ================================================================== */
+
+/**
+ * Часы обучения — единственное в сводке, что вписывают руками, кроме
+ * расходов и целей: лист «Развитие» иначе не посчитать. Запись — лист с
+ * часами и парой слов; свои тренировки берутся с карточки тренера сами.
+ */
+function LearningSheet({ onClose, onSaved }) {
+  const [hours, setHours] = useState('');
+  const [note, setNote] = useState('');
+  const [day, setDay] = useState(new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
+
+  const save = async () => {
+    setBusy(true);
+    setProblem('');
+    try {
+      await apiMutate('trainer.learning.add', { hours, note, day });
+      haptic('success');
+      onSaved();
+      onClose();
+    } catch (err) {
+      setProblem(err.message || 'Не получилось сохранить.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet title="Записать обучение" onClose={onClose} onDone={save} done={busy ? 'Сохраняем…' : 'Записать'} dirty={!!hours} locked={busy} focus="input">
+      <div className="goals__form">
+        <Field label="Часов" inputMode="decimal" value={hours} onChange={setHours} placeholder="1,5" disabled={busy} />
+        <Field label="Что это было" inputMode="text" value={note} onChange={setNote} placeholder="Семинар, курс, книга" disabled={busy} />
+        <Field label="Дата" type="date" value={day} onChange={setDay} disabled={busy} />
+      </div>
+      {problem && <p className="small form__error" role="alert">{problem}</p>}
+    </Sheet>
+  );
+}
+
+function Development({ state, now, before }) {
+  const [adding, setAdding] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const month = state.period === 'year' ? null : state.month;
+  const { data, reload } = useData('trainer.learning.list', { month: month || thisMonth() }, [month, revision]);
+
+  const remove = async (id) => {
+    try {
+      await apiMutate('trainer.learning.delete', { id });
+      haptic();
+      setRevision((v) => v + 1);
+    } catch (_) {
+      reload();
+    }
+  };
+
+  const entries = month && data && data.entries ? data.entries : [];
+  const row = (id) => <Metric id={id} spec={DEVELOPMENT[id]} now={now} before={before} />;
+
+  return (
+    <>
+      <Section
+        title="Развитие"
+        note="часы обучения — из журнала, свои тренировки — с вашей карточки"
+        action={(
+          <button type="button" className="button button--ghost button--small" onClick={() => { setAdding(true); haptic(); }}>
+            Записать
+          </button>
+        )}
+      >
+        <Panel>
+          <Rows>
+            {row('learningHours')}
+            {row('learningEntries')}
+            {row('ownWorkouts')}
+          </Rows>
+        </Panel>
+        {entries.length > 0 && (
+          <Panel className="learning">
+            <Rows>
+              {entries.map((e) => (
+                <div className="rows__item learning__item" key={e.id}>
+                  <span className="rows__label learning__what">
+                    {formatDate(e.day, false)}{e.note ? ' · ' + e.note : ''}
+                  </span>
+                  <span className="rows__value learning__hours">
+                    {formatNumber(e.hours, 1)} ч
+                    <button type="button" className="button button--ghost button--small" onClick={() => remove(e.id)} aria-label={'Удалить запись ' + formatDate(e.day, false)}>
+                      Удалить
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </Rows>
+          </Panel>
+        )}
+      </Section>
+      {adding && <LearningSheet onClose={() => setAdding(false)} onSaved={() => setRevision((v) => v + 1)} />}
     </>
   );
 }

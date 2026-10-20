@@ -17,6 +17,7 @@ import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
 import { onlineDaysLeft, onlineLabel, addOnlineMonth } from '../online.js';
+import { SOURCES } from './Metrics.jsx';
 
 /* ==================================================================
  * Клиенты
@@ -803,7 +804,7 @@ function cardSummary(client) {
     client.payer && 'платит ' + client.payer,
     client.test && 'тестовый',
   ].filter(Boolean);
-  return marks.length ? marks.join(' · ') : 'имя, цена, пакет, онлайн, сплит, архив';
+  return marks.length ? marks.join(' · ') : 'имя, цена, пакет, откуда пришёл, онлайн, сплит, архив';
 }
 
 /**
@@ -969,6 +970,8 @@ function ClientEdit({ client }) {
     price: client.price === null || client.price === undefined ? '' : String(client.price),
     packageCount: client.packageCount === null || client.packageCount === undefined ? '' : String(client.packageCount),
     payer: client.payer || '',
+    // Откуда пришёл (FT-653) — категория для сводки, сторона «Маркетинг»
+    source: client.source || '',
   };
 
   const [form, setForm] = useState(initial);
@@ -1019,6 +1022,16 @@ function ClientEdit({ client }) {
       {!client.splitOf && (
         <PayerSelect client={client} value={form.payer} onChange={(v) => set('payer', v)} disabled={busy} />
       )}
+
+      {/* Откуда узнал о тренере — для сводки («Откуда приходят новые»).
+          Список, а не свободное поле: это категория, а не заметка */}
+      <label className="field">
+        <span className="field__label">Откуда пришёл</span>
+        <select className="field__input" value={form.source} disabled={busy} onChange={(e) => set('source', e.target.value)}>
+          <option value="">Не отмечено</option>
+          {SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+      </label>
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
       {saved && !failure && <Note tone="good" icon={IconCheck}>Сохранено. Изменения появятся в карточке через несколько секунд.</Note>}

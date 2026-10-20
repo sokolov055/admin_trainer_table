@@ -351,15 +351,15 @@ const withDemoMuscles = (blocks) => blocks.map((b) => ({ ...b, exercises: b.exer
 const MONTHS = ['Сентябрь 2026', 'Август 2026', 'Июль 2026', 'Июнь 2026'];
 
 const CLIENTS = [
-  { row: 3, name: 'Анна Морозова', price: 3000, count: 10, balance: 12000, trainings: 6, revenue: 18000, payer: '', template: 'P01 — Набор массы', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 13.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(2), nextTrainingDate: daysAhead(2, '10:00'), startDate: daysAgo(400), birthDate: null, chatId: '11111', clientKey: 'anna', hasLink: true },
-  { row: 4, name: 'Евгений и Екатерина', price: 4000, count: 8, balance: -4000, trainings: 4, revenue: 16000, payer: '', template: 'P03 — Сплит', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: 'Евгений: ✅ 08.09.2026  |  Екатерина: ❌ 20.07.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(5), nextTrainingDate: daysAhead(5, '19:00'), startDate: daysAgo(220), birthDate: null, chatId: '22222', clientKey: 'evgeny', hasLink: true, members: ['Евгений', 'Екатерина'] },
+  { row: 3, name: 'Анна Морозова', source: 'referral', price: 3000, count: 10, balance: 12000, trainings: 6, revenue: 18000, payer: '', template: 'P01 — Набор массы', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 13.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(2), nextTrainingDate: daysAhead(2, '10:00'), startDate: daysAgo(400), birthDate: null, chatId: '11111', clientKey: 'anna', hasLink: true },
+  { row: 4, name: 'Евгений и Екатерина', source: 'gym', price: 4000, count: 8, balance: -4000, trainings: 4, revenue: 16000, payer: '', template: 'P03 — Сплит', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: 'Евгений: ✅ 08.09.2026  |  Екатерина: ❌ 20.07.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(5), nextTrainingDate: daysAhead(5, '19:00'), startDate: daysAgo(220), birthDate: null, chatId: '22222', clientKey: 'evgeny', hasLink: true, members: ['Евгений', 'Екатерина'] },
   // Сплит отдельными карточками (30.09.2026): пара скрыта, участники — в скобке
   { row: 29, name: 'Олег + Светлана', price: 4000, balance: 16000, trainings: 3, revenue: 12000, payer: '', lastTrainingDate: daysAgo(2), nextTrainingDate: daysAhead(0, '23:30'), chatId: '', clientKey: 'os', hasLink: false, members: ['Олег', 'Светлана'], pairHidden: true },
   { row: 30, name: 'Олег', price: 2500, balance: 0, trainings: 3, revenue: 0, payer: '', lastTrainingDate: daysAgo(2), nextTrainingDate: daysAhead(0, '23:30'), chatId: '66666', clientKey: 'oleg', hasLink: false, invited: true, splitOf: 29, splitName: 'Олег + Светлана', splitPayer: true, splitPayerRow: 30, splitPayerName: 'Олег', splitBalance: 16000, splitTrainingsLeft: 4 },
   { row: 31, name: 'Светлана', price: 2500, balance: 0, trainings: 3, revenue: 0, payer: '', lastTrainingDate: daysAgo(2), nextTrainingDate: daysAhead(0, '23:30'), chatId: '77777', clientKey: 'sveta', hasLink: false, invited: true, splitOf: 29, splitName: 'Олег + Светлана', splitPayer: false, splitPayerRow: 30, splitPayerName: 'Олег', splitBalance: 16000, splitTrainingsLeft: 4 },
-  { row: 5, name: 'Дмитрий Соколов', price: 2500, count: 12, balance: 7500, trainings: 9, revenue: 22500, payer: '', template: 'REPEAT_LAST_MONTH', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '❌ 02.08.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(1), nextTrainingDate: daysAhead(1, '08:30'), startDate: daysAgo(700), birthDate: null, chatId: '33333', clientKey: 'dmitry', hasLink: true },
+  { row: 5, name: 'Дмитрий Соколов', source: 'referral', price: 2500, count: 12, balance: 7500, trainings: 9, revenue: 22500, payer: '', template: 'REPEAT_LAST_MONTH', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '❌ 02.08.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(1), nextTrainingDate: daysAhead(1, '08:30'), startDate: daysAgo(700), birthDate: null, chatId: '33333', clientKey: 'dmitry', hasLink: true },
   { row: 6, name: 'Мария Волкова', price: 3000, count: 10, balance: 0, trainings: 0, revenue: 0, payer: '', template: '', monthStatus: '', lastMeasureStatus: '', monthSheetStatus: '❌ нет "Сентябрь 2026"', lastTrainingDate: daysAgo(38), startDate: daysAgo(120), birthDate: null, chatId: '', clientKey: 'maria', hasLink: false },
-  { row: 7, name: 'Игорь Лебедев', price: 3500, count: 8, balance: 14000, trainings: 7, revenue: 24500, payer: '', template: 'P02 — Сила', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 11.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(3), startDate: daysAgo(310), birthDate: null, chatId: '44444', clientKey: 'igor', hasLink: true },
+  { row: 7, name: 'Игорь Лебедев', source: 'social', price: 3500, count: 8, balance: 14000, trainings: 7, revenue: 24500, payer: '', template: 'P02 — Сила', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 11.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(3), startDate: daysAgo(310), birthDate: null, chatId: '44444', clientKey: 'igor', hasLink: true },
   // Онлайн-ведение (FT-530): занятий с тренером нет, оплачен месяц
   { row: 8, name: 'Ксения Орлова', price: 6000, count: 0, balance: 0, trainings: 0, revenue: 6000, payer: '', template: '', monthStatus: '', lastMeasureStatus: '✅ 05.10.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: null, startDate: daysAgo(40), birthDate: null, chatId: '88888', clientKey: 'ksenia', hasLink: false, online: true, onlineUntil: isoDay(new Date(Date.now() + 20 * 86400000)) },
 ];
@@ -848,7 +848,25 @@ function demoClients(months) {
   };
 }
 
-const demoTargets = { averageCheck: 3500, revenueYear: 7000000, retention: 80, measuredShare: 100, cancelShare: 10 };
+const demoTargets = { averageCheck: 3500, revenueYear: 7000000, retention: 80, measuredShare: 100, cancelShare: 10, referralShare: 50, learningHours: 8 };
+
+/** Откуда пришли новые: половина по рекомендации, часть не отмечена */
+function demoMarketing(months) {
+  const n = months.length;
+  return { newClients: 2 * n, referral: n, gym: 0, club: 0, social: n, site: 0, other: 0, unknown: 0, referralShare: 50 };
+}
+
+/** Развитие: часы из журнала и свои тренировки */
+let demoLearning = [
+  { id: 1, day: thisMonthKey() + '-03', hours: 1.5, note: 'Семинар по биомеханике' },
+  { id: 2, day: thisMonthKey() + '-11', hours: 3, note: 'Курс по питанию, модуль 2' },
+];
+function demoDevelopment(months) {
+  const n = months.length;
+  const current = months.includes(thisMonthKey());
+  const hours = current ? demoLearning.reduce((s, e) => s + e.hours, 0) : 6 * n;
+  return { learningHours: Math.round(hours * 10) / 10, learningEntries: current ? demoLearning.length : 2 * n, ownWorkouts: 9 * n };
+}
 
 function demoOverview() {
   const month = thisMonthKey();
@@ -863,6 +881,8 @@ function demoOverview() {
     finance: { now, before },
     clients: { now: demoClients([month]), before: demoClients([demoPrevMonth(month)]) },
     process: { now: process, before: demoProcess([demoPrevMonth(month)]) },
+    marketing: { now: demoMarketing([month]), before: demoMarketing([demoPrevMonth(month)]) },
+    development: { now: demoDevelopment([month]), before: demoDevelopment([demoPrevMonth(month)]) },
     year: { year: Number(month.slice(0, 4)), revenue: 2880450, forecast: 3610000, throughMonth: Number(month.slice(5)) },
     targets: demoTargets,
     signals: {
@@ -871,8 +891,9 @@ function demoOverview() {
         { row: 7, name: 'Игорь Лебедев', days: 31, nextAt: new Date(Date.now() + 3 * 86400000).toISOString() },
       ],
       packages: [
-        { row: 4, name: 'Евгений и Екатерина', balance: -4000, left: -1 },
+        { row: 4, name: 'Евгений и Екатерина', balance: -4000, left: -1, split: true },
         { row: 30, name: 'Олег', balance: 2500, left: 1 },
+        { row: 6, name: 'Мария Волкова', balance: 0, left: 0, payer: 'Игорь Лебедев' },
       ],
       measureDue: [
         { row: 5, name: 'Дмитрий Соколов', days: 79 },
@@ -908,6 +929,8 @@ function demoMetrics(params) {
       finance: { now: demoFinance(months(year)), before: demoFinance(months(year - 1)) },
       clients: { now: demoClients(months(year)), before: demoClients(months(year - 1)) },
       process: { now: demoProcess(months(year)), before: demoProcess(months(year - 1)) },
+      marketing: { now: demoMarketing(months(year)), before: demoMarketing(months(year - 1)) },
+      development: { now: demoDevelopment(months(year)), before: demoDevelopment(months(year - 1)) },
     };
   }
 
@@ -923,6 +946,8 @@ function demoMetrics(params) {
     finance: { now: demoFinance([month]), before: demoFinance([before]) },
     clients: { now: demoClients([month]), before: demoClients([before]) },
     process: { now: demoProcess([month]), before: demoProcess([before]) },
+    marketing: { now: demoMarketing([month]), before: demoMarketing([before]) },
+    development: { now: demoDevelopment([month]), before: demoDevelopment([before]) },
   };
 }
 
@@ -949,6 +974,8 @@ function demoSeries(params) {
       finance: demoFinance(b.months),
       clients: demoClients(b.months),
       process: demoProcess(b.months),
+      marketing: demoMarketing(b.months),
+      development: demoDevelopment(b.months),
     })),
   };
 }
@@ -1800,6 +1827,7 @@ const MOCK = {
     if (typeof params.test === 'boolean') client.test = params.test;
     if (typeof params.online === 'boolean') client.online = params.online;
     if (params.onlineUntil !== undefined) client.onlineUntil = params.onlineUntil || null;
+    if (params.source !== undefined) client.source = params.source || '';
     return { ok: true };
   },
 
@@ -2130,6 +2158,22 @@ const MOCK = {
   'trainer.metrics.series': (params) => demoSeries(params),
   'trainer.metrics.overview': () => demoOverview(),
   'trainer.metrics.targets': () => ({ targets: demoTargets }),
+  'trainer.learning.list': (params) => {
+    const month = params.month || thisMonthKey();
+    const entries = demoLearning.filter((e) => e.day.startsWith(month)).sort((a, b) => (a.day < b.day ? 1 : -1));
+    return { month, entries, hours: Math.round(entries.reduce((s, e) => s + e.hours, 0) * 10) / 10 };
+  },
+  'trainer.learning.add': (params) => {
+    const hours = Number(String(params.hours || '').replace(',', '.'));
+    if (!(hours > 0) || hours > 24) throw new Error('Часы — число от 0 до 24.');
+    const entry = { id: Date.now(), day: params.day || new Date().toISOString().slice(0, 10), hours: Math.round(hours * 10) / 10, note: String(params.note || '').trim() || null };
+    demoLearning = [entry, ...demoLearning];
+    return entry;
+  },
+  'trainer.learning.delete': (params) => {
+    demoLearning = demoLearning.filter((e) => e.id !== Number(params.id));
+    return { deleted: Number(params.id) };
+  },
   'trainer.metrics.targets.set': (params) => {
     Object.entries(params.targets || {}).forEach(([k, v]) => {
       if (v === '' || v === null || v === undefined) delete demoTargets[k];

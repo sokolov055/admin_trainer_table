@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import {
-  Lead, Section, Panel, Rows, Loading, ErrorState, Empty, Delta, Field, Sheet,
+  Lead, Section, Panel, Rows, Loading, ErrorState, Empty, Delta, Field, Sheet, Tag,
   formatNumber, formatMoney, formatDate, plural,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
@@ -42,15 +42,21 @@ export const GOALS = [
   { id: 'averageCheck', label: 'Средняя оплата', unit: '₽', side: 'finance', group: 'finance', hint: 'за одну оплату' },
   { id: 'revenueYear', label: 'Выручка за год', unit: '₽', side: 'finance', year: true },
   { id: 'retention', label: 'Удержание', unit: '%', side: 'clients', group: 'clients', hint: 'остались с прошлого месяца' },
+  { id: 'referralShare', label: 'Доля по рекомендации', unit: '%', side: 'marketing', group: 'marketing', hint: 'из новых с отмеченным источником' },
   { id: 'measuredShare', label: 'Доля с замером', unit: '%', side: 'process', group: 'process', hint: 'из тех, кто ходит' },
   { id: 'cancelShare', label: 'Доля отмен', unit: '%', side: 'process', group: 'process', aim: -1, hint: 'не больше' },
+  { id: 'learningHours', label: 'Часов обучения', unit: 'ч', side: 'development', group: 'development', hint: 'за месяц' },
   { id: 'activeClients', label: 'Клиентов в работе', unit: 'чел', side: 'clients', group: 'process' },
 ];
 
+/** Пять сторон BSC из листов; «Маркетинг» живёт на вкладке клиентов,
+ *  «Развитие» — на процессах */
 const SIDES = {
   finance: { label: 'Деньги', pane: 'finance' },
   clients: { label: 'Клиенты', pane: 'clients' },
+  marketing: { label: 'Маркетинг', pane: 'clients' },
   process: { label: 'Процессы', pane: 'processes' },
+  development: { label: 'Развитие', pane: 'processes' },
 };
 
 /** Насколько цифра дошла до цели: 0…100, у «не больше» — обратный смысл */
@@ -176,14 +182,17 @@ function SideRow({ goal, value, was, target, onGo }) {
 
 const dayWord = (n) => n + ' ' + plural(n, 'день', 'дня', 'дней');
 
-/** Список людей, по которому можно нажать: имя и в чём дело */
+/**
+ * Список людей, по которому можно нажать: имя и в чём дело. Пара сплита —
+ * одной строкой с меткой: занятия, деньги и программа у неё общие.
+ */
 function People({ list, note, onOpen, at }) {
   return (
     <Panel>
       <Rows>
         {list.map((c) => (
           <button type="button" key={c.row} className="rows__item rows__item--pick person" onClick={() => onOpen({ row: c.row, name: c.name }, at)}>
-            <span className="rows__label person__name">{c.name}</span>
+            <span className="rows__label person__name">{c.name}{c.split && <Tag>сплит</Tag>}</span>
             <span className="rows__value person__note">{note(c)}<IconChevron size={16} className="side__chevron" /></span>
           </button>
         ))}
@@ -203,7 +212,9 @@ const SIGNALS = [
     id: 'packages', Icon: IconMoney, at: 'payments',
     title: (n) => 'Пакет кончается · ' + n,
     note: 'осталось одно занятие или уже долг',
-    line: (c) => (c.balance < 0 ? 'долг ' + formatMoney(-c.balance) : c.left <= 0 ? 'занятий не осталось' : 'осталось 1 занятие'),
+    // Деньги у плательщика (семья, пара) — так и пишем: звонить ему
+    line: (c) => (c.payer ? 'платит ' + c.payer + ' · ' : '')
+      + (c.balance < 0 ? 'долг ' + formatMoney(-c.balance) : c.left <= 0 ? 'занятий не осталось' : 'осталось 1 занятие'),
   },
   {
     id: 'measureDue', Icon: IconRuler, at: 'progress',
@@ -261,8 +272,14 @@ export function Dashboard({ onGo, onOpenClient }) {
       ? 'столько же, сколько ' + then
       : (diff > 0 ? 'на ' + diff + '% больше' : 'на ' + (-diff) + '% меньше') + ', чем ' + then + ' (' + formatMoney(pace.revenue) + ')';
 
-  const values = { finance: f, clients: c, process: p };
-  const befores = { finance: fb, clients: cb, process: pb };
+  // Старый сервер сторон «Маркетинг» и «Развитие» не знает — строки
+  // покажут «пока нет», а не упадут
+  const m = (data.marketing && data.marketing.now) || {};
+  const mb = (data.marketing && data.marketing.before) || {};
+  const d = (data.development && data.development.now) || {};
+  const dbf = (data.development && data.development.before) || {};
+  const values = { finance: f, clients: c, process: p, marketing: m, development: d };
+  const befores = { finance: fb, clients: cb, process: pb, marketing: mb, development: dbf };
 
   const year = data.year || {};
   const yearTarget = goals.revenueYear;
@@ -287,7 +304,7 @@ export function Dashboard({ onGo, onOpenClient }) {
       />
 
       <Section
-        title="Четыре стороны"
+        title="Пять сторон"
         note="ключевая цифра каждой — к цели и к прошлому месяцу"
         action={(
           <button type="button" className="button button--ghost button--small" onClick={() => { setEditing(true); haptic(); }}>
