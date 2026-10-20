@@ -235,7 +235,7 @@ test('FT-551: план меню становится фактом только �
   const diary = page.getByTestId('nutrition-diary');
   await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
   await diary.getByRole('button', { name: 'Что приготовить на остаток', exact: true }).click();
-  const eat = page.getByRole('button', { name: 'Съел — записать порцию', exact: true }).first();
+  const eat = page.getByRole('button', { name: 'Съедено — записать', exact: true }).first();
   await eat.waitFor();
   assert.equal(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s,d) => s+d.entries.length,0)), 0);
   await eat.click();
@@ -438,6 +438,58 @@ test('FT-643: диалоги дневника на общем листе — с�
   await page.screenshot({ path: join(shots, 'diary-sheet-lesson-390.png') });
   await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
   await noSheets();
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('FT-644: плашка вместо анкеты, день словом, числа целыми, «набран» при нулевом остатке', { timeout: 120000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  const ids = [RECIPES[0].id, RECIPES.find(r => r.meal !== RECIPES[0].meal).id];
+  await page.addInitScript(ids => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('ration_v1', JSON.stringify({ liked: ids, seen: [], pantry: [] })); }, ids);
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  const diary = page.getByTestId('nutrition-diary');
+  // Клиент без анкеты: одна плашка, а не вся анкета под дневником
+  await diary.getByRole('heading', { name: 'Норма ещё не посчитана' }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+  await page.screenshot({ path: join(shots, 'diary-notice-390.png'), fullPage: true, animations: 'disabled' });
+  // День словами, без «2026-10-20» и «20.10.2026»
+  assert.equal(await diary.locator('.diary-date__text').innerText(), 'Сегодня');
+  await diary.getByRole('button', { name: 'Повторить еду', exact: true }).click();
+  const copy = page.getByRole('dialog');
+  await copy.getByText('Записи добавятся к дню «Сегодня».', { exact: false }).waitFor();
+  assert.ok(!/\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4}/.test(await copy.innerText()));
+  await copy.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.locator('.sheet').waitFor({ state: 'detached' });
+  // Кнопка плашки ведёт в «Норма и анкета», на дневнике плашки уже нет
+  await diary.getByRole('button', { name: 'Заполнить анкету', exact: true }).click();
+  await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Норма ещё не посчитана' }).count(), 0);
+  await page.getByRole('tab', { name: 'Дневник', exact: true }).click();
+  await diary.getByRole('heading', { name: 'Норма ещё не посчитана' }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
+  // Продукт с белком выше нормы: название со счётчиком, потом «набран»
+  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Свой продукт', exact: true }).click();
+  const form = page.getByRole('dialog');
+  await form.getByLabel('Название продукта', { exact: true }).fill('Протеин');
+  assert.equal(await form.locator('.field__counter').innerText(), '7 / 120');
+  assert.equal(await form.getByLabel('Название продукта', { exact: true }).getAttribute('maxlength'), '120');
+  for (const [label, value] of [['Ккал', '400'], ['Белки, г', '100'], ['Жиры, г', '0'], ['Углеводы, г', '0']]) await form.getByLabel(label, { exact: true }).fill(value);
+  await form.getByRole('button', { name: 'Создать продукт', exact: true }).click();
+  await page.getByLabel('Количество, г', { exact: true }).fill('200');
+  await page.getByRole('button', { name: 'Записать в дневник', exact: true }).click();
+  await diary.getByRole('button', { name: 'Изменить: Протеин', exact: true }).waitFor();
+  await diary.getByRole('button', { name: 'Что приготовить на остаток', exact: true }).click();
+  await page.getByText('белок на сегодня набран', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Съел — записать порцию', exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Съедено — записать', exact: true }).first().waitFor();
+  const kcal = await page.locator('.day__kcal').innerText();
+  assert.ok(/^[\d\s  ]+$/.test(kcal), 'ккал целым числом: ' + kcal);
+  for (const text of await page.locator('.day__bar-head').allInnerTexts()) assert.ok(!/\d,\d/.test(text), 'граммы целыми: ' + text);
+  await page.screenshot({ path: join(shots, 'diary-plan-done-390.png'), animations: 'disabled' });
   assert.deepEqual(errors, []);
   await page.close();
 });

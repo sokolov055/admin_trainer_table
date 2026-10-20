@@ -2,6 +2,19 @@ export const DIARY_MEALS = [{ id: 'breakfast', label: 'Завтрак' }, { id: 
 export const NUTRIENTS = ['kcal', 'protein', 'fat', 'carbs'];
 export const today = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
 export const shiftDay = (day, count) => new Date(Date.parse(day + 'T12:00:00Z') + count * 86400000).toISOString().slice(0, 10);
+// День словами: «Сегодня», «Вчера», «Завтра», иначе «20 октября, вт» (год — только если не текущий).
+// Сырые «2026-10-20» и «20.10.2026» человеку не показываем.
+export function dayLabel(iso) {
+  const now = today();
+  if (iso === now) return 'Сегодня';
+  if (iso === shiftDay(now, -1)) return 'Вчера';
+  if (iso === shiftDay(now, 1)) return 'Завтра';
+  const d = new Date(iso + 'T12:00:00Z');
+  if (Number.isNaN(d.getTime())) return String(iso || '');
+  const opts = { timeZone: 'UTC' };
+  const date = d.toLocaleDateString('ru-RU', { ...opts, day: 'numeric', month: 'long', ...(iso.slice(0, 4) === now.slice(0, 4) ? {} : { year: 'numeric' }) }).replace(/\s?г\.$/, '');
+  return date + ', ' + d.toLocaleDateString('ru-RU', { ...opts, weekday: 'short' });
+}
 export const requestId = () => globalThis.crypto?.randomUUID?.() || 'diary-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 export const totalEntries = entries => entries.reduce((sum, e) => {
   const factor = e.amount / (e.product.unit === 'portion' ? 1 : 100);

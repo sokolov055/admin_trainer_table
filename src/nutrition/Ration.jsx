@@ -97,6 +97,8 @@ function EggPicker({ value, onChange }) {
           onClick={() => { onChange(s); haptic(); }}
         >{s.label} {s.mark}</button>
       ))}
+      {/* Маркировка С0/С1/С2 на упаковке — что она значит, пока не ясно */}
+      <span className="eggs__hint small muted">Размер указан на упаковке: С2 — мелкие, С1 — средние, С0 — крупные. По нему считаем, сколько штук в рецепте.</span>
     </div>
   );
 }
@@ -561,15 +563,25 @@ function Deck({ cards, liked, onLike, onSkip, onEnough, onRestart }) {
  * Шаг 3. День и список покупок
  * ================================================================== */
 
-function Bar({ label, value, goal, unit }) {
+// Граммы — целыми, как в дневнике; при нулевом остатке (diary) «из 0 г» не
+// пишем, а говорим, что на сегодня набрано
+function Bar({ label, value, goal, unit, doneText }) {
   const share = goal > 0 ? Math.min(1.35, value / goal) : 0;
   const off = goal > 0 && Math.abs(value - goal) / goal > OFF_TARGET;
+  if (doneText && !(goal > 0)) {
+    return (
+      <div className="day__bar day__bar--done">
+        <div className="day__bar-head"><span>{doneText}</span></div>
+        <div className="day__bar-track"><span style={{ transform: 'scaleX(1)' }} /></div>
+      </div>
+    );
+  }
   return (
     <div className="day__bar">
       <div className="day__bar-head">
         <span>{label}</span>
         <span className={off ? 'day__bar-off' : ''}>
-          {formatNumber(value)}{unit} <i>из {formatNumber(goal)}{unit}</i>
+          {formatNumber(Math.round(value))}{unit} <i>из {formatNumber(Math.round(goal))}{unit}</i>
         </span>
       </div>
       <div className="day__bar-track">
@@ -606,17 +618,17 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
       <Section>
         <Panel pad>
           <div className="day__lead">
-            <span className="day__kcal">{formatNumber(totals.kcal)}</span>
+            <span className="day__kcal">{formatNumber(Math.round(totals.kcal))}</span>
             <span className="day__unit">{onEat ? 'ккал в оставшемся плане' : 'ккал за день'}</span>
           </div>
           {eaten.kcal > 0 && (
             <p className="small muted" style={{ margin: '0 0 var(--space-2)' }}>
-              {onEat ? 'Уже записано съеденным: ' : 'из них своё — '}{formatNumber(eaten.kcal)} ккал, блюда подобраны под остаток
+              {onEat ? 'Уже записано съеденным: ' : 'из них своё — '}{formatNumber(Math.round(eaten.kcal))} ккал, блюда подобраны под остаток
             </p>
           )}
-          <Bar label="Белки" value={totals.protein} goal={targets.protein} unit=" г" />
-          <Bar label="Жиры" value={totals.fat} goal={targets.fat} unit=" г" />
-          <Bar label="Углеводы" value={totals.carbs} goal={targets.carbs} unit=" г" />
+          <Bar label="Белки" value={totals.protein} goal={targets.protein} unit=" г" doneText={onEat ? 'белок на сегодня набран' : undefined} />
+          <Bar label="Жиры" value={totals.fat} goal={targets.fat} unit=" г" doneText={onEat ? 'жиры на сегодня набраны' : undefined} />
+          <Bar label="Углеводы" value={totals.carbs} goal={targets.carbs} unit=" г" doneText={onEat ? 'углеводы на сегодня набраны' : undefined} />
         </Panel>
       </Section>
 
@@ -666,7 +678,7 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
                       {dish.servings !== 1 && <span className="day__servings">{servingLabel(dish.servings)}</span>}
                     </p>
                     <Recipe recipe={dish.recipe} />
-                    {onEat && <button type="button" className="button button--primary diary-plan-eat" onClick={() => onEat(dish.recipe, dish.servings)}>Съел — записать порцию</button>}
+                    {onEat && <button type="button" className="button button--primary diary-plan-eat" onClick={() => onEat(dish.recipe, dish.servings)}>Съедено — записать</button>}
                   </div>
                 </div>
               );

@@ -2259,11 +2259,27 @@ export function Nutrition({ clientRow, clientView = false }) {
     reload();
   };
 
+  // Анкета без нормы — не тянем всю форму под дневник: одна плашка с кнопкой,
+  // сама анкета открывается во вкладке «Норма и анкета» (FT-644)
+  const surveyNotice = diaryEnabled && !configured && !editing ? (
+    <Section>
+      <Panel pad>
+        <h3 style={{ margin: '0 0 6px', fontSize: 'var(--text-md)', fontWeight: 640 }}>Норма ещё не посчитана</h3>
+        <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
+          {byTrainer
+            ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и ляжет в таблицу так же, как если бы он сделал это сам.'
+            : 'Семь ответов о себе — и вы увидите суточную норму калорий и БЖУ. Дневник работает и без неё.'}
+        </p>
+        <button className="button button--primary" onClick={() => setDiaryTab('settings')}>Заполнить анкету</button>
+      </Panel>
+    </Section>
+  ) : null;
+
   return (
     <>
       {(!diaryEnabled || diaryTab === 'diary') && <GoalBanner clientRow={clientRow} clientView={clientView} section="nutrition" />}
-      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow} preview={clientView} targets={targets} onPlan={!clientRow && hasPlus(rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
-      {(!diaryEnabled || diaryTab === 'settings' || editing || (!configured && diaryTab === 'diary')) && <>
+      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow} preview={clientView} targets={targets} onPlan={!clientRow && hasPlus(rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {(!diaryEnabled || diaryTab === 'settings' || editing) && <>
       {configured && (
         <Lead
           label="Расчёт по анкете"

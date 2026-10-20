@@ -180,7 +180,7 @@ function AddForm({ products, onAdd, onCancel, trial = false }) {
           <>
             <label className="field">
               <span className="field__label">Что это</span>
-              <input className="field__input" value={fields.name} maxLength={60} placeholder="название продукта или блюда" onChange={set('name')} autoComplete="off" />
+              <input className="field__input" value={fields.name} maxLength={60} placeholder="Например, сникерс или кофе с сиропом" onChange={set('name')} autoComplete="off" />
             </label>
 
             {matches.length > 0 && (

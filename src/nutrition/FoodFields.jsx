@@ -1,9 +1,12 @@
 import React from 'react';
 import './diary.css';
-export function FoodField({ label, value, onChange, ...rest }) {
-  return <label className="field"><span className="field__label">{label}</span><input className="field__input" value={value} onChange={e => onChange(e.target.value)} {...rest} /></label>;
+// counter — показать «27 / 120» под полем (нужен maxLength)
+export function FoodField({ label, value, onChange, counter = false, ...rest }) {
+  return <label className="field"><span className="field__label">{label}</span><input className="field__input" value={value} onChange={e => onChange(e.target.value)} {...rest} />{counter && rest.maxLength ? <span className="field__counter" aria-hidden="true">{String(value ?? '').length} / {rest.maxLength}</span> : null}</label>;
 }
 const Field = FoodField;
+// Совпадает с food.add / food.review на сервере (lib/food-catalog.js)
+export const FOOD_NAME_MAX = 120;
 
 export const PREPARATIONS = [['as_sold', 'Как продаётся'], ['raw', 'Сырой продукт'], ['dry', 'Сухой вес'], ['cooked', 'Готовый вес'], ['unspecified', 'Не уточнён']];
 // На 100 чего цифры с упаковки: напитки — в миллилитрах, их порции потом тоже в мл
@@ -12,7 +15,7 @@ export function FoodFields({ value, onChange }) {
   const set = key => next => onChange({ ...value, [key]: next });
   const unit = value.unit === 'ml' ? 'ml' : 'g';
   return <>
-    <Field label="Название продукта" value={value.name} onChange={set('name')} maxLength={60} required />
+    <Field label="Название продукта" value={value.name} onChange={set('name')} maxLength={FOOD_NAME_MAX} counter required />
     <Field label="Бренд (необязательно)" value={value.brand || ''} onChange={set('brand')} maxLength={60} />
     <label className="field"><span className="field__label">В каком виде взвешиваете</span><select className="field__input" value={value.preparation || 'as_sold'} onChange={e => set('preparation')(e.target.value)}>{PREPARATIONS.map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></label>
     <Field label="Штрихкод (необязательно)" value={value.barcode || ''} onChange={set('barcode')} inputMode="numeric" maxLength={14} />

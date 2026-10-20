@@ -8,7 +8,13 @@
 .diary-tabs button { white-space: nowrap; }
 .diary-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
 .diary-date { display: flex; gap: var(--space-2); align-items: center; }
-.diary-date input { border: 0; background: transparent; color: inherit; font: inherit; min-width: 0; max-width: 155px; }
+/* День словами («Сегодня», «20 октября, вт»); настоящее поле даты лежит
+   поверх прозрачным — касание открывает системный выбор даты */
+.diary-date__pick { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 9.5em; min-height: 44px; padding: 0 var(--space-3); border-radius: var(--radius-sm); cursor: pointer; transition: background-color var(--dur-press) var(--ease-out); }
+.diary-date__pick:active { background: var(--surface-active); }
+.diary-date__text { font-weight: 600; font-size: var(--text-sm); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.diary-date input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; margin: 0; cursor: pointer; font: inherit; }
+.diary-date__pick:focus-within { outline: 2px solid var(--accent-solid); outline-offset: -2px; }
 
 /* ---------- Итог дня: кольцо и полоски едут, а не прыгают ---------- */
 @property --diary-progress { syntax: '<number>'; inherits: false; initial-value: 0; }
@@ -105,6 +111,11 @@ button.diary-food-main:active { background: var(--surface-active); }
   .diary-daybar { font-size: 11px; }
   .diary-ingredient { grid-template-columns: minmax(0, 1fr) 76px 44px; }
 }
+
+/* Длинные названия (до 120 знаков) — в две строки с многоточием, а не стеной */
+.diary-food-main strong, .food-catalog-row strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.field__counter { display: block; text-align: right; font-size: var(--text-xs); color: var(--text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.diary-notice { margin: var(--space-3) 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .diary-ring, .diary-track > span, .diary-daybar-fill, .diary-food-main, .diary-like, .diary-when, .diary-more, .diary-lesson { transition: none; }
