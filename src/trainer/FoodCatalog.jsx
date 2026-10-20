@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiMutate, apiPublic } from '../api.js';
 import { Panel, Note, Loading, ErrorState } from '../ui.jsx';
+import FoodScan from '../nutrition/FoodScan.jsx';
 import { FoodFields, FoodField as Field, foodTitle } from '../nutrition/FoodFields.jsx';
 
 // Одна карточка с этикетки становится доступной всем. Редактирует общий
@@ -33,6 +34,7 @@ export default function FoodCatalog() {
   };
   if (editing) return <section aria-label="Карточка продукта"><h2>{editing.id ? 'Проверить продукт' : 'Новый продукт'}</h2><Panel pad><form onSubmit={save}>
     <p className="small muted">Все значения на 100 г. Сверьте этикетку и вид продукта. Правка справочника не меняет уже записанное питание.</p>
+    <FoodScan disabled={busy} onDraft={patch => setEditing(f => ({ ...f, ...patch }))} onFound={setEditing} />
     <FoodFields value={editing} onChange={setEditing} />
     <Field label="Другие названия для поиска" value={editing.aliases || ''} onChange={aliases => setEditing(f => ({ ...f, aliases }))} maxLength={240} />
     {editing.id && <Field label="Источник: производитель или проверенная этикетка" value={editing.sourceRef || ''} onChange={sourceRef => setEditing(f => ({ ...f, sourceRef }))} maxLength={300} required />}

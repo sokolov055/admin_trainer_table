@@ -27,7 +27,7 @@ test('очередь не удваивает подтверждённое; чу�
 });
 
 const stubs = {
-  api: `export const apiStale=(a,p)=>({data:null,promise:globalThis.__diary.read(a,p)}); export const apiMutate=(a,p)=>globalThis.__diary.mutate(a,p);`,
+  api: `export const apiPublic=(a,p)=>globalThis.__diary.read(a,p); export const apiStale=(a,p)=>({data:null,promise:globalThis.__diary.read(a,p)}); export const apiMutate=(a,p)=>globalThis.__diary.mutate(a,p);`,
   gestures: `export const useBackGesture=()=>{};`,
   offline: `export const localWrites=async()=>[]; export const onWritesChange=()=>()=>{}; export const queueWrite=async(k,p)=>{globalThis.__diary.queued.push({kind:k,params:p})}; export const isOffline=e=>e?.code===0; export const dropWrite=async()=>{};`,
   account: `export const offlineAccount=()=> 'unit-account';`,

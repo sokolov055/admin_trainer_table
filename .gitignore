@@ -17,3 +17,5 @@ ft551-browser.log
 
 # Локальные логи проверки каталога FT-551
 ft551-catalog-*.log
+
+ft551-catalog-audit.json

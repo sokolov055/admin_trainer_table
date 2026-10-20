@@ -6,19 +6,107 @@ import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
+import { buildSync } from 'esbuild';
+import { parseLabel } from '../src/nutrition/label-model.js';
 import { RECIPES } from '../src/nutrition/recipes.js';
 const root = fileURLToPath(new URL('..', import.meta.url)), out = join(root, 'dist-diary'), shots = join(root, '.impeccable/review');
 let browser, server, origin;
 const errors = [];
 before(async () => {
   execFileSync(process.execPath, [join(root, 'node_modules/vite/bin/vite.js'), 'build', '--outDir', out], { cwd: root, env: { ...process.env, VITE_MOCK: '1' }, stdio: 'ignore' });
-  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
+  buildSync({ entryPoints: [join(root, 'src/nutrition/food-recognition.js')], outfile: join(out, 'recognition-test.js'), bundle: true, platform: 'browser', format: 'esm', logLevel: 'silent' });
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
   server = createServer((req, res) => { const name = decodeURIComponent(req.url.split('?')[0]); const file = join(out, name === '/' ? 'index.html' : name); const target = existsSync(file) && extname(file) ? file : join(out, 'index.html'); res.writeHead(200, { 'Content-Type': types[extname(target)] || 'application/octet-stream' }); res.end(readFileSync(target)); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); origin = 'http://127.0.0.1:' + server.address().port;
   browser = await (process.env.DIARY_BROWSER === 'webkit' ? webkit : chromium).launch();
   mkdirSync(shots, { recursive: true });
 }, { timeout: 180000 });
 after(async () => { await browser?.close(); if (server) await new Promise(resolve => server.close(resolve)); });
+
+test('FT-551: реальное локальное OCR и штрихкод, черновик без автосохранения', { timeout: 180000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  const pageErrors = [], external = [];
+  page.on('pageerror', e => pageErrors.push(e.message));
+  await page.route('**/*', route => {
+    const url = route.request().url();
+    if (/^https?:/.test(url) && !url.startsWith(origin + '/')) { external.push(url); return route.abort(); }
+    return route.continue();
+  });
+  await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  const scanner = page.getByRole('region', { name: 'Сканер продукта' });
+  await scanner.getByRole('button', { name: 'Распознать этикетку', exact: true }).click();
+  const labelPng = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 650;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1200, 650);
+    ctx.fillStyle = '#000'; ctx.font = '52px Arial';
+    ['Пищевая ценность на 100 г', 'Белки 8,5 г', 'Жиры 2 г', 'Углеводы 12 г', 'Энергия 420 кДж / 100 ккал'].forEach((line, i) => ctx.fillText(line, 50, 100 + i * 105));
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  // Тот же путь, что для нестандартной схемы WKWebView: worker/core из Blob,
+  // языковые модели байтами; внутри worker нет запросов к capacitor:// или CDN.
+  const localText = await page.evaluate(async ({ base, png }) => {
+    const { createRecognition } = await import(base + '/recognition-test.js');
+    const image = new Image(); image.src = 'data:image/png;base64,' + png; await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+    canvas.getContext('2d').drawImage(image, 0, 0);
+    return createRecognition({ base: base + '/', useBlobWorker: true }).recognize(canvas);
+  }, { base: origin, png: labelPng });
+  assert.deepEqual(parseLabel(localText).fields, { protein: '8.5', fat: '2', carbs: '12', kcal: '100' });
+  await scanner.getByLabel('Выбрать фото продукта').setInputFiles({ name: 'synthetic-label.png', mimeType: 'image/png', buffer: Buffer.from(labelPng, 'base64') });
+  await scanner.getByRole('button', { name: 'Прочитать этикетку', exact: true }).click();
+  await scanner.getByRole('button', { name: 'Отменить распознавание', exact: true }).click();
+  assert.equal(await scanner.getByRole('button', { name: 'Заполнить черновик', exact: true }).count(), 0);
+  await scanner.getByRole('button', { name: 'Прочитать этикетку', exact: true }).click();
+  await scanner.getByRole('button', { name: 'Заполнить черновик', exact: true }).waitFor({ timeout: 100000 });
+  assert.ok((await scanner.innerText()).includes('8.5'));
+  await page.screenshot({ path: join(shots, 'food-scan-label-390.png') });
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.screenshot({ path: join(shots, 'food-scan-label-1024.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Ещё ни продукта, ни записи в дневнике нет: только результат OCR на устройстве.
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('nutrition_demo_server:3')).foods.length), 1);
+  await scanner.getByRole('button', { name: 'Заполнить черновик', exact: true }).click();
+  assert.equal(await page.getByLabel('Ккал', { exact: true }).inputValue(), '100');
+  assert.equal(await page.getByLabel('Белки, г', { exact: true }).inputValue(), '8.5');
+  await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.evaluate(() => { const key = 'nutrition_demo_server:3', state = JSON.parse(localStorage.getItem(key)); state.foods[0].barcode = '4006381333931'; localStorage.setItem(key, JSON.stringify(state)); });
+  await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await scanner.getByRole('button', { name: 'Сканировать штрихкод', exact: true }).click();
+  // Синтетический EAN-13: стандартные таблицы модулей, декодирует настоящий ZXing.
+  const barcodePng = await page.evaluate(() => {
+    const code = '4006381333931', odd = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+    const even = ['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
+    const parity = 'LGLLGG';
+    const bits = '101' + [...code.slice(1,7)].map((n,i) => (parity[i] === 'L' ? odd : even)[Number(n)]).join('') + '01010' + [...code.slice(7)].map(n => odd[Number(n)].replace(/[01]/g, b => b === '0' ? '1' : '0')).join('') + '101';
+    const canvas = document.createElement('canvas'); canvas.width = 700; canvas.height = 300;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,700,300); ctx.fillStyle = '#000';
+    [...bits].forEach((b,i) => { if (b === '1') ctx.fillRect(100+i*5,40,5,200); });
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await scanner.getByLabel('Выбрать фото продукта').setInputFiles({ name: 'synthetic-ean.png', mimeType: 'image/png', buffer: Buffer.from(barcodePng, 'base64') });
+  await scanner.getByRole('button', { name: 'Прочитать штрихкод', exact: true }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('input')].some(i => i.value === '4006381333931'));
+  await scanner.getByRole('button', { name: 'Найти по штрихкоду', exact: true }).click();
+  await scanner.getByRole('button', { name: 'Использовать продукт', exact: true }).click();
+  await page.getByRole('button', { name: 'Записать в дневник', exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).flatMap(d => d.entries).length), 0);
+  await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await scanner.getByRole('button', { name: 'Сканировать штрихкод', exact: true }).click();
+  await scanner.getByLabel('Цифры штрихкода').fill('4006381333932');
+  await scanner.getByRole('button', { name: 'Найти по штрихкоду', exact: true }).click();
+  await scanner.getByText(/контрольная цифра не совпадает/).waitFor();
+  await scanner.getByLabel('Цифры штрихкода').fill('4601234567893');
+  await scanner.getByRole('button', { name: 'Найти по штрихкоду', exact: true }).click();
+  await scanner.getByRole('button', { name: 'Добавить с этикетки', exact: true }).click();
+  assert.equal(await page.getByLabel('Штрихкод (необязательно)', { exact: true }).inputValue(), '4601234567893');
+  assert.deepEqual(external, []); assert.deepEqual(pageErrors, []);
+  await page.close();
+});
 
 test('FT-551: любимые, приёмы, порции, история, рецепты и очередь без дублей', { timeout: 180000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
