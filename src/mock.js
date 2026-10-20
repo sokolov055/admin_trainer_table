@@ -820,8 +820,72 @@ function demoProcess(months) {
     perClient: Math.round((trainings / 15) * 10) / 10,
     withPlan: 18,
     planShare: 78,
+    cancels: 5 * months.length,
+    cancelsLate: 2 * months.length,
+    moves: 4 * months.length,
+    cancelShare: 5.3,
     silentClients: 4,
   };
+}
+
+/**
+ * Клиенты: удержание ниже цели в летние месяцы, осенью — выше. Ушедшие
+ * и новые — по два-три человека: столько и бывает у одного тренера.
+ */
+function demoClients(months) {
+  const n = months.length;
+  const summer = months.some((m) => ['06', '07', '08'].includes(m.slice(5)));
+  const active = 15 + (summer ? -2 : 1);
+  const retained = summer ? 11 : 13;
+  return {
+    active,
+    newClients: 2 * n,
+    retained,
+    lost: summer ? 3 : 1,
+    retention: Math.round((retained / 15) * 1000) / 10,
+    renewals: 9 * n,
+    newPayers: 2 * n,
+  };
+}
+
+const demoTargets = { averageCheck: 3500, revenueYear: 7000000, retention: 80, measuredShare: 100, cancelShare: 10 };
+
+function demoOverview() {
+  const month = thisMonthKey();
+  const day = new Date().getDate();
+  const now = { ...demoFinance([month]), revenue: 216850, expenses: 62000, profit: 154850, trainings: 89, activeClients: 15, cash: 195000, payments: 8, averageCheck: 2546, perTraining: 2436 };
+  const before = demoFinance([demoPrevMonth(month)]);
+  const process = { ...demoProcess([month]), measuredShare: 60, cancels: 4, cancelsLate: 1, moves: 3, cancelShare: 4.3, silentClients: 2 };
+  return {
+    month,
+    previousMonth: demoPrevMonth(month),
+    pace: { day, month: demoPrevMonth(month), trainings: 82, revenue: 199800 },
+    finance: { now, before },
+    clients: { now: demoClients([month]), before: demoClients([demoPrevMonth(month)]) },
+    process: { now: process, before: demoProcess([demoPrevMonth(month)]) },
+    year: { year: Number(month.slice(0, 4)), revenue: 2880450, forecast: 3610000, throughMonth: Number(month.slice(5)) },
+    targets: demoTargets,
+    signals: {
+      silent: [
+        { row: 6, name: 'Мария Волкова', days: 38, nextAt: null },
+        { row: 7, name: 'Игорь Лебедев', days: 31, nextAt: new Date(Date.now() + 3 * 86400000).toISOString() },
+      ],
+      packages: [
+        { row: 4, name: 'Евгений и Екатерина', balance: -4000, left: -1 },
+        { row: 30, name: 'Олег', balance: 2500, left: 1 },
+      ],
+      measureDue: [
+        { row: 5, name: 'Дмитрий Соколов', days: 79 },
+        { row: 30, name: 'Олег', days: null },
+      ],
+      noPlan: [{ row: 6, name: 'Мария Волкова' }],
+    },
+  };
+}
+
+function thisMonthKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
 
 function demoPrevMonth(month) {
@@ -842,6 +906,7 @@ function demoMetrics(params) {
       previousYear: year - 1,
       throughMonth: through,
       finance: { now: demoFinance(months(year)), before: demoFinance(months(year - 1)) },
+      clients: { now: demoClients(months(year)), before: demoClients(months(year - 1)) },
       process: { now: demoProcess(months(year)), before: demoProcess(months(year - 1)) },
     };
   }
@@ -856,6 +921,7 @@ function demoMetrics(params) {
     compare: params.compare === 'year' ? 'year' : 'month',
     previousMonth: before,
     finance: { now: demoFinance([month]), before: demoFinance([before]) },
+    clients: { now: demoClients([month]), before: demoClients([before]) },
     process: { now: demoProcess([month]), before: demoProcess([before]) },
   };
 }
@@ -881,6 +947,7 @@ function demoSeries(params) {
           : b.key,
       partial: b.months.includes(last),
       finance: demoFinance(b.months),
+      clients: demoClients(b.months),
       process: demoProcess(b.months),
     })),
   };
@@ -2061,6 +2128,15 @@ const MOCK = {
 
   'trainer.metrics': (params) => demoMetrics(params),
   'trainer.metrics.series': (params) => demoSeries(params),
+  'trainer.metrics.overview': () => demoOverview(),
+  'trainer.metrics.targets': () => ({ targets: demoTargets }),
+  'trainer.metrics.targets.set': (params) => {
+    Object.entries(params.targets || {}).forEach(([k, v]) => {
+      if (v === '' || v === null || v === undefined) delete demoTargets[k];
+      else demoTargets[k] = Number(String(v).replace(/\s+/g, '').replace(',', '.'));
+    });
+    return { targets: demoTargets };
+  },
 
   'trainer.finance': () => ({
     sheet: 'BSC_Финансы',

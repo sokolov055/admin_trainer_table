@@ -37,6 +37,9 @@ const output = await build({
       bundle.onResolve({ filter: /useData\.js$/ }, () => ({ path: 'data', namespace: 'metrics-test' }));
       bundle.onResolve({ filter: /[\\/]api\.js$/ }, () => ({ path: 'api', namespace: 'metrics-test' }));
       bundle.onResolve({ filter: /telegram\.js$/ }, () => ({ path: 'telegram', namespace: 'metrics-test' }));
+      // Лист целей рисуется порталом в document.body — в проверке тела нет,
+      // и портал заменён на «нарисовать на месте»
+      bundle.onResolve({ filter: /^react-dom$/ }, () => ({ path: 'react-dom', namespace: 'metrics-test' }));
 
       bundle.onLoad({ filter: /.*/, namespace: 'metrics-test' }, (args) => {
         if (args.path === 'data') return {
@@ -51,6 +54,7 @@ const output = await build({
             export const logout = () => {};
             export const apiStale = () => ({ data: null, stale: false, promise: Promise.resolve({}) });`,
         };
+        if (args.path === 'react-dom') return { contents: 'export const createPortal = (node) => node; export const flushSync = (fn) => fn();' };
         if (args.path === 'telegram') return {
           contents: `export const haptic = () => {};
             export const getInitData = () => '';
@@ -64,12 +68,21 @@ const output = await build({
   }],
 });
 
+// Лист (Sheet) трогает document и window: фокус, блокировка прокрутки,
+// Escape. Здесь их нет — подставляем ровно столько, чтобы он нарисовался
+const noop = () => {};
+const el = () => ({ style: {}, classList: { add: noop, remove: noop, toggle: noop }, scrollTop: 0, focus: noop, contains: () => false, querySelector: () => null, getBoundingClientRect: () => ({ top: 0, height: 0 }) });
+globalThis.document = { activeElement: null, addEventListener: noop, removeEventListener: noop, body: el(), documentElement: el(), querySelector: () => null, querySelectorAll: () => [] };
+globalThis.window = { addEventListener: noop, removeEventListener: noop, matchMedia: () => ({ matches: true, addEventListener: noop, removeEventListener: noop }), scrollY: 0, scrollTo: noop, innerHeight: 800, innerWidth: 390, visualViewport: null, history: { state: null, pushState: noop, back: noop }, location: { hash: '' }, requestAnimationFrame: (cb) => setTimeout(cb, 0), cancelAnimationFrame: noop, setTimeout: (...a) => setTimeout(...a), clearTimeout: (...a) => clearTimeout(...a) };
+globalThis.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+globalThis.cancelAnimationFrame = noop;
+
 const module = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0].text + '\n})')(
   createRequire(import.meta.url), module, module.exports,
 );
 
-const { Finance, Processes, Expenses, resetPeriod } = module.exports;
+const { Finance, Clients, Processes, Expenses, Dashboard, resetPeriod } = module.exports;
 
 /* ==========================================================================
  * Инструменты
@@ -125,7 +138,7 @@ function type(tree, label, value) {
 }
 
 /** Ответ сервера с показателями: только то, что экран действительно читает */
-function metrics({ month = '2026-09', now = {}, before = {}, process: proc = {}, processBefore = {} } = {}) {
+function metrics({ month = '2026-09', now = {}, before = {}, clients = {}, clientsBefore = {}, process: proc = {}, processBefore = {} } = {}) {
   const zeroFinance = {
     revenue: 0, expenses: 0, profit: 0, payments: 0, trainings: 0, activeClients: 0,
     bank: 0, averageCheck: null, perTraining: null, perClient: null, topShare: null, bankCover: null,
@@ -142,9 +155,12 @@ function metrics({ month = '2026-09', now = {}, before = {}, process: proc = {},
     month,
     previousMonth: past.getUTCFullYear() + '-' + String(past.getUTCMonth() + 1).padStart(2, '0'),
     finance: { now: { ...zeroFinance, ...now }, before: { ...zeroFinance, ...before } },
+    clients: { now: { ...zeroClients, ...clients }, before: { ...zeroClients, ...clientsBefore } },
     process: { now: { ...zeroProcess, ...proc }, before: { ...zeroProcess, ...processBefore } },
   };
 }
+
+const zeroClients = { active: 0, newClients: 0, retained: 0, lost: 0, retention: null, renewals: 0, newPayers: 0 };
 
 /**
  * Отрисовка экрана.
@@ -152,11 +168,12 @@ function metrics({ month = '2026-09', now = {}, before = {}, process: proc = {},
  * `answer` получает действие и параметры и возвращает данные — так видно,
  * какой месяц экран на самом деле спросил у сервера.
  */
-function draw(Screen, answer, { onMutate } = {}) {
+function draw(Screen, answer, { onMutate, props } = {}) {
   resetPeriod();
   const asked = [];
   const charted = [];
   const sent = [];
+  const stats = [];
 
   globalThis.__metrics = {
     useData(action, params) {
@@ -174,6 +191,12 @@ function draw(Screen, answer, { onMutate } = {}) {
       }
       // Сверка денег (LedgerCheck) о периоде не спрашивает — не считаем
       if (action === 'trainer.ledger') return { loading: false, data: null, error: null, reload() {} };
+      // Кто отменяет (ScheduleStats) — свой запрос с границами периода
+      if (action === 'trainer.schedule.stats') {
+        stats.push(params);
+        const data = answer(action, params);
+        return { loading: false, data: data && data.total ? data : null, error: null, reload() {} };
+      }
       asked.push({ action, params });
       return { loading: false, data: answer(action, params), error: null, reload() {} };
     },
@@ -184,9 +207,9 @@ function draw(Screen, answer, { onMutate } = {}) {
   };
 
   let tree;
-  act(() => { tree = renderer.create(React.createElement(Screen)); });
+  act(() => { tree = renderer.create(React.createElement(Screen, props || {})); });
 
-  return { tree, asked, sent, charted };
+  return { tree, asked, sent, charted, stats };
 }
 
 /* ==========================================================================
@@ -619,4 +642,245 @@ test('цифры «на сегодня» на график не переключ
 test('идущий период подписан, чтобы не читаться провалом', () => {
   const { tree } = draw(Finance, answerWithSeries);
   assert.match(screenText(tree), /ещё идёт, данные неполные/);
+});
+
+/* ==========================================================================
+ * Клиенты
+ * ========================================================================== */
+
+test('клиенты: удержание словами, новые и ушедшие рядом', () => {
+  const { tree } = draw(Clients, () => metrics({
+    clients: { active: 15, newClients: 2, retained: 13, lost: 1, retention: 86.7, renewals: 9, newPayers: 2 },
+    clientsBefore: { active: 15, newClients: 3, retained: 12, lost: 3, retention: 80 },
+  }));
+
+  const text = screenText(tree);
+  assert.match(text, /Клиентов · Сентябрь 2026/);
+  assert.match(text, /удержание 86,7% — 13 из 15 остались/);
+  assert.match(text, /Пришли впервые/);
+  assert.match(text, /Продлений/);
+});
+
+test('клиенты без прошлого периода не делят на ноль', () => {
+  const { tree } = draw(Clients, () => metrics({ clients: { active: 4 } }));
+  const text = screenText(tree);
+
+  assert.ok(!/NaN|Infinity|undefined|null/.test(text), 'в тексте экрана: ' + text);
+  assert.match(text, /сравнить не с чем/);
+  assert.match(text, /прошлый период пуст/, 'прочерк у удержания объясняется');
+});
+
+/** Старый сервер стороны «Клиенты» не знает — экран не падает */
+test('без стороны «Клиенты» в ответе экран рисуется пустым, а не падает', () => {
+  const data = metrics();
+  delete data.clients;
+  const { tree } = draw(Clients, () => data);
+  assert.match(screenText(tree), /занятий за этот период ещё не было/);
+});
+
+/* ==========================================================================
+ * Процессы: срывы и кто отменяет — за тот же период
+ * ========================================================================== */
+
+const STATS = {
+  total: { done: 41, cancelClient: 5, cancelTrainer: 1, cancelLate: 3, cancelCharged: 2, moveClient: 4, moveTrainer: 2 },
+  lateHours: 24,
+  clients: [{ clientRow: 3, name: 'Анна Морозова', done: 6, cancelClient: 2, cancelTrainer: 0, cancelLate: 1, cancelCharged: 1, moveClient: 2, moveTrainer: 0 }],
+  recent: [{ kind: 'cancel', who: 'client', late: true, charged: true, reason: 'заболела', clientRow: 3, clientName: 'Анна Морозова', fromAt: '2026-09-20T10:00:00.000Z', toAt: null }],
+};
+
+test('срывы: отмены, переносы и доля — с красным ростом', () => {
+  const { tree, stats } = draw(Processes, (action) => (action === 'trainer.schedule.stats' ? STATS : metrics({
+    process: { trainings: 100, cancels: 6, cancelsLate: 3, moves: 6, cancelShare: 5.7 },
+    processBefore: { trainings: 90, cancels: 2, cancelsLate: 0, moves: 1, cancelShare: 2.2 },
+  })));
+
+  const text = screenText(tree);
+  assert.match(text, /Срывы/);
+  assert.match(text, /Доля отмен/);
+  assert.match(text, /Кто отменяет/, 'имена — под теми же цифрами');
+  assert.match(text, /Анна Морозова/);
+  assert.match(text, /заболела/);
+
+  // Рост отмен — хуже: дельта красная
+  const row = tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).startsWith('Отмен'), { deep: true })[0];
+  const delta = row.findAll((node) => typeof node.type === 'string' && String(node.props.className || '').includes('delta--'), { deep: true })[0];
+  assert.match(delta.props.className, /delta--off/);
+
+  // Кто отменяет — за тот же месяц, что открыт в сводке
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  assert.equal(stats[0].from, from);
+});
+
+test('старый сервер без срывов: раздела нет, экран цел', () => {
+  const data = metrics({ process: { trainings: 10 } });
+  delete data.process.now.cancels;
+  const { tree } = draw(Processes, (action) => (action === 'trainer.schedule.stats' ? null : data));
+  const text = screenText(tree);
+  assert.doesNotMatch(text, /Срывы/);
+  assert.ok(!/NaN|undefined/.test(text));
+});
+
+test('шаг назад в процессах двигает и период «кто отменяет»', () => {
+  const { tree, stats } = draw(Processes, (action) => (action === 'trainer.schedule.stats' ? STATS : metrics()));
+  press(tree, 'Предыдущий месяц');
+
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+  assert.equal(stats[stats.length - 1].from, from);
+});
+
+/* ==========================================================================
+ * Обзор
+ * ========================================================================== */
+
+/** Ответ обзора: октябрь к 20-му, цели из «Горизонтов», сигналы с именами */
+function overview(extra = {}) {
+  return {
+    month: '2026-10',
+    previousMonth: '2026-09',
+    pace: { day: 20, month: '2026-09', trainings: 82, revenue: 199800 },
+    finance: {
+      now: { revenue: 216850, expenses: 62000, profit: 154850, trainings: 89, activeClients: 15, averageCheck: 2546 },
+      before: { revenue: 340250, expenses: 62000, profit: 278250, trainings: 141, activeClients: 21, averageCheck: 2544 },
+    },
+    clients: { now: { active: 15, retention: 86.7, retained: 13, lost: 1, newClients: 2 }, before: { active: 15, retention: 80 } },
+    process: {
+      now: { trainings: 89, activeClients: 15, measuredShare: 50, cancelShare: 4.3, silentClients: 2 },
+      before: { trainings: 141, activeClients: 21, measuredShare: 60, cancelShare: 6 },
+    },
+    year: { year: 2026, revenue: 3333700, forecast: 4100000, throughMonth: 10 },
+    targets: { averageCheck: 3500, revenueYear: 7000000, retention: 80, measuredShare: 100, cancelShare: 10 },
+    signals: {
+      silent: [{ row: 6, name: 'Мария Волкова', days: 38, nextAt: null }, { row: 7, name: 'Игорь Лебедев', days: 31, nextAt: '2026-10-24T10:00:00.000Z' }],
+      packages: [{ row: 4, name: 'Евгений', balance: -4000, left: -1 }],
+      measureDue: [{ row: 5, name: 'Дмитрий Соколов', days: 79 }],
+      noPlan: [{ row: 6, name: 'Мария Волкова' }],
+    },
+    ...extra,
+  };
+}
+
+const quiet = { onGo() {}, onOpenClient() {} };
+
+test('обзор: выручка к сегодняшнему числу против того же числа прошлого месяца', () => {
+  const { tree } = draw(Dashboard, () => overview(), { props: quiet });
+  const text = screenText(tree);
+
+  assert.match(text, /Выручка · Октябрь 2026, к 20-му/);
+  assert.match(text, /216 850 ₽/);
+  assert.match(text, /на 9% больше, чем к 20 сентября \(199 800 ₽\)/);
+  assert.match(text, /89 · было 82/, 'тренировок — тоже к тому же числу');
+
+  const lead = tree.root.findAll((node) => typeof node.type === 'string' && String(node.props.className || '').includes('lead--'), { deep: true })[0];
+  assert.match(lead.props.className, /lead--good/, 'темп выше прошлого — зелёным');
+});
+
+test('обзор: четыре стороны с целью, достигнутая помечена, недостигнутая — «до цели»', () => {
+  const { tree } = draw(Dashboard, () => overview(), { props: quiet });
+  const text = screenText(tree);
+
+  assert.match(text, /Средняя оплата/);
+  assert.match(text, /до цели 954 ₽ из 3 500 ₽/);
+  assert.match(text, /Удержание/);
+  assert.match(text, /цель 80% — есть/);
+  assert.match(text, /Доля отмен/);
+  assert.match(text, /цель 10% — есть/, 'у «не больше» цель достигнута, когда цифра ниже');
+  assert.match(text, /Клиентов в работе/);
+  assert.match(text, /цель не задана/);
+
+  const bars = tree.root.findAll((node) => node.props && node.props.role === 'progressbar', { deep: true });
+  const check = bars.find((b) => b.props['aria-valuenow'] === 73);
+  assert.ok(check, 'средняя оплата 2 546 из 3 500 — 73 %');
+});
+
+test('обзор: строка стороны ведёт на её вкладку', () => {
+  const gone = [];
+  const { tree } = draw(Dashboard, () => overview(), { props: { onGo: (pane) => gone.push(pane), onOpenClient() {} } });
+
+  const row = tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).includes('Удержание'), { deep: true })[0];
+  act(() => { row.props.onClick(); });
+
+  assert.deepEqual(gone, ['clients']);
+});
+
+test('обзор: год к цели и прогноз по темпу', () => {
+  const { tree } = draw(Dashboard, () => overview(), { props: quiet });
+  const text = screenText(tree);
+
+  assert.match(text, /Год · 2026/);
+  assert.match(text, /3 333 700 ₽/);
+  assert.match(text, /до цели 3 666 300 ₽ из 7 000 000 ₽/);
+  assert.match(text, /около 4 100 000 ₽, цель 7 000 000 ₽ при таком темпе не выйдет/);
+});
+
+test('обзор: сигналы с именами открывают нужный раздел карточки', () => {
+  const opened = [];
+  const { tree } = draw(Dashboard, () => overview(), { props: { onGo() {}, onOpenClient: (client, at) => opened.push([client.name, at]) } });
+  const text = screenText(tree);
+
+  assert.match(text, /Молчат · 2/);
+  assert.match(text, /38 дней без занятий/);
+  assert.match(text, /31 день без занятий · записан на 24\.10/);
+  assert.match(text, /Пакет кончается · 1/);
+  assert.match(text, /долг 4 000 ₽/);
+  assert.match(text, /Пора снять замер · 1/);
+  assert.match(text, /замер 79 дней назад/);
+  assert.match(text, /Нет программы на месяц · 1/);
+
+  const personButton = (name) => tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).startsWith(name), { deep: true });
+  act(() => { personButton('Мария Волкова')[1].props.onClick(); });
+  act(() => { personButton('Евгений')[0].props.onClick(); });
+  act(() => { personButton('Дмитрий Соколов')[0].props.onClick(); });
+
+  assert.deepEqual(opened, [['Мария Волкова', 'plan'], ['Евгений', 'payments'], ['Дмитрий Соколов', 'progress']]);
+});
+
+test('обзор без сигналов хвалит, а не показывает пустые разделы', () => {
+  const { tree } = draw(Dashboard, () => overview({ signals: { silent: [], packages: [], measureDue: [], noPlan: [] } }), { props: quiet });
+  const text = screenText(tree);
+
+  assert.match(text, /Всё на месте/);
+  assert.doesNotMatch(text, /Молчат ·/);
+});
+
+test('обзор: пустой месяц без целей не показывает NaN и не красит', () => {
+  const { tree } = draw(Dashboard, () => overview({
+    pace: { day: 1, month: '2026-09', trainings: 0, revenue: 0 },
+    finance: { now: { revenue: 0, expenses: 0, profit: 0, trainings: 0, activeClients: 0, averageCheck: null }, before: {} },
+    clients: { now: { active: 0, retention: null }, before: {} },
+    process: { now: { trainings: 0, measuredShare: null, cancelShare: null }, before: {} },
+    year: { year: 2026, revenue: 0, forecast: null, throughMonth: 10 },
+    targets: {},
+    signals: { silent: [], packages: [], measureDue: [], noPlan: [] },
+  }), { props: quiet });
+  const text = screenText(tree);
+
+  assert.ok(!/NaN|Infinity|undefined|null/.test(text), 'в тексте экрана: ' + text);
+  assert.match(text, /занятий в этом месяце ещё не было/);
+  const lead = tree.root.findAll((node) => typeof node.type === 'string' && String(node.props.className || '').includes('lead'), { deep: true })[0];
+  assert.doesNotMatch(lead.props.className, /lead--/);
+});
+
+test('цели правятся листом и уходят на сервер разом', async () => {
+  const { tree, sent } = draw(Dashboard, () => overview(), {
+    props: quiet,
+    onMutate: (action, params) => ({ targets: { ...params.targets, averageCheck: 4000 } }),
+  });
+
+  press(tree, 'Цели');
+  assert.match(screenText(tree), /Норма, с которой сравнивается каждая цифра/);
+
+  type(tree, 'Средняя оплата', '4000');
+  type(tree, 'Удержание', '');
+  press(tree, 'Сохранить');
+  // Лист закрывается не сразу — ждём его таймер и ответ сервера
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].action, 'trainer.metrics.targets.set');
+  assert.equal(sent[0].params.targets.averageCheck, '4000');
+  assert.equal(sent[0].params.targets.retention, '', 'пустое поле снимает цель');
+  assert.match(screenText(tree), /из 4 000 ₽/, 'экран показывает цель из ответа сервера');
 });

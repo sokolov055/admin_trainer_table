@@ -3395,6 +3395,123 @@ code {
   line-height: 1.5;
 }
 
+/* ==========================================================================
+   Обзор сводки: стороны с целью, год, сигналы (20.10.2026)
+   ========================================================================== */
+
+/* Строка стороны: слева — кто и что, цель и полоса; справа — цифра со
+   стрелкой и шеврон «туда». Выравнивание по верху, не по базовой линии:
+   слева три строки, справа одна. */
+.side { align-items: flex-start; }
+
+.side__text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.side__who {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.side__what {
+  font-size: var(--text-base);
+  font-weight: 560;
+  color: var(--text);
+}
+
+.side__goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.side__goal--done { color: var(--good-text); }
+
+.side__value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding-top: 14px;
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+
+/* Шеврон «туда» — вправо: та же стрелка списка, что смотрит вниз, повёрнута */
+.side__chevron { color: var(--text-muted); flex: none; transform: rotate(-90deg); }
+
+/* Полоса до цели: одна тонкая дорожка, заливка акцентом; дошли — зелёным.
+   Не кольцо и не плитка: дорожка читается и при трёх подряд. */
+.bar {
+  display: block;
+  position: relative;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+  max-width: 220px;
+}
+
+.bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--dur-panel) var(--ease-out);
+}
+
+.bar--done .bar__fill { background: var(--good-text); }
+
+/* Год: сумма крупно, рядом — до цели; ниже полоса и прогноз */
+.year__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.year__value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.year .bar { max-width: none; margin-top: var(--space-3); }
+
+.year__forecast { margin: var(--space-3) 0 0; line-height: 1.5; }
+
+/* Человек в сигнале: имя — основным цветом, в чём дело — тише */
+.person { align-items: center; }
+.person__name { color: var(--text); font-size: var(--text-base); font-weight: 550; flex: 1 1 auto; }
+.person__note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 450;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  flex: 0 1 auto;
+}
+
+/* Лист целей: поля столбиком, вступление — тише */
+.goals__intro { margin: 0 0 var(--space-4); line-height: 1.5; }
+.goals__form { display: grid; gap: var(--space-4); margin-bottom: var(--space-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bar__fill { transition: none; }
+}
+
 /* --- расходы --- */
 
 .expense {

@@ -1,8 +1,8 @@
-import ScheduleStats from './ScheduleStats.jsx';
 import { useReturnScroll } from '../scroll.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clients, Lost, Settings, ClientManage } from './screens.jsx';
-import { Finance, Processes } from './Metrics.jsx';
+import { Finance, Clients as ClientMetrics, Processes } from './Metrics.jsx';
+import { Dashboard } from './Dashboard.jsx';
 import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
 import { PlankAccess } from '../plank-access.js';
@@ -106,11 +106,17 @@ const CLIENT_PANES = [
   { value: 'lost', label: 'Ушедшие' },
 ];
 
-/** Сводка: две половины одного BSC — деньги и процессы за ними */
+/**
+ * Сводка: обзор и три стороны одного BSC — деньги, клиенты, процессы.
+ * С 20.10.2026 видна каждому тренеру по своим клиентам (сервер отбирает
+ * по trainer_id), а не только владельцу. Отмены и переносы — внутри
+ * «Процессов» за тот же период, а не отдельной вкладкой.
+ */
 const DASH_PANES = [
-  { value: 'finance', label: 'Финансы', owner: true },
-  { value: 'processes', label: 'Процессы', owner: true },
-  { value: 'sessions', label: 'Занятия' },
+  { value: 'overview', label: 'Обзор' },
+  { value: 'finance', label: 'Финансы' },
+  { value: 'clients', label: 'Клиенты' },
+  { value: 'processes', label: 'Процессы' },
 ];
 
 /**
@@ -385,9 +391,15 @@ export default function TrainerApp({ me }) {
           data-kept={tabs.kept('dashboard') ? '' : undefined}
         >
           <div key={dashPane}>
+            {dashPane === 'overview' && (
+              <Dashboard
+                onGo={switchPane(setDashPane)}
+                onOpenClient={(client, at) => openCard(client, at, 'К обзору')}
+              />
+            )}
             {dashPane === 'finance' && <Finance />}
+            {dashPane === 'clients' && <ClientMetrics />}
             {dashPane === 'processes' && <Processes />}
-            {dashPane === 'sessions' && <ScheduleStats />}
           </div>
         </main>
       )}

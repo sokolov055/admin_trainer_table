@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import {
   Lead, Section, Panel, Rows, Loading, ErrorState, Delta, Segmented,
-  formatNumber, formatMoney,
+  formatNumber, formatMoney, plural,
 } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
 import { IconBack } from '../icons.jsx';
 import LedgerCheck from './LedgerCheck.jsx';
+import ScheduleStats from './ScheduleStats.jsx';
 
 /**
- * Показатели: финансы и процессы.
+ * Показатели: финансы, клиенты и процессы — три стороны одного BSC.
  *
  * Раньше этот экран показывал листы BSC как есть — широкую таблицу
  * «метрика × месяц», которую на телефоне надо листать вбок. Беда была не в
@@ -25,7 +26,8 @@ import LedgerCheck from './LedgerCheck.jsx';
  *
  * Рядом с каждой цифрой — изменение к прошлому месяцу. Число без сравнения
  * ничего не значит: «выручка 336 400» — это много или мало? Ответ даёт
- * только соседняя колонка.
+ * только соседняя колонка. Главное на сегодня — цели и кому позвонить —
+ * на «Обзоре» (Dashboard.jsx); здесь — глубже, по каждой стороне.
  */
 
 const MONTHS = [
@@ -76,8 +78,8 @@ export function thisMonth(now = new Date()) {
  * Год сравнивается с прошлым годом, а текущий, ещё не кончившийся, — с
  * теми же месяцами прошлого (это считает сервер, здесь только подпись).
  *
- * Выбор общий для «Финансов» и «Процессов» и переживает переход между
- * ними: переключив на год, человек ждёт года и на соседней вкладке.
+ * Выбор общий для всех трёх сторон и переживает переход между ними:
+ * переключив на год, человек ждёт года и на соседней вкладке.
  */
 const PERIODS = [
   { value: 'month', label: 'Месяц' },
@@ -95,6 +97,7 @@ let remembered = null;
 export function resetPeriod() {
   remembered = null;
   chosen.finance = 'profit';
+  chosen.clients = 'active';
   chosen.process = 'trainings';
   grainRemembered = 'month';
 }
@@ -137,6 +140,7 @@ function describe(data) {
       against: data.previousYear + ' году' + range,
       short: 'к ' + data.previousYear + ' году',
       same: 'сколько в ' + data.previousYear + ' году',
+      before: 'в ' + data.previousYear + ' году',
     };
   }
 
@@ -146,7 +150,17 @@ function describe(data) {
     against: past,
     short: data.compare === 'year' ? 'к ' + past : 'к прошлому месяцу',
     same: data.compare === 'year' ? 'сколько год назад' : 'сколько месяцем раньше',
+    before: data.compare === 'year' ? 'год назад' : 'в прошлом месяце',
   };
+}
+
+/** Границы открытого периода — для статистики занятий, у которой свой запрос */
+function rangeOf(state) {
+  if (state.period === 'year') {
+    return { from: new Date(state.year, 0, 1).toISOString(), to: new Date(state.year + 1, 0, 1).toISOString() };
+  }
+  const [y, m] = state.month.split('-').map(Number);
+  return { from: new Date(y, m - 1, 1).toISOString(), to: new Date(y, m, 1).toISOString() };
 }
 
 /**
@@ -213,7 +227,7 @@ function PeriodBar({ state, update }) {
  * число клиентов в работе. У них нет истории по месяцам, и график из
  * одинаковых столбиков только сбивал бы с толку.
  */
-const FINANCE = {
+export const FINANCE = {
   profit: { label: 'Прибыль', unit: '₽' },
   revenue: { label: 'Выручка', unit: '₽' },
   expenses: { label: 'Расходы', unit: '₽', aim: -1 },
@@ -228,19 +242,39 @@ const FINANCE = {
   bankCover: { label: 'Отработать это займёт', unit: 'мес.', digits: 1, aim: 0, chart: false, note: 'выручки не было' },
 };
 
-const PROCESS = {
+/**
+ * Клиенты — то, чем в таблице был пустой лист «Продажи»: кто пришёл, кто
+ * остался, кто ушёл, кто продлил. Удержание — доля тех, кто занимался в
+ * прошлом периоде и занимается в этом; ушедший — был в прошлом, в этом
+ * не был и вперёд не записан.
+ */
+export const CLIENTS = {
+  active: { label: 'Занимались' },
+  newClients: { label: 'Пришли впервые' },
+  retained: { label: 'Остались с прошлого периода' },
+  lost: { label: 'Ушли', aim: -1 },
+  retention: { label: 'Удержание', unit: '%', note: 'прошлый период пуст' },
+  renewals: { label: 'Продлений' },
+  newPayers: { label: 'Первых оплат' },
+};
+
+export const PROCESS = {
   trainings: { label: 'Тренировок проведено' },
   perClient: { label: 'Тренировок на клиента', digits: 1, note: 'занятий не было' },
   activeClients: { label: 'Клиентов в работе', chart: false },
   measuredClients: { label: 'Сняты замеры' },
-  measuredShare: { label: 'Доля с замером', unit: '%' },
-  withPlan: { label: 'Есть программа', chart: false },
-  planShare: { label: 'Доля с программой', unit: '%', chart: false },
+  measuredShare: { label: 'Доля с замером', unit: '%', note: 'занятий не было' },
+  withPlan: { label: 'Есть программа на месяц' },
+  planShare: { label: 'Доля с программой', unit: '%', note: 'занятий не было' },
+  cancels: { label: 'Отмен', aim: -1 },
+  cancelsLate: { label: 'Из них поздних', aim: -1 },
+  moves: { label: 'Переносов', aim: -1 },
+  cancelShare: { label: 'Доля отмен', unit: '%', aim: -1, note: 'занятий не было' },
   silentClients: { label: 'Не приходили месяц', aim: -1, chart: false },
 };
 
-/** Выбранная для графика цифра — своя у финансов и у процессов */
-const chosen = { finance: 'profit', process: 'trainings' };
+/** Выбранная для графика цифра — своя у каждой стороны */
+const chosen = { finance: 'profit', clients: 'active', process: 'trainings' };
 
 function useChosen(group) {
   const [key, setKey] = useState(chosen[group]);
@@ -308,7 +342,7 @@ function Metric({ id, spec, now, before, picked, onPick, label }) {
  * там, где доля ровная, и не округляет 8,9 до 9. Лишняя цифра после
  * запятой в доле — это шум, который читается как точность, которой нет.
  */
-function format(value, unit, digits) {
+export function format(value, unit, digits) {
   if (unit === '₽') return formatMoney(value);
   if (unit === '%') return formatNumber(value, digits) + '%';
   if (unit === 'мес.') return formatNumber(value, digits) + ' мес.';
@@ -504,6 +538,86 @@ export function Finance() {
 }
 
 /* ==================================================================
+ * Клиенты
+ * ================================================================== */
+
+export function Clients() {
+  const [state, update] = usePeriod();
+  const [picked, pick] = useChosen('clients');
+  const { loading, data, error, reload } = useMetrics(state);
+
+  const top = (
+    <>
+      <PeriodBar state={state} update={update} />
+      <MetricChart group="clients" id={picked} spec={CLIENTS[picked]} state={state} />
+    </>
+  );
+
+  if (loading) return <>{top}<Loading rows={4} /></>;
+  if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
+
+  // Старый сервер стороны «Клиенты» не знает — тогда экран честно пуст
+  const now = (data.clients && data.clients.now) || {};
+  const before = (data.clients && data.clients.before) || {};
+  const period = describe(data);
+  const row = (id) => (
+    <Metric id={id} spec={CLIENTS[id]} now={now} before={before} picked={picked === id} onPick={pick} />
+  );
+
+  const activeBefore = before.active || 0;
+  const hint = now.retention === null || now.retention === undefined
+    ? (now.active ? 'сравнить не с чем: ' + period.before + ' занятий не было' : 'занятий за этот период ещё не было')
+    : 'удержание ' + formatNumber(now.retention) + '% — ' + formatNumber(now.retained, 0) + ' из '
+      + formatNumber(activeBefore, 0) + ' ' + plural(activeBefore, 'остался', 'остались', 'остались');
+
+  return (
+    <>
+      {top}
+
+      <Lead
+        label={'Клиентов · ' + period.label}
+        tone={now.retention !== null && now.retention !== undefined ? (now.retention >= 80 ? 'good' : undefined) : undefined}
+        value={formatNumber(now.active || 0, 0)}
+        hint={hint}
+        facts={[
+          { label: 'Новых', value: formatNumber(now.newClients || 0, 0) },
+          { label: 'Ушли', value: formatNumber(now.lost || 0, 0) },
+          { label: 'Продлений', value: formatNumber(now.renewals || 0, 0) },
+        ]}
+      />
+
+      <Section title="Движение" note={'рядом — изменение к ' + period.against}>
+        <Panel>
+          <Rows>
+            {row('active')}
+            {row('newClients')}
+            {row('retained')}
+            {row('lost')}
+            {row('retention')}
+          </Rows>
+        </Panel>
+      </Section>
+
+      <Section title="Оплаты" note="продление — повторная оплата того, кто уже платил">
+        <Panel>
+          <Rows>
+            {row('renewals')}
+            {row('newPayers')}
+          </Rows>
+        </Panel>
+      </Section>
+
+      <p className="small muted metrics__foot">
+        Удержание — сколько из тех, кто занимался в прошлом периоде,
+        занимались и в этом. Ушёл — был в прошлом периоде, в этом не был и
+        вперёд не записан. Новый — тот, у кого первое занятие пришлось на этот
+        период. Нажмите на строку — график покажет её историю.
+      </p>
+    </>
+  );
+}
+
+/* ==================================================================
  * Процессы
  * ================================================================== */
 
@@ -528,6 +642,7 @@ export function Processes() {
   const row = (id) => (
     <Metric id={id} spec={PROCESS[id]} now={now} before={before} picked={picked === id} onPick={pick} />
   );
+  const knowsCancels = now.cancels !== undefined;
 
   return (
     <>
@@ -571,6 +686,19 @@ export function Processes() {
         </Panel>
       </Section>
 
+      {knowsCancels && (
+        <Section title="Срывы" note="отмены и переносы занятий этого периода">
+          <Panel>
+            <Rows>
+              {row('cancels')}
+              {row('cancelsLate')}
+              {row('moves')}
+              {row('cancelShare')}
+            </Rows>
+          </Panel>
+        </Section>
+      )}
+
       <Section title="Кому позвонить" note="месяц без занятий — это ещё не уход, но уже повод">
         <Panel>
           <Rows>
@@ -581,9 +709,14 @@ export function Processes() {
 
       <p className="small muted metrics__foot">
         {now.silentClients > 0
-          ? 'Молчащие — те, у кого за последние тридцать дней нет ни одного проведённого занятия. Считается от сегодняшнего дня, а не от выбранного месяца.'
+          ? 'Молчащие — те, у кого за последние тридцать дней нет ни одного проведённого занятия. Считается от сегодняшнего дня, а не от выбранного месяца. Имена — в «Обзоре».'
           : 'Все, кто в работе, за последний месяц приходили хотя бы раз.'}
       </p>
+
+      {/* Кто именно отменяет и переносит — тот же период, что и сверху.
+          Раньше это была отдельная вкладка «Занятия» со своим выбором
+          месяца: два разных «этот месяц» на одном экране путали. */}
+      <ScheduleStats range={rangeOf(state)} />
     </>
   );
 }

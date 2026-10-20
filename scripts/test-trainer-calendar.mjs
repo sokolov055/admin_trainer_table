@@ -20,6 +20,7 @@ const output = await build({
 
       stub(/^\.\/screens\.jsx$/, 'trainer-screens');
       stub(/Metrics\.jsx$/, 'metrics');
+      stub(/Dashboard\.jsx$/, 'dashboard');
       stub(/Expenses\.jsx$/, 'expenses');
       stub(/Schedule\.jsx$/, 'schedule');
       stub(/ScheduleStats\.jsx$/, 'schedule');
@@ -69,7 +70,8 @@ const output = await build({
         };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }];` };
-        if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Processes=()=>null;` };
+        if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Clients=()=>null; export const Processes=()=>null;` };
+        if (args.path === 'dashboard') return { loader: 'jsx', contents: `export const Dashboard=()=>null;` };
         if (args.path === 'schedule') return { loader: 'jsx', contents: `export default () => null;` };
         if (args.path === 'expenses') return { loader: 'jsx', contents: `export const Expenses=()=>null;` };
         if (args.path === 'client-screens') return { contents: `export const Overview=()=>null; export const Plan=()=>null; export const Progress=()=>null; export const Nutrition=()=>null; export const WorkoutJournal=()=>null;` };
