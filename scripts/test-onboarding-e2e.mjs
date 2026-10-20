@@ -30,7 +30,7 @@ async function open(width = 390, enabled = true) {
 }
 const next = (page) => page.locator('.ob__next');
 const radio = (page, name) => page.getByRole('radio', { name: new RegExp('^' + name) });
-const sheetDone = (page) => page.locator('.ob-sheet__done');
+const sheetDone = (page) => page.locator('.sheet__done');
 test('анкета 2.0: согласие, данные барабанами, обмен, цель и темп, назад, прерывание, план и программа', async () => {
   const page = await open(); const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -80,7 +80,8 @@ test('анкета 2.0: согласие, данные барабанами, о�
   assert.equal(await page.locator('.ob-program').first().locator('.ob-session').count(), 2);
   await page.locator('.ob-session').first().click();
   await page.getByRole('dialog').getByRole('button', { name: 'Выбрать эту программу' }).click();
-  await page.getByRole('dialog').waitFor({ state: 'detached' });
+  // Уходящий лист уже скрыт от читалки (FT-643) — ждём, пока он уйдёт из DOM
+  await page.locator('.sheet').waitFor({ state: 'detached' });
   assert.equal(await page.locator('.ob-program__pick').first().getAttribute('aria-checked'), 'true');
   await page.getByRole('button', { name: 'Начать по этой программе' }).click();
   await page.getByRole('heading', { name: /Всё готово/ }).waitFor();

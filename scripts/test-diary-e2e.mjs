@@ -119,6 +119,8 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await diary.getByRole('button', { name: 'Добавить в ужин', exact: true }).click();
   const dialog = () => page.getByRole('dialog');
   await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
+  // Дата и приём свёрнуты в строку «Сегодня · Ужин · изменить» (FT-643)
+  await dialog().getByRole('button', { name: /^Сегодня · Ужин/ }).click();
   assert.equal(await dialog().getByLabel('Приём пищи').inputValue(), 'dinner');
   await dialog().getByLabel('Количество, г', { exact: true }).fill('150');
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
@@ -318,5 +320,86 @@ test('FT-551: тренер назначает цель и оставляет к�
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   await page.getByTestId('nutrition-diary').getByText('Уточните вес готового блюда.', { exact: true }).waitFor();
   await page.getByTestId('nutrition-diary').getByText('Осталось 1 900 ккал', { exact: true }).waitFor();
+  await page.close();
+});
+
+test('FT-643: диалоги дневника на общем листе — стопка, запертая прокрутка, фокус в количестве, ошибка у поля', { timeout: 120000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
+  const sheets = () => page.evaluate(() => document.querySelectorAll('.sheet').length);
+  const noSheets = () => page.waitForFunction(() => !document.querySelector('.sheet'));
+  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).waitFor();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
+  await dialog().getByRole('heading', { name: 'Добавить еду · Обед' }).waitFor();
+  // Лист живёт в body, страница под ним заперта
+  assert.equal(await page.evaluate(() => document.body.style.overflow), 'hidden');
+  assert.ok(await page.evaluate(() => document.querySelector('.sheet').parentElement === document.body));
+  await dialog().getByLabel('Поиск продуктов и блюд').fill('Йог');
+  await dialog().getByRole('button', { name: 'Свой продукт', exact: true }).click();
+  // Стопка: два листа в DOM, для читалки и кликов — только верхний
+  await dialog().getByRole('heading', { name: 'Продукт с этикетки' }).waitFor();
+  assert.equal(await sheets(), 2);
+  assert.equal(await dialog().count(), 1);
+  await dialog().getByLabel('Название продукта', { exact: true }).fill('Пробный');
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+  await page.screenshot({ path: join(shots, 'diary-sheet-stack-390.png') });
+  // Касание мимо листа с набранной формой ничего не теряет
+  await page.locator('.sheet').last().locator('.sheet__scrim').click({ position: { x: 20, y: 20 } });
+  await page.waitForTimeout(50);
+  assert.equal(await dialog().getByLabel('Название продукта', { exact: true }).inputValue(), 'Пробный');
+  await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
+  // Назад — на список, поиск в нём на месте
+  await dialog().getByRole('heading', { name: 'Добавить еду · Обед' }).waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('.sheet').length === 1);
+  assert.equal(await dialog().getByLabel('Поиск продуктов и блюд').inputValue(), 'Йог');
+  assert.equal(await page.evaluate(() => document.body.style.overflow), 'hidden');
+  await dialog().getByRole('button', { name: 'Все', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
+  // Фокус сразу в количестве, число выделено; дата и приём — одной строкой
+  await dialog().getByRole('heading', { name: 'Записать съеденное' }).waitFor();
+  await page.waitForFunction(() => document.activeElement?.id === 'diary-amount');
+  assert.deepEqual(await page.evaluate(() => { const a = document.activeElement; return [a.selectionStart, a.selectionEnd, a.value]; }), [0, 3, '100']);
+  await dialog().getByRole('button', { name: /^Сегодня · Обед/ }).waitFor();
+  assert.equal(await dialog().getByLabel('Приём пищи').count(), 0);
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+  await page.screenshot({ path: join(shots, 'diary-sheet-entry-390.png') });
+  // Ошибка — под полем и без «обновите данные»
+  await dialog().getByLabel('Количество, г', { exact: true }).fill('0');
+  await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
+  assert.match(await dialog().locator('.field__error').innerText(), /Проверьте количество/);
+  assert.doesNotMatch(await dialog().innerText(), /Обновите данные/);
+  await dialog().getByLabel('Количество, г', { exact: true }).fill('150');
+  await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
+  // Зелёный успех; лист ушёл, прокрутка отперта
+  await diary.locator('.note--good', { hasText: 'Порция записана' }).waitFor();
+  await noSheets();
+  assert.equal(await page.evaluate(() => document.body.style.overflow), '');
+  await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).waitFor();
+  await diary.getByRole('button', { name: '+ 250 мл', exact: true }).click();
+  await diary.locator('.note--good', { hasText: 'Сохранено.' }).waitFor();
+  // Рецепт → ингредиент: Escape закрывает верхний лист, название рецепта остаётся
+  await diary.getByRole('tab', { name: 'Рецепты', exact: true }).click();
+  await diary.getByRole('button', { name: 'Свой рецепт', exact: true }).click();
+  await dialog().getByLabel('Название блюда').fill('Стопка');
+  await dialog().getByRole('button', { name: 'Добавить ингредиент', exact: true }).click();
+  await dialog().getByRole('heading', { name: 'Ингредиент рецепта' }).waitFor();
+  await page.keyboard.press('Escape');
+  await dialog().getByRole('heading', { name: 'Свой рецепт' }).waitFor();
+  assert.equal(await dialog().getByLabel('Название блюда').inputValue(), 'Стопка');
+  await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await noSheets();
+  // Урок — тоже лист
+  await diary.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await diary.locator('.diary-lesson').first().click();
+  await dialog().waitFor();
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+  await page.screenshot({ path: join(shots, 'diary-sheet-lesson-390.png') });
+  await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await noSheets();
+  assert.deepEqual(errors, []);
   await page.close();
 });

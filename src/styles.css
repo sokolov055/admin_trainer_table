@@ -6236,3 +6236,39 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .admin-stories__thumb-note { position: absolute; left: 4px; right: 4px; bottom: 4px; padding: 2px 4px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 9.5px; font-weight: 700; line-height: 1.2; text-align: center; }
 .admin-stories__thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .se-loading { position: fixed; inset: 0; z-index: 65; background: #0c0b0e; }
+
+/* ==========================================================================
+ * Нижний лист (ui.jsx → Sheet). Один на всё приложение: анкета, дневник.
+ * Выезжает снизу кривой iOS, уходит быстрее, чем приходит; тело листа
+ * прокручивается само, страница под ним заперта (body overflow в ui.jsx).
+ * ========================================================================== */
+.sheet { position: fixed; inset: 0; z-index: 110; }
+.sheet__scrim { position: absolute; inset: 0; background: var(--scrim); touch-action: none; animation: sheet-fade 240ms var(--ease-out) both; }
+.sheet__panel {
+  position: absolute; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
+  padding: 8px 20px max(20px, env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0;
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); outline: none;
+  animation: sheet-up 360ms var(--ease-ios) both;
+}
+.sheet.is-leaving .sheet__scrim { animation: sheet-fade-out 220ms ease-in both; }
+.sheet.is-leaving .sheet__panel { animation: sheet-down 220ms ease-in both; }
+.sheet__grip { flex: none; display: block; width: 36px; height: 5px; margin: 0 auto 4px; border-radius: 3px; background: var(--border-strong); }
+.sheet__head { flex: none; position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 40px; }
+.sheet__head h2 { margin: 0; font-size: 17px; font-weight: 720; text-align: center; overflow-wrap: anywhere; }
+.sheet__close { position: absolute; right: -4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; }
+.sheet__close::before { content: ''; position: absolute; width: 36px; height: 36px; border-radius: 50%; background: var(--surface-sunken); z-index: -1; }
+.sheet__close:active { transform: translateY(-50%) scale(0.92); }
+.sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 2px 20px 4px; }
+/* 16px — иначе iOS приближает страницу при фокусе в поле */
+.sheet__body input, .sheet__body select, .sheet__body textarea { font-size: 16px; }
+.sheet__done { flex: none; min-height: 54px; margin-top: 8px; border-radius: 16px; font-size: 17px; font-weight: 720; }
+@keyframes sheet-fade { from { opacity: 0; } }
+@keyframes sheet-fade-out { to { opacity: 0; } }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+@keyframes sheet-down { to { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .sheet__panel, .sheet.is-leaving .sheet__panel { animation: sheet-fade 160ms linear both; }
+  .sheet__close:active { transform: translateY(-50%); }
+}

@@ -1,5 +1,7 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefresh, IconSearch, IconBack } from './icons.jsx';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefresh, IconSearch, IconBack, IconClose } from './icons.jsx';
+import { useBackGesture } from './gestures.jsx';
 import { environmentInfo } from './telegram.js';
 import { hasToken, describeDevice } from './session.js';
 import { logout } from './api.js';
@@ -884,4 +886,126 @@ export function plural(n, one, few, many) {
   if (mod10 === 1 && mod100 !== 11) return one;
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
   return many;
+}
+
+/* ==========================================================================
+ * Нижний лист
+ * ========================================================================== */
+
+/** Листы знают друг о друге через контекст: вложенный лист накрывает
+ *  родителя, и тот перестаёт отвечать на клавиши и чтение с экрана. */
+const SheetContext = createContext(null);
+
+/** Прокрутку страницы держит первый открытый лист и отпускает последний
+ *  закрытый — вложенные листы один счётчик делят между собой. */
+let sheetLocks = 0;
+let sheetOverflow = '';
+function lockPage() {
+  if (sheetLocks++ === 0) {
+    sheetOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+}
+function unlockPage() {
+  sheetLocks = Math.max(0, sheetLocks - 1);
+  if (sheetLocks === 0) document.body.style.overflow = sheetOverflow;
+}
+
+/** Длительность ухода листа — та же, что в styles.css (.sheet.is-leaving) */
+const SHEET_LEAVE = 220;
+
+/**
+ * Нижний лист — один на всё приложение (FT-577 анкета, FT-643 дневник).
+ *
+ * Выезжает снизу, живёт в body через портал, страницу под собой не даёт
+ * прокручивать. Закрывается крестиком, Escape, системным «назад» и
+ * касанием мимо — но касание мимо не трогает лист с набранной формой
+ * (`dirty`): случайное движение пальца не должно стирать ввод.
+ *
+ * Листы складываются стопкой: лист, открытый из листа, рисуется поверх,
+ * а нижний остаётся в DOM со всеми полями и получает `inert`. Закрытие
+ * верхнего возвращает на нижний как он был.
+ *
+ * `locked` держит лист открытым, пока форма отправляется.
+ *
+ * Фокус: `focus` — селектор поля, которое получает фокус сразу (так
+ * открывается клавиатура); без него — сам лист, чтобы читалка назвала
+ * заголовок. На выходе фокус возвращается кнопке, которая лист открыла.
+ */
+export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = false, locked = false, focus, className, children }) {
+  const [leaving, setLeaving] = useState(false);
+  const [covered, setCovered] = useState(0);
+  const panel = useRef(null);
+  const opener = useRef(typeof document !== 'undefined' ? document.activeElement : null);
+  const titleId = useRef('sheet-title-' + Math.random().toString(36).slice(2, 8));
+  const live = useRef({ leaving: false, covered: 0, locked, onClose });
+  live.current.covered = covered;
+  live.current.locked = locked;
+  live.current.onClose = onClose;
+  const parent = useContext(SheetContext);
+
+  // locked — форма отправляется: лист не закрыть, пока не пришёл ответ
+  const close = (cb) => {
+    if (live.current.leaving || live.current.locked) return;
+    live.current.leaving = true;
+    setLeaving(true);
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(() => {
+      if (cb) cb();
+      try { opener.current?.focus?.({ preventScroll: true }); } catch (_) {}
+    }, reduce ? 0 : SHEET_LEAVE);
+  };
+
+  useBackGesture(() => close(live.current.onClose), true, null, { swipe: false });
+
+  useEffect(() => {
+    if (!parent) return undefined;
+    parent.cover(1);
+    return () => parent.cover(-1);
+  }, [parent]);
+
+  useLayoutEffect(() => {
+    lockPage();
+    const p = panel.current;
+    // Поле с автофокусом уже взяло фокус при монтировании — не отбираем
+    if (p && !p.contains(document.activeElement)) {
+      const target = (focus && p.querySelector(focus)) || p.querySelector('[role="spinbutton"]') || p;
+      try { target.focus({ preventScroll: true }); } catch (_) {}
+      if (target !== p && typeof target.select === 'function') { try { target.select(); } catch (_) {} }
+    }
+    return () => unlockPage();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (live.current.covered || live.current.leaving) return;
+      if (e.key === 'Escape') { e.stopPropagation(); close(live.current.onClose); return; }
+      if (e.key === 'Tab') keepFocusInside(e, panel.current);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  const ctx = useMemo(() => ({ cover: (d) => setCovered((c) => Math.max(0, c + d)) }), []);
+  const hidden = covered > 0 || leaving;
+
+  return createPortal(
+    <SheetContext.Provider value={ctx}>
+      {/* data-no-gestures: барабан и списки внутри крутят вниз — это не «потяни, чтобы обновить» */}
+      <div className={'sheet' + (leaving ? ' is-leaving' : '') + (covered ? ' is-covered' : '') + (className ? ' ' + className : '')}
+        data-no-gestures="" inert={hidden ? '' : undefined} aria-hidden={hidden ? 'true' : undefined}>
+        <div className="sheet__scrim" onClick={() => { if (!dirty) close(live.current.onClose); }} />
+        <section ref={panel} className="sheet__panel" role="dialog" aria-modal="true" aria-labelledby={titleId.current} tabIndex={-1}>
+          <span className="sheet__grip" aria-hidden="true" />
+          <header className="sheet__head">
+            <h2 id={titleId.current}>{title}</h2>
+            <button type="button" className="sheet__close" aria-label="Закрыть" onClick={() => close(live.current.onClose)}><IconClose size={18} /></button>
+          </header>
+          <div className="sheet__body">{children}</div>
+          {onDone && <button type="button" className="button button--primary button--block sheet__done" onClick={() => close(onDone)}>{done}</button>}
+        </section>
+      </div>
+    </SheetContext.Provider>,
+    document.body,
+  );
 }

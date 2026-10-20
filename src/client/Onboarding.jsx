@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { apiPublic, apiMutate } from '../api.js';
 import { IconBack, IconCheck, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { formatNumber, plural } from '../ui.jsx';
+import { formatNumber, plural, Sheet } from '../ui.jsx';
 import {
   STEPS, STAGES, SIGNUP_STAGE, GOALS, LIFESTYLES, QUESTIONS, WHEELS, PACES,
   wheelStart, hasBody, canAdvance, nextStep, resumeStep, stageOf, timesWeek, bmrOf,
@@ -10,7 +10,7 @@ import {
 } from './onboarding-model.js';
 import Art from './OnboardingArt.jsx';
 import StageBar from './StageBar.jsx';
-import { Wheel, Sheet, range } from './Wheel.jsx';
+import { Wheel, range } from './Wheel.jsx';
 import Permissions, { usePermissions, useAppOffer, AppOffer } from './Permissions.jsx';
 import { MuscleFigure, tallyExercises, splitTally, nameLine } from '../muscles/MuscleMap.jsx';
 import { useKeyboardInset } from '../keyboard-inset.js';
@@ -358,7 +358,7 @@ function BodySheet({ k, answers, onDone, onClose }) {
   const kg = Math.floor(value);
   const tenth = Math.round((value - kg) * 10);
   return (
-    <Sheet title={w.label} onClose={onClose} onDone={() => onDone(value, next)} done={next ? 'Далее' : 'Готово'}>
+    <Sheet className="ob-sheet" title={w.label} onClose={onClose} onDone={() => onDone(value, next)} done={next ? 'Далее' : 'Готово'}>
       <div className="ob-wheels">
         {k === 'weight' ? <>
           <Wheel label="Вес, килограммы" values={range(w.min, w.max)} value={kg} width={2}
@@ -388,7 +388,7 @@ function BirthSheet({ value, next, onDone, onClose }) {
   const age = ageOf({ birth: iso }, now);
   const ok = age >= 14 && age <= 100;
   return (
-    <Sheet title="Дата рождения" onClose={onClose} onDone={ok ? () => onDone(iso, next) : null} done={next ? 'Далее' : 'Готово'}>
+    <Sheet className="ob-sheet" title="Дата рождения" onClose={onClose} onDone={ok ? () => onDone(iso, next) : null} done={next ? 'Далее' : 'Готово'}>
       <div className="ob-wheels">
         <Wheel key={daysIn(y, m)} label="День" values={range(1, daysIn(y, m))} value={day} width={1} onChange={setD} />
         <Wheel label="Месяц" values={range(1, 12)} value={m} width={2} format={(v) => MONTHS[v - 1]} onChange={setM} />
@@ -403,7 +403,7 @@ function PaceSheet({ goal, value, onDone, onClose }) {
   const [pace, setPace] = useState(value);
   const p = PACES[goal];
   return (
-    <Sheet title={p.title} onClose={onClose} onDone={() => onDone(pace)} done="Сохранить">
+    <Sheet className="ob-sheet" title={p.title} onClose={onClose} onDone={() => onDone(pace)} done="Сохранить">
       <p className="ob-sheet__lead">Чтобы подобрать посильный темп и точно посчитать норму.</p>
       <div className="ob-choices ob-choices--compact" role="radiogroup" aria-label={p.title}>
         {p.options.map((o) => (
@@ -556,7 +556,7 @@ export function Program({ p, i, best, on, onPick }) {
         ))}
       </div>
       <button type="button" className="ob-program__all" onClick={() => setOpen(0)}>Все упражнения</button>
-      {open !== null && <Sheet title={tidyTitle(p.title)} onClose={() => setOpen(null)}
+      {open !== null && <Sheet className="ob-sheet" title={tidyTitle(p.title)} onClose={() => setOpen(null)}
         onDone={() => { setOpen(null); if (!on) onPick(); }} done={on ? 'Закрыть' : 'Выбрать эту программу'}>
         <div className="ob-sheet__scroll" ref={(el) => { if (el && open) el.querySelector(`[data-session="${open}"]`)?.scrollIntoView({ block: 'start' }); }}>
           {sessions.map((b, j) => (

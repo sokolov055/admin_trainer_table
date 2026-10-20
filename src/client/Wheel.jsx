@@ -1,6 +1,4 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { IconClose } from '../icons.jsx';
 
 /**
  * Барабан и нижнее окно для чисел анкеты (FT-577) — как у ONLYFITS:
@@ -79,43 +77,6 @@ export function Wheel({ values, value, onChange, label, format = (v) => String(v
   );
 }
 
-/**
- * Нижнее окно. Закрывается крестиком, касанием мимо и Escape; фокус
- * уходит внутрь и возвращается на кнопку, которая окно открыла.
- */
-export function Sheet({ title, onClose, onDone, done = 'Готово', children }) {
-  const [leaving, setLeaving] = useState(false);
-  const panel = useRef(null);
-  const opener = useRef(typeof document !== 'undefined' ? document.activeElement : null);
-  const close = (cb) => {
-    if (leaving) return;
-    setLeaving(true);
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    setTimeout(() => { cb(); opener.current?.focus?.({ preventScroll: true }); }, reduce ? 0 : 220);
-  };
-  useEffect(() => {
-    panel.current?.querySelector('[role="spinbutton"], button')?.focus({ preventScroll: true });
-    const esc = (e) => { if (e.key === 'Escape') close(onClose); };
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, []);
-
-  return createPortal(
-    // data-no-gestures: барабан крутят вниз — это не «потяни, чтобы обновить»
-    <div className={'ob-sheet' + (leaving ? ' is-leaving' : '')} data-no-gestures="">
-      <div className="ob-sheet__scrim" onClick={() => close(onClose)} />
-      <section ref={panel} className="ob-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="ob-sheet-title">
-        <span className="ob-sheet__grip" aria-hidden="true" />
-        <header className="ob-sheet__head">
-          <h2 id="ob-sheet-title">{title}</h2>
-          <button type="button" className="ob-sheet__close" aria-label="Закрыть" onClick={() => close(onClose)}><IconClose size={18} /></button>
-        </header>
-        {children}
-        {onDone && <button type="button" className="button button--primary button--block ob-sheet__done" onClick={() => close(onDone)}>{done}</button>}
-      </section>
-    </div>,
-    document.body,
-  );
-}
+/** Нижнее окно с FT-643 общее — Sheet в ui.jsx */
 
 export const range = (min, max, step = 1) => Array.from({ length: Math.floor((max - min) / step) + 1 }, (_, i) => min + i * step);

@@ -271,28 +271,13 @@
 .kb-open .signin__register, .kb-open .ob__body { animation: none; transform: none; }
 
 /* ---------- Нижнее окно с барабаном ---------- */
-.ob-sheet { position: fixed; inset: 0; z-index: 80; font-family: 'Manrope', var(--font); }
-.ob-sheet__scrim { position: absolute; inset: 0; background: var(--scrim); animation: ob-fade 240ms var(--ease-out) both; }
-.ob-sheet__panel {
-  position: absolute; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; box-sizing: border-box;
-  padding: 8px 20px max(20px, env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0;
-  background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
-  animation: ob-sheet-up 360ms var(--ease-ios) both;
-}
-.ob-sheet.is-leaving .ob-sheet__scrim { animation: ob-fade-out 220ms ease-in both; }
-.ob-sheet.is-leaving .ob-sheet__panel { animation: ob-sheet-down 220ms ease-in both; }
-.ob-sheet__grip { display: block; width: 36px; height: 5px; margin: 0 auto 4px; border-radius: 3px; background: var(--border-strong); }
-.ob-sheet__head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; }
-.ob-sheet__head h2 { margin: 0; font-size: 17px; font-weight: 720; }
-.ob-sheet__close { position: absolute; right: -4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--surface-sunken); color: var(--text); cursor: pointer; }
+/* Сам лист — общий (.sheet в styles.css, Sheet в ui.jsx); здесь только
+   шрифт анкеты и её содержимое внутри листа */
+.ob-sheet { font-family: 'Manrope', var(--font); }
+.ob-sheet button { font-family: inherit; }
 .ob-sheet__lead.is-error { color: var(--critical-text); font-weight: 650; }
 .ob-sheet__lead { margin: 0 0 14px; color: var(--text-secondary); font-size: 14px; line-height: 1.45; text-align: center; }
-.ob-sheet__done { min-height: 54px; margin-top: 8px; border-radius: 16px; font-size: 17px; font-weight: 720; }
-.ob-sheet button { font-family: inherit; }
 @keyframes ob-fade { from { opacity: 0; } }
-@keyframes ob-fade-out { to { opacity: 0; } }
-@keyframes ob-sheet-up { from { transform: translateY(100%); } }
-@keyframes ob-sheet-down { to { transform: translateY(100%); } }
 
 .ob-wheels { display: flex; gap: 8px; margin: 4px 0 12px; }
 .wheel { position: relative; flex: 1; min-width: 0; }
@@ -326,7 +311,6 @@
 @media (prefers-reduced-motion: reduce) {
   .onboarding__step, .ob-choice, .ob-pill, .ob-tile, .stagebar__dot, .stagebar__line::after { transition: none; }
   .ob-step, .ob-choice, .ob-group, .ob-tile, .ob-promise li, .ob-macro, .ob-program, .ob-summary li, .ob-hero { animation: ob-fade 160ms linear both; }
-  .ob-sheet__panel, .ob-sheet.is-leaving .ob-sheet__panel { animation: ob-fade 160ms linear both; }
   .ob-done__ring, .ob-done__tick { animation: none; stroke-dashoffset: 0; }
   .ob-choice.is-on .ob-choice__mark svg { animation: none; }
 }
