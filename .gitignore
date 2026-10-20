@@ -19,3 +19,8 @@ ft551-browser.log
 ft551-catalog-*.log
 
 ft551-catalog-audit.json
+
+# Граф кода graphify (локальный, строится graphify extract . --code-only)
+graphify-out/
+# Рабочие копии других агентов (git worktree)
+worktrees/
