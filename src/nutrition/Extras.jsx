@@ -52,8 +52,9 @@ export default function Extras({ extras, products, onAdd, onRemove, trial = fals
 }
 
 function amountLabel(item) {
-  if (item.pieces && item.product.piece) return formatNumber(item.pieces) + ' шт. (' + formatNumber(item.grams) + ' г)';
-  return formatNumber(item.grams) + ' г';
+  const unit = item.product?.unit === 'ml' ? ' мл' : ' г';
+  if (item.pieces && item.product.piece) return formatNumber(item.pieces) + ' шт. (' + formatNumber(item.grams) + unit + ')';
+  return formatNumber(item.grams) + unit;
 }
 
 /**
@@ -97,7 +98,7 @@ function AddForm({ products, onAdd, onCancel, trial = false }) {
     const res = picked ? { product: picked, errors: [] } : cleanProduct(fields);
     const qty = Number(String(amount).replace(',', '.'));
     const errs = [...res.errors];
-    if (!Number.isFinite(qty) || qty <= 0) errs.push(unit === 'pcs' ? 'Сколько штук' : 'Сколько граммов');
+    if (!Number.isFinite(qty) || qty <= 0) errs.push(unit === 'pcs' ? 'Сколько штук' : picked?.unit === 'ml' ? 'Сколько миллилитров' : 'Сколько граммов');
     if (errs.length) { setErrors(errs); return; }
 
     let product = res.product;
@@ -168,7 +169,7 @@ function AddForm({ products, onAdd, onCancel, trial = false }) {
           <div className="extras__picked">
             <div>
               <div className="extras__name">{picked.name}</div>
-              <div className="extras__meta">на 100 г: {macros(picked)}{picked.piece ? ' · 1 шт. = ' + formatNumber(picked.piece) + ' г' : ''}</div>
+              <div className="extras__meta">на 100 {picked.unit === 'ml' ? 'мл' : 'г'}: {macros(picked)}{picked.piece ? ' · 1 шт. = ' + formatNumber(picked.piece) + ' г' : ''}</div>
             </div>
             <div className="extras__picked-actions">
               {heart(picked)}
@@ -213,7 +214,7 @@ function AddForm({ products, onAdd, onCancel, trial = false }) {
         )}
 
         <div className="extras__amount">
-          <Num label={unit === 'pcs' ? 'Сколько штук' : 'Сколько граммов'} value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Num label={unit === 'pcs' ? 'Сколько штук' : picked?.unit === 'ml' ? 'Сколько миллилитров' : 'Сколько граммов'} value={amount} onChange={(e) => setAmount(e.target.value)} />
           {pieceKnown && (
             <div className="extras__unit" role="radiogroup" aria-label="Единица">
               <button type="button" className={'chip' + (unit === 'g' ? ' chip--active' : '')} aria-checked={unit === 'g'} role="radio" onClick={() => setUnit('g')}>г</button>

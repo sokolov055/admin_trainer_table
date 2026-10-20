@@ -300,6 +300,44 @@ test('FT-551: собственный каталог, бренд, этикетк�
   await page.close();
 });
 
+test('напиток с этикетки на 100 мл: единица хранится, порция и подписи в миллилитрах', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Свой продукт', exact: true }).click();
+  const form = page.getByRole('dialog');
+  await form.getByLabel('Название продукта', { exact: true }).fill('Крюшон');
+  await form.getByRole('radio', { name: 'на 100 мл', exact: true }).click();
+  assert.equal(await form.getByRole('radio', { name: 'на 100 мл', exact: true }).getAttribute('aria-checked'), 'true');
+  for (const [label, value] of [['Ккал', '42'], ['Белки, г', '0'], ['Жиры, г', '0'], ['Углеводы, г', '10,5']]) await form.getByLabel(label, { exact: true }).fill(value);
+  await form.getByRole('button', { name: 'Создать продукт', exact: true }).click();
+  // Количество — в миллилитрах, быстрые порции — стакан и банка
+  await page.getByRole('dialog').getByRole('heading', { name: 'Крюшон' }).waitFor();
+  await page.getByLabel('Количество, мл', { exact: true }).waitFor();
+  await page.getByRole('dialog').getByRole('button', { name: '250 мл', exact: true }).click();
+  await page.getByRole('dialog').getByText('105 ккал', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Записать в дневник', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Изменить: Крюшон', exact: true }).waitFor();
+  await page.getByTestId('nutrition-diary').getByText('250 мл', { exact: true }).waitFor();
+  // В каталоге напиток подписан «на 100 мл»
+  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Поиск продуктов и блюд').fill('Крюшон');
+  await page.getByRole('dialog').getByRole('button', { name: 'Все', exact: true }).click();
+  await page.getByRole('dialog').getByText(/42 ккал \/ 100 мл/).waitFor();
+  await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.locator('.sheet').waitFor({ state: 'detached' });
+  await page.goto(origin + '/?mockRole=trainer');
+  await page.getByRole('button', { name: 'Библиотека', exact: true }).click();
+  await page.getByRole('tab', { name: 'Продукты', exact: true }).click();
+  await page.getByLabel('Найти продукт, бренд или штрихкод').fill('Крюшон');
+  await page.getByText(/42 ккал \/ 100 мл/).waitFor();
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test('FT-551: тренер назначает цель и оставляет комментарий, клиент видит результат', { timeout: 90000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
   await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));

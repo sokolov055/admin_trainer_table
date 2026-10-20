@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiMutate, apiPublic } from '../api.js';
 import { Panel, Note, Loading, ErrorState } from '../ui.jsx';
 import FoodScan from '../nutrition/FoodScan.jsx';
-import { FoodFields, FoodField as Field, foodTitle } from '../nutrition/FoodFields.jsx';
+import { FoodFields, FoodField as Field, foodTitle, foodPer } from '../nutrition/FoodFields.jsx';
 
 // Одна карточка с этикетки становится доступной всем. Редактирует общий
 // справочник только владелец; дневники хранят прежние снимки значений.
@@ -33,7 +33,7 @@ export default function FoodCatalog() {
     catch (e) { setError(e); } finally { setBusy(false); }
   };
   if (editing) return <section aria-label="Карточка продукта"><h2>{editing.id ? 'Проверить продукт' : 'Новый продукт'}</h2><Panel pad><form onSubmit={save}>
-    <p className="small muted">Все значения на 100 г. Сверьте этикетку и вид продукта. Правка справочника не меняет уже записанное питание.</p>
+    <p className="small muted">Значения на 100 г, у напитков — на 100 мл. Сверьте этикетку, единицу и вид продукта. Правка справочника не меняет уже записанное питание.</p>
     <FoodScan disabled={busy} onDraft={patch => setEditing(f => ({ ...f, ...patch }))} onFound={setEditing} />
     <FoodFields value={editing} onChange={setEditing} />
     <Field label="Другие названия для поиска" value={editing.aliases || ''} onChange={aliases => setEditing(f => ({ ...f, aliases }))} maxLength={240} />
@@ -44,7 +44,7 @@ export default function FoodCatalog() {
   return <section aria-label="База продуктов"><h2>База продуктов</h2><p className="small muted">Справочные продукты USDA и карточки с этикеток. Пользовательские данные помечены как непроверенные до вашей проверки. Имена клиентов и сведения о здоровье сюда не добавляйте.</p>
     <label className="field"><span className="field__label">Карточки</span><select aria-label="Карточки" className="field__input" value={status} onChange={e => setStatus(e.target.value)}><option value="unverified">Непроверенные</option><option value="">Все продукты</option></select></label>
     <Field label="Найти продукт, бренд или штрихкод" value={q} onChange={setQ} />
-    <button className="button" onClick={() => { setError(null); setEditing({ name: '', brand: '', barcode: '', preparation: 'as_sold', kcal: '', protein: '', fat: '', carbs: '' }); }}>Добавить продукт</button>
-    {resource.loading ? <Loading rows={3} /> : resource.error ? <ErrorState error={resource.error} onRetry={reload} /> : <Panel>{(resource.data?.foods || []).map(f => <button type="button" className="diary-food-main food-catalog-row" key={f.id} onClick={() => { setError(null); setEditing(f); }}><strong>{foodTitle(f)}</strong><small>{f.kcal} ккал / 100 г · {f.source}</small></button>)}{!resource.data?.foods?.length && <p className="small muted">Ничего не найдено. Уточните название или добавьте продукт с этикетки.</p>}</Panel>}
+    <button className="button" onClick={() => { setError(null); setEditing({ name: '', brand: '', barcode: '', preparation: 'as_sold', unit: 'g', kcal: '', protein: '', fat: '', carbs: '' }); }}>Добавить продукт</button>
+    {resource.loading ? <Loading rows={3} /> : resource.error ? <ErrorState error={resource.error} onRetry={reload} /> : <Panel>{(resource.data?.foods || []).map(f => <button type="button" className="diary-food-main food-catalog-row" key={f.id} onClick={() => { setError(null); setEditing(f); }}><strong>{foodTitle(f)}</strong><small>{f.kcal} ккал / {foodPer(f)} · {f.source}</small></button>)}{!resource.data?.foods?.length && <p className="small muted">Ничего не найдено. Уточните название или добавьте продукт с этикетки.</p>}</Panel>}
   </section>;
 }

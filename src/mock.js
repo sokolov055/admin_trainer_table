@@ -1343,7 +1343,7 @@ const MOCK = {
     const q = String(params.q || '').toLowerCase();
     return { foods: all.filter((f) => !q || f.name.toLowerCase().includes(q)) };
   },
-  'food.add': (params) => ({ food: { id: 99, name: params.name, kcal: Number(params.kcal) || 0, protein: Number(params.protein) || 0, fat: Number(params.fat) || 0, carbs: Number(params.carbs) || 0, piece: Number(params.piece) || 0, uses: 0 }, existed: false }),
+  'food.add': (params) => ({ food: { id: 99, name: params.name, kcal: Number(params.kcal) || 0, protein: Number(params.protein) || 0, fat: Number(params.fat) || 0, carbs: Number(params.carbs) || 0, piece: Number(params.piece) || 0, unit: params.unit === 'ml' ? 'ml' : 'g', uses: 0 }, existed: false }),
   'food.use': () => ({ ok: true }),
   'dishes.list': () => ({
     dishes: RECIPES_DEMO.map((r, i) => ({

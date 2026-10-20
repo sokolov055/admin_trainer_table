@@ -70,7 +70,7 @@ export function diaryMock(action, p = {}) {
     s.foods = s.foods.filter(f => f.id !== p.id); result = { hidden: p.id };
   } else if (action === 'food.add') {
     const old = s.foods.find(f => f.name.toLowerCase() === p.name.toLowerCase() && (f.brand || '') === (p.brand || ''));
-    const product = old || { id: Date.now(), kind: 'food', name: p.name, brand: p.brand || '', barcode: p.barcode || '', preparation: p.preparation || 'as_sold', revision: 1, reviewStatus: 'unverified', unit: 'g', source: 'Демо: данные с этикетки', ...Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, Number(p[k])])) };
+    const product = old || { id: Date.now(), kind: 'food', name: p.name, brand: p.brand || '', barcode: p.barcode || '', preparation: p.preparation || 'as_sold', revision: 1, reviewStatus: 'unverified', unit: p.unit === 'ml' ? 'ml' : 'g', source: 'Демо: данные с этикетки', ...Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, Number(p[k])])) };
     if (!old) s.foods.push(product); result = { food: product, existed: !!old };
   } else fail(404, 'Нет демо-данных для ' + action);
   if (p.requestId) s.operations[p.requestId] = copy(result);
