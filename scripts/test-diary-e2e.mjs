@@ -139,9 +139,9 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await diary.getByText('0,25 л выпито', { exact: true }).waitFor();
   await diary.getByLabel('Всё за день записано').click();
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).some(d => d.complete));
-  await diary.getByRole('button', { name: 'Неделя', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Неделя', exact: true }).click();
   await diary.getByText('Среднее за полные дни: 140 ккал', { exact: true }).waitFor();
-  await diary.getByRole('button', { name: 'Рецепты', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Рецепты', exact: true }).click();
   await diary.getByRole('button', { name: 'Свой рецепт', exact: true }).click();
   await dialog().getByLabel('Название блюда').fill('Мой тестовый десерт');
   await dialog().getByRole('button', { name: 'Добавить ингредиент', exact: true }).click();
@@ -153,7 +153,7 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await dialog().getByLabel('Вес всего готового блюда, г').fill('100');
   await dialog().getByRole('button', { name: 'Сохранить в мои блюда', exact: true }).click();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('nutrition_demo_server:3')).recipes[0].revision === 2);
-  await diary.getByRole('button', { name: 'Дневник', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Дневник', exact: true }).click();
   await diary.getByRole('button', { name: 'Добавить в завтрак', exact: true }).click();
   await dialog().getByRole('button', { name: 'Добавить Мой тестовый десерт', exact: true }).click();
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
@@ -189,6 +189,41 @@ test('FT-551: любимые, приёмы, порции, история, рец
 });
 
 
+test('FT-642: удаление записи — «Удалено · Вернуть», на сервер после паузы; четыре вкладки', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
+  const entries = () => page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0));
+  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).waitFor();
+  assert.deepEqual(await diary.getByRole('tab').allInnerTexts(), ['Дневник', 'Неделя', 'Рецепты', 'Ещё']);
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
+  await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).waitFor();
+  assert.equal(await entries(), 1);
+  // В форме «Удалить запись» стоит отдельно от «Записать в дневник», удаление отложенное.
+  await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Удалить запись', exact: true }).click();
+  await page.getByRole('button', { name: 'Вернуть', exact: true }).click();
+  await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).waitFor();
+  assert.equal(await entries(), 1);
+  await page.screenshot({ path: join(shots, 'diary-tabs-390.png') });
+  // Смахивание: корзина под строкой (до жеста скрыта — шлём событие), затем пауза и сервер.
+  await diary.locator('button.swipe__trash[aria-label="Удалить: Йогурт 2%"]').dispatchEvent('click');
+  await page.getByText('Запись удалена', { exact: true }).waitFor();
+  assert.equal(await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).count(), 0);
+  assert.equal(await entries(), 1);
+  await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0) === 0, null, { timeout: 30000 });
+  await diary.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await diary.getByRole('button', { name: 'Норма и анкета', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Разобраться за пару минут' }).waitFor();
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test('FT-551: план меню становится фактом только после подтверждения порции', { timeout: 90000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
   const ids = [RECIPES[0].id, RECIPES.find(r => r.meal !== RECIPES[0].meal).id];
@@ -197,7 +232,7 @@ test('FT-551: план меню становится фактом только �
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary');
   await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
-  await diary.getByRole('button', { name: 'План меню', exact: true }).click();
+  await diary.getByRole('button', { name: 'Что приготовить на остаток', exact: true }).click();
   const eat = page.getByRole('button', { name: 'Съел — записать порцию', exact: true }).first();
   await eat.waitFor();
   assert.equal(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s,d) => s+d.entries.length,0)), 0);
@@ -232,7 +267,7 @@ test('FT-551: собственный каталог, бренд, этикетк�
   await page.getByLabel('Количество, г', { exact: true }).fill('150');
   await page.getByRole('button', { name: 'Записать в дневник', exact: true }).click();
   await page.getByTestId('nutrition-diary').getByText('180 ккал', { exact: true }).first().waitFor();
-  await page.getByRole('button', { name: 'Подсказки', exact: true }).click();
+  await page.getByRole('tab', { name: 'Ещё', exact: true }).click();
   assert.equal(await page.getByText('Расчёт по анкете', { exact: true }).count(), 0);
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: 'Собрать рацион', exact: true }).count(), 0);
@@ -241,7 +276,7 @@ test('FT-551: собственный каталог, бренд, этикетк�
   await page.screenshot({ path: join(shots, 'nutrition-tips-390.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
   await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Дневник', exact: true }).click();
+  await page.getByRole('tab', { name: 'Дневник', exact: true }).click();
 
   await page.goto(origin + '/?mockRole=trainer');
   await page.getByRole('button', { name: 'Библиотека', exact: true }).click();

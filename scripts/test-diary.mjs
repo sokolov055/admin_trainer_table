@@ -31,20 +31,23 @@ const stubs = {
   gestures: `export const useBackGesture=()=>{};`,
   offline: `export const localWrites=async()=>[]; export const onWritesChange=()=>()=>{}; export const queueWrite=async(k,p)=>{globalThis.__diary.queued.push({kind:k,params:p})}; export const isOffline=e=>e?.code===0; export const dropWrite=async()=>{};`,
   account: `export const offlineAccount=()=> 'unit-account';`,
-  ui: `import React from 'react'; export const Section=({children})=><section>{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Loading=()=> <div>Загрузка</div>;export const formatNumber=n=>String(n);`,
+  ui: `import React from 'react'; export const Section=({children})=><section>{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Loading=()=> <div>Загрузка</div>;export const formatNumber=n=>String(n);export const Chips=({items,value,onChange,label})=><div role="tablist" aria-label={label}>{items.map(i=><button key={i.value} role="tab" aria-selected={i.value===value} onClick={()=>onChange(i.value)}>{i.label}</button>)}</div>;`,
   icons: `import React from 'react';const I=()=> <i/>; export const IconPlus=I,IconClose=I,IconHeart=I,IconCopy=I,IconTrash=I,IconChevron=I,IconNutrition=I;`,
+  // Смахивание и «Вернуть» — свои модули с проверками; здесь удаление уходит сразу, чтобы видеть вызов сервера.
+  SwipeRow: `import React from 'react'; export default ({children,onDelete,label,disabled})=><div data-swipe={label} data-disabled={disabled?'1':''}><button aria-label={label} onClick={onDelete}>x</button>{children}</div>;`,
+  pendingDelete: `export const usePendingDelete=(commit,{onDone,onError}={})=>({remove:(id,payload)=>{globalThis.__diary.removed.push(id);Promise.resolve(commit(payload)).then(()=>onDone&&onDone(payload),e=>onError&&onError(e));},hidden:()=>false,bar:null,flush(){}});`,
 };
 const bundle = await build({ entryPoints: ['src/nutrition/Diary.jsx'], bundle: true, write: false, format: 'cjs', platform: 'node', external: ['react'], logLevel: 'silent', plugins: [{ name: 'diary-stubs', setup(b) {
-  b.onResolve({ filter: /\/(api|gestures|ui|icons|offline-writes|offline-account)\.(js|jsx)$/ }, a => ({ path: ({ 'offline-writes': 'offline', 'offline-account': 'account' })[a.path.split('/').at(-1).split('.')[0]] || a.path.split('/').at(-1).split('.')[0], namespace: 'stub' }));
+  b.onResolve({ filter: /\/(api|gestures|ui|icons|offline-writes|offline-account|SwipeRow|pendingDelete)\.(js|jsx)$/ }, a => ({ path: ({ 'offline-writes': 'offline', 'offline-account': 'account' })[a.path.split('/').at(-1).split('.')[0]] || a.path.split('/').at(-1).split('.')[0], namespace: 'stub' }));
   b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: stubs[a.path], loader: 'jsx' }));
   b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
 } }] });
 const module = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + bundle.outputFiles[0].text + '\n})')(createRequire(import.meta.url), module, module.exports);
-const { useDiaryResource, DiaryEntryForm } = module.exports;
+const { useDiaryResource, DiaryEntryForm, default: NutritionDiary } = module.exports;
 globalThis.window = { addEventListener() {}, removeEventListener() {} };
 globalThis.document = { activeElement: null, addEventListener() {}, removeEventListener() {} };
-globalThis.__diary = { queued: [] };
+globalThis.__diary = { queued: [], removed: [] };
 test('поздний ответ прошлого дня не заменяет открытый день', async () => {
   const pending = new Map();
   __diary.read = (_a, p) => new Promise(resolve => pending.set(p.day, resolve));
@@ -79,5 +82,38 @@ test('отказ сервера не маскируется как сохран�
   await act(async () => tree.root.findByType('form').props.onSubmit({ preventDefault() {} }));
   assert.equal(saved, false); assert.equal(__diary.queued.length, 0);
   assert.ok(JSON.stringify(tree.toJSON()).includes('Конфликт записи'));
+  tree.unmount();
+});
+test('«Удалить запись» в форме не трогает сервер сам — отдаёт запись родителю (FT-642)', async () => {
+  let removed = null, mutated = 0;
+  __diary.mutate = async () => { mutated++; };
+  const entry = { id: 7, revision: 2, day: '2026-10-17', meal: 'lunch', amount: 120, product: food };
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(DiaryEntryForm, { entry, onClose() {}, onSaved() {}, onRemove: e => { removed = e; } })); });
+  const buttons = tree.root.findAllByType('button').filter(b => Array.isArray(b.props.children) && b.props.children.includes(' Удалить запись'));
+  assert.equal(buttons.length, 1);
+  await act(async () => buttons[0].props.onClick());
+  assert.equal(removed.id, 7); assert.equal(mutated, 0);
+  tree.unmount();
+});
+test('дневник: четыре вкладки, смахивание строки удаляет запись с revision, «План меню» — кнопка в итоге', async () => {
+  const calls = [];
+  __diary.read = async (a, p) => a === 'diary.get' ? { day: p.day, entries: [{ id: 7, revision: 2, day: p.day, meal: 'lunch', amount: 120, product: food }], totals: totalEntries([{ product: food, amount: 120 }]), targets: { kcal: 2000, protein: 100, fat: 60, carbs: 250 }, complete: false, waterMl: 0, comment: '', revision: 1 } : { products: [] };
+  __diary.mutate = async (a, p) => { calls.push([a, p]); return {}; };
+  __diary.removed = [];
+  let planned = null, tree;
+  await act(async () => { tree = renderer.create(React.createElement(NutritionDiary, { onPlan: p => { planned = p; } })); });
+  await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  const tabs = tree.root.findAllByProps({ role: 'tab' }).map(t => t.props.children);
+  assert.deepEqual(tabs, ['Дневник', 'Неделя', 'Рецепты', 'Ещё']);
+  const plan = tree.root.findAllByType('button').find(b => b.props.children === 'Что приготовить на остаток');
+  assert.ok(plan && !plan.props.disabled);
+  await act(async () => plan.props.onClick());
+  assert.equal(planned.targets.kcal, 2000); assert.equal(planned.totals.kcal, 84);
+  const swipe = tree.root.findAllByProps({ 'aria-label': 'Удалить: Йогурт' }).find(n => n.type === 'button');
+  await act(async () => swipe.props.onClick());
+  await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.deepEqual(__diary.removed, [7]);
+  assert.equal(calls[0][0], 'diary.entry.remove'); assert.equal(calls[0][1].id, 7); assert.equal(calls[0][1].revision, 2);
   tree.unmount();
 });

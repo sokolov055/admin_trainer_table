@@ -382,12 +382,12 @@ export function SubNav({ className = '', children }) {
   return <div ref={ref} className={'app__subnav' + (className ? ' ' + className : '') + edges}>{children}</div>;
 }
 
-export function Chips({ items, value, onChange, variant, className }) {
+export function Chips({ items, value, onChange, variant, className, label }) {
   const rowRef = useRef(null);
   useActiveInView(rowRef, value);
   const edges = useEdgeFade(rowRef);
   return (
-    <div ref={rowRef} className={'chips' + (variant ? ' chips--' + variant : '') + (className ? ' ' + className : '') + edges} role="tablist">
+    <div ref={rowRef} className={'chips' + (variant ? ' chips--' + variant : '') + (className ? ' ' + className : '') + edges} role="tablist" aria-label={label}>
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const label = typeof item === 'string' ? item : item.label;
