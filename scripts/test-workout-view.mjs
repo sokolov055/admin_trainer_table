@@ -14,6 +14,32 @@ test('focusOf: первый неотмеченный подход; в супер
   assert.deepEqual(focusOf({ exercises: [{ id: 'a', sets: [set('done')] }] }), { ex: '', set: -1 });
 });
 
+test('focusOf: держится упражнения, где отметили подход, а не первого по списку (QA 20.10.2026)', () => {
+  // Кардио первым, к нему не притрагивались; отметили первый подход приседа
+  const s = { exercises: [
+    { id: 'cardio', supersetGroup: '', sets: [set('pending')] },
+    { id: 'squat', supersetGroup: '', sets: [set('done'), set('pending'), set('pending')] },
+    { id: 'press', supersetGroup: '', sets: [set('pending'), set('pending')] },
+  ] };
+  assert.deepEqual(focusOf(s, 'squat'), { ex: 'squat', set: 1 }, 'с подсказкой — следующий подход приседа');
+  assert.deepEqual(focusOf(s), { ex: 'squat', set: 1 }, 'без подсказки (перезагрузка) — начатое упражнение, а не кардио');
+  // Присед закончен — дальше по списку: кардио всё ещё ждёт
+  const done = { exercises: [s.exercises[0], { ...s.exercises[1], sets: [set('done'), set('done'), set('done')] }, s.exercises[2]] };
+  assert.deepEqual(focusOf(done, 'squat'), { ex: 'cardio', set: 0 });
+  // Подсказка на суперсет — круг целиком: у напарника подход того же круга
+  const round = { exercises: [
+    { id: 'cardio', supersetGroup: '', sets: [set('pending')] },
+    { id: 'b', supersetGroup: 'g', sets: [set('done'), set('pending')] },
+    { id: 'c', supersetGroup: 'g', sets: [set('pending'), set('pending')] },
+  ] };
+  assert.deepEqual(focusOf(round, 'b'), { ex: 'c', set: 0 });
+});
+
+test('nextInfo: «вес тот же · было тяжело» — когда вес не сдвинулся после «тяжело»', () => {
+  const ex = { id: 'a', name: 'Присед', supersetGroup: '', sets: [{ ...set('done', '100', '5'), effort: 'hard' }, set('pending', '100', '5')] };
+  assert.deepEqual(nextInfo({ exercises: [ex] }, { ex: 'a', set: 1 }).change, { kind: 'same', text: 'вес тот же · было тяжело' });
+});
+
 test('nextInfo: куда идти и что накинуть; суперсет — весь круг', () => {
   const ex = { id: 'a', name: 'Присед', prevWeight: '', supersetGroup: '', sets: [set('done', '100', '5'), set('pending', '102.5', '5')] };
   const n = nextInfo({ exercises: [ex] }, { ex: 'a', set: 1 });

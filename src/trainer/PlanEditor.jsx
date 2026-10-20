@@ -6,7 +6,7 @@ import { planExerciseForSave } from '../plan-payload.js';
 import { Note } from '../ui.jsx';
 import { IconAlert } from '../icons.jsx';
 import BlockOrder from './BlockOrder.jsx';
-import { BlockEdit, blankExercise } from './PlanInline.jsx';
+import { BlockEdit, AddBlock, blankExercise } from './PlanInline.jsx';
 import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
 
@@ -27,10 +27,15 @@ import { copyPlanBlocks } from '../plan-block-actions.js';
  * Сохраняется шаблон целиком, одним снимком: так удаление становится
  * настоящим. onSubmit(blocks) — куда сохранять; single — шаблон одной
  * тренировки, добавлять и убирать тренировки в нём нельзя.
+ *
+ * Тренировка добавляется тем же «+»-меню, что в программе клиента
+ * (AddBlock: новая или из шаблона тренировки) — до 20.10.2026 здесь были
+ * своя кнопка и нативный список. Отмена — только стрелкой «Назад» над
+ * формой: в плавающей панели она дублировала её (QA C05b).
  */
 export default function PlanEditor({
-  blocks, onSaved, onCancel, onSubmit, single = false, submitLabel = 'Сохранить шаблон',
-  workoutTemplates = null, loadWorkout = null,
+  blocks, onSaved, onSubmit, single = false, submitLabel = 'Сохранить шаблон',
+  workoutTemplates = null,
 }) {
   const [draft, setDraft] = useState(() => (blocks.length
     ? blocks.map((b) => ({ id: b.id || '', title: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blankExercise(), ...e })) }))
@@ -53,7 +58,7 @@ export default function PlanEditor({
   }, []);
 
   // Правка шаблона — не раздел: смахнуть влево в соседний раздел значило
-  // бы бросить несохранённое. Выход — «Сохранить» или «Отмена»
+  // бы бросить несохранённое. Выход — «Сохранить» или «Назад»
   useTabLock(true);
 
   // Из свёрнутого списка — к тренировке: развернуть и прокрутить к ней
@@ -193,38 +198,18 @@ export default function PlanEditor({
         </div>
       ))}
 
+      {/* Программа-шаблон: «+» под последней тренировкой — новая или из
+          шаблона тренировки, копией, которая помнит, откуда взята
+          (sourceId). Поправят шаблон тренировки — приложение спросит,
+          обновить ли её здесь. */}
       {!single && !ordering && (
-        <button className="button button--block" disabled={busy} onClick={() => change((next) => {
-          next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blankExercise()] });
-          return next;
-        })}>Добавить тренировку</button>
-      )}
-
-      {/* Программа-шаблон: тренировка из шаблона тренировки — копией, которая
-          помнит, откуда взята (sourceId). Поправят шаблон тренировки —
-          приложение спросит, обновить ли её здесь. */}
-      {!single && !ordering && workoutTemplates && workoutTemplates.length > 0 && (
-        <div className="plan-edit__from-template">
-          <select
-            className="field__input"
-            aria-label="Тренировка из шаблона"
-            value=""
-            disabled={busy}
-            onChange={async (e) => {
-              const id = Number(e.target.value);
-              if (!id) return;
-              const block = await loadWorkout(id);
-              if (!block) return;
-              change((next) => {
-                next.push({ title: block.title, sourceId: id, exercises: block.exercises.map((x) => ({ ...blankExercise(), ...x })) });
-                return next;
-              });
-            }}
-          >
-            <option value="">+ Тренировка из шаблона…</option>
-            {workoutTemplates.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-          </select>
-        </div>
+        <AddBlock
+          busy={busy}
+          onAdd={(made) => change((next) => {
+            next.push(made || { title: `Тренировка № ${next.length + 1}`, exercises: [blankExercise()] });
+            return next;
+          })}
+        />
       )}
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message || 'Не получилось сохранить'}</Note>}
@@ -233,9 +218,10 @@ export default function PlanEditor({
           пряталось бы под ней */}
       <div className="plan-edit__float-space" aria-hidden="true" />
 
-      {/* «Сохранить», «Свернуть» и «Отмена» — всегда под рукой, с любого
-          места. Панель — у края экрана, вне ленты: «липкое»
-          позиционирование ломается внутри сдвигаемых слоёв */}
+      {/* «Сохранить» и «Свернуть» — всегда под рукой, с любого места.
+          Панель — у края экрана, вне ленты, над нижним меню
+          (--float-bottom): «липкое» позиционирование ломается внутри
+          сдвигаемых слоёв */}
       {typeof document !== 'undefined' && onScreen && createPortal(
         <div className="plan-edit__float" role="toolbar" aria-label="Правка шаблона">
           <button className="button button--primary" disabled={busy} onClick={save}>
@@ -244,7 +230,6 @@ export default function PlanEditor({
           {!single && draft.length > 1 && (
             <button className="button" disabled={busy} onClick={toggleOrdering}>{ordering ? 'Развернуть' : 'Свернуть'}</button>
           )}
-          <button className="button button--ghost" disabled={busy} onClick={onCancel}>Отмена</button>
         </div>,
         document.body,
       )}

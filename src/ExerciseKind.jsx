@@ -21,7 +21,7 @@ import { IconCheck } from './icons.jsx';
 
 export default function ExerciseKind({ track, onChange, disabled = false, className = '', note = null, allowAuto = false }) {
   const set = (patch) => onChange({ ...track, ...patch });
-  // В карточке упражнения (Library.jsx) есть «Определить само»: тип по
+  // В карточке упражнения (Library.jsx) есть «Автоматически»: тип по
   // названию и мышце (сервер, exercise-kind.js); auto — текущая догадка
   const auto = allowAuto && !!track.auto;
   const toggle = (key, label) => (
@@ -48,7 +48,7 @@ export default function ExerciseKind({ track, onChange, disabled = false, classN
             className={'chip' + (auto ? ' chip--active' : '')}
             disabled={disabled}
             onClick={() => !auto && onChange({ ...track, auto: true, weightMode: undefined })}
-          >{auto ? 'Само: ' + KIND_LABELS[track.kind].toLowerCase() : 'Определить само'}</button>
+          >{auto ? 'Автоматически: ' + KIND_LABELS[track.kind].toLowerCase() : 'Автоматически'}</button>
         )}
         {Object.entries(KIND_LABELS).map(([k, v]) => (
           <button

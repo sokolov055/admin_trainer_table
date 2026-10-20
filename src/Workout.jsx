@@ -8,7 +8,7 @@ import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, cloneSet, editSetField } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -56,6 +56,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [storageError, setStorageError] = useState(false);
   const [conflict, setConflict] = useState(null);
   const [confirm, setConfirm] = useState('');
+  // Меню ⋯ в шапке: «Выбрать упражнения», «Отменить занятие» (QA 20.10.2026)
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // id занятия, которое сейчас подтверждают к удалению. Отдельным
   // состоянием, а не флагом «показать диалог»: подтверждение обязано быть
@@ -576,6 +578,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * отсчитываем назад от выбранной длительности
    */
   const restStart = useRef({ until: 0, start: 0 });
+  // Где только что отметили подход: «Дальше» на экране отдыха и подсветка
+  // держатся этого упражнения, пока в нём есть подходы (focusOf, QA 20.10.2026)
+  const lastMarked = useRef('');
   const restStartOf = (until) => {
     if (restStart.current.until === until && restStart.current.start) return restStart.current.start;
     return until - ((state.current && state.current.session.restSeconds) || 90) * 1000;
@@ -610,10 +615,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     setCollapsedUntil(0);
     change(v => ({ ...v, restUntil: until, restLocal: '' }));
     const cur = state.current && state.current.session;
-    setRestHere({ until, total: Math.max(1000, until - Date.now()), next: cur ? nextInfo(cur, focusOf(cur)) : null, sessionId: cur ? cur.id : '' });
+    setRestHere({ until, total: Math.max(1000, until - Date.now()), next: cur ? nextInfo(cur, focusOf(cur, lastMarked.current)) : null, sessionId: cur ? cur.id : '' });
     save();
     // Что дальше — в уведомление о конце отдыха и в шторку (Android)
-    scheduleRestEnd(until, nextText(state.current && state.current.session)).then((ok) => {
+    scheduleRestEnd(until, nextText(state.current && state.current.session, lastMarked.current)).then((ok) => {
       if (!ok || state.current?.session.restUntil !== until) return;
       change(v => (v.restUntil === until ? { ...v, restLocal: localRestPlatform() } : v));
       save();
@@ -826,6 +831,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               // Один расчёт на свежем снимке — и в занятие, и для отдыха:
               // change зовёт transform сразу (20.10.2026, аудит)
               let rated = null;
+              lastMarked.current = ex.id;
               updateExercise(ei, x => { rated = rateSet(x, si, effort); return rated.ex; });
               // Последний подход занятия — без отдыха, сразу «Завершить?»
               if (allDone()) { afterLast(); return; }
@@ -928,6 +934,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
         const lack = lackOf(ex, si);
         if (lack) { setMessage(lack); return; }
+        lastMarked.current = ex.id;
         updateExercise(ei, x => { const y = pinIntervals(x, si); return { ...y, sets: y.sets.map((s, i) => (i === si ? { ...s, state: 'done', effort } : s)) }; });
         if (allDone()) { afterLast(); return; }
         if (restAfter) startRest(restFor(effort, restBase(ex)));
@@ -1087,6 +1094,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       if (why) { setRoundLack({ key, text: ex.name + ': ' + why.replace(/ перед отметкой.*$/, '').toLowerCase() }); return; }
       setRoundLack(null);
       let rated = null;
+      lastMarked.current = ex.id;
       updateExercise(ei, x => { rated = rateSet(pinIntervals(x, r), r, effort); return rated.ex; });
       if (!last) return;
       if (allDone()) { afterLast(); return; }
@@ -1098,8 +1106,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       // Отдых круга — самый долгий из своих отдыхов упражнений круга
       startRest(roundRest(efforts, Math.max(...live.map(m => m.ex.rest || 0)) || restBase(), raised));
     };
+    // Оценки — только под ближайшим в круге: два ряда по три кнопки
+    // читались как шесть равных (QA 20.10.2026). У следующих — подпись,
+    // их ряд появится, когда очередь дойдёт
+    if (!(waiting[0] && waiting[0].ex.id === ex.id)) {
+      return <p className="workout__effort-next">Следом, без отдыха — после «{waiting[0].ex.name}»</p>;
+    }
     return <>
-      {effortChooser(pick, waiting[0] && waiting[0].ex.id === ex.id)}
+      {effortChooser(pick, true)}
       {/* Подпись — по порядку круга: последнее упражнение запускает отдых */}
       <p className="workout__effort-next">{last || !after ? 'Последнее в круге — запустит отдых' : 'Без отдыха → ' + after.ex.name}</p>
     </>;
@@ -1144,7 +1158,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const all = fn => change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] ? fn(e) : e)) }));
     const setAll = patch => all(e => ({ ...e, sets: e.sets.map((x, i) => (i === r ? { ...x, ...patch } : x)) }));
     return <details className="workout__set-options workout__round-options">
-      <summary>{skipped ? 'Круг пропущен · изменить' : 'Настройки круга'}</summary>
+      <summary>{skipped ? 'Круг пропущен · изменить' : 'Настройки круга'}<IconChevron size={14} aria-hidden="true" /></summary>
       {inRound.map(({ ex, ei }) => (
         <div className="workout__round-set" key={ex.id}>
           <div className="workout__round-set-name">{ex.name}</div>
@@ -1710,7 +1724,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Куда смотреть: первое упражнение с неотмеченным подходом и этот
   // подход. Оно обведено, подход подсвечен, его «готово» — залито; всё
   // остальное тише. Иначе в зале глаза разбегаются по одинаковым строкам.
-  const focus = focusOf(s);
+  const focus = focusOf(s, lastMarked.current);
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
@@ -1927,23 +1941,20 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {/* Видимый выход из занятия (FT-567; 09.10 был только жест): занятие
             не завершается и не отменяется — сохраняется и идёт дальше, в
             программе его ждёт «Вернуться к занятию». То же, что смахнуть вправо */}
-        <BackButton label={backLabel === 'К программе' ? 'Программа' : backLabel} onClick={close} />
+        {/* Шапка в три строки (QA 20.10.2026; было пять и 230 px — треть
+            экрана в зале): «назад» и «Завершить» (в шапке, у времени, а не
+            внизу под упражнениями — владелец, 03.10.2026); название;
+            время · подходы · отдых · пауза · ⋯. Редкое — «Выбрать» и
+            «Отменить занятие» — в меню ⋯ */}
+        <div className="workout__head-row">
+          <BackButton label={backLabel === 'К программе' ? 'Программа' : backLabel} onClick={close} />
+          {editable && !confirm && <button type="button" className="button button--primary workout__finish-btn" onClick={() => setConfirm('complete')}>Завершить</button>}
+          {!editable && <button type="button" className="button button--primary workout__finish-btn" disabled={busy || !!conflict} onClick={resume}>Продолжить</button>}
+        </div>
         {/* Название — касанием: переименовывает только тренер (07.10.2026), сервер это же проверяет */}
         {renamingTitle && clientRow && !clientView
           ? <input className="workout__title-input" aria-label="Название занятия" autoFocus value={s.title} maxLength={160} onChange={e => change(v => ({ ...v, title: e.target.value }))} onBlur={() => setRenamingTitle(false)} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingTitle(false); }} />
-          : <h2>{editable && clientRow && !clientView ? <button type="button" className="workout__title-tap" onClick={() => setRenamingTitle(true)}>{s.title}</button> : s.title}</h2>}
-        <p>{s.month || 'Свободная тренировка'} · {labels[s.status]}</p>
-        <div className="workout__metrics"><span>Время <strong>{clock(elapsed)}</strong></span><span>Подходы <strong>{stats.done} / {stats.total}</strong></span>
-          {/* Завершить и отменить — здесь, у времени, а не внизу под всеми
-              упражнениями (владелец, 03.10.2026) */}
-          {editable && !confirm && <span className="workout__head-actions">
-            <button type="button" className="button button--primary" onClick={() => setConfirm('complete')}>Завершить</button>
-            <button type="button" className="button button--ghost" onClick={() => setConfirm('cancel')}>Отменить</button>
-          </span>}
-          {!editable && <span className="workout__head-actions">
-            <button type="button" className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить</button>
-          </span>}
-        </div>
+          : <div className="workout__title-row"><h2>{editable && clientRow && !clientView ? <button type="button" className="workout__title-tap" onClick={() => setRenamingTitle(true)}>{s.title}</button> : s.title}</h2><p className="workout__title-meta">{s.month || 'Свободная тренировка'} · {labels[s.status]}</p></div>}
         {editable && confirm && <div className="workout__confirm" role="alertdialog" aria-label={confirm === 'complete' ? 'Завершить тренировку' : 'Отменить занятие'}>
           <p>{confirmText}</p>
           <div className="workout__confirm-actions">
@@ -1953,14 +1964,27 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           </div>
         </div>}
         {/* Пауза и отдых — в шапке, что едет за прокруткой (владелец, 09.10.2026).
-            Назад — смахнуть вправо, кнопки «К программе» нет.
             Длительность не только запускает отдых, но и запоминается: дальше
             он стартует сам после каждого отмеченного подхода */}
-        {editable && !confirm && <div className="workout__toolbar workout__toolbar--head">
-          <button className="button" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
-          {!asClient && <button className={'button workout__pick-toggle' + (picking ? ' is-on' : '')} aria-pressed={picking} onClick={() => (picking ? endPick() : pickFromButton())}>{picking ? 'Готово' : 'Выбрать'}</button>}
-          <label>Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
-        </div>}
+        <div className="workout__line">
+          <span className="workout__metrics" aria-label={`Время ${clock(elapsed)}, подходы ${stats.done} из ${stats.total}`}><strong>{clock(elapsed)}</strong><span aria-hidden="true"> · </span><b>{stats.done} / {stats.total}</b></span>
+          {editable && !confirm && <>
+            <label className="workout__rest-pick">Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
+            <button type="button" className="button button--ghost workout__pause" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
+            {picking
+              ? <button type="button" className="button workout__pick-toggle is-on" aria-pressed onClick={endPick}>Готово</button>
+              : <div className="workout__more">
+                <button type="button" className="icon-button workout__more-btn" aria-label="Ещё" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => { setMoreOpen(o => !o); haptic(); }}><IconMore size={22} /></button>
+                {moreOpen && <>
+                  <div className="workout__more-scrim" onClick={() => setMoreOpen(false)} aria-hidden="true" />
+                  <div className="workout__menu" role="menu" aria-label="Ещё">
+                    {!asClient && <button type="button" role="menuitem" className="workout__menu-item" onClick={() => { setMoreOpen(false); pickFromButton(); }}>Выбрать упражнения</button>}
+                    <button type="button" role="menuitem" className="workout__menu-item workout__menu-item--critical" onClick={() => { setMoreOpen(false); setConfirm('cancel'); }}>Отменить занятие</button>
+                  </div>
+                </>}
+              </div>}
+          </>}
+        </div>
         {/* Полоса своя, а не браузерный progress: системный выглядит
             по-разному в каждом движке и ни в одной теме не совпадает с
             палитрой приложения. Значение дублируется для чтения вслух. */}
@@ -2088,7 +2112,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {canAddExercise(s) && <button className="button button--block" disabled={s.exercises.length >= 30} onClick={() => change(s => ({ ...s, exercises: [...s.exercises, newExercise(s)] }))}>Добавить упражнение</button>}
         <label className="workout__field">Как прошла тренировка<textarea value={s.note} maxLength={1000} rows={3} onChange={e => change(s => ({ ...s, note: e.target.value }))} /></label>
       </fieldset>
-      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{stats.done} подходов · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>К журналу</button></div>}
+      {/* Главная кнопка после завершения — уйти к программе: занятие закончено,
+          «Продолжить» — на случай ошибки, а не следующий шаг (QA 20.10.2026) */}
+      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{setsWord(stats.done)} · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>{backLabel}</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button></div>}
       {/* «Сохранить сейчас» и «Скачать результат» убраны (03.10.2026):
           сохраняется само. Не сохранилось — «Повторить» в сообщении об
           ошибке вверху; конфликт версий — «Скачать мой черновик» там же */}

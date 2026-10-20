@@ -428,7 +428,10 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
 
   return (
     <>
-      <Back onClick={onCancel}>Отмена</Back>
+      {/* Сверху — куда ведёт стрелка, как у соседних экранов библиотеки
+          («К шаблону», «Тренажёры»); «Отмена» была и здесь, и в плавающей
+          панели редактора — дубль убран 20.10.2026 (QA C05b) */}
+      <Back onClick={onCancel}>{template ? 'К шаблону' : 'К шаблонам'}</Back>
 
       <Panel pad>
         <div className="library__form">
@@ -469,13 +472,8 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
           single={kind === 'workout'}
           submitLabel="Сохранить шаблон"
           workoutTemplates={workoutList}
-          loadWorkout={async (id) => {
-            const t = await apiPublic('library.template.get', { id });
-            return t && t.blocks && t.blocks[0];
-          }}
           onSubmit={submit}
           onSaved={(saved) => { haptic('success'); onSaved(saved); }}
-          onCancel={onCancel}
         />
         {ask && (
           <Panel pad>
@@ -800,8 +798,23 @@ function Exercises() {
       </div>
       <Search value={q} onChange={setQ} placeholder="Поиск упражнения" />
       <Chips className="library__filters" items={muscles} value={muscle} onChange={setMuscle} />
-      <label className="field"><span className="field__label">Как учитывать нагрузку</span><select className="field__input" value={loadKind} onChange={(e) => setLoadKind(e.target.value)}><option value="">Все способы</option>{Object.entries(KIND_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}<option value="assistance">Вес помощи и повторения</option></select></label>
-      <label className="field"><span className="field__label">Оборудование</span><select className="field__input" value={gearKind} onChange={(e) => setGearKind(e.target.value)}><option value="">Любое</option><option value="none">Без привязки</option><option value="any">С привязкой</option><option value="machine">Тренажёр</option><option value="equipment">Оборудование</option></select></label>
+      {/* Два фильтра в одну строку, подпись — в пустом значении самого
+          списка: с подписями сверху и во всю ширину они занимали до списка
+          ~300 px, и упражнения начинались под сгибом (QA 20.10.2026) */}
+      <div className="library__selects">
+        <select className="field__input" aria-label="Как учитывать нагрузку" value={loadKind} onChange={(e) => setLoadKind(e.target.value)}>
+          <option value="">Нагрузка: все</option>
+          {Object.entries(KIND_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <option value="assistance">Вес помощи и повторения</option>
+        </select>
+        <select className="field__input" aria-label="Оборудование" value={gearKind} onChange={(e) => setGearKind(e.target.value)}>
+          <option value="">Оборудование: любое</option>
+          <option value="none">Без привязки</option>
+          <option value="any">С привязкой</option>
+          <option value="machine">Тренажёр</option>
+          <option value="equipment">Оборудование</option>
+        </select>
+      </div>
 
       <div className="library__count">
         <p>{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
@@ -845,6 +858,15 @@ function Exercises() {
         </Row>
       ))}
       {shown.length > 200 && <p className="small muted">Показаны первые 200 — уточните поиск.</p>}
+      {/* Пусто из-за фильтров — сказать об этом и дать снять их одним
+          нажатием: до 20.10.2026 список просто обрывался на «0 упражнений» */}
+      {shown.length === 0 && (q || muscle || loadKind || gearKind) && (
+        <Empty
+          title="Ничего не нашлось по фильтрам"
+          text="Попробуйте другое название, мышцу или способ учёта нагрузки."
+          action={<button className="button" onClick={() => { setQ(''); setMuscle(''); setLoadKind(''); setGearKind(''); haptic(); }}>Сбросить фильтры</button>}
+        />
+      )}
       {del.bar}
     </>
   );
@@ -1301,7 +1323,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
           {actions({ muscle: draft.muscle })}
         </>, 'Не указана')}
 
-        {row('load', 'Как учитывать нагрузку', known ? trackLine(known) : 'Определить само', kindOf, () => <>
+        {row('load', 'Как учитывать нагрузку', known ? trackLine(known) : 'Автоматически', kindOf, () => <>
           <ExerciseKind track={draft.track || { kind: 'strength', auto: true }} allowAuto className="exercise-kind--bare" onChange={(t) => set({ track: t })} />
           {/* Тренажёр у кардио не выбирают (09.10.2026): настройки — в программе */}
           {draft.track && draft.track.weightMode === 'assistance' && <p className="small muted">Прежние записи сохраняют свой способ учёта.</p>}

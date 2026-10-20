@@ -52,27 +52,45 @@ export function unitsOf(list) {
   return out;
 }
 
-/** Ближайший подход занятия; в суперсете — следующее упражнение того же круга */
-export function focusOf(s) {
+/**
+ * Ближайший подход занятия; в суперсете — следующее упражнение того же круга.
+ *
+ * Порядок (QA 20.10.2026): сначала упражнение, где только что отметили
+ * подход (hint — его id; у суперсета — весь круг), потом начатые — с
+ * отмеченным и неотмеченным подходом, последнее по списку, — и только
+ * потом первое по порядку. Раньше брали первое с неотмеченным: кардио
+ * первым в списке, к которому не притрагивались, после каждого подхода
+ * приседа «Дальше» звало на дорожку
+ */
+export function focusOf(s, hint = '') {
   const list = (s && s.exercises) || [];
-  for (let i = 0; i < list.length; i += 1) {
-    const si = list[i].sets.findIndex(x => x.state === 'pending');
-    if (si === -1) continue;
-    const group = list[i].supersetGroup;
+  const pendingAt = (e) => e.sets.findIndex(x => x.state === 'pending');
+  const pick = (e) => {
+    const si = pendingAt(e);
+    if (si === -1) return null;
+    const group = e.supersetGroup;
     if (group) {
-      const mates = list.filter(e => e.supersetGroup === group);
-      const r = Math.min(...mates.map(e => { const j = e.sets.findIndex(x => x.state === 'pending'); return j === -1 ? Infinity : j; }));
-      const who = mates.find(e => e.sets[r] && e.sets[r].state === 'pending');
+      const mates = list.filter(m => m.supersetGroup === group);
+      const r = Math.min(...mates.map(m => { const j = pendingAt(m); return j === -1 ? Infinity : j; }));
+      const who = mates.find(m => m.sets[r] && m.sets[r].state === 'pending');
       if (who) return { ex: who.id, set: r };
     }
-    return { ex: list[i].id, set: si };
+    return { ex: e.id, set: si };
+  };
+  const hinted = hint ? list.find(e => e.id === hint) : null;
+  const sameRound = (e) => e === hinted || (!!hinted && !!hinted.supersetGroup && e.supersetGroup === hinted.supersetGroup);
+  const started = (e) => pendingAt(e) !== -1 && e.sets.some(x => x.state === 'done');
+  const order = [...list.filter(sameRound), ...list.filter(started).reverse(), ...list];
+  for (const e of order) {
+    const found = pick(e);
+    if (found) return found;
   }
   return { ex: '', set: -1 };
 }
 
 /** «Присед со штангой · подход 2 из 5 · 90 кг × 5» — для уведомлений */
-export function nextText(s) {
-  const n = s ? nextInfo(s, focusOf(s)) : null;
+export function nextText(s, hint = '') {
+  const n = s ? nextInfo(s, focusOf(s, hint)) : null;
   if (n && n.items) return [n.part, n.items.map(it => [it.name, it.load].filter(Boolean).join(' ')).join(' + ')].join(' · ');
   return n ? [n.name, n.part, n.load].filter(Boolean).join(' · ') : '';
 }
@@ -96,9 +114,11 @@ export function nextInfo(s, focus) {
     const before = list.slice(0, list.indexOf(x)).filter(y => y.state === 'done').pop();
     if (before && x.weight && before.weight) {
       const d = num(x.weight) - num(before.weight);
+      // Было тяжело, а вес не сдвинулся (диапазон, свой вес) — сказать,
+      // почему тот же, иначе кажется, что оценку не учли (QA 20.10.2026)
       return d > 0 ? { kind: 'up', text: 'накинуть ' + kg(d) + ' кг' }
         : d < 0 ? { kind: 'down', text: 'снять ' + kg(-d) + ' кг' }
-          : { kind: 'same', text: 'вес тот же' };
+          : { kind: 'same', text: before.effort === 'hard' ? 'вес тот же · было тяжело' : 'вес тот же' };
     }
     // Первый подход упражнения: что было в прошлый раз, нет — так и сказать
     if (!before) return { kind: 'new', text: e.prevWeight ? 'в прошлый раз ' + String(e.prevWeight).replace('.', ',') + ' кг' : 'первый подход' };

@@ -400,3 +400,12 @@ export function IconDelta({ value, size = 14, ...rest }) {
     </Icon>
   );
 }
+
+/** Три точки — «ещё»: редкие действия в меню, а не кнопками в шапке */
+export const IconMore = (p) => (
+  <Icon {...p}>
+    <circle cx="5" cy="12" r="0.9" fill="currentColor" />
+    <circle cx="12" cy="12" r="0.9" fill="currentColor" />
+    <circle cx="19" cy="12" r="0.9" fill="currentColor" />
+  </Icon>
+);

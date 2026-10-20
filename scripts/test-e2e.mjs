@@ -508,7 +508,8 @@ test('в активной тренировке один раздел: настр
   assert.ok(text.indexOf('Чего избегать') < text.indexOf('Мышцы'), 'мышцы — в конце');
   assert.equal(await squat.getByText('Крюки на 4-й, упоры на 2-й').isVisible(), true, 'своя настройка на виду');
 
-  await page.getByRole('button', { name: 'Отменить', exact: true }).click();
+  await page.getByRole('button', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Отменить занятие' }).click();
   await page.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();
   await swipe(page, { x: 4, y: 420 }, { x: 340, y: 420 });
 });
@@ -944,7 +945,8 @@ test('игра на отдыхе у тестового клиента глаза
     await phone.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
     await phone.getByRole('button', { name: 'К отдыху', exact: true }).click();
     await phone.getByRole('button', { name: 'Закончить отдых', exact: true }).click();
-    await phone.getByRole('button', { name: 'Отменить', exact: true }).click();
+    await phone.getByRole('button', { name: 'Ещё', exact: true }).click();
+    await phone.getByRole('menuitem', { name: 'Отменить занятие' }).click();
     await phone.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();
     await phone.locator('.workout__header').getByText(/Отменена/).waitFor();
   } finally { await context.close(); }
@@ -1368,7 +1370,8 @@ test('новый шаблон тренировки — без уровня, у �
     await tab.getByRole('heading', { name: 'Упражнения' }).waitFor({ timeout: 5000 });
     assert.equal(await level(), 0, 'у шаблона тренировки уровня нет');
     assert.equal(await tab.getByPlaceholder('На что обратить внимание в этой тренировке').count(), 1, 'подсказка про тренировку');
-    await tab.getByRole('button', { name: 'Отмена' }).first().click();
+    // Выход из редактора — стрелкой «К шаблонам»: «Отмены» в нём с 20.10.2026 нет
+    await tab.getByRole('button', { name: 'К шаблонам' }).first().click();
 
     await tab.getByRole('tab', { name: 'Программы', exact: true }).click();
     await tab.getByRole('button', { name: 'Новый шаблон программы' }).click();

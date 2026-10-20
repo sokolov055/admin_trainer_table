@@ -85,6 +85,8 @@ const delay = () => new Promise(resolve => setTimeout(resolve, 30));
 const text = node => typeof node === 'string' ? node : (node.children || []).map(text).join('');
 const button = label => tree.root.findAllByType('button').find(b => text(b) === label);
 async function click(label) { const b = button(label); assert.ok(b, label); assert.ok(!b.props.disabled, 'Кнопка доступна: ' + label); await act(async () => { await b.props.onClick(); await delay(); }); }
+// Меню ⋯ в шапке (QA 20.10.2026): «Выбрать упражнения», «Отменить занятие»
+async function openMore(root = tree.root) { const b = root.findAllByType('button').find(x => x.props['aria-label'] === 'Ещё'); assert.ok(b, 'кнопка ⋯'); await act(async () => { b.props.onClick(); await delay(); }); }
 // Прошлый экран размонтируем: у занятия свой секундный таймер, и
 // оставленный в живых экземпляр не даёт процессу тестов завершиться.
 async function mount(launch = true) { if (tree) tree.unmount(); await act(async () => { tree = renderer.create(React.createElement(Workout, { launch: launch ? { block, month: 'Сентябрь 2026' } : null, onClose() {} })); await delay(); }); }
@@ -128,7 +130,8 @@ test('отмена доступна во время сохранения и от
   let pending;
   await act(async () => { pending = hideOnce(); await delay(); });
   try {
-    await click('Отменить');
+    await openMore();
+    await click('Отменить занятие');
     await click('Отменить');
     assert.ok(tree.root.findAllByType('p').some(n => text(n).includes('Отменена')));
   } finally {
@@ -156,7 +159,8 @@ test('интерфейс: запись подхода, пауза, продол�
   assert.equal(saved.status, 'completed');
   assert.equal(saved.exercises[0].sets[0].weight, '45,5');
   assert.equal(saved.exercises[0].sets[1].state, 'skipped');
-  await click('К журналу');
+  // Главная кнопка после завершения — назад, к программе (QA 20.10.2026)
+  await click('К программе');
   assert.ok(tree.root.findAllByType('button').some(b => text(b).includes('Тренировка тест')));
   await act(async () => tree.unmount()); tree = null;
 });
@@ -381,12 +385,15 @@ test('суперсет из программы виден в занятии', as
     assert.equal(summaries().filter(t => t === 'Круг пропущен · изменить').length, 1);
     await press('Вернуть круг');
 
-    // Оценка — у каждого упражнения круга (03.10.2026): не последнее —
-    // «без отдыха» к следующему, последнее — отдых
+    // Оценка — по порядку круга (03.10.2026): не последнее — «без отдыха»
+    // к следующему, последнее — отдых. Кнопки только у ближайшего, у
+    // следующего — подпись «следом» (QA 20.10.2026: шесть кнопок читались
+    // как равные)
     const round1 = () => local.root.findAllByProps({ className: 'workout__round' })[0];
     const norm = () => round1().findAll(n => n.type === 'button' && text(n) === 'Норм');
-    assert.equal(norm().length, 2, 'кнопки под каждым упражнением круга');
+    assert.equal(norm().length, 1, 'кнопки — только под ближайшим упражнением круга');
     assert.ok(round1().findAll(n => n.type === 'p' && /^Без отдыха/.test(text(n))).length === 1, 'первое — без отдыха');
+    assert.ok(round1().findAll(n => n.type === 'p' && /^Следом, без отдыха/.test(text(n))).length === 1, 'второе — подпись «следом»');
     // Повторов у подтягиваний нет — подсказка под кругом, с названием
     const reps = round1().findAll(n => n.type === 'input' && /Подтягивания, подход 1, повторы/.test(n.props['aria-label'] || ''))[0];
     await act(async () => { reps.props.onChange({ target: { value: '' } }); await delay(); });
@@ -1064,7 +1071,8 @@ test('корзина подхода удаляет с «Вернуть»; выб
     await press('Вернуть');
     assert.equal(sets(), 6, 'вернулся');
 
-    await press('Выбрать');
+    await openMore(local.root);
+    await press('Выбрать упражнения');
     const heads = local.root.findAll(n => n.props.role === 'checkbox');
     assert.equal(heads.length, 2);
     for (const h of heads) await act(async () => { h.props.onClick(); await delay(); });

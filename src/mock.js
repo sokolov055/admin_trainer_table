@@ -1002,6 +1002,11 @@ let demoExercises = [
   id: i + 1, name, muscle, equipment, notes: '', mine: false, common: true,
   media: anim ? { kind: 'animation', url: anim } : null,
   setup: '', setupOk: false, machines: [], alternatives: [],
+  // Способ учёта — как отдаёт сервер (trackOf: угадан по названию и
+  // оборудованию, auto). Без него фильтр «Нагрузка» в демо давал пустоту
+  track: equipment === 'Собственный вес'
+    ? { kind: 'bodyweight', machine: '', unilateral: false, perSide: false, auto: true }
+    : { kind: 'strength', machine: '', unilateral: false, perSide: equipment === 'Гантели', auto: true },
 }));
 Object.assign(demoExercises[7], { setup: 'Стойки — крюки чуть выше колена.\nОшибка: спина круглится внизу.' });
 // «Как настроить тренажёр»: одна проверенная инструкция и один черновик

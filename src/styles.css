@@ -3998,6 +3998,11 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 .library__bar { display: flex; gap: var(--space-2); margin: var(--space-3) 0; }
 .library__bar .button--primary { flex: 1; }
+/* Фильтры «Нагрузка» и «Оборудование» — одной строкой, подпись в самом
+   списке (20.10.2026): во всю ширину с подписями сверху они отодвигали
+   упражнения за сгиб экрана */
+.library__selects { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 5fr); gap: var(--space-2); margin: var(--space-3) 0; }
+.library__selects .field__input { min-width: 0; padding: 10px 8px; font-size: var(--text-sm); text-overflow: ellipsis; }
 .library__count { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .library__row { display: flex; align-items: center; gap: var(--space-2); }
 .library__row-body { flex: 1; min-width: 0; }
