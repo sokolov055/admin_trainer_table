@@ -1,7 +1,8 @@
 import { validBarcode } from './label-model.js';
 export async function preparePhoto(file, rotation = 0) {
   if (!file || file.size > 20 * 1024 * 1024) throw new Error('Фото слишком большое. Выберите изображение до 20 МБ.');
-  if (!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type)) throw new Error('Выберите фото JPEG, PNG, WebP или HEIC.');
+  // Некоторые файловые менеджеры Android отдают файл без типа — тогда судит decode() ниже.
+  if (file.type && !/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type)) throw new Error('Выберите фото JPEG, PNG, WebP или HEIC.');
   const url = URL.createObjectURL(file), image = new Image();
   try {
     image.src = url; await image.decode();
