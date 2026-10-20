@@ -103,3 +103,29 @@ test('подсказка «последний раз»: число, верх д�
   assert.equal(lastRunText({ ...base, effort: 'ok', streak: 2, action: 'up', step: 2.5 }),
     'Последний раз (15.10) вы делали 60 · 60 кг на 12 повторов, вам было нормально — норм 2 раза подряд — сегодня пробуем +2,5 кг');
 });
+
+test('20.10.2026: копия подхода — без «было», own и сдвигов оценки; замена названия не теряет сделанное', async () => {
+  const { cloneSet, replaceWorkoutExercise } = await import('../src/workout-model.js');
+  const src = { weight: '60', reps: '8', state: 'done', kind: 'work', effort: 'easy', raised: true, was: 2, own: true, sid: 'abcd1234', moved: [{ i: 1 }], closed: true, suggest: 'easy' };
+  assert.deepEqual(cloneSet(src), { weight: '60', reps: '8', state: 'pending', kind: 'work' });
+  const current = { id: 'x', name: 'Жим', note: 'темп', supersetGroup: '', target: '8',
+    sets: [work(60, { state: 'done', effort: 'ok' }), work(60, { state: 'done', effort: 'ok' }), work(60), work(60)] };
+  const next = replaceWorkoutExercise(current, { name: 'Жим гантелей', exerciseId: 7 }, { startSets: [{ weight: '22', reps: '10' }, { weight: '24', reps: '10' }, { weight: '24', reps: '10' }] });
+  assert.equal(next.name, 'Жим гантелей');
+  assert.equal(next.note, 'темп');
+  assert.deepEqual(next.sets.map((s) => [s.state, s.weight]), [['done', '60'], ['done', '60'], ['pending', '22'], ['pending', '24']], 'сделанное осталось, неотмеченные — из истории нового');
+  const fresh = replaceWorkoutExercise({ ...current, sets: [work(60), work(60)] }, { name: 'Жим гантелей', exerciseId: 7 });
+  assert.deepEqual(fresh.sets.map((s) => s.weight), ['', ''], 'ничего не сделано — подходы новые, без весов прежнего');
+});
+
+test('20.10.2026: «прошлый раз» частями — для карточки упражнения, текст тот же', async () => {
+  const { lastRunParts } = await import('../src/effort.js');
+  const last = { date: '2026-10-09', weights: ['100', '120'], reps: ['8', '8'], effort: 'easy', action: 'up', reason: 'easy', step: 5, streak: 0 };
+  const p = lastRunParts(last);
+  assert.equal(p.date, '09.10');
+  assert.equal(p.was, '100 · 120 кг на 8 повторов, вам было легко');
+  assert.equal(p.today, 'сегодня +5 кг');
+  assert.equal(p.action, 'up');
+  assert.equal(lastRunText(last), 'Последний раз (09.10) вы делали 100 · 120 кг на 8 повторов, вам было легко — сегодня +5 кг');
+  assert.equal(lastRunParts(null), null);
+});

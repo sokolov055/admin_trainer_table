@@ -43,6 +43,12 @@ export function fromPlan(block, month, members = []) {
       // упражнение делается сразу, а не после отдыха.
       supersetGroup: e.supersetGroup || '',
       prescription: prescription(e),
+      // Отдых после подхода этого упражнения из программы (20.10.2026):
+      // занятие берёт его вместо общего restSeconds
+      ...(techniqueOf(e.technique).rest ? { rest: techniqueOf(e.technique).rest } : {}),
+      // Отдых после подхода этого упражнения из программы (20.10.2026):
+      // занятие берёт его вместо общего restSeconds
+      ...(techniqueOf(e.technique).rest ? { rest: techniqueOf(e.technique).rest } : {}),
       // Для оценки подхода (effort.js): группа и снаряд дают шаг веса,
       // план повторов — «не добил», lastRun — «последний раз вы делали…»
       ...extrasOf(e, split),
@@ -183,11 +189,19 @@ export function replaceWorkoutExercise(current, picked, history = null) {
   }
 
   const made = fromPlan({ title: '', exercises: [source] }, '', []).exercises[0];
+  // Сделанные подходы остаются (20.10.2026, аудит): тренер исправил название
+  // после двух подходов — результат не теряется. Новые — только вместо
+  // неотмеченных, столько же, сколько их было
+  const kept = (current.sets || []).filter((s) => s.state !== 'pending');
+  const open = (current.sets || []).length - kept.length;
+  const fresh = made.sets.filter((s) => s.kind !== 'warmup').slice(0, Math.max(0, open));
+  while (kept.length && fresh.length < open && made.sets.length) fresh.push(cloneSet(made.sets[made.sets.length - 1]));
   return {
     ...made,
     id: current.id,
     note: current.note || '',
     supersetGroup: current.supersetGroup || '',
+    ...(kept.length ? { sets: [...kept, ...fresh] } : {}),
   };
 }
 export function summary(session) {
@@ -372,11 +386,22 @@ export function newExercise(session) {
     sets: whos.length ? whos.map(who => ({ ...blankSet(), who })) : [blankSet()] };
 }
 
+/**
+ * Копия подхода для нового, неотмеченного: без оценки и того, что она
+ * сдвинула, без «было» (was — свой подход прошлого раза, у нового его нет),
+ * без own (вес был вписан руками в тот подход, не в этот) и без sid (номер
+ * подхода на сервере). До 20.10.2026 четыре места копировали подход как
+ * есть — два подхода делили один «было» и двигались как один
+ */
+export function cloneSet(set) {
+  const { effort, suggest, raised, lowered, capped, moved, own, closed, was, sid, ...rest } = set || blankSet();
+  return { ...rest, state: 'pending' };
+}
+
 /** Подход в конец с часов тренера (FT-533) — как последний, неотмеченный */
 export function withSet(ex) {
   if (ex.sets.length >= 20 || ex.sets.some(x => x.who)) return ex;
-  const { effort, suggest, raised, closed, was, sid, ...last } = ex.sets[ex.sets.length - 1] || blankSet();
-  return { ...ex, sets: [...ex.sets, { ...last, state: 'pending', kind: 'work' }] };
+  return { ...ex, sets: [...ex.sets, { ...cloneSet(ex.sets[ex.sets.length - 1]), kind: 'work' }] };
 }
 
 /**

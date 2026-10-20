@@ -15,6 +15,7 @@ import { IconPlus, IconLinkPair, IconCheck, IconTrash, IconClose } from '../icon
 import { patchPlanExercise } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 import MuscleEdit from '../muscles/MuscleEdit.jsx';
+import RestChips from '../RestChips.jsx';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -148,6 +149,13 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     if (rest.length < 2) rest.forEach((e) => { e.supersetGroup = ''; });
   });
   const remove = (i) => { setOpen(null); set((next) => { next.splice(i, 1); }); };
+  /** Отдых после подхода (20.10.2026) — у упражнения; у суперсета один на круг: у всех его упражнений */
+  const setRest = (i, rest) => set((next) => {
+    const g = next[i].supersetGroup;
+    next.forEach((e, k) => {
+      if (k === i || (g && e.supersetGroup === g)) e.technique = techniqueText({ ...techniqueOf(e.technique), rest });
+    });
+  });
 
   const add = (make) => {
     const at = list.length;
@@ -232,7 +240,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const ex = list[i];
     const track = trackOf(ex);
     const scheme = planScheme(ex, inSuperset) || 'подходы не заданы';
-    const weight = track.kind !== 'cardio' && !split && ex.weight ? ' · ' + ex.weight + (/^[+-]?\d/.test(String(ex.weight)) ? (planOneSide(ex) ? ' кг/стор.' : ' кг') : '') : '';
+    const weight = track.kind !== 'cardio' && !split && ex.weight ? ' · ' + ex.weight + (/^[+-]?\d/.test(String(ex.weight)) ? (planOneSide(ex) ? '\u00a0кг/стор.' : '\u00a0кг') : '') : '';
     const isName = open && open.kind === 'name' && open.i === i;
     const isScheme = open && open.kind === 'scheme' && open.i === i;
     // Силовое в суперсете: повторы и вес всегда на виду, круги — справа от скобки
@@ -304,7 +312,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
               {/* Тренажёры и оборудование (10.10.2026) — прямо в программе */}
               {ex.name && <ExerciseMachines key={'m:' + keyOf(ex.name)} exerciseId={ex.exerciseId} name={ex.name} />}
               <div className="plan-inline__panel-actions">
-                <button type="button" className="button button--primary" onClick={() => setOpen(ex.name ? null : { kind: 'name', i })}>Готово</button>
+                {/* Передумали: имени нет — пустая строка не нужна (QA 20.10.2026) */}
+                <button type="button" className="button button--primary" onClick={() => (String(ex.name || '').trim() ? setOpen(null) : remove(i))}>{String(ex.name || '').trim() ? 'Готово' : 'Убрать'}</button>
               </div>
             </div>
           )
@@ -320,6 +329,11 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
           </div>
         )}
         {/* Правка суперсета: выйти из него — у каждого упражнения, присоединить следующее — у нижнего (FT-473, FT-486) */}
+        {!isName && inline && groupOpen && i === groupFirst && (
+          <div className="plan-inline__panel plan-inline__panel--rest">
+            <RestChips value={techniqueOf(ex.technique).rest} onChange={(rest) => setRest(i, rest)} hint={false} />
+          </div>
+        )}
         {!isName && inline && groupOpen && (
           <div className="plan-inline__group-actions">
             <button type="button" className="button" onClick={() => { leave(i); haptic(); }}>Выйти из суперсета</button>
@@ -424,18 +438,23 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       <div className="plan-inline__panel" ref={schemeRef}>
         {track.kind === 'cardio'
           ? (
-            <CardioPlan
-              value={cardioFrom(ex, track)}
-              track={track}
-              onChange={(c) => patch(i, {
-                cardio: c,
-                ...(c.machine && c.machine !== track.machine && (!ex.name || Object.values(MACHINE_NAMES).includes(ex.name)) ? { name: MACHINE_NAMES[c.machine], exerciseId: null } : {}),
-              })}
-            />
+            <>
+              <CardioPlan
+                value={cardioFrom(ex, track)}
+                track={track}
+                onChange={(c) => patch(i, {
+                  cardio: c,
+                  ...(c.machine && c.machine !== track.machine && (!ex.name || Object.values(MACHINE_NAMES).includes(ex.name)) ? { name: MACHINE_NAMES[c.machine], exerciseId: null } : {}),
+                })}
+              />
+              {/* Кардио в круге или после силовой — отдых после отрезка тоже свой */}
+              <RestChips value={tech.rest} onChange={(rest) => setRest(i, rest)} hint={false} />
+            </>
           )
           : (
             <>
               <div className="plan-inline__fields">{repsWeight(i)}</div>
+              <RestChips value={tech.rest} onChange={(rest) => setRest(i, rest)} />
               <div className="plan-inline__sets-head">
                 <span>{inGroup ? 'Круги' : 'Подходы'}</span>
                 <span className="muted">{tech.warmup ? tech.warmup + ' разм. + ' : ''}{work} раб.</span>

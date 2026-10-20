@@ -263,3 +263,13 @@ test('FT-570: вес помощи хранится отдельно от отя�
   assert.equal(rowFields(trackOf({ track: { kind: 'bodyweight' } }))[0].key, 'weight');
   assert.equal(setText({ weight: '10', reps: '8' }, bw), '+10 кг × 8');
 });
+
+test('20.10.2026: отдых упражнения в программе — technique rest120, в схеме «отдых 2:00»', async () => {
+  const { techniqueOf, techniqueText, planScheme, restText } = await import('../src/exercise-track.js');
+  assert.equal(techniqueOf('warmup1 rest120').rest, 120);
+  assert.equal(techniqueOf('rest900').rest, 0, 'больше 10 минут — не отдых');
+  assert.equal(techniqueText({ warmup: 1, rest: 90 }), 'warmup1 rest90');
+  assert.equal(restText(90), '1:30');
+  assert.equal(restText(45), '45 с');
+  assert.equal(planScheme({ sets: '3', reps: '8', technique: 'rest180' }), '3 × 8 · отдых 3:00');
+});

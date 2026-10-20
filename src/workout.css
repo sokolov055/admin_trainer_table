@@ -171,21 +171,6 @@
 
 .workout__exercise > h3 { margin-bottom: var(--space-1); }
 
-/* Прошлый вес — подсказка рядом с планом, а не второй план: человек в
-   зале решает по ней, добавлять ли сегодня. */
-.workout__prev {
-  margin-left: var(--space-2);
-  padding-left: var(--space-2);
-  border-left: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.workout__rest-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex: 0 0 auto;
-}
-
 /* Суперсет — указание к действию, а не пометка о происхождении: следующее
    упражнение делается сразу, без отдыха. Поэтому строка цветная и стоит
    выше плана, который человек читает уже спокойнее. */
@@ -278,67 +263,6 @@
 .workout__set--done .workout__set-row > span { color: var(--good-text); font-weight: 640; }
 .workout__set--done input { background: transparent; border-color: var(--good-line); }
 
-.workout__check {
-  width: 48px;
-  min-height: 48px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: var(--surface);
-  transition: background-color var(--dur-fast) var(--ease-out),
-              color var(--dur-fast) var(--ease-out),
-              border-color var(--dur-fast) var(--ease-out),
-              transform var(--dur-press) var(--ease-out);
-}
-
-.workout__check:active { transform: scale(0.94); }
-
-.workout__check[aria-pressed="true"] {
-  background: var(--good-text);
-  color: var(--surface);
-  border-color: var(--good-text);
-}
-
-/* --- Отдых, конец занятия, история --- */
-
-.workout__rest {
-  margin: var(--space-3) 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
-  background: var(--info-fill);
-  border: 1px solid var(--info-line);
-  color: var(--info-text);
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-/* Пока идёт отдых, таймер нужен там, куда человек и так смотрит, —
-   внизу, под большим пальцем, над панелью вкладок. Высота панели здесь
-   повторена числом: она фиксированная и задана в styles.css. */
-.workout__rest--float {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(66px + env(safe-area-inset-bottom));
-  z-index: 15;
-  width: min(860px, calc(100% - 2 * var(--space-4)));
-  margin: 0 auto;
-  box-shadow: var(--shadow-lg);
-}
-
-/* Без панели вкладок — в режиме просмотра и на широком экране — полоса
-   садится на нижний край сама. */
-.app__body--plain .workout__rest--float {
-  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
-}
-
 .workout__finish {
   margin: var(--space-5) 0;
   padding: var(--space-4);
@@ -407,7 +331,7 @@
 .workout__history-row > .swipe__content { flex: 1; min-width: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .workout__check:active { transform: none; }
+
   .workout__bar span { transition: none; }
 }
 
@@ -430,7 +354,7 @@
 .workout__round-check { margin-top: var(--space-2); gap: 8px; }
 .button.workout__round-check--done, .button.workout__round-check--done:hover { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
 .workout__round-lack { margin: 6px 0 0; font-size: var(--text-sm); color: var(--critical-text, #b42318); }
-.workout__round-edit { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
+
 /* «Соединить в суперсет» — в промежутке между карточками, негромко:
    это не действие подхода, а решение о порядке */
 .workout__join {
@@ -458,12 +382,9 @@
   display: block; margin: 6px 0 0 52px; padding: 6px 0; border: 0; background: none;
   color: var(--accent); font: inherit; font-size: var(--text-sm); cursor: pointer;
 }
-.workout__extras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-2) 0; }
-.workout__extras label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
-.workout__extras input { width: 100%; text-align: center; }
+
 .workout__track { display: grid; gap: var(--space-2); margin: var(--space-2) 0; }
-.workout__check-line { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); min-height: 40px; }
-.workout__check-line input { width: 20px; height: 20px; accent-color: var(--accent); }
+
 .workout__round-units { font-weight: 400; color: var(--text-muted); font-size: var(--text-xs); }
 /* Настройки круга: по упражнению — строкой с названием, общее — внизу */
 .workout__round-options { margin-top: var(--space-2); }
@@ -496,11 +417,6 @@
 .workout__ex-count { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2, var(--bg)); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .workout__exercise--done .workout__ex-count { background: var(--good-fill); color: var(--good-text); }
 
-/* План — цифрами, которые ищут глазами: «3 × 30» крупно, остальное рядом мельче */
-.workout__target { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: var(--space-2) 0 0; color: var(--text-secondary); font-size: var(--text-sm); }
-.workout__target strong { font-size: var(--text-xl); font-weight: 720; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.workout__target .workout__prev { margin-left: 0; }
-
 /* Текущее упражнение — обведено акцентом; законченное — приглушено */
 .workout__exercise--current { border: 2px solid var(--accent); padding: calc(var(--space-4) - 1px); box-shadow: 0 6px 20px -12px var(--accent); }
 .workout__exercise--done { opacity: 0.72; }
@@ -511,7 +427,7 @@
 .workout__set--current + .workout__set { border-top-color: transparent; }
 .workout__set-row input { font-size: var(--text-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
 .workout__set--current input { border-color: var(--accent); background: var(--surface); }
-.workout__check--next { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+
 .workout__set--skipped .workout__set-row input { text-decoration: line-through; opacity: 0.5; }
 .workout__skipped { margin: 2px 0 4px 52px; font-size: var(--text-xs); color: var(--text-muted); }
 
@@ -533,11 +449,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .workout__exercise { transition: opacity var(--dur-fast, 160ms) var(--ease-out, ease-out), border-color var(--dur-fast, 160ms) var(--ease-out, ease-out); }
 }
-/* Сделанный подход — галочка зелёная, но без заливки: единственная яркая
-   заливка на экране — «готово» у следующего подхода */
-.workout__check[aria-pressed="true"] { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
-.workout__ex-num { min-width: 0; margin-right: 2px; }
 
+.workout__ex-num { min-width: 0; margin-right: 2px; }
 
 /* Подход: отступы и подсветка — у содержимого, иначе под ним видно красное */
 .workout__set.swipe { padding: 0; background: transparent; }
@@ -592,10 +505,7 @@
 .workout__tune-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-2); }
 .workout__tune-fields label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); min-width: 0; }
 .workout__tune-fields input { text-align: center; font-variant-numeric: tabular-nums; }
-/* План и единицы — кнопками, но выглядят текстом; значок — что нажимается */
-.workout__target-tap { all: unset; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: var(--space-2) 0 0; color: var(--text-secondary); font-size: var(--text-sm); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.workout__target-tap svg { align-self: center; color: var(--text-muted); }
-.workout__target--units { color: var(--text-muted); }
+
 .workout__target-tap:focus-visible, button.workout__round-units:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 button.workout__round-units { all: unset; white-space: pre-wrap; font-weight: 400; color: var(--text-muted); font-size: var(--text-xs); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
@@ -604,9 +514,6 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__round > [data-member].workout__exercise--lifted { background: var(--surface); border-radius: var(--radius-sm); }
 .workout__fields [data-unit], .workout__round > [data-member] { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
 .workout__exercise--lifted { position: relative; z-index: 3; transition: none !important; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); }
-
-/* «Легко / Норм / Тяжело» вместо галочки (effort.js, 03.10.2026) */
-.workout__check--asking { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Оценка подхода (03.10.2026). Заливки темнее фирменных зелёного и
    оранжевого: белый текст на них — не ниже 4,5:1 (craft-floor). Тихие —
@@ -638,7 +545,15 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__suggest { display: flex; align-items: center; gap: 4px; margin: 2px 0 var(--space-1); font-size: 13px; font-weight: 600; }
 .workout__suggest--easy { color: var(--good-text); }
 .workout__suggest--hard, .workout__suggest--short { color: var(--warning-text); }
-.workout__last { margin: var(--space-1) 0 var(--space-2); font-size: 13px; line-height: 1.4; color: var(--text-muted); max-width: 60ch; }
+/* «Прошлый раз» (LastRunHint, 20.10.2026): было — приглушённо, сегодня —
+   своей строкой со стрелкой: число и направление ищут глазами */
+.workout__last { display: grid; gap: 2px; margin: var(--space-1) 0 var(--space-2); font-size: 13px; line-height: 1.4; max-width: 60ch; }
+.workout__last p { margin: 0; }
+.workout__last-was { color: var(--text-muted); }
+.workout__last-label { color: var(--text-secondary); font-weight: 600; margin-right: 6px; }
+.workout__last-today { display: flex; align-items: center; gap: 4px; color: var(--text); font-weight: 600; }
+.workout__last-today--up { color: var(--good-text); }
+.workout__last-today--down { color: var(--warning-text); }
 /* Цель диапазона повторов (19.10.2026): заметнее подсказки «последний раз» */
 .workout__goal { margin: var(--space-1) 0; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text); max-width: 60ch; }
 .workout__goal-left { margin: 2px 0 var(--space-1); font-size: 13px; color: var(--text-muted); }
@@ -660,7 +575,6 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__confirm p { margin: 0 0 var(--space-3); color: var(--text); font-size: var(--text-sm); }
 .workout__confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .workout__confirm-actions .button { min-height: 44px; }
-
 
 @media (prefers-reduced-motion: reduce) { .workout__confirm { animation: none; } }
 
@@ -731,11 +645,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Инструкция упражнения на виду; фото и регулировки конкретного тренажёра —
    в собственной раскрывашке (FT-570). */
 .workout__about { display: grid; gap: var(--space-3); margin: var(--space-2) 0 var(--space-3); }
-.workout__about-name { margin: 0; color: var(--text); font-size: var(--text-sm); }
-.workout__machine-info { margin: 0; }
-/* Мышцы и анимация — по касанию, чтобы подходы были ближе */
-.workout__extra { margin: 0; }
-.workout__extra[open] { display: grid; gap: var(--space-3); padding-bottom: var(--space-2); }
+
 /* Вариант А (18.10.2026): шаги одной нумерацией, одно «Чего избегать» */
 .workout__about > summary { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
 .guide__meta { color: var(--text-muted); font-size: 12.5px; font-weight: 500; }
@@ -840,3 +750,24 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__units-tap { font-size: 13px; }
 /* Подпись в две строки («Скорость, км/ч») — поля всё равно в одну линию */
 .workout__cardio-grid, .intervals-row__fields { align-items: end; }
+
+/* ---- QA 20.10.2026: шапка компактнее, второстепенное тише ---------------- */
+/* Шапка: название и статус одной строкой, цифры — на ступень меньше,
+   отступы плотнее — в зале треть экрана уходила на хром */
+.workout__header { padding: var(--space-2) var(--space-4) var(--space-2); }
+.workout__header h2 { margin-top: 2px; }
+.workout__header > p { margin: 0; font-size: var(--text-xs); }
+.workout__metrics { margin-top: var(--space-2); gap: var(--space-3); }
+.workout__metrics strong { font-size: var(--text-lg); }
+.workout__toolbar--head { margin-top: var(--space-2); }
+.workout__toolbar--head .button, .workout__toolbar--head label, .workout__head-actions .button { height: 36px; }
+.workout__bar { margin-top: var(--space-2); }
+/* «Выбрать» включён — контур акцентом, а не вторая залитая кнопка рядом с «Завершить» */
+.workout__toolbar--head .button.is-on { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+/* Панель выбора: счётчик уступает место кнопкам, «Удалить» не уезжает одна на вторую строку */
+.workout__pick-bar { flex-wrap: nowrap; }
+.workout__pick-bar .button { padding: 0 10px; font-size: var(--text-sm); margin: 0; }
+.workout__pick-count { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+/* Разминочный подход — третий план (синий текст), а не кнопка во всю ширину в каждой карточке */
+.workout__exercise .workout__add.workout__add--warmup { width: auto; min-height: 36px; margin: 0 0 var(--space-1); padding: 0 2px; border: 0; background: none; color: var(--accent); font-size: 14px; font-weight: 600; text-align: left; }
+.workout__exercise .workout__add.workout__add--warmup::before { content: '+ '; }

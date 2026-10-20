@@ -1370,3 +1370,65 @@ test('19.10.2026: нажали «Легко» вместо «Норм» — оц
   assert.equal(weightOf(2), '40');
   assert.equal(dots().length, 0);
 });
+
+/**
+ * Отдых по упражнению (20.10.2026): в программе у упражнения свой отдых
+ * (technique rest120) — после его подхода таймер идёт две минуты, а не общие
+ * полторы; у упражнения без своего — общий отдых занятия
+ */
+test('отдых упражнения из программы важнее общего отдыха занятия', async () => {
+  data.clear();
+  let local;
+  await act(async () => {
+    local = renderer.create(React.createElement(Workout, { launch: { block: { title: 'Ноги', exercises: [
+      { name: 'Присед со штангой', sets: '2', reps: '5', weight: '100', technique: 'rest180' },
+      { name: 'Разгибания ног', sets: '2', reps: '12', weight: '40' },
+    ] }, month: 'Октябрь 2026' }, onClose() {} }));
+    await delay();
+  });
+  const rest = () => local.root.findAll(n => n.props && n.props.role === 'dialog' && /^rest-screen/.test(n.props.className || ''));
+  const timer = () => local.root.findAll(n => n.props && n.props.role === 'timer')[0];
+  const mark = async (label) => {
+    const btn = local.root.findAll(n => n.type === 'button' && text(n) === label)[0];
+    await act(async () => { await btn.props.onClick(); await delay(); });
+  };
+  await mark('Норм');
+  assert.equal(rest().length, 1);
+  assert.match(text(timer()), /^(3:00|2:59)$/, 'у приседа свой отдых — 3 минуты');
+  await act(async () => {
+    const stop = local.root.findAll(n => n.type === 'button' && /Закончить отдых/.test(text(n)))[0];
+    await stop.props.onClick();
+    await delay();
+  });
+  await mark('Тяжело');
+  assert.match(text(timer()), /^(3:30|3:29)$/, '«тяжело» — +30 с к своему отдыху');
+  await act(async () => {
+    const stop = local.root.findAll(n => n.type === 'button' && /Закончить отдых/.test(text(n)))[0];
+    await stop.props.onClick();
+    await delay();
+  });
+  await mark('Норм');
+  assert.match(text(timer()), /^(1:30|1:29)$/, 'у разгибаний своего отдыха нет — общий 1:30');
+  local.unmount();
+});
+
+test('отдых упражнения меняется в занятии: панель настроек → чипы → таймер по новому', async () => {
+  data.clear();
+  let local;
+  await act(async () => {
+    local = renderer.create(React.createElement(Workout, { clientRow: 3, launch: { block: { title: 'Ноги', exercises: [
+      { name: 'Жим ногами', sets: '2', reps: '12', weight: '100' },
+    ] }, month: 'Октябрь 2026' }, onClose() {} }));
+    await delay();
+  });
+  const byLabel = label => local.root.findAllByType('button').find(b => b.props['aria-label'] === label);
+  const press = async b => { assert.ok(b); await act(async () => { b.props.onClick(); await delay(); }); };
+  await press(byLabel('Жим ногами: настройки'));
+  const chips = local.root.findAll(n => n.props && n.props.role === 'radiogroup' && n.props['aria-label'] === 'Отдых после подхода');
+  assert.equal(chips.length, 1, 'в панели настроек — отдых упражнения');
+  await press(chips[0].findAll(n => n.type === 'button' && text(n) === '2:00')[0]);
+  await press(local.root.findAllByType('button').find(b => text(b) === 'Норм'));
+  const timer = local.root.findAll(n => n.props && n.props.role === 'timer')[0];
+  assert.match(text(timer), /^(2:00|1:59)$/, 'отдых две минуты — выбранный у упражнения');
+  local.unmount();
+});

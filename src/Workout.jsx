@@ -7,8 +7,8 @@ import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWor
 import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, editSetField } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron } from './icons.jsx';
+import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, cloneSet, editSetField } from './workout-model.js';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -30,46 +30,19 @@ import ExercisePicker from './trainer/ExercisePicker.jsx';
 import { ExerciseMachines } from './trainer/MachinesEditor.jsx';
 import { HistoryPick } from './trainer/HistoryMove.jsx';
 
-/** У тренажёра есть что раскрыть: фото или где регулировки */
-function machineHasDetails(m) {
-  return !!(m && (m.setup || m.photo || (m.photos && m.photos.length)));
-}
 import { useData } from './useData.js';
-import { SetupText, SetupMistakes, setupParts, MachineInfo, MachineNote, Media } from './media.jsx';
-import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
-import { EFFORTS, EFFORT_WORD, EFFORT_HINT, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, lastRunText, otherMachineText, wasSet, repsGoalText, repsLeftText } from './effort.js';
-import { unlockAlarm } from './rest-alarm.js';
+import { MachineNote } from './media.jsx';
+import { EFFORT_WORD, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, otherMachineText, wasSet, repsGoalText, repsLeftText, isAssisted } from './effort.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
 import { useReveal } from './reveal.js';
+import { setsWord, planText, supersetMark, focusOf, nextText, nextInfo, unitsOf as units } from './workout-view.js';
+import { EffortChooser, EffortFix } from './EffortButtons.jsx';
+import RestChips from './RestChips.jsx';
+import LastRunHint from './LastRunHint.jsx';
 
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
-
-/**
- * План упражнения без RPE: его убрали из приложения 03.10.2026, но в
- * занятиях, начатых раньше, «RPE 8-9» осталось в снимке плана
- */
-/** «1 подход», «3 подхода», «5 подходов» */
-const setsWord = (n) => n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? 'подход' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'подхода' : 'подходов');
-const planText = (p) => String(p || '').split(' · ').filter(x => x && !/^RPE\b/i.test(x)).join(' · ');
-
-/**
- * Подпись про суперсет.
- *
- * Группа приезжает из плана, но упражнения в занятии можно менять
- * местами и удалять, поэтому считаем по текущему списку: осталось одно —
- * подписи нет, «суперсет из одного» только собьёт.
- */
-function supersetMark(exercises, index) {
-  const group = exercises[index].supersetGroup;
-  if (!group) return '';
-
-  const same = exercises.filter(e => e.supersetGroup === group);
-  if (same.length < 2) return '';
-
-  return `Суперсет · ${same.indexOf(exercises[index]) + 1} из ${same.length}, без отдыха между упражнениями`;
-}
 
 // backLabel — куда ведёт «назад»: из программы — к ней, из меню — к списку клиентов
 export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose, backLabel = 'К программе' }) {
@@ -103,9 +76,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // строкой «Настройки подхода» под каждым: их читают редко, а место они
   // занимали у цифр, ради которых экран и открыт
   const [openSet, setOpenSet] = useState('');
-  // Отметка подхода — с оценкой «легко / норм / тяжело» (03.10.2026):
-  // галочка раскрывает выбор под подходом (ключ подхода или круга)
-  const [effortFor, setEffortFor] = useState('');
   // Отдых, запущенный с этого телефона (rest-here.js): окно «Отдых
   // окончен» всплывает в любом разделе только у того, кто его запустил
   // «Свернуть таймер»: until свёрнутого отдыха — плашка вместо экрана
@@ -143,9 +113,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // карточка выше экрана, цель за ней не видна
   const [reorder, setReorder] = useState(null);
   const drag = useRef(null);
+  // Снять слушатели перетаскивания, если экран закрыли посреди удержания
+  const dragOff = useRef(null);
+  useEffect(() => () => { if (dragOff.current) dragOff.current(); }, []);
   const swallowClick = useRef(false);
   const params = clientRow ? { clientRow } : {};
 
+  /**
+   * Черновик на устройстве — синхронно на каждое изменение. Отложенную
+   * запись (20.10.2026) откатили: при смене экземпляра экрана сброс старого
+   * мог затереть черновик нового — тот самый сценарий из теста «ответ
+   * старого экрана не затирает новый ввод». Сериализация занятия стоит
+   * единицы миллисекунд, это дешевле риска потерять подход
+   */
   const store = value => {
     state.current = value;
     if (mounted.current) setRecord(value);
@@ -447,8 +427,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // обновлять, завершили или отменили — убрать (native-activity.js)
   useEffect(() => {
     const status = record?.session?.status;
-    if (['active', 'paused'].includes(status)) showWorkoutActivity(record, clientRow, { coach: isCoaching(clientRow, clientView) });
-    else if (['completed', 'cancelled'].includes(status)) endWorkoutActivity(record.session.id);
+    if (['active', 'paused'].includes(status)) {
+      // Пересобирать плашку на каждое нажатие клавиши незачем: через
+      // треть секунды тишины, по свежему снимку (20.10.2026, аудит)
+      const t = setTimeout(() => showWorkoutActivity(state.current, clientRow, { coach: isCoaching(clientRow, clientView) }), 300);
+      return () => clearTimeout(t);
+    }
+    if (['completed', 'cancelled'].includes(status)) endWorkoutActivity(record.session.id);
+    return undefined;
   }, [record]);
 
   useEffect(() => {
@@ -570,11 +556,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
 
   /**
-   * Длительность отдыха занятия. Не выбрана — 1:30, как на часах: с
-   * оценками подхода (03.10.2026) отдых запускается всегда, а «Вручную»
-   * (ноль) оставлял человека без таймера — так было на живой тренировке
+   * Длительность отдыха. У упражнения свой отдых из программы (ex.rest,
+   * 20.10.2026: базовым 2–3 минуты, изолирующим — минута) — он; нет —
+   * общий отдых занятия. Не выбран — 1:30, как на часах: с оценками подхода
+   * (03.10.2026) отдых запускается всегда, а «Вручную» (ноль) оставлял
+   * человека без таймера — так было на живой тренировке
    */
-  const restBase = () => (state.current && state.current.session.restSeconds) || 90;
+  const restBase = (ex = null) => (ex && ex.rest) || (state.current && state.current.session.restSeconds) || 90;
 
   /** +30 секунд к отдыху — и уведомление переставить */
   const extendRest = () => {
@@ -648,9 +636,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     ? { ...x, sets: x.sets.map((set, i) => (i === si ? withIntervals(set, setIntervals(set, x), trackOf(x)) : set)) }
     : x);
   const lackOf = (ex, si) => missing(pinIntervals(ex, si).sets[si], trackOf(ex));
+  // Номер последней замены: ответ истории применяется только к ней (выбрали
+  // A, потом B, потом снова A — ответ на первое A пришёл бы в уже новое A)
+  const replaceSeq = useRef(0);
   const replaceExercise = async (ei, picked) => {
     const current = state.current && state.current.session.exercises[ei];
     if (!current) return;
+    replaceSeq.current += 1;
+    const seq = replaceSeq.current;
 
     // Сразу убираем снимок прежнего упражнения. Даже если сеть пропадёт,
     // жим ногами не должен остаться весами у приседа.
@@ -668,7 +661,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       });
       updateExercise(ei, (ex) => {
         // Ответ старого выбора не должен затереть следующий выбор.
-        if (ex.name !== picked.name || Number(ex.exerciseId || 0) !== Number(picked.exerciseId || 0)) return ex;
+        if (seq !== replaceSeq.current || ex.name !== picked.name || Number(ex.exerciseId || 0) !== Number(picked.exerciseId || 0)) return ex;
         return replaceWorkoutExercise(ex, picked, history);
       });
     } catch (error) {
@@ -781,6 +774,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     });
     const key = ex.id + ':' + si;
     const current = focus.ex === ex.id && focus.set === si;
+    // «На сторону» — у первого подхода человека (он переносится на все), у
+    // остальных — только если отличается: 16 одинаковых флажков на экране
+    // (QA 20.10.2026) читались как шум
+    const firstOwn = ex.sets.findIndex(x => (x.who || '') === (set.who || ''));
+    const sideHere = track.kind === 'strength' && (si === firstOwn || setOneSide(set, track) !== setOneSide(ex.sets[firstOwn], track));
     const removeSet = () => { setUndo(s.exercises, 'Подход удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
     return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
@@ -802,8 +800,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 дальше любую можно снять, владелец 07.10.2026) и «было» */}
             {/* Тот же подход в прошлый раз — у каждого подхода свой
                 (владелец, 03.10.2026: «было» на всё упражнение бесполезно) */}
-            {(track.kind === 'strength' || was) && <div className="workout__set-meta">
-              {track.kind === 'strength' && <label className="workout__side">
+            {(sideHere || was) && <div className="workout__set-meta">
+              {sideHere && <label className="workout__side">
                 <input type="checkbox" checked={setOneSide(set, track)} disabled={!editable} onChange={e => {
                   const side = e.target.checked ? 'one' : 'two';
                   const who = set.who || '';
@@ -825,13 +823,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               // Разминку можно и без веса: свой вес, без нагрузки (FT-620)
               const lack = missing(set, track, { requireWeight: set.kind !== 'warmup' });
               if (lack) { setMessage(lack); return; }
-              updateExercise(ei, x => rateSet(x, si, effort).ex);
+              // Один расчёт на свежем снимке — и в занятие, и для отдыха:
+              // change зовёт transform сразу (20.10.2026, аудит)
+              let rated = null;
+              updateExercise(ei, x => { rated = rateSet(x, si, effort); return rated.ex; });
               // Последний подход занятия — без отдыха, сразу «Завершить?»
               if (allDone()) { afterLast(); return; }
               // Отдых начинается там, где человек нажал: подход отмечен —
-              // время пошло. Длительность — по оценке и по тому, прибавили
-              // ли вес (effort.js)
-              if (restAfter) startRest(restFor(effort, restBase(), rateSet(ex, si, effort).raised));
+              // время пошло. Длительность — по оценке и по тому, было ли
+              // куда прибавить (effort.js, capped)
+              if (restAfter) startRest(restFor(effort, restBase(ex), !!(rated && rated.capped)));
             }, current, set.kind === 'warmup')}
             {set.state === 'pending' && set.suggest && (() => {
               // Только у ближайшего: сразу за отмеченным подходом того же человека
@@ -929,7 +930,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         if (lack) { setMessage(lack); return; }
         updateExercise(ei, x => { const y = pinIntervals(x, si); return { ...y, sets: y.sets.map((s, i) => (i === si ? { ...s, state: 'done', effort } : s)) }; });
         if (allDone()) { afterLast(); return; }
-        if (restAfter) startRest(restFor(effort, restBase()));
+        if (restAfter) startRest(restFor(effort, restBase(ex)));
       }, current)}
       {!inRound && openSet === key && <div className="workout__set-options">
         {editable && set.state === 'done' && effortFix(set.effort, (effort) => { setOpenSet(''); updateSet(ei, si, x => ({ ...x, effort })); })}
@@ -986,47 +987,33 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     }, 80);
   };
 
-  /** В занятии уже есть оценка — подсказку под кнопками больше не показываем */
-  const rated = () => !!(state.current && state.current.session.exercises.some(e => e.sets.some(x => x.effort)));
+  /**
+   * Подсказку «легко — мог ещё 3 повтора…» показываем, пока человек не
+   * оценил ни одного подхода — в этом занятии или раньше (отметка на
+   * устройстве): тренеру после первого занятия это шум (QA 20.10.2026)
+   */
+  const HINT_KEY = 'effort_hint_seen_v1';
+  const rated = () => {
+    if (state.current && state.current.session.exercises.some(e => e.sets.some(x => x.effort))) {
+      try { localStorage.setItem(HINT_KEY, '1'); } catch (_) { /* приватный режим */ }
+      return true;
+    }
+    try { return localStorage.getItem(HINT_KEY) === '1'; } catch (_) { return false; }
+  };
 
   /**
    * Выбор оценки подхода (круга): три кнопки, каждая отмечает и запускает
    * отдых — короче после «Легко», дольше после «Тяжело» (effort.js)
    */
   const effortChooser = (onPick, current = true, warmup = false) => (
-    <>
-      <div className={'workout__effort' + (current ? '' : ' workout__effort--quiet')} role="group" aria-label="Подход сделан — как прошло?">
-        {/* Разминка (FT-620): оценка ничего не решает — вес она не двигает, —
-            поэтому одна кнопка «Готово», без «Легко / Норм / Тяжело» */}
-        {warmup
-          ? <button type="button" className="workout__effort-btn workout__effort-btn--ok workout__effort-btn--warmup"
-            onClick={() => { haptic(); unlockAlarm(); onPick(''); }}>Готово</button>
-          : EFFORTS.map(e => (
-          <button type="button" key={e.key} className={'workout__effort-btn workout__effort-btn--' + e.key}
-            onClick={() => { haptic(); unlockAlarm(); onPick(e.key); }}>{e.label}</button>
-        ))}
-      </div>
-      {/* Что значат кнопки — под текущими, пока в занятии нет ни одной оценки */}
-      {current && !warmup && !rated() && <p className="workout__effort-hint">{EFFORT_HINT}</p>}
-    </>
+    <EffortChooser onPick={onPick} current={current} warmup={warmup} hint={current && !warmup && !rated()} />
   );
 
   /**
    * «Как прошло?» у уже отмеченного подхода: поменять оценку, если нажали
    * не ту. Текущая — залита, остальные — контуром. Отдых не перезапускается
    */
-  const effortFix = (current, onPick) => (
-    <div className="workout__effort-fix">
-      <p className="workout__effort-fix-title">Как прошло? Нажали не то — поменяйте</p>
-      <div className="workout__effort workout__effort--quiet" role="group" aria-label="Как прошёл подход">
-        {EFFORTS.map(e => (
-          <button type="button" key={e.key} aria-pressed={current === e.key}
-            className={'workout__effort-btn workout__effort-btn--' + e.key + (current === e.key ? ' workout__effort-btn--on' : '')}
-            onClick={() => { if (current !== e.key) { haptic(); onPick(e.key); } }}>{e.label}</button>
-        ))}
-      </div>
-    </div>
-  );
+  const effortFix = (current, onPick) => <EffortFix current={current} onPick={onPick} />;
 
   /** Кардио: добавить метрику, которой нет в плане, — калории с экрана тренажёра, пульс с часов */
   const metricAdd = (ex, ei) => {
@@ -1099,15 +1086,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       const why = lackOf(ex, r);
       if (why) { setRoundLack({ key, text: ex.name + ': ' + why.replace(/ перед отметкой.*$/, '').toLowerCase() }); return; }
       setRoundLack(null);
-      const rated = rateSet(ex, r, effort);
-      updateExercise(ei, x => rateSet(pinIntervals(x, r), r, effort).ex);
+      let rated = null;
+      updateExercise(ei, x => { rated = rateSet(pinIntervals(x, r), r, effort); return rated.ex; });
       if (!last) return;
       if (allDone()) { afterLast(); return; }
-      // Круг закончен — отдых по всем оценкам круга
+      // Круг закончен — отдых по всем оценкам круга; короче — если всем
+      // прибавлять было некуда (capped)
       const others = live.filter(m => m.ex.id !== ex.id).map(m => m.ex.sets[r]);
       const efforts = [...others.map(x => x.effort || 'ok'), effort];
-      const raised = rated.raised || others.some(x => x.raised);
-      startRest(roundRest(efforts, restBase(), raised));
+      const raised = !!(rated && rated.capped) && others.every(x => x.capped);
+      // Отдых круга — самый долгий из своих отдыхов упражнений круга
+      startRest(roundRest(efforts, Math.max(...live.map(m => m.ex.rest || 0)) || restBase(), raised));
     };
     return <>
       {effortChooser(pick, waiting[0] && waiting[0].ex.id === ex.id)}
@@ -1244,7 +1233,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const addRound = () => change(v => ({
       ...v,
       exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets.length < 20
-        ? { ...e, sets: [...e.sets, { ...e.sets[e.sets.length - 1], state: 'pending' }] }
+        ? { ...e, sets: [...e.sets, cloneSet(e.sets[e.sets.length - 1])] }
         : e)),
     }));
     const currentHere = members.some(({ ex }) => ex.id === focus.ex);
@@ -1257,9 +1246,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {members.some(({ ex }) => planText(ex.prescription)) && (
         <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '')).join('; ')}</p>
       )}
-      {members.filter(({ ex }) => lastRunText(ex.lastRun)).map(({ ex }) => (
-        <p className="workout__last" key={'last' + ex.id}>{ex.name}: {lastRunText(ex.lastRun).replace(/^Последний раз/, 'последний раз')}</p>
-      ))}
+      {members.map(({ ex }) => <LastRunHint key={'last' + ex.id} last={ex.lastRun} name={ex.name} />)}
       {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
       {members.map(({ ex }) => ex.exerciseId && setups[ex.exerciseId]
         ? <WorkoutGuidance key={'about' + ex.id} info={setups[ex.exerciseId]} trainer={!asClient} title={ex.name} /> : null)}
@@ -1360,11 +1347,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const tuneEditor = (ex, ei, id, inRound = false) => {
     const track = trackOf(ex);
     const note = inRound && <label className="workout__field">Заметка<textarea value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, x => ({ ...x, note: e.target.value }))} /></label>;
+    // Отдых после подхода этого упражнения (20.10.2026) — только в этом
+    // занятии; «Общий» — отдых занятия из шапки. У круга — самый долгий из своих
+    const rest = <RestChips value={ex.rest || 0} fallback={(state.current && state.current.session.restSeconds) || 90}
+      onChange={(seconds) => updateExercise(ei, ({ rest: _r, ...x }) => (seconds ? { ...x, rest: seconds } : x))} hint={!inRound} />;
     const done = <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>;
     if (track.kind === 'cardio') {
       const c = cardioOf(ex);
       return <div className="workout__panel" key={'tune-' + id}>
         <CardioPlan kind={false} value={c} track={trackOf({ ...ex, cardio: c })} onChange={next => editCardio(ei, next, inRound ? Number(String(id).split(':').pop()) : -1)} />
+        {rest}
         {note}
         {done}
       </div>;
@@ -1372,17 +1364,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const open = ex.sets.filter(x => x.state === 'pending');
     const sample = open[0] || ex.sets[ex.sets.length - 1] || {};
     // Сразу всем неотмеченным: сделанное — это уже результат
-    const editAll = (key, value) => updateExercise(ei, x => ({ ...x, sets: x.sets.map(set => {
-      if (set.state !== 'pending') return set;
-      if (key !== 'weight') return { ...set, [key]: value };
-      const { suggest, ...rest } = set;
-      return { ...rest, weight: value, own: true };
-    }) }));
-    const last = ex.sets[ex.sets.length - 1];
-    const addSet = () => updateExercise(ei, x => {
-      const { effort, suggest, ...prev } = x.sets[x.sets.length - 1];
-      return { ...x, sets: [...x.sets, { ...prev, state: 'pending' }] };
+    // Вес (у веса помощи — помощь) руками — свой (own): оценки его не двигают
+    const editAll = (key, value) => updateExercise(ei, x => {
+      const valueKey = isAssisted(x) ? 'assist' : 'weight';
+      return { ...x, sets: x.sets.map(set => {
+        if (set.state !== 'pending') return set;
+        if (key !== valueKey) return { ...set, [key]: value };
+        const { suggest, ...rest } = set;
+        return { ...rest, [valueKey]: value, own: true };
+      }) };
     });
+    const last = ex.sets[ex.sets.length - 1];
+    const addSet = () => updateExercise(ei, withSet);
     const dropSet = () => { setUndo(s.exercises, 'Подход удалён'); updateExercise(ei, x => ({ ...x, sets: x.sets.slice(0, -1) })); };
     return <div className="workout__panel" key={'tune-' + id}>
       {!inRound && <div className="workout__tune-count">
@@ -1397,6 +1390,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         ))}
       </div>}
       {open.length > 0 && <p className="small muted">{open.length === ex.sets.length ? 'Меняется во всех подходах.' : 'Меняется в неотмеченных подходах.'}</p>}
+      {rest}
       {note}
       {done}
     </div>;
@@ -1408,15 +1402,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * пальцем, соседи расступаются; отпустили — встала. Суперсет едет целиком.
    * Сдвинули палец раньше — это прокрутка, перестановки нет.
    */
-  const units = (list) => {
-    const out = [];
-    list.forEach(e => {
-      const key = e.supersetGroup && list.filter(x => x.supersetGroup === e.supersetGroup).length > 1 ? 'g' + e.supersetGroup : e.id;
-      const found = out.find(u => u.key === key);
-      if (found) found.items.push(e); else out.push({ key, items: [e] });
-    });
-    return out;
-  };
   /**
    * Порядок упражнений внутри суперсета — тем же удержанием, но только
    * среди своих (02.10.2026): строка ездит в пределах круга, из суперсета не
@@ -1469,6 +1454,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 8;
     const g = { key, from, to: from, rows, rects, gap, y0, pointerId };
     drag.current = g;
+    dragOff.current = () => finish({ pointerId, type: 'pointercancel' });
+    dragOff.current = () => finish({ pointerId, type: 'pointercancel' });
+    dragOff.current = () => finish({ pointerId, type: 'pointercancel' });
     rows[from].classList.add('workout__exercise--lifted');
     // Пока тащат — страница не листается (постоянный слушатель выше)
     const move = (ev) => {
@@ -1503,6 +1491,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       window.removeEventListener('pointercancel', finish);
       rows.forEach(row => { row.style.transform = ''; row.classList.remove('workout__exercise--lifted'); });
       drag.current = null;
+      dragOff.current = null;
       // Касание после перетаскивания — не «переименовать»
       swallowClick.current = true;
       setTimeout(() => { swallowClick.current = false; }, 350);
@@ -1656,7 +1645,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         const chosen = u.items.filter(e => picked.has(e.id));
         if (!chosen.length) return;
         const group = u.items.length > 1 && chosen.length === u.items.length ? 'superset-' + uid() : '';
-        out.push(...chosen.map(e => ({ ...e, id: uid(), supersetGroup: group, note: '', sets: e.sets.map(({ effort, raised, ...x }) => ({ ...x, state: 'pending' })) })));
+        out.push(...chosen.map(e => ({ ...e, id: uid(), supersetGroup: group, note: '', sets: e.sets.map(cloneSet) })));
       });
       return { ...v, exercises: out.slice(0, 30) };
     });
@@ -1770,7 +1759,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       autoMachine.current.add(mark);
       chooseMachine(ei, primary);
     });
-  }, [setups, editable, s && s.exercises]);
+    // Зависимость — состав и тренажёры, а не массив упражнений: тот новый на
+    // каждое нажатие клавиши (20.10.2026, аудит)
+  }, [setups, editable, s ? s.exercises.map((e) => e.id + '|' + (e.exerciseId || '') + '|' + ((e.machine && e.machine.uid) || '')).join() : '']);
 
   /**
    * Под названием упражнения из базы (07.10.2026): на каком тренажёре
@@ -1818,13 +1809,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const machines = info.machines || [];
     if (machines.length) return machines.map((m) => ({ target: 'm:' + m.uid, label: machines.length > 1 ? m.name : '' }));
     return info.noteKey ? [{ target: info.noteKey, label: '' }] : [];
-  };
-
-  /** Тренажёры без фото и регулировок — строкой: у остальных название в «Тренажёр · …» ниже (FT-570) */
-  const gearLine = (machines) => {
-    const plain = machines.filter((m) => !machineHasDetails(m));
-    if (!plain.length) return null;
-    return <p className="small workout__gear">{plain.map((m) => (m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр') + ' · ' + m.name).join('   ')}</p>;
   };
 
   /**
@@ -2047,13 +2031,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               и так видны в строках. Единицы — касанием: подходы, вес, время,
               у кардио — цели и интервалы, как в круге суперсета */}
           {!ex.sets.some(x => x.who) && !asClient && <button type="button" className="workout__units-tap" aria-expanded={tuning === ex.id} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id)}>
-            {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}<IconSliders size={12} aria-hidden="true" />
+            {isFunctional(ex) ? 'Интервалы' : trackOf(ex).kind === 'cardio' ? 'Цели и настройки' : 'Подходы, вес и отдых'}<IconSliders size={12} aria-hidden="true" />
           </button>}
           {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {/* Цель диапазона — к ней клиент стремится (19.10.2026) */}
           {repsGoalText(ex) && <p className="workout__goal">{repsGoalText(ex)}</p>}
-          {lastRunText(ex.lastRun) && <p className="workout__last">{lastRunText(ex.lastRun)}</p>}
+          <LastRunHint last={ex.lastRun} />
           {/* Разминка — сверху, над подходами (FT-532): встаёт перед рабочими */}
           {trackOf(ex).kind !== 'cardio' && !ex.sets.some(x => x.who) && (
             <button type="button" className="button button--ghost button--block workout__add workout__add--warmup" disabled={ex.sets.length >= 20} onClick={() => updateExercise(ei, withWarmup)}>
@@ -2068,8 +2052,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {(() => {
             const who = [...new Set(ex.sets.map(x => x.who).filter(Boolean))];
             const round = who.length
-              ? who.map(w => ({ ...[...ex.sets].reverse().find(x => x.who === w), state: 'pending' }))
-              : [{ ...ex.sets[ex.sets.length - 1], state: 'pending' }];
+              ? who.map(w => cloneSet([...ex.sets].reverse().find(x => x.who === w)))
+              : [cloneSet(ex.sets[ex.sets.length - 1])];
             return (
               <button className="button button--ghost button--block workout__add" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
                 {who.length > 1 ? 'Добавить круг' : trackOf(ex).kind === 'cardio' ? 'Добавить отрезок' : 'Добавить подход'}
@@ -2124,69 +2108,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {erase.bar}
     </>}
   </div>;
-}
-
-/** Ближайший подход занятия; в суперсете — следующее упражнение того же круга */
-function focusOf(s) {
-  const list = (s && s.exercises) || [];
-  for (let i = 0; i < list.length; i += 1) {
-    const si = list[i].sets.findIndex(x => x.state === 'pending');
-    if (si === -1) continue;
-    const group = list[i].supersetGroup;
-    if (group) {
-      const mates = list.filter(e => e.supersetGroup === group);
-      const r = Math.min(...mates.map(e => { const j = e.sets.findIndex(x => x.state === 'pending'); return j === -1 ? Infinity : j; }));
-      const who = mates.find(e => e.sets[r] && e.sets[r].state === 'pending');
-      if (who) return { ex: who.id, set: r };
-    }
-    return { ex: list[i].id, set: si };
-  }
-  return { ex: '', set: -1 };
-}
-
-/** «Присед со штангой · подход 2 из 5 · 90 кг × 5» — для уведомлений */
-function nextText(s) {
-  const n = s ? nextInfo(s, focusOf(s)) : null;
-  if (n && n.items) return [n.part, n.items.map(it => [it.name, it.load].filter(Boolean).join(' ')).join(' + ')].join(' · ');
-  return n ? [n.name, n.part, n.load].filter(Boolean).join(' · ') : '';
-}
-
-/**
- * Что дальше — для экрана отдыха (владелец, 03.10.2026): куда идти и что
- * накинуть или снять. Тот же человек и то же упражнение — разница с
- * прошлым подходом; другое упражнение — «новое» и вес с прошлого раза
- */
-function nextInfo(s, focus) {
-  const ex = s.exercises.find(e => e.id === focus.ex);
-  const set = ex && ex.sets[focus.set];
-  if (!set) return null;
-  const num = (v) => Number(String(v || '').replace(',', '.'));
-  const kg = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
-  const own = ex.sets.filter(x => (x.who || '') === (set.who || ''));
-  const part = (set.who ? set.who + ' · ' : '') + 'подход ' + (own.indexOf(set) + 1) + ' из ' + own.length;
-  const load = [set.weight ? kg(num(set.weight)) + ' кг' : '', set.reps ? '× ' + set.reps : ''].filter(Boolean).join(' ');
-  const loadOf = (x) => [x.weight ? kg(num(x.weight)) + ' кг' : '', x.reps ? '× ' + x.reps : ''].filter(Boolean).join(' ');
-  const changeOf = (e, x, list) => {
-    const before = list.slice(0, list.indexOf(x)).filter(y => y.state === 'done').pop();
-    if (before && x.weight && before.weight) {
-      const d = num(x.weight) - num(before.weight);
-      return d > 0 ? { kind: 'up', text: 'накинуть ' + kg(d) + ' кг' }
-        : d < 0 ? { kind: 'down', text: 'снять ' + kg(-d) + ' кг' }
-          : { kind: 'same', text: 'вес тот же' };
-    }
-    if (!before) return { kind: 'new', text: 'новое упражнение' + (e.prevWeight ? ' · в прошлый раз ' + String(e.prevWeight).replace('.', ',') : '') };
-    return null;
-  };
-  // Дальше суперсет — весь круг, а не одно упражнение (03.10.2026)
-  const mates = ex.supersetGroup && !set.who ? s.exercises.filter(e => e.supersetGroup === ex.supersetGroup) : [];
-  if (mates.length > 1) {
-    const r = focus.set;
-    const rounds = Math.max(...mates.map(e => e.sets.length));
-    const items = mates.filter(e => e.sets[r] && e.sets[r].state !== 'skipped')
-      .map(e => ({ name: e.name, load: loadOf(e.sets[r]), change: changeOf(e, e.sets[r], e.sets), done: e.sets[r].state === 'done' }));
-    return { name: 'Суперсет', part: 'круг ' + (r + 1) + ' из ' + rounds, items };
-  }
-  return { name: ex.name, part, load, change: changeOf(ex, set, own) };
 }
 
 /**

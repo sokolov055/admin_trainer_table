@@ -12,10 +12,13 @@
  * Вес — главный рычаг, отдых — запасной:
  *   1. Легко → следующим подходам +шаг. Не больше двух прибавок за
  *      занятие на упражнение (случайное «легко» не уводит вес далеко);
- *      прибавлять некуда (свой вес, потолок) — отдых на 30 с короче.
+ *      прибавлять некуда (свой вес без нагрузки, помощь уже 0) — отдых
+ *      на 30 с короче (capped). Легко на лёгком подходе лесенки или после
+ *      двух прибавок — отдых обычный: вес впереди ещё растёт.
  *   2. Норм → вес и отдых как есть.
  *   3. Тяжело и повторов меньше плана → −шаг сразу: не добил.
- *   4. Тяжело второй раз подряд → −шаг.
+ *   4. Тяжело второй раз подряд → −шаг, но один раз: прошлое «тяжело»
+ *      уже сняло шаг — третье подряд вес не трогает (20.10.2026).
  *   5. Тяжело один раз, повторы сделаны → вес держим, отдых на 30 с дольше.
  *      Тяжело всегда даёт +30 с отдыха.
  *   Разминочные подходы вес не двигают. Новый вес встаёт только в
@@ -69,7 +72,6 @@ export const EFFORT_WORD = { easy: 'легко', ok: 'нормально', hard:
 
 export const EFFORT_HINT = 'Легко — мог ещё 3 повтора и больше, норм — 1–2 в запасе, тяжело — на пределе';
 
-/** Сколько прибавок веса за занятие на одно упражнение */
 const num = (v) => Number(String(v ?? '').replace(',', '.'));
 const text = (kg) => String(Math.round(kg * 100) / 100);
 const has = (s, words) => words.some((w) => s.includes(w));
@@ -159,11 +161,16 @@ function measure(assist) {
     : { has: (s) => num(s.weight) > 0, value: (s) => num(s.weight), load: (s) => num(s.weight), key: 'weight' };
 }
 
-/** Отдых после подхода: тяжело — +30 с, легко без прибавки — −30 с */
-export function restFor(effort, base, raised = false) {
+/**
+ * Отдых после подхода: тяжело — +30 с; легко и прибавлять некуда (свой вес,
+ * помощь уже 0 — capped из rateSet) — −30 с; иначе как выбран. «Легко» на
+ * лёгком подходе лесенки или после двух прибавок отдых не трогает: вес
+ * впереди ещё растёт (до 20.10.2026 укорачивался любой отдых без прибавки)
+ */
+export function restFor(effort, base, capped = false) {
   if (!base) return 0;
   if (effort === 'hard') return Math.min(1800, base + 30);
-  if (effort === 'easy' && !raised) return Math.max(30, base - 30);
+  if (effort === 'easy' && capped) return Math.max(30, base - 30);
   return base;
 }
 
@@ -171,13 +178,16 @@ export function restFor(effort, base, raised = false) {
  * Отдых после круга суперсета: хоть одно тяжело — дольше; все легко и
  * прибавить было некуда — короче; иначе как выбран
  */
-export function roundRest(efforts, base, raised = false) {
+export function roundRest(efforts, base, capped = false) {
   if (!base) return 0;
   if (efforts.includes('hard')) return Math.min(1800, base + 30);
-  if (efforts.length && efforts.every((e) => e === 'easy') && !raised) return Math.max(30, base - 30);
+  if (efforts.length && efforts.every((e) => e === 'easy') && capped) return Math.max(30, base - 30);
   return base;
 }
 
+/** Сколько прибавок веса за занятие на одно упражнение */
+/** Сколько прибавок веса за занятие на одно упражнение */
+/** Сколько прибавок веса за занятие на одно упражнение */
 export const MAX_RAISES = 2;
 
 const EFFORT_SET = ['easy', 'ok', 'hard'];
@@ -264,14 +274,16 @@ export function rateSet(ex, si, effort) {
     const short = target > 0 && num(set.reps) > 0 && num(set.reps) < target;
     if (effort === 'easy' && heaviest && raises < MAX_RAISES) { dir = 1; suggest = 'easy'; }
     else if (effort === 'hard' && short) { dir = -1; suggest = 'short'; }
-    else if (effort === 'hard' && last && last.effort === 'hard') { dir = -1; suggest = 'hard'; }
+    // «Тяжело» второй раз подряд — −шаг, но не второй раз за одно и то же:
+    // прошлое «тяжело» уже сняло шаг (lowered) — хватит (20.10.2026)
+    else if (effort === 'hard' && last && last.effort === 'hard' && !last.lowered) { dir = -1; suggest = 'hard'; }
   }
   const step = (load) => (assist ? assistStep(ex) : stepOf(ex, load));
   let changed = false;
   // Что сдвинула эта оценка — чтобы «не то нажал» вернуло веса (unrateAt)
   const moved = [];
   const sets = ex.sets.map((x, i) => {
-    if (i === si) return { ...x, state: 'done', effort, ...(dir > 0 ? { raised: true } : {}) };
+    if (i === si) return { ...x, state: 'done', effort };
     if (!dir || i < si || !mine(x) || x.state !== 'pending' || x.kind === 'warmup' || x.own) return x;
     if (!m.has(x)) return x;
     const w = m.load(x);
@@ -293,18 +305,18 @@ export function rateSet(ex, si, effort) {
     moved.push({ i, key: m.key, from: String(x[m.key] ?? ''), to: next, suggest: x.suggest || '' });
     return { ...x, [m.key]: next, suggest };
   });
-  if (moved.length) sets[si] = { ...sets[si], moved };
-  return { ex: { ...ex, sets }, raised: dir > 0 && changed, lowered: dir < 0 && changed };
-}
-
-/** Для старых вызовов: только упражнение */
-export function applyEffort(ex, si, effort) {
-  return rateSet(ex, si, effort).ex;
+  // raised / lowered — оценка сдвинула вес следующих подходов; capped —
+  // хотели прибавить, а некуда (потолок прибавок не считается: это не
+  // «некуда», а «хватит»). По capped отдых короче (restFor)
+  const capped = effort === 'easy' && work && m.has(set) && heaviest && dir > 0 && !changed;
+  sets[si] = { ...sets[si], ...(moved.length ? { moved } : {}), ...(dir > 0 && changed ? { raised: true } : {}),
+    ...(dir < 0 && changed ? { lowered: true } : {}), ...(capped ? { capped: true } : {}) };
+  return { ex: { ...ex, sets }, raised: dir > 0 && changed, lowered: dir < 0 && changed, capped };
 }
 
 /** Снять отметку: оценка и признак прибавки уходят вместе с ней */
 export function unrate(set) {
-  const { effort, raised, moved, ...rest } = set;
+  const { effort, raised, lowered, capped, moved, ...rest } = set;
   return { ...rest, state: 'pending' };
 }
 
@@ -399,18 +411,35 @@ export function otherMachineText(other) {
   return 'Последний раз' + date + ' вы делали это упражнение ' + where + ': ' + what + '. Здесь тренажёр другой — впишите вес заново.';
 }
 
-export function lastRunText(last) {
-  if (!last || !Array.isArray(last.weights) || !last.weights.length) return '';
+/**
+ * То же — частями, для карточки упражнения (20.10.2026): «Прошлый раз ·
+ * 09.10 — 100 · 120 · 140 кг на 8 повторов, было легко» и отдельной
+ * строкой «Сегодня +5 кг — было легко» со стрелкой. Одна длинная фраза
+ * читалась плохо: в зале ищут глазами число и направление
+ */
+export function lastRunParts(last) {
+  if (!last || !Array.isArray(last.weights) || !last.weights.length) return null;
   // Вес помощи (FT-628): «с помощью 30 · 30 кг», сдвиг — помощи
   const assist = last.mode === 'assist' && Array.isArray(last.assist);
   const values = assist ? last.assist : last.weights;
   const reps = Array.isArray(last.reps) ? last.reps : [];
   const same = reps.length && reps.every((r) => r && r === reps[0]);
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(last.date || '') ? ' (' + last.date.slice(8, 10) + '.' + last.date.slice(5, 7) + ')' : '';
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(last.date || '') ? last.date.slice(8, 10) + '.' + last.date.slice(5, 7) : '';
   const what = (assist ? 'с помощью ' : '') + (same
     ? values.join(' · ') + ' кг на ' + reps[0] + ' ' + plural(Number(reps[0]), 'повтор', 'повтора', 'повторов')
     : values.map((w, i) => w + (reps[i] ? '×' + reps[i] : '')).join(' · ') + ' кг');
   const felt = last.effort ? ', вам было ' + EFFORT_WORD[last.effort] : '';
+  return { date, was: what + felt, today: todayText(last, assist), action: last.action || 'same' };
+}
+
+export function lastRunText(last) {
+  const p = lastRunParts(last);
+  if (!p) return '';
+  return 'Последний раз' + (p.date ? ' (' + p.date + ')' : '') + ' вы делали ' + p.was + (p.today ? ' — ' + p.today : '');
+}
+
+/** Что сегодня: «сегодня +5 кг», «так же», «−10 %: перерыв»; пусто — нечего сказать */
+function todayText(last, assist) {
   const step = String(last.step || '').replace('.', ',');
   // Помощь: «up» — меньше помощи, это прогресс
   const kg = (sign) => (assist ? 'помощь ' + (sign > 0 ? '−' : '+') : sign > 0 ? '+' : '−') + step + ' кг';
@@ -431,5 +460,5 @@ export function lastRunText(last) {
     // Повторы другие — вес пересчитан в соотношении (сервер, scaleTo)
     scaled: 'сегодня на ' + (lo || '') + ' ' + plural(lo, 'повтор', 'повтора', 'повторов') + ', это примерно ' + String(last.scaled || '').replace('.', ',') + ' кг',
   }[last.action] || '';
-  return 'Последний раз' + date + ' вы делали ' + what + felt + (today ? ' — ' + today : '');
+  return today;
 }

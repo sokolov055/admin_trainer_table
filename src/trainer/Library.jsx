@@ -7,6 +7,7 @@ import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
+import ExerciseKind from '../ExerciseKind.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
 import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
@@ -1256,7 +1257,9 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
     </div>
   );
 
-  const kindOf = () => ({ kind: known?.weightMode === 'assistance' ? 'assistance' : known && !known.auto ? known.kind : 'auto', unilateral: !!known?.unilateral, perSide: !!known?.perSide });
+  // Вид — тем же меню, что в программе и занятии (ExerciseKind): снимок
+  // текущего, у «авто» — догадка сервера, чтобы чипы показывали её
+  const kindOf = () => ({ track: known ? { ...known } : { kind: 'strength', auto: true } });
   const flip = (map, r) => {
     const v = map || { primary: [], secondary: [] };
     return { primary: v.primary.filter((x) => x !== r).concat(!v.primary.includes(r) && !v.secondary.includes(r) ? [r] : []), secondary: v.secondary.filter((x) => x !== r).concat(v.primary.includes(r) ? [r] : []) };
@@ -1299,23 +1302,17 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
         </>, 'Не указана')}
 
         {row('load', 'Как учитывать нагрузку', known ? trackLine(known) : 'Определить само', kindOf, () => <>
-          <Chips
-            items={[{ value: 'auto', label: known && known.auto ? 'Само: ' + KIND_LABELS[known.kind].toLowerCase() : 'Определить само' },
-              ...Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })), { value: 'assistance', label: 'Вес помощи и повторения' }]}
-            value={draft.kind} onChange={(v) => set({ kind: v })} />
+          <ExerciseKind track={draft.track || { kind: 'strength', auto: true }} allowAuto className="exercise-kind--bare" onChange={(t) => set({ track: t })} />
           {/* Тренажёр у кардио не выбирают (09.10.2026): настройки — в программе */}
-          {draft.kind !== 'auto' && draft.kind !== 'cardio' && (
-            <label className="library__check"><input type="checkbox" checked={draft.unilateral} onChange={(ev) => set({ unilateral: ev.target.checked })} />Повторы на каждую сторону (выпады, тяга одной рукой)</label>
-          )}
-          {draft.kind === 'strength' && (
-            <label className="library__check"><input type="checkbox" checked={draft.perSide} onChange={(ev) => set({ perSide: ev.target.checked })} />Вес с одной стороны (гантели, Смит, рычажные)</label>
-          )}
-          {draft.kind === 'assistance' && <p className="small muted">Вес помощи, кг: чем он больше, тем легче упражнение. Прежние записи сохраняют свой способ учёта.</p>}
-          {actions({ track: draft.kind === 'auto' ? { auto: true } : { kind: draft.kind === 'assistance' ? 'bodyweight' : draft.kind, weightMode: draft.kind === 'assistance' ? 'assistance' : undefined, machine: known?.machine || 'treadmill', unilateral: draft.unilateral, perSide: draft.perSide } })}
+          {draft.track && draft.track.weightMode === 'assistance' && <p className="small muted">Прежние записи сохраняют свой способ учёта.</p>}
+          {actions({ track: !draft.track || draft.track.auto ? { auto: true } : {
+            kind: draft.track.kind, weightMode: draft.track.weightMode || undefined, machine: draft.track.machine || 'treadmill',
+            unilateral: !!draft.track.unilateral, perSide: !!draft.track.perSide,
+          } })}
         </>)}
 
-        {e.equipment && row('equipment', 'Инвентарь (прежнее значение)', e.equipment, () => ({ equipment: e.equipment }), () => <>
-          <Field label="Инвентарь" inputMode="text" value={draft.equipment} onChange={(v) => set({ equipment: v })} />
+        {e.equipment && row('equipment', 'Инвентарь', e.equipment, () => ({ equipment: e.equipment }), () => <>
+          <Field label="Инвентарь" inputMode="text" value={draft.equipment} onChange={(v) => set({ equipment: v })} hint="По нему считается шаг веса в занятии: гантели и гири — 1–2 кг, остальное — 2,5 кг и больше." />
           {actions({ equipment: draft.equipment })}
         </>)}
 

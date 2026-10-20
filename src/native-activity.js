@@ -57,6 +57,7 @@ export function exerciseList(s) {
     // Вес и повторы подходов — правка подхода с часов; у веса помощи — помощь
     weights: ex.sets.slice(0, 20).map((x) => String((isAssisted(ex) ? x.assist : x.weight) || '')),
     ...(isAssisted(ex) ? { assist: true } : {}),
+    ...(ex.rest ? { rest: ex.rest } : {}),
     reps: ex.sets.slice(0, 20).map((x) => String(x.reps || '')),
     // Разминочный подход — «разминка» в списке тренера (FT-533)
     kinds: ex.sets.slice(0, 20).map((x) => (x.kind === 'warmup' ? 'warmup' : 'work')),
@@ -205,6 +206,8 @@ export function setQueue(s) {
       // У разминки шага нет: «Легко» на ней вес не прибавляет (FT-620)
       ...(strength ? { dumbbell: isDumbbell(ex), ...(set.kind !== 'warmup' ? { step: assist ? assistStep(ex) : stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}) } : {}),
       ...(strength && suggestText(set, prevOf(ex, set), ex) ? { suggest: suggestText(set, prevOf(ex, set), ex) } : {}),
+      // Отдых после этого подхода, если у упражнения он свой (20.10.2026)
+      ...(ex.rest ? { rest: ex.rest } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
       amount: strength ? '' : setText(set, ex),
       exerciseDone: n - 1,
@@ -425,7 +428,11 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
       // Неотмеченные — пропущены с пометкой closed: «Продолжить» вернёт их
       // finishedAt — когда завершили на самом деле: без сети занятие дойдёт
       // до сервера позже, и время отправки его бы сдвинуло (FT-566)
-      s = { ...s, status: any ? 'completed' : 'cancelled', restUntil: 0, finishedAt: new Date().toISOString(), exercises: closeSets(s.exercises) };
+      // Нажатое в фоне дошло позже — время и конец по нажатию, как на сервере
+      // (watch-workout.js, 19.10.2026)
+      const ran = s.status === 'active' ? Math.max(0, now - at) : 0;
+      s = { ...s, status: any ? 'completed' : 'cancelled', restUntil: 0, finishedAt: new Date(at).toISOString(),
+        elapsedMs: Math.max(0, (s.elapsedMs || 0) - ran), exercises: closeSets(s.exercises) };
     }
   }
   return s;

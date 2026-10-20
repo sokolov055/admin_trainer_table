@@ -47,7 +47,6 @@ export function WorkoutJournal(props) {
 WorkoutJournal.preload = WorkoutPage.preload;
 export const Ration = lazyPage(() => import('../nutrition/Ration.jsx'));
 const NutritionDiary = lazyPage(() => import('../nutrition/Diary.jsx'));
-export const PlanEditor = lazyPage(() => import('../trainer/PlanEditor.jsx'));
 const TemplateApply = lazyPage(() => import('../trainer/Library.jsx'), 'TemplateApply');
 const SaveAsTemplate = lazyPage(() => import('../trainer/Library.jsx'), 'SaveAsTemplate');
 // Правка программы прямо на экране (03.10.2026) — только у тренера
@@ -476,7 +475,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
 
   // Проведённой считается тренировка, у которой есть завершённое занятие
   // этого месяца. Порядок в «Очереди» — тот же, что в программе.
-  const queueBlocks = shownBlocks.filter((b) => !blockSessions(sessions, b, data.month).length);
+  // Один проход по журналу на все тренировки, а не три фильтра на каждую
+  const pastOf = new Map(shownBlocks.map((b) => [b, blockSessions(sessions, b, data.month)]));
+  const queueBlocks = shownBlocks.filter((b) => !pastOf.get(b).length);
   const visibleBlocks = planTab === 'all' ? shownBlocks : queueBlocks;
   // «Выполненные» (01.10.2026) — все завершённые занятия месяца по дате
   // занятия, свежие сверху: тренировки программы (и повторы), свободные.
@@ -879,7 +880,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       )}
 
       {(planTab === 'queue' || planTab === 'all') && <div className={'plan__blocks' + (selectingBlocks ? ' plan__blocks--selecting' : '')} ref={blocksRef}>{visibleBlocks.map((block, i, shownList) => {
-        const past = blockSessions(sessions, block, data.month);
+        const past = pastOf.get(block) || [];
         const bi = shownBlocks.indexOf(block);
         const editHere = canEdit && !made0(planTab);
 
@@ -930,7 +931,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           data-done={past.length ? '' : undefined}
           onPointerDown={canEdit && !selectingBlocks && !past.length ? (e) => {
             if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select')) return;
-            const movable = shownList.filter((b) => !blockSessions(sessions, b, data.month).length);
+            const movable = shownList.filter((b) => !(pastOf.get(b) || []).length);
             holdToReorder(e, {
               row: e.currentTarget.closest('.plan__block-swipe') || e.currentTarget,
               rows: () => (blocksRef.current ? [...blocksRef.current.querySelectorAll(':scope > [data-block]:not([data-done])')] : []),
@@ -1430,26 +1431,23 @@ function MonthVisibility({ month, hidden, clientRow, onChanged }) {
     }
   };
 
+  // Одной строкой (QA 20.10.2026): панель с абзацем и кнопкой во всю ширину
+  // занимала четверть первого экрана ради редкого действия
   return (
-    <Section>
-      <Panel pad>
-        <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
-          {hidden
-            ? `Месяц «${month}» скрыт — клиент его не видит.`
-            : `Месяц «${month}» виден клиенту. Скрытый останется у вас со всем содержимым.`}
-        </p>
-
-        <button className="button button--block" onClick={toggle} disabled={busy}>
-          {busy ? 'Меняю…' : hidden ? 'Показать клиенту' : 'Скрыть от клиента'}
-        </button>
-
-        {failure && (
-          <Note tone="critical" icon={IconAlert}>
-            {failure.message || 'Не получилось изменить видимость листа'}
-          </Note>
-        )}
-      </Panel>
-    </Section>
+    <div className={'plan__visibility' + (hidden ? ' plan__visibility--hidden' : '')}>
+      <span className="plan__visibility-text">
+        {hidden ? 'Скрыт от клиента' : 'Виден клиенту'}
+        <span className="plan__visibility-note">{hidden ? ' · останется у вас со всем содержимым' : ''}</span>
+      </span>
+      <button type="button" className="button button--ghost" onClick={toggle} disabled={busy}>
+        {busy ? 'Меняю…' : hidden ? 'Показать клиенту' : 'Скрыть от клиента'}
+      </button>
+      {failure && (
+        <Note tone="critical" icon={IconAlert}>
+          {failure.message || 'Не получилось изменить видимость листа'}
+        </Note>
+      )}
+    </div>
   );
 }
 

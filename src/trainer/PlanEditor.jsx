@@ -1,168 +1,45 @@
-import ExercisePicker from './ExercisePicker.jsx';
-import HistoryMove, { HistoryPick, hadHistory } from './HistoryMove.jsx';
-import { planExerciseForSave } from '../plan-payload.js';
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { separatorOf } from '../remove.js';
-import SwipeRow from '../SwipeRow.jsx';
-import { haptic } from '../telegram.js';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTabLock } from '../gestures.jsx';
 import { apiMutate } from '../api.js';
-import { trackOf, cardioFrom, techniqueOf, techniqueText } from '../exercise-track.js';
-import CardioPlan, { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
-import { useData } from '../useData.js';
+import { planExerciseForSave } from '../plan-payload.js';
 import { Note } from '../ui.jsx';
-import { IconAlert, IconArrowUp, IconArrowDown, IconLinkPair, IconPlus } from '../icons.jsx';
+import { IconAlert } from '../icons.jsx';
 import BlockOrder from './BlockOrder.jsx';
+import { BlockEdit, blankExercise } from './PlanInline.jsx';
 import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
-import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
-import ClientSetup from './ClientSetup.jsx';
-import { ExerciseMachines } from './MachinesEditor.jsx';
 
 /**
- * Редактор программы месяца.
+ * Редактор шаблона (программы или одной тренировки) в «Библиотеке».
  *
- * Последнее, ради чего тренер открывал таблицу на телефоне. Экран сделан
- * под эту ситуацию: он в зале, между клиентами, и ему нужно поменять вес
- * в двух строках или дописать упражнение — а не «составить программу».
- * Поэтому здесь нет конструктора: список, поля и кнопка «Сохранить».
- * Порядок тренировок меняют перетаскиванием в свёрнутом виде
- * (BlockOrder.jsx) — развёрнутая тренировка выше экрана.
+ * До 20.10.2026 здесь был второй, свой редактор упражнений: колонки
+ * «Подходы · Повторы · Вес», стрелки «Выше/Ниже», кнопки «Дропсет», «Вид»,
+ * «Тренажёры». Он разошёлся с правкой программы клиента (PlanInline.jsx):
+ * не умел разминку, перестановка рвала все суперсеты блока, подходы
+ * суперсета синхронизировались не так. Теперь упражнения правятся тем же
+ * BlockEdit, что и в программе клиента: тап по названию — из базы, тап по
+ * схеме — повторы, вес, подходы, отдых, суперсет; подержать — перетащить;
+ * смахнуть — удалить. Здесь остаётся только то, что у шаблона своё:
+ * список тренировок, их порядок (BlockOrder: свернуть, перетащить,
+ * скопировать, удалить), тренировка из шаблона тренировки и «Сохранить».
  *
- * Сохраняется месяц целиком, одним снимком. Так удаление становится
- * настоящим: дописывание поверх прежнего оставило бы убранное упражнение
- * жить под старым номером.
- *
- * Суперсет отмечается у ВЕРХНЕГО упражнения пары — «делается вместе со
- * следующим». Это то, как о нём думают: не «мы с ним в группе», а «после
- * этого сразу следующее, без отдыха».
+ * Сохраняется шаблон целиком, одним снимком: так удаление становится
+ * настоящим. onSubmit(blocks) — куда сохранять; single — шаблон одной
+ * тренировки, добавлять и убирать тренировки в нём нельзя.
  */
-
-const blank = () => ({
-  name: '', weight: '', prevWeight: '', sets: '', reps: '', rpe: '', supersetGroup: '',
-  // Сплит: кто делает (пусто — все) и вес каждого
-  performers: [], splitWeights: {}, splitPrev: {},
-  // Ссылка на упражнение из базы: выбрано в подсказках или связано по названию
-  exerciseId: null,
-  // Приём: 'dropset' — последний подход со сбросами веса
-  technique: '',
-  // Кардио: тренажёр, метрики с целями, режим, интервалы (CardioPlan)
-  cardio: null,
-});
-
-/** Упражнение кардио по тренажёру — после силовой или отдельным днём */
-const cardioExercise = (machine = 'treadmill') => ({ ...blank(), name: MACHINE_NAMES[machine], sets: '1', cardio: newCardio(machine) });
-
-const norm = (v) => String(v || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
-
-/**
- * Подписи колонок по типу упражнения. Колонки те же четыре — меняется
- * смысл: у кардио «повторы» — время, «вес» — режим тренажёра («8 км/ч,
- * 3%», «уровень 6»); у статики «повторы» — секунды.
- */
-function columns(exercise, t, one = false) {
-  const sets = exercise.supersetGroup ? 'Круги' : 'Подходы';
-  if (t.kind === 'cardio') {
-    const mode = t.machine === 'treadmill' ? 'км/ч, %' : t.machine === 'other' ? 'режим' : 'уровень';
-    return { heads: ['Отрезки', 'Время', 'Режим'], ph: ['Отр.', 'мин', mode] };
-  }
-  if (t.kind === 'timed') return { heads: [sets, 'Время, с', 'Доп. вес'], ph: ['Подх.', 'сек', 'свой'] };
-  const reps = t.unilateral ? 'Повт./стор.' : 'Повторы';
-  if (t.kind === 'bodyweight') return { heads: [sets, reps, 'Доп. вес'], ph: ['Подх.', 'Повт.', 'свой'] };
-  return { heads: [sets, reps, one ? 'Кг/стор.' : 'Вес'], ph: ['Подх.', 'Повт.', 'Вес'] };
-}
-
-/**
- * Тот же редактор правит и шаблоны из библиотеки: у шаблона те же блоки.
- * onSubmit(blocks) — куда сохранять вместо программы клиента; single —
- * шаблон одной тренировки, добавлять и убирать тренировки в нём нельзя;
- * submitLabel — подпись кнопки сохранения.
- */
-// members — участники сплита: у упражнения появляются исполнители и вес
-// каждого вместо одного общего веса
 export default function PlanEditor({
-  clientRow, month, blocks, onSaved, onCancel, onSubmit, single = false, submitLabel = 'Сохранить программу',
-  members = [], workoutTemplates = null, loadWorkout = null,
+  blocks, onSaved, onCancel, onSubmit, single = false, submitLabel = 'Сохранить шаблон',
+  workoutTemplates = null, loadWorkout = null,
 }) {
-  const split = members.length > 1;
-  // Подсказки названий из библиотеки: общие и свои упражнения. Набрать
-  // «жим» и выбрать из списка быстрее, чем печатать целиком, а названия
-  // одинаковые во всех программах — по ним строится «было» у клиента.
-  const library = useData('library.exercises', {}, []);
-  const [extra, setExtra] = useState([]);
-  // Заменили упражнение, которое клиент уже делал, — спросить, не то же ли
-  // это под новым названием (HistoryMove): { key, from, to }
-  const [historyAsk, setHistoryAsk] = useState(null);
-  // У какой строки открыт «делал под другим названием?» (HistoryPick): 'bi-ei'
-  const [historyPick, setHistoryPick] = useState(null);
-  const exercises = (library.data ? library.data.exercises : []).concat(extra);
   const [draft, setDraft] = useState(() => (blocks.length
-    // id — тренировки в месяце: по нему сервер узнаёт её после
-    // переименования и переименовывает и в журнале занятий
-    ? blocks.map((b) => ({ id: b.id || '', title: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blank(), ...e })) }))
-    : [{ title: 'Тренировка № 1', exercises: [blank()] }]));
-
+    ? blocks.map((b) => ({ id: b.id || '', title: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blankExercise(), ...e })) }))
+    : [{ title: 'Тренировка № 1', exercises: [blankExercise()] }]));
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
-
-  // Тип — по базе, как только название узнано: вписал «Стульчик» — колонки
-  // сразу «на время», не дожидаясь сохранения. Переименовали строку — тип
-  // идёт за новым названием, а не остаётся от прежнего.
-  // Вид, исправленный здесь, — сразу на экране, не дожидаясь списка базы
-  const [kinds, setKinds] = useState({}); // название → вид
-  const [kindAt, setKindAt] = useState(''); // 'bi:ei' — у какого упражнения открыт «Вид»
-  const [machinesAt, setMachinesAt] = useState(''); // 'bi:ei' — у какого открыты тренажёры
-  const [kindNote, setKindNote] = useState(null); // { at, text, error }
-  const trackIn = (exercise) => {
-    if (exercise.cardio) return trackOf(exercise);
-    const key = norm(exercise.name);
-    if (key && kinds[key]) return trackOf({ ...exercise, track: kinds[key] });
-    const base = (key && exercises.find((x) => norm(x.name) === key))
-      || (exercise.exerciseId && exercises.find((x) => x.id === exercise.exerciseId));
-    return trackOf(base && base.track ? { ...exercise, track: base.track } : exercise);
-  };
-
-  /**
-   * Вид упражнения из шаблона — в базу тренера (07.10.2026): шаблоны и
-   * программы берут вид из базы, так что исправленное здесь видно везде
-   */
-  const changeKind = (bi, ei, t) => {
-    const exercise = draft[bi].exercises[ei];
-    const key = norm(exercise.name);
-    const at = bi + ':' + ei;
-    change((next) => {
-      const e = next[bi].exercises[ei];
-      e.track = t;
-      e.cardio = t.kind === 'cardio' ? (e.cardio ? { ...e.cardio, machine: t.machine } : newCardio(t.machine)) : null;
-      return next;
-    });
-    setKinds((prev) => ({ ...prev, [key]: t }));
-    setKindNote(null);
-    saveExerciseTrack({ exerciseId: exercise.exerciseId, name: exercise.name, track: t })
-      .then((saved) => {
-        if (saved && !exercise.exerciseId) {
-          change((next) => {
-            next.forEach((b) => b.exercises.forEach((e) => { if (!e.exerciseId && norm(e.name) === key) e.exerciseId = saved.id; }));
-            return next;
-          });
-        }
-        if (library.reload) library.reload();
-      })
-      .catch((error) => setKindNote({ at, text: 'В базу не сохранилось: ' + (error.message || 'нет связи'), error: true }));
-  };
-
   const [ordering, setOrdering] = useState(false);
-
-  /*
-   * Анимации правки — одним местом:
-   *   вставка — нижние упражнения раздвигаются, новое проявляется на своём
-   *     месте и сразу получает курсор в названии;
-   *   суперсет — два упражнения «притягиваются», как магниты, с коротким
-   *     акцентным контуром; разъединение — короткий отскок врозь.
-   * Только transform, opacity и тень; с reduce motion — без движения.
-   */
   const rootRef = useRef(null);
+
   // Панель кнопок вынесена в body и не прячется вместе с вкладкой: раздел
   // «Шаблоны» остаётся смонтированным (hidden), и панель ездила по всем
   // разделам (09.10.2026). Видна, только пока редактор на экране
@@ -174,54 +51,8 @@ export default function PlanEditor({
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const pending = useRef(null);
-  const reducedMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return true; } };
-  const rowsOf = (bi) => {
-    const block = rootRef.current && rootRef.current.querySelectorAll('.plan-edit__block')[bi];
-    return block ? [...block.querySelectorAll('.plan-edit__row')] : [];
-  };
-  const insertAt = (bi, at, make) => {
-    pending.current = { kind: 'insert', bi, at, rects: rowsOf(bi).map((r) => r.getBoundingClientRect().top) };
-    change((next) => { next[bi].exercises.splice(at, 0, make()); return next; });
-  };
-  useLayoutEffect(() => {
-    const p = pending.current;
-    pending.current = null;
-    if (!p) return;
-    const rows = rowsOf(p.bi);
-    const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
-    if (p.kind === 'insert') {
-      const fresh = rows[p.at];
-      if (fresh) {
-        const input = fresh.querySelector('input');
-        if (input) input.focus({ preventScroll: true });
-        if (!reducedMotion()) {
-          fresh.animate([{ opacity: 0, transform: 'translateY(-10px) scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: EASE });
-        }
-      }
-      if (!reducedMotion()) {
-        rows.forEach((row, i) => {
-          if (i <= p.at || p.rects[i - 1] === undefined) return;
-          const dy = p.rects[i - 1] - row.getBoundingClientRect().top;
-          if (Math.abs(dy) > 1) row.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 320, easing: EASE });
-        });
-      }
-      return;
-    }
-    if (reducedMotion()) return;
-    const a = rows[p.ei];
-    const b = rows[p.ei + 1];
-    if (!a || !b) return;
-    if (p.kind === 'join') {
-      const ring = '0 0 0 2px var(--accent)';
-      a.animate([{ transform: 'translateY(-12px)', boxShadow: ring }, { transform: 'none', boxShadow: '0 0 0 0 transparent' }], { duration: 420, easing: EASE });
-      b.animate([{ transform: 'translateY(12px)', boxShadow: ring }, { transform: 'none', boxShadow: '0 0 0 0 transparent' }], { duration: 420, easing: EASE });
-    } else {
-      a.animate([{ transform: 'none' }, { transform: 'translateY(-8px)', offset: 0.35 }, { transform: 'none' }], { duration: 340, easing: EASE });
-      b.animate([{ transform: 'none' }, { transform: 'translateY(8px)', offset: 0.35 }, { transform: 'none' }], { duration: 340, easing: EASE });
-    }
-  }, [draft]);
-  // Правка программы — не раздел: смахнуть влево в соседний раздел значило
+
+  // Правка шаблона — не раздел: смахнуть влево в соседний раздел значило
   // бы бросить несохранённое. Выход — «Сохранить» или «Отмена»
   useTabLock(true);
 
@@ -236,7 +67,6 @@ export default function PlanEditor({
   // Щипок: свели пальцы — свернуть тренировки, развели — развернуть
   usePinch({
     enabled: !single && draft.length > 1 && !busy,
-    // Вслед за пальцами тренировки ужимаются до строк названия (pinch.js)
     target: () => rootRef.current,
     collapsed: ordering,
     morph: {
@@ -244,12 +74,9 @@ export default function PlanEditor({
       head: '.plan-edit__block-head',
       rows: '.block-order__row',
     },
-    // Без toggleOrdering: тот прокручивает к началу списка, а щипок держит
-    // на месте то, над чем свели пальцы (pinch.js, якорь)
     onIn: () => { if (!ordering) setOrdering(true); },
     onOut: () => { if (ordering) setOrdering(false); },
   });
-
   const toggleOrdering = () => {
     const next = !ordering;
     setOrdering(next);
@@ -273,90 +100,6 @@ export default function PlanEditor({
     setFailure(null);
   };
 
-  const setExercise = (bi, ei, field, value) => change((next) => {
-    const list = next[bi].exercises;
-    list[ei][field] = value;
-    // Суперсет делают кругами: число подходов у всех упражнений группы
-    // одно. Вписал у любого — встало у всех.
-    const group = list[ei].supersetGroup;
-    if (field === 'sets' && group) {
-      list.forEach((e) => { if (e.supersetGroup === group) e.sets = value; });
-    }
-    return next;
-  });
-
-  /**
-   * Кто делает упражнение. Пустой список значит «все»: так и хранится,
-   * чтобы новое упражнение не требовало отмечать каждого. Снять можно
-   * всех, кроме последнего: упражнение без исполнителя — это удаление.
-   */
-  const togglePerformer = (bi, ei, name) => change((next) => {
-    const ex = next[bi].exercises[ei];
-    const active = ex.performers && ex.performers.length ? ex.performers : members;
-    const on = active.includes(name) ? active.filter((n) => n !== name) : members.filter((m) => m === name || active.includes(m));
-    if (!on.length) return next;
-    ex.performers = on.length === members.length ? [] : on;
-    return next;
-  });
-
-  const setSplitWeight = (bi, ei, name, value) => change((next) => {
-    const ex = next[bi].exercises[ei];
-    ex.splitWeights = { ...(ex.splitWeights || {}), [name]: value };
-    return next;
-  });
-
-  /** Подходы группы — одним числом: первое заполненное в ней */
-  const syncSets = (list, group) => {
-    if (!group) return;
-    const members = list.filter((e) => e.supersetGroup === group);
-    const sets = (members.find((e) => String(e.sets || '').trim()) || {}).sets || '';
-    members.forEach((e) => { e.sets = sets; });
-  };
-
-  /**
-   * Пометка «вместе со следующим» живёт на паре, а не на упражнении:
-   * снимаем — и следующее перестаёт быть частью группы, а не остаётся
-   * висеть в одиночной.
-   */
-  const toggleSuperset = (bi, ei) => change((next) => {
-    const list = next[bi].exercises;
-    const mine = list[ei].supersetGroup;
-
-    if (mine && list[ei + 1] && list[ei + 1].supersetGroup === mine) {
-      // Разрезаем группу по этой границе: у каждой половины из двух и
-      // больше упражнений своя группа, одиночка — без группы
-      const left = [];
-      const right = [];
-      list.forEach((e, k) => { if (e.supersetGroup === mine) (k <= ei ? left : right).push(e); });
-      if (left.length < 2) left.forEach((e) => { e.supersetGroup = ''; });
-      const fresh = 'g' + Date.now() + '-' + ei;
-      right.forEach((e) => { e.supersetGroup = right.length < 2 ? '' : fresh; });
-      return next;
-    }
-
-    if (!list[ei + 1]) return next;
-
-    // Третье к паре — в ту же группу, а не новой парой поверх старой
-    const group = mine || 'g' + Date.now() + '-' + ei;
-    const joined = list[ei + 1].supersetGroup;
-    list[ei].supersetGroup = group;
-    list.forEach((e, k) => { if (k === ei + 1 || (joined && e.supersetGroup === joined)) e.supersetGroup = group; });
-    syncSets(list, group);
-    return next;
-  });
-
-  const move = (bi, ei, delta) => change((next) => {
-    const list = next[bi].exercises;
-    const to = ei + delta;
-    if (to < 0 || to >= list.length) return next;
-
-    [list[ei], list[to]] = [list[to], list[ei]];
-
-    // Перестановка рвёт пару: соседство было её единственным признаком.
-    list.forEach((e) => { e.supersetGroup = ''; });
-    return next;
-  });
-
   const save = async () => {
     setBusy(true);
     setFailure(null);
@@ -369,11 +112,7 @@ export default function PlanEditor({
       }));
       // В сервер — только то, что он хранит (plan-payload.js); шаблону — как было
       const forServer = clean.map((b) => ({ ...b, exercises: b.exercises.map(planExerciseForSave) }));
-
-      const result = onSubmit
-        ? await onSubmit(clean)
-        : await apiMutate('plan.save', { clientRow, month, blocks: forServer });
-
+      const result = onSubmit ? await onSubmit(clean) : await apiMutate('plan.save', { blocks: forServer });
       onSaved(result);
     } catch (error) {
       setFailure(error);
@@ -382,9 +121,6 @@ export default function PlanEditor({
     }
   };
 
-  // Без общей панели: карточка — у каждой тренировки, одна на уровень.
-  // Карточка в карточке (панель → тренировка → упражнение) и была тем,
-  // из-за чего тренировки сливались.
   return (
     <div className="plan-edit" ref={rootRef}>
       <p className="small muted" style={{ marginTop: 0 }}>
@@ -393,11 +129,7 @@ export default function PlanEditor({
 
       {!single && draft.length > 1 && (
         <div className="plan-edit__order-bar">
-          <button
-            className={'button' + (ordering ? ' button--primary' : '')}
-            disabled={busy}
-            onClick={toggleOrdering}
-          >
+          <button className={'button' + (ordering ? ' button--primary' : '')} disabled={busy} onClick={toggleOrdering}>
             {ordering ? 'Развернуть' : 'Свернуть тренировки'}
           </button>
           {ordering && <span className="small muted">Нажмите тренировку — откроется она. Тащите за значок справа, смахните влево — удалить, держите — копировать</span>}
@@ -418,10 +150,7 @@ export default function PlanEditor({
           onRemove={(indices) => {
             if (draft.length - indices.length < 1) return;
             const names = indices.map((i) => '«' + (draft[i].title || 'Без названия') + '»');
-            setUndo({
-              draft,
-              text: names.length === 1 ? 'Удалена ' + names[0] : 'Удалено тренировок: ' + names.length,
-            });
+            setUndo({ draft, text: names.length === 1 ? 'Удалена ' + names[0] : 'Удалено тренировок: ' + names.length });
             change((next) => next.filter((_, i) => !indices.includes(i)));
           }}
         />
@@ -436,13 +165,13 @@ export default function PlanEditor({
 
       {!ordering && draft.map((block, bi) => (
         <div className="plan-edit__block" key={bi}>
-          {/* Номер и название — одной строкой: по номеру тренировки видно
-              издалека, когда листаешь длинную программу */}
           {block.sourceId && workoutTemplates && (
             <span className="plan-edit__source">
-              из шаблона «{(workoutTemplates.find((t) => t.id === block.sourceId) || {}).title || 'тренировки'}» · правка здесь — только в этой программе
+              из шаблона «{(workoutTemplates.find((t) => t.id === block.sourceId) || {}).title || 'тренировки'}» · правка здесь — только в этом шаблоне
             </span>
           )}
+          {/* Номер и название — одной строкой: по номеру тренировки видно
+              издалека, когда листаешь длинную программу */}
           <div className="plan-edit__block-head">
             {!single && <span className="plan-edit__block-num" aria-hidden="true">{bi + 1}</span>}
             <input
@@ -454,256 +183,21 @@ export default function PlanEditor({
               onChange={(e) => change((next) => { next[bi].title = e.target.value; return next; })}
             />
           </div>
-
-          {block.exercises.map((exercise, ei) => {
-            const track = trackIn(exercise);
-            // Вес на одну сторону: отметка в шаблоне, без неё — как в базе
-            const side = techniqueOf(exercise.technique).side;
-            const one = track.kind === 'strength' && (side ? side === 'one' : !!track.perSide);
-            const cols = columns(exercise, track, one);
-            const paired = !!exercise.supersetGroup
-              && block.exercises[ei + 1]
-              && block.exercises[ei + 1].supersetGroup === exercise.supersetGroup;
-
-            return (
-              <React.Fragment key={ei}>
-              {/* Смахнуть упражнение влево — удалить, как в списках iPhone;
-                  полоска «+ Упражнение» под ним уходит вместе с ним */}
-              <SwipeRow
-                className={'plan-edit__row plan-edit__row--swipe' + (exercise.supersetGroup ? ' plan-edit__row--superset' : '')}
-                contentClassName="plan-edit__row-in"
-                disabled={busy}
-                label={'Удалить упражнение ' + (exercise.name || (ei + 1))}
-                removeWith={(row) => [separatorOf(row, '.plan-edit__between', 'next')]}
-                onDelete={() => change((next) => {
-                  next[bi].exercises.splice(ei, 1);
-                  if (!next[bi].exercises.length) next[bi].exercises.push(blank());
-                  return next;
-                })}
-              >
-                <ExercisePicker
-                  value={exercise.name}
-                  exerciseId={exercise.exerciseId}
-                  exercises={exercises}
-                  disabled={busy}
-                  onPick={({ name, exerciseId }) => {
-                    if (clientRow && exerciseId && exerciseId !== exercise.exerciseId && hadHistory(exercise)) {
-                      setHistoryAsk({ key: bi + '-' + ei, from: { id: exercise.exerciseId || null, name: exercise.name }, to: { id: exerciseId, name } });
-                    } else if (historyAsk && historyAsk.key === bi + '-' + ei) setHistoryAsk(null);
-                    change((next) => {
-                    // Другое упражнение — «было» от прежнего ему не подходит
-                    // (был жим лёжа, стали подтягивания). Своё «было» из
-                    // журнала сервер покажет после сохранения
-                    const e0 = next[bi].exercises[ei];
-                    if ((exerciseId || null) !== (e0.exerciseId || null) || name !== e0.name) {
-                      e0.prevWeight = '';
-                      e0.lastWeight = '';
-                      e0.startSets = undefined;
-                      e0.lastRun = undefined;
-                      e0.exercise = null;
-                    }
-                    next[bi].exercises[ei].name = name;
-                    next[bi].exercises[ei].exerciseId = exerciseId;
-                    const base = exerciseId && exercises.find((x) => x.id === exerciseId);
-                    next[bi].exercises[ei].track = base && base.track ? base.track : undefined;
-                    next[bi].exercises[ei].exercise = base || null;
-                    return next;
-                  });
-                  }}
-                  onAdded={(saved) => setExtra((prev) => [...prev, saved])}
-                />
-                {historyAsk && historyAsk.key === bi + '-' + ei && (
-                  <HistoryMove clientRow={clientRow} from={historyAsk.from} to={historyAsk.to} onClose={() => setHistoryAsk(null)} />
-                )}
-                {clientRow && exercise.exerciseId && !(historyAsk && historyAsk.key === bi + '-' + ei)
-                  && (!hadHistory(exercise) || historyPick === bi + '-' + ei) ? (
-                  <HistoryPick clientRow={clientRow} to={{ id: Number(exercise.exerciseId), name: exercise.name }}
-                    onOpen={() => setHistoryPick(bi + '-' + ei)} onClose={() => setHistoryPick(null)}
-                    after="«Было» покажется после сохранения программы." />
-                ) : null}
-
-                {clientRow && exercise.exerciseId && <ClientSetup exerciseId={exercise.exerciseId} clientRow={clientRow}
-                  members={split ? (exercise.performers && exercise.performers.length ? members.filter((m) => exercise.performers.includes(m)) : members) : []} />}
-
-                {track.kind === 'cardio' ? (
-                  <CardioPlan
-                    value={cardioFrom(exercise, track)}
-                    track={track}
-                    disabled={busy}
-                    onChange={(c) => change((next) => {
-                      const e = next[bi].exercises[ei];
-                      // Название по тренажёру меняем, только если оно и было
-                      // названием тренажёра, а не своим («Бег в горку»)
-                      if (c.machine && c.machine !== track.machine && (!e.name || Object.values(MACHINE_NAMES).includes(e.name))) {
-                        e.name = MACHINE_NAMES[c.machine];
-                        e.exerciseId = null;
-                      }
-                      e.cardio = c;
-                      return next;
-                    })}
-                  />
-                ) : (
-                <>
-                <div className={'plan-edit__numbers plan-edit__labels' + (split ? ' plan-edit__numbers--split' : '')} aria-hidden="true">
-                  <span>{cols.heads[0]}</span><span>{cols.heads[1]}</span>{!split && <span>{cols.heads[2]}</span>}
-                </div>
-                <div className={'plan-edit__numbers' + (split ? ' plan-edit__numbers--split' : '')}>
-                  <input className="field__input" aria-label={cols.heads[0]} placeholder={cols.ph[0]} inputMode="numeric" value={exercise.sets} maxLength={40} disabled={busy} onChange={(e) => setExercise(bi, ei, 'sets', e.target.value)} />
-                  <input className="field__input" aria-label={cols.heads[1]} placeholder={cols.ph[1]} inputMode="text" value={exercise.reps} maxLength={80} disabled={busy} onChange={(e) => setExercise(bi, ei, 'reps', e.target.value)} />
-                  {!split && <input className="field__input" aria-label={cols.heads[2]} placeholder={cols.ph[2]} inputMode={'decimal'} value={exercise.weight} maxLength={80} disabled={busy} onChange={(e) => setExercise(bi, ei, 'weight', e.target.value)} />}
-                </div>
-                </>
-                )}
-
-                {!split && (exercise.lastWeight || exercise.prevWeight) && <span className="plan-edit__prev">было {exercise.lastWeight || exercise.prevWeight}</span>}
-
-                {/* Сплит: кто делает и с каким весом — строкой на человека.
-                    Кнопка с именем — «делает»; снятому вес не нужен. */}
-                {split && (
-                  <div className="plan-edit__split">
-                    {members.map((m) => {
-                      const doing = !exercise.performers || !exercise.performers.length || exercise.performers.includes(m);
-                      const prev = exercise.splitPrev && exercise.splitPrev[m];
-                      return (
-                        <div className="plan-edit__person" key={m}>
-                          <button
-                            type="button"
-                            className={'chip' + (doing ? ' chip--active' : '')}
-                            aria-pressed={doing}
-                            disabled={busy}
-                            onClick={() => togglePerformer(bi, ei, m)}
-                          >{m}</button>
-                          <input
-                            className="field__input"
-                            aria-label={'Вес: ' + m}
-                            placeholder={doing ? 'Вес' : 'не делает'}
-                            inputMode="decimal"
-                            value={(exercise.splitWeights && exercise.splitWeights[m]) || ''}
-                            maxLength={80}
-                            disabled={busy || !doing}
-                            onChange={(e) => setSplitWeight(bi, ei, m, e.target.value)}
-                          />
-                          {prev && doing && <span className="plan-edit__prev">было {prev}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="plan-edit__actions">
-                  <button className="icon-button plan-edit__icon" aria-label="Выше" title="Выше" disabled={busy || ei === 0} onClick={() => move(bi, ei, -1)}>
-                    <IconArrowUp size={18} />
-                  </button>
-                  <button className="icon-button plan-edit__icon" aria-label="Ниже" title="Ниже" disabled={busy || ei === block.exercises.length - 1} onClick={() => move(bi, ei, 1)}>
-                    <IconArrowDown size={18} />
-                  </button>
-                  {/* Дропсет — в последнем подходе: в зале там уже будет
-                      строка первого сброса */}
-                  {(track.kind === 'strength' || track.kind === 'bodyweight') && (
-                    <button
-                      type="button"
-                      className={'button button--ghost plan-edit__pair' + (techniqueOf(exercise.technique).dropset ? ' plan-edit__pair--on' : '')}
-                      aria-pressed={techniqueOf(exercise.technique).dropset}
-                      disabled={busy}
-                      onClick={() => { const t = techniqueOf(exercise.technique); setExercise(bi, ei, 'technique', techniqueText({ ...t, dropset: !t.dropset })); }}
-                    >Дропсет</button>
-                  )}
-                  {track.kind === 'strength' && (
-                    <button
-                      type="button"
-                      className={'button button--ghost plan-edit__pair' + (one ? ' plan-edit__pair--on' : '')}
-                      aria-pressed={one}
-                      disabled={busy}
-                      onClick={() => setExercise(bi, ei, 'technique', techniqueText({ ...techniqueOf(exercise.technique), side: one ? 'two' : 'one' }))}
-                    >Вес на сторону</button>
-                  )}
-                  {/* Вид упражнения — как в идущем занятии; пишется в базу */}
-                  {exercise.name && (
-                    <button
-                      type="button"
-                      className={'button button--ghost plan-edit__pair' + (kindAt === bi + ':' + ei ? ' plan-edit__pair--on' : '')}
-                      aria-expanded={kindAt === bi + ':' + ei}
-                      disabled={busy}
-                      onClick={() => setKindAt(kindAt === bi + ':' + ei ? '' : bi + ':' + ei)}
-                    >Вид</button>
-                  )}
-                  {/* Тренажёры и оборудование (10.10.2026): прикрепить прямо
-                      здесь, а не уходить в базу упражнений */}
-                  {exercise.name && (
-                    <button
-                      type="button"
-                      className={'button button--ghost plan-edit__pair' + (machinesAt === bi + ':' + ei ? ' plan-edit__pair--on' : '')}
-                      aria-expanded={machinesAt === bi + ':' + ei}
-                      disabled={busy}
-                      onClick={() => setMachinesAt(machinesAt === bi + ':' + ei ? '' : bi + ':' + ei)}
-                    >Тренажёры</button>
-                  )}
-                </div>
-                {machinesAt === bi + ':' + ei && exercise.name && (
-                  <div className="plan-edit__kind">
-                    <ExerciseMachines exerciseId={exercise.exerciseId} name={exercise.name} />
-                  </div>
-                )}
-                {kindAt === bi + ':' + ei && exercise.name && (
-                  <div className="plan-edit__kind">
-                    <ExerciseKind track={track} disabled={busy} onChange={(t) => changeKind(bi, ei, t)} note={kindNote && kindNote.at === bi + ':' + ei ? kindNote : null} />
-                  </div>
-                )}
-              </SwipeRow>
-
-              {/* Между упражнениями: вставить ещё одно прямо здесь и
-                  соединить соседей в суперсет — там, где об этом думают,
-                  а не в конце тренировки */}
-              {ei < block.exercises.length - 1 && (
-                <div className={'plan-edit__between' + (paired ? ' plan-edit__between--paired' : '')}>
-                  <button type="button" className="plan-edit__between-btn" disabled={busy} onClick={() => insertAt(bi, ei + 1, blank)}>
-                    <IconPlus size={16} />
-                    Упражнение
-                  </button>
-                  <button
-                    type="button"
-                    className={'plan-edit__between-btn' + (paired ? ' plan-edit__between-btn--on' : '')}
-                    aria-pressed={paired}
-                    disabled={busy}
-                    onClick={() => { pending.current = { kind: paired ? 'split' : 'join', bi, ei }; toggleSuperset(bi, ei); haptic(); }}
-                  >
-                    <IconLinkPair size={16} />
-                    {paired ? 'В суперсете — разъединить' : 'Суперсет'}
-                  </button>
-                </div>
-              )}
-              </React.Fragment>
-            );
-          })}
-
-          <div className="plan-edit__block-actions">
-            <button className="button" disabled={busy} onClick={() => insertAt(bi, block.exercises.length, blank)}>Добавить упражнение</button>
-            {/* Кардио после силовой — в конец этой же тренировки */}
-            <button className="button" disabled={busy} onClick={() => insertAt(bi, block.exercises.length, () => cardioExercise())}>Добавить кардио</button>
-
-            {!single && (
-              <button className="button button--ghost" disabled={busy || draft.length === 1} onClick={() => change((next) => {
-                next.splice(bi, 1);
-                return next;
-              })}>Убрать тренировку</button>
-            )}
-          </div>
+          {/* Упражнения — тем же редактором, что в программе клиента */}
+          <BlockEdit
+            block={block}
+            canRemove={!single && draft.length > 1}
+            onChange={(exercises) => change((next) => { next[bi].exercises = exercises; return next; })}
+            onRemove={() => change((next) => next.filter((_, k) => k !== bi))}
+          />
         </div>
       ))}
 
       {!single && !ordering && (
-        <>
-          <button className="button button--block" disabled={busy} onClick={() => change((next) => {
-            next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blank()] });
-            return next;
-          })}>Добавить тренировку</button>
-          {/* Кардио отдельным днём: тренировка из одного кардио, тренажёр
-              выбирается в ней же */}
-          <button className="button button--block" disabled={busy} onClick={() => change((next) => {
-            next.push({ title: 'Кардио', exercises: [cardioExercise()] });
-            return next;
-          })}>Добавить кардиотренировку</button>
-        </>
+        <button className="button button--block" disabled={busy} onClick={() => change((next) => {
+          next.push({ title: `Тренировка № ${next.length + 1}`, exercises: [blankExercise()] });
+          return next;
+        })}>Добавить тренировку</button>
       )}
 
       {/* Программа-шаблон: тренировка из шаблона тренировки — копией, которая
@@ -722,7 +216,7 @@ export default function PlanEditor({
               const block = await loadWorkout(id);
               if (!block) return;
               change((next) => {
-                next.push({ title: block.title, sourceId: id, exercises: block.exercises.map((x) => ({ ...blank(), ...x })) });
+                next.push({ title: block.title, sourceId: id, exercises: block.exercises.map((x) => ({ ...blankExercise(), ...x })) });
                 return next;
               });
             }}
@@ -740,11 +234,10 @@ export default function PlanEditor({
       <div className="plan-edit__float-space" aria-hidden="true" />
 
       {/* «Сохранить», «Свернуть» и «Отмена» — всегда под рукой, с любого
-          места программы. Панель — у края экрана, вне ленты: «липкое»
-          позиционирование ломается внутри сдвигаемых слоёв (листание
-          разделов), и кнопка оставалась внизу страницы */}
+          места. Панель — у края экрана, вне ленты: «липкое»
+          позиционирование ломается внутри сдвигаемых слоёв */}
       {typeof document !== 'undefined' && onScreen && createPortal(
-        <div className="plan-edit__float" role="toolbar" aria-label="Правка программы">
+        <div className="plan-edit__float" role="toolbar" aria-label="Правка шаблона">
           <button className="button button--primary" disabled={busy} onClick={save}>
             {busy ? 'Сохраняю…' : submitLabel}
           </button>

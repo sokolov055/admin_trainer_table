@@ -470,12 +470,33 @@ export function techniqueOf(t) {
   // side1 / side2 — вес в программе на одну сторону или на обе (07.10.2026);
   // нет отметки — как у упражнения в базе (perSide)
   const side = /(^|\s)side1(\s|$)/.test(s) ? 'one' : /(^|\s)side2(\s|$)/.test(s) ? 'two' : '';
-  return { dropset: /(^|\s)dropset(\s|$)/.test(s), warmup: m ? Math.min(5, Number(m[1])) : 0, side };
+  // rest90 — отдых после подхода этого упражнения, секунды (20.10.2026):
+  // базовым 2–3 минуты, изолирующим — минута. Нет — общий отдых занятия
+  const r = s.match(/(^|\s)rest(\d{2,3})(\s|$)/);
+  return { dropset: /(^|\s)dropset(\s|$)/.test(s), warmup: m ? Math.min(5, Number(m[1])) : 0, side, rest: r ? restSeconds(r[2]) : 0 };
 }
 
-export function techniqueText({ dropset = false, warmup = 0, side = '' } = {}) {
+/** Отдых упражнения в программе: 10–600 с, иначе 0 — общий отдых занятия */
+export function restSeconds(v) {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 10 && n <= 600 ? n : 0;
+}
+
+/** Варианты отдыха в программе: чипы в редакторе и на часах */
+export const REST_OPTIONS = [45, 60, 90, 120, 150, 180, 240, 300];
+
+/** «1:30», «45 с», «3:00» */
+export function restText(seconds) {
+  const n = restSeconds(seconds);
+  if (!n) return '';
+  if (n < 60) return n + ' с';
+  return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');
+}
+
+export function techniqueText({ dropset = false, warmup = 0, side = '', rest = 0 } = {}) {
   const n = Math.max(0, Math.min(5, Math.floor(Number(warmup) || 0)));
-  return [n ? 'warmup' + n : '', dropset ? 'dropset' : '', side === 'one' ? 'side1' : side === 'two' ? 'side2' : ''].filter(Boolean).join(' ');
+  const r = restSeconds(rest);
+  return [n ? 'warmup' + n : '', dropset ? 'dropset' : '', side === 'one' ? 'side1' : side === 'two' ? 'side2' : '', r ? 'rest' + r : ''].filter(Boolean).join(' ');
 }
 
 /**
@@ -515,7 +536,7 @@ export function planScheme(ex, inSuperset = false) {
   const base = inSuperset ? (reps && reps + unit + (unit ? '' : ' повт.') + side) : (sets && sets + ' × ' + (reps || '?') + unit + side);
   const tech = techniqueOf(ex.technique);
   // Разминка — перед схемой: «2 разм. + 4 × 12»
-  return [(tech.warmup && base ? tech.warmup + ' разм. + ' : '') + base, tech.dropset && 'дропсет в последнем'].filter(Boolean).join(' · ');
+  return [(tech.warmup && base ? tech.warmup + ' разм. + ' : '') + base, tech.dropset && 'дропсет в последнем', tech.rest && 'отдых ' + restText(tech.rest)].filter(Boolean).join(' · ');
 }
 
 /**

@@ -110,3 +110,29 @@ test('смена оценки у второго подхода не трогае
   assert.equal(ex.sets[1].effort, 'hard');
   assert.deepEqual(ws(ex).slice(0, 2), ['60', '60']);
 });
+
+/**
+ * Аудит 20.10.2026: «тяжело» второй раз подряд снимает шаг один раз —
+ * третье «тяжело» подряд вес не трогает; отдых короче только когда
+ * прибавлять некуда (capped), а не при любом «легко» без прибавки
+ */
+test('третье «тяжело» подряд не снимает второй шаг', () => {
+  const ex = press([100, 100, 100, 100]);
+  const r1 = rateSet(ex, 0, 'hard');
+  assert.equal(r1.lowered, false, 'первое тяжело — вес держим');
+  const r2 = rateSet(r1.ex, 1, 'hard');
+  assert.equal(r2.lowered, true);
+  assert.deepEqual(r2.ex.sets.map((s) => s.weight), ['100', '100', '97.5', '97.5']);
+  const r3 = rateSet(r2.ex, 2, 'hard');
+  assert.equal(r3.lowered, false, 'шаг уже снят — третье тяжело вес не трогает');
+  assert.deepEqual(r3.ex.sets.map((s) => s.weight), ['100', '100', '97.5', '97.5']);
+});
+
+test('capped: «легко» на лёгком подходе лесенки — отдых обычный, на последнем без следующих — тоже не capped', () => {
+  const ladder = press([100, 120, 140]);
+  assert.equal(rateSet(ladder, 0, 'easy').capped, false, 'не самый тяжёлый — вес впереди ещё растёт');
+  assert.equal(rateSet(ladder, 2, 'easy').capped, true, 'самый тяжёлый, а сдвигать нечего — прибавлять некуда');
+  const own = { ...press([100, 100]), track: { kind: 'bodyweight' } };
+  const bare = { ...own, sets: own.sets.map((s) => ({ ...s, weight: '' })) };
+  assert.equal(rateSet(bare, 0, 'easy').capped, false, 'без веса оценка веса не касается');
+});
