@@ -839,7 +839,7 @@ test('обзор: сигналы с именами открывают нужны
   assert.match(text, /долг 4 000 ₽/);
   assert.match(text, /Пора снять замер · 1/);
   assert.match(text, /замер 79 дней назад/);
-  assert.match(text, /Нет программы на месяц · 1/);
+  assert.match(text, /Нет программы · 1/);
 
   const personButton = (name) => tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).startsWith(name), { deep: true });
   act(() => { personButton('Мария Волкова')[1].props.onClick(); });

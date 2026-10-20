@@ -265,7 +265,7 @@ export const PROCESS = {
   activeClients: { label: 'Клиентов в работе', chart: false },
   measuredClients: { label: 'Сняты замеры' },
   measuredShare: { label: 'Доля с замером', unit: '%', note: 'занятий не было' },
-  withPlan: { label: 'Есть программа на месяц' },
+  withPlan: { label: 'Есть программа' },
   planShare: { label: 'Доля с программой', unit: '%', note: 'занятий не было' },
   cancels: { label: 'Отмен', aim: -1 },
   cancelsLate: { label: 'Из них поздних', aim: -1 },
