@@ -283,3 +283,27 @@ test('перестановка внутри суперсета: из него н
   assert.equal(ids(move('c', 2)), 'abecd');
   assert.equal(ids(move('d', 2)), 'cabed');
 });
+
+test('20.10.2026: очередь часов — вся тренировка, а не 12 подходов (страница спала — «Все подходы отмечены» посреди)', () => {
+  const exercises = Array.from({ length: 6 }, (_, i) => ({ id: 'x' + i, name: 'Упражнение ' + i, sets: [set('pending'), set('pending'), set('pending'), set('pending')] }));
+  assert.equal(la.setQueue(record({ exercises }).session).length, 24);
+});
+
+test('FT-628 на часах: вес помощи в поле веса, вес с часов — в помощь, «легко» убавляет помощь', () => {
+  const grav = (state, assist) => ({ state, weight: '', assist, reps: '10', rpe: '', kind: 'work' });
+  const exercises = [{ id: 'g', name: 'Подтягивания в гравитроне', track: { kind: 'bodyweight', weightMode: 'assistance' },
+    sets: [grav('pending', '56'), grav('pending', '56'), grav('pending', '56')] }];
+  const s = record({ exercises }).session;
+  const q = la.setQueue(s);
+  assert.deepEqual([q[0].weight, q[0].assist, q[0].step, q[0].reps], ['56', true, 5, '10']);
+  assert.equal(la.exerciseList(s)[0].assist, true);
+  assert.deepEqual(la.exerciseList(s)[0].weights, ['56', '56', '56']);
+  let next = la.applyActions(s, [{ kind: 'done', sessionId: 's1', exerciseId: 'g', who: '', weight: '56', setIndex: 0, effort: 'easy' }]);
+  assert.deepEqual(next.exercises[0].sets.map((x) => [x.state, x.assist]), [['done', '56'], ['pending', '51'], ['pending', '51']], '«легко» — помощи меньше');
+  assert.match(la.setQueue(next)[0].suggest, /^−5 кг помощи/);
+  // Вес с часов — свой (own), оценки его больше не двигают, как и у обычного веса
+  next = la.applyActions(next, [{ kind: 'weight', sessionId: 's1', exerciseId: 'g', who: '', value: '50' }]);
+  assert.deepEqual(next.exercises[0].sets.map((x) => x.assist), ['56', '50', '50'], 'колёсико крутит помощь');
+  next = la.applyActions(next, [{ kind: 'setEdit', sessionId: 's1', exerciseId: 'g', who: '', setIndex: 2, weight: '40' }]);
+  assert.equal(next.exercises[0].sets[2].assist, '40', 'правка подхода с часов — тоже помощь');
+});

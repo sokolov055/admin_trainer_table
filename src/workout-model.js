@@ -66,7 +66,8 @@ export function fromPlan(block, month, members = []) {
           ...blankSet(),
           // Начальный вес (решение владельца 28.09.2026): прошлый рабочий
           // вес клиента в упражнении, нет — из программы, нет и там — пусто
-          weight: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight),
+          // Вес помощи (гравитрон, FT-628): число программы — помощь
+          [isAssisted(e) ? 'assist' : 'weight']: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight),
           ...planSet(e, trackOf(e)),
         })),
     })) };

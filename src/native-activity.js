@@ -14,7 +14,7 @@
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
 import { trackOf, volumeOf, setText as trackSetText } from './exercise-track.js';
 import { closeSets, withSet, withWarmup } from './workout-model.js';
-import { rateSet, isDumbbell, stepOf, suggestText } from './effort.js';
+import { rateSet, isDumbbell, stepOf, suggestText, isAssisted, assistStep } from './effort.js';
 
 const isEffort = (e) => ['easy', 'ok', 'hard'].includes(e);
 /** Подход перед этим у того же человека — для подписи подобранного веса */
@@ -54,8 +54,9 @@ export function exerciseList(s) {
     group: ex.supersetGroup || '',
     sets: ex.sets.slice(0, 20).map((x) => x.state || 'pending'),
     who: ex.sets.slice(0, 20).map((x) => x.who || ''),
-    // Вес и повторы подходов — правка подхода с часов
-    weights: ex.sets.slice(0, 20).map((x) => String(x.weight || '')),
+    // Вес и повторы подходов — правка подхода с часов; у веса помощи — помощь
+    weights: ex.sets.slice(0, 20).map((x) => String((isAssisted(ex) ? x.assist : x.weight) || '')),
+    ...(isAssisted(ex) ? { assist: true } : {}),
     reps: ex.sets.slice(0, 20).map((x) => String(x.reps || '')),
     // Разминочный подход — «разминка» в списке тренера (FT-533)
     kinds: ex.sets.slice(0, 20).map((x) => (x.kind === 'warmup' ? 'warmup' : 'work')),
@@ -158,9 +159,12 @@ function nextText(ex) {
   return ex.name + ' · ' + ex.sets.length + (reps ? ' × ' + reps : ' подх.');
 }
 
-/** Сколько подходов вперёд знает плашка: «Отдых» на ней отмечает подход
- *  и переходит к следующему, пока страница спит */
-const QUEUE = 12;
+/** Сколько подходов вперёд знают часы и плашка: «Отдых» отмечает подход
+ *  и переходит к следующему, пока страница спит. Было 12: страница спала,
+ *  и после 12 отметок часы показывали «Все подходы отмечены» посреди
+ *  тренировки (20.10.2026). Теперь — вся тренировка; плашке iPhone сам
+ *  оставляет текущий круг и следующий (WorkoutState.forActivity) */
+const QUEUE = 60;
 
 /**
  * Очередь подходов для плашки: текущий и следующие по порядку занятия.
@@ -183,18 +187,23 @@ export function setQueue(s) {
   const item = (ex, set, extra) => {
     const own = set.who ? ex.sets.filter((x) => x.who === set.who) : ex.sets;
     const n = own.indexOf(set) + 1;
-    const strength = trackOf(ex).kind === 'strength' && !!ex.id;
+    // Вес помощи (гравитрон, FT-628): на часах в поле веса — помощь, «Легко»
+    // её убавляет (assist: true для часов)
+    const assist = isAssisted(ex) && !!ex.id;
+    const strength = (trackOf(ex).kind === 'strength' && !!ex.id) || assist;
+    const key = assist ? 'assist' : 'weight';
     return {
       exerciseId: ex.id || '',
       who: set.who || '',
       exercise: ex.name,
       detail: [set.who || '', (trackOf(ex).kind === 'cardio' ? 'Отрезок ' : 'Подход ') + n + ' из ' + own.length
         + (set.kind === 'warmup' ? ', разминка' : '')].filter(Boolean).join(' · '),
-      ...(strength ? { weight: String(set.weight || '').trim() } : {}),
+      ...(strength ? { weight: String(set[key] || '').trim() } : {}),
+      ...(assist ? { assist: true } : {}),
       // Для оценки на часах: шаг колёсика (гантели — 1 кг), шаг прибавки и
       // почему у подхода такой вес
       // У разминки шага нет: «Легко» на ней вес не прибавляет (FT-620)
-      ...(strength ? { dumbbell: isDumbbell(ex), ...(set.kind !== 'warmup' ? { step: stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}) } : {}),
+      ...(strength ? { dumbbell: isDumbbell(ex), ...(set.kind !== 'warmup' ? { step: assist ? assistStep(ex) : stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}) } : {}),
       ...(strength && suggestText(set, prevOf(ex, set), ex) ? { suggest: suggestText(set, prevOf(ex, set), ex) } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
       amount: strength ? '' : setText(set, ex),
@@ -291,6 +300,8 @@ const WEIGHT_RE = /^\d+(\.\d+)?$/;
 
 /** Подходы упражнения того же человека */
 const mine = (ex, a) => ex.id === String(a.exerciseId || '');
+/** Куда писать вес с часов: у веса помощи — в помощь (FT-628) */
+const loadKey = (ex) => (isAssisted(ex) ? 'assist' : 'weight');
 const whose = (set, a) => (set.who || '') === String(a.who || '');
 
 /**
@@ -319,9 +330,10 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         if (!mine(ex, a)) return ex;
         const first = ex.sets.find((set) => set.state === 'pending' && whose(set, a));
         if (!first) return ex;
-        const was = String(first.weight || '');
-        return { ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) && (set === first || String(set.weight || '') === was)
-          ? { ...set, weight: String(a.value), own: true } : set) };
+        const key = loadKey(ex);
+        const was = String(first[key] || '');
+        return { ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) && (set === first || String(set[key] || '') === was)
+          ? { ...set, [key]: String(a.value), own: true } : set) };
       }) };
     } else if (a.kind === 'done') {
       // setIndex — какой по счёту подход (у пары — у своего человека): его и
@@ -344,7 +356,7 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         if (!target || target.state !== 'pending') return ex;
         marked = true;
         const next = { ...ex, sets: ex.sets.map((set) => set !== target ? set
-          : { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { weight: String(a.weight) } : {}) }) };
+          : { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { [loadKey(ex)]: String(a.weight) } : {}) }) };
         // Оценка с часов (03.10.2026): вес следующих подходов — по effort.js
         return isEffort(a.effort) ? rateSet(next, ex.sets.indexOf(target), a.effort).ex : next;
       }) };
@@ -377,7 +389,7 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
           const target = ex.sets.filter((set) => whose(set, a))[index];
           if (!target) return ex;
           const next = { ...ex, sets: ex.sets.map((set) => set !== target ? set
-            : { ...set, ...(weight !== null ? { weight, own: true } : {}), ...(reps !== null ? { reps } : {}) }) };
+            : { ...set, ...(weight !== null ? { [loadKey(ex)]: weight, own: true } : {}), ...(reps !== null ? { reps } : {}) }) };
           return effort && target.state === 'pending' ? rateSet(next, ex.sets.indexOf(target), effort).ex : next;
         }) };
       }
