@@ -27,4 +27,14 @@ export function withPending(day, writes = []) {
   return { ...day, entries, totals: totalEntries(entries), complete: extra.length ? false : day.complete };
 }
 export function productKey(p) { return p.kind + ':' + p.id; }
+// Приём по часам телефона: кнопка внизу экрана сразу открывает тот, что сейчас
+export function mealNow(hour = new Date().getHours()) { return hour < 11 ? 'breakfast' : hour < 16 ? 'lunch' : hour < 21 ? 'dinner' : 'snack'; }
+// Итог дня одной фразой: в пределах 10 % нормы — «в норме»
+export function dayVerdict(eaten, target) {
+  if (!(target > 0)) return { tone: 'neutral', text: 'Норма не назначена — итог без сравнения.' };
+  const diff = Math.round(eaten - target);
+  if (Math.abs(diff) <= target * 0.1) return { tone: 'good', text: 'В пределах нормы — так держать.' };
+  if (diff < 0) return { tone: 'under', text: 'Меньше нормы на ' + Math.abs(diff) + ' ккал. Если записано не всё — допишите до завершения.' };
+  return { tone: 'over', text: 'Больше нормы на ' + diff + ' ккал. Смотрите на неделю: один день результат не меняет.' };
+}
 export function mealFromRecipe(value) { return ({ 'завтрак': 'breakfast', 'обед': 'lunch', 'ужин': 'dinner', 'перекус': 'snack' })[value] || 'snack'; }

@@ -2,7 +2,10 @@ import React from 'react';
 import './diary.css';
 // counter — показать «27 / 120» под полем (нужен maxLength)
 export function FoodField({ label, value, onChange, counter = false, ...rest }) {
-  return <label className="field"><span className="field__label">{label}</span><input className="field__input" value={value} onChange={e => onChange(e.target.value)} {...rest} />{counter && rest.maxLength ? <span className="field__counter" aria-hidden="true">{String(value ?? '').length} / {rest.maxLength}</span> : null}</label>;
+  const input = <><span className="field__label">{label}</span><input className="field__input" value={value} onChange={e => onChange(e.target.value)} {...rest} /></>;
+  if (!counter || !rest.maxLength) return <label className="field">{input}</label>;
+  // Счётчик — рядом с меткой, а не внутри: имя поля остаётся «Название продукта»
+  return <div className="field"><label>{input}</label><span className="field__counter" aria-hidden="true">{String(value ?? '').length} / {rest.maxLength}</span></div>;
 }
 const Field = FoodField;
 // Совпадает с food.add / food.review на сервере (lib/food-catalog.js)

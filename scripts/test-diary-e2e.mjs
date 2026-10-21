@@ -139,7 +139,11 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
   await diary.getByRole('button', { name: '+ 250 мл', exact: true }).click();
   await diary.getByText('0,25 л выпито', { exact: true }).waitFor();
-  await diary.getByLabel('Всё за день записано').click();
+  // FT-646: завершение дня — итог листом, потом подтверждение
+  await diary.getByRole('button', { name: 'Завершить день', exact: true }).click();
+  await dialog().getByText('Записей', { exact: true }).waitFor();
+  await dialog().getByRole('button', { name: 'Завершить день', exact: true }).click();
+  await diary.getByText('День завершён', { exact: true }).waitFor();
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).some(d => d.complete));
   await diary.getByRole('tab', { name: 'Неделя', exact: true }).click();
   await diary.getByText('Среднее за полные дни: 140 ккал', { exact: true }).waitFor();
@@ -157,6 +161,8 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('nutrition_demo_server:3')).recipes[0].revision === 2);
   await diary.getByRole('tab', { name: 'Дневник', exact: true }).click();
   await diary.getByRole('button', { name: 'Добавить в завтрак', exact: true }).click();
+  // FT-646: список открывается на «Недавних» — рецепта там ещё нет
+  await dialog().getByRole('button', { name: 'Все', exact: true }).click();
   await dialog().getByRole('button', { name: 'Добавить Мой тестовый десерт', exact: true }).click();
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
   await diary.getByRole('button', { name: 'Изменить: Мой тестовый десерт', exact: true }).waitFor();

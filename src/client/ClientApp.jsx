@@ -32,6 +32,7 @@ import Onboarding from './Onboarding.jsx';
 import { signupLead, clearSignupLead } from '../login-route.js';
 import { useFirstSteps, FirstHint, FirstRegime } from './FirstSteps.jsx';
 import Tour from './Tour.jsx';
+import TodayStrip from './TodayStrip.jsx';
 import { forgetFocus, GoalBanner } from './focus.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
@@ -400,6 +401,8 @@ export default function ClientApp({ me, clientRow, preview }) {
           {/* Цель — сразу под историями: первое, что видно на «Обзоре» (FT-577).
               Тренер в карточке клиента видит её внутри самого Overview */}
           {t.id === 'overview' && (!clientRow || preview) && <GoalBanner clientRow={clientRow} clientView={!!preview} section="overview" />}
+          {/* «Сегодня» — три числа с подписями (FT-646); только в своём кабинете */}
+          {t.id === 'overview' && own && <TodayStrip onOpen={go} />}
           {t.id === 'overview' && fs && (fs.regime || fs.notify) && (
             <FirstRegime regime={fs.regime} notify={fs.notify}
               onSeen={() => firstSteps.send('client.firstSteps.regimeSeen', {})}
