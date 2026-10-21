@@ -2397,7 +2397,8 @@ function setDemoLoginRole(role) {
 
 export function mockApi(action, params) {
   const role = new URLSearchParams(window.location.search).get('mockRole') || demoLoginRole() || 'client';
-  const handler = action.startsWith('diary.') || ['food.add', 'food.search', 'food.review', 'food.hide'].includes(action) ? p => diaryMock(action, p)
+  // Тренер без номера карточки — свой дневник «Моих тренировок» (№99), как на сервере (selfAsClient)
+  const handler = action.startsWith('diary.') || ['food.add', 'food.search', 'food.review', 'food.hide'].includes(action) ? p => diaryMock(action, role === 'trainer' && !p.clientRow && action.startsWith('diary.') ? { ...p, clientRow: 99 } : p)
     : action.includes('.onboarding.') ? p => onboardingMock(action, p, mockCompute)
     : action === 'client.focus' ? () => focusMock(nutrition, mockCompute)
     : action.startsWith('client.firstSteps.') ? p => firstStepsMock(action, p)

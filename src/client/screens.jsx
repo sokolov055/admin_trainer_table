@@ -744,7 +744,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </p>
       )}
       {runningLine}
-      {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="plan" />}
+      {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || !!data.self} section="plan" />}
 
       {/* Пожелания клиента (FT-498) — тренеру до того, как он возьмётся
           править программу: их ради этого и пишут. Заявку на программу из
@@ -1732,7 +1732,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
             замер» стоит в самом пустом состоянии, а не отдельно над ним.
             Пока форма открыта, на её месте — она */}
         {adding && addMeasure}
-        {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="progress" />}
+        {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
         {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
         {!familyRow && <Summary clientRow={clientRow} />}
         <Empty
@@ -1797,7 +1797,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
 
   return (
     <>
-      {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="progress" />}
+      {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
       {addMeasure}
 
       {/* Цели, серии и награды — сразу под записью замера: ответ на
@@ -2295,7 +2295,10 @@ function PlusLocked({ rights, busy, error, onTrial }) {
   );
 }
 
-export function Nutrition({ clientRow, clientView = false }) {
+// self — «Мои тренировки» тренера (21.10.2026): раздел как у клиента —
+// свой дневник, вода, рацион; данные — своей карточки (clientRow), сервер
+// пускает тренера в неё клиентом (selfAsClient)
+export function Nutrition({ clientRow, clientView = false, self = false }) {
   const { loading, data, error, reload } = useData(
     'client.nutrition', clientRow ? { clientRow } : {}, [clientRow]
   );
@@ -2332,7 +2335,7 @@ export function Nutrition({ clientRow, clientView = false }) {
 
   // clientRow выбирает данные, но не должен сам по себе менять интерфейс:
   // в предпросмотре тренер работает с выбранным клиентом именно как клиент.
-  const byTrainer = !!clientRow && !clientView;
+  const byTrainer = !!clientRow && !clientView && !self;
   const configured = !!data.configured;
   const options = data.options;
   const survey = data.survey || null;
@@ -2401,8 +2404,8 @@ export function Nutrition({ clientRow, clientView = false }) {
 
   return (
     <>
-      {(!diaryEnabled || diaryTab === 'diary') && <GoalBanner clientRow={clientRow} clientView={clientView} section="nutrition" />}
-      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow} preview={clientView} targets={targets} onPlan={!clientRow && hasPlus(rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {(!diaryEnabled || diaryTab === 'diary') && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="nutrition" />}
+      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} onPlan={self || (!clientRow && hasPlus(rights)) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
       {(!diaryEnabled || diaryTab === 'settings' || editing) && <>
       {configured && (
         <Lead
@@ -2422,7 +2425,7 @@ export function Nutrition({ clientRow, clientView = false }) {
           <Note tone="good">
             Норма посчитана и сохранена
             {saved.clientName ? ' — ' + saved.clientName : ''}.
-            {byTrainer ? '' : ' Тренер получил уведомление.'}
+            {byTrainer || self ? '' : ' Тренер получил уведомление.'}
           </Note>
         </Section>
       )}
@@ -2572,7 +2575,7 @@ export function Nutrition({ clientRow, clientView = false }) {
           <Note tone="info" icon={IconNutrition}>
             {byTrainer
               ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и ляжет в таблицу так же, как если бы он сделал это сам.'
-              : 'Семь ответов о себе — и вы увидите суточную норму калорий и БЖУ. Тренер получит результат сразу.'}
+              : 'Семь ответов о себе — и вы увидите суточную норму калорий и БЖУ.' + (self ? '' : ' Тренер получит результат сразу.')}
           </Note>
         </Section>
       )}
