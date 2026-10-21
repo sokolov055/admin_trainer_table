@@ -24,3 +24,5 @@ ft551-catalog-audit.json
 graphify-out/
 # Рабочие копии других агентов (git worktree)
 worktrees/
+dist-review/
+dist-onboarding-test/
