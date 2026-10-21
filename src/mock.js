@@ -18,7 +18,7 @@
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
 import { onboardingMock, firstStepsMock, focusMock } from './onboarding-mock.js';
-import { isoDay } from './online.js';
+import { isoDay, addOnlineMonths } from './online.js';
 import { diaryMock } from './nutrition/diary-mock.js';
 
 const daysAgo = (n) => {
@@ -371,9 +371,16 @@ function onlineOverview(params, base) {
   return {
     ...base, row: c.row, name: c.name, balance: c.balance, price: c.price,
     trainingsLeft: null, trainingsThisMonth: 0, lastTrainingDate: null, nextTrainingDate: null,
-    packageEnding: { known: false }, online: { until: c.onlineUntil || null },
+    packageEnding: { known: false },
+    online: { until: c.onlineUntil || null, product: { name: '1 месяц', months: 1, paidAt: daysAgo(10) } },
   };
 }
+
+// Продукты онлайн-ведения тренера (21.10.2026)
+const ONLINE_PRODUCTS = [
+  { id: 1, name: '1 месяц', months: 1, price: 6000 },
+  { id: 2, name: '3 месяца', months: 3, price: 15000 },
+];
 
 // Демо-ссылки входа: карточка → «Пригласить в приложение»
 let accessLinks = {};
@@ -2331,12 +2338,34 @@ const MOCK = {
     ],
   }),
 
-  'payment.create': (params) => ({
-    ok: true,
-    paymentId: 'P13',
-    amount: Math.round((params.price || 0) * (params.count || 0)),
-    clientName: 'Анна Морозова',
-  }),
+  'payment.create': (params) => {
+    const product = params.productId ? ONLINE_PRODUCTS.find((p) => p.id === Number(params.productId)) : null;
+    if (product) {
+      const client = CLIENTS.find((c) => c.row === Number(params.clientRow));
+      const until = addOnlineMonths(client && client.onlineUntil, product.months);
+      if (client) client.onlineUntil = until;
+      return { ok: true, paymentId: 'P14', amount: params.amount || product.price, until, product: product.name, months: product.months };
+    }
+    return {
+      ok: true,
+      paymentId: 'P13',
+      amount: Math.round((params.price || 0) * (params.count || 0)),
+      clientName: 'Анна Морозова',
+    };
+  },
+
+  'online.products': () => ({ products: ONLINE_PRODUCTS.map((p) => ({ ...p })) }),
+  'online.product.save': (params) => {
+    const found = ONLINE_PRODUCTS.find((p) => p.id === Number(params.id));
+    const product = { id: found ? found.id : Date.now(), name: params.name || params.months + ' мес.', months: Number(params.months), price: Number(params.price) };
+    if (found) Object.assign(found, product); else ONLINE_PRODUCTS.push(product);
+    return { product };
+  },
+  'online.product.archive': (params) => {
+    const i = ONLINE_PRODUCTS.findIndex((p) => p.id === Number(params.id));
+    if (i >= 0) ONLINE_PRODUCTS.splice(i, 1);
+    return { ok: true };
+  },
 
   'payment.cancel': (params) => ({
     ok: true,

@@ -59,8 +59,12 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
 
   const needsAttention = clients.filter((c) => {
     // Онлайн-клиент (FT-530) с тренером не занимается — «давно не был» не
-    // про него; внимания требует истёкший срок ведения
-    if (c.online) return c.balance < 0 || onlineDaysLeft(c.onlineUntil) < 0;
+    // про него; внимания требует срок ведения: истёк или осталось 3 дня и
+    // меньше (тогда же приходит напоминание, 21.10.2026)
+    if (c.online) {
+      const left = onlineDaysLeft(c.onlineUntil);
+      return c.balance < 0 || (left !== null && left <= 3);
+    }
     const days = daysSince(c.lastTrainingDate);
     return c.balance < 0 || days === null || days > s.staleDays;
   });

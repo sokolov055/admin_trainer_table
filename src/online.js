@@ -52,12 +52,20 @@ export function onlineLabel(until, now = new Date()) {
  * Конец месяца не перескакивает: с 31 января — по 28 (29) февраля.
  */
 export function addOnlineMonth(until, now = new Date()) {
+  return addOnlineMonths(until, 1, now);
+}
+
+/**
+ * То же на months месяцев — продукт ведения «3 месяца» (21.10.2026). Сервер
+ * считает так же (server/src/lib/online-products.js, extendUntil)
+ */
+export function addOnlineMonths(until, months, now = new Date()) {
   const left = onlineDaysLeft(until, now);
   const from = left !== null && left >= 0
     ? (() => { const d = parseDay(until); d.setDate(d.getDate() + 1); return d; })()
     : new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const y = from.getFullYear();
-  const m = from.getMonth() + 1;
+  const m = from.getMonth() + months;
   const last = new Date(y, m + 1, 0).getDate();
   if (from.getDate() > last) return isoDay(new Date(y, m, last));
   const next = new Date(y, m, from.getDate());

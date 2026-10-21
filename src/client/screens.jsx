@@ -202,9 +202,15 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           value={onlineLeft === null ? 'Срок не указан' : onlineLeft < 0 ? 'Срок истёк' : 'по ' + onlineDay(online.until)}
           tone={onlineLeft !== null && onlineLeft < 0 ? 'critical' : onlineLeft !== null ? 'good' : undefined}
           hint={
-            onlineLeft !== null && onlineLeft < 0
+            // Что куплено («Онлайн-ведение · 3 месяца», 21.10.2026) и
+            // сколько осталось, когда срок на исходе
+            (online.product && online.product.name && (onlineLeft === null || onlineLeft >= 0) ? '«' + online.product.name + '» · ' : '')
+            + (onlineLeft !== null && onlineLeft < 0
               ? 'Закончился ' + onlineDay(online.until) + ' · ' + (clientRow && !clientView ? 'напомните клиенту об оплате' : 'напишите тренеру, чтобы продлить')
-              : (clientRow && !clientView ? 'Клиент сам строит график' : 'График строите сами, тренер на связи в мессенджере')
+              : onlineLeft !== null && onlineLeft <= 3
+                ? (onlineLeft === 0 ? 'сегодня последний день' : 'осталось ' + onlineLeft + ' ' + plural(onlineLeft, 'день', 'дня', 'дней'))
+                  + (clientRow && !clientView ? '' : ' — продлите у тренера')
+                : (clientRow && !clientView ? 'Клиент сам строит график' : 'График строите сами, тренер на связи в мессенджере'))
           }
         />
       ) : (
