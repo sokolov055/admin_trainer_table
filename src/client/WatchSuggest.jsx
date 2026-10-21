@@ -88,7 +88,7 @@ export default function WatchSuggest({ trainer = true, onOpen }) {
         </div>
       </div>
       <p className="watch-suggest__text">
-        {`Сегодня по плану «${title}». Запишите подходы — ${trainer ? 'тренер увидит, что вы делали, а веса' : 'веса'} на следующий раз подстроятся.`}
+        {`Следующая по программе — «${title}». Запишите подходы — ${trainer ? 'тренер увидит, что вы делали, а веса' : 'веса'} на следующий раз подстроятся.`}
       </p>
       <div className="watch-suggest__actions">
         <button className="button button--primary button--block" onClick={record}>{`Записать подходы к «${title}»`}</button>

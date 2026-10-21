@@ -1,7 +1,7 @@
 import React from 'react';
 import { Section, Panel, Sheet, formatNumber } from '../ui.jsx';
 import { dayLabel, dayVerdict } from './diary-model.js';
-import { n } from './diary-ui.jsx';
+import { n, ErrorNote } from './diary-ui.jsx';
 
 /**
  * Завершение дня (FT-646, план трёх разборов): карточка «Всё записали?» внизу
@@ -9,9 +9,10 @@ import { n } from './diary-ui.jsx';
  */
 // Завершение дня (FT-646): не галочка между приёмами, а итог — сколько
 // съедено против нормы, БЖУ, вода и слово тренера; после — вибрация.
-export function FinishSheet({ data, totals, target, busy, onFinish, onClose }) {
+// error — ошибка завершения (409, нет связи): лист модальный, плашка в теле дневника под ним не видна
+export function FinishSheet({ data, totals, target, busy, error, onFinish, onClose }) {
   const verdict = dayVerdict(totals.kcal, Number(target.kcal || 0));
-  return <Sheet title={'Итог дня · ' + dayLabel(data.day)} locked={busy} onClose={onClose}><div className="diary-finish"><p className="diary-finish__kcal"><strong>{n(totals.kcal)}</strong> <span>ккал{target.kcal ? ' из ' + n(target.kcal) : ''}</span></p><p className={'diary-finish__verdict diary-finish__verdict--' + verdict.tone}>{verdict.text}</p><dl className="diary-finish__facts">{[['protein', 'Белки'], ['fat', 'Жиры'], ['carbs', 'Углеводы']].map(([k, text]) => <div key={k}><dt>{text}</dt><dd>{n(totals[k])}{target[k] ? ' из ' + n(target[k]) : ''} г</dd></div>)}<div><dt>Вода</dt><dd>{formatNumber(data.waterMl / 1000, 2)} л</dd></div><div><dt>Записей</dt><dd>{data.entries.length}</dd></div></dl>{data.comment ? <div className="diary-finish__coach"><small>От тренера</small><p>{data.comment}</p></div> : <p className="small muted">Завершённый день идёт в среднее за неделю, тренер видит итог.</p>}<div className="diary-form-footer"><button className="button button--primary" disabled={busy} onClick={onFinish}>{busy ? 'Сохраняю…' : 'Завершить день'}</button></div></div></Sheet>;
+  return <Sheet title={'Итог дня · ' + dayLabel(data.day)} locked={busy} onClose={onClose}><div className="diary-finish"><p className="diary-finish__kcal"><strong>{n(totals.kcal)}</strong> <span>ккал{target.kcal ? ' из ' + n(target.kcal) : ''}</span></p><p className={'diary-finish__verdict diary-finish__verdict--' + verdict.tone}>{verdict.text}</p><dl className="diary-finish__facts">{[['protein', 'Белки'], ['fat', 'Жиры'], ['carbs', 'Углеводы']].map(([k, text]) => <div key={k}><dt>{text}</dt><dd>{n(totals[k])}{target[k] ? ' из ' + n(target[k]) : ''} г</dd></div>)}<div><dt>Вода</dt><dd>{formatNumber(data.waterMl / 1000, 2)} л</dd></div><div><dt>Записей</dt><dd>{data.entries.length}</dd></div></dl>{data.comment ? <div className="diary-finish__coach"><small>От тренера</small><p>{data.comment}</p></div> : <p className="small muted">Завершённый день идёт в среднее за неделю, тренер видит итог.</p>}<div className="diary-form-footer"><ErrorNote error={error} /><button className="button button--primary" disabled={busy} onClick={onFinish}>{busy ? 'Сохраняю…' : 'Завершить день'}</button></div></div></Sheet>;
 }
 export function DayFinish({ data, totals, target, readOnly, busy, onOpen, onReopen }) {
   const verdict = dayVerdict(totals.kcal, Number(target.kcal || 0));

@@ -25,7 +25,9 @@ export default function TodayStrip({ onOpen }) {
 }
 
 function WithDiary({ awards, onOpen }) {
-  const diary = useData('diary.get', { day: today() }, []);
+  // День — при каждой отрисовке: приложение, не закрытое за полночь, не должно показывать вчерашние ккал
+  const day = today();
+  const diary = useData('diary.get', { day }, [day]);
   return <Strip awards={awards} day={diary.data} onOpen={onOpen} />;
 }
 
