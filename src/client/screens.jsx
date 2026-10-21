@@ -2377,7 +2377,8 @@ export function Nutrition({ clientRow, clientView = false }) {
 
   // Анкета без нормы — не тянем всю форму под дневник: одна плашка с кнопкой,
   // сама анкета открывается во вкладке «Норма и анкета» (FT-644)
-  const surveyNotice = diaryEnabled && !configured && !editing ? (
+  // Норму уже назначил тренер — плашка «не посчитана» рядом с нормой только путает
+  const surveyNotice = diaryEnabled && !configured && !editing && !(Number(targets?.kcal) > 0) ? (
     <Section>
       <Panel pad>
         <h3 style={{ margin: '0 0 6px', fontSize: 'var(--text-md)', fontWeight: 640 }}>Норма ещё не посчитана</h3>

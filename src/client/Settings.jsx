@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Panel, Segmented, Field, formatNumber, formatWhen } from '../ui.jsx';
 import { IconCopy, IconCheck, IconExternal } from '../icons.jsx';
 import { haptic } from '../telegram.js';
@@ -202,11 +202,16 @@ export function Reminders() {
   useEffect(check, []);
   useOnReturn(check);
 
+  // Пересчёт на телефоне — не на каждую букву в поле времени: набор «07:30»
+  // дал бы три снятия и постановки подряд
+  const syncLater = useRef(0);
   const change = (kind, patch) => {
     const next = saveReminders({ ...s, [kind]: { ...s[kind], ...patch } });
     setS(next);
-    syncReminders().catch(() => {});
+    clearTimeout(syncLater.current);
+    syncLater.current = setTimeout(() => { syncReminders().catch(() => {}); }, 500);
   };
+  useEffect(() => () => clearTimeout(syncLater.current), []);
 
   const toggle = async (kind, on) => {
     haptic();

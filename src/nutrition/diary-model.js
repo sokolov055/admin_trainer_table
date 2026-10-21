@@ -32,10 +32,10 @@ export function mealNow(hour = new Date().getHours()) { return hour < 11 ? 'brea
 // Итог дня одной фразой: в пределах 10 % нормы — «в норме»
 export function dayVerdict(eaten, target) {
   if (!(target > 0)) return { tone: 'neutral', text: 'Норма не назначена — итог без сравнения.' };
-  const diff = Math.round(eaten - target);
+  const diff = Math.round(eaten - target), fmt = v => Math.abs(v).toLocaleString('ru-RU');
   if (Math.abs(diff) <= target * 0.1) return { tone: 'good', text: 'В пределах нормы — так держать.' };
-  if (diff < 0) return { tone: 'under', text: 'Меньше нормы на ' + Math.abs(diff) + ' ккал. Если записано не всё — допишите до завершения.' };
-  return { tone: 'over', text: 'Больше нормы на ' + diff + ' ккал. Смотрите на неделю: один день результат не меняет.' };
+  if (diff < 0) return { tone: 'under', text: 'Меньше нормы на ' + fmt(diff) + ' ккал. Если записано не всё — допишите до завершения.' };
+  return { tone: 'over', text: 'Больше нормы на ' + fmt(diff) + ' ккал. Смотрите на неделю: один день результат не меняет.' };
 }
 export function mealFromRecipe(value) { return ({ 'завтрак': 'breakfast', 'обед': 'lunch', 'ужин': 'dinner', 'перекус': 'snack' })[value] || 'snack'; }
 // Подписи и разбор ввода дневника (перенесены из Diary.jsx 21.10.2026): без React
