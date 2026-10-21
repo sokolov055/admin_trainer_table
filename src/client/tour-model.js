@@ -73,7 +73,7 @@ export const TOUR_SECTIONS = [
       { id: 'measure', tab: 'progress', wait: true, title: 'Новый замер',
         target: [PAGE + '.progress__add > .button', PAGE + '.state__action .button'],
         text: '«Записать замер» — вес и обхваты, хватит и одного показателя. Из замеров строятся график и изменения.' },
-      { id: 'goals', tab: 'progress', wait: true, target: [PAGE + '.goals__rings', PAGE + '.goals'], title: 'Цели и серии',
+      { id: 'goals', tab: 'progress', wait: true, target: [PAGE + '.goal-card', PAGE + '.goals'], title: 'Цели и серии',
         text: 'Тренировки за неделю, месяц и год — против цели. Выполнили цель недели — растёт серия; за тренировки, серии и рекорды — награды.' },
       { id: 'summary', tab: 'progress', wait: true, target: [PAGE + '.summary__bar', PAGE + '.summary'], title: 'Итоги недели и месяца',
         text: 'Что сделано за неделю и месяц, со стрелками к прошлому такому же периоду. Листайте стрелками или пальцем вбок.' },
