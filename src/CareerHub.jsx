@@ -3,6 +3,7 @@ import { CAREER, GAMES, ITEMS, coins, goalText, itemEffect, priceOf, rankComplet
 import { useCareer } from './CareerSession.jsx';
 import { useGameChrome, buzz } from './game-feel.js';
 import { IconPlankGame, IconScooterGame, IconMatchGame, IconBliniGame } from './game-icons.jsx';
+import GameProgressCard from './GameProgressCard.jsx';
 import './career.css';
 
 const GAME = {
@@ -101,7 +102,7 @@ export default function CareerHub({ onClose, onPlay }) {
         {confirmRestart ? <><p>Начать с первой ступени? Заработок и бонусы сбросятся.</p><button type="button" onClick={() => { career.restart(); setConfirmRestart(false); }}>Начать заново</button><button type="button" onClick={() => setConfirmRestart(false)}>Оставить</button></>
           : <button type="button" className="career-text" onClick={() => setConfirmRestart(true)}>Начать карьеру заново</button>}
       </div>}
-      <p className="career-hint career-hint--fine">Прогресс карьеры хранится только на этом устройстве.</p>
+      <GameProgressCard className="career-save" />
     </div>
 
     {promoted && <div className="career-overlay" role="dialog" aria-modal="true" aria-labelledby="career-promoted">

@@ -9,6 +9,8 @@ import { clock } from './workout-model.js';
 import { IconBack, IconGuide, IconClose, IconCheck } from './icons.jsx';
 import { useGameChrome, buzz, vibrationOn, setVibration } from './game-feel.js';
 import { useMission, MissionNote } from './CareerMission.jsx';
+import { useGameProgress, saveProgress } from './game-progress.js';
+import GameProgressCard from './GameProgressCard.jsx';
 import './blini-game.css';
 
 const kg = value => value.toLocaleString('ru-RU') + ' кг';
@@ -50,6 +52,17 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     if (!mission || !state.mission || !['won', 'lost'].includes(mode) || reported.current === serial) return;
     reported.current = serial; report({ won: mode === 'won' });
   }, [mission, mode, serial, state.mission, report]);
+
+  // Прогресс в аккаунте: каждое сохранение партии уходит на сервер (если включено),
+  // а более свежее сохранение с другого устройства подхватывается
+  const account = useGameProgress();
+  useEffect(() => session.onPersist(data => saveProgress('blini', data)), [session]);
+  useEffect(() => {
+    if (!account.enabled) return;
+    const remote = account.states.blini;
+    if (remote && remote.savedAt > session.savedAt()) session.hydrate(remote.state);
+    else if (!remote || remote.savedAt < session.savedAt()) session.save();
+  }, [account.enabled, account.states.blini, session]);
 
   const [help, setHelp] = useState(false);
   const [soundError, setSoundError] = useState('');
@@ -285,14 +298,16 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           </div>}
           <button className="blini-primary" ref={primary} onClick={start}>Играть</button>
           <button className="blini-secondary" onClick={openHelp}>Как играть</button>
+          <GameProgressCard />
         </> : mode === 'paused' ? <>
           <div className="blini-panel-mark"><span className="blini-pause-icon" /></div>
-          <h3 id={title}>{reason === 'rest' ? 'Пора к подходу' : 'Можно выдохнуть'}</h3>
-          <p>{reason === 'rest' ? 'Блины замерли на месте. Продолжим на следующем отдыхе.' : 'Цепочка стоит. Продолжишь с того же места.'}</p>
+          <h3 id={title}>{reason === 'rest' ? 'Пора к подходу' : reason === 'saved' ? 'Партия сохранена' : 'Можно выдохнуть'}</h3>
+          <p>{reason === 'rest' ? 'Блины замерли на месте. Продолжим на следующем отдыхе.' : reason === 'saved' ? `Уровень ${level + 1}, «${track.name}». Блины стоят там же, где ты остановился.` : 'Цепочка стоит. Продолжишь с того же места.'}</p>
           <div className="blini-mission"><span><strong>{kg(hud.score)}</strong> из {kg(hud.target)}</span><span>{seconds(hud.seconds)}</span></div>
           <label className="blini-toggle"><input type="checkbox" checked={vibration} onChange={event => { setVibration(event.target.checked); setVibrationState(event.target.checked); if (event.target.checked) buzz('tap'); }} />Вибрация</label>
           <button className="blini-primary" ref={primary} onClick={resume}>Продолжить игру</button>
           <button className="blini-secondary" onClick={close}>{backLabel}</button>
+          <GameProgressCard />
         </> : <>
           <span className="blini-chapter">Уровень {level + 1} · «{track.name}»</span>
           <h3 id={title}>{mode === 'won' ? (result?.ace ? 'Уложился в норматив!' : 'Уровень взят!') : 'Блины на помосте'}</h3>

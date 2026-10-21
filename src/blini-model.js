@@ -397,3 +397,38 @@ export function aimEnd(game) {
   }
   return { x: shooter.x + dx * 900, y: shooter.y + dy * 900, hit: false };
 }
+
+// Сохранение партии (FT-700, 22.10.2026): продолжить с того же места — на этом
+// устройстве или на другом, если прогресс сохраняется в аккаунте. Трасса —
+// по имени из правил; броски в полёте и вспышки не сохраняются.
+const SAVED = ['seed', 'nextId', 'tick', 'score', 'full', 'mode', 'lives', 'reload', 'negative', 'pause', 'technique', 'streak', 'bestChain', 'bestStreak', 'cleared', 'shotsFired', 'powerAt', 'aim', 'current', 'next'];
+export function serializeGame(game) {
+  const out = { version: RULES_VERSION, rules: { ...game.rules, powers: [...game.rules.powers] } };
+  for (const key of SAVED) out[key] = game[key];
+  out.chains = game.chains.map(c => ({ rush: c.rush, back: c.back, last: c.last, danger: c.danger, balls: c.balls.map(b => ({ ...b, enter: null })) }));
+  return out;
+}
+const finite = n => typeof n === 'number' && Number.isFinite(n);
+/** Партия из сохранения; чужая версия правил или испорченная запись — null. */
+export function restoreGame(data) {
+  try {
+    if (!data || data.version !== RULES_VERSION || !data.rules || !TRACKS[data.rules.track]) return null;
+    const game = createBlini(data.seed, data.rules);
+    if (!Array.isArray(data.chains) || data.chains.length !== game.chains.length) return null;
+    for (const key of SAVED) if (key in data && typeof data[key] === typeof game[key]) game[key] = data[key];
+    const colors = game.rules.colors;
+    game.chains.forEach((chain, i) => {
+      const saved = data.chains[i];
+      chain.rush = !!saved.rush; chain.back = Math.max(0, saved.back | 0); chain.danger = !!saved.danger;
+      chain.last = Number.isInteger(saved.last) && saved.last < colors ? saved.last : -1;
+      chain.balls = (Array.isArray(saved.balls) ? saved.balls : [])
+        .filter(b => b && finite(b.s) && Number.isInteger(b.color) && b.color >= 0 && b.color < PLATES.length && finite(b.size))
+        .map(b => ({ id: b.id | 0, color: b.color, s: b.s, size: Math.max(.2, Math.min(1, b.size)), power: POWERS[b.power] ? b.power : null, powerUntil: b.powerUntil | 0, pull: 0, combo: b.combo | 0, gap: !!b.gap, fresh: !!b.fresh, shot: !!b.shot, enter: null }));
+    });
+    game.shots = []; game.events = [];
+    if (!['playing', 'won', 'lost'].includes(game.mode)) game.mode = 'playing';
+    if (!PLATES[game.current]) game.current = 0;
+    if (!PLATES[game.next]) game.next = 0;
+    return game;
+  } catch (_) { return null; }
+}

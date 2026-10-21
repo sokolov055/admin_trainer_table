@@ -210,3 +210,38 @@ test('сессия: задание карьеры — свой план и по�
   assert.equal(session.getSnapshot().mission, null);
   assert.equal(session.game().lives, 0);
 });
+
+test('сохранение партии: восстановленная продолжается так же, как исходная', async () => {
+  const { serializeGame, restoreGame } = await import('../src/blini-model.js');
+  const game = createBlini(41, 3);
+  for (let t = 0; t < 1500; t++) { step(game); if (t % 50 === 0) botTurn(game); drain(game); }
+  game.shots = []; // броски в полёте не сохраняются
+  const copy = restoreGame(JSON.parse(JSON.stringify(serializeGame(game))));
+  assert.ok(copy, 'восстановилась');
+  assert.equal(copy.track.id, game.track.id); assert.equal(copy.chains.length, game.chains.length);
+  for (let t = 0; t < 800; t++) { step(game); step(copy); drain(game); drain(copy); }
+  assert.deepEqual([copy.tick, copy.score, copy.mode, copy.chains[0].balls.length], [game.tick, game.score, game.mode, game.chains[0].balls.length]);
+  assert.equal(restoreGame({ ...serializeGame(game), version: 99 }), null, 'чужая версия правил');
+  assert.equal(restoreGame({ ...serializeGame(game), rules: { ...game.rules, track: 'луна' } }), null, 'нет такой трассы');
+  const odd = serializeGame(game); odd.chains[0].balls.push({ s: 'x', color: 9 });
+  assert.equal(restoreGame(odd).chains[0].balls.length, game.chains[0].balls.length, 'испорченный блин отброшен');
+});
+
+test('сессия: сохранение из аккаунта новее — партия на паузе «сохранена»; старее — не трогает', async () => {
+  const { serializeGame } = await import('../src/blini-model.js');
+  const session = createBliniSession({ seed: 5, now: () => 0 });
+  const saves = []; session.onPersist(data => saves.push(data));
+  const remote = createBlini(9, 2); advance(remote, 600);
+  assert.equal(session.hydrate({ unlocked: 4, level: 2, savedAt: Date.now() + 1000, game: serializeGame(remote) }), true);
+  const snap = session.getSnapshot();
+  assert.deepEqual([snap.mode, snap.reason, snap.level, snap.unlocked], ['paused', 'saved', 2, 4]);
+  assert.equal(session.game().tick, remote.tick);
+  assert.equal(session.hydrate({ unlocked: 1, level: 0, savedAt: 1 }), false, 'старое сохранение не применяется');
+  const token = {}; session.claim(token, () => false); session.resume(token);
+  session.pause('manual', token);
+  assert.ok(saves.at(-1)?.game, 'пауза сохраняет незаконченную партию');
+  assert.equal(saves.at(-1).unlocked, 4);
+  session.mission({ goal: { level: 1, target: 900 }, boost: false });
+  session.save();
+  assert.equal(saves.at(-1).game, null, 'задание карьеры не сохраняется как партия');
+});

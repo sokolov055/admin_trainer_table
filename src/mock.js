@@ -1222,6 +1222,11 @@ const MOCK = {
   'auth.logout': () => ({ ok: true, revoked: 1 }),
 
   'scooter.board': () => ({ profile: { enabled: false }, entries: [] }),
+  // Прогресс игр в аккаунте (FT-700): в демо — в памяти страницы
+  'games.progress': () => ({ enabled: mockGameProgress.enabled, version: '2026-10-22', states: mockGameProgress.enabled ? mockGameProgress.states : {} }),
+  'games.progress.enable': (p) => { if (p.accept !== true) throw new Error('Нужно отдельное согласие на сохранение игр.'); mockGameProgress.enabled = true; return { enabled: true, version: '2026-10-22', states: mockGameProgress.states }; },
+  'games.progress.save': (p) => { if (!mockGameProgress.enabled) throw new Error('Сохранение игр в аккаунте выключено.'); mockGameProgress.states[p.game] = { state: p.state, savedAt: p.savedAt }; return { saved: true, savedAt: p.savedAt }; },
+  'games.progress.disable': () => { mockGameProgress.enabled = false; mockGameProgress.states = {}; return { enabled: false, version: '2026-10-22', states: {} }; },
   // ?mockRole=candidate — кандидат в тренеры на отборе (FT-548, CandidateApp.jsx)
   'me': (params) => (params.__role === 'candidate' ? {
     role: 'candidate', candidate: true, name: 'Мария Ковалёва', email: 'maria@fittrack.demo', chatId: '', identityType: 'email', accountId: '',
@@ -2394,6 +2399,8 @@ function demoLoginRole() {
 function setDemoLoginRole(role) {
   try { window.sessionStorage.setItem('mockRole', role); } catch (_) { /* приватный режим */ }
 }
+
+const mockGameProgress = { enabled: false, states: {} };
 
 export function mockApi(action, params) {
   const role = new URLSearchParams(window.location.search).get('mockRole') || demoLoginRole() || 'client';

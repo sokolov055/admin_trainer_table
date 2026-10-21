@@ -31,3 +31,21 @@ html.game-is-open .rest-pill { z-index: 85; }
 .rest-screen.rest-screen--scooter { background: #173c34; }
 .rest-screen.rest-screen--match { background: #173e34; }
 .rest-screen.rest-screen--blini { background: #173a32; }
+
+/* Сохранение игр в аккаунте (FT-700): карточка с отдельным согласием в панелях «Блинов» и в карьере */
+.game-save { display: grid; gap: 6px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid #d8d3bd; border-radius: 14px; background: #f4f1df; color: #183f36; text-align: left; font-size: 12.5px; line-height: 1.4; }
+.game-save strong { font-size: 14px; }
+.game-save span { color: #49685e; }
+.game-save label { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; padding-top: 4px; font-weight: 650; color: #183f36; }
+.game-save input { flex: 0 0 auto; width: 20px; height: 20px; margin: 0; accent-color: #286749; }
+.game-save a { color: #245c45; }
+.game-save button { min-height: 44px; padding: 8px 14px; border: 0; border-radius: 12px; background: #286749; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.game-save button:disabled { opacity: .5; cursor: default; }
+.game-save small { color: #9b2c22; font-weight: 700; }
+.game-save--on { grid-template-columns: 1fr auto; align-items: center; padding: 6px 8px 6px 12px; }
+.game-save--on span { color: #183f36; font-weight: 700; }
+.game-save--on b { color: #2c9a55; }
+.game-save .game-save__link { min-height: 40px; background: transparent; color: #245c45; text-decoration: underline; }
+.game-save__row { display: flex; gap: 8px; grid-column: 1 / -1; }
+.game-save__row button:last-child { background: transparent; color: #183f36; }
+.career-save { margin: 18px 16px 8px; }

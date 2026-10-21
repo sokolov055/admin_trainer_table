@@ -262,7 +262,7 @@ export default function App() {
     <ScooterSessionProvider>
     <MatchSessionProvider>
     <BliniSessionProvider>
-    <CareerProvider key={[me.identityType, me.chatId, me.email, me.member].join(':')} id={[me.identityType, me.chatId || me.email || '', me.member || ''].join(':')}>
+    <CareerProvider key={[me.identityType, me.chatId, me.email, me.member].join(':')} id={[me.identityType, me.chatId || me.email || '', me.member || ''].join(':')} sync={me.role === 'client' && !me.member && me.plankGameEnabled === true}>
       <Deferred fallback={waitingPage}>
         {me.role === 'trainer' ? <TrainerApp me={me} />
           : me.role === 'candidate' ? <CandidateApp me={me} onApproved={load} />
