@@ -48,13 +48,20 @@
 }
 
 /* Плитки: по три в ряд и на 320 px (≈ 86 px шириной); крупный шрифт
-   переносит подпись, а не режет её */
+   переносит подпись, а не режет её. Сетка — в шесть долей, плитка
+   занимает две: неполный последний ряд растягивается на всю ширину,
+   а не оставляет дыру справа (пять плиток — три и две по половине) */
 .quick-tiles {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   padding-bottom: 4px;
 }
+
+.quick-tiles > .quick-tile { grid-column: span 2; }
+.quick-tiles > .quick-tile:nth-child(3n + 1):nth-last-child(2),
+.quick-tiles > .quick-tile:nth-child(3n + 2):last-child { grid-column: span 3; }
+.quick-tiles > .quick-tile:nth-child(3n + 1):last-child { grid-column: span 6; }
 
 .quick-tile {
   display: flex;
@@ -85,7 +92,53 @@
 /* Значок — акцентом для текста: обычный акцент на подложке бледнее (FT-645) */
 .quick-tile__icon { display: flex; color: var(--accent-ink); }
 
+/* Что именно случится: «+250 мл» у воды, приём по часам у еды — плитка
+   воды записывает сразу, без формы, и это видно до касания */
+.quick-tile__hint {
+  margin-top: -5px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+/* «Глазами клиента»: плитка видна, как у клиента, но не нажимается */
+.quick-tile:disabled { opacity: 0.45; cursor: default; }
+.quick-tile:disabled:active { transform: none; }
+
+.quick-note {
+  margin: 10px 2px 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+/* ---- Лист под «+» ------------------------------------------------------
+   Меню стоит над листом (tabbar--raised), поэтому низ листа — под ним:
+   отступ до верха меню, как у плавающих панелей (--float-bottom). Свой
+   крестик в шапке не нужен — закрывает тот же «+», ставший крестиком, —
+   но он остаётся для клавиатуры и читалки: меню за пределами диалога, и
+   до него они не дойдут (виден при фокусе с клавиатуры). */
+.sheet--quick .sheet__panel { padding-bottom: calc(var(--float-bottom) + 2px); }
+.sheet--quick .sheet__close { opacity: 0; pointer-events: none; }
+.sheet--quick .sheet__close:focus-visible { opacity: 1; pointer-events: auto; }
+
+/* Пункты поднимаются со стороны «+» вслед за листом, по одному с шагом
+   30 мс (emil-design-eng, «Stagger»): видно, что лист вырос из кнопки, а
+   не упал сверху. Только «backwards»: после въезда стиль снова свой, и
+   нажатие (scale) работает. Касаться можно сразу — задержка не мешает */
+.sheet--quick .quick-main,
+.sheet--quick .quick-tile {
+  transform-origin: 50% 100%;
+  animation: quick-in 300ms var(--ease-out) backwards;
+  animation-delay: calc(90ms + var(--i, 0) * 30ms);
+}
+
+@keyframes quick-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .quick-main, .quick-tile { transition: none; }
+  .sheet--quick .quick-main, .sheet--quick .quick-tile { animation: none; }
   .quick-main:active, .quick-tile:active { transform: none; }
 }

@@ -951,8 +951,13 @@ const SHEET_LEAVE = 220;
  * Фокус: `focus` — селектор поля, которое получает фокус сразу (так
  * открывается клавиатура); без него — сам лист, чтобы читалка назвала
  * заголовок. На выходе фокус возвращается кнопке, которая лист открыла.
+ *
+ * Лист, открытый кнопкой вне себя («+» нижнего меню), закрывается и ею:
+ * `closeRef.current()` — тот же уход, что у крестика, а `onLeaving` —
+ * в первый кадр ухода, чтобы кнопка начала обратное движение вместе с
+ * листом, а не после него.
  */
-export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = false, locked = false, focus, className, children }) {
+export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = false, locked = false, focus, className, closeRef, onLeaving, children }) {
   const [leaving, setLeaving] = useState(false);
   const [covered, setCovered] = useState(0);
   const panel = useRef(null);
@@ -962,6 +967,8 @@ export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = f
   live.current.covered = covered;
   live.current.locked = locked;
   live.current.onClose = onClose;
+  live.current.onLeaving = onLeaving;
+  if (closeRef) closeRef.current = () => close(live.current.onClose);
   const parent = useContext(SheetContext);
 
   // locked — форма отправляется: лист не закрыть, пока не пришёл ответ
@@ -969,6 +976,7 @@ export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = f
     if (live.current.leaving || live.current.locked) return;
     live.current.leaving = true;
     setLeaving(true);
+    if (live.current.onLeaving) live.current.onLeaving();
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     setTimeout(() => {
       if (cb) cb();

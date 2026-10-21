@@ -256,6 +256,9 @@ export default function ClientApp({ me, clientRow, preview }) {
   // сюда переехал выход: это конец разговора, а не раздел.
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  // Крестик на «+»: снимается в первый кадр ухода листа, а не после него
+  const [quickX, setQuickX] = useState(false);
+  const quickClose = useRef(null);
   const current = VIEWS.find((v) => v.id === view) || VIEWS[0];
   const onTab = TABS.some((t) => t.id === view);
 
@@ -286,14 +289,27 @@ export default function ClientApp({ me, clientRow, preview }) {
     setView(id);
     setMenuOpen(false);
     setQuickOpen(false);
+    setQuickX(false);
     haptic();
   };
   goRef.current = go;
 
   // «+» посередине меню — лист быстрой записи (пункт 13 плана, 21.10.2026).
   // Плитка листа переключает вкладку и оставляет ей запрос: форма замера,
-  // занятие, дневник открываются там, где живут (quick-actions.js)
-  const quickAction = { label: 'Быстрая запись', open: quickOpen, onClick: () => { setQuickOpen(true); haptic(); } };
+  // занятие, дневник открываются там, где живут (quick-actions.js).
+  // Пока лист открыт, меню стоит над ним и «+» повёрнут в крестик: лист
+  // закрывается тем же местом, откуда появился (как в макете Plus)
+  const quickAction = {
+    label: quickX ? 'Закрыть быструю запись' : 'Быстрая запись',
+    open: quickX,
+    raised: quickOpen,
+    onClick: () => {
+      haptic();
+      if (quickOpen) { if (quickClose.current) quickClose.current(); return; }
+      setQuickOpen(true);
+      setQuickX(true);
+    },
+  };
   const quickPick = (tab, kind, payload) => {
     go(tab);
     requestQuick(kind, payload);
@@ -554,8 +570,9 @@ export default function ClientApp({ me, clientRow, preview }) {
       )}
 
       {quickOpen && onTab && (
-        <QuickAdd me={me} clientRow={clientRow} preview={!!preview}
-          onClose={() => setQuickOpen(false)} onPick={quickPick} />
+        <QuickAdd me={me} clientRow={clientRow} preview={!!preview} tab={view}
+          closeRef={quickClose} onLeaving={() => setQuickX(false)}
+          onClose={() => { setQuickOpen(false); setQuickX(false); }} onPick={quickPick} />
       )}
 
       <TabBar tabs={TABS} active={view} onSelect={go} action={quickAction} />

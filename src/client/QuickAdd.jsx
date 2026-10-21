@@ -3,6 +3,7 @@ import { Sheet } from '../ui.jsx';
 import { useData } from '../useData.js';
 import { useRights, hasPlus } from '../rights.js';
 import { blockSessions } from '../plan-model.js';
+import { label as mealLabel, mealNow } from '../nutrition/diary-model.js';
 import { IconPlay, IconScale, IconRuler, IconDrop, IconNutrition, IconSend } from '../icons.jsx';
 import './quick-add.css';
 
@@ -10,43 +11,62 @@ import './quick-add.css';
  * «Что записать» — лист под «+» нижнего меню клиента (пункт 13 плана,
  * 21.10.2026; из разбора «Худеем вместе», макет Plus).
  *
- * Сверху — главное действие дня, занятие: «+» не спорит с «Тренировками»,
- * а сокращает путь к их главной кнопке. Ниже — то, что записывают чаще
- * всего, в два касания с любой вкладки.
+ * Сверху — главное действие. Обычно это занятие: «+» не спорит с
+ * «Тренировками», а сокращает путь к их главной кнопке. На «Питании»
+ * главное — еда: человек пришёл туда записывать приём, и лист не должен
+ * предлагать ему тренировку. Занятие тогда встаёт на место плитки «Еда» —
+ * меняются местами два пункта, остальные плитки стоят где стояли, и палец
+ * находит их там же с любой вкладки.
  *
  * Только действия, которые в приложении уже есть. Плитка не открывает
  * свою форму, а переключает вкладку и просит её открыть свою
  * (quick-actions.js): форма одна, и правится в одном месте. Еда и вода —
- * когда открыт дневник питания, «Тренеру» — когда тренер есть: пожелание
- * тренеру внизу «Тренировок» (Wishes.jsx) — единственный способ написать
- * ему из приложения.
+ * с «Плюсом», «Тренеру» — когда тренер есть: пожелание тренеру внизу
+ * «Тренировок» (Wishes.jsx) — единственный способ написать ему из
+ * приложения.
  *
- * onPick(tab, kind, payload) — ClientApp закрывает лист, переключает
- * вкладку и оставляет запрос.
+ * Тренер «глазами клиента» видит тот же набор, что клиент, но еда, вода и
+ * «Тренеру» там не нажимаются: дневник в просмотре только для чтения, а
+ * пожелание тренер написал бы сам себе. Раньше их просто не было, и лист
+ * на «Питании» выглядел так, будто про еду в нём забыли.
+ *
+ * tab — вкладка, с которой открыли лист. onPick(tab, kind, payload) —
+ * ClientApp закрывает лист, переключает вкладку и оставляет запрос.
  */
-export default function QuickAdd({ me, clientRow, preview, onClose, onPick }) {
+export default function QuickAdd({ me, clientRow, preview, tab, onClose, onPick, closeRef, onLeaving }) {
   const rights = useRights();
-  // Свой кабинет. «Глазами клиента» у тренера дневник только для чтения,
-  // а пожелание написал бы тренер сам себе
+  // Свой кабинет — записывать можно всё. «Глазами клиента» нажимается то,
+  // что тренер и так ведёт за клиента: занятие, вес, замеры. В карточке
+  // клиента у тренера (не «глазами») дневника и пожелания нет вовсе
   const own = !clientRow;
-  const main = useMainAction(clientRow, preview);
+  const workout = useMainAction(clientRow, preview);
+  const food = hasPlus(rights) && (own || preview);
+  const coach = own ? !!(me && !me.unlinked) : !!preview;
+
+  const actions = {
+    workout: { kind: 'workout', tab: 'plan', label: workout.payload.session ? 'К занятию' : 'Занятие', title: workout.title, note: workout.note, payload: workout.payload, Icon: IconPlay },
+    food: { kind: 'food', tab: 'nutrition', label: 'Еда', title: 'Добавить еду', hint: mealLabel(mealNow()), note: mealLabel(mealNow()) + ' · по времени, можно сменить', Icon: IconNutrition, off: !own },
+  };
+  // Еда — главной на «Питании», если её можно записать
+  const mainKind = tab === 'nutrition' && food && own ? 'food' : 'workout';
+  const main = actions[mainKind];
+  const swapped = mainKind === 'food' ? actions.workout : (food ? actions.food : null);
 
   const tiles = [
+    ...(swapped ? [swapped] : []),
+    ...(food ? [{ kind: 'water', tab: 'nutrition', label: 'Вода', hint: '+250 мл', name: 'Вода, плюс 250 мл', Icon: IconDrop, off: !own }] : []),
     { kind: 'weight', tab: 'progress', label: 'Вес', Icon: IconScale },
     { kind: 'measure', tab: 'progress', label: 'Замеры', Icon: IconRuler },
-    ...(own && hasPlus(rights) ? [
-      { kind: 'water', tab: 'nutrition', label: 'Вода', Icon: IconDrop },
-      { kind: 'food', tab: 'nutrition', label: 'Еда', Icon: IconNutrition },
-    ] : []),
-    ...(own && me && !me.unlinked ? [
-      { kind: 'wish', tab: 'plan', label: 'Тренеру', name: 'Написать тренеру', Icon: IconSend },
-    ] : []),
+    ...(coach ? [{ kind: 'wish', tab: 'plan', label: 'Тренеру', name: 'Написать тренеру', Icon: IconSend, off: !own }] : []),
   ];
+  const locked = tiles.some((t) => t.off);
+  // Занятию нужен payload (что начать), остальным — нет
+  const pick = (a) => (a.payload ? onPick(a.tab, a.kind, a.payload) : onPick(a.tab, a.kind));
 
   return (
-    <Sheet title="Что записать" onClose={onClose}>
-      <button type="button" className="quick-main" onClick={() => onPick('plan', 'workout', main.payload)}>
-        <span className="quick-main__icon"><IconPlay size={22} /></span>
+    <Sheet title="Что записать" onClose={onClose} className="sheet--quick" closeRef={closeRef} onLeaving={onLeaving}>
+      <button type="button" className="quick-main" style={{ '--i': 0 }} onClick={() => pick(main)}>
+        <span className="quick-main__icon"><main.Icon size={22} /></span>
         <span className="quick-main__text">
           <span className="quick-main__title">{main.title}</span>
           {main.note && <span className="quick-main__note">{main.note}</span>}
@@ -54,13 +74,17 @@ export default function QuickAdd({ me, clientRow, preview, onClose, onPick }) {
       </button>
 
       <div className="quick-tiles">
-        {tiles.map((t) => (
-          <button key={t.kind} type="button" className="quick-tile" aria-label={t.name} onClick={() => onPick(t.tab, t.kind)}>
+        {tiles.map((t, i) => (
+          <button key={t.kind} type="button" className="quick-tile" style={{ '--i': i + 1 }}
+            aria-label={t.name} disabled={t.off} onClick={() => pick(t)}>
             <span className="quick-tile__icon"><t.Icon size={26} /></span>
-            {t.label}
+            <span className="quick-tile__label">{t.label}</span>
+            {t.hint && <span className="quick-tile__hint">{t.hint}</span>}
           </button>
         ))}
       </div>
+
+      {locked && <p className="quick-note">Бледное клиент записывает сам — в просмотре не нажимается.</p>}
     </Sheet>
   );
 }

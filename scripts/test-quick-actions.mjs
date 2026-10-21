@@ -52,6 +52,13 @@ vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0]
 );
 const { default: QuickAdd, setRights } = bundled.exports;
 
+// Подпись плитки без пояснения под ней («+250 мл», приём по часам)
+const labelOf = (node) => {
+  if (!node || typeof node !== 'object') return null;
+  if (node.props && node.props.className === 'quick-tile__label') return textOf(node);
+  for (const child of node.children || []) { const found = labelOf(child); if (found != null) return found; }
+  return null;
+};
 const textOf = (node) => (typeof node === 'string' ? node : ((node && node.children) || []).map(textOf).join(''));
 const buttonsOf = (node, out = []) => {
   if (node && typeof node === 'object') {
@@ -64,7 +71,7 @@ const buttonsOf = (node, out = []) => {
 const BLOCKS = [{ id: 'b1', title: 'Ноги и ягодицы', exercises: [] }, { id: 'b2', title: 'Спина', exercises: [] }];
 const done = (id) => ({ id: 'done-' + id, status: 'completed', sourceBlockId: id, month: 'Октябрь 2026', updatedAt: '2026-10-20' });
 
-async function sheet({ me = { name: 'Клиент' }, clientRow, preview = false, sessions = [], blocks = BLOCKS } = {}) {
+async function sheet({ me = { name: 'Клиент' }, clientRow, preview = false, tab, sessions = [], blocks = BLOCKS } = {}) {
   globalThis.__quick = {
     'client.plan': { month: 'Октябрь 2026', blocks },
     'workout.list': { sessions },
@@ -72,12 +79,13 @@ async function sheet({ me = { name: 'Клиент' }, clientRow, preview = false
   const picks = [];
   let root;
   await act(async () => {
-    root = renderer.create(React.createElement(QuickAdd, { me, clientRow, preview, onClose: () => {}, onPick: (...a) => picks.push(a) }));
+    root = renderer.create(React.createElement(QuickAdd, { me, clientRow, preview, tab, onClose: () => {}, onPick: (...a) => picks.push(a) }));
   });
   const shown = buttonsOf(root.toJSON());
   return {
     main: textOf(shown[0]),
-    tiles: shown.slice(1).map(textOf),
+    tiles: shown.slice(1).map(labelOf),
+    off: shown.slice(1).filter((b) => b.props.disabled).map(labelOf),
     press: async (i) => {
       const button = root.root.findAllByType('button')[i];
       await act(async () => { button.props.onClick(); });
@@ -92,16 +100,41 @@ test('лист: сверху занятие по программе, ниже �
   const s = await sheet();
   assert.match(s.main, /^Начать занятие/);
   assert.match(s.main, /Ноги и ягодицы · следующая по плану$/);
-  assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Вода', 'Еда', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.off, []);
   assert.equal(s.tiles.includes('Самочувствие'), false, 'чего нет в приложении — нет и в листе');
 
   assert.deepEqual(await s.press(0), ['plan', 'workout', { title: 'Ноги и ягодицы' }]);
-  assert.deepEqual(await s.press(1), ['progress', 'weight']);
-  assert.deepEqual(await s.press(2), ['progress', 'measure']);
-  assert.deepEqual(await s.press(3), ['nutrition', 'water']);
-  assert.deepEqual(await s.press(4), ['nutrition', 'food']);
+  assert.deepEqual(await s.press(1), ['nutrition', 'food']);
+  assert.deepEqual(await s.press(2), ['nutrition', 'water']);
+  assert.deepEqual(await s.press(3), ['progress', 'weight']);
+  assert.deepEqual(await s.press(4), ['progress', 'measure']);
   assert.deepEqual(await s.press(5), ['plan', 'wish']);
   await s.close();
+});
+
+test('на «Питании» главное — еда, занятие встаёт на её место, остальные плитки где были', async () => {
+  setRights(null);
+  let s = await sheet({ tab: 'nutrition' });
+  assert.match(s.main, /^Добавить еду/);
+  assert.deepEqual(s.tiles, ['Занятие', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(await s.press(0), ['nutrition', 'food']);
+  assert.deepEqual(await s.press(1), ['plan', 'workout', { title: 'Ноги и ягодицы' }]);
+  await s.close();
+
+  // Идёт занятие — плитка зовёт вернуться к нему
+  s = await sheet({ tab: 'nutrition', sessions: [{ id: 's1', status: 'active', title: 'Спина' }] });
+  assert.equal(s.tiles[0], 'К занятию');
+  assert.deepEqual(await s.press(1), ['plan', 'workout', { session: 's1' }]);
+  await s.close();
+
+  // Без «Плюса» еды нет — и на «Питании» главным остаётся занятие
+  setRights({ plus: false });
+  s = await sheet({ tab: 'nutrition' });
+  assert.match(s.main, /^Начать занятие/);
+  assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Тренеру']);
+  await s.close();
+  setRights(null);
 });
 
 test('без «Плюса» нет еды и воды, без тренера — плитки «Тренеру»', async () => {
@@ -112,15 +145,22 @@ test('без «Плюса» нет еды и воды, без тренера —
 
   setRights(null);
   s = await sheet({ me: { name: 'Клиент', unlinked: true } });
-  assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Вода', 'Еда']);
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры']);
   await s.close();
 });
 
-test('тренер «глазами клиента»: дневник там только для чтения, писать тренеру некому', async () => {
+test('тренер «глазами клиента»: набор как у клиента, но еда, вода и «Тренеру» не нажимаются', async () => {
   setRights(null);
-  const s = await sheet({ clientRow: 7, preview: true });
-  assert.deepEqual(s.tiles, ['Вес', 'Замеры']);
+  const s = await sheet({ clientRow: 7, preview: true, tab: 'nutrition' });
+  assert.match(s.main, /^Начать занятие/, 'дневник в просмотре только для чтения — главной еда не становится');
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.off, ['Еда', 'Вода', 'Тренеру']);
   await s.close();
+
+  // Тренер в карточке клиента (не «глазами клиента») — без дневника и пожелания
+  const card = await sheet({ clientRow: 7 });
+  assert.deepEqual(card.tiles, ['Вес', 'Замеры']);
+  await card.close();
 });
 
 test('главная кнопка решает, как «Тренировки»: идущее занятие, следующая, свободная', async () => {
