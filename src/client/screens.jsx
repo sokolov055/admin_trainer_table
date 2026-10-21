@@ -36,6 +36,8 @@ import { GoalBanner } from './focus.jsx';
 import { onlineDaysLeft, onlineDay } from '../online.js';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 import { useRights, hasPlus, isPro, setRights } from '../rights.js';
+import { useQuickRequest } from '../quick-actions.js';
+import { revealSoon } from '../reveal.js';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
@@ -417,6 +419,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // отправленные с телефона: они сразу во «Выполненных» и считаются
   // проведёнными в программе
   const [journalOffline, setJournalOffline] = useState(false);
+  // Журнал хоть раз ответил — до этого «+» не знает, идёт ли занятие
+  const [journalReady, setJournalReady] = useState(false);
   useEffect(() => {
     let alive = true;
     journalList(clientRow, familyRow ? { familyRow } : {})
@@ -424,8 +428,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         if (!alive) return;
         setSessions(r.sessions);
         setJournalOffline(r.offline);
+        setJournalReady(true);
       })
-      .catch(() => { if (alive) setSessions([]); });
+      .catch(() => { if (alive) { setSessions([]); setJournalReady(true); } });
     return () => { alive = false; };
   }, [clientRow, workout, familyRow, journalTick]);
   // Очередь телефона ушла на сервер или пополнилась — перечитать список
@@ -433,6 +438,47 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // «Записать подходы» с «Обзора» — к силовой с часов (watch-launch.js):
   // та же тренировка программы, что у «Начать тренировку», начало — по часам
   useWatchLaunch({ enabled: !clientRow && !clientView && !familyRow, data, month, setMonth, open: openWorkout });
+
+  // «+» нижнего меню (quick-actions.js): только свой кабинет и «глазами
+  // клиента» — у семьи и в карточке клиента у тренера запросов нет
+  const quickHere = !familyRow && (!clientRow || clientView);
+
+  // «Начать занятие» из «+» — то же, что кнопки этого экрана: идёт занятие —
+  // вернуться к нему, иначе тренировка из листа (или первая в очереди), а
+  // без программы — свободная. Ждём программу и журнал
+  const monthLeft = useRef(null);
+  useQuickRequest('workout', (want) => {
+    if (workout) return true;
+    // Открыт другой месяц — лист «+» считал по текущей программе: вернуться
+    // к ней и дождаться её данных, а не начать по прежнему месяцу
+    if (month) { monthLeft.current = data; setMonth(''); return false; }
+    if (monthLeft.current && data === monthLeft.current) return false;
+    monthLeft.current = null;
+    if (loading || !journalReady) return false;
+    if (error || !data) return true;
+    const live = sessions.find((x) => x.status === 'active' || x.status === 'paused');
+    if (live) { openWorkout({ sessionId: live.id }); return true; }
+    const queue = (data.blocks || []).filter((b) => !blockSessions(sessions, b, data.month).length);
+    const block = want.free ? null : (queue.find((b) => b.title === want.title) || queue[0]);
+    if (!block) { openWorkout({ block: FREE_BLOCK, month: '' }); return true; }
+    localWorkouts(clientRow).catch(() => []).then((local) => {
+      openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [] });
+    });
+    return true;
+  }, quickHere);
+
+  // «Тренеру» из «+» — к пожеланию тренеру внизу экрана (Wishes.jsx). Из
+  // открытого занятия сначала к программе, как кнопкой «К программе»
+  useQuickRequest('wish', () => {
+    if (workout) { setWorkout(null); reload(); return false; }
+    if (loading) return false;
+    // Экран отрисован, а поля нет (ошибка загрузки) — запрос снимаем
+    const field = document.querySelector('main:not([hidden]) .wishes__input');
+    if (!field) return true;
+    try { field.focus({ preventScroll: true }); } catch (_) { /* старый браузер */ }
+    revealSoon(() => field.closest('.wishes') || field);
+    return true;
+  }, quickHere && !clientRow);
 
   // Выход из журнала — перечитать и программу: тренер мог переименовать
   // занятие, и тренировка в программе переименовалась вместе с ним
@@ -1564,6 +1610,23 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(null);
 
+  // «Вес» и «Замеры» из «+» нижнего меню (quick-actions.js): открыть форму
+  // и подвести к ней экран. Каждый запрос — новый объект: форма могла быть
+  // уже открыта, а экран — уйти от неё прокруткой
+  const [quick, setQuick] = useState(null); // { kind: 'weight' | 'measure' }
+  const openForm = (kind) => () => {
+    if (loading) return false;
+    if (!error) {
+      setAdded(null);
+      setAdding(true);
+      setQuick({ kind });
+    }
+    return true;
+  };
+  const quickHere = !familyRow && (!clientRow || clientView);
+  useQuickRequest('weight', openForm('weight'), quickHere);
+  useQuickRequest('measure', openForm('measure'), quickHere);
+
   if (loading) return <Loading rows={3} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
@@ -1604,8 +1667,9 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
               && measurements.series[i].sheetName) || '',
           }))}
           clientRow={clientRow}
-          onSaved={(result) => { setAdding(false); setAdded(result); reload(); }}
-          onCancel={() => setAdding(false)}
+          reveal={quick}
+          onSaved={(result) => { setAdding(false); setQuick(null); setAdded(result); reload(); }}
+          onCancel={() => { setAdding(false); setQuick(null); }}
         />
       </Section>
     )
@@ -1895,8 +1959,12 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
  * Пределы вменяемости («вес 7 кг» — это 70) проверяет сервер: они уже
  * живут в двух местах, и третья копия здесь однажды разошлась бы с
  * обеими. Отказ приходит текстом, который можно показать как есть.
+ *
+ * reveal — запрос из «+» нижнего меню ({ kind }): подвести форму на
+ * экран. «Вес» открывает форму с одним полем веса — встал на весы, вписал,
+ * записал; остальные показатели — кнопкой под ним.
  */
-function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
+function MeasureForm({ fields, series, clientRow, reveal = null, onSaved, onCancel }) {
   // Локальный день, а не UTC: в Москве после трёх ночи toISOString отдал
   // бы вчерашнее число, и замер лёг бы не в тот день.
   const today = (() => {
@@ -1917,6 +1985,21 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
 
   const list = (fields && fields.length ? fields : ['Вес']);
   const filled = list.filter((f) => String(values[f] || '').trim());
+
+  // Только вес — если форму открыли «Весом» из «+»; уже открытую с
+  // набранным не сворачиваем
+  const [allFields, setAllFields] = useState(() => !(reveal && reveal.kind === 'weight' && list.includes('Вес')));
+  const shown = allFields ? list : ['Вес'];
+  const box = useRef(null);
+  const weightInput = useRef(null);
+  useEffect(() => {
+    if (!reveal) return undefined;
+    if (reveal.kind === 'measure') setAllFields(true);
+    if (reveal.kind === 'weight' && weightInput.current) {
+      try { weightInput.current.focus({ preventScroll: true }); } catch (_) { /* старый браузер */ }
+    }
+    return revealSoon(() => box.current);
+  }, [reveal]);
 
   const set = (name, value) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -1966,6 +2049,7 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
   };
 
   return (
+    <div ref={box}>
     <Panel pad>
       <div className="survey">
         {named.length > 1 && (
@@ -2001,25 +2085,33 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
         </div>
 
         <div className="survey__group">
-          <div className="survey__legend">
-            Показатели
-            <span className="survey__legend-note">
-              достаточно одного — например, только веса. Пустые поля не записываются
-              и прежние значения в этой строке не трогают
-            </span>
-          </div>
+          {allFields && (
+            <div className="survey__legend">
+              Показатели
+              <span className="survey__legend-note">
+                достаточно одного — например, только веса. Пустые поля не записываются
+                и прежние значения в этой строке не трогают
+              </span>
+            </div>
+          )}
           <div className="field-row">
-            {list.map((f) => (
+            {shown.map((f) => (
               <Field
                 key={f}
                 label={f + (f === 'Вес' ? ', кг' : ', см')}
                 inputMode="decimal"
                 value={values[f] || ''}
                 onChange={(v) => set(f, v)}
+                inputRef={f === 'Вес' ? weightInput : undefined}
                 disabled={busy}
               />
             ))}
           </div>
+          {!allFields && (
+            <button type="button" className="button button--ghost" style={{ justifySelf: 'start' }} onClick={() => setAllFields(true)} disabled={busy}>
+              Другие показатели
+            </button>
+          )}
         </div>
       </div>
 
@@ -2038,6 +2130,7 @@ function MeasureForm({ fields, series, clientRow, onSaved, onCancel }) {
         <button className="button" onClick={onCancel} disabled={busy}>Отмена</button>
       </div>
     </Panel>
+    </div>
   );
 }
 

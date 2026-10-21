@@ -43,6 +43,8 @@ import GameShell from '../GameShell.jsx';
 import { IconPlankGame, IconScooterGame, IconMatchGame, IconCareerGame } from '../game-icons.jsx';
 import CareerHub from '../CareerHub.jsx';
 import { useCareer } from '../CareerSession.jsx';
+import QuickAdd from './QuickAdd.jsx';
+import { requestQuick } from '../quick-actions.js';
 
 /**
  * Панель клиента.
@@ -234,6 +236,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   // пятая — про себя, а не про тренировки — сломала бы их ряд. Заодно
   // сюда переехал выход: это конец разговора, а не раздел.
   const [menuOpen, setMenuOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const current = VIEWS.find((v) => v.id === view) || VIEWS[0];
   const onTab = TABS.some((t) => t.id === view);
 
@@ -263,9 +266,19 @@ export default function ClientApp({ me, clientRow, preview }) {
     else if (TABS.some((t) => t.id === view)) captureScreen();
     setView(id);
     setMenuOpen(false);
+    setQuickOpen(false);
     haptic();
   };
   goRef.current = go;
+
+  // «+» посередине меню — лист быстрой записи (пункт 13 плана, 21.10.2026).
+  // Плитка листа переключает вкладку и оставляет ей запрос: форма замера,
+  // занятие, дневник открываются там, где живут (quick-actions.js)
+  const quickAction = { label: 'Быстрая запись', open: quickOpen, onClick: () => { setQuickOpen(true); haptic(); } };
+  const quickPick = (tab, kind, payload) => {
+    go(tab);
+    requestQuick(kind, payload);
+  };
 
   // Кнопка раздела в истории (FT-615): вкладка, «Мои данные» или инструкция
   const openFromStory = (section) => {
@@ -503,7 +516,12 @@ export default function ClientApp({ me, clientRow, preview }) {
       </main>
       )}
 
-      <TabBar tabs={TABS} active={view} onSelect={go} />
+      {quickOpen && onTab && (
+        <QuickAdd me={me} clientRow={clientRow} preview={!!preview}
+          onClose={() => setQuickOpen(false)} onPick={quickPick} />
+      )}
+
+      <TabBar tabs={TABS} active={view} onSelect={go} action={quickAction} />
     </div>
   );
 }

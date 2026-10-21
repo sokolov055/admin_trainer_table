@@ -1,0 +1,91 @@
+/* ==========================================================================
+ * «Что записать» — лист под «+» нижнего меню (QuickAdd.jsx, пункт 13
+ * плана). Сверху главная кнопка — занятие, ниже плитки по три в ряд.
+ * ========================================================================== */
+
+/* Главное действие — того же цвета, что главные кнопки приложения, но
+   крупнее: вторая строка говорит, что именно начнётся */
+.quick-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  margin: 4px 0 12px;
+  padding: 10px 16px 10px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.quick-main:active { transform: scale(0.98); }
+.quick-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.quick-main__icon { flex: none; display: flex; }
+
+.quick-main__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-main__title { font-size: 16px; font-weight: 650; line-height: 1.25; }
+
+/* Название тренировки бывает длинным — переносится, а не обрезается:
+   ради него кнопку и читают */
+.quick-main__note {
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+/* Плитки: по три в ряд и на 320 px (≈ 86 px шириной); крупный шрифт
+   переносит подпись, а не режет её */
+.quick-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding-bottom: 4px;
+}
+
+.quick-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 84px;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-sunken);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.quick-tile:active { transform: scale(0.96); }
+.quick-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Значок — акцентом для текста: обычный акцент на подложке бледнее (FT-645) */
+.quick-tile__icon { display: flex; color: var(--accent-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-main, .quick-tile { transition: none; }
+  .quick-main:active, .quick-tile:active { transform: none; }
+}

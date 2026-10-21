@@ -1,0 +1,101 @@
+/* ==========================================================================
+ * «+» посередине нижнего меню клиента (TabBar.jsx, action) — быстрая
+ * запись, лист «Что записать» (client/QuickAdd.jsx). Пункт 13 плана,
+ * 21.10.2026. У тренера меню без кнопки, и эти правила его не касаются.
+ * ========================================================================== */
+
+/* Вкладки — по ширине подписи, а не поровну: при пятом элементе на 360 px
+   «Тренировкам» поровну не хватало бы места. Две половины равны, поэтому
+   кнопка стоит ровно посередине капсулы. */
+.tabbar--action .tabbar__group {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+}
+
+.tabbar--action .tabbar__item { flex: 1 1 auto; }
+
+/* Таблетка: место и ширина приходят из замеров (TabBar.jsx), отсчёт — от
+   края капсулы. Вкладки разной ширины, поэтому едет и ширина. Переход —
+   только после первого замера (tabbar--ready): иначе на запуске таблетка
+   ехала бы из места «поровну» в своё. */
+.tabbar.tabbar--action .tabbar__pill {
+  left: 0;
+  transition: none;
+}
+
+.tabbar.tabbar--action.tabbar--ready .tabbar__pill {
+  transition: transform var(--dur-nav) var(--ease-ios),
+              width var(--dur-nav) var(--ease-ios),
+              opacity var(--dur-fast) var(--ease-out);
+}
+
+/* Палец ведёт таблетку и снимок после жеста — без перехода, как в styles.css */
+.tabbar.tabbar--action.tabbar--ready.tabbar--dragging .tabbar__pill,
+.gesture-landing .tabbar.tabbar--action.tabbar--ready .tabbar__pill { transition: none; }
+
+.tabbar__action {
+  position: relative;
+  flex: none;
+  width: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Круг чуть выше капсулы: это не ещё одна вкладка, а действие, и палец
+   не путает его с соседними разделами. Цвет — акцент темы (в Telegram —
+   цвет его кнопки), плюс — цвет текста на ней. */
+.tabbar__action-disc {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 6px 16px rgba(38, 114, 205, 0.34), 0 1px 3px rgba(0, 0, 0, 0.12);
+  transform: translateY(-10px);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  .tabbar__action-disc {
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 34%, transparent), 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.tabbar__action:active .tabbar__action-disc { transform: translateY(-10px) scale(0.94); }
+
+/* Лист открыт — плюс повёрнут в крестик: под затемнением видно, что тем
+   же местом лист и закрывается (как в разборе «Худеем вместе») */
+.tabbar__action svg { transition: transform var(--dur-nav) var(--ease-ios); }
+.tabbar__action[aria-expanded="true"] svg { transform: rotate(45deg); }
+
+.tabbar__action:focus-visible { outline: none; }
+.tabbar__action:focus-visible .tabbar__action-disc { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* 320–359 px: капсула шире на 8 px, поля вкладок и круг уже — так все
+   четыре подписи помещаются целиком и с «+» посередине */
+@media (max-width: 359px) {
+  .tabbar.tabbar--action {
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+  }
+  .tabbar--action .tabbar__item { padding-left: 2px; padding-right: 2px; }
+  .tabbar__action { width: 56px; }
+  .tabbar__action-disc { width: 50px; height: 50px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabbar.tabbar--action.tabbar--ready .tabbar__pill { transition: opacity var(--dur-fast) var(--ease-out); }
+  .tabbar__action-disc,
+  .tabbar__action svg { transition: none; }
+}

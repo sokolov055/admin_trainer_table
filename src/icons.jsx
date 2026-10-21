@@ -81,6 +81,22 @@ export const IconRuler = (p) => (
   </Icon>
 );
 
+/** Напольные весы — «Вес» в быстрой записи */
+export const IconScale = (p) => (
+  <Icon {...p}>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+    <path d="M7.5 10a4.5 4.5 0 0 1 9 0" />
+    <path d="m12 10 2-2.4" />
+  </Icon>
+);
+
+/** Капля — вода в дневнике питания */
+export const IconDrop = (p) => (
+  <Icon {...p}>
+    <path d="M12 3.5s6 6.6 6 10.9a6 6 0 0 1-12 0C6 10.1 12 3.5 12 3.5Z" />
+  </Icon>
+);
+
 export const IconNutrition = (p) => (
   <Icon {...p}>
     <path d="M12 8.5c0-2.5 1.8-4.5 4.5-4.5 0 2.6-1.9 4.5-4.5 4.5Z" />
@@ -322,6 +338,13 @@ export const IconArrowUp = (p) => (
 export const IconPlus = (p) => (
   <Icon {...p}>
     <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+
+/** «Начать» — занятие из быстрой записи */
+export const IconPlay = (p) => (
+  <Icon {...p}>
+    <path d="M8 5.5v13l10.5-6.5L8 5.5Z" />
   </Icon>
 );
 
