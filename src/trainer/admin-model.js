@@ -79,3 +79,31 @@ export function flagStatus(flag) {
 
 /** Платформы в порядке показа */
 export const PLATFORM_NAMES = { ios: 'iPhone', android: 'Android' };
+
+// Число из поля ввода или из настроек: «1 000» и 1000 — одно и то же
+const toNum = (v) => (typeof v === 'number' ? v : String(v ?? '').trim() === '' ? NaN : Number(String(v).replace(/\s/g, '')));
+
+/**
+ * Цена ступени на одного клиента (FT-545; из разбора SmartGym, 21.10.2026):
+ * цена месяца ÷ верхняя граница клиентов, до рубля. «≈ 20 ₽ за клиента»
+ * продаёт ступень понятнее, чем «990 ₽ за 50».
+ *
+ * null — строки нет: бесплатная ступень, последняя (unlimited: предела у
+ * неё нет, сверх границы — по цене за клиента), пустое или неверное поле.
+ */
+export function perClientPrice({ price, upTo } = {}, { unlimited = false } = {}) {
+  const p = toNum(price);
+  const n = toNum(upTo);
+  if (unlimited || !Number.isFinite(p) || p <= 0 || !Number.isInteger(n) || n < 1) return null;
+  const each = Math.round(p / n);
+  return each >= 1 ? each : null;
+}
+
+/** «≈ 20 ₽ за клиента в месяц при 50 клиентах»; без цены на клиента — пусто */
+export function perClientNote(tier, opts) {
+  const each = perClientPrice(tier, opts);
+  if (each === null) return '';
+  const n = toNum(tier.upTo);
+  const word = n % 10 === 1 && n % 100 !== 11 ? 'клиенте' : 'клиентах';
+  return `≈ ${each.toLocaleString('ru-RU')} ₽ за клиента в месяц при ${n.toLocaleString('ru-RU')} ${word}`;
+}

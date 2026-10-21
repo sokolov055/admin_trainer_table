@@ -14,7 +14,7 @@ import Games from './Games.jsx';
 import AdminStories from './AdminStories.jsx';
 import { Logs } from './screens.jsx';
 import {
-  PLATFORM_NAMES, flagStatus, growthPoints, monthName, needsConfirm, percent, sourceTotals,
+  PLATFORM_NAMES, flagStatus, growthPoints, monthName, needsConfirm, percent, perClientNote, sourceTotals,
 } from './admin-model.js';
 
 /**
@@ -238,15 +238,22 @@ function Tariffs() {
 
       <Section title="Ступени тренера" note="Цена месяца по числу активных клиентов. Названия — в коде, здесь границы и цены">
         <div className="admin-list">
-          {form.tiers.map((t, i) => (
-            <Panel pad key={t.key} className="admin-tier">
-              <strong>{t.title}</strong>
-              <div className="admin-tier__fields">
-                <Field label="Клиентов до" value={t.upTo} onChange={(v) => setTier(i, 'upTo', v)} disabled={busy} />
-                <Field label="Цена, ₽ в месяц" value={t.price} onChange={(v) => setTier(i, 'price', v)} disabled={busy} />
-              </div>
-            </Panel>
-          ))}
+          {form.tiers.map((t, i) => {
+            // Цена на клиента — по тому, что сейчас в полях: видно сразу, как
+            // правка цены или границы меняет её. У последней ступени предела
+            // нет, у бесплатной считать нечего
+            const per = perClientNote(t, { unlimited: i === form.tiers.length - 1 });
+            return (
+              <Panel pad key={t.key} className="admin-tier">
+                <strong>{t.title}</strong>
+                <div className="admin-tier__fields">
+                  <Field label="Клиентов до" value={t.upTo} onChange={(v) => setTier(i, 'upTo', v)} disabled={busy} />
+                  <Field label="Цена, ₽ в месяц" value={t.price} onChange={(v) => setTier(i, 'price', v)} disabled={busy} />
+                </div>
+                {per && <p className="small muted" style={{ margin: 0 }}>{per}</p>}
+              </Panel>
+            );
+          })}
         </div>
       </Section>
 
