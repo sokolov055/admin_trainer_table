@@ -449,6 +449,22 @@ test('FT-643: диалоги дневника на общем листе — с�
   await page.close();
 });
 
+// Плашка «Норма ещё не посчитана» — только у клиента без анкеты и без нормы от тренера
+test('плашка анкеты показывается без нормы и ведёт в «Норма и анкета»', { timeout: 60000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('nutrition_demo_server:3', JSON.stringify({ days: {}, targets: {}, recipes: [], foods: [], settings: { mode: 'count', meals: null, chosen: true } })); });
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  const diary = page.getByTestId('nutrition-diary');
+  await diary.getByRole('heading', { name: 'Норма ещё не посчитана' }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
+  await diary.getByRole('button', { name: 'Заполнить анкету', exact: true }).click();
+  await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Норма ещё не посчитана' }).count(), 0);
+  await page.close();
+});
+
 test('FT-644: плашка вместо анкеты, день словом, числа целыми, «набран» при нулевом остатке', { timeout: 120000 }, async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
   page.on('pageerror', e => errors.push(e.message));
@@ -457,9 +473,10 @@ test('FT-644: плашка вместо анкеты, день словом, ч�
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary');
-  // Клиент без анкеты: одна плашка, а не вся анкета под дневником
-  await diary.getByRole('heading', { name: 'Норма ещё не посчитана' }).waitFor();
+  // Клиент без анкеты, но с нормой от тренера: ни анкеты под дневником, ни плашки «не посчитана» рядом с нормой
+  await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
+  assert.equal(await diary.getByRole('heading', { name: 'Норма ещё не посчитана' }).count(), 0);
   await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
   await page.screenshot({ path: join(shots, 'diary-notice-390.png'), fullPage: true, animations: 'disabled' });
   // День словами, без «2026-10-20» и «20.10.2026»
@@ -470,12 +487,12 @@ test('FT-644: плашка вместо анкеты, день словом, ч�
   assert.ok(!/\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4}/.test(await copy.innerText()));
   await copy.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.locator('.sheet').waitFor({ state: 'detached' });
-  // Кнопка плашки ведёт в «Норма и анкета», на дневнике плашки уже нет
-  await diary.getByRole('button', { name: 'Заполнить анкету', exact: true }).click();
+  // Анкета живёт в «Ещё → Норма и анкета», на дневнике её нет
+  await page.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await diary.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
   await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
-  assert.equal(await page.getByRole('heading', { name: 'Норма ещё не посчитана' }).count(), 0);
   await page.getByRole('tab', { name: 'Дневник', exact: true }).click();
-  await diary.getByRole('heading', { name: 'Норма ещё не посчитана' }).waitFor();
+  await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
   // Продукт с белком выше нормы: название со счётчиком, потом «набран»
   await diary.getByRole('button', { name: 'Добавить еду', exact: true }).click();
@@ -558,7 +575,7 @@ test('план трёх разборов, п. 8: «Как вы считаете 
   await row.waitFor();
   assert.match(await row.innerText(), /2 ладони · примерно/);
   await diary.getByRole('button', { name: 'Изменить: Овощи · кулак', exact: true }).waitFor();
-  assert.match(await diary.innerText(), /2\/5/);
+  assert.match(await diary.innerText(), /2[\s ]из 5/);
   await page.screenshot({ path: join(shots, 'diary-palm-390.png') });
   await page.close();
 });
