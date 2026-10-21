@@ -1,5 +1,5 @@
 /* ==========================================================================
-   «Подключения» и «Напоминания» в «Настройках» клиента
+   «Подключения», «Напоминания», «Поддержка» в «Настройках» клиента
    (client/Settings.jsx, макет Settings.dc.html, 21.10.2026).
    Строка — название, под ним состояние, справа одно действие: кнопка или
    переключатель. Строки делит волосяная линия, как в системных настройках.
@@ -156,4 +156,36 @@
 @media (prefers-reduced-motion: reduce) {
   .switch__track,
   .switch__track::after { transition: none; }
+}
+
+/* --- строки-кнопки «Поддержки» --- */
+.conn-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.conn-link:last-child { border-bottom: 0; }
+.conn-link svg { flex-shrink: 0; color: var(--text-muted); }
+.conn-link:active { background: var(--surface-active); }
+.conn-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.conn-link:disabled { opacity: 0.45; cursor: not-allowed; background: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  .conn-link:not(:disabled):hover { background: var(--surface-hover); }
 }

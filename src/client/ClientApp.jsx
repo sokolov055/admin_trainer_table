@@ -20,7 +20,7 @@ import DeleteAccount from '../DeleteAccount.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
-import { Connections, Reminders } from './Settings.jsx';
+import { Connections, Reminders, Support } from './Settings.jsx';
 import { syncReminders, remindersAvailable } from '../native-reminders.js';
 import Family from './Family.jsx';
 import WatchSuggest from './WatchSuggest.jsx';
@@ -530,6 +530,9 @@ export default function ClientApp({ me, clientRow, preview }) {
                   : <PushSetting clientRow={clientRow} />}
               </Section>
             )}
+            <Section title="Поддержка">
+              <Support disabled={!!preview} />
+            </Section>
 
 
             {/* Выход стоит последним: это конец разговора, а не раздел.

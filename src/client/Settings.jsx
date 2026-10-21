@@ -1,22 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Panel, Segmented, Field, formatNumber, formatWhen } from '../ui.jsx';
+import { IconCopy, IconCheck, IconExternal } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
-import { isNativeApp, plugin } from '../native-bridge.js';
+import { isNativeApp, plugin, screensNote } from '../native-bridge.js';
+import { APP_VERSION } from '../version.js';
+import { copyText } from '../access.js';
+import { accountState } from '../trainer-link.js';
 import {
   stepsAvailability, stepsConnected, stepsOn, connectSteps, openHealthSettings, healthHub, onIphone,
   workoutsAvailable, workoutsOn, connectWorkouts, reportDevice,
 } from '../native-steps.js';
 import { ensureBackgroundSync } from '../native-sync.js';
 import { notifyPermission, askNotifyPermission } from '../native-rest.js';
-import { openPhoneSettings } from '../native-review.js';
+import { openPhoneSettings, canRateInStore, openStorePage, deviceInfo } from '../native-review.js';
 import { readReminders, saveReminders, syncReminders, remindersAvailable } from '../native-reminders.js';
 import { WEEKDAYS_SHORT, reminderNote, validTime } from '../reminders-model.js';
 import './settings.css';
 
 /**
- * «Подключения» и «Напоминания» в «Настройках» клиента (план трёх
- * разборов, пункт 14, 21.10.2026; макет Settings.dc.html).
+ * «Подключения», «Напоминания» и «Поддержка» в «Настройках» клиента (план
+ * трёх разборов, пункт 14 и пункт 6, 21.10.2026; макет Settings.dc.html).
  *
  * Подключения — только состояние того, что уже есть на телефоне: откуда
  * шаги, приходят ли тренировки с часов, разрешены ли уведомления. Новых
@@ -273,6 +277,76 @@ export function Reminders() {
         {can
           ? 'Напоминания ставит сам телефон, без нашего сервера: расписание хранится только на нём. Время можно менять касанием по строке.'
           : 'Напоминания работают в приложении для iPhone и Android.'}
+      </p>
+    </>
+  );
+}
+
+/* ==========================================================================
+ * Поддержка: оценить и скопировать данные
+ * ========================================================================== */
+
+/** Текст для письма в поддержку — только то, что человек сам решит отправить */
+async function supportText() {
+  const lines = ['Fit Track — данные для поддержки', 'Версия: ' + APP_VERSION + screensNote()];
+  const d = await deviceInfo().catch(() => null);
+  if (d && d.app) lines.push('Приложение: ' + d.app);
+  if (d && d.device) lines.push('Устройство: ' + d.device);
+  // ID «FT-…» — тот же, что в «Моём тренере»; нет связи — без него
+  const id = await accountState().then((r) => (r && r.publicId) || '').catch(() => '');
+  if (id) lines.push('ID: ' + id);
+  return lines.join('\n');
+}
+
+export function Support({ disabled = false }) {
+  const [rate, setRate] = useState(false);
+  // Текст собираем заранее: Safari и WebView iPhone пишут в буфер только
+  // прямо в нажатии, а ожидание модели и ID это нажатие «остужает»
+  const [text, setText] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (disabled) return undefined;
+    let alive = true;
+    canRateInStore().then((ok) => { if (alive) setRate(ok); }).catch(() => {});
+    supportText().then((t) => { if (alive) setText(t); }).catch(() => {});
+    return () => { alive = false; };
+  }, [disabled]);
+  useEffect(() => {
+    if (!copied) return undefined;
+    const t = setTimeout(() => setCopied(false), 4000);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  const copy = async () => {
+    setFailed(false);
+    try {
+      await copyText(text || await supportText());
+      setCopied(true);
+      haptic('success');
+    } catch (_) { setFailed(true); }
+  };
+
+  return (
+    <>
+      <Panel>
+        {rate && (
+          <button type="button" className="conn-link" onClick={() => { haptic(); openStorePage().catch(() => {}); }}>
+            <span>Оценить Fit Track</span>
+            <IconExternal size={18} />
+          </button>
+        )}
+        <button type="button" className="conn-link" onClick={copy} disabled={disabled}>
+          <span>Скопировать данные для поддержки</span>
+          {copied ? <IconCheck size={18} /> : <IconCopy size={18} />}
+        </button>
+      </Panel>
+      <p className={'conn-caption' + (failed ? ' conn-caption--bad' : '')} role="status">
+        {disabled
+          ? 'Здесь клиент копирует версию приложения, модель телефона и свой ID для письма в поддержку. В режиме просмотра это не нажимается.'
+          : failed ? 'Не получилось скопировать — телефон не дал доступ к буферу обмена.'
+            : copied ? 'Скопировано: версия, устройство и ID — вставьте в письмо поддержке.'
+              : 'Версия приложения, модель телефона и ваш ID — в буфер обмена, чтобы вставить в письмо.'}
       </p>
     </>
   );
