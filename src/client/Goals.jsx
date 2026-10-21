@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
-import { Section, Panel, Segmented, formatNumber, plural } from '../ui.jsx';
+import { Section, Panel, Segmented, Qty, formatNumber, plural } from '../ui.jsx';
 import { IconCheck, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { goalDots, dotsLabel, daysLeft } from './goal-dots.js';
@@ -89,7 +89,9 @@ function GoalCard({ title, layout, grid = false, children }) {
       <div className="goal-card__head">
         <h3 className="goal-card__title">{title}</h3>
         <span className={'goal-card__count' + (full ? ' goal-card__count--done' : '')} aria-hidden={has || undefined}>
-          {has ? formatNumber(layout.done) + ' из ' + formatNumber(layout.target) : trainings(layout.done)}
+          {has
+            ? <Qty value={formatNumber(layout.done)} unit={'из ' + formatNumber(layout.target)} />
+            : <Qty value={formatNumber(layout.done)} unit={plural(layout.done, 'тренировка', 'тренировки', 'тренировок')} />}
         </span>
       </div>
       {has && (

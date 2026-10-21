@@ -1,7 +1,7 @@
 import React from 'react';
 import { useData } from '../useData.js';
 import { useRights, hasPlus } from '../rights.js';
-import { formatNumber } from '../ui.jsx';
+import { formatNumber, Qty } from '../ui.jsx';
 import { today } from '../nutrition/diary-model.js';
 import './today-strip.css';
 
@@ -14,6 +14,8 @@ import './today-strip.css';
  * цифры уже есть в разделах, а лишние запросы на каждого клиента не нужны.
  */
 const thousands = (v) => (v >= 1000 ? formatNumber(Math.round(v / 100) / 10) + ' тыс.' : formatNumber(v));
+// То же для крупной цифры плитки: «тыс.» — серой единицей (Qty, FT-665)
+const thousandsQty = (v) => (v >= 1000 ? <Qty value={formatNumber(Math.round(v / 100) / 10)} unit="тыс." /> : formatNumber(v));
 
 export default function TodayStrip({ onOpen }) {
   const awards = useData('client.awards', {}, []);
@@ -44,7 +46,7 @@ function Strip({ awards, day, onOpen }) {
   const steps = awards?.steps;
   if (steps) {
     tiles.push({
-      id: 'progress', value: thousands(steps.today || 0),
+      id: 'progress', value: thousandsQty(steps.today || 0),
       label: steps.goal ? 'шагов из ' + thousands(steps.goal) : 'шагов сегодня',
       done: !!steps.goal && steps.today >= steps.goal,
     });

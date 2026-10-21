@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { apiMutate } from '../api.js';
-import { Sheet, Note, formatNumber } from '../ui.jsx';
+import { Sheet, Note, Qty, formatNumber } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { queueWrite, isOffline } from '../offline-writes.js';
 import { PALM, PALM_GROUPS, palmNorm, palmCount, palmUnit, palmSnapshot } from './palm-model.js';
@@ -80,7 +80,8 @@ export function PalmSummary({ entries, targets }) {
           return (
             <div key={g.id} className={'palm-ring palm-ring--' + g.id + (goal && have >= goal ? ' is-done' : '')} style={{ '--palm-progress': pct }}>
               <span className="palm-ring__circle"><HandIcon kind={g.id} size={22} /></span>
-              <strong>{formatNumber(have)}{goal ? '/' + goal : ''}</strong>
+              {/* «3 из 5»: число с серой единицей, как счёт в «Целях» (Qty, FT-665) */}
+              <strong>{goal ? <Qty value={formatNumber(have)} unit={'из ' + goal} /> : formatNumber(have)}</strong>
               <small>{g.title}</small>
             </div>
           );
