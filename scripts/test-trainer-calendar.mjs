@@ -13,6 +13,8 @@ const output = await build({
   format: 'cjs',
   platform: 'node',
   external: ['react'],
+  // Стили компонентов (TabBar тянет tabbar-action.css) тесту не нужны
+  loader: { '.css': 'empty' },
   plugins: [{
     name: 'trainer-calendar-stubs',
     setup(bundle) {
@@ -64,7 +66,7 @@ const output = await build({
         if (args.path === 'icons') return {
           loader: 'jsx',
           contents: `import React from 'react'; const I=()=> <i />;
-            export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
+            export const IconPlus=I; export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
             export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I; export const IconEye=I;`,
         };

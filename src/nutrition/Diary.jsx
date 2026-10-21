@@ -7,6 +7,7 @@ import { IconPlus, IconClose, IconHeart, IconCopy, IconTrash, IconChevron, IconN
 import { haptic } from '../telegram.js';
 import SwipeRow from '../SwipeRow.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
+import { useQuickRequest } from '../quick-actions.js';
 import { localWrites, onWritesChange, queueWrite, isOffline, dropWrite } from '../offline-writes.js';
 import { offlineAccount } from '../offline-account.js';
 import { DIARY_MEALS, NUTRIENTS, today, shiftDay, dayLabel, requestId, totalEntries, withPending, productKey, mealNow, dayVerdict, mealFromRecipe } from './diary-model.js';
@@ -337,6 +338,10 @@ export default function NutritionDiary({ clientRow, readOnly = false, preview = 
   // «Обед · 320 ккал», а с нормой на приём — «Обед · 320 из 630 ккал» (п. 10)
   const mealLine = id => { const eaten = totalEntries(shown.filter(e => e.meal === id)).kcal, norm = mealNorm(id); return label(id) + ' · ' + n(eaten) + (norm ? ' из ' + n(norm) : '') + ' ккал'; };
   const mealNorm = id => settings.meals && target.kcal ? Number(target.kcal) * (settings.meals[id] || 0) / 100 : 0;
+  // «+» посередине панели (п. 13): «Еда» — сразу выбор еды на приём по часам,
+  // «Вода» — +250 мл одним касанием; пока день не загружен — ждём (false)
+  useQuickRequest('food', () => { if (!resource.data) return false; chooseTab('diary'); add(day === today() ? mealNow() : 'snack'); }, !readOnly);
+  useQuickRequest('water', () => { if (!resource.data || busy) return false; chooseTab('diary'); haptic(); updateDay({ waterDelta: 250 }, 'Вода: +250 мл.'); }, !readOnly);
   const openEntry = entry => { if (readOnly || entry.pending) return; setModal({ type: 'entry', entry }); };
   const modalView = () => {
     if (!modal) return null;
