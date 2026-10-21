@@ -89,7 +89,7 @@ export function startNative() {
       bar.setStyle({ style: isDark(color) ? 'DARK' : 'LIGHT' }).catch(() => {});
     };
     const later = () => requestAnimationFrame(paint);
-    new MutationObserver(later).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+    new MutationObserver(later).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-palette', 'style', 'class'] });
     try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', later); } catch (_) {}
     if (document.body) later(); else window.addEventListener('DOMContentLoaded', later);
   }

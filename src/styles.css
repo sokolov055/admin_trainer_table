@@ -1779,7 +1779,8 @@ button, input, select, textarea { font-family: inherit; }
 .chip {
   flex: 0 0 auto;
   border: 1px solid var(--border);
-  background: var(--surface);
+  /* Персональные цвета заливают чипы третьим цветом (palettes.js) */
+  background: var(--chip-bg, var(--surface));
   color: var(--text-secondary);
   border-radius: 999px;
   padding: 6px 13px;

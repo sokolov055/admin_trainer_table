@@ -16,18 +16,12 @@ globalThis.localStorage = {
   setItem: (k, v) => { if (broken) throw new Error('denied'); store.set(k, String(v)); },
 };
 
-const { PALETTES, STANDARD, PALETTE_KEY, paletteTokens, paletteCss, getPaletteId, setPaletteId, paletteById } = await import('../src/palettes.js');
+const { PALETTES, STANDARD, PALETTE_KEY, BASE, WASH, paletteTokens, paletteColors, paletteCss, getPaletteId, setPaletteId, paletteById, contrast, over, lum } = await import('../src/palettes.js');
 
 const HEX = /^#[0-9a-f]{6}$/;
-const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-const lum = (h) => { const [r, g, b] = rgb(h); return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); };
-const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-const hex = (arr) => '#' + arr.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
-/** Подложка: акцент с прозрачностью поверх поверхности */
-const over = (fg, alpha, bg) => { const f = rgb(fg), b = rgb(bg); return hex(f.map((v, i) => v * alpha + b[i] * (1 - alpha))); };
 
-// Поверхности — из styles.css, чтобы проверка не разошлась с темой
+// Основа палитр совпадает с темами styles.css — иначе контраст считался бы
+// не к тем поверхностям
 const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
 const blockOf = (selector) => {
   const at = css.indexOf(selector + ' {');
@@ -39,20 +33,23 @@ const token = (block, name) => {
   assert.ok(m, 'нет токена ' + name);
   return m[1];
 };
-const LIGHT = blockOf(':root');
-const DARK = blockOf(":root[data-theme='dark']");
-const SURF = {
-  light: [token(LIGHT, '--bg'), token(LIGHT, '--surface'), token(LIGHT, '--surface-sunken')],
-  dark: [token(DARK, '--bg'), token(DARK, '--surface')],
-};
-const WASH = { light: 0.10, dark: 0.16 };
 const AA = 4.5;
 
-test('палитры владельца — все на месте, стандартная первой', () => {
+test('основа палитр — те же цвета, что у тем styles.css', () => {
+  for (const [scheme, sel] of [['light', ':root'], ['dark', ":root[data-theme='dark']"]]) {
+    const b = blockOf(sel);
+    assert.equal(BASE[scheme].bg, token(b, '--bg'), scheme);
+    assert.equal(BASE[scheme].surface, token(b, '--surface'), scheme);
+    assert.equal(BASE[scheme].sunken, token(b, '--surface-sunken'), scheme);
+    assert.deepEqual(BASE[scheme].text, [token(b, '--text'), token(b, '--text-secondary'), token(b, '--text-muted')], scheme);
+  }
+});
+
+test('палитры владельца — все на месте, стандартная первой, Хэллоуин последним', () => {
   assert.equal(PALETTES[0].id, STANDARD);
   assert.deepEqual(PALETTES.map((p) => p.name), [
     'Стандартный', 'Мандаринка', 'Ара', 'Кокос', 'Красная панда', 'Море и скалы', 'Золотой фазан',
-    'Фисташка', 'Фламинго', 'Авокадо', 'Косатка', 'Снежный барс', 'Инжир',
+    'Фисташка', 'Фламинго', 'Авокадо', 'Косатка', 'Снежный барс', 'Инжир', 'Хэллоуин',
   ]);
   assert.equal(new Set(PALETTES.map((p) => p.id)).size, PALETTES.length, 'id не повторяются');
   for (const p of PALETTES) {
@@ -61,38 +58,50 @@ test('палитры владельца — все на месте, станда
   }
 });
 
-test('у каждой палитры полный набор токенов в обеих темах', () => {
-  for (const p of PALETTES.slice(1)) {
-    for (const scheme of ['light', 'dark']) {
-      const t = p[scheme];
-      for (const k of ['accent', 'ink', 'accent2', 'ink2']) assert.match(t[k], HEX, `${p.id}/${scheme}/${k}`);
-      const tokens = paletteTokens(p, scheme);
-      assert.deepEqual(Object.keys(tokens).sort(), [
-        '--accent', '--accent-2', '--accent-2-ink', '--accent-2-wash', '--accent-ink',
-        '--accent-solid', '--accent-text', '--accent-wash',
-      ]);
-      Object.values(tokens).forEach((v) => assert.ok(v, `${p.id}/${scheme}`));
+test('три роли: фон — второй цвет, мелкое — третий, у каждой палитры свой фон', () => {
+  for (const scheme of ['light', 'dark']) {
+    const bgs = new Set();
+    for (const p of PALETTES.slice(1)) {
+      const t = paletteTokens(p, scheme);
+      assert.deepEqual(Object.keys(t).sort(), [
+        '--accent', '--accent-2', '--accent-2-ink', '--accent-2-wash', '--accent-ink', '--accent-solid',
+        '--accent-text', '--accent-wash', '--bg', '--chip-bg', '--surface', '--surface-sunken',
+      ], p.id);
+      ['--bg', '--surface', '--surface-sunken', '--accent'].forEach((k) => assert.match(t[k], HEX, `${p.id}/${scheme}/${k}`));
+      // Подложки мелкого — третьим цветом, полупрозрачные
+      assert.match(t['--chip-bg'], /^rgba\(\d+, \d+, \d+, 0\.\d+\)$/);
+      assert.equal(t['--accent-wash'], t['--chip-bg']);
+      assert.notEqual(t['--bg'], BASE[scheme].bg, p.id + ': фон подкрашен');
+      bgs.add(t['--bg']);
     }
+    assert.ok(bgs.size >= 10, scheme + ': фоны разные, а не одна бежевая — ' + bgs.size);
   }
   assert.equal(paletteTokens(paletteById(STANDARD), 'light'), null, 'стандартная — токены styles.css');
 });
 
-test('контраст: текст на кнопке, акцент текстом, надписи на подложках — не ниже 4,5:1', () => {
+test('контраст: текст темы, кнопка, акцент и надписи на подложках — не ниже 4,5:1', () => {
   for (const p of PALETTES.slice(1)) {
     for (const scheme of ['light', 'dark']) {
-      const t = p[scheme];
-      const onButton = paletteTokens(p, scheme)['--accent-text'];
+      const c = paletteColors(p, scheme);
       const at = (what, v) => `${p.id}/${scheme}: ${what} ${v.toFixed(2)}`;
-      const c = contrast(onButton, t.accent);
-      assert.ok(c >= AA, at('текст на кнопке', c));
-      for (const s of SURF[scheme]) {
-        const a = contrast(t.accent, s);
-        assert.ok(a >= AA, at('акцент к поверхности ' + s, a));
-        const i = contrast(t.ink, over(t.accent, WASH[scheme], s));
-        assert.ok(i >= AA, at('ink на подложке ' + s, i));
-        const i2 = contrast(t.ink2, over(t.accent2, WASH[scheme], s));
-        assert.ok(i2 >= AA, at('ink2 на подложке ' + s, i2));
+      const grounds = [c.bg, c.surface, c.sunken];
+      const washes = grounds.map((g) => over(c.fill, WASH[scheme], g));
+      assert.ok(contrast(c.onButton, c.accent) >= AA, at('текст на кнопке', contrast(c.onButton, c.accent)));
+      // Текст темы — на фоне, карточке, дорожке; на подложках мелкого —
+      // основной и вторичный (подписи чипов, меток), приглушённого там нет
+      for (const g of grounds) {
+        for (const text of BASE[scheme].text) assert.ok(contrast(text, g) >= AA, at('текст ' + text + ' на ' + g, contrast(text, g)));
       }
+      for (const g of washes) {
+        for (const text of BASE[scheme].text.slice(0, 2)) assert.ok(contrast(text, g) >= AA, at('текст ' + text + ' на подложке ' + g, contrast(text, g)));
+      }
+      for (const g of [...grounds, ...washes]) {
+        assert.ok(contrast(c.accent, g) >= AA, at('акцент на ' + g, contrast(c.accent, g)));
+        assert.ok(contrast(c.ink2, g) >= AA, at('третий цвет текстом на ' + g, contrast(c.ink2, g)));
+      }
+      // Тёмная остаётся тёмной, светлая — светлой: строка состояния и
+      // системные элементы подбираются по фону
+      assert.ok(scheme === 'dark' ? lum(c.bg) < 0.05 : lum(c.bg) > 0.6, at('светлота фона', lum(c.bg)));
     }
   }
 });
@@ -103,7 +112,7 @@ test('CSS: светлая и тёмная для каждой палитры, т
     assert.ok(out.includes(`:root[data-palette='${p.id}'] {`), p.id);
     assert.ok(out.includes(`:root[data-palette='${p.id}'][data-theme='dark'] {`), p.id);
     assert.ok(out.includes(`:root[data-palette='${p.id}']:not([data-theme='light']) {`), p.id);
-    assert.ok(out.includes(p.dark.accent) && out.includes(p.light.accent), p.id);
+    assert.ok(out.includes(paletteColors(p, 'dark').accent) && out.includes(paletteColors(p, 'light').accent), p.id);
   }
   assert.ok(!out.includes("data-palette='standard'"), 'стандартной своих правил не нужно');
   assert.ok(out.includes('@media (prefers-color-scheme: dark)'));
