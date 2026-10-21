@@ -19,8 +19,10 @@
  *   3. Тяжело и повторов меньше плана → −шаг сразу: не добил.
  *   4. Тяжело второй раз подряд → −шаг, но один раз: прошлое «тяжело»
  *      уже сняло шаг — третье подряд вес не трогает (20.10.2026).
- *   5. Тяжело один раз, повторы сделаны → вес держим, отдых на 30 с дольше.
- *      Тяжело всегда даёт +30 с отдыха.
+ *   5. Тяжело один раз, повторы сделаны → вес держим, отдых на 30 с дольше:
+ *      следующие подходы не тяжелее сделанного (21.10.2026 — сделал 45
+ *      вместо подобранных 50, тяжело, а дальше стояло 50; лесенка прошлого
+ *      раза сохраняется). Тяжело всегда даёт +30 с отдыха.
  *   Разминочные подходы вес не двигают. Новый вес встаёт только в
  *   нетронутые подходы того же человека: что вписано руками — не трогаем.
  *
@@ -278,13 +280,17 @@ export function rateSet(ex, si, effort) {
     // прошлое «тяжело» уже сняло шаг (lowered) — хватит (20.10.2026)
     else if (effort === 'hard' && last && last.effort === 'hard' && !last.lowered) { dir = -1; suggest = 'hard'; }
   }
+  // Тяжело, повторы сделаны — вес держим: подобранное тяжелее сделанного
+  // опускается до сделанного (шаг не снимается, lowered не ставится)
+  const hold = !dir && effort === 'hard' && work && m.has(set);
+  if (hold) suggest = 'held';
   const step = (load) => (assist ? assistStep(ex) : stepOf(ex, load));
   let changed = false;
   // Что сдвинула эта оценка — чтобы «не то нажал» вернуло веса (unrateAt)
   const moved = [];
   const sets = ex.sets.map((x, i) => {
     if (i === si) return { ...x, state: 'done', effort };
-    if (!dir || i < si || !mine(x) || x.state !== 'pending' || x.kind === 'warmup' || x.own) return x;
+    if ((!dir && !hold) || i < si || !mine(x) || x.state !== 'pending' || x.kind === 'warmup' || x.own) return x;
     if (!m.has(x)) return x;
     const w = m.load(x);
     // Отсчёт — от того, что сделано сейчас, а не от веса прошлой тренировки
@@ -296,9 +302,12 @@ export function rateSet(ex, si, effort) {
     let base;
     if (was !== null && then !== null && then >= was) base = cur + (then - was);
     // Нет истории — как было: не легче этого, лесенка ниже — своя
+    else if (hold) base = cur;
     else if (w >= cur) base = w;
     else return x;
-    const next = text(assist ? Math.max(0, -(base + dir * step(base))) : Math.max(0, base + dir * step(base)));
+    if (hold && w <= base) return x;
+    const to = hold ? base : base + dir * step(base);
+    const next = text(assist ? Math.max(0, -to) : Math.max(0, to));
     // Сдвигать некуда (помощь уже 0) — подход как был
     if (num(next) === num(x[m.key])) return x;
     changed = true;
@@ -342,7 +351,7 @@ export function rerate(ex, si, effort) {
   return rateSet(unrateAt(ex, si), si, effort);
 }
 
-const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело' };
+const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело', held: 'было тяжело' };
 
 /** Подпись подобранного веса: «+2,5 кг · было легко»; у помощи — «−5 кг помощи · было легко» */
 export function suggestText(set, prev, ex = null) {
