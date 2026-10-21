@@ -1,6 +1,7 @@
 // Только VITE_MOCK: персистентный стенд без данных настоящих клиентов.
 import { FOOD, RECIPES } from './recipes.js';
 import { today, shiftDay, totalEntries } from './diary-model.js';
+import { PALM, palmSnapshot } from './palm-model.js';
 const copy = x => JSON.parse(JSON.stringify(x));
 const fail = (code, text) => { throw Object.assign(new Error(text), { code }); };
 export function diaryMock(action, p = {}) {
@@ -9,21 +10,27 @@ export function diaryMock(action, p = {}) {
   try { s = JSON.parse(localStorage.getItem(key)); } catch { /* пустой стенд */ }
   s ||= { days: {}, targets: { kcal: 2000, protein: 130, fat: 65, carbs: 224 }, recipes: [], foods: [{ id: 551, kind: 'food', name: 'Йогурт 2%', kcal: 70, protein: 8, fat: 2, carbs: 5, unit: 'g', source: 'Демо: данные с этикетки' }], likes: ['food:551', 'dish:' + RECIPES[0].id], operations: {} };
   const dayOf = d => { s.days[d] ||= { day: d, entries: [], complete: false, waterMl: 0, comment: '', revision: 0 }; return s.days[d]; };
-  const present = d => ({ ...copy(dayOf(d)), totals: totalEntries(dayOf(d).entries), targets: s.targets });
+  const present = d => ({ ...copy(dayOf(d)), totals: totalEntries(dayOf(d).entries), targets: s.targets, settings: s.settings || { mode: 'count', meals: null, chosen: false } });
   const catalog = () => [
     ...s.recipes, ...s.foods,
     ...Object.entries(FOOD).map(([name, f]) => ({ kind: 'ingredient', id: name, name, ...f, unit: 'g', source: 'Справочник · вес до приготовления' })),
     ...RECIPES.map(r => ({ kind: 'dish', id: r.id, name: r.name, ...r.per, unit: 'portion', source: 'Рецепт тренера · одна порция', ingredients: r.items, steps: r.steps })),
   ].map(f => ({ ...f, liked: s.likes.includes(f.kind + ':' + f.id) }));
-  const resolve = ref => catalog().find(f => f.kind === ref.kind && String(f.id) === String(ref.id)) || fail(404, 'Продукт не найден.');
+  // «Только калории» и «Ладонь» — как на сервере (diary-handlers.js resolveProduct)
+  const quick = ref => { const kcal = Number(ref.kcal); if (!(kcal >= 1 && kcal <= 5000)) fail(400, 'Калории: от 1 до 5000.'); const m = k => ref[k] === '' || ref[k] == null ? null : Number(ref[k]); const name = String(ref.name || '').trim() || 'Примерно'; return { kind: 'quick', id: 'q-' + name.toLowerCase() + '-' + kcal, name, kcal, protein: m('protein'), fat: m('fat'), carbs: m('carbs'), unit: 'portion', approx: true, source: 'Примерно · без продукта' }; };
+  const resolve = ref => ref?.kind === 'quick' ? quick(ref) : ref?.kind === 'palm' ? (PALM[ref.id] ? palmSnapshot(ref.id) : fail(400, 'Выберите группу.')) : catalog().find(f => f.kind === ref.kind && String(f.id) === String(ref.id)) || fail(404, 'Продукт не найден.');
   const day = p.day || today();
   if (p.requestId && s.operations[p.requestId]) return copy(s.operations[p.requestId]);
   let result;
   if (action === 'diary.get') result = present(day);
-  else if (action === 'diary.catalog') {
+  else if (action === 'diary.settings.save') {
+    const old = s.settings || { mode: 'count', meals: null };
+    if (p.meals && Object.values(p.meals).reduce((a, b) => a + Number(b), 0) !== 100) fail(400, 'Доли приёмов в сумме должны давать 100 %.');
+    s.settings = { mode: p.mode ?? old.mode, meals: p.meals === undefined ? old.meals : p.meals, chosen: true }; result = copy(s.settings);
+  } else if (action === 'diary.catalog') {
     let all = catalog().filter(f => (f.name + ' ' + (f.brand || '') + ' ' + (f.barcode || '')).toLowerCase().includes(String(p.q || '').toLowerCase()));
     if (p.scope === 'favorites') all = all.filter(f => f.liked);
-    if (p.scope === 'recent') { const ids = new Set(Object.values(s.days).flatMap(d => d.entries.map(e => e.product.kind + ':' + e.product.id))); all = all.filter(f => ids.has(f.kind + ':' + f.id)); }
+    if (p.scope === 'recent') { const ids = new Set(Object.values(s.days).flatMap(d => d.entries.filter(e => !['quick', 'palm'].includes(e.product.kind)).map(e => e.product.kind + ':' + e.product.id))); all = all.filter(f => ids.has(f.kind + ':' + f.id)); }
     result = { products: all, ownRecipes: s.recipes };
   } else if (action === 'diary.entry.save') {
     const old = p.id ? Object.values(s.days).flatMap(d => d.entries).find(e => e.id === p.id) : null;

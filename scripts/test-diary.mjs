@@ -32,7 +32,7 @@ const stubs = {
   offline: `export const localWrites=async()=>[]; export const onWritesChange=()=>()=>{}; export const queueWrite=async(k,p)=>{globalThis.__diary.queued.push({kind:k,params:p})}; export const isOffline=e=>e?.code===0; export const dropWrite=async()=>{};`,
   account: `export const offlineAccount=()=> 'unit-account';`,
   ui: `import React from 'react'; export const Section=({children})=><section>{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Loading=()=> <div>Загрузка</div>;export const Sheet=({title,children})=><section role="dialog"><h2>{title}</h2>{children}</section>;export const formatNumber=n=>String(n);export const Chips=({items,value,onChange,label})=><div role="tablist" aria-label={label}>{items.map(i=><button key={i.value} role="tab" aria-selected={i.value===value} onClick={()=>onChange(i.value)}>{i.label}</button>)}</div>;`,
-  icons: `import React from 'react';const I=()=> <i/>; export const IconPlus=I,IconClose=I,IconHeart=I,IconCopy=I,IconTrash=I,IconChevron=I,IconNutrition=I;`,
+  icons: `import React from 'react';const I=()=> <i/>; export const IconPlus=I,IconClose=I,IconHeart=I,IconCopy=I,IconTrash=I,IconChevron=I,IconNutrition=I,IconCheck=I;`,
   // Смахивание и «Вернуть» — свои модули с проверками; здесь удаление уходит сразу, чтобы видеть вызов сервера.
   SwipeRow: `import React from 'react'; export default ({children,onDelete,label,disabled})=><div data-swipe={label} data-disabled={disabled?'1':''}><button aria-label={label} onClick={onDelete}>x</button>{children}</div>;`,
   pendingDelete: `export const usePendingDelete=(commit,{onDone,onError}={})=>({remove:(id,payload)=>{globalThis.__diary.removed.push(id);Promise.resolve(commit(payload)).then(()=>onDone&&onDone(payload),e=>onError&&onError(e));},hidden:()=>false,bar:null,flush(){}});`,
@@ -116,4 +116,29 @@ test('дневник: четыре вкладки, смахивание стро
   assert.deepEqual(__diary.removed, [7]);
   assert.equal(calls[0][0], 'diary.entry.remove'); assert.equal(calls[0][1].id, 7); assert.equal(calls[0][1].revision, 2);
   tree.unmount();
+});
+
+// План трёх разборов: «Ладонь» и итог дня
+test('«Ладонь»: норма в порциях из нормы КБЖУ, подписи порций, счёт по группам', async () => {
+  const { palmNorm, palmCount, palmUnit, PALM } = await import('../src/nutrition/palm-model.js');
+  assert.equal(palmNorm(null), null);
+  assert.equal(palmNorm({ kcal: 0 }), null);
+  // 1800 ккал, Б 120 / Ж 60 / У 200: 5 ладоней, 8 горстей, (60 − 20) / 9 ≈ 4 пальца, овощей 5
+  assert.deepEqual(palmNorm({ kcal: 1800, protein: 120, fat: 60, carbs: 200 }), { protein: 5, carbs: 8, fat: 4, veg: 5 });
+  assert.deepEqual(palmNorm({ kcal: 1200, protein: 20, fat: 10, carbs: 10 }), { protein: 2, carbs: 1, fat: 1, veg: 4 });
+  assert.equal(palmUnit('protein', 1), 'ладонь');
+  assert.equal(palmUnit('protein', 1.5), 'ладони');
+  assert.equal(palmUnit('carbs', 5), 'горстей');
+  assert.equal(palmUnit('fat', 2), 'больших пальца');
+  const entries = [{ amount: 1.5, product: { kind: 'palm', id: 'protein' } }, { amount: 1, product: { kind: 'palm', id: 'protein' } }, { amount: 100, product: food }];
+  assert.deepEqual(palmCount(entries), { protein: 2.5, carbs: 0, fat: 0, veg: 0 });
+  assert.equal(totalEntries([{ amount: 2, product: { ...PALM.protein, unit: 'portion' } }]).kcal, 270);
+});
+test('итог дня: в пределах 10 % — норма, меньше и больше — со словами', async () => {
+  const { dayVerdict, mealNow } = await import('../src/nutrition/diary-model.js');
+  assert.equal(dayVerdict(1700, 1800).tone, 'good');
+  assert.equal(dayVerdict(1000, 1800).tone, 'under');
+  assert.match(dayVerdict(2200, 1800).text, /на 400 ккал/);
+  assert.equal(dayVerdict(500, 0).tone, 'neutral');
+  assert.equal(mealNow(8), 'breakfast'); assert.equal(mealNow(13), 'lunch'); assert.equal(mealNow(19), 'dinner'); assert.equal(mealNow(23), 'snack');
 });

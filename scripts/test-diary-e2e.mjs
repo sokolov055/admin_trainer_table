@@ -499,3 +499,36 @@ test('FT-644: плашка вместо анкеты, день словом, ч�
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test('план трёх разборов, п. 1: «Только калории» — примерная запись без продукта', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Только калории', exact: true }).click();
+  await dialog().getByRole('heading', { name: 'Только калории' }).waitFor();
+  // Без калорий не сохраняется
+  await dialog().getByRole('button', { name: 'Добавить', exact: true }).click();
+  await dialog().getByText('Калории: от 1 до 5000.').waitFor();
+  await dialog().getByLabel('Калории, ккал').fill('450');
+  await dialog().getByLabel('Что это было').fill('Бизнес-ланч');
+  await dialog().getByRole('button', { name: 'Добавить 450 ккал', exact: true }).click();
+  const row = diary.getByRole('button', { name: 'Изменить: Бизнес-ланч', exact: true });
+  await row.waitFor();
+  assert.match(await row.innerText(), /примерно/);
+  assert.ok((await diary.innerText()).includes('≈ 450 ккал'));
+  assert.ok((await diary.innerText()).includes('из съеденного примерно 450 ккал'));
+  await page.screenshot({ path: join(shots, 'diary-quick-390.png') });
+  // П. 3: карточка продукта — проверка и источник видны до записи
+  await diary.getByRole('button', { name: 'Добавить в ужин', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Все', exact: true }).click();
+  await dialog().getByLabel('Поиск продуктов и блюд').fill('Йогурт 2%');
+  await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
+  await dialog().getByText('Не проверено — сверьте с упаковкой').waitFor();
+  await dialog().getByText(/^Источник:/).waitFor();
+  await page.screenshot({ path: join(shots, 'diary-product-390.png') });
+  await page.close();
+});

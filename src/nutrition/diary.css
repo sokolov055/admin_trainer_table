@@ -151,3 +151,22 @@ button.diary-food-main:active { background: var(--surface-active); }
 .food-catalog-row:last-child { border-bottom: 0; }
 .food-catalog-row:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: -2px; }
 .food-catalog-actions { flex-wrap: wrap; margin-top: var(--space-4); }
+
+/* «Только калории» (план трёх разборов, п. 1): число — главное поле */
+.diary-quick #quick-kcal { font-size: 28px; font-weight: 650; min-height: 56px; font-variant-numeric: tabular-nums; }
+.diary-quick__macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+
+/* Карточка продукта (план трёх разборов, п. 3): проверка, источник, «нет данных» */
+.diary-product { margin: 4px 0 var(--space-3); }
+.diary-product__trust { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: var(--text-sm); font-weight: 600; background: var(--surface-sunken); color: var(--text-secondary); }
+.diary-product__trust--good { background: var(--good-fill); color: var(--good-text); }
+.diary-product__trust--warn { background: var(--warning-fill); color: var(--warning-text); }
+.diary-product__trust--approx { background: var(--info-fill); color: var(--info-text); }
+.diary-product__kcal { margin: var(--space-2) 0 0; display: flex; align-items: baseline; gap: 6px; }
+.diary-product__kcal strong { font-size: 28px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.diary-product__kcal span { font-size: var(--text-sm); color: var(--text-secondary); }
+.diary-product__macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-2) 0; }
+.diary-product__macros dt { font-size: var(--text-sm); color: var(--text-secondary); }
+.diary-product__macros dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.diary-product__macros dd.is-missing { font-weight: 500; color: var(--text-muted); }
+.diary-product__source { margin: 2px 0 0; }
