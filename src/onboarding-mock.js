@@ -5,12 +5,13 @@ const store = (r) => localStorage.setItem(KEY, JSON.stringify(r));
 const enabled = () => new URLSearchParams(location.search).get('mockOnboarding') === '1'
   && localStorage.getItem('fittrack_demo_onboarding_off') !== '1';
 const programs = [
-  { id: 1, title: 'Старт в зале', description: 'Базовые движения всего тела, по три подхода', blocks: [
+  // Уровень и минуты — метки карточки, как у «Программ тренера» (FT-497)
+  { id: 1, title: 'Старт в зале', level: 'Новичок', minutes: 45, description: 'Базовые движения всего тела, по три подхода', blocks: [
     { title: 'Занятие А', exercises: [{ name: 'Жим ногами', sets: '3', reps: '12' }, { name: 'Тяга верхнего блока', sets: '3', reps: '12' }, { name: 'Жим гантелей лёжа', sets: '3', reps: '10' }] },
     { title: 'Занятие Б', exercises: [{ name: 'Гоблет-присед', sets: '3', reps: '10' }, { name: 'Тяга гантели в наклоне', sets: '3', reps: '10' }] }] },
-  { id: 2, title: 'Сила: основа', description: 'Присед, жим и тяга с постепенной прибавкой', blocks: [
+  { id: 2, title: 'Сила: основа', level: 'Средний', minutes: 30, minutesAuto: true, description: 'Присед, жим и тяга с постепенной прибавкой', blocks: [
     { title: 'Занятие', exercises: [{ name: 'Присед со штангой', sets: '4', reps: '6' }, { name: 'Жим лёжа', sets: '4', reps: '6' }] }] },
-  { id: 3, title: 'Кардио и тонус', description: 'Круговые тренировки и интервалы', blocks: [
+  { id: 3, title: 'Кардио и тонус', level: 'Новичок', minutes: 35, description: 'Круговые тренировки и интервалы', blocks: [
     { title: 'Круг', exercises: [{ name: 'Выпады', sets: '3', reps: '12' }, { name: 'Отжимания', sets: '3', reps: '10' }] }] },
 ];
 // Мышцы для карты на карточке программы — как их отдаёт сервер
@@ -59,7 +60,7 @@ export function onboardingMock(action, p, compute) {
   const choice = () => {
     const fits = JSON.stringify(pick(saved.answers)) === JSON.stringify(saved.pickedFor || pick(saved.answers));
     return { editable: true, answers: pick(saved.answers), program: saved.selectedTitle, fits, consentNeeded: false,
-      revision: saved.revision, programs: fits ? [] : programs.filter((r) => r.title !== saved.selectedTitle).map((r) => ({ ...r, days: saved.answers.days })) };
+      revision: saved.revision, programs: fits ? [] : programs.filter((r) => r.title !== saved.selectedTitle).map((r) => ({ ...r, days: saved.answers.days, place: saved.answers.place })) };
   };
   if (action === 'client.onboarding.choice') return saved.completed ? choice() : { editable: false, reason: 'none' };
   if (action === 'client.onboarding.edit') {
@@ -90,7 +91,7 @@ export function onboardingMock(action, p, compute) {
       norm: n && n.ready ? { kcal: n.kcal, protein: n.protein, fat: n.fat, carbs: n.carbs, goalLabel: n.goalLabel, paceLabel: n.paceLabel } : null };
   }
   return { enabled: true, eligible: !saved.completed, ...saved,
-    programs: complete(saved.answers) ? programs.map((r) => ({ ...r, days: saved.answers.days })) : [],
+    programs: complete(saved.answers) ? programs.map((r) => ({ ...r, days: saved.answers.days, place: saved.answers.place })) : [],
     norm: norm(saved.answers, compute), prefill: { sex: null, birth: null, age: null, height: null, weight: null, lifestyle: null } };
 }
 

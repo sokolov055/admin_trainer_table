@@ -1059,10 +1059,19 @@ const demoBlocks = [
 ];
 
 let demoTemplates = [
-  { id: 1, kind: 'program', title: 'Похудение, 3 раза в неделю', goal: 'Похудение', level: 'Новичок', description: 'Круговой формат, отдых 60 секунд.', isPublic: false, mine: true, author: 'Константин', blocks: demoBlocks, uses: 0 },
-  { id: 2, kind: 'program', title: 'Сила: база 5×5', goal: 'Сила', level: 'Средний', description: '', isPublic: true, mine: false, author: 'Мария', blocks: demoBlocks, uses: 4 },
+  { id: 1, kind: 'program', title: 'Похудение, 3 раза в неделю', goal: 'Похудение', level: 'Новичок', description: 'Круговой формат, отдых 60 секунд.', isPublic: false, mine: true, author: 'Константин', blocks: demoBlocks, uses: 0,
+    place: 'gym', days: 3, minutes: 45, minutesAuto: false, forClients: true },
+  { id: 2, kind: 'program', title: 'Сила: база 5×5', goal: 'Сила', level: 'Средний', description: '', isPublic: true, mine: false, author: 'Мария', blocks: demoBlocks, uses: 4,
+    place: 'gym', days: 3, minutes: 60, minutesAuto: false, forClients: false },
   { id: 3, kind: 'workout', title: 'Ноги и ягодицы', goal: 'Тонус', level: '', description: '', isPublic: false, mine: true, author: 'Константин', blocks: [demoBlocks[1]], uses: 0 },
+  // «Программы тренера» (FT-497): показаны клиентам, в демо — с ?mockShowcase=1
+  { id: 4, kind: 'program', title: 'UL [4]', goal: 'Сила', level: 'Опытный', description: 'Верх и низ по очереди, четыре тренировки в неделю.', isPublic: false, mine: true, author: 'Константин', blocks: demoBlocks, uses: 0,
+    place: 'gym', days: 4, minutes: 25, minutesAuto: true, forClients: true },
+  { id: 5, kind: 'program', title: 'Ягодицы с нуля дома', goal: 'Тонус', level: 'Новичок', description: 'Резинка и гантели, по 40 минут.', isPublic: false, mine: true, author: 'Константин', blocks: [demoBlocks[1]], uses: 0,
+    place: 'home', days: 2, minutes: 40, minutesAuto: false, forClients: true },
 ];
+// Заявки клиента из витрины: id шаблона → id пожелания
+const demoShowcaseAsked = new Map();
 
 let demoTemplateSeq = 10;
 let demoExerciseSeq = 100;
@@ -1098,6 +1107,12 @@ function demoTemplateSave(params) {
     description: params.description || '',
     isPublic: !!params.isPublic,
     blocks: params.blocks || [],
+    // Карточка программы (FT-497); минуты без цифры — «посчитаны» грубо
+    place: params.place || '',
+    days: Number(params.days) || null,
+    minutes: Number(params.minutes) || 15 * Math.max(1, (params.blocks || [])[0]?.exercises?.length || 1) + 5,
+    minutesAuto: !Number(params.minutes),
+    forClients: (params.kind || 'program') === 'program' && !!params.forClients,
   };
   if (params.id) {
     const t = demoTemplate(params.id);
@@ -1107,6 +1122,19 @@ function demoTemplateSave(params) {
   const t = { id: ++demoTemplateSeq, mine: true, author: 'Константин', uses: 0, ...fields };
   demoTemplates = [t, ...demoTemplates];
   return demoTemplateCard(t, true);
+}
+
+/** «Программы тренера» в демо (FT-497) — как showcase-handlers.js на сервере */
+const demoShowcased = () => demoTemplates.filter((t) => t.mine && t.kind === 'program' && t.forClients);
+function demoShowcaseCard(t) {
+  const asked = mockWishes.some((w) => w.templateId === t.id && w.status !== 'done');
+  return { id: t.id, title: t.title, goal: t.goal, description: t.description, level: t.level, place: t.place || '', days: t.days || null,
+    minutes: t.minutes || null, minutesAuto: !!t.minutesAuto, workouts: t.blocks.length, repeats: false, requested: asked };
+}
+function demoShowcaseProgram(id) {
+  const t = demoShowcased().find((x) => x.id === Number(id));
+  if (!t) mockFail('Программа не найдена. Возможно, тренер её убрал.');
+  return t;
 }
 
 const MOCK = {
@@ -1398,6 +1426,23 @@ const MOCK = {
     if (p.reply !== undefined) { w.reply = String(p.reply).trim(); w.repliedAt = new Date().toISOString(); }
     w.status = p.done === true ? 'done' : p.done === false ? 'read' : (w.status === 'new' ? 'read' : w.status);
     return w;
+  },
+  // «Программы тренера» (FT-497): в демо — только с ?mockShowcase=1, чтобы
+  // прежние снимки и проверки «Тренировок» не менялись
+  'showcase.list': () => (new URLSearchParams(window.location.search).get('mockShowcase') === '1'
+    ? { available: true, trainer: 'Константин', programs: demoShowcased().map(demoShowcaseCard) }
+    : { available: false, programs: [] }),
+  'showcase.get': (p) => {
+    const t = demoShowcaseProgram(p.id);
+    return { ...demoShowcaseCard(t), sessions: t.blocks.map((b) => ({ title: b.title, exercises: b.exercises.map((e) => ({
+      name: e.name, volume: [e.sets, e.reps].filter(Boolean).join(' × '), superset: !!e.supersetGroup,
+    })) })) };
+  },
+  'showcase.request': (p) => {
+    const t = demoShowcaseProgram(p.id);
+    if (mockWishes.some((w) => w.templateId === t.id && w.status !== 'done')) return { requested: true, already: true };
+    mockWishes.push({ id: Date.now(), text: `Хочу программу «${t.title}»`, status: 'new', templateId: t.id, createdAt: new Date().toISOString(), reply: '', repliedAt: null });
+    return { requested: true, already: false };
   },
   // Копия своих данных (FT-496): в демо — заглушка вместо файла с сервера
   'account.export': () => ({ url: 'data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><meta charset="utf-8"><h1>Мои данные в Fit Track</h1><p>Демо: здесь будет выгрузка.</p>'), expiresAt: new Date(Date.now() + 600000).toISOString() }),
@@ -2175,7 +2220,14 @@ const MOCK = {
     return demoTemplateSave({ ...source, id: undefined, isPublic: false });
   },
   'library.template.fromClient': (params) => demoTemplateSave({ kind: params.kind || 'program', title: params.title, goal: params.goal, isPublic: params.isPublic, blocks: demoBlocks }),
-  'plan.fromTemplate': (params) => ({ month: params.month, blocks: demoTemplate(params.templateId).blocks }),
+  'plan.fromTemplate': (params) => {
+    // Как сервер: назначенная программа закрывает заявку клиента на неё (FT-497)
+    mockWishes.filter((w) => w.templateId === Number(params.templateId) && w.status !== 'done').forEach((w) => {
+      w.status = 'done';
+      w.reply = w.reply || `Программа назначена — «${params.month}» в «Тренировках».`;
+    });
+    return { month: params.month, blocks: demoTemplate(params.templateId).blocks };
+  },
 
   'trainer.metrics': (params) => demoMetrics(params),
   'trainer.metrics.series': (params) => demoSeries(params),

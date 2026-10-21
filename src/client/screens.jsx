@@ -20,7 +20,7 @@ import {
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { captureScreen } from '../gestures.jsx';
+import { captureScreen, useBackGesture } from '../gestures.jsx';
 import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
@@ -55,6 +55,9 @@ const SaveAsTemplate = lazyPage(() => import('../trainer/Library.jsx'), 'SaveAsT
 // Правка программы прямо на экране (03.10.2026) — только у тренера
 const BlockEdit = lazyPage(() => import('../trainer/PlanInline.jsx'), 'BlockEdit');
 const AddBlock = lazyPage(() => import('../trainer/PlanInline.jsx'), 'AddBlock');
+// «Программы тренера» (FT-497) — клиенту с тренером и тренеру «глазами клиента»
+const ProgramsSection = lazyPage(() => import('./Programs.jsx'), 'ProgramsSection');
+const ProgramsShowcase = lazyPage(() => import('./Programs.jsx'), 'ProgramsShowcase');
 const waiting = <Loading lead={false} rows={3} />;
 
 /* ==================================================================
@@ -350,6 +353,11 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [workout, setWorkout] = useState(null);
   // Из журнала тренировки — обратно к тому же месту программы
   useReturnScroll(!!workout);
+  // «Программы тренера» целиком (FT-497): поверх программы, назад — жестом
+  // или стрелкой, на то же место
+  const [showcase, setShowcase] = useState(false);
+  useReturnScroll(showcase);
+  useBackGesture(() => setShowcase(false), showcase);
 
   // Переход вперёд снимает экран — его покажет жест «назад» под журналом
   const openWorkout = (value) => { captureScreen(); setWorkout(value); };
@@ -485,6 +493,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // занятие, и тренировка в программе переименовалась вместе с ним
   // (сервер, renameBlockFromJournal). Старые данные остаются на экране до ответа.
   if (workout) return <Deferred fallback={waiting}><WorkoutJournal key={clientRow || 'self'} clientRow={clientRow} clientView={clientView} launch={workout.block || workout.sessionId ? workout : null} onClose={() => { setWorkout(null); reload(); }} /></Deferred>;
+
+  if (showcase) return <Deferred fallback={waiting}><ProgramsShowcase clientRow={clientRow} clientView={clientView} onClose={() => setShowcase(false)} /></Deferred>;
 
   if (loading || error) return <>
     {loading ? <Loading lead={false} rows={4} /> : <ErrorState error={error} onRetry={reload} />}
@@ -730,8 +740,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView} section="plan" />}
 
       {/* Пожелания клиента (FT-498) — тренеру до того, как он возьмётся
-          править программу: их ради этого и пишут */}
-      {clientRow && !clientView && !familyRow && !data.self && <Wishes clientRow={clientRow} trainer />}
+          править программу: их ради этого и пишут. Заявку на программу из
+          «Программ тренера» (FT-497) назначают отсюда — открываем её месяц */}
+      {clientRow && !clientView && !familyRow && !data.self && <Wishes clientRow={clientRow} trainer onAssigned={(m) => setMonth(m)} />}
 
       {/* Месяцы: «+» слева — новый месяц; тап по выбранному — переименовать
           (владелец, 03.10.2026: вместо меню «Изменить программу») */}
@@ -1124,6 +1135,15 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <p className="small muted" style={{ marginTop: 22, textAlign: 'center' }}>
           Откройте тренировку, чтобы записывать подходы и рабочие веса
         </p>
+      )}
+
+      {/* «Программы тренера» (FT-497) — перед пожеланием: выбрать готовую
+          и попросить тренера. Клиенту с тренером и тренеру «глазами
+          клиента»; без тренера, у семьи и в «Моих тренировках» — нет */}
+      {(!clientRow || clientView) && !familyRow && !data.self && (
+        <Deferred fallback={null}>
+          <ProgramsSection clientRow={clientRow} clientView={clientView} onOpenAll={() => { captureScreen(); setShowcase(true); }} />
+        </Deferred>
       )}
 
       {/* Пожелание тренеру своими словами (FT-498) — клиенту, в конце

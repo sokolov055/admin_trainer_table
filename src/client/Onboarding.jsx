@@ -14,6 +14,8 @@ import { Wheel, range } from './Wheel.jsx';
 import Permissions, { usePermissions, useAppOffer, AppOffer } from './Permissions.jsx';
 import { MuscleFigure, tallyExercises, splitTally, nameLine } from '../muscles/MuscleMap.jsx';
 import { useKeyboardInset } from '../keyboard-inset.js';
+import { LevelTag } from './ProgramFacts.jsx';
+import { minutesText, PLACES } from './programs-model.js';
 import './onboarding.css';
 import '../brand-type.css';
 
@@ -522,17 +524,22 @@ export function Program({ p, i, best, on, onPick }) {
   const sessions = uniqueSessions(p.blocks);
   const all = sessions.flatMap((b) => b.exercises);
   const { primary, secondary } = splitTally(tallyExercises(all));
-  const perSession = Math.round(all.length / Math.max(1, sessions.length));
+  // Метки — как у карточек «Программ тренера» (FT-497): уровень, раз в
+  // неделю, минуты, место; минуты без цифры тренера посчитаны — с «≈»
   return (
     <article className={'ob-program' + (on ? ' is-on' : '')} style={{ '--i': i }}>
       <button type="button" role="radio" aria-checked={on} className="ob-program__pick" onClick={onPick}>
         <span className="ob-program__head">
-          {best && <span className="ob-program__badge">Лучше всего под цель</span>}
+          {(best || p.level) && <span className="ob-program__tags">
+            {best && <span className="ob-program__badge">Лучше всего под цель</span>}
+            <LevelTag level={p.level} />
+          </span>}
           <strong className="ob-program__title">{tidyTitle(p.title)}</strong>
           <span className="ob-program__chips">
             <span>{timesWeek(p.days)}</span>
+            {p.minutes ? <span>{minutesText(p)}</span> : null}
+            {PLACES[p.place] ? <span>{PLACES[p.place]}</span> : null}
             <span>{sessions.length} {plural(sessions.length, 'занятие', 'занятия', 'занятий')}{p.blocks.length > sessions.length ? ' по кругу' : ''}</span>
-            <span>~{perSession} {plural(perSession, 'упражнение', 'упражнения', 'упражнений')}</span>
           </span>
           {p.description && <span className="ob-program__text">{p.description}</span>}
         </span>

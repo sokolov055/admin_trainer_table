@@ -20,6 +20,7 @@ import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachinesEditor, MachineForm, AlternativesEditor, extrasHint } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
+import { TEMPLATE_GOALS, PLACES, minutesText, timesText } from '../client/programs-model.js';
 
 /**
  * Библиотека тренера: шаблоны программ и тренировок, упражнения.
@@ -53,7 +54,8 @@ const SCOPES = [
   { value: 'public', label: 'Общие' },
 ];
 
-const GOALS = ['Похудение', 'Набор массы', 'Рельеф', 'Сила', 'Тонус', 'Выносливость', 'Здоровая спина', 'Реабилитация'];
+// Тот же список задаёт порядок групп в «Программах тренера» у клиента
+const GOALS = TEMPLATE_GOALS;
 const OWN_GOAL = '__own';
 
 /**
@@ -92,6 +94,15 @@ const LEVELS = [
   { value: 'Средний', label: 'Средний' },
   { value: 'Опытный', label: 'Опытный' },
 ];
+
+// Карточка программы для клиентов (FT-497): где, сколько раз в неделю
+const PLACE_ITEMS = [{ value: '', label: 'Не указано' }, ...Object.entries(PLACES).map(([value, label]) => ({ value, label }))];
+const DAY_ITEMS = [{ value: '', label: '—' }, ...[1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) }))];
+
+/** «зал · 3 раза в неделю · ≈ 45 мин» — строкой в списке и в карточке шаблона */
+function cardLine(t) {
+  return [PLACES[t.place] && PLACES[t.place].toLowerCase(), t.days && timesText(t), minutesText(t)].filter(Boolean).join(' · ');
+}
 
 export default function Library({ pane, owner = false }) {
   if (pane === 'foods') return owner ? <FoodCatalog /> : <Note>Общий справочник проверяет владелец сервиса.</Note>;
@@ -227,9 +238,11 @@ function Templates({ kind, owner }) {
                 kind === 'program' && t.workouts + ' ' + plural(t.workouts, 'тренировка', 'тренировки', 'тренировок'),
                 t.exercises + ' ' + plural(t.exercises, 'упражнение', 'упражнения', 'упражнений'),
                 t.level,
+                kind === 'program' && cardLine(t),
                 !t.mine && 'автор: ' + t.author,
               ].filter(Boolean).join(' · ')}
             </span>
+            {t.mine && t.forClients && <Tag tone="good">клиентам</Tag>}
             {t.mine && t.isPublic && <Tag tone="good">поделились</Tag>}
           </div>
         </Row>
@@ -322,7 +335,8 @@ function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSav
         <h2 className="library__title">{t.title}</h2>
         <div className="item__meta library__meta">
           {t.goal && <Tag>{t.goal}</Tag>}
-          <span>{[t.level, t.mine ? (t.isPublic ? 'ваш · в общем доступе' : 'ваш') : 'автор: ' + t.author].filter(Boolean).join(' · ')}</span>
+          <span>{[t.level, t.kind === 'program' && cardLine(t), t.mine ? (t.isPublic ? 'ваш · в общем доступе' : 'ваш') : 'автор: ' + t.author].filter(Boolean).join(' · ')}</span>
+          {t.mine && t.forClients && <Tag tone="good">видят ваши клиенты</Tag>}
         </div>
         {t.description && <p className="small" style={{ marginTop: 0 }}>{t.description}</p>}
 
@@ -389,6 +403,12 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
   const [level, setLevel] = useState(template ? template.level : '');
   const [description, setDescription] = useState(template ? template.description : '');
   const [isPublic, setPublic] = useState(template ? template.isPublic : false);
+  // Карточка для клиентов (FT-497). Минуты: пусто — сервер посчитает по
+  // упражнениям (minutesAuto), тогда в поле не подставляем посчитанное
+  const [place, setPlace] = useState(template ? template.place || '' : '');
+  const [days, setDays] = useState(template && template.days ? String(template.days) : '');
+  const [minutes, setMinutes] = useState(template && template.minutes && !template.minutesAuto ? String(template.minutes) : '');
+  const [forClients, setForClients] = useState(template ? !!template.forClients : false);
 
   const blocks = template
     ? template.blocks
@@ -421,6 +441,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
       level,
       description,
       isPublic,
+      ...(kind === 'program' ? { place, days, minutes, forClients } : {}),
       blocks: clean,
       propagate,
     });
@@ -445,6 +466,25 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
             <Segmented items={LEVELS} value={level} onChange={setLevel} label="Уровень" />
           </div>}
 
+          {/* Метки карточки для клиентов (FT-497): «45 мин · зал · 2 раза в неделю» */}
+          {kind === 'program' && <div>
+            <span className="field__label">Где заниматься</span>
+            <Segmented items={PLACE_ITEMS} value={place} onChange={setPlace} label="Где заниматься" />
+          </div>}
+          {kind === 'program' && <div>
+            <span className="field__label">Раз в неделю</span>
+            <Segmented wrap items={DAY_ITEMS} value={days} onChange={setDays} label="Раз в неделю" />
+          </div>}
+          {kind === 'program' && (
+            <Field
+              label="Минут на тренировку"
+              value={minutes}
+              onChange={(v) => setMinutes(v.replace(/\D/g, '').slice(0, 3))}
+              placeholder={template && template.minutesAuto ? '≈ ' + template.minutes + ' — по упражнениям' : 'Посчитаем по упражнениям'}
+              hint="Пусто — посчитаем по подходам и отдыху; клиент увидит с «≈»"
+            />
+          )}
+
           <label className="field">
             <span className="field__label">Описание</span>
             <textarea
@@ -455,6 +495,16 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
               onChange={(e) => setDescription(e.target.value)}
             />
           </label>
+
+          {kind === 'program' && (
+            <label className="library__check">
+              <input type="checkbox" checked={forClients} onChange={(e) => setForClients(e.target.checked)} />
+              <span>
+                Показывать моим клиентам
+                <span className="small muted"> — в «Тренировках» → «Программы тренера»: клиент увидит карточку и состав и сможет попросить эту программу, назначаете вы</span>
+              </span>
+            </label>
+          )}
 
           <label className="library__check">
             <input type="checkbox" checked={isPublic} onChange={(e) => setPublic(e.target.checked)} />

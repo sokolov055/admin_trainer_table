@@ -3,6 +3,11 @@ import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { Section, Panel, Note, formatDate } from '../ui.jsx';
 import { IconAlert, IconCheck, IconTrash } from '../icons.jsx';
+import { lazyPage, Deferred } from '../lazy.js';
+import './programs.css';
+
+// Назначить шаблон — то же окно, что в библиотеке; грузится только тренеру
+const AssignForm = lazyPage(() => import('../trainer/Library.jsx'), 'AssignForm');
 
 /**
  * Пожелание к программе своими словами (08.10.2026, FT-498).
@@ -94,10 +99,14 @@ function ClientWishes() {
   );
 }
 
-function TrainerWish({ wish, clientRow }) {
+function TrainerWish({ wish, clientRow, onAssigned }) {
   const [reply, setReply] = useState(wish.reply || '');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Заявка на программу из «Программ тренера» (FT-497): назначить тем же
+  // окном, что из библиотеки; сервер сам отметит заявку «Учтено»
+  const [assigning, setAssigning] = useState(false);
+  const request = !!wish.templateId && wish.status !== 'done';
   const [problem, setProblem] = useState('');
 
   const answer = async (fields) => {
@@ -134,17 +143,31 @@ function TrainerWish({ wish, clientRow }) {
         />
       )}
       {problem && <Note tone="critical" icon={IconAlert}>{problem}</Note>}
+      {request && assigning && !open && (
+        <div className="wish__assign">
+          <Deferred fallback={null}>
+            <AssignForm
+              template={{ id: wish.templateId, kind: 'program' }}
+              clientRow={clientRow}
+              onDone={(month) => { setAssigning(false); if (onAssigned) onAssigned(month); }}
+            />
+          </Deferred>
+          <button className="button button--ghost button--small" onClick={() => setAssigning(false)}>Отмена</button>
+        </div>
+      )}
       <div className="wish__actions">
         {open ? (
           <>
             <button className="button button--primary button--small" disabled={busy} onClick={() => answer({ reply, done: true })}>Ответить и учесть</button>
             <button className="button button--small" disabled={busy} onClick={() => answer({ reply })}>Только ответить</button>
           </>
-        ) : (
+        ) : assigning ? null : (
           <>
-            {wish.status !== 'done'
-              ? <button className="button button--primary button--small" disabled={busy} onClick={() => answer({ done: true })}>Учтено</button>
-              : <button className="button button--small" disabled={busy} onClick={() => answer({ done: false })}>Вернуть в работу</button>}
+            {request
+              ? <button className="button button--primary button--small" disabled={busy} onClick={() => setAssigning(true)}>Назначить программу</button>
+              : wish.status !== 'done'
+                ? <button className="button button--primary button--small" disabled={busy} onClick={() => answer({ done: true })}>Учтено</button>
+                : <button className="button button--small" disabled={busy} onClick={() => answer({ done: false })}>Вернуть в работу</button>}
             <button className="button button--ghost button--small" disabled={busy} onClick={() => setOpen(true)}>{wish.reply ? 'Изменить ответ' : 'Ответить'}</button>
           </>
         )}
@@ -153,7 +176,7 @@ function TrainerWish({ wish, clientRow }) {
   );
 }
 
-function TrainerWishes({ clientRow }) {
+function TrainerWishes({ clientRow, onAssigned }) {
   const { data } = useData('wish.list', { clientRow }, [clientRow]);
   const wishes = (data && data.wishes) || [];
   if (!wishes.length) return null;
@@ -162,14 +185,15 @@ function TrainerWishes({ clientRow }) {
     <Section title="Пожелания клиента" note={waiting ? 'ждут: ' + waiting : 'все учтены'}>
       <Panel pad className="wishes">
         <ul className="wishes__list">
-          {wishes.map((w) => <TrainerWish key={w.id} wish={w} clientRow={clientRow} />)}
+          {wishes.map((w) => <TrainerWish key={w.id} wish={w} clientRow={clientRow} onAssigned={onAssigned} />)}
         </ul>
       </Panel>
     </Section>
   );
 }
 
-// trainer — тренер в карточке клиента; иначе — сам клиент
-export default function Wishes({ clientRow = 0, trainer = false }) {
-  return trainer ? <TrainerWishes clientRow={clientRow} /> : <ClientWishes />;
+// trainer — тренер в карточке клиента; иначе — сам клиент.
+// onAssigned(месяц) — тренер назначил программу по заявке: показать этот месяц
+export default function Wishes({ clientRow = 0, trainer = false, onAssigned }) {
+  return trainer ? <TrainerWishes clientRow={clientRow} onAssigned={onAssigned} /> : <ClientWishes />;
 }
