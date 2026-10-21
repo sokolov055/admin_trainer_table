@@ -30,7 +30,7 @@ const play = async page => { await page.getByRole('button', { name: 'Играт�
 const game = page => page.evaluate(() => bliniFixture.game());
 const read = page => page.evaluate(() => bliniFixture.read());
 // Где лежит поле 360 × 640 на экране: сдвиг и масштаб, которые посчитал экран
-const field = page => page.evaluate(() => { const c = document.querySelector('.blini-canvas'), r = c.getBoundingClientRect(), [ox, oy, s] = c.dataset.field.split(' ').map(Number); return { x: r.left + ox, y: r.top + oy, s }; });
+const field = page => page.evaluate(() => { const c = document.querySelector('.blini-canvas--play'), r = c.getBoundingClientRect(), [ox, oy, s] = c.dataset.field.split(' ').map(Number); return { x: r.left + ox, y: r.top + oy, s }; });
 async function tap(page, x, y) {
   const f = await field(page);
   await page.mouse.click(f.x + x * f.s, f.y + y * f.s);
@@ -38,7 +38,7 @@ async function tap(page, x, y) {
 // Карта на весь экран, поле во всю ширину между верхней строкой и кнопками, ничего не листается
 const layout = page => page.evaluate(() => {
   const box = s => document.querySelector(s).getBoundingClientRect();
-  const canvas = box('.blini-canvas'), topBar = box('.blini-top'), bottom = box('.blini-bottom'), c = document.querySelector('.blini-canvas');
+  const canvas = box('.blini-canvas--play'), topBar = box('.blini-top'), bottom = box('.blini-bottom'), c = document.querySelector('.blini-canvas--play');
   const [ox, oy, s] = c.dataset.field.split(' ').map(Number);
   const fieldTop = canvas.top + oy, fieldBottom = fieldTop + 640 * s;
   const root = document.querySelector('.blini-game');
@@ -89,7 +89,7 @@ test('блины: касание бросает блин, касание Мих�
 test('блины: клавиатура — стрелки поворачивают стойку, пробел бросает', async t => {
   const page = await setup(t);
   await play(page);
-  await page.locator('.blini-canvas').focus();
+  await page.locator('.blini-canvas--play').focus();
   const aim = (await game(page)).aim;
   await page.keyboard.press('ArrowRight');
   assert.ok(Math.abs((await game(page)).aim - aim - .09) < 1e-6);

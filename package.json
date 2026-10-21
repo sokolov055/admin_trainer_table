@@ -40,7 +40,8 @@
     "test:match": "node --test scripts/test-match-model.mjs scripts/test-career-model.mjs scripts/test-match-browser.mjs",
     "check:match-balance": "node scripts/check-match-balance.mjs",
     "test:blini": "node --test scripts/test-blini-model.mjs scripts/test-career-model.mjs scripts/test-blini-browser.mjs",
-    "check:blini-balance": "node scripts/check-blini-balance.mjs"
+    "check:blini-balance": "node scripts/check-blini-balance.mjs",
+    "profile:blini": "node scripts/profile-blini.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",

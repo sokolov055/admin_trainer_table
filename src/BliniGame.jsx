@@ -72,9 +72,10 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   const fx = useRef(createFx());
   const aiming = useRef(false);
   const deadline = useRef(restUntil); deadline.current = restUntil;
-  const root = useRef(null), top = useRef(null), bottom = useRef(null), canvas = useRef(null), panel = useRef(null), primary = useRef(null);
+  const root = useRef(null), top = useRef(null), bottom = useRef(null), canvas = useRef(null), layer = useRef(null), panel = useRef(null), primary = useRef(null);
   const view = useRef({ width: 1, height: 1, dpr: 1, s: 1, ox: 0, oy: 0 });
-  const background = useRef(null);
+  // Качество картинки: плотность пикселей не выше 2; если кадры не успевают — ниже ступенями
+  const quality = useRef(2), refit = useRef(() => {});
   const soundOn = useRef(sound); soundOn.current = sound;
   const title = useId();
   const reduced = useRef(false);
@@ -107,13 +108,13 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
 
   const draw = () => {
     const ctx = canvas.current?.getContext('2d'); if (!ctx) return;
-    drawScene(ctx, session.game(), fx.current, { t: performance.now(), aiming: aiming.current, view: view.current, background: background.current, reduced: reduced.current });
+    drawScene(ctx, session.game(), fx.current, { t: performance.now(), aiming: aiming.current, view: view.current, reduced: reduced.current });
   };
 
   // Холст — на весь экран; поле 360 × 640 — во всю ширину между верхней строкой и кнопками
   useLayoutEffect(() => {
-    const box = root.current, el = canvas.current;
-    if (!box || !el) return undefined;
+    const box = root.current, el = canvas.current, bg = layer.current;
+    if (!box || !el || !bg) return undefined;
     const fit = () => {
       const rect = box.getBoundingClientRect();
       const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
@@ -121,13 +122,16 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
       const below = bottom.current ? rect.bottom - bottom.current.getBoundingClientRect().top + 4 : 0;
       const room = Math.max(160, height - above - below);
       const s = Math.min(width / FIELD.width, room / FIELD.height);
-      const dpr = Math.min(3, window.devicePixelRatio || 1);
+      const dpr = Math.min(quality.current, window.devicePixelRatio || 1);
       view.current = { width, height, dpr, s, ox: (width - FIELD.width * s) / 2, oy: above + (room - FIELD.height * s) / 2 };
-      el.width = Math.round(width * dpr); el.height = Math.round(height * dpr);
+      for (const c of [el, bg]) { c.width = Math.round(width * dpr); c.height = Math.round(height * dpr); }
       el.dataset.field = [view.current.ox, view.current.oy, s].map(n => n.toFixed(2)).join(' ');
-      background.current = bakeBackground(track, view.current);
+      el.dataset.quality = String(dpr);
+      // Фон карты — отдельный неподвижный слой: каждый кадр рисуется только то, что движется
+      bakeBackground(track, view.current, bg);
       draw();
     };
+    refit.current = fit;
     fit();
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;
     observer?.observe(box);
@@ -138,8 +142,12 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   // Пока партия идёт — кадр за кадром; на паузе и в панелях — одна неподвижная картинка
   useEffect(() => {
     if (mode !== 'playing' || help) { draw(); return undefined; }
-    let frame = 0;
+    let frame = 0, last = performance.now(), slow = 0, average = 16.7;
     const loop = () => {
+      // Кадр дольше 24 мс две секунды подряд — снизить плотность пикселей на ступень
+      const now = performance.now(); average = average * .95 + (now - last) * .05; last = now;
+      slow = average > 24 ? slow + 1 : 0;
+      if (slow > 120 && quality.current > 1) { quality.current = Math.max(1, quality.current - .5); slow = 0; refit.current(); }
       const events = session.frame(token.current);
       if (events.length) {
         addEvents(fx.current, session.game(), events, performance.now(), reduced.current);
@@ -246,7 +254,8 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   const backLabel = mission ? 'Вернуться в карьеру' : `Вернуться ${restLeft == null ? 'в приложение' : 'к отдыху'}`;
 
   return <section className={`blini-game blini-game--${mode}`} aria-label="Блины" data-no-gestures data-phase={mode} ref={root} onKeyDown={panelKeys}>
-    <canvas ref={canvas} className="blini-canvas" tabIndex={active ? 0 : -1}
+    <canvas ref={layer} className="blini-canvas blini-canvas--bg" aria-hidden="true" />
+    <canvas ref={canvas} className="blini-canvas blini-canvas--play" tabIndex={active ? 0 : -1}
       role="img" aria-label={`Карта «${track.name}». В руке ${PLATES[hud.current].name}, следующий ${PLATES[hud.next].name}.`}
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { aiming.current = false; }} onKeyDown={keys} />
     <div className="blini-scene">

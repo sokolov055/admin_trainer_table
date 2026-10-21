@@ -19,6 +19,7 @@
 /* Карта — на весь экран; верхняя строка и кнопки лежат поверх неё и пропускают касания мимо себя */
 .blini-canvas { position: absolute; inset: 0; z-index: 0; display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
 .blini-canvas:focus-visible { outline: 3px solid #8fc3ff; outline-offset: -3px; }
+.blini-canvas--bg { pointer-events: none; background: #173a32; }
 .blini-scene { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none;
   padding: calc(8px + env(safe-area-inset-top)) max(var(--bg-gutter), env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(var(--bg-gutter), env(safe-area-inset-left)); }
 .blini-scene > * { pointer-events: none; }

@@ -108,14 +108,20 @@ function build(source) {
 
 export const TRACKS = Object.freeze(Object.fromEntries(SOURCES.map(s => [s.id, build(s)])));
 
-/** Точка пути на расстоянии s от начала. До начала — продолжение первого отрезка назад. */
-export function pointAt(path, s) {
+/**
+ * Точка пути на расстоянии s от начала — в готовый объект out, без выделения памяти:
+ * в кадре и на каждом шаге правил это вызывается сотни раз. До начала пути —
+ * продолжение первого отрезка назад.
+ */
+export function pointInto(path, s, out) {
   const { xs, ys, length } = path;
-  if (s <= 0) { const dx = xs[1] - xs[0], dy = ys[1] - ys[0]; return { x: xs[0] + dx * s, y: ys[0] + dy * s }; }
-  if (s >= length) return { x: xs[length], y: ys[length] };
+  if (s <= 0) { out.x = xs[0] + (xs[1] - xs[0]) * s; out.y = ys[0] + (ys[1] - ys[0]) * s; return out; }
+  if (s >= length) { out.x = xs[length]; out.y = ys[length]; return out; }
   const i = Math.floor(s), k = s - i;
-  return { x: xs[i] + (xs[i + 1] - xs[i]) * k, y: ys[i] + (ys[i + 1] - ys[i]) * k };
+  out.x = xs[i] + (xs[i + 1] - xs[i]) * k; out.y = ys[i] + (ys[i + 1] - ys[i]) * k;
+  return out;
 }
+export const pointAt = (path, s) => pointInto(path, s, { x: 0, y: 0 });
 
 /** Ближайшая к точке позиция на пути в окне [from, to]. */
 export function nearestS(path, x, y, from, to) {

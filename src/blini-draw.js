@@ -1,7 +1,7 @@
 // «Блины»: рисование сцены на холсте. Правил здесь нет — только то, что видно:
 // карта с фоном и предметами, трасса, помост, блины, Гиря Михалыч, броски и вспышки.
 // Фон карты рисуется один раз на размер экрана, каждый кадр — только движущееся.
-import { FIELD, pointAt } from './blini-tracks.js';
+import { FIELD, pointAt, pointInto } from './blini-tracks.js';
 import { PLATES, POWERS, TUNING, platePoint, aimEnd } from './blini-model.js';
 
 const R = TUNING.plate / 2;
@@ -32,11 +32,12 @@ function arcText(ctx, text, radius, size) {
     angle += w / radius;
   }
 }
-function plateSprite(color) {
-  if (sprites.has(color)) return sprites.get(color);
-  const p = PLATES[color], c = canvasOf(SPRITE, SPRITE), ctx = c.getContext('2d'), r = SPRITE / 2 - 2;
+function plateSprite(color, size = SPRITE) {
+  const key = color + ':' + size;
+  if (sprites.has(key)) return sprites.get(key);
+  const p = PLATES[color], c = canvasOf(size, size), ctx = c.getContext('2d'), r = size / 2 - Math.max(1, size / 96);
   const ink = p.kg === 5 ? '#2b2925' : p.kg === 15 ? '#2f2600' : '#ffffff';
-  ctx.translate(SPRITE / 2, SPRITE / 2);
+  ctx.translate(size / 2, size / 2);
   // Резиновый диск с лёгким объёмом и тёмным бортом
   const face = ctx.createRadialGradient(-r * .35, -r * .4, r * .1, 0, 0, r);
   face.addColorStop(0, shade(p.color, p.kg === 5 ? 1.02 : 1.14)); face.addColorStop(.7, p.color); face.addColorStop(1, shade(p.color, .82));
@@ -68,7 +69,7 @@ function plateSprite(color) {
   ctx.beginPath(); ctx.arc(0, 0, r * .13, 0, TAU); ctx.fill();
   ctx.globalCompositeOperation = 'source-over';
   ctx.beginPath(); ctx.arc(0, 0, r * .13, 0, TAU); ctx.lineWidth = r * .025; ctx.strokeStyle = '#59626a'; ctx.stroke();
-  sprites.set(color, c);
+  sprites.set(key, c);
   return c;
 }
 const images = new Map();
@@ -78,17 +79,54 @@ export function plateImage(color) {
   return images.get(color);
 }
 
-function plate(ctx, x, y, color, size = 1, roll = 0, power = null, t = 0) {
+// Уровни детализации: картинки блина готовятся под экранный размер (шаг 8 px),
+// чтобы каждый кадр не уменьшать большую. PIXEL — пикселей экрана на единицу поля.
+let PIXEL = 2;
+const bucket = r => Math.max(16, Math.ceil(r * 2 * PIXEL / 8) * 8);
+const overlays = new Map();
+// Блик сверху-слева и затемнение края — блин катится, а свет остаётся на месте
+function glossSprite(size) {
+  const key = 'gloss:' + size;
+  if (overlays.has(key)) return overlays.get(key);
+  const c = canvasOf(size, size), ctx = c.getContext('2d'), r = size / 2 - 1;
+  ctx.translate(size / 2, size / 2);
+  const g = ctx.createRadialGradient(-r * .45, -r * .5, r * .05, -r * .2, -r * .25, r * .95);
+  g.addColorStop(0, 'rgba(255,255,255,.34)'); g.addColorStop(.45, 'rgba(255,255,255,.08)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fillStyle = g; ctx.fill();
+  const edge = ctx.createRadialGradient(0, 0, r * .8, 0, 0, r);
+  edge.addColorStop(0, 'rgba(0,0,0,0)'); edge.addColorStop(1, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = edge; ctx.fill();
+  overlays.set(key, c);
+  return c;
+}
+// Тень на полу и толщина диска (край снизу справа) одной картинкой; поле вокруг — 25 %
+function underSprite(color, size) {
+  const key = 'under:' + color + ':' + size;
+  if (overlays.has(key)) return overlays.get(key);
+  const full = Math.round(size * 1.25), c = canvasOf(full, full), ctx = c.getContext('2d'), r = size / 2 - 1, k = size / TUNING.plate;
+  ctx.translate(full / 2, full / 2);
+  ctx.beginPath(); ctx.ellipse(2.6 * k, 4.2 * k, r, r * .92, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,.26)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(.9 * k, 2 * k, r, 0, TAU); ctx.fillStyle = shade(PLATES[color].color, .55); ctx.fill();
+  overlays.set(key, c);
+  return c;
+}
+
+function plate(ctx, x, y, color, size = 1, roll = 0, power = null, t = 0, alpha = 1) {
   const r = R * size;
   ctx.save(); ctx.translate(x, y);
+  if (alpha < 1) ctx.globalAlpha = alpha;
   if (power) {
     const glow = .55 + .45 * Math.sin(t / 140);
-    ctx.beginPath(); ctx.arc(0, 0, r + 5, 0, TAU); ctx.fillStyle = `rgba(255,240,150,${.35 + .45 * glow})`; ctx.fill();
+    ctx.globalAlpha = alpha * (.35 + .45 * glow);
+    ctx.beginPath(); ctx.arc(0, 0, r + 5, 0, TAU); ctx.fillStyle = '#fff09a'; ctx.fill();
+    ctx.globalAlpha = alpha;
   }
-  ctx.beginPath(); ctx.ellipse(1.5, 3, r * .98, r * .9, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
+  const px = bucket(r);
+  ctx.drawImage(underSprite(color, px), -r * 1.25, -r * 1.25, r * 2.5, r * 2.5);
   ctx.rotate(roll);
-  ctx.drawImage(plateSprite(color), -r, -r, r * 2, r * 2);
+  ctx.drawImage(plateSprite(color, px), -r, -r, r * 2, r * 2);
   ctx.rotate(-roll);
+  ctx.drawImage(glossSprite(px), -r, -r, r * 2, r * 2);
   if (power) {
     ctx.translate(r * .7, -r * .7);
     ctx.beginPath(); ctx.arc(0, 0, 7.5, 0, TAU); ctx.fillStyle = '#183f36'; ctx.fill();
@@ -147,7 +185,7 @@ const DECOR = {
     ctx.fillStyle = '#7d2630'; ctx.beginPath(); ctx.roundRect(-12, -36, 24, 72, 6); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-12, -6); ctx.lineTo(12, -6); ctx.stroke();
   },
-  plate(ctx, k) { ctx.drawImage(plateSprite(k % 5), -15, -15, 30, 30); },
+  plate(ctx, k) { ctx.drawImage(plateSprite(k % 5, bucket(15)), -15, -15, 30, 30); },
   mat(ctx, k) {
     ctx.fillStyle = ['#7d63c7', '#2f9d93', '#d0567a'][k % 3]; ctx.beginPath(); ctx.roundRect(-17, -40, 34, 80, 5); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.roundRect(-17, 26, 34, 14, 7); ctx.fill();
@@ -317,11 +355,19 @@ function freeSpots(track, view, theme, random) {
  * Фон карты на весь экран: основа темы, предметы, желоб трассы, люк въезда и помост.
  * view — как поле лежит на экране: масштаб s и сдвиг ox, oy в CSS-пикселях.
  */
-export function bakeBackground(track, view) {
+export function bakeBackground(track, view, target = null) {
   const { width, height, dpr, s, ox, oy } = view;
-  const c = canvasOf(Math.max(1, Math.round(width * dpr)), Math.max(1, Math.round(height * dpr)));
+  const c = target || canvasOf(Math.max(1, Math.round(width * dpr)), Math.max(1, Math.round(height * dpr)));
   const ctx = c.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height);
   ctx.setTransform(s * dpr, 0, 0, s * dpr, ox * dpr, oy * dpr);
+  PIXEL = s * dpr;
+  // Заранее, пока печётся фон: картинки блинов всех размеров, через которые
+  // проходит растущий после вставки блин, — в кадре они больше не создаются
+  const sizes = new Set();
+  for (let k = .2; k <= 1.001; k += .05) sizes.add(bucket(R * k));
+  sizes.add(bucket(R * .55));
+  for (const size of sizes) { glossSprite(size); for (let color = 0; color < PLATES.length; color++) { plateSprite(color, size); underSprite(color, size); } }
   const visible = { x: -ox / s, y: -oy / s, w: width / s, h: height / s };
   const theme = THEMES[track.theme] || THEMES.gym, random = rng(track.id.length * 977 + 13);
   theme.base(ctx, visible, random);
@@ -343,10 +389,12 @@ export function bakeBackground(track, view) {
       ctx.lineWidth = w; ctx.strokeStyle = color; ctx.stroke(p);
       ctx.restore();
     });
-    // Люк, из которого выезжают блины, — виден на широком экране
+    // Люк, из которого выезжают блины, — с глубиной; виден на широком экране
     const a = pointAt(path, 0);
-    ctx.beginPath(); ctx.arc(a.x, a.y, R + 7, 0, TAU); ctx.fillStyle = '#101315'; ctx.fill();
-    ctx.lineWidth = 3; ctx.strokeStyle = '#6d757b'; ctx.stroke();
+    const hole = ctx.createRadialGradient(a.x, a.y, 2, a.x, a.y, R + 7);
+    hole.addColorStop(0, '#000'); hole.addColorStop(.7, '#15191c'); hole.addColorStop(1, '#2c3338');
+    ctx.beginPath(); ctx.arc(a.x, a.y, R + 7, 0, TAU); ctx.fillStyle = hole; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#7d868c'; ctx.stroke();
     // Помост в конце пути
     const e = pointAt(path, path.length);
     ctx.save(); ctx.translate(e.x, e.y);
@@ -356,8 +404,20 @@ export function bakeBackground(track, view) {
     ctx.strokeStyle = '#5d3b1d'; ctx.lineWidth = 2.4; ctx.stroke();
     ctx.strokeStyle = '#d29a5c'; ctx.lineWidth = 1.4;
     for (const dy of [-7, 7]) { ctx.beginPath(); ctx.moveTo(-17, dy); ctx.lineTo(17, dy); ctx.stroke(); }
+    // Гриф поперёк помоста — сюда и «грузятся» блины, если их не снять
+    ctx.fillStyle = '#c3cacf'; ctx.fillRect(-26, -1.6, 52, 3.2);
+    for (const bx of [-21, 21]) { ctx.fillStyle = '#3a4146'; ctx.beginPath(); ctx.roundRect(bx - 2.5, -8, 5, 16, 1.5); ctx.fill(); }
     ctx.restore();
   }
+  // Свет сверху и мягкое затемнение по краям экрана — глубина без лишних деталей
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const w = c.width, h = c.height;
+  const light = ctx.createLinearGradient(0, 0, 0, h);
+  light.addColorStop(0, 'rgba(255,255,255,.06)'); light.addColorStop(.5, 'rgba(255,255,255,0)'); light.addColorStop(1, 'rgba(0,0,0,.12)');
+  ctx.fillStyle = light; ctx.fillRect(0, 0, w, h);
+  const vignette = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .42, w / 2, h / 2, Math.max(w, h) * .72);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(0,0,0,.28)');
+  ctx.fillStyle = vignette; ctx.fillRect(0, 0, w, h);
   return c;
 }
 
@@ -391,6 +451,8 @@ function mihalych(ctx, game, fx, t, danger, reduced) {
   ctx.restore();
   ctx.translate(0, bob);
   ctx.beginPath(); ctx.ellipse(0, 33 - bob, 25, 6, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fill();
+  // Присед при броске: чуть ниже и шире — бросок «от ног»
+  if (throwing && !reduced) { ctx.translate(0, 30); ctx.scale(1.05, .93); ctx.translate(0, -30); }
   // Ножки в кроссовках
   for (const k of [-1, 1]) {
     limb(ctx, [[k * 8, 24], [k * 10, 31]], 5);
@@ -487,26 +549,37 @@ const LINES = {
   full: ['План закрыт! Добиваем!'], saved: ['Пояс спас спину!'], start: ['Погнали!', 'Разминка окончена!', 'Ну, за тоннаж!'],
 };
 function line(fx, kind) { fx.lines = (fx.lines || 0) + 1; const list = LINES[kind]; return list[fx.lines % list.length]; }
+const POOL = { parts: 160, texts: 24, rings: 32 };
 export function createFx(t = 0, greet = false) {
-  const fx = { parts: [], texts: [], rings: [], banner: null, say: null, flex: 0, lines: 0 };
+  const make = n => Array.from({ length: n }, () => ({ born: -1e9, x: 0, y: 0, vx: 0, vy: 0, spin: 0, color: '', text: '', size: 0, gold: false, big: false, dust: false }));
+  const fx = { parts: make(POOL.parts), texts: make(POOL.texts), rings: make(POOL.rings), next: { parts: 0, texts: 0, rings: 0 }, banner: null, say: null, flex: 0, shake: null, lines: 0 };
   if (greet) fx.say = { text: line(fx, 'start'), born: t };
   return fx;
 }
+// Следующая свободная запись пула по кругу: самая старая перезаписывается
+function take(fx, kind, t) { const list = fx[kind], i = fx.next[kind]; fx.next[kind] = (i + 1) % list.length; const item = list[i]; item.born = t; return item; }
 
 export function addEvents(fx, game, events, t, reduced = false) {
   for (const e of events) {
     if (e.kind === 'clear') {
-      fx.rings.push({ x: e.x, y: e.y, born: t, big: e.depth > 1 });
-      if (!reduced) e.plates.forEach((c, i) => {
-        for (let k = 0; k < 5; k++) {
-          const a = (i * 5 + k) * 2.4, v = 40 + ((i * 7 + k * 13) % 30);
-          fx.parts.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 20, born: t, color: PLATES[c].color });
-        }
-      });
-      fx.texts.push({ x: e.x, y: e.y - 6, born: t, text: `+${e.points.toLocaleString('ru-RU')} кг`, size: 16 });
-      if (e.depth > 1) { fx.texts.push({ x: e.x, y: e.y - 28, born: t, text: `Цепь ×${e.depth}`, size: 20, gold: true }); fx.flex = t; fx.say = { text: line(fx, 'chain'), born: t }; }
-      else if (e.streak >= 3) {
-        fx.texts.push({ x: e.x, y: e.y - 28, born: t, text: `Серия ×${e.streak}`, size: 17, gold: true });
+      const ring = take(fx, 'rings', t); ring.x = e.x; ring.y = e.y; ring.big = e.depth > 1; ring.dust = false;
+      if (!reduced) {
+        // Облачко магнезии и резиновая крошка цвета снятых блинов
+        for (let k = 0; k < 3; k++) { const d = take(fx, 'rings', t); d.x = e.x + (k - 1) * 9; d.y = e.y + (k % 2) * 5; d.dust = true; d.big = k === 1; }
+        e.plates.forEach((c, i) => {
+          for (let k = 0; k < 5; k++) {
+            const a = (i * 5 + k) * 2.4, v = 45 + ((i * 7 + k * 13) % 35), part = take(fx, 'parts', t);
+            part.x = e.x; part.y = e.y; part.vx = Math.cos(a) * v; part.vy = Math.sin(a) * v - 25; part.spin = (k - 2) * 3; part.color = PLATES[c].color;
+          }
+        });
+        if (e.depth > 1) fx.shake = { born: t, power: Math.min(5, 1.5 + e.depth) };
+      }
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y - 6; text.text = `+${e.points.toLocaleString('ru-RU')} кг`; text.size = 16; text.gold = false;
+      if (e.depth > 1) {
+        const chain = take(fx, 'texts', t); chain.x = e.x; chain.y = e.y - 28; chain.text = `Цепь ×${e.depth}`; chain.size = 20; chain.gold = true;
+        fx.flex = t; fx.say = { text: line(fx, 'chain'), born: t };
+      } else if (e.streak >= 3) {
+        const streak = take(fx, 'texts', t); streak.x = e.x; streak.y = e.y - 28; streak.text = `Серия ×${e.streak}`; streak.size = 17; streak.gold = true;
         if (e.streak % 3 === 0) { fx.flex = t; fx.say = { text: line(fx, 'streak'), born: t }; }
       }
     }
@@ -515,9 +588,6 @@ export function addEvents(fx, game, events, t, reduced = false) {
     if (e.kind === 'saved') { fx.banner = { born: t, text: 'Пояс выручил: блины откатились' }; fx.say = { text: line(fx, 'saved'), born: t }; }
     if (e.kind === 'danger') fx.say = { text: line(fx, 'danger'), born: t };
   }
-  fx.parts = fx.parts.filter(p => t - p.born < 600);
-  fx.texts = fx.texts.filter(p => t - p.born < 950);
-  fx.rings = fx.rings.filter(p => t - p.born < 450);
   if (fx.banner && t - fx.banner.born > 1800) fx.banner = null;
 }
 
@@ -531,53 +601,87 @@ function aimLine(ctx, game, strong) {
   ctx.restore();
 }
 
-/** Кадр: готовый фон карты, потом всё, что движется. view — как поле лежит на экране. */
-export function drawScene(ctx, game, fx, { t, aiming = false, view, background, reduced = false }) {
+/**
+ * Кадр того, что движется. Фон карты — отдельный неподвижный слой под этим
+ * холстом (bakeBackground), его каждый кадр не перерисовываем: склейку слоёв
+ * делает видеокарта. В кадре нет новых объектов — точки блинов пишутся в одну.
+ */
+const AT = { x: 0, y: 0 };
+export function drawScene(ctx, game, fx, { t, aiming = false, view, background = null, reduced = false }) {
   const { width, height, dpr, s, ox, oy } = view;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (background) ctx.drawImage(background, 0, 0);
-  else { ctx.fillStyle = '#173a32'; ctx.fillRect(0, 0, width * dpr, height * dpr); }
-  ctx.setTransform(s * dpr, 0, 0, s * dpr, ox * dpr, oy * dpr);
+  else ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  // Тряска на цепи: пара пикселей на четверть секунды
+  let sx = 0, sy = 0;
+  if (fx.shake && !reduced) {
+    const k = (t - fx.shake.born) / 260;
+    if (k < 1) { const p = fx.shake.power * (1 - k); sx = Math.sin(t / 23) * p; sy = Math.cos(t / 29) * p; } else fx.shake = null;
+  }
+  ctx.setTransform(s * dpr, 0, 0, s * dpr, (ox + sx) * dpr, (oy + sy) * dpr);
+  PIXEL = s * dpr;
   let danger = 0;
   for (const chain of game.chains) {
-    const share = chain.balls.length ? Math.max(0, chain.balls.at(-1).s) / chain.path.length : 0;
-    danger = Math.max(danger, share);
+    const share = chain.balls.length ? Math.max(0, chain.balls[chain.balls.length - 1].s) / chain.path.length : 0;
+    if (share > danger) danger = share;
     if (share > .75) {
-      const e = pointAt(chain.path, chain.path.length), k = (share - .75) / .25, pulse = .5 + .5 * Math.sin(t / 110);
-      ctx.beginPath(); ctx.arc(e.x, e.y, 28 + 10 * pulse, 0, TAU); ctx.fillStyle = `rgba(232,72,58,${.2 + .35 * k * pulse})`; ctx.fill();
+      const e = pointInto(chain.path, chain.path.length, AT), k = (share - .75) / .25, pulse = .5 + .5 * Math.sin(t / 110);
+      ctx.globalAlpha = .2 + .35 * k * pulse;
+      ctx.beginPath(); ctx.arc(e.x, e.y, 28 + 10 * pulse, 0, TAU); ctx.fillStyle = '#e8483a'; ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
   for (const chain of game.chains) {
-    for (const ball of chain.balls) {
+    const balls = chain.balls;
+    for (let i = 0; i < balls.length; i++) {
+      const ball = balls[i];
       if (ball.s < -R) continue;
-      const at = platePoint(chain, ball);
-      plate(ctx, at.x, at.y, ball.color, Math.max(.2, ball.size), ball.s / R, ball.power, t);
+      const at = platePoint(chain, ball, AT);
+      plate(ctx, at.x, at.y, ball.color, ball.size > .2 ? ball.size : .2, ball.s / R, ball.power, t);
     }
   }
   if (game.technique > 0 || aiming) aimLine(ctx, game, game.technique > 0);
-  for (const shot of game.shots) plate(ctx, shot.x, shot.y, shot.color, 1, t / 60);
+  // Брошенный блин тянет за собой шлейф
+  for (const shot of game.shots) {
+    if (!reduced) for (let k = 3; k >= 1; k--) plate(ctx, shot.x - shot.vx * k * 1.6, shot.y - shot.vy * k * 1.6, shot.color, 1 - k * .08, t / 60, null, t, .32 - k * .08);
+    plate(ctx, shot.x, shot.y, shot.color, 1, t / 60);
+  }
   mihalych(ctx, game, fx, t, danger, reduced);
   for (const ring of fx.rings) {
-    const k = (t - ring.born) / 450;
+    const age = t - ring.born;
+    if (ring.dust) {
+      if (age > 700) continue;
+      const k = age / 700;
+      ctx.globalAlpha = .38 * (1 - k);
+      ctx.beginPath(); ctx.arc(ring.x, ring.y - k * 10, (ring.big ? 14 : 10) + k * 22, 0, TAU); ctx.fillStyle = '#f7f6f0'; ctx.fill();
+      continue;
+    }
+    if (age > 450) continue;
+    const k = age / 450;
+    ctx.globalAlpha = 1 - k;
     ctx.beginPath(); ctx.arc(ring.x, ring.y, (ring.big ? 24 : 16) + k * 28, 0, TAU);
-    ctx.lineWidth = 3 * (1 - k); ctx.strokeStyle = `rgba(255,249,220,${1 - k})`; ctx.stroke();
+    ctx.lineWidth = 3 * (1 - k); ctx.strokeStyle = '#fff9dc'; ctx.stroke();
   }
   for (const p of fx.parts) {
-    const k = (t - p.born) / 1000;
-    ctx.globalAlpha = Math.max(0, 1 - k / .6);
+    const age = t - p.born;
+    if (age > 600) continue;
+    const k = age / 1000;
+    ctx.globalAlpha = 1 - age / 600;
     ctx.fillStyle = p.color;
-    ctx.fillRect(p.x + p.vx * k - 2.5, p.y + p.vy * k + 60 * k * k - 2.5, 5, 5);
+    ctx.save(); ctx.translate(p.x + p.vx * k, p.y + p.vy * k + 70 * k * k); ctx.rotate(p.spin * k);
+    ctx.fillRect(-3, -2, 6, 4); ctx.restore();
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   // Надпись у края поля сдвигается внутрь, чтобы не обрезалась
-  const x = tx => Math.max(56, Math.min(FIELD.width - 56, tx.x));
   for (const tx of fx.texts) {
-    const k = (t - tx.born) / 950, y = Math.max(tx.size, tx.y - 30 * k);
-    ctx.globalAlpha = Math.max(0, 1 - k * k);
+    const age = t - tx.born;
+    if (age > 950) continue;
+    const k = age / 950, y = Math.max(tx.size, tx.y - 30 * k), x = Math.max(56, Math.min(FIELD.width - 56, tx.x));
+    ctx.globalAlpha = 1 - k * k;
     ctx.font = `850 ${tx.size}px Manrope, sans-serif`;
-    ctx.lineWidth = 4; ctx.strokeStyle = '#123630'; ctx.strokeText(tx.text, x(tx), y);
-    ctx.fillStyle = tx.gold ? '#ffe17a' : '#fff9e9'; ctx.fillText(tx.text, x(tx), y);
+    ctx.lineWidth = 4; ctx.strokeStyle = '#123630'; ctx.strokeText(tx.text, x, y);
+    ctx.fillStyle = tx.gold ? '#ffe17a' : '#fff9e9'; ctx.fillText(tx.text, x, y);
   }
   ctx.globalAlpha = 1;
   bubble(ctx, game, fx, t);

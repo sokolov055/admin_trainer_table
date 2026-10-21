@@ -6,7 +6,7 @@
 // блины больше не выходят; сними оставшиеся и уровень пройден.
 // Время идёт шагами по 10 мс, случайность — в состоянии: партия воспроизводима.
 // Разбор жанра — docs/research/2026-10-21-Zuma.md основного репозитория.
-import { FIELD, TRACKS, pointAt, nearestS } from './blini-tracks.js';
+import { FIELD, TRACKS, pointAt, pointInto, nearestS } from './blini-tracks.js';
 
 export const RULES_VERSION = 1;
 export const TICK_MS = 10;
@@ -99,12 +99,14 @@ const need = (a, b) => D * (a.size + b.size) / 2;
 const touching = (b, i) => b[i + 1].s - b[i].s <= need(b[i], b[i + 1]) + .75;
 const emit = (game, event) => game.events.push(event);
 /** Точка блина на поле: положение по пути, а только что вставленный — ещё летит к месту. */
-export function platePoint(chain, ball) {
-  const p = pointAt(chain.path, ball.s);
+export function platePoint(chain, ball, out = { x: 0, y: 0 }) {
+  const p = pointInto(chain.path, ball.s, out);
   if (!ball.enter) return p;
   const k = ball.enter.t;
-  return { x: p.x + (ball.enter.x - p.x) * k, y: p.y + (ball.enter.y - p.y) * k };
+  p.x += (ball.enter.x - p.x) * k; p.y += (ball.enter.y - p.y) * k;
+  return p;
 }
+const SCRATCH = { x: 0, y: 0 };
 
 function newColor(game, chain) {
   const { colors, repeat } = game.rules;
@@ -282,7 +284,7 @@ function stepShots(game) {
       for (let i = 0; i < chain.balls.length; i++) {
         const ball = chain.balls[i];
         if (ball.s < 0 || ball.s > chain.path.length) continue;
-        const p = pointAt(chain.path, ball.s);
+        const p = pointInto(chain.path, ball.s, SCRATCH);
         if ((p.x - shot.x) ** 2 + (p.y - shot.y) ** 2 < (D * .9) ** 2) { hit = { c, i }; break; }
       }
     }
@@ -391,7 +393,7 @@ export function aimEnd(game) {
     if (x < 0 || y < 0 || x > FIELD.width || y > FIELD.height) return { x, y, hit: false };
     for (const chain of game.chains) for (const b of chain.balls) {
       if (b.s < 0 || b.s > chain.path.length) continue;
-      const p = pointAt(chain.path, b.s);
+      const p = pointInto(chain.path, b.s, SCRATCH);
       if ((p.x - x) ** 2 + (p.y - y) ** 2 < (D * .9) ** 2) return { x, y, hit: true };
     }
   }
