@@ -23,12 +23,15 @@ import { ensureBackgroundSync } from './native-sync.js';
 import { settleLive } from './live-settle.js';
 import { linkWidgets, reloadWidgets } from './native-widget.js';
 import { loadApiConfig, currentApiUrl } from './apiConfig.js';
+import { noteAppUse } from './native-review.js';
 
 export { isNativeApp };
 
 export function startNative() {
   if (!isNativeApp()) return;
   document.documentElement.classList.add('is-native');
+  // Первый запуск — от него отсчёт «не просить оценку в первые 3 дня»
+  noteAppUse();
 
   const app = plugin('App');
   if (app && app.addListener) {

@@ -36,6 +36,7 @@ import { EFFORT_WORD, restFor, roundRest, rateSet, rerate, unrateAt, suggestText
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
+import { maybeAskReview, noteWorkoutDone } from './native-review.js';
 import { useReveal } from './reveal.js';
 import { setsWord, planText, supersetMark, focusOf, nextText, nextInfo, unitsOf as units } from './workout-view.js';
 import { EffortChooser, EffortFix } from './EffortButtons.jsx';
@@ -94,6 +95,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const readyRef = useRef(false);
   readyRef.current = ready;
   const takingLiveActions = useRef(false);
+  // id занятия, которое человек только что завершил на этом экране (оценка)
+  const finishedHere = useRef('');
   const conflictRef = useRef(null);
   // Просили сохранить, пока шло прежнее сохранение (см. save)
   const saveAgain = useRef(false);
@@ -973,6 +976,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         return;
       }
     }
+    // Своя тренировка клиента завершена здесь — успех для просьбы об оценке
+    // (native-review.js). Окно — уже на экране итога, см. finishedHere
+    if (kind === 'complete' && !clientRow) {
+      finishedHere.current = state.current.session.id;
+      noteWorkoutDone(state.current.session.id);
+    }
     // finishedAt — когда завершили на самом деле: без сети занятие дойдёт
     // до сервера позже, и время отправки его бы сдвинуло (FT-566)
     change(v => ({ ...v, status: kind === 'complete' ? 'completed' : 'cancelled', restUntil: 0, finishedAt: new Date().toISOString(), exercises: closeSets(v.exercises) }));
@@ -1731,6 +1740,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
+
+  // Просьба об оценке (план трёх разборов, пункт 6): системное окно — когда
+  // экран итога уже показан, никогда посреди тренировки. Только занятие,
+  // завершённое на этом экране; открытое из истории не считается. Ушли с
+  // экрана раньше — не просим
+  const finishedId = s && s.status === 'completed' ? s.id : '';
+  useEffect(() => {
+    if (!finishedId || finishedHere.current !== finishedId) return undefined;
+    finishedHere.current = '';
+    const t = setTimeout(() => { maybeAskReview('workout').catch(() => {}); }, 1500);
+    return () => clearTimeout(t);
+  }, [finishedId]);
 
   // Тренажёр закрепляет тренер (16.10.2026): в занятии он один — первый из
   // привязанных, клиент не выбирает. Черновик, начатый до привязки, или
