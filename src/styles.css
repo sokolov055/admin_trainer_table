@@ -38,6 +38,8 @@
   --accent-solid: #2672cd;
   --accent-text: var(--tg-button-text, #ffffff);
   --accent-wash: rgba(38, 114, 205, 0.10);
+  /* Текст акцентом на --accent-wash: обычный акцент даёт там 4,2:1 (FT-645) */
+  --accent-ink: #1b5aa6;
   --tabbar-edge: rgba(255, 255, 255, 0.8);
 
   /* --- линии --- */
@@ -178,6 +180,7 @@
   --accent: var(--tg-button, #3987e5);
   --accent-solid: #3987e5;
   --accent-wash: rgba(57, 135, 229, 0.16);
+  --accent-ink: #8fbcf2;
   --tabbar-edge: rgba(255, 255, 255, 0.07);
 
   --border: rgba(255, 255, 255, 0.11);
@@ -242,6 +245,7 @@
     --accent: var(--tg-button, #3987e5);
     --accent-solid: #3987e5;
     --accent-wash: rgba(57, 135, 229, 0.16);
+  --accent-ink: #8fbcf2;
     --tabbar-edge: rgba(255, 255, 255, 0.07);
 
     --border: rgba(255, 255, 255, 0.11);
@@ -1758,6 +1762,9 @@ button { font-family: inherit; }
   border-color: transparent;
   color: var(--text-secondary);
   padding: 6px 15px;
+  /* Дорожка режет накладку .chip::after по своей высоте: при 31 px чипа
+     касание ловилось только на 37 px. С 38 px внутри дорожки — 44 (FT-645). */
+  min-height: 38px;
 }
 
 .chips--nav .chip--active {
@@ -5889,8 +5896,10 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   border-radius: var(--radius);
   overflow: visible;
 }
+/* overflow: hidden у чипа режет его же накладку .chip::after, поэтому
+   цель касания здесь — сам чип: 44 px (FT-645) */
 .chips--track .chip {
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 var(--space-2);
   border-radius: 9px;
   border-color: transparent;
