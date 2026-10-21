@@ -47,7 +47,7 @@ for (const scheme of ['light', 'dark']) {
   await page.screenshot({ path: `${DEST}-edit-${scheme}.png` });
   await page.getByRole('radio', { name: '3' }).click();
   await page.getByRole('button', { name: 'Сохранить' }).click();
-  await page.locator('.goals__rings').waitFor({ timeout: 10000 });
+  await page.locator('.goal-card').first().waitFor({ timeout: 10000 });
   await page.waitForTimeout(600);
   await page.locator('.goals').first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${DEST}-saved-${scheme}.png` });

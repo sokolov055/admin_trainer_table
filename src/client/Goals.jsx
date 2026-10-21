@@ -4,6 +4,8 @@ import { apiMutate } from '../api.js';
 import { Section, Panel, Segmented, formatNumber, plural } from '../ui.jsx';
 import { IconCheck, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import { goalDots, dotsLabel, daysLeft } from './goal-dots.js';
+import './goals.css';
 
 /**
  * Цели, серии и награды — первым блоком «Прогресса» (07.10.2026, FT-490).
@@ -12,11 +14,12 @@ import { haptic } from '../telegram.js';
  * журнала, календаря тренера, часов, шагов и замеров. Здесь — только показ
  * и правка двух чисел цели.
  *
- * Кольца — неделя, месяц, год: ответ на «я сейчас иду по плану или нет»
- * виден до чтения цифр. Анимации заполнения при открытии нет намеренно:
- * «Прогресс» открывают каждый день, и кольцо, которое каждый раз
- * заполняется заново, через неделю раздражает. Плавно меняется только то,
- * что поменялось на глазах — после правки цели.
+ * Неделя, месяц, год — точками (план трёх разборов, пункт 4, 21.10.2026;
+ * до этого кольцами): каждая тренировка — точка, и «иду ли я по плану»
+ * видно до чтения цифр — сколько сделано, сколько пропущено, сколько
+ * впереди. Пропущено — сколько по плану должно было набраться к сегодня
+ * (due с сервера) минус сделанное. Анимации заполнения при открытии нет
+ * намеренно: «Прогресс» открывают каждый день.
  *
  * Награды свёрнуты в одну строку «Награды · 4 из 14»: список из полутора
  * десятков вех на каждом заходе отодвигал бы замеры, ради которых экран
@@ -58,34 +61,49 @@ function weekRange(monday) {
 const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const trainings = (n) => n + ' ' + plural(n, 'тренировка', 'тренировки', 'тренировок');
 
+const weeksOf = (n) => n + ' ' + plural(n, 'неделя', 'недели', 'недель');
+
+/** «Осталось 3 тренировки за 11 дней»; дней не осталось — без срока */
+function leftText(left, days) {
+  return plural(left, 'Осталась', 'Осталось', 'Осталось') + ' ' + trainings(left)
+    + (days > 0 ? ' за ' + days + ' ' + plural(days, 'день', 'дня', 'дней') : '');
+}
+
+/** Серия под целью месяца: «серия 4 недели, лучшая 7» */
+function seriesText(streak) {
+  if (streak.weeks > 0) return 'серия ' + weeksOf(streak.weeks) + (streak.best > streak.weeks ? ', лучшая ' + streak.best : '');
+  return streak.best > 0 ? 'лучшая серия — ' + weeksOf(streak.best) : '';
+}
+
 /**
- * Кольцо цели. Центр — сколько сделано, под ним — из скольких: число
- * крупно, потому что его и ищут глазами. Выполненное кольцо — сплошное
- * насыщенное, чтобы три кольца читались одним взглядом.
+ * Карточка периода: название, «6 из 9» и точки. Ряд точек читается с
+ * экрана одной фразой (role="img"), поэтому число в шапке для него скрыто.
+ * Пропуски, кроме цвета, названы словами под точками: по одному цвету
+ * сделанное от пропущенного отличают не все. Цели нет — только число.
  */
-function Ring({ label, done, target }) {
-  const r = 26;
-  const length = 2 * Math.PI * r;
-  const share = target > 0 ? Math.min(done / target, 1) : 0;
-  const full = done >= target;
+function GoalCard({ title, layout, grid = false, children }) {
+  const has = layout.target > 0;
+  const full = has && layout.done >= layout.target;
   return (
-    <div className={'goal-ring' + (full ? ' goal-ring--done' : '')} role="img" aria-label={label + ': ' + done + ' из ' + target}>
-      <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
-        <circle className="goal-ring__track" cx="32" cy="32" r={r} />
-        <circle
-          className="goal-ring__fill"
-          cx="32" cy="32" r={r}
-          strokeDasharray={length}
-          strokeDashoffset={length * (1 - share)}
-          transform="rotate(-90 32 32)"
-        />
-      </svg>
-      <div className="goal-ring__value" aria-hidden="true">
-        <span className="goal-ring__done">{formatNumber(done)}</span>
-        <span className="goal-ring__target">из {formatNumber(target)}</span>
+    <Panel pad className="goal-card">
+      <div className="goal-card__head">
+        <h3 className="goal-card__title">{title}</h3>
+        <span className={'goal-card__count' + (full ? ' goal-card__count--done' : '')} aria-hidden={has || undefined}>
+          {has ? formatNumber(layout.done) + ' из ' + formatNumber(layout.target) : trainings(layout.done)}
+        </span>
       </div>
-      <div className="goal-ring__label" aria-hidden="true">{label}</div>
-    </div>
+      {has && (
+        <div
+          className={'goal-dots' + (grid ? ' goal-dots--grid' + (layout.columns > 13 ? ' goal-dots--dense' : '') : '')}
+          style={grid ? { '--goal-cols': layout.columns } : undefined}
+          role="img"
+          aria-label={dotsLabel(layout)}
+        >
+          {layout.dots.map((kind, i) => <span key={i} className={'goal-dot goal-dot--' + kind} />)}
+        </div>
+      )}
+      {has ? children : <p className="goal-card__foot">Цели на этот период нет</p>}
+    </Panel>
   );
 }
 
@@ -219,7 +237,14 @@ export default function Goals({ clientRow, preview = false }) {
   // клиент и «глазами клиента» — клиент
   const viewer = clientRow && !preview ? 'trainer' : 'client';
   const monthName = capital(MONTHS[parts(data.today).m - 1]);
-  const rings = data.rings.map((r) => (r.id === 'month' ? { ...r, label: monthName } : r));
+  const ring = (id) => data.rings.find((r) => r.id === id) || { done: 0, target: 0 };
+  // Неделя — без пропусков: она ещё идёт, а что на ней недобрано, говорит
+  // строка серии ниже
+  const week = goalDots(ring('week'), { withMissed: false });
+  const month = goalDots(ring('month'));
+  const year = goalDots(ring('year'));
+  const trainedToday = !!data.trainings && data.trainings.last === data.today;
+  const series = seriesText(data.streak);
   const streak = streakLine(data.streak, data.goal);
   const steps = stepsLine(data.steps);
   const lines = [streak, steps].filter(Boolean);
@@ -239,35 +264,60 @@ export default function Goals({ clientRow, preview = false }) {
         <button className="button button--ghost button--small" onClick={() => setEditing(true)}>Изменить</button>
       )}
     >
-      <Panel pad className="goals">
+      <div className="goals">
         {editing ? (
-          <GoalForm goal={data.goal} clientRow={clientRow} onDone={() => setEditing(false)} />
+          <Panel pad>
+            <GoalForm goal={data.goal} clientRow={clientRow} onDone={() => setEditing(false)} />
+          </Panel>
         ) : (
           <>
-            <div className="goals__rings">
-              {rings.map((r) => <Ring key={r.id} {...r} />)}
-            </div>
-            <div className="goals__lines">
-              {lines.map((l, i) => (
-                <div key={i} className={'goals__line' + (l.warn ? ' goals__line--warn' : '')}>
-                  <div className="goals__main">{l.main}</div>
-                  <div className="goals__hint">{l.hint}</div>
-                </div>
-              ))}
-            </div>
-            <button
-              className="goals__toggle"
-              aria-expanded={open}
-              onClick={() => { setOpen(!open); haptic(); }}
-            >
-              <span>Награды</span>
-              <span className="goals__count">{data.got} из {data.awards.length}</span>
-              <IconChevron size={18} className={'goals__chevron' + (open ? ' goals__chevron--open' : '')} />
-            </button>
-            {open && <AwardList awards={sorted} />}
+            <GoalCard title="Неделя" layout={week}>
+              <p className="goal-card__foot">
+                {week.done >= week.target
+                  ? <span className="goal-card__ok">Цель недели выполнена</span>
+                  : leftText(week.target - week.done, daysLeft(data.today, 'week', trainedToday))}
+              </p>
+            </GoalCard>
+            <GoalCard title={monthName} layout={month}>
+              <p className="goal-card__foot">
+                {month.done >= month.target
+                  ? <span className="goal-card__ok">Цель месяца выполнена</span>
+                  : leftText(month.target - month.done, daysLeft(data.today, 'month', trainedToday))}
+                {month.missed > 0 && <> · <span className="goal-card__missed">пропущено {month.missed}</span></>}
+                {series && ' · ' + series}
+              </p>
+            </GoalCard>
+            <GoalCard title={(ring('year').label || parts(data.today).y) + ' год'} layout={year} grid>
+              <ul className="goal-legend">
+                <li><span className="goal-dot goal-dot--done" aria-hidden="true" />сделано {formatNumber(year.done)}</li>
+                <li><span className="goal-dot goal-dot--missed" aria-hidden="true" />пропущено {formatNumber(year.missed)}</li>
+                <li><span className="goal-dot goal-dot--ahead" aria-hidden="true" />впереди {formatNumber(year.ahead)}</li>
+              </ul>
+              {year.per > 1 && <p className="goal-card__foot">Одна точка — {trainings(year.per)}</p>}
+            </GoalCard>
+            <Panel pad>
+              <div className="goals__lines">
+                {lines.map((l, i) => (
+                  <div key={i} className={'goals__line' + (l.warn ? ' goals__line--warn' : '')}>
+                    <div className="goals__main">{l.main}</div>
+                    <div className="goals__hint">{l.hint}</div>
+                  </div>
+                ))}
+              </div>
+              <button
+                className="goals__toggle"
+                aria-expanded={open}
+                onClick={() => { setOpen(!open); haptic(); }}
+              >
+                <span>Награды</span>
+                <span className="goals__count">{data.got} из {data.awards.length}</span>
+                <IconChevron size={18} className={'goals__chevron' + (open ? ' goals__chevron--open' : '')} />
+              </button>
+              {open && <AwardList awards={sorted} />}
+            </Panel>
           </>
         )}
-      </Panel>
+      </div>
     </Section>
   );
 }

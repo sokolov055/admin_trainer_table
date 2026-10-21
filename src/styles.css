@@ -4981,81 +4981,13 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 /* ==========================================================================
    Цели, серии и награды — первым блоком «Прогресса» (FT-490, client/Goals.jsx)
-   Кольца не заполняются при каждом открытии: экран смотрят ежедневно.
-   Переход — только когда число меняется на глазах (правка цели).
+   Неделя, месяц и год точками — client/goals.css (21.10.2026); здесь —
+   строки серий и награды.
    ========================================================================== */
-
-.goals__rings {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
-}
-
-.goal-ring {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: var(--space-1);
-}
-
-.goal-ring svg { display: block; }
-
-.goal-ring__track {
-  fill: none;
-  stroke: var(--surface-sunken);
-  stroke-width: 6;
-}
-
-.goal-ring__fill {
-  fill: none;
-  stroke: var(--chart-up);
-  stroke-width: 6;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 420ms var(--ease-out);
-}
-
-.goal-ring--done .goal-ring__fill { stroke: var(--chart-up-strong); }
-
-.goal-ring__value {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 64px;
-  height: 64px;
-  margin-left: -32px;
-  display: grid;
-  place-content: center;
-  text-align: center;
-  line-height: 1.05;
-}
-
-.goal-ring__done {
-  font-size: var(--text-md);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.goal-ring--done .goal-ring__done { color: var(--good-text); }
-
-.goal-ring__target {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.goal-ring__label {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  font-weight: 550;
-}
 
 .goals__lines {
   display: grid;
   gap: var(--space-3);
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
 }
 
 .goals__main {
@@ -5170,7 +5102,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .goal-form__actions { display: flex; gap: var(--space-2); }
 
 @media (prefers-reduced-motion: reduce) {
-  .goal-ring__fill,
   .goals__chevron { transition: none; }
 }
 

@@ -1,0 +1,103 @@
+/* Цели точками: неделя, месяц, год (client/Goals.jsx, план трёх разборов,
+   пункт 4). Сделано — сплошная зелёная, пропущено — янтарная с тёмным
+   ободком (на белом одна янтарная заливка почти не видна), впереди —
+   контур. Заполнения при открытии нет: экран смотрят ежедневно (FT-490). */
+
+.goals { display: grid; gap: var(--space-3); }
+
+.goal-card { display: grid; gap: var(--space-3); }
+
+.goal-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.goal-card__title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.goal-card__count {
+  font-size: var(--text-base);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.goal-card__count--done,
+.goal-card__ok { color: var(--good-text); }
+
+.goal-card__ok { font-weight: 600; }
+
+.goal-card__foot {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
+  text-wrap: pretty;
+}
+
+.goal-card__missed { color: var(--warning-text); font-weight: 600; }
+
+.goal-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.goal-dot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.goal-dot--done { background: var(--chart-up-strong); }
+
+.goal-dot--missed {
+  background: var(--warning);
+  box-shadow: inset 0 0 0 1.5px var(--warning-text);
+}
+
+.goal-dot--ahead { box-shadow: inset 0 0 0 1.5px var(--chart-neutral); }
+
+/* Год — сеткой: 13 колонок крупных точек, при 157–300 точках — 26 мелких */
+.goal-dots--grid {
+  display: grid;
+  grid-template-columns: repeat(var(--goal-cols, 13), minmax(0, 1fr));
+  gap: 6px;
+}
+
+.goal-dots--dense { gap: 3px; }
+
+.goal-dots--grid .goal-dot {
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.goal-dots--dense .goal-dot--ahead { box-shadow: inset 0 0 0 1px var(--chart-neutral); }
+
+.goal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goal-legend .goal-dot { width: 10px; height: 10px; }

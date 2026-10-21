@@ -526,13 +526,17 @@ function mockAwards(params = {}) {
     { id: 'steps-7', title: 'Неделя шагов', note: 'Норма шагов семь дней подряд', got: '2026-10-03' },
     { id: 'steps-20k', title: '20 000 шагов', note: 'За один день', got: null, done: 0, need: 1 },
   ];
+  // due — сколько по плану должно было набраться к сегодня, как на сервере:
+  // по вчера, целыми (точки целей: пропущено = due − done)
+  const monthTarget = Math.max(1, Math.round((g.week * daysInMonth) / 7));
+  const daysBefore = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(now.getFullYear(), 0, 1)) / 86400000);
   return {
     today: day(now),
     goal: g,
     rings: [
-      { id: 'week', label: 'Неделя', done: thisWeek, target: g.week },
-      { id: 'month', label: 'Месяц', done: Math.min(now.getDate() <= 7 ? 2 : 5, daysInMonth), target: Math.max(1, Math.round((g.week * daysInMonth) / 7)) },
-      { id: 'year', label: String(now.getFullYear()), done: 61, target: g.week * 52 },
+      { id: 'week', label: 'Неделя', done: thisWeek, target: g.week, due: Math.floor((((now.getDay() + 6) % 7) * g.week) / 7) },
+      { id: 'month', label: 'Месяц', done: Math.min(now.getDate() <= 7 ? 2 : 5, daysInMonth), target: monthTarget, due: Math.min(monthTarget, Math.floor(((now.getDate() - 1) * g.week) / 7)) },
+      { id: 'year', label: String(now.getFullYear()), done: 61, target: g.week * 52, due: Math.min(g.week * 52, Math.floor((daysBefore * g.week) / 7)) },
     ],
     trainings: { total: 87, last: day(now) },
     streak: broke
