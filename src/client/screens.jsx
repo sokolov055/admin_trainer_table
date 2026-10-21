@@ -9,7 +9,6 @@ import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures }
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
-import { useWatchLaunch } from './watch-launch.js';
 import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
@@ -21,7 +20,7 @@ import {
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { captureScreen, useBackGesture } from '../gestures.jsx';
-import { supersets, blockSessions, doneLine, roundLine } from '../plan-model.js';
+import { supersets, blockSessions, pickBlock, doneLine, roundLine } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
@@ -444,17 +443,17 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   }, [clientRow, workout, familyRow, journalTick]);
   // Очередь телефона ушла на сервер или пополнилась — перечитать список
   useEffect(() => onOutboxChange(() => setJournalTick((t) => t + 1)), []);
-  // «Записать подходы» с «Обзора» — к силовой с часов (watch-launch.js):
-  // та же тренировка программы, что у «Начать тренировку», начало — по часам
-  useWatchLaunch({ enabled: !clientRow && !clientView && !familyRow, data, month, setMonth, open: openWorkout });
-
   // «+» нижнего меню (quick-actions.js): только свой кабинет и «глазами
   // клиента» — у семьи и в карточке клиента у тренера запросов нет
   const quickHere = !familyRow && (!clientRow || clientView);
 
   // «Начать занятие» из «+» — то же, что кнопки этого экрана: идёт занятие —
   // вернуться к нему, иначе тренировка из листа (или первая в очереди), а
-  // без программы — свободная. Ждём программу и журнал
+  // без программы — свободная. Ждём программу и журнал.
+  // Той же просьбой приходит «Записать подходы» с «Обзора» (WatchSuggest.jsx):
+  // та самая тренировка программы, даже проведённая, начало — по часам
+  // (startedAt), чтобы сервер совместил занятие с их тренировкой. Какую
+  // тренировку взять, решает pickBlock (plan-model.js)
   const monthLeft = useRef(null);
   useQuickRequest('workout', (want) => {
     if (workout) return true;
@@ -468,10 +467,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     const live = sessions.find((x) => x.status === 'active' || x.status === 'paused');
     if (live) { openWorkout({ sessionId: live.id }); return true; }
     const queue = (data.blocks || []).filter((b) => !blockSessions(sessions, b, data.month).length);
-    const block = want.free ? null : (queue.find((b) => b.title === want.title) || queue[0]);
-    if (!block) { openWorkout({ block: FREE_BLOCK, month: '' }); return true; }
+    const block = pickBlock(data.blocks, queue, want);
+    // С часов и такой тренировки в текущем месяце нет — просьба снимается
+    if (!block) { if (!want.blockId && !want.startedAt) openWorkout({ block: FREE_BLOCK, month: '' }); return true; }
+    // «Было» — с занятиями, ещё не дошедшими до сервера, как у «Начать тренировку»
     localWorkouts(clientRow).catch(() => []).then((local) => {
-      openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [] });
+      openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [], ...(want.startedAt ? { startedAt: want.startedAt } : {}) });
     });
     return true;
   }, quickHere);

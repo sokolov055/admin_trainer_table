@@ -51,6 +51,24 @@ export function blockSessions(sessions, block, month) {
 }
 
 /**
+ * Какую тренировку программы начать по запросу 'workout' (quick-actions.js).
+ *
+ * Из «+» нижнего меню — названная в листе из очереди (ещё не проведённых)
+ * или первая в ней; с «Записать подходы?» на «Обзоре» (WatchSuggest.jsx,
+ * есть blockId или startedAt) — та самая тренировка среди всех блоков,
+ * даже проведённых: подходы дописывают к силовой с часов. У старых
+ * тренировок id нет — по названию, как в «Выполненных». null — нечего
+ * открывать: из «+» это свободная тренировка, с часов — просьба снимается.
+ */
+export function pickBlock(blocks, queue, want) {
+  if (!want || want.free) return null;
+  if (want.blockId || want.startedAt) {
+    return (blocks || []).find((b) => (want.blockId ? b.id === want.blockId : b.title === want.title)) || null;
+  }
+  return (queue || []).find((b) => b.title === want.title) || (queue || [])[0] || null;
+}
+
+/**
  * Сделанное на занятии — строкой, как в программе: «3 × 15 · 20 кг», а если
  * подходы разные — каждый: «20 кг × 12, 22.5 кг × 10».
  *

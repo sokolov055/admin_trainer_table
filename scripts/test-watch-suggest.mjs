@@ -4,8 +4,10 @@
  * Показывать ли карточку, решает сервер (health.workouts.suggest) — его
  * условия проверены в server/test/watch-suggest.test.js. Здесь — экран:
  * вчерашний ответ из кэша не показывается, «Не сейчас» прячет карточку для
- * этой тренировки часов, «Записать подходы» открывает «Тренировки», и те
- * начинают ту же тренировку программы с началом по часам.
+ * этой тренировки часов, «Записать подходы» открывает «Тренировки» и
+ * оставляет им ту же просьбу 'workout', что «+» нижнего меню
+ * (quick-actions.js), — с началом по часам; какую тренировку программы
+ * открыть, решает pickBlock (plan-model.js).
  */
 
 import assert from 'node:assert/strict';
@@ -15,11 +17,15 @@ import vm from 'node:vm';
 import { build } from 'esbuild';
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
+import { pickBlock } from '../src/plan-model.js';
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const output = await build({
+  // Шина запросов — из той же сборки, что и карточка: одна очередь
   stdin: {
     contents: `export { default as WatchSuggest } from '../src/client/WatchSuggest.jsx';
-      export { requestWatchLaunch, useWatchLaunch } from '../src/client/watch-launch.js';`,
+      export { requestQuick, useQuickRequest } from '../src/quick-actions.js';`,
     resolveDir: 'scripts',
     loader: 'js',
   },
@@ -35,7 +41,6 @@ const output = await build({
     setup(bundle) {
       bundle.onResolve({ filter: /useData\.js$/ }, () => ({ path: 'data', namespace: 'ws-test' }));
       bundle.onResolve({ filter: /[\\/]ui\.jsx$/ }, () => ({ path: 'ui', namespace: 'ws-test' }));
-      bundle.onResolve({ filter: /workout-outbox\.js$/ }, () => ({ path: 'outbox', namespace: 'ws-test' }));
       bundle.onResolve({ filter: /\.css$/ }, () => ({ path: 'styles', namespace: 'ws-test' }));
       bundle.onLoad({ filter: /.*/, namespace: 'ws-test' }, (args) => {
         if (args.path === 'styles') return { contents: '' };
@@ -43,10 +48,6 @@ const output = await build({
         if (args.path === 'ui') return {
           contents: `export const formatNumber = (n) => Number(n).toLocaleString('ru-RU');
             export const formatTime = (iso) => new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });`,
-        };
-        if (args.path === 'outbox') return {
-          contents: `export const localWorkouts = async () => [];
-            export const withLocalWeights = (block) => ({ ...block, withLocal: true });`,
         };
         return null;
       });
@@ -58,7 +59,7 @@ const module = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0].text + '\n})')(
   createRequire(import.meta.url), module, module.exports,
 );
-const { WatchSuggest, requestWatchLaunch, useWatchLaunch } = module.exports;
+const { WatchSuggest, requestQuick, useQuickRequest } = module.exports;
 
 // Браузерное окружение, которого у node нет: события страницы и хранилище
 globalThis.window = new EventTarget();
@@ -158,65 +159,71 @@ test('«Не сейчас» прячет карточку этой тренир�
   act(() => other.tree.unmount());
 });
 
-/** «Тренировки» глазами useWatchLaunch: программа, месяц и переход в журнал */
+/**
+ * «Тренировки» глазами шины: обработчик 'workout', как в Plan (screens.jsx),
+ * получает просьбу один раз, когда готов. Выбор тренировки — pickBlock.
+ */
 function plan({ data, month = '' }) {
-  const opened = [];
+  const got = [];
   const months = [];
   function Plan(props) {
-    useWatchLaunch({ enabled: true, data: props.data, month: props.month, setMonth: (m) => months.push(m), open: (v) => opened.push(v) });
+    useQuickRequest('workout', (want) => {
+      // Открыт другой месяц — вернуться к текущему и дождаться его программы
+      if (props.month) { months.push(''); return false; }
+      if (!props.data) return false;
+      got.push(want);
+      return true;
+    });
     return null;
   }
   let tree;
   act(() => { tree = renderer.create(React.createElement(Plan, { data, month })); });
-  return { tree, opened, months, Plan };
+  const update = (next) => act(() => { tree.update(React.createElement(Plan, next)); });
+  return { tree, got, months, update };
 }
 const program = {
   month: 'Октябрь 2026', members: [],
   blocks: [{ id: 'b-legs', title: 'Ноги и ягодицы', exercises: [] }, { id: 'b-back', title: 'Спина', exercises: [] }],
 };
-const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
-test('«Записать подходы» открывает «Тренировки», те — тренировку программы с началом по часам', async () => {
+test('«Записать подходы» открывает «Тренировки», те — тренировку программы с началом по часам', () => {
   store.clear();
   const card = draw({ data: suggestion(), stale: false });
   // «Тренировки» уже открыты и спрятаны — заберут просьбу по событию
   const p = plan({ data: program });
   act(() => button(card.tree, /Записать подходы/).props.onClick());
-  await settle();
   assert.deepEqual(card.opened, ['plan']);
-  assert.equal(p.opened.length, 1);
-  assert.equal(p.opened[0].block.id, 'b-legs');
-  assert.equal(p.opened[0].block.withLocal, true, '«Было» — с неотправленными занятиями, как у «Начать тренировку»');
-  assert.equal(p.opened[0].month, 'Октябрь 2026');
-  assert.equal(p.opened[0].startedAt, at(8, 30));
+  assert.deepEqual(p.got, [{ blockId: 'b-legs', title: 'Ноги и ягодицы', startedAt: at(8, 30) }]);
+  // По просьбе с часов — та самая тренировка, даже проведённая (не в очереди)
+  assert.equal(pickBlock(program.blocks, [], p.got[0]).id, 'b-legs');
   // Просьба одна: второй раз не откроется
-  act(() => p.tree.update(React.createElement(p.Plan, { data: { ...program }, month: '' })));
-  await settle();
-  assert.equal(p.opened.length, 1);
+  p.update({ data: { ...program }, month: '' });
+  assert.equal(p.got.length, 1);
   act(() => { p.tree.unmount(); card.tree.unmount(); });
 });
 
-test('«Тренировки» ещё не открывались — забирают, когда загрузят программу; другой месяц — возврат к текущему', async () => {
-  requestWatchLaunch({ blockId: 'b-back', title: 'Спина', startedAt: at(18, 0) });
-  const p = plan({ data: { month: 'Сентябрь 2026', members: [], blocks: [{ id: 'old', title: 'Старая', exercises: [] }] }, month: 'Сентябрь 2026' });
-  await settle();
+test('«Тренировки» ещё не открывались — забирают, когда загрузят программу; другой месяц — возврат к текущему', () => {
+  act(() => { requestQuick('workout', { blockId: 'b-back', title: 'Спина', startedAt: at(18, 0) }); });
+  const p = plan({ data: null, month: 'Сентябрь 2026' });
   assert.deepEqual(p.months, [''], 'открыт сентябрь — вернуться к текущему');
-  assert.equal(p.opened.length, 0);
-  act(() => p.tree.update(React.createElement(p.Plan, { data: program, month: '' })));
-  await settle();
-  assert.equal(p.opened.length, 1);
-  assert.equal(p.opened[0].block.id, 'b-back');
+  assert.equal(p.got.length, 0);
+  p.update({ data: null, month: '' });
+  assert.equal(p.got.length, 0, 'программа ещё грузится — просьба ждёт');
+  p.update({ data: program, month: '' });
+  assert.equal(p.got.length, 1);
+  assert.equal(pickBlock(program.blocks, [], p.got[0]).id, 'b-back');
+  p.update({ data: program, month: '' });
+  assert.equal(p.got.length, 1);
   act(() => p.tree.unmount());
 });
 
-test('просьба старше минуты не открывает занятие сама', async () => {
+test('просьба старше минуты не открывает занятие сама', () => {
   const realNow = Date.now;
-  requestWatchLaunch({ blockId: 'b-legs', title: 'Ноги и ягодицы', startedAt: at(8, 30) });
+  act(() => { requestQuick('workout', { blockId: 'b-legs', title: 'Ноги и ягодицы', startedAt: at(8, 30) }); });
   Date.now = () => realNow() + 61000;
   try {
     const p = plan({ data: program });
-    await settle();
-    assert.equal(p.opened.length, 0);
+    assert.equal(p.got.length, 0);
     act(() => p.tree.unmount());
   } finally { Date.now = realNow; }
 });
@@ -238,23 +245,18 @@ test('«Не сейчас» пишет id тренировки часов на �
   act(() => again.tree.unmount());
 });
 
-test('у старой тренировки id нет — блок по названию; нет и его при текущем месяце — просьба забыта', async () => {
-  requestWatchLaunch({ blockId: '', title: 'Спина', startedAt: at(18, 0) });
-  const p = plan({ data: program });
-  await settle();
-  assert.equal(p.opened.length, 1);
-  assert.equal(p.opened[0].block.id, 'b-back');
-  assert.deepEqual(p.months, []);
-  act(() => p.tree.unmount());
-
-  // Такой тренировки нет, а месяц открыт текущий — возвращаться некуда: просьба снимается, не висит
-  requestWatchLaunch({ blockId: 'b-nope', title: 'Нет такой', startedAt: at(18, 0) });
-  const q = plan({ data: program, month: '' });
-  await settle();
-  assert.equal(q.opened.length, 0);
-  assert.deepEqual(q.months, []);
-  act(() => q.tree.update(React.createElement(q.Plan, { data: { ...program, blocks: [...program.blocks, { id: 'b-nope', title: 'Нет такой', exercises: [] }] }, month: '' })));
-  await settle();
-  assert.equal(q.opened.length, 0, 'появившаяся позже тренировка занятие сама не откроет');
-  act(() => q.tree.unmount());
+test('pickBlock: с часов — по id среди всех, у старой — по названию; из «+» — из очереди', () => {
+  const queue = [program.blocks[1]]; // «Ноги» уже проведены
+  assert.equal(pickBlock(program.blocks, queue, { blockId: 'b-legs', title: 'Ноги и ягодицы', startedAt: at(8, 30) }).id, 'b-legs', 'проведённая — тоже: подходы дописывают');
+  assert.equal(pickBlock(program.blocks, queue, { blockId: '', title: 'Спина', startedAt: at(18, 0) }).id, 'b-back', 'у старой тренировки id нет — по названию');
+  // Такой тренировки нет — просьба снимается, а не берётся первая попавшаяся
+  assert.equal(pickBlock(program.blocks, queue, { blockId: 'b-nope', title: 'Нет такой', startedAt: at(18, 0) }), null);
+  assert.equal(pickBlock(program.blocks, queue, { blockId: '', title: 'Нет такой', startedAt: at(18, 0) }), null);
+  // «Начать занятие» из «+» — как было: названная из очереди, иначе первая в ней, без программы — свободная
+  assert.equal(pickBlock(program.blocks, queue, { title: 'Спина' }).id, 'b-back');
+  assert.equal(pickBlock(program.blocks, queue, { title: 'Ноги и ягодицы' }).id, 'b-back', 'проведённая не начинается заново — первая в очереди');
+  assert.equal(pickBlock(program.blocks, queue, {}).id, 'b-back');
+  assert.equal(pickBlock(program.blocks, [], { title: 'Спина' }), null);
+  assert.equal(pickBlock(program.blocks, queue, { free: true }), null);
+  assert.equal(pickBlock(undefined, undefined, { blockId: 'b-legs' }), null);
 });

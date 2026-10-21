@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useData } from '../useData.js';
 import { formatNumber, formatTime } from '../ui.jsx';
-import { requestWatchLaunch } from './watch-launch.js';
+import { requestQuick } from '../quick-actions.js';
 import './watch-suggest.css';
 
 /**
@@ -71,7 +71,10 @@ export default function WatchSuggest({ trainer = true, onOpen }) {
   const facts = [length(w.duration), w.kcal ? formatNumber(Math.round(w.kcal)) + ' ккал' : ''].filter(Boolean);
   const later = () => { rememberHidden(w.id); setHidden((list) => [...list, w.id]); };
   const record = () => {
-    requestWatchLaunch({ blockId: s.block.id, title, startedAt: w.startedAt });
+    // Та же просьба, что у «Начать занятие» из «+» (quick-actions.js), но с
+    // началом по часам: «Тренировки» заберут её, когда откроются и загрузят
+    // программу (обработчик 'workout' в Plan, screens.jsx)
+    requestQuick('workout', { blockId: s.block.id, title, startedAt: w.startedAt });
     onOpen('plan');
   };
 
