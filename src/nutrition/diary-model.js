@@ -38,3 +38,7 @@ export function dayVerdict(eaten, target) {
   return { tone: 'over', text: 'Больше нормы на ' + diff + ' ккал. Смотрите на неделю: один день результат не меняет.' };
 }
 export function mealFromRecipe(value) { return ({ 'завтрак': 'breakfast', 'обед': 'lunch', 'ужин': 'dinner', 'перекус': 'snack' })[value] || 'snack'; }
+// Подписи и разбор ввода дневника (перенесены из Diary.jsx 21.10.2026): без React
+export const label = id => DIARY_MEALS.find(m => m.id === id)?.label || id;
+export const paramsOf = clientRow => clientRow ? { clientRow } : {};
+export const decimal = value => Number(String(value).replace(',', '.'));
