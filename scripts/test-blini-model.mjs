@@ -43,12 +43,12 @@ test('трассы: шаг в одну единицу, въезд из-за кр
   }
 });
 
-test('уровни: двенадцать, все трассы, цвета 4–5, план растёт по тройкам трасс', () => {
+test('уровни: двенадцать, все трассы, цвета 4–5, план растёт от круга к кругу', () => {
   assert.equal(LEVELS.length, 12);
   assert.deepEqual([...new Set(LEVELS.map(l => l.track))].sort(), Object.keys(TRACKS).sort());
   for (const [i, level] of LEVELS.entries()) {
     assert.ok(level.colors >= 4 && level.colors <= 5 && level.speed > 0 && level.par > 0, `уровень ${i + 1}`);
-    if (i >= 3) assert.ok(level.target > LEVELS[i - 3].target, `уровень ${i + 1}: план выше, чем три уровня назад`);
+    if (i >= 4) assert.ok(level.target > LEVELS[i - 4].target, `уровень ${i + 1}: план выше, чем на той же трассе кругом раньше`);
   }
   assert.equal(levelRules(99).track, LEVELS.at(-1).track, 'номер больше последнего — последний');
   assert.equal(missionRules({ level: 2, target: 777 }, true).lives, 1, 'пояс — одна страховка');

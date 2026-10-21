@@ -17,6 +17,7 @@ function Fixture({ menu = true, rest = false, until = Infinity, now = Date.now()
     game: () => { const g = session.game(); return { tick: g.tick, shots: g.shots.length, fired: g.shotsFired, score: g.score, mode: g.mode, current: g.current, next: g.next, aim: g.aim, shooter: g.track.shooter, balls: g.chains.map(c => c.balls.filter(b => b.s >= 0).map(b => ({ color: b.color, ...platePoint(c, b) }))) }; },
     win: () => { const g = session.game(); g.score = g.rules.target; g.full = true; g.chains.forEach(c => { c.balls = []; }); },
     setRest: setRestHere,
+    choose: level => session.choose(level),
   };
   return <>{menu && <main className="game-shell game-shell--blini"><BliniGame onClose={() => window.showBlini({ menu: false })} /></main>}{rest && <RestScreen until={until} total={30000} now={now} allowGame={allowed} onStop={() => window.showBlini({ menu: false })} />}</>;
 }

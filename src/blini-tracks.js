@@ -1,10 +1,11 @@
 // «Блины» (21.10.2026): трассы, по которым катится цепочка блинов.
-// Поле — 360 × 560 условных единиц, вертикально, под телефон. Трасса строится
-// из прямых и дуг, потом делится на точки через каждую единицу длины —
-// положение блина задаётся расстоянием от начала пути, без геометрии на лету.
+// Поле — 360 × 640 условных единиц, вертикально, под вытянутый экран телефона;
+// экран растягивает его на всю ширину, а фон карты рисуется и за краями поля.
+// Трасса строится из прямых и дуг, потом делится на точки через каждую единицу
+// длины — положение блина задаётся расстоянием от начала пути.
 // Путь начинается за краем поля (цепочка въезжает) и кончается у помоста.
 
-export const FIELD = Object.freeze({ width: 360, height: 560 });
+export const FIELD = Object.freeze({ width: 360, height: 640 });
 
 function builder(x, y) {
   const points = [[x, y]];
@@ -31,6 +32,24 @@ function builder(x, y) {
       }
       cx = points.at(-1)[0]; cy = points.at(-1)[1]; return api;
     },
+    // Ломаная со скруглёнными углами радиуса r
+    corners(list, r) {
+      for (let i = 0; i < list.length; i++) {
+        const [vx, vy] = list[i], next = list[i + 1];
+        if (!next) { api.line(vx, vy); break; }
+        const inLen = Math.hypot(vx - cx, vy - cy), outLen = Math.hypot(next[0] - vx, next[1] - vy);
+        const k = Math.min(r, inLen / 2, outLen / 2);
+        const ax = vx + (cx - vx) / inLen * k, ay = vy + (cy - vy) / inLen * k;
+        const bx = vx + (next[0] - vx) / outLen * k, by = vy + (next[1] - vy) / outLen * k;
+        api.line(ax, ay);
+        for (let s = 1; s <= 24; s++) {
+          const t = s / 24, u = 1 - t;
+          points.push([u * u * ax + 2 * u * t * vx + t * t * bx, u * u * ay + 2 * u * t * vy + t * t * by]);
+        }
+        cx = bx; cy = by;
+      }
+      return api;
+    },
     points: () => points,
   };
   return api;
@@ -43,6 +62,7 @@ function resample(dense) {
   for (let i = 1; i < dense.length; i++) {
     const [ax, ay] = dense[i - 1], [bx, by] = dense[i];
     const seg = Math.hypot(bx - ax, by - ay);
+    if (!seg) continue;
     let at = 1 - carry;
     while (at <= seg) { const k = at / seg; xs.push(ax + (bx - ax) * k); ys.push(ay + (by - ay) * k); at += 1; }
     carry = seg - (at - 1);
@@ -51,34 +71,39 @@ function resample(dense) {
 }
 
 const PI = Math.PI;
-// Поле — одна или две трассы (у «Гантели» — по цепочке на каждый диск, как
-// у «боссов» Zuma). Стрелок стоит там, где до всех витков не меньше 40 единиц.
+// Карта — трасса и тема фона (blini-draw.js). У «Гантели» две цепочки, как у
+// «боссов» Zuma. Стрелок стоит там, где до всех витков не меньше 45 единиц.
 const SOURCES = [
   {
-    id: 'stadium', name: 'Стадион', shooter: [180, 280],
-    note: 'Спираль сужается к центру — помост в самой середине.',
-    paths: [() => builder(-30, 48).line(180, 48).spiral(180, 280, 170, 232, 64, 92, -PI / 2, 2.25).points()],
+    id: 'stadium', name: 'Стадион', theme: 'stadium', shooter: [180, 320],
+    note: 'Беговая дорожка закручена спиралью — помост в самом центре стадиона.',
+    paths: [() => builder(-30, 40).line(180, 40).spiral(180, 320, 170, 280, 64, 100, -PI / 2, 2.25).points()],
   },
   {
-    id: 'snake', name: 'Змейка', shooter: [176, 280],
-    note: 'Длинная змейка сверху и снизу, стрелок посередине.',
+    id: 'kitchen', name: 'Кухня', theme: 'kitchen', shooter: [153, 330],
+    note: 'Квадратная спираль по кухонному столу. Не отвлекайся на брокколи.',
+    paths: [() => builder(-30, 30).corners([[340, 30], [340, 610], [20, 610], [20, 84], [286, 84], [286, 556], [74, 556], [74, 138], [232, 138], [232, 420]], 24).points()],
+  },
+  {
+    id: 'snake', name: 'Зал', theme: 'gym', shooter: [176, 320],
+    note: 'Змейка между гантелями и скамьями — длинная, сверху и снизу.',
     paths: [() => builder(-30, 40).line(300, 40).arc(300, 80, PI).line(70, 120).arc(70, 160, -PI).line(300, 200)
-      .arc(300, 240, PI / 2).line(340, 320).arc(300, 320, PI / 2).line(70, 360).arc(70, 400, -PI).line(300, 440)
-      .arc(300, 480, PI).line(80, 520).points()],
+      .arc(300, 240, PI / 2).line(340, 400).arc(300, 400, PI / 2).line(70, 440).arc(70, 480, -PI).line(300, 520)
+      .arc(300, 560, PI).line(80, 600).points()],
   },
   {
-    id: 'dumbbell', name: 'Гантель', shooter: [180, 280],
-    note: 'Два диска гантели — две цепочки. Следи за обеими.',
+    id: 'dumbbell', name: 'Гантель', theme: 'platform', shooter: [180, 320],
+    note: 'Два диска гантели — две цепочки на помосте. Следи за обеими.',
     paths: [
-      () => builder(-30, 16).line(180, 16).spiral(180, 128, 165, 112, 62, 44, -PI / 2, 1.4).points(),
-      () => builder(390, 544).line(180, 544).spiral(180, 432, 165, 112, 62, 44, PI / 2, 1.4).points(),
+      () => builder(-30, 30).line(180, 30).spiral(180, 150, 165, 120, 62, 46, -PI / 2, 1.4).points(),
+      () => builder(390, 610).line(180, 610).spiral(180, 490, 165, 120, 62, 46, PI / 2, 1.4).points(),
     ],
   },
 ];
 
 function build(source) {
   const paths = source.paths.map(make => Object.freeze(resample(make())));
-  return Object.freeze({ id: source.id, name: source.name, note: source.note, shooter: Object.freeze({ x: source.shooter[0], y: source.shooter[1] }), paths: Object.freeze(paths) });
+  return Object.freeze({ id: source.id, name: source.name, theme: source.theme, note: source.note, shooter: Object.freeze({ x: source.shooter[0], y: source.shooter[1] }), paths: Object.freeze(paths) });
 }
 
 export const TRACKS = Object.freeze(Object.fromEntries(SOURCES.map(s => [s.id, build(s)])));

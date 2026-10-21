@@ -29,40 +29,46 @@ async function setup(t, viewport = { width: 390, height: 844 }) {
 const play = async page => { await page.getByRole('button', { name: 'Играть', exact: true }).click(); await page.clock.runFor(3000); };
 const game = page => page.evaluate(() => bliniFixture.game());
 const read = page => page.evaluate(() => bliniFixture.read());
-// Точка поля 360 × 560 → координаты на экране
+// Где лежит поле 360 × 640 на экране: сдвиг и масштаб, которые посчитал экран
+const field = page => page.evaluate(() => { const c = document.querySelector('.blini-canvas'), r = c.getBoundingClientRect(), [ox, oy, s] = c.dataset.field.split(' ').map(Number); return { x: r.left + ox, y: r.top + oy, s }; });
 async function tap(page, x, y) {
-  const box = await page.locator('.blini-canvas').boundingBox();
-  await page.mouse.click(box.x + x / 360 * box.width, box.y + y / 560 * box.height);
+  const f = await field(page);
+  await page.mouse.click(f.x + x * f.s, f.y + y * f.s);
 }
+// Карта на весь экран, поле во всю ширину между верхней строкой и кнопками, ничего не листается
 const layout = page => page.evaluate(() => {
-  const parts = ['.blini-top', '.blini-hud', '.blini-canvas', '.blini-feedback', '.blini-footer'].map(s => document.querySelector(s).getBoundingClientRect());
-  const canvas = parts[2], root = document.querySelector('.blini-game');
+  const box = s => document.querySelector(s).getBoundingClientRect();
+  const canvas = box('.blini-canvas'), topBar = box('.blini-top'), bottom = box('.blini-bottom'), c = document.querySelector('.blini-canvas');
+  const [ox, oy, s] = c.dataset.field.split(' ').map(Number);
+  const fieldTop = canvas.top + oy, fieldBottom = fieldTop + 640 * s;
+  const root = document.querySelector('.blini-game');
   return {
-    inside: parts.every(r => r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight + .5 && r.right <= innerWidth + .5),
-    ordered: parts.every((r, i) => i === 0 || r.top >= parts[i - 1].bottom - .5),
-    ratio: Math.abs(canvas.width / canvas.height - 360 / 560) < .01,
+    full: Math.abs(canvas.width - innerWidth) < 1 && Math.abs(canvas.height - innerHeight) < 1,
+    inside: [topBar, bottom].every(r => r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight + .5 && r.right <= innerWidth + .5),
+    clear: fieldTop >= topBar.bottom - .5 && fieldBottom <= bottom.top + .5,
     scrolls: root.scrollHeight > root.clientHeight + 1 || document.documentElement.scrollWidth > innerWidth,
-    width: canvas.width,
+    width: 360 * s, plate: 30 * s,
   };
 });
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
-  test(`блины: всё на экране без прокрутки, поле в пропорции ${viewport.width}×${viewport.height}`, async t => {
+  test(`блины: карта на весь экран, поле между строкой и кнопками ${viewport.width}×${viewport.height}`, async t => {
     const page = await setup(t, viewport);
     await play(page);
     const result = await layout(page);
-    assert.deepEqual({ inside: result.inside, ordered: result.ordered, ratio: result.ratio, scrolls: result.scrolls }, { inside: true, ordered: true, ratio: true, scrolls: false }, JSON.stringify(result));
-    assert.ok(result.width >= (viewport.height > 700 ? 340 : 230), `поле ${result.width} px`);
+    assert.deepEqual({ full: result.full, inside: result.inside, clear: result.clear, scrolls: result.scrolls }, { full: true, inside: true, clear: true, scrolls: false }, JSON.stringify(result));
+    assert.ok(result.width >= (viewport.height > 700 ? viewport.width * .95 : 260), `поле ${result.width} px`);
+    assert.ok(result.plate >= (viewport.height > 700 ? 30 : 21), `блин ${result.plate} px`);
     await page.screenshot({ path: `reports/blini/play-${viewport.width}.png` });
   });
 }
 
-test('блины: касание бросает блин, касание стойки меняет блин, пауза и продолжение', async t => {
+test('блины: касание бросает блин, касание Михалыча меняет блин, пауза и продолжение', async t => {
   const page = await setup(t);
   await play(page);
   const before = await game(page);
   assert.ok(before.tick > 200, 'партия идёт по часам');
-  const target = before.balls.flat().find(b => b.x > 20 && b.x < 340 && b.y > 20 && b.y < 540);
+  const target = before.balls.flat().find(b => b.x > 20 && b.x < 340 && b.y > 20 && b.y < 620);
   await tap(page, target.x, target.y);
   assert.equal((await game(page)).fired, before.fired + 1, 'блин брошен');
   await page.clock.runFor(2000);
@@ -114,7 +120,7 @@ test('блины: победа открывает следующий урове�
   await page.getByRole('button', { name: 'Следующий уровень' }).click();
   const state = await read(page);
   assert.equal(state.level, 1); assert.equal(state.unlocked, 1); assert.equal(state.mode, 'ready');
-  await page.getByRole('heading', { name: '«Змейка»' }).waitFor();
+  await page.getByRole('heading', { name: '«Кухня»' }).waitFor();
 });
 
 test('блины на отдыхе: четвёртая кнопка, а конец отдыха ставит партию на паузу', async t => {

@@ -16,43 +16,38 @@
 .blini-game .blini-icon { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; border: 0; border-radius: 12px; background: transparent; color: var(--bg-ink); }
 .blini-pause-icon { display: block; width: 13px; height: 18px; border-left: 4px solid currentColor; border-right: 4px solid currentColor; border-radius: 1px; }
 
-.blini-scene { position: relative; display: flex; flex-direction: column; gap: var(--bg-gap); width: 100%; max-width: 640px; height: 100%; margin: 0 auto;
-  padding: calc(10px + env(safe-area-inset-top)) max(var(--bg-gutter), env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(var(--bg-gutter), env(safe-area-inset-left)); }
-.blini-scene > * { flex: 0 0 auto; }
-.blini-top { display: flex; align-items: center; gap: 8px; min-height: 46px; }
-.blini-top__gap { flex: 1; }
-.blini-game .blini-round { width: 46px; height: 46px; flex: 0 0 46px; border-radius: 15px; background: var(--bg-cream); color: var(--bg-ink); box-shadow: 0 5px 16px #06191438; }
-.blini-rest { display: flex; align-items: center; gap: 7px; min-height: 46px; padding: 0 14px; border-radius: 15px; background: #e6f2d9; color: var(--bg-ink); box-shadow: 0 5px 16px #06191438; font-size: 12px; font-weight: 750; line-height: 1.2; }
-.blini-rest strong { font-size: 20px; font-weight: 850; font-variant-numeric: tabular-nums; }
-
-.blini-hud { display: flex; align-items: center; gap: 11px; padding: 7px 13px 8px 7px; background: var(--bg-paper); border-radius: 16px; box-shadow: 0 5px 12px #06191438; }
-.blini-level { min-width: 62px; display: flex; flex-direction: column; align-items: center; justify-content: center; align-self: stretch; border-radius: 11px; background: var(--bg-green); color: #fff; padding: 3px 9px 5px; }
-.blini-level strong { font-size: 26px; font-weight: 850; line-height: 1.05; font-variant-numeric: tabular-nums; }
-.blini-level > span { font-size: 10px; font-weight: 750; }
-.blini-plan { flex: 1; min-width: 0; }
-.blini-plan__numbers { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.blini-plan__numbers strong { font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1; font-weight: 850; white-space: nowrap; }
-.blini-plan__numbers > span { font-size: 11px; font-weight: 750; white-space: nowrap; display: inline-flex; gap: 3px; align-items: center; }
-.blini-progress { height: 9px; border-radius: 5px; background: #dddccb; overflow: hidden; box-shadow: inset 0 2px 3px #183f361f; }
+/* Карта — на весь экран; верхняя строка и кнопки лежат поверх неё и пропускают касания мимо себя */
+.blini-canvas { position: absolute; inset: 0; z-index: 0; display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.blini-canvas:focus-visible { outline: 3px solid #8fc3ff; outline-offset: -3px; }
+.blini-scene { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none;
+  padding: calc(8px + env(safe-area-inset-top)) max(var(--bg-gutter), env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(var(--bg-gutter), env(safe-area-inset-left)); }
+.blini-scene > * { pointer-events: none; }
+.blini-scene button, .blini-scene .blini-plan, .blini-scene .blini-chip, .blini-scene .blini-feedback { pointer-events: auto; }
+.blini-top { display: flex; align-items: stretch; gap: 6px; width: 100%; max-width: 640px; margin: 0 auto; }
+.blini-game .blini-round { width: 44px; height: 46px; flex: 0 0 44px; border-radius: 14px; background: #fffdf2f0; color: var(--bg-ink); box-shadow: 0 4px 14px #06191455; }
+.blini-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 52px; padding: 2px 6px; border-radius: 14px; background: #286749f2; color: #fff; box-shadow: 0 4px 14px #06191455; line-height: 1.05; }
+.blini-chip span { font-size: 9.5px; font-weight: 750; }
+.blini-chip strong { font-size: 20px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.blini-chip--rest { min-width: 62px; background: #e6f2d9f2; color: var(--bg-ink); }
+.blini-chip--rest strong { font-size: 17px; }
+.blini-plan { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 5px 10px 6px; border-radius: 14px; background: #fff9e9f0; box-shadow: 0 4px 14px #06191455; }
+.blini-plan__numbers { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 5px; }
+.blini-plan__numbers strong { font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1; font-weight: 850; white-space: nowrap; }
+.blini-plan__numbers > span { font-size: 11px; font-weight: 750; color: var(--bg-muted); white-space: nowrap; display: inline-flex; gap: 3px; align-items: center; }
+.blini-progress { height: 8px; border-radius: 5px; background: #dddccb; overflow: hidden; box-shadow: inset 0 2px 3px #183f361f; }
 .blini-progress > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: #d8343f; transform-origin: left; transition: transform 280ms var(--bg-ease); }
 .blini-progress.is-full > span { background: #2c9a55; }
-.blini-belt { align-self: stretch; display: grid; place-items: center; padding: 0 10px; border-radius: 11px; background: #8b5a2b; color: #fff4dc; font-size: 11px; font-weight: 850; }
+.blini-belt { position: absolute; top: -7px; right: 8px; padding: 1px 7px; border-radius: 8px; background: #8b5a2b; color: #fff4dc; font-size: 10px; font-style: normal; font-weight: 850; }
 
-/* Поле — самый большой прямоугольник 360 × 560 в оставшемся месте; размер холста задаёт экран */
-.blini-stage { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; }
-.blini-canvas { display: block; border-radius: 18px; background: #173a32; box-shadow: 0 0 0 4px #0f2b25, 0 12px 26px #04100d80; touch-action: none; user-select: none; -webkit-user-select: none; transition: box-shadow 240ms ease; }
-.blini-canvas.is-danger { box-shadow: 0 0 0 4px #b83a2e, 0 0 26px #e8483a66; }
-
-.blini-feedback { min-height: 34px; line-height: 1.3; display: flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 9px; background: #0f2b25ed; color: #fff9e8; font-size: 12px; font-weight: 650; text-align: center; }
-.blini-feedback.is-danger { background: #8f2a21; }
+.blini-bottom { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 640px; margin: 0 auto; }
+.blini-feedback { align-self: center; max-width: 100%; min-height: 28px; display: flex; align-items: center; justify-content: center; padding: 4px 12px; border-radius: 14px; background: #0f2b25d9; color: #fff9e8; font-size: 12px; font-weight: 700; line-height: 1.25; text-align: center; }
+.blini-feedback.is-danger { background: #8f2a21eb; }
 .blini-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.blini-footer button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; padding: 8px 14px; background: var(--bg-cream); color: var(--bg-ink); border: 0; border-radius: 15px; font-size: 13px; font-weight: 800; box-shadow: 0 5px 16px #06191438; }
+.blini-footer button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 6px 14px; background: #fffdf2f0; color: var(--bg-ink); border: 0; border-radius: 16px; font-size: 13px; font-weight: 800; box-shadow: 0 4px 14px #06191455; }
 .blini-swap-arrow { margin-inline: -3px; font-size: 14px; font-weight: 800; }
 
-.blini-plate { --size: 30px; display: inline-grid; place-items: center; width: var(--size); height: var(--size); flex: 0 0 var(--size); border-radius: 50%; background: var(--plate); color: var(--ink);
-  box-shadow: inset 0 0 0 1.5px #00000033, inset 0 0 0 calc(var(--size) * .14) var(--plate), inset 0 0 0 calc(var(--size) * .14 + 1px) #ffffff3a, 0 2px 3px #0f2b2540;
-  font-size: calc(var(--size) * .36); font-weight: 850; line-height: 1; font-variant-numeric: tabular-nums; }
-.blini-plate--small { --size: 24px; }
+.blini-plate { --size: 34px; display: inline-block; width: var(--size); height: var(--size); flex: 0 0 var(--size); border-radius: 50%; filter: drop-shadow(0 2px 2px #0f2b2550); }
+.blini-plate--small { --size: 30px; }
 .blini-power { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%; background: var(--bg-ink); color: #fff6c4; box-shadow: 0 0 0 3px #fff3b0; }
 .blini-power svg { width: 16px; height: 16px; }
 
@@ -85,11 +80,10 @@
 .blini-rule-plates { display: flex; flex: 0 0 72px; }
 .blini-rule-plates .blini-plate { --size: 26px; margin-right: -3px; }
 /* Цифра на блине и знак бонуса — своего цвета, не цвета подписи рядом */
-.blini-game .blini-plate { color: var(--ink); }
 .blini-game .blini-power { color: #fff6c4; }
 .blini-panel--win { box-shadow: 0 0 0 3px #f1c232, 0 16px 40px #0e2c3670; }
 
 @keyframes blini-panel-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }
 @media (min-width: 700px) and (min-height: 640px) { .blini-overlay { align-items: center; } .blini-panel { margin: auto; } }
-@media (max-height: 640px) { .blini-hud { padding-block: 4px 5px; } .blini-level strong { font-size: 22px; } .blini-feedback { min-height: 28px; padding-block: 4px; } }
-@media (prefers-reduced-motion: reduce) { .blini-game button, .blini-panel, .blini-progress > span, .blini-canvas { transition: none; animation: none; } .blini-game button:active:not(:disabled) { transform: none; } }
+@media (max-height: 640px) { .blini-feedback { min-height: 24px; padding-block: 2px; font-size: 11px; } .blini-footer button { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .blini-game button, .blini-panel, .blini-progress > span { transition: none; animation: none; } .blini-game button:active:not(:disabled) { transform: none; } }

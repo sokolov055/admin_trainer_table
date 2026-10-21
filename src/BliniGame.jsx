@@ -2,7 +2,7 @@ import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'reac
 import { useBliniSession } from './BliniSession.jsx';
 import { LEVELS, PLATES, POWERS, levelRules, missionRules } from './blini-model.js';
 import { FIELD, TRACKS } from './blini-tracks.js';
-import { createFx, addEvents, drawScene } from './blini-draw.js';
+import { createFx, addEvents, drawScene, bakeBackground, plateImage } from './blini-draw.js';
 import { createBliniAudio } from './blini-audio.js';
 import { restHere, onRestHere } from './rest-here.js';
 import { clock } from './workout-model.js';
@@ -18,10 +18,9 @@ const colorsLabel = n => n + ' ' + (n === 1 ? 'цвет' : n >= 2 && n <= 4 ? '�
 function Sound({ enabled }) {
   return <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z" />{enabled ? <path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" /> : <path d="m16 9 5 6m0-6-5 6" />}</svg>;
 }
-/** Блин в подписях и правилах — тот же цвет и вес, что на поле. */
+/** Блин в подписях и правилах — та же картинка, что на поле. */
 export function Plate({ color, small = false }) {
-  const p = PLATES[color];
-  return <span className={'blini-plate' + (small ? ' blini-plate--small' : '')} style={{ '--plate': p.color, '--ink': p.ink }} aria-hidden="true">{p.kg}</span>;
+  return <img className={'blini-plate' + (small ? ' blini-plate--small' : '')} src={plateImage(color)} alt="" aria-hidden="true" draggable="false" />;
 }
 function PowerMark({ power }) {
   return <span className="blini-power" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -34,7 +33,8 @@ function PowerMark({ power }) {
 
 /**
  * «Блины» (21.10.2026): цепочка олимпийских блинов катится к помосту,
- * стойка в центре бросает блины. Три одного цвета подряд снимаются.
+ * Гиря Михалыч в центре бросает блины. Три одного цвета подряд снимаются.
+ * Поле — на весь экран, верхняя строка и кнопки лежат поверх карты.
  * Правила — blini-model.js, рисование — blini-draw.js, партия — blini-session.js.
  */
 export default function BliniGame({ onClose, restLeft, restUntil = Infinity, career = false }) {
@@ -59,8 +59,9 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   const fx = useRef(createFx());
   const aiming = useRef(false);
   const deadline = useRef(restUntil); deadline.current = restUntil;
-  const root = useRef(null), stage = useRef(null), canvas = useRef(null), panel = useRef(null), primary = useRef(null);
-  const view = useRef({ scale: 1, dpr: 1 });
+  const root = useRef(null), top = useRef(null), bottom = useRef(null), canvas = useRef(null), panel = useRef(null), primary = useRef(null);
+  const view = useRef({ width: 1, height: 1, dpr: 1, s: 1, ox: 0, oy: 0 });
+  const background = useRef(null);
   const soundOn = useRef(sound); soundOn.current = sound;
   const title = useId();
   const reduced = useRef(false);
@@ -92,23 +93,26 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   useGameChrome(root);
 
   const draw = () => {
-    const el = canvas.current; if (!el) return;
-    const ctx = el.getContext('2d'); if (!ctx) return;
-    const { scale, dpr } = view.current;
-    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
-    drawScene(ctx, session.game(), fx.current, { t: performance.now(), aiming: aiming.current });
+    const ctx = canvas.current?.getContext('2d'); if (!ctx) return;
+    drawScene(ctx, session.game(), fx.current, { t: performance.now(), aiming: aiming.current, view: view.current, background: background.current, reduced: reduced.current });
   };
 
-  // Холст — самый большой прямоугольник поля 360 × 560, что помещается в сцену
+  // Холст — на весь экран; поле 360 × 640 — во всю ширину между верхней строкой и кнопками
   useLayoutEffect(() => {
-    const box = stage.current, el = canvas.current;
+    const box = root.current, el = canvas.current;
     if (!box || !el) return undefined;
     const fit = () => {
-      const w = Math.max(160, Math.min(box.clientWidth, box.clientHeight * FIELD.width / FIELD.height));
+      const rect = box.getBoundingClientRect();
+      const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
+      const above = top.current ? top.current.getBoundingClientRect().bottom - rect.top + 4 : 0;
+      const below = bottom.current ? rect.bottom - bottom.current.getBoundingClientRect().top + 4 : 0;
+      const room = Math.max(160, height - above - below);
+      const s = Math.min(width / FIELD.width, room / FIELD.height);
       const dpr = Math.min(3, window.devicePixelRatio || 1);
-      view.current = { scale: w / FIELD.width, dpr };
-      el.style.width = w + 'px'; el.style.height = w * FIELD.height / FIELD.width + 'px';
-      el.width = Math.round(w * dpr); el.height = Math.round(w * FIELD.height / FIELD.width * dpr);
+      view.current = { width, height, dpr, s, ox: (width - FIELD.width * s) / 2, oy: above + (room - FIELD.height * s) / 2 };
+      el.width = Math.round(width * dpr); el.height = Math.round(height * dpr);
+      el.dataset.field = [view.current.ox, view.current.oy, s].map(n => n.toFixed(2)).join(' ');
+      background.current = bakeBackground(track, view.current);
       draw();
     };
     fit();
@@ -116,7 +120,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     observer?.observe(box);
     window.addEventListener('resize', fit);
     return () => { observer?.disconnect(); window.removeEventListener('resize', fit); };
-  }, []);
+  }, [track]);
 
   // Пока партия идёт — кадр за кадром; на паузе и в панелях — одна неподвижная картинка
   useEffect(() => {
@@ -166,13 +170,13 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     }
     setSoundError(''); session.toggleSound();
   };
-  const start = () => { if (sound) audio.current?.unlock(); fx.current = createFx(); session.start(token.current); };
+  const start = () => { if (sound) audio.current?.unlock(); fx.current = createFx(performance.now(), true); session.start(token.current); };
   const resume = () => { if (sound) audio.current?.unlock(); session.resume(token.current); };
   const swap = () => { if (session.swap(token.current)) buzz('tap'); };
 
   const toField = event => {
-    const rect = canvas.current.getBoundingClientRect();
-    return { x: (event.clientX - rect.left) / rect.width * FIELD.width, y: (event.clientY - rect.top) / rect.height * FIELD.height };
+    const rect = canvas.current.getBoundingClientRect(), { s, ox, oy } = view.current;
+    return { x: (event.clientX - rect.left - ox) / s, y: (event.clientY - rect.top - oy) / s };
   };
   const down = event => {
     if (mode !== 'playing' || event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return;
@@ -191,8 +195,8 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     if (!aiming.current) return;
     aiming.current = false;
     const p = toField(event), { shooter } = track;
-    // Касание стойки — поменять блин в руке на следующий
-    if (Math.hypot(p.x - shooter.x, p.y - shooter.y) < 30) { swap(); return; }
+    // Касание Михалыча — поменять блин в руке на следующий
+    if (Math.hypot(p.x - shooter.x, p.y - shooter.y) < 32) { swap(); return; }
     session.shoot(p.x, p.y, token.current);
   };
   const turn = delta => {
@@ -225,50 +229,48 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     : hud.full ? 'План выполнен — сними оставшиеся блины'
     : hud.danger >= .85 ? 'Блины у помоста! Снимай ближние'
     : hud.streak >= 3 ? `Серия ×${hud.streak}: каждое попадание дороже`
-    : 'Касание поля — бросок, стойки — обмен');
+    : 'Касание поля — бросок, Михалыча — обмен');
   const backLabel = mission ? 'Вернуться в карьеру' : `Вернуться ${restLeft == null ? 'в приложение' : 'к отдыху'}`;
 
   return <section className={`blini-game blini-game--${mode}`} aria-label="Блины" data-no-gestures data-phase={mode} ref={root} onKeyDown={panelKeys}>
+    <canvas ref={canvas} className="blini-canvas" tabIndex={active ? 0 : -1}
+      role="img" aria-label={`Карта «${track.name}». В руке ${PLATES[hud.current].name}, следующий ${PLATES[hud.next].name}.`}
+      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { aiming.current = false; }} onKeyDown={keys} />
     <div className="blini-scene">
-      <header className="blini-top">
+      <header className="blini-top" ref={top}>
         <button type="button" className="blini-icon blini-round" onClick={close} aria-label={mission ? 'К карьере' : restLeft == null ? 'Закрыть игру' : 'К отдыху'}><IconBack size={22} /></button>
-        {restLeft != null && <div className="blini-rest" title="Пора к подходу? Игра подождёт."><span>Отдых</span><strong role="timer">{clock(Math.max(0, restLeft))}</strong></div>}
-        <span className="blini-top__gap" />
+        {restLeft != null
+          ? <div className="blini-chip blini-chip--rest" title="Пора к подходу? Игра подождёт."><span>Отдых</span><strong role="timer">{clock(Math.max(0, restLeft))}</strong></div>
+          : <div className="blini-chip"><span>Уровень</span><strong>{level + 1}</strong></div>}
+        <div className="blini-plan">
+          <div className="blini-plan__numbers"><strong data-blini="score">{kg(hud.score)}</strong><span>{hud.full ? <><IconCheck size={14} /> План</> : `из ${hud.target.toLocaleString('ru-RU')}`}</span></div>
+          <div className={'blini-progress' + (hud.full ? ' is-full' : '')} role="progressbar" aria-label="Тоннаж до плана" aria-valuenow={Math.min(hud.score, hud.target)} aria-valuemin={0} aria-valuemax={hud.target}><span style={{ transform: `scaleX(${progress})` }} /></div>
+          {hud.lives > 0 && <em className="blini-belt" aria-label="Пояс: одна страховка">Пояс</em>}
+        </div>
         <button type="button" className="blini-icon blini-round" onClick={toggleSound} aria-label={sound ? 'Выключить звук' : 'Включить звук'} aria-pressed={sound}><Sound enabled={sound} /></button>
         <button type="button" className="blini-icon blini-round" onClick={() => session.pause()} disabled={!active} aria-label="Пауза"><span className="blini-pause-icon" /></button>
       </header>
-      <div className="blini-hud">
-        <div className="blini-level"><span>Уровень</span><strong>{level + 1}</strong></div>
-        <div className="blini-plan">
-          <div className="blini-plan__numbers"><strong data-blini="score">{kg(hud.score)}</strong><span>{hud.full ? <><IconCheck size={15} /> План есть</> : `План ${kg(hud.target)}`}</span></div>
-          <div className={'blini-progress' + (hud.full ? ' is-full' : '')} role="progressbar" aria-label="Тоннаж до плана" aria-valuenow={Math.min(hud.score, hud.target)} aria-valuemin={0} aria-valuemax={hud.target}><span style={{ transform: `scaleX(${progress})` }} /></div>
-        </div>
-        {hud.lives > 0 && <div className="blini-belt" aria-label="Пояс: одна страховка">Пояс</div>}
+      <div className="blini-bottom" ref={bottom}>
+        <div className={'blini-feedback' + (hud.danger >= .85 && !hud.full ? ' is-danger' : '')} role="status" aria-live="polite">{message}</div>
+        <footer className="blini-footer">
+          <button type="button" onClick={swap} disabled={!active} aria-label={`Поменять: в руке ${PLATES[hud.current].name}, следующий ${PLATES[hud.next].name}`}><Plate color={hud.current} small /><span className="blini-swap-arrow" aria-hidden="true">⇄</span><Plate color={hud.next} small />Поменять</button>
+          <button type="button" onClick={openHelp}><IconGuide size={19} />Как играть</button>
+        </footer>
       </div>
-      <div className="blini-stage" ref={stage}>
-        <canvas ref={canvas} className={'blini-canvas' + (hud.danger >= .85 ? ' is-danger' : '')} tabIndex={active ? 0 : -1}
-          role="img" aria-label={`Трасса «${track.name}». В руке ${PLATES[hud.current].name}, следующий ${PLATES[hud.next].name}.`}
-          onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { aiming.current = false; }} onKeyDown={keys} />
-      </div>
-      <div className={'blini-feedback' + (hud.danger >= .85 && !hud.full ? ' is-danger' : '')} role="status" aria-live="polite">{message}</div>
-      <footer className="blini-footer">
-        <button type="button" onClick={swap} disabled={!active} aria-label={`Поменять: в руке ${PLATES[hud.current].name}, следующий ${PLATES[hud.next].name}`}><Plate color={hud.current} small /><span className="blini-swap-arrow" aria-hidden="true">⇄</span><Plate color={hud.next} small />Поменять</button>
-        <button type="button" onClick={openHelp}><IconGuide size={19} />Как играть</button>
-      </footer>
     </div>
     {shownPanel && <div className="blini-overlay">
       <div className={`blini-panel${mode === 'won' && !help ? ' blini-panel--win' : ''}`} ref={panel} role="dialog" aria-modal="true" aria-labelledby={title}>
         <button className="blini-panel-close blini-icon" onClick={() => help ? setHelp(false) : close()} aria-label={help ? 'Закрыть правила' : 'Выйти из игры'}><IconClose size={18} /></button>
         {help ? <>
           <h3 id={title}>Снимай блины</h3>
-          <p>Блины катятся к помосту. Коснись поля — стойка бросит блин туда. Три и больше одного цвета подряд снимаются.</p>
+          <p>Блины катятся к помосту. Коснись поля — Гиря Михалыч бросит блин туда. Три и больше одного цвета подряд снимаются.</p>
           <div className="blini-rules">
             <div><span className="blini-rule-plates"><Plate color={0} /><Plate color={0} /><Plate color={0} /></span><span><strong>Три одного цвета</strong>Снимаются, а вес идёт в тоннаж</span></div>
             <div><span className="blini-rule-plates"><Plate color={1} /><Plate color={2} /><Plate color={1} /></span><span><strong>Цепь</strong>После снятия на стыке снова один цвет — блины откатываются назад, очки ×2, ×3…</span></div>
             <div><span className="blini-rule-plates"><Plate color={3} /></span><span><strong>План</strong>Набери тоннаж — новые блины перестанут выходить. Сними оставшиеся</span></div>
           </div>
           <div className="blini-powers">{Object.entries(POWERS).map(([id, power]) => <div key={id}><PowerMark power={id} /><span><strong>{power.name}</strong>{power.effect}</span></div>)}</div>
-          <p className="blini-panel__fine">Бонус светится на блине — сними его, пока не погас. Касание стойки или кнопка «Поменять» меняет блин в руке на следующий.</p>
+          <p className="blini-panel__fine">Бонус светится на блине — сними его, пока не погас. Гиря Михалыч, 16 кг харизмы: коснись его или кнопки «Поменять», и он возьмёт следующий блин.</p>
           <button className="blini-primary" ref={primary} onClick={() => { setHelp(false); if (mode === 'paused') resume(); }}>Понятно</button>
         </> : mode === 'ready' ? <>
           <span className="blini-chapter">Уровень {level + 1} из {LEVELS.length}</span>

@@ -28,7 +28,7 @@ export const POWERS = Object.freeze({
 });
 
 export const TUNING = Object.freeze({
-  plate: 26, // диаметр блина в единицах поля
+  plate: 30, // диаметр блина в единицах поля
   shotSpeed: 6, fastShot: 11, reload: 16, maxShots: 2,
   grow: .16, // вставленный блин раздвигает соседей за ~6 шагов
   pull: .16, pullMax: 4.5, // разрыв с одинаковыми цветами стягивается с ускорением
@@ -47,18 +47,18 @@ export const TUNING = Object.freeze({
  * powerEvery — шагов между бонусами; par — норматив, секунд.
  */
 export const LEVELS = Object.freeze([
-  { track: 'stadium', speed: .45, start: .3, target: 1800, colors: 4, slow: 3, powerEvery: 1500, par: 50 },
-  { track: 'snake', speed: .16, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 90 },
-  { track: 'dumbbell', speed: .16, start: .22, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 60 },
-  { track: 'stadium', speed: .6, start: .34, target: 2300, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
-  { track: 'snake', speed: .24, start: .3, target: 2500, colors: 4, slow: 2.6, powerEvery: 1400, par: 110 },
-  { track: 'dumbbell', speed: .2, start: .26, target: 2500, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
-  { track: 'stadium', speed: .5, start: .34, target: 2600, colors: 5, slow: 2.3, powerEvery: 1300, par: 90 },
-  { track: 'snake', speed: .16, start: .3, target: 2800, colors: 5, slow: 2.3, powerEvery: 1300, par: 145 },
-  { track: 'dumbbell', speed: .16, start: .26, target: 2800, colors: 5, slow: 2.3, powerEvery: 1300, par: 95 },
-  { track: 'stadium', speed: .65, start: .38, target: 3000, colors: 5, slow: 2, powerEvery: 1200, par: 115 },
-  { track: 'snake', speed: .22, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 170 },
-  { track: 'dumbbell', speed: .2, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
+  { track: 'stadium', speed: .5, start: .3, target: 1800, colors: 4, slow: 3, powerEvery: 1500, par: 50 },
+  { track: 'kitchen', speed: .5, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 75 },
+  { track: 'snake', speed: .16, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 85 },
+  { track: 'dumbbell', speed: .14, start: .22, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 60 },
+  { track: 'stadium', speed: .7, start: .34, target: 2300, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
+  { track: 'kitchen', speed: .6, start: .3, target: 2400, colors: 4, slow: 2.6, powerEvery: 1400, par: 100 },
+  { track: 'snake', speed: .2, start: .3, target: 2600, colors: 5, slow: 2.6, powerEvery: 1400, par: 155 },
+  { track: 'dumbbell', speed: .14, start: .26, target: 2500, colors: 5, slow: 2.6, powerEvery: 1400, par: 85 },
+  { track: 'stadium', speed: .6, start: .34, target: 2800, colors: 5, slow: 2.2, powerEvery: 1300, par: 100 },
+  { track: 'kitchen', speed: .6, start: .34, target: 3000, colors: 5, slow: 2, powerEvery: 1200, par: 155 },
+  { track: 'snake', speed: .26, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 160 },
+  { track: 'dumbbell', speed: .18, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
 ].map(level => Object.freeze(level)));
 
 const DEFAULTS = Object.freeze({ repeat: .42, lives: 0, powers: Object.keys(POWERS) });
@@ -357,7 +357,7 @@ export function shoot(game, x, y) {
   if (game.mode !== 'playing' || game.reload > 0 || game.shots.length >= TUNING.maxShots) return false;
   if (x != null) aim(game, x, y);
   const { shooter } = game.track, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
-  game.shots.push({ x: shooter.x + dx * 22, y: shooter.y + dy * 22, vx: dx * TUNING.shotSpeed, vy: dy * TUNING.shotSpeed, color: game.current });
+  game.shots.push({ x: shooter.x + dx * 34, y: shooter.y + dy * 34, vx: dx * TUNING.shotSpeed, vy: dy * TUNING.shotSpeed, color: game.current });
   game.current = game.next; game.next = pickColor(game);
   game.reload = game.technique > 0 ? Math.round(TUNING.reload / 2) : TUNING.reload;
   game.shotsFired++;
@@ -386,7 +386,7 @@ export function dangerOf(game) {
 /** Куда упрётся прицел: первая точка луча, где он задевает блин, или край поля. */
 export function aimEnd(game) {
   const { shooter } = game.track, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
-  for (let t = 22; t < 900; t += 4) {
+  for (let t = 34; t < 900; t += 4) {
     const x = shooter.x + dx * t, y = shooter.y + dy * t;
     if (x < 0 || y < 0 || x > FIELD.width || y > FIELD.height) return { x, y, hit: false };
     for (const chain of game.chains) for (const b of chain.balls) {
