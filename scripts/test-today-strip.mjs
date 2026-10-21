@@ -37,7 +37,7 @@ const output = await build({
       bundle.onResolve({ filter: /[\\/]ui\.jsx$/ }, () => ({ path: 'ui', namespace: 'strip-test' }));
       bundle.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
       bundle.onLoad({ filter: /.*/, namespace: 'strip-test' }, (args) => (args.path === 'ui'
-        ? { contents: "export const formatNumber = (n) => Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 1 });" }
+        ? { contents: "import React from 'react'; export const formatNumber = (n) => Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 1 }); export const Qty = ({ value, unit }) => <span>{value}{unit ? ' ' + unit : ''}</span>;", loader: 'jsx' }
         : { contents: 'export const useData = (action, params) => globalThis.__strip.useData(action, params);' }));
     },
   }],
