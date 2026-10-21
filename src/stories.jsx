@@ -381,10 +381,11 @@ export function Stories({ personal = [], role = 'client', onOpen }) {
  * кружков на «Обзоре», но открывается когда угодно — прокрутил кружки раз и
  * потерял, а вернуться было некуда.
  */
-// topics — из useStoryTopics: та же инструкция, что в ряду кружков
-export function GuideViewer({ topics, onClose, onOpen }) {
+// topics — из useStoryTopics: та же инструкция, что в ряду кружков;
+// start — с какого кадра («Как пользоваться» открывает нужный раздел)
+export function GuideViewer({ topics, start = 0, onClose, onOpen }) {
   const guide = (topics || prepareTopics(TOPICS)).filter((t) => t.id === 'guide');
-  const [at, setAt] = useState({ topic: 0, frame: 0 });
+  const [at, setAt] = useState(() => ({ topic: 0, frame: Math.max(0, Math.min(start, ((guide[0] || {}).frames || []).length - 1)) }));
   const markSeen = useCallback((id) => {
     const seen = readSeen();
     if (seen.indexOf(id) === -1) writeSeen(seen.concat(id));

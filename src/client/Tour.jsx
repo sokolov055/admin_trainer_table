@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { haptic } from '../telegram.js';
+import { tourSteps } from './tour-model.js';
 import './tour.css';
 
 /**
@@ -13,6 +14,10 @@ import './tour.css';
  * тренировку» (или «Прогресс» с шагами), её можно нажать — она сделает
  * своё обычное дело, и тур закончится. «Пропустить» видно на каждом шаге.
  *
+ * С section — тур одного раздела из «Как пользоваться» (21.10.2026):
+ * те же карточки, 3–4 шага, «Закрыть» вместо «Пропустить» и «Готово» в
+ * конце. Шаги и их порядок — в tour-model.js.
+ *
  * Подсветка — одно «окно» с огромной тенью вокруг: оно плавно переезжает
  * от цели к цели. На шагах-объяснениях касания мимо карточки гасятся;
  * на шаге действия гасятся только касания вокруг окна.
@@ -20,36 +25,11 @@ import './tour.css';
 
 const PAD = 6;
 const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-export function tourSteps({ unlinked, action, app }) {
-  const steps = [
-    { tab: 'overview', target: '.tabbar [data-tab="overview"]', title: 'Обзор — главное на сегодня',
-      text: unlinked
-        ? 'Ваша цель, график и норма. Когда появится тренер — здесь же его занятия и оплата.'
-        : 'Ваша цель, следующая тренировка с тренером и сколько занятий оплачено.' },
-    { tab: 'plan', target: '.tabbar [data-tab="plan"]', title: 'Тренировки',
-      text: 'Программа по занятиям. «Начать тренировку» — и отмечайте подходы по ходу, отдых считает таймер. Проведённые — во вкладке «Выполненные».' },
-    { tab: 'progress', target: '.tabbar [data-tab="progress"]', title: 'Прогресс',
-      text: app
-        ? 'Замеры, рабочие веса, шаги с телефона и награды за серии — видно, как вы идёте к цели.'
-        : 'Замеры, рабочие веса, шаги и награды за серии — видно, как вы идёте к цели. Шаги приходят из приложения на телефоне.' },
-    { tab: 'nutrition', target: '.tabbar [data-tab="nutrition"]', title: 'Питание',
-      text: 'Норма калорий и БЖУ под вашу цель и рацион из того, что есть дома, — со списком покупок.' },
-    { tab: 'overview', target: '.app__bar [aria-label="Меню"]', title: 'Меню «Ещё»',
-      text: 'Ваш тренер и ID для привязки, ваши данные, настройки и «Как пользоваться» — короткие инструкции, если что-то забудется.' },
-  ];
-  if (action === 'workout') {
-    steps.push({ tab: 'plan', action: 'workout', wait: true, title: 'Начните первое занятие',
-      target: 'main.app__body:not([hidden]) [data-first-action="workout"]',
-      text: 'Нажмите «Начать тренировку» — откроются упражнения программы. Подходы отмечаете по ходу.' });
-  } else if (action === 'steps') {
-    steps.push({ tab: 'overview', action: 'steps', title: 'Посмотрите свои шаги', target: '.tabbar [data-tab="progress"]',
-      text: 'Нажмите «Прогресс» — там шаги за сегодня и за две недели. Не подключены — там же кнопка «Подключить шаги».' });
-  } else {
-    steps.push({ tab: 'overview', title: 'Готово!', text: 'Всё самое важное — в нижнем меню. Приятных тренировок!' });
-  }
-  return steps;
-}
+// Цель — строка или список запасных: первая, что есть на экране
+const find = (target) => [].concat(target || []).map((s) => document.querySelector(s)).find(Boolean) || null;
+// Шагов нет — один и тот же пустой шаг: новый объект на каждой
+// перерисовке перезапускал бы поиск цели
+const NONE = {};
 
 function useRect(step) {
   const [rect, setRect] = useState(null);
@@ -69,7 +49,11 @@ function useRect(step) {
     };
     const look = () => {
       if (!alive) return;
-      const t = step.target ? document.querySelector(step.target) : null;
+      const t = find(step.target);
+      // Цель ещё не появилась — окно не остаётся на прошлой: с новым
+      // текстом оно подсвечивало бы не то (и на шаге действия пропускало
+      // касания к прежней кнопке)
+      if (!t && tries === 0) setRect(null);
       if (t) {
         el.current = t;
         if (step.wait) t.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
@@ -96,11 +80,11 @@ function useRect(step) {
   return { rect, missing, el };
 }
 
-export default function Tour({ unlinked, action, app, onTab, onDone }) {
+export default function Tour({ unlinked, action, app, section, onTab, onDone }) {
   // Шаги — один раз на показ: иначе каждая перерисовка начинала бы поиск цели заново
-  const [steps] = useState(() => tourSteps({ unlinked, action, app }));
+  const [steps] = useState(() => tourSteps({ unlinked, action, app, section }));
   const [i, setI] = useState(0);
-  const step = steps[i];
+  const step = steps[i] || NONE;
   const { rect, missing, el } = useRect(step);
   const done = useRef(false);
   const title = useRef(null);
@@ -110,6 +94,8 @@ export default function Tour({ unlinked, action, app, onTab, onDone }) {
   useEffect(() => { if (step.tab) onTab(step.tab); }, [i]);
   useEffect(() => { title.current?.focus({ preventScroll: true }); }, [i]);
   useEffect(() => {
+    // Неизвестный раздел — показывать нечего
+    if (!steps.length) finish('skipped');
     const key = (e) => { if (e.key === 'Escape') finish('skipped'); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
@@ -129,11 +115,15 @@ export default function Tour({ unlinked, action, app, onTab, onDone }) {
     return () => { document.removeEventListener('click', tap, true); t?.removeAttribute('aria-describedby'); };
   }, [live, i]);
 
+  // Первый вход отчитывается серверу как прежде (последний шаг — «skipped»);
+  // тур раздела дошёл до конца — «done», по нему раздел отмечается пройденным
   const next = () => {
     haptic();
-    if (last) finish('skipped');
+    if (last) finish(section ? 'done' : 'skipped');
     else setI(i + 1);
   };
+
+  if (!steps.length) return null;
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -165,10 +155,10 @@ export default function Tour({ unlinked, action, app, onTab, onDone }) {
           <p id="tour-text">{step.text}</p>
         </div>
         <div className="tour__actions">
-          {!last && <button type="button" className="tour__skip" onClick={() => finish('skipped')}>Пропустить</button>}
+          {!last && <button type="button" className="tour__skip" onClick={() => finish('skipped')}>{section ? 'Закрыть' : 'Пропустить'}</button>}
           {last && step.action && !missing
             ? <button type="button" className="tour__skip" onClick={() => finish('skipped')}>Не сейчас</button>
-            : <button type="button" className="button button--primary tour__next" onClick={next}>{last ? 'Начать' : 'Далее'}</button>}
+            : <button type="button" className="button button--primary tour__next" onClick={next}>{last ? (section ? 'Готово' : 'Начать') : 'Далее'}</button>}
         </div>
       </section>
     </div>,

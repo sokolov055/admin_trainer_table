@@ -33,8 +33,10 @@ import { signupLead, clearSignupLead } from '../login-route.js';
 import { useFirstSteps, FirstHint, FirstRegime } from './FirstSteps.jsx';
 import Tour from './Tour.jsx';
 import TodayStrip from './TodayStrip.jsx';
+import Help from './Help.jsx';
+import { tourSections, markTourPassed } from './tour-model.js';
 import { forgetFocus, GoalBanner } from './focus.jsx';
-import { isNativeApp } from '../native-bridge.js';
+import { isNativeApp, iosApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
 import GameShell from '../GameShell.jsx';
 import { IconPlankGame, IconScooterGame, IconMatchGame, IconCareerGame } from '../game-icons.jsx';
@@ -165,11 +167,14 @@ export default function ClientApp({ me, clientRow, preview }) {
   const tour = !!fs?.tour;
   const hintPlan = !tour && fs?.hint === 'workout';
   useEffect(() => { if (hintPlan) setView((v) => (v === 'overview' ? 'plan' : v)); }, [hintPlan]);
-  // «Как пользоваться» (FT-495) — инструкция из меню, а не только кружком на «Обзоре»
-  const [guideOpen, setGuideOpen] = useState(false);
+  // «Как пользоваться» (FT-495) — инструкция из меню, а не только кружком
+  // на «Обзоре». Открыта — номер кадра, с которого её смотрят
+  const [guideAt, setGuideAt] = useState(null);
+  const guideOpen = guideAt !== null;
   // Инструкция — та же, что в кружках: из панели владельца или вшитая (FT-615)
   const storyTopics = useStoryTopics('client');
-  const guide = { id: 'guide', label: 'Как пользоваться', note: guideNote(storyTopics), Icon: IconGuide, action: () => setGuideOpen(true) };
+  // Тур одного раздела, запущенный из «Как пользоваться» (21.10.2026)
+  const [helpTour, setHelpTour] = useState(null);
 
   // Личные истории «Моя неделя» и «Итоги месяца» (FT-493) — в кабинете
   // клиента и у тренера «глазами клиента»: режим для того и есть, чтобы
@@ -186,9 +191,15 @@ export default function ClientApp({ me, clientRow, preview }) {
       .catch(() => { if (alive) setPersonal([]); });
     return () => { alive = false; };
   }, [mine, clientRow]);
+  // «Как пользоваться» — экран меню: короткие туры по разделам (свой
+  // кабинет и «глазами клиента»: туры говорят с клиентом) и инструкция.
+  // Часы — только в приложении на iPhone
+  const tours = mine ? tourSections({ ios: iosApp() }) : [];
+  const guideFrames = ((storyTopics || []).find((t) => t.id === 'guide') || {}).frames || [];
+  const guide = { id: 'guide', label: 'Как пользоваться', note: tours.length ? 'Короткие туры и инструкция' : guideNote(storyTopics), Icon: IconGuide };
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['career', 'plank-game', 'scooter-game', 'match-game'].includes(m.id) || plankEnabled), ...(hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['career', 'plank-game', 'scooter-game', 'match-game'].includes(m.id) || plankEnabled), ...(tours.length || hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -257,7 +268,7 @@ export default function ClientApp({ me, clientRow, preview }) {
 
   // Кнопка раздела в истории (FT-615): вкладка, «Мои данные» или инструкция
   const openFromStory = (section) => {
-    if (section === 'guide') { setGuideOpen(true); return; }
+    if (section === 'guide') { setGuideAt(0); return; }
     if (TABS.some((t) => t.id === section) || section === 'profile') go(section);
   };
 
@@ -365,14 +376,21 @@ export default function ClientApp({ me, clientRow, preview }) {
         <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
 
-      {guideOpen && <GuideViewer topics={storyTopics} onClose={() => setGuideOpen(false)} onOpen={openFromStory} />}
+      {guideOpen && <GuideViewer topics={storyTopics} start={guideAt} onClose={() => setGuideAt(null)} onOpen={openFromStory} />}
 
       {tour && onTab && !guideOpen && (
         <Tour unlinked={!!(me && me.unlinked)} action={fs.action} app={isNativeApp()}
           onTab={(id) => { setMenuOpen(false); if (id !== view) go(id); }}
           onDone={(result) => firstSteps.send('client.firstSteps.hint', { result })} />
       )}
-      {!tour && fs?.hint && onTab && !menuOpen && !guideOpen && (fs.hint !== 'workout' || view === 'plan') && (
+      {/* Тур раздела из «Как пользоваться»: сам открывает нужную вкладку;
+          дошли до «Готово» — раздел отмечается пройденным на устройстве */}
+      {helpTour && !tour && !guideOpen && (
+        <Tour key={helpTour} section={helpTour} unlinked={!!(me && me.unlinked)} app={isNativeApp()}
+          onTab={(id) => { setMenuOpen(false); if (id !== view) go(id); }}
+          onDone={(result) => { if (result === 'done') markTourPassed(helpTour); setHelpTour(null); }} />
+      )}
+      {!tour && !helpTour && fs?.hint && onTab && !menuOpen && !guideOpen && (fs.hint !== 'workout' || view === 'plan') && (
         <FirstHint key={fs.hint} kind={fs.hint} onDone={(result) => firstSteps.send('client.firstSteps.hint', { result })} />
       )}
 
@@ -440,6 +458,8 @@ export default function ClientApp({ me, clientRow, preview }) {
         )}
 
         {view === 'family' && <Family members={familyMembers} preview={!!preview} />}
+
+        {view === 'guide' && <Help tours={tours} frames={guideFrames} onTour={setHelpTour} onGuide={setGuideAt} />}
 
         {view === 'trainer' && (preview
           ? <PreviewOnly text="Здесь клиент видит свой ID «FT-…», своего тренера и запросы на привязку." />
