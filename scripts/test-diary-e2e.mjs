@@ -561,3 +561,32 @@ test('план трёх разборов, п. 8: «Как вы считаете 
   await page.screenshot({ path: join(shots, 'diary-palm-390.png') });
   await page.close();
 });
+
+test('план трёх разборов, пп. 10–11: норма по приёмам и рецепты под остаток', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('diary_approach_later_v1', String(Date.now())); });
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
+  await diary.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await diary.getByRole('button', { name: /^Норма по приёмам/ }).click();
+  await dialog().getByText('Сумма: 100 %').waitFor();
+  await dialog().getByRole('button', { name: 'Больше: Завтрак', exact: true }).click();
+  await dialog().getByText(/Сумма: 105 % — уберите 5 %/).waitFor();
+  assert.equal(await dialog().getByRole('button', { name: 'Сохранить', exact: true }).isDisabled(), true);
+  await dialog().getByRole('button', { name: 'Меньше: Перекус', exact: true }).click();
+  await page.screenshot({ path: join(shots, 'diary-meal-shares-390.png') });
+  await dialog().getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Дневник', exact: true }).click();
+  // Мок: 2000 ккал в день; завтрак 30 % → 600, перекус 5 % → 100
+  await diary.getByText(/из 600 ккал/).first().waitFor();
+  await diary.getByText(/можно ещё 600/).first().waitFor();
+  await diary.getByRole('tab', { name: 'Рецепты', exact: true }).click();
+  await diary.getByRole('button', { name: /под остаток$/ }).waitFor();
+  assert.equal(await diary.getByRole('button', { name: /под остаток$/ }).getAttribute('aria-pressed'), 'true');
+  await diary.getByRole('button', { name: 'Ужин', exact: true }).click();
+  await diary.getByText('Влезает в остаток', { exact: false }).first().waitFor();
+  await page.screenshot({ path: join(shots, 'diary-recipes-390.png') });
+  await page.close();
+});

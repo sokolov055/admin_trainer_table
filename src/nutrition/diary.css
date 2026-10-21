@@ -180,3 +180,25 @@ button.diary-food-main:active { background: var(--surface-active); }
 .diary-pickbar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-3) calc(-1 * var(--space-2)) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border: 1px solid var(--border); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-md); font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .diary-pickbar .button { min-height: 40px; border-radius: 999px; }
 @media (prefers-reduced-motion: reduce) { .diary-way { transition: none; } .diary-way:active { transform: none; } }
+
+/* Норма на приём (план трёх разборов, п. 10) */
+.diary-meal-norm { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; line-height: 1.25; }
+.diary-meal-norm strong { color: var(--text); font-weight: 650; }
+.diary-meal-norm small { font-size: var(--text-sm); color: var(--good-text); }
+.diary-meal-norm.is-over small { color: var(--warning-text); }
+.meal-shares__row { display: grid; grid-template-columns: minmax(0, 1fr) 44px 64px 44px 76px; align-items: center; gap: var(--space-2); min-height: 52px; border-bottom: 1px solid var(--border); }
+.meal-shares__name { font-weight: 600; }
+.meal-shares__step { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: 20px; cursor: pointer; }
+.meal-shares__step:active { background: var(--surface-active); }
+.meal-shares__pct { text-align: center; font-size: var(--text-md); font-variant-numeric: tabular-nums; }
+.meal-shares__kcal { text-align: right; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.meal-shares__sum { margin: var(--space-3) 0; font-size: var(--text-sm); font-weight: 600; color: var(--warning-text); }
+.meal-shares__sum.is-ok { color: var(--good-text); }
+.meal-shares__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.meal-shares__actions .button--primary { flex: 1; }
+@media (max-width: 360px) { .meal-shares__row { grid-template-columns: minmax(0, 1fr) 44px 52px 44px; } .meal-shares__kcal { display: none; } }
+
+/* Рецепты под остаток нормы (план трёх разборов, п. 11) */
+.recipe-filters { margin-bottom: var(--space-3); }
+.recipe-filters__label { margin: var(--space-2) 0 0; font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+.recipe-fits { color: var(--good-text) !important; }

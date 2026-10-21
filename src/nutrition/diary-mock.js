@@ -14,7 +14,7 @@ export function diaryMock(action, p = {}) {
   const catalog = () => [
     ...s.recipes, ...s.foods,
     ...Object.entries(FOOD).map(([name, f]) => ({ kind: 'ingredient', id: name, name, ...f, unit: 'g', source: 'Справочник · вес до приготовления' })),
-    ...RECIPES.map(r => ({ kind: 'dish', id: r.id, name: r.name, ...r.per, unit: 'portion', source: 'Рецепт тренера · одна порция', ingredients: r.items, steps: r.steps })),
+    ...RECIPES.map(r => ({ kind: 'dish', id: r.id, name: r.name, ...r.per, unit: 'portion', source: 'Рецепт тренера · одна порция', ingredients: r.items, steps: r.steps, meal: r.meal, minutes: r.minutes, tags: r.minutes && r.minutes <= 20 ? ['быстро'] : [] })),
   ].map(f => ({ ...f, liked: s.likes.includes(f.kind + ':' + f.id) }));
   // «Только калории» и «Ладонь» — как на сервере (diary-handlers.js resolveProduct)
   const quick = ref => { const kcal = Number(ref.kcal); if (!(kcal >= 1 && kcal <= 5000)) fail(400, 'Калории: от 1 до 5000.'); const m = k => ref[k] === '' || ref[k] == null ? null : Number(ref[k]); const name = String(ref.name || '').trim() || 'Примерно'; return { kind: 'quick', id: 'q-' + name.toLowerCase() + '-' + kcal, name, kcal, protein: m('protein'), fat: m('fat'), carbs: m('carbs'), unit: 'portion', approx: true, source: 'Примерно · без продукта' }; };
