@@ -9,6 +9,7 @@ import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures }
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
+import { useWatchLaunch } from './watch-launch.js';
 import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
@@ -429,6 +430,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   }, [clientRow, workout, familyRow, journalTick]);
   // Очередь телефона ушла на сервер или пополнилась — перечитать список
   useEffect(() => onOutboxChange(() => setJournalTick((t) => t + 1)), []);
+  // «Записать подходы» с «Обзора» — к силовой с часов (watch-launch.js):
+  // та же тренировка программы, что у «Начать тренировку», начало — по часам
+  useWatchLaunch({ enabled: !clientRow && !clientView && !familyRow, data, month, setMonth, open: openWorkout });
 
   // Выход из журнала — перечитать и программу: тренер мог переименовать
   // занятие, и тренировка в программе переименовалась вместе с ним

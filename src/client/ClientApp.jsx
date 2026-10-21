@@ -20,6 +20,7 @@ import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
 import Family from './Family.jsx';
+import WatchSuggest from './WatchSuggest.jsx';
 import { apiPublic } from '../api.js';
 import MyTrainer, { LinkOffers } from './MyTrainer.jsx';
 import { ConsentGate } from '../Consent.jsx';
@@ -419,6 +420,9 @@ export default function ClientApp({ me, clientRow, preview }) {
           {/* Цель — сразу под историями: первое, что видно на «Обзоре» (FT-577).
               Тренер в карточке клиента видит её внутри самого Overview */}
           {t.id === 'overview' && (!clientRow || preview) && <GoalBanner clientRow={clientRow} clientView={!!preview} section="overview" />}
+          {/* Силовая с часов без занятия в приложении — «Записать подходы?»
+              (пункт 12 плана трёх разборов); только в своём кабинете */}
+          {t.id === 'overview' && own && <WatchSuggest trainer={!(me && me.unlinked)} onOpen={go} />}
           {/* «Сегодня» — три числа с подписями (FT-646); только в своём кабинете */}
           {t.id === 'overview' && own && <TodayStrip onOpen={go} />}
           {t.id === 'overview' && fs && (fs.regime || fs.notify) && (

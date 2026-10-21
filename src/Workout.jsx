@@ -192,6 +192,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     }
   };
   const freshRecord = session => ({ session, revision: 0, dirty: true, tick: Date.now(), edit: 1 });
+  // Подходы к силовой с часов («Обзор», client/watch-launch.js): начало —
+  // по часам, чтобы сервер совместил занятие с их тренировкой
+  const planned = l => ({ ...fromPlan(l.block, l.month, l.members || []), ...(l.startedAt ? { startedAt: l.startedAt } : {}) });
 
   useEffect(() => {
     mounted.current = true;
@@ -258,14 +261,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const active = sessions.find(s => ['active', 'paused'].includes(s.status));
           if (wanted) await open(wanted);
           else if (active) await open(active.id);
-          else if (launch && launch.block) store(freshRecord(fromPlan(launch.block, launch.month, launch.members || [])));
+          else if (launch && launch.block) store(freshRecord(planned(launch)));
         }
       } catch (e) {
         if (alive) {
           setMessage(launch && launch.block
             ? 'Нет связи — тренировка идёт на телефоне и сохранится, когда связь появится.'
             : 'Нет связи с журналом. ' + e.message);
-          if (!draft && launch && launch.block) store(freshRecord(fromPlan(launch.block, launch.month, launch.members || [])));
+          if (!draft && launch && launch.block) store(freshRecord(planned(launch)));
         }
       } finally { if (alive) setReady(true); }
     })();

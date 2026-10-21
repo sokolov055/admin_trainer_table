@@ -1,0 +1,28 @@
+/* «Записать подходы?» на «Обзоре» (WatchSuggest.jsx, пункт 12 плана трёх
+   разборов). Рамка цвета акцента: карточка просит действия сегодня, а не
+   сообщает. Подписи — не мельче 13 px и не бледнее 4,5:1. */
+.watch-suggest {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  margin: 0 0 var(--space-4); padding: 14px;
+  border: 2px solid var(--accent-solid); border-radius: var(--radius-lg);
+  background: var(--surface); color: var(--text);
+  animation: watch-suggest-in 320ms var(--ease-out) both;
+}
+.watch-suggest__head { display: flex; gap: var(--space-3); align-items: flex-start; }
+.watch-suggest__icon {
+  display: grid; place-items: center; flex: 0 0 auto; width: 44px; height: 44px;
+  border-radius: var(--radius); background: var(--accent-wash); color: var(--accent-ink);
+}
+.watch-suggest__what { flex: 1; min-width: 0; }
+.watch-suggest__eyebrow,
+.watch-suggest__facts { margin: 0; font-size: var(--text-sm); line-height: 1.35; color: var(--text-secondary); }
+.watch-suggest__title {
+  margin: 2px 0; font-size: 16px; font-weight: 650; line-height: 1.25;
+  letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+}
+.watch-suggest__text { margin: 0; font-size: 14px; line-height: 1.45; text-wrap: pretty; }
+.watch-suggest__actions { display: flex; flex-direction: column; gap: var(--space-2); }
+.watch-suggest__actions .button { font-size: 14px; text-align: center; }
+.watch-suggest__actions .button--primary { min-height: 48px; font-size: var(--text-base); }
+@keyframes watch-suggest-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .watch-suggest { animation: none; } }

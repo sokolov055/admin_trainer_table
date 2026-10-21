@@ -1951,6 +1951,20 @@ const MOCK = {
     };
   },
   'health.workouts.sync': (params) => ({ saved: (params.workouts || []).length }),
+  // «Записать подходы?» на «Обзоре» (пункт 12): в демо — только с
+  // ?mockWatch=1, чтобы проверки «Обзора» видели прежний экран. id
+  // тренировки пустой, как у демо-программы: «Тренировки» найдут её по названию
+  'health.workouts.suggest': () => {
+    if (!new URLSearchParams(window.location.search).get('mockWatch')) return { suggestion: null };
+    const at = (h, m) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString(); };
+    return {
+      suggestion: {
+        workout: { id: 'hw-today', type: 'strengthTraining', startedAt: at(8, 30), endedAt: at(9, 30), duration: 3600, kcal: 410 },
+        block: { id: '', title: PLAN_BLOCKS[0].title },
+        month: MONTHS[0],
+      },
+    };
+  },
   'device.report': () => ({ saved: true }),
   'account.delete': () => ({ deleted: true }),
   'push.native.status': () => ({ enabled: true }),
