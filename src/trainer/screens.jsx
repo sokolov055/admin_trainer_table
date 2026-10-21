@@ -249,7 +249,7 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
                 {/* Не приглашён — это задача тренера, а не свойство
                     клиента: ни ссылки, ни Telegram у человека нет, и в
                     кабинет он войти не может. */}
-                {!c.chatId && !c.invited && <Badge kind="warn">не приглашён</Badge>}
+                {!c.chatId && !c.invited && !c.joined && <Badge kind="warn">не приглашён</Badge>}
                 {!c.hasLink && <Badge>без таблицы</Badge>}
               </div>
             </button>
@@ -296,7 +296,7 @@ function TrainerDay({ summary, clients, attention }) {
   else hint = 'впереди занятий не назначено';
   if (day && day.total && left === 0) hint = 'все занятия на сегодня проведены · ' + hint;
 
-  const uninvited = clients.filter((c) => !c.chatId && !c.invited).length;
+  const uninvited = clients.filter((c) => !c.chatId && !c.invited && !c.joined).length;
 
   return (
     <Lead
@@ -737,7 +737,8 @@ function ClientFamily({ client }) {
  * клиенту «Доступ» открыт сразу — у новой карточки это первое дело.
  */
 export function ClientManage({ client }) {
-  const invited = !!(client.chatId || client.invited);
+  // joined — уже входил по ссылке или почте (сервер, trainerClients)
+  const invited = !!(client.chatId || client.invited || client.joined);
   const [open, setOpen] = useState(invited ? '' : 'access');
   const toggle = (id) => { setOpen((cur) => (cur === id ? '' : id)); haptic(); };
   const split = client.members && client.members.length > 1;
