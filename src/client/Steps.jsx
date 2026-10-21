@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
-import { Section, Panel, formatNumber, formatDate } from '../ui.jsx';
+import { Section, Panel, formatNumber, formatDate, plural } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import WatchHelp from './WatchHelp.jsx';
@@ -293,6 +293,7 @@ export default function Steps({ clientRow, self = false, preview = false }) {
           points={points}
           plain
           format={(v) => formatNumber(v)}
+          unit={(v) => plural(v, 'шаг', 'шага', 'шагов')}
           highlight={points[points.length - 1].key}
           label="Шаги"
         />

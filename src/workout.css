@@ -429,7 +429,7 @@
 .workout__set--current input { border-color: var(--accent); background: var(--surface); }
 
 .workout__set--skipped .workout__set-row input { text-decoration: line-through; opacity: 0.5; }
-.workout__skipped { margin: 2px 0 4px 52px; font-size: var(--text-xs); color: var(--text-muted); }
+.workout__skipped { margin: 2px 0 4px 52px; font-size: var(--text-sm); color: var(--text-muted); }
 
 /* Номер подхода — он же вход в настройки: тихая цель вместо строки под каждым */
 .workout__set-num { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 44px; min-height: 44px; padding: 0 4px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -579,7 +579,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .workout__confirm { animation: none; } }
 
 /* «было 6 кг × 10» — тот же подход в прошлый раз, под строкой подхода */
-.workout__was { margin: -2px 0 6px; padding-left: 64px; font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.workout__was { margin: -2px 0 6px; padding-left: 64px; font-size: var(--text-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 /* Строка под подходом: «на сторону» и «было» — под колонкой веса */
 .workout__set-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 14px; margin: -2px 0 6px; padding-left: 64px; }
 .workout__set-meta .workout__was { margin: 0; padding: 0; }
@@ -648,7 +648,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 
 /* Вариант А (18.10.2026): шаги одной нумерацией, одно «Чего избегать» */
 .workout__about > summary { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
-.guide__meta { color: var(--text-muted); font-size: 12.5px; font-weight: 500; }
+.guide__meta { color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }
 .guide { display: grid; gap: var(--space-4); }
 .guide__machine { display: grid; gap: var(--space-2); }
 .guide__machine-name { margin: 0; font-size: var(--text-base); font-weight: 700; color: var(--text); }
@@ -709,7 +709,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 
 /* Главное действие — скругление и высота как у полей */
 .workout__effort-btn { min-height: var(--field-h, 52px); border-radius: var(--field-r, 12px); font-size: 17px; letter-spacing: -0.005em; }
-.workout__effort-hint { margin-top: var(--space-1); font-size: 12px; }
+.workout__effort-hint { margin-top: var(--space-1); font-size: var(--text-sm); }
 
 /* Второй план — кнопка с рамкой, как «Пауза» и «Выбрать» в шапке */
 .workout__exercise .workout__add,
@@ -806,7 +806,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 
 /* Подписи разбора упражнения — как остальные подписи приложения, без капса:
    это было единственное место с ним (QA 20.10.2026) */
-.guide__h { letter-spacing: 0; text-transform: none; font-size: 12.5px; }
+.guide__h { letter-spacing: 0; text-transform: none; font-size: var(--text-sm); }
 
 /* Карточка клиента над занятием — до одной строки с именем: вкладки и
    «К списку» во время тренировки не нужны, у занятия свой «назад» и своя

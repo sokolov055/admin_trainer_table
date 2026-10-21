@@ -15,7 +15,7 @@ import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
-  Chips, Segmented, Options, Field, Note, Delta,
+  Chips, Segmented, Options, Field, Note, Delta, Qty,
   formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
@@ -208,10 +208,11 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
       ) : (
       <Lead
         label={leadIsTrainings ? 'Оплачено вперёд' : 'Баланс'}
+        // Число крупно, «тренировки» и «₽» мельче и серым (FT-665)
         value={
           leadIsTrainings
-            ? leadLeft + ' ' + plural(leadLeft, 'тренировка', 'тренировки', 'тренировок')
-            : formatMoney(leadMoney)
+            ? <Qty value={leadLeft} unit={plural(leadLeft, 'тренировка', 'тренировки', 'тренировок')} />
+            : <Qty value={formatNumber(Math.round(leadMoney))} unit="₽" />
         }
         tone={leadMoney < 0 ? 'critical' : leadMoney > 0 ? 'good' : undefined}
         hint={
@@ -1794,7 +1795,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {hasRows ? (
         <Lead
           label={activeField}
-          value={last ? formatNumber(last.y) + unit : '—'}
+          value={last ? <Qty value={formatNumber(last.y)} unit={unit.trim()} /> : '—'}
           hint={
             change !== null
               ? 'было ' + formatNumber(first.y) + unit + (period === 'last' ? ' на прошлом замере, ' : ' с ') + formatDate(first.x, false)
@@ -1807,7 +1808,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         // кроме роста весов, и это честный ответ на «что изменилось».
         <Lead
           label="Рабочие веса"
-          value={grew.length + ' из ' + lifts.length}
+          value={<Qty value={grew.length} unit={'из ' + lifts.length} />}
           hint="упражнений прибавили с прошлого месяца"
           facts={progress && progress.currentMonth
             ? [{ label: 'Месяц', value: progress.currentMonth }]

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { formatDate, formatNumber } from './ui.jsx';
+import { formatDate, formatNumber, Qty } from './ui.jsx';
 import { IconDelta } from './icons.jsx';
 
 /**
@@ -225,7 +225,7 @@ export function LineChart({ series, formatValue, unit = '' }) {
             top: 2,
           }}
         >
-          <div className="muted" style={{ fontSize: 11 }}>{formatDate(hover.date)}</div>
+          <div className="muted">{formatDate(hover.date)}</div>
           {hover.items.map((item, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span className="legend__swatch" style={{ background: item.color }} />
@@ -433,7 +433,11 @@ const BAR_HEIGHT = 180;
  * «к прошлому периоду». Для шагов день ниже вчерашнего — не провал, и
  * красить его красным значило бы ругать за обычный вторник.
  */
-export function BarChart({ points, aim = 1, format, highlight, label, plain = false }) {
+/**
+ * unit — единица у числа над графиком: строка или функция от значения
+ * («шаг», «шага», «шагов»); мельче и серым, как везде (FT-665)
+ */
+export function BarChart({ points, aim = 1, format, highlight, label, plain = false, unit }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(320);
   const [active, setActive] = useState(null);
@@ -510,7 +514,11 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
     <div className="bars" ref={wrapRef}>
       <div className="bars__readout" aria-live="polite">
         <span className="bars__period">{current.label}{current.partial ? ' · ещё идёт, данные неполные' : ''}</span>
-        <span className="bars__value">{current.has ? format(current.value) : '—'}</span>
+        <span className="bars__value">
+          {!current.has ? '—'
+            : unit ? <Qty value={format(current.value)} unit={typeof unit === 'function' ? unit(current.value) : unit} />
+              : format(current.value)}
+        </span>
         {!plain && current.delta !== null && current.delta !== 0 && (
           <span className={'bars__delta bars__delta--' + current.trend}>
             <IconDelta value={current.delta} size={14} />

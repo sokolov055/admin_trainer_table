@@ -19,6 +19,14 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="icon" href="icon-192.png" />
 
+    <!-- Шрифт интерфейса (FT-665) — сразу, вместе с оболочкой: иначе браузер
+         узнаёт о нём только из CSS, и первый кадр рисуется системным
+         шрифтом, а потом перескакивает. Свои файлы из public/fonts, не
+         Google Fonts. crossorigin обязателен: шрифт из CSS грузится в
+         режиме CORS, и без него предзагрузка не совпала бы и шла впустую. -->
+    <link rel="preload" href="fonts/roboto-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/roboto-latin.woff2" as="font" type="font/woff2" crossorigin />
+
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
 

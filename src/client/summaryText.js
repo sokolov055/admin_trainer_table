@@ -97,6 +97,15 @@ export function minutesText(min) {
 }
 
 const kg = (n) => formatNumber(Math.round(n)) + ' кг';
+
+/** «1 ч 25 мин» парами для Qty: [[1, 'ч'], [25, 'мин']] */
+export function minutesParts(min) {
+  const m = Math.round(Math.abs(min));
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  if (!h) return [[rest, 'мин']];
+  return rest ? [[h, 'ч'], [rest, 'мин']] : [[h, 'ч']];
+}
 const weightText = (n) => formatNumber(n, Number.isInteger(n) ? 0 : 1) + ' кг';
 
 /**
@@ -113,13 +122,13 @@ export function metricRows(s) {
     },
     {
       id: 'minutes', label: 'Время',
-      value: minutesText(s.now.minutes), unit: '',
+      value: minutesText(s.now.minutes), unit: '', parts: minutesParts(s.now.minutes),
       diff: s.now.minutes - s.before.minutes, diffText: minutesText,
     },
     {
       // «Поднятый вес», а не «тоннаж»: тренерское слово клиенту непонятно
       id: 'tonnage', label: 'Поднятый вес',
-      value: kg(s.now.tonnage), unit: '',
+      value: formatNumber(Math.round(s.now.tonnage)), unit: 'кг',
       diff: s.now.tonnage - s.before.tonnage, diffText: (d) => kg(Math.abs(d)),
     },
   ];

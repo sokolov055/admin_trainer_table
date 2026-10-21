@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useData } from '../useData.js';
-import { Section, Panel, Segmented, plural } from '../ui.jsx';
+import { Section, Panel, Segmented, Qty, plural } from '../ui.jsx';
 import { IconChevron, IconDelta } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { MuscleSummary } from '../muscles/MuscleMap.jsx';
@@ -158,7 +158,7 @@ export default function Summary({ clientRow }) {
                     <div key={r.id} className="summary__fact">
                       <dt className="summary__label">{r.label}</dt>
                       <dd className="summary__value">
-                        {r.value}{r.unit ? <span className="summary__unit"> {r.unit}</span> : null}
+                        <Qty value={r.value} unit={r.unit} parts={r.parts} />
                       </dd>
                       <dd className="summary__change"><Change row={r} /></dd>
                     </div>

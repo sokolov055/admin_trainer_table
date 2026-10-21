@@ -198,6 +198,26 @@ export function Lead({ label, value, hint, tone, facts }) {
 }
 
 /**
+ * Число с единицей (FT-665): «72,4 кг», «5 000 ₽», «1 ч 20 мин». Число —
+ * размером и весом места, где стоит; единица мельче и серым (.qty__unit).
+ * Между ними неразрывный пробел: «кг» не уезжает на другую строку от
+ * своего числа. Несколько пар — parts: [[1, 'ч'], [20, 'мин']].
+ */
+export function Qty({ value, unit, parts, className = '' }) {
+  const list = parts || [[value, unit]];
+  return (
+    <span className={'qty' + (className ? ' ' + className : '')}>
+      {list.map(([v, u], i) => (
+        <React.Fragment key={i}>
+          {i > 0 ? ' ' : ''}{v}
+          {u ? <>&nbsp;<span className="qty__unit">{u}</span></> : null}
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
+/**
  * Видимый «назад» над заголовком экрана (FT-567). Жест и системный Back
  * делают то же самое, но о них нужно знать заранее; кнопка видна всем,
  * в том числе в браузере с мышью. Подпись — куда вернёт: «Клиенты»,
