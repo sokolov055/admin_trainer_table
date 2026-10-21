@@ -121,3 +121,44 @@ test('тренер «глазами клиента» видит витрину �
   assert.equal(tree.toJSON(), null);
   tree.unmount();
 });
+
+const askButton = (sheet) => sheet.findAll((n) => n.type === 'button' && text(n) === 'Хочу эту программу');
+const openCard = async (i) => {
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(ProgramsShowcase, { onClose() {} })); });
+  await act(async () => { cards(tree)[i].props.onClick(); });
+  return tree;
+};
+
+test('уже просили: метка на карточке, в окне — «Заявка у тренера» вместо кнопки; «уже есть» от сервера и отказ', async () => {
+  list = { available: true, trainer: 'Константин', programs };
+  calls.length = 0;
+  let tree = await openCard(2);
+  assert.match(text(cards(tree)[2]), /Заявка у тренера/, 'метка на карточке');
+  let sheet = tree.root.findByProps({ className: 'sheet' });
+  assert.equal(askButton(sheet).length, 0, 'повторно попросить нельзя');
+  assert.match(text(sheet), /Заявка у тренера\. Когда он назначит программу/);
+  assert.deepEqual(calls, []);
+  tree.unmount();
+
+  // Заявка уже лежала у тренера (already) — тот же итог, без ошибки
+  globalThis.__api = async (action, params) => { calls.push([action, params]); return { requested: true, already: true }; };
+  tree = await openCard(1);
+  await act(async () => { await askButton(tree.root.findByProps({ className: 'sheet' }))[0].props.onClick(); });
+  assert.deepEqual(calls, [['showcase.request', { id: 2 }]]);
+  sheet = tree.root.findByProps({ className: 'sheet' });
+  assert.equal(askButton(sheet).length, 0);
+  assert.match(text(sheet), /Заявка у тренера/);
+  tree.unmount();
+
+  // Отказ сервера: кнопка остаётся, причина — под ней
+  globalThis.__api = async () => { throw new Error('Попросить программу может только сам клиент.'); };
+  tree = await openCard(1);
+  await act(async () => { await askButton(tree.root.findByProps({ className: 'sheet' }))[0].props.onClick(); });
+  sheet = tree.root.findByProps({ className: 'sheet' });
+  assert.equal(askButton(sheet).length, 1);
+  assert.equal(askButton(sheet)[0].props.disabled, false);
+  assert.match(text(sheet), /Попросить программу может только сам клиент\./);
+  tree.unmount();
+  globalThis.__api = async (action, params) => { calls.push([action, params]); return { requested: true, already: false }; };
+});

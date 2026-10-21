@@ -220,3 +220,41 @@ test('просьба старше минуты не открывает заня�
     act(() => p.tree.unmount());
   } finally { Date.now = realNow; }
 });
+
+test('«Не сейчас» пишет id тренировки часов на устройство — новые впереди, не больше двадцати', () => {
+  store.clear();
+  store.set('fittrack.watchSuggest.hidden', JSON.stringify(Array.from({ length: 20 }, (_, i) => 'old-' + i)));
+  const { tree } = draw({ data: suggestion(), stale: false });
+  act(() => button(tree, /Не сейчас/).props.onClick());
+  const saved = JSON.parse(store.get('fittrack.watchSuggest.hidden'));
+  assert.equal(saved[0], 'hk-1');
+  assert.equal(saved.length, 20);
+  assert.equal(saved.includes('old-19'), false, 'самая старая вытеснена');
+  act(() => tree.unmount());
+  // Испорченное хранилище — как пустое
+  store.set('fittrack.watchSuggest.hidden', '{oops');
+  const again = draw({ data: suggestion(), stale: false });
+  assert.match(screen(again.tree), /Записать подходы/);
+  act(() => again.tree.unmount());
+});
+
+test('у старой тренировки id нет — блок по названию; нет и его при текущем месяце — просьба забыта', async () => {
+  requestWatchLaunch({ blockId: '', title: 'Спина', startedAt: at(18, 0) });
+  const p = plan({ data: program });
+  await settle();
+  assert.equal(p.opened.length, 1);
+  assert.equal(p.opened[0].block.id, 'b-back');
+  assert.deepEqual(p.months, []);
+  act(() => p.tree.unmount());
+
+  // Такой тренировки нет, а месяц открыт текущий — возвращаться некуда: просьба снимается, не висит
+  requestWatchLaunch({ blockId: 'b-nope', title: 'Нет такой', startedAt: at(18, 0) });
+  const q = plan({ data: program, month: '' });
+  await settle();
+  assert.equal(q.opened.length, 0);
+  assert.deepEqual(q.months, []);
+  act(() => q.tree.update(React.createElement(q.Plan, { data: { ...program, blocks: [...program.blocks, { id: 'b-nope', title: 'Нет такой', exercises: [] }] }, month: '' })));
+  await settle();
+  assert.equal(q.opened.length, 0, 'появившаяся позже тренировка занятие сама не откроет');
+  act(() => q.tree.unmount());
+});

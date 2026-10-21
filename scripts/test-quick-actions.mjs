@@ -64,9 +64,9 @@ const buttonsOf = (node, out = []) => {
 const BLOCKS = [{ id: 'b1', title: 'Ноги и ягодицы', exercises: [] }, { id: 'b2', title: 'Спина', exercises: [] }];
 const done = (id) => ({ id: 'done-' + id, status: 'completed', sourceBlockId: id, month: 'Октябрь 2026', updatedAt: '2026-10-20' });
 
-async function sheet({ me = { name: 'Клиент' }, clientRow, preview = false, sessions = [] } = {}) {
+async function sheet({ me = { name: 'Клиент' }, clientRow, preview = false, sessions = [], blocks = BLOCKS } = {}) {
   globalThis.__quick = {
-    'client.plan': { month: 'Октябрь 2026', blocks: BLOCKS },
+    'client.plan': { month: 'Октябрь 2026', blocks },
     'workout.list': { sessions },
   };
   const picks = [];
@@ -138,6 +138,28 @@ test('главная кнопка решает, как «Тренировки»:
   assert.match(s.main, /^Свободная тренировка/);
   assert.deepEqual(await s.press(0), ['plan', 'workout', { free: true }]);
   await s.close();
+});
+
+test('программы нет — сразу «Свободная тренировка»; идущее занятие — «идёт», а не «на паузе»', async () => {
+  setRights(null);
+  let s = await sheet({ blocks: [] });
+  assert.match(s.main, /^Свободная тренировка/);
+  assert.match(s.main, /Без программы: что сделаете, то и запишется$/);
+  assert.deepEqual(await s.press(0), ['plan', 'workout', { free: true }]);
+  await s.close();
+
+  s = await sheet({ sessions: [{ id: 's2', status: 'active', title: 'Ноги и ягодицы' }] });
+  assert.match(s.main, /^Вернуться к занятию/);
+  assert.match(s.main, /Ноги и ягодицы · идёт$/);
+  assert.deepEqual(await s.press(0), ['plan', 'workout', { session: 's2' }]);
+  await s.close();
+
+  // Программа ещё не загрузилась — без названия, что начать, решат «Тренировки»
+  globalThis.__quick = { 'client.plan': null, 'workout.list': null };
+  let root;
+  await act(async () => { root = renderer.create(React.createElement(QuickAdd, { me: { name: 'Клиент' }, onClose: () => {}, onPick: () => {} })); });
+  assert.equal(textOf(buttonsOf(root.toJSON())[0]), 'Начать занятие');
+  await act(async () => { root.unmount(); });
 });
 
 function Screen({ kind = 'weight', onRequest, enabled = true }) {

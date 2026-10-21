@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { STEPS, LAST, canAdvance, nextStep, resumeStep, stageOf, bmrOf, timesWeek, ageOf, hasBody, fmtBirth } from '../src/client/onboarding-model.js';
 import { TOUR_SECTIONS, tourSteps, tourSections, passedTours, markTourPassed } from '../src/client/tour-model.js';
 
@@ -128,4 +130,35 @@ test('«Как пользоваться»: часы — только в прил
   } finally {
     if (had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage;
   }
+});
+
+/* Цель шага подсвечивается по селектору: класс или атрибут, которого нет на
+   экранах, оставит карточку без подсветки, и тур молча укажет в пустоту.
+   Проверка простая — по строке в исходниках src/ (jsx, js, css, html). */
+test('цели туров: каждый класс и атрибут из селекторов есть в исходниках', () => {
+  const files = [];
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walk(p); else if (/\.(jsx|js|css|html)$/.test(e.name)) files.push(p);
+  });
+  walk('src');
+  const source = files.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+  const targets = TOUR_SECTIONS.flatMap((s) => s.steps.flatMap((st) => [st.target].flat().filter(Boolean)));
+  targets.push(...tourSteps({ action: 'workout' }).map((s) => s.target).filter(Boolean), tourSteps({ action: 'steps' }).at(-1).target);
+  assert.ok(targets.length >= 20, 'целей: ' + targets.length);
+  const missing = [];
+  for (const sel of new Set(targets)) {
+    const parts = sel.replace(/:not\([^)]*\)/g, '').split(/\s*>\s*|\s+/).filter(Boolean);
+    for (const part of parts) {
+      for (const cls of part.match(/\.[\w-]+/g) || []) {
+        const name = cls.slice(1);
+        if (!new RegExp('(^|[^\\w-])' + name + '(?![\\w-])').test(source)) missing.push(sel + ' → ' + cls);
+      }
+      for (const [, attr, value] of part.matchAll(/\[([\w-]+)="([^"]*)"\]/g)) {
+        if (!source.includes(attr)) missing.push(sel + ' → [' + attr + ']');
+        else if (value && !source.includes(value)) missing.push(sel + ' → ' + attr + '="' + value + '"');
+      }
+    }
+  }
+  assert.deepEqual(missing, []);
 });
