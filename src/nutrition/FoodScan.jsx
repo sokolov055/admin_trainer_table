@@ -3,6 +3,7 @@ import { apiPublic } from '../api.js';
 import { Note } from '../ui.jsx';
 import { foodTitle, foodPer } from './FoodFields.jsx';
 import { parseLabel, validBarcode } from './label-model.js';
+import ScanGuide from './ScanGuide.jsx';
 import './food-scan.css';
 
 export default function FoodScan({ onDraft, onFound, disabled = false }) {
@@ -66,7 +67,9 @@ export default function FoodScan({ onDraft, onFound, disabled = false }) {
   return <section className="food-scan" aria-label="Сканер продукта">
     {!mode ? <div className="diary-inline-actions"><button type="button" className="button" disabled={disabled} onClick={() => reset('barcode')}>Сканировать штрихкод</button><button type="button" className="button" disabled={disabled} onClick={() => reset('label')}>Распознать этикетку</button></div> : <>
       <div className="food-scan-head"><h3>{mode === 'barcode' ? 'Штрихкод продукта' : 'Фото этикетки'}</h3><button type="button" className="button button--ghost" onClick={() => reset('')}>Закрыть сканер</button></div>
-      <p className="small muted">{mode === 'barcode' ? 'Снимите товарный штрихкод целиком, без бликов.' : 'Снимите таблицу КБЖУ крупно, вместе с надписью «на 100 г» или «на 100 мл».'} Фото обрабатывается на устройстве и не загружается на сервер.</p>
+      {/* «Как снять» — до первого снимка; после снимка место занимает само фото */}
+      {!image && !text && <ScanGuide mode={mode} />}
+      <p className="small muted">Фото обрабатывается на телефоне и никуда не отправляется. Камера спросит разрешение при первом снимке.</p>
       <div className="diary-inline-actions"><button type="button" className="button" disabled={locked} onClick={() => camera.current.click()}>Снять фото</button><button type="button" className="button" disabled={locked} onClick={() => gallery.current.click()}>Выбрать фото</button></div>
       <input ref={camera} className="food-scan-file" type="file" accept="image/*" capture="environment" aria-label="Снять фото продукта" onChange={e => { void loadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
       <input ref={gallery} className="food-scan-file" type="file" accept="image/*" aria-label="Выбрать фото продукта" onChange={e => { void loadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
