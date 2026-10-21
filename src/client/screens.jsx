@@ -158,7 +158,6 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
   if (data.unlinked) {
     return (
       <>
-      {clientRow && !clientView && <GoalBanner clientRow={clientRow} section="overview" />}
       <Section title="Тренера пока нет">
         <Panel pad>
           <p className="small">
@@ -195,7 +194,6 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
 
   return (
     <>
-      {clientRow && !clientView && <GoalBanner clientRow={clientRow} section="overview" />}
       {online ? (
         <Lead
           label={onlineLeft !== null && onlineLeft >= 0 ? 'Онлайн-ведение оплачено' : 'Онлайн-ведение'}
@@ -744,7 +742,6 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </p>
       )}
       {runningLine}
-      {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || !!data.self} section="plan" />}
 
       {/* Пожелания клиента (FT-498) — тренеру до того, как он возьмётся
           править программу: их ради этого и пишут. Заявку на программу из
@@ -1732,6 +1729,8 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
             замер» стоит в самом пустом состоянии, а не отдельно над ним.
             Пока форма открыта, на её месте — она */}
         {adding && addMeasure}
+        {/* Плашка цели — только здесь (владелец, 21.10.2026: на каждом
+            экране она мешала; цель — разговор о прогрессе) */}
         {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
         {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
         {!familyRow && <Summary clientRow={clientRow} />}
@@ -2404,7 +2403,6 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
 
   return (
     <>
-      {(!diaryEnabled || diaryTab === 'diary') && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="nutrition" />}
       {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} onPlan={self || (!clientRow && hasPlus(rights)) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
       {(!diaryEnabled || diaryTab === 'settings' || editing) && <>
       {configured && (

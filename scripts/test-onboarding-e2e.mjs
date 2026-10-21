@@ -88,6 +88,8 @@ test('анкета 2.0: согласие, данные барабанами, о�
   await page.screenshot({ path: join(ROOT, '../reports/ft-577/done-390.png'), fullPage: true });
   await page.getByRole('button', { name: 'Продолжить' }).click();
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
+  // Плашка цели — только в «Прогрессе» (21.10.2026)
+  await page.getByRole('button', { name: 'Прогресс', exact: true }).last().click();
   await page.getByRole('region', { name: 'Ваша цель' }).first().waitFor();
   assert.deepEqual(errors, []); await page.close();
 });

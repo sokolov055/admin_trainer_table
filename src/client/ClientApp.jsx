@@ -39,7 +39,7 @@ import Tour from './Tour.jsx';
 import TodayStrip from './TodayStrip.jsx';
 import Help from './Help.jsx';
 import { tourSections, markTourPassed } from './tour-model.js';
-import { forgetFocus, GoalBanner } from './focus.jsx';
+import { forgetFocus } from './focus.jsx';
 import { isNativeApp, iosApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
 import GameShell from '../GameShell.jsx';
@@ -451,7 +451,6 @@ export default function ClientApp({ me, clientRow, preview }) {
           {t.id === 'overview' && personal && <Stories personal={personal} onOpen={openFromStory} />}
           {/* Цель — сразу под историями: первое, что видно на «Обзоре» (FT-577).
               Тренер в карточке клиента видит её внутри самого Overview */}
-          {t.id === 'overview' && (!clientRow || preview) && <GoalBanner clientRow={clientRow} clientView={!!preview} section="overview" />}
           {/* Силовая с часов без занятия в приложении — «Записать подходы?»
               (пункт 12 плана трёх разборов); только в своём кабинете */}
           {t.id === 'overview' && own && <WatchSuggest trainer={!(me && me.unlinked)} onOpen={go} />}
