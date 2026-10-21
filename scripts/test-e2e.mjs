@@ -701,8 +701,11 @@ test('клиент: «Как пользоваться» открывается �
   await page.goto(origin);
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
   await page.locator('.menu__item').filter({ hasText: 'Как пользоваться' }).click();
+  // План трёх разборов, п. 5: меню открывает экран с турами и инструкцией,
+  // строка инструкции — историю с этого кадра
+  await assert.doesNotReject(page.getByText('Короткие туры', { exact: true }).waitFor({ timeout: 10000 }));
+  await page.locator('.help-row--plain').first().click();
   const viewer = page.locator('.story');
-  await assert.doesNotReject(viewer.getByText('Как пользоваться Fit Track').waitFor({ timeout: 10000 }));
   await assert.doesNotReject(viewer.getByRole('heading', { name: 'Вход' }).waitFor({ timeout: 5000 }), 'первый кадр — «Вход»');
   await viewer.getByRole('button', { name: 'Закрыть' }).click();
   await viewer.waitFor({ state: 'detached', timeout: 5000 });
@@ -1817,7 +1820,8 @@ test('FT-568: список и карточка показывают один б�
     const overview = phone.locator('.card-section[data-view="overview"]');
     await overview.locator('.lead__hint').waitFor({ timeout: 10000 });
     assert.match(await overview.locator('.lead__hint').innerText(), /12\s*000 ₽ на балансе/);
-    assert.match(await overview.locator('.lead__value').innerText(), /4 тренировки/);
+    // Число и единица — через неразрывный пробел (Qty, FT-665)
+    assert.match(await overview.locator('.lead__value').innerText(), /4.тренировки/);
     await phone.waitForTimeout(700);
     assert.ok((await phone.evaluate(() => window.__balanceHints)).every((hint) => !hint.includes('58')),
       'устаревший кеш не мелькает даже до ответа сервера');
