@@ -520,7 +520,8 @@ test('план трёх разборов, п. 1: «Только калории»
   const row = diary.getByRole('button', { name: 'Изменить: Бизнес-ланч', exact: true });
   await row.waitFor();
   assert.match(await row.innerText(), /примерно/);
-  assert.ok((await diary.innerText()).includes('≈ 450 ккал'));
+  // innerText сохраняет неразрывный пробел Qty между числом и «ккал» (getByText его нормализует сам)
+  assert.match(await diary.innerText(), /≈ 450[\s ]ккал/);
   assert.ok((await diary.innerText()).includes('из съеденного примерно 450 ккал'));
   await page.screenshot({ path: join(shots, 'diary-quick-390.png') });
   // П. 3: карточка продукта — проверка и источник видны до записи

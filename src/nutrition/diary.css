@@ -66,9 +66,9 @@ button.diary-food-main:active { background: var(--surface-active); }
 .diary-day-done p { margin: 2px 0 0; }
 .diary-day-done .button { flex-shrink: 0; }
 .diary-day-open { margin: var(--space-3) 0; }
-.diary-finish__kcal { margin: 0; display: flex; align-items: baseline; gap: 6px; }
-.diary-finish__kcal strong { font-size: var(--text-hero); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.diary-finish__kcal span { font-size: var(--text-base); color: var(--text-secondary); }
+/* Итог дня — число-герой (hero/700), единица «ккал из 2 000» — серая .qty__unit (Qty, FT-665) */
+.diary-finish__kcal { margin: 0; }
+.diary-finish__kcal .qty { font-size: var(--text-hero); font-weight: 700; line-height: 1.1; }
 .diary-finish__verdict { margin: var(--space-2) 0 var(--space-4); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-sm); background: var(--surface-sunken); }
 .diary-finish__verdict--good { background: var(--good-fill); color: var(--good-text); }
 .diary-finish__verdict--over { background: var(--warning-fill); color: var(--warning-text); }
@@ -171,8 +171,9 @@ button.diary-food-main:active { background: var(--surface-active); }
 .diary-product__trust--warn { background: var(--warning-fill); color: var(--warning-text); }
 .diary-product__trust--approx { background: var(--info-fill); color: var(--info-text); }
 .diary-product__kcal { margin: var(--space-2) 0 0; display: flex; align-items: baseline; gap: 6px; }
-.diary-product__kcal strong { font-size: var(--text-num); font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.diary-product__kcal span { font-size: var(--text-sm); color: var(--text-secondary); }
+/* «70 ккал на 100 г» — Qty (FT-665); strong + span остаются только для «нет данных» */
+.diary-product__kcal .qty, .diary-product__kcal strong { font-size: var(--text-num); font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.diary-product__kcal strong + span { font-size: var(--text-sm); color: var(--text-secondary); }
 .diary-product__macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-2) 0; }
 .diary-product__macros dt { font-size: var(--text-sm); color: var(--text-secondary); }
 .diary-product__macros dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -191,7 +192,7 @@ button.diary-food-main:active { background: var(--surface-active); }
 
 /* Норма на приём (план трёх разборов, п. 10) */
 .diary-meal-norm { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; line-height: 1.25; }
-.diary-meal-norm strong { color: var(--text); font-size: var(--text-base); font-weight: 650; }
+.diary-meal-norm .qty { color: var(--text); font-size: var(--text-base); font-weight: 650; }
 .diary-meal-norm small { font-size: var(--text-sm); color: var(--good-text); }
 .diary-meal-norm.is-over small { color: var(--warning-text); }
 .meal-shares__row { display: grid; grid-template-columns: minmax(0, 1fr) 44px 64px 44px 76px; align-items: center; gap: var(--space-2); min-height: 52px; border-bottom: 1px solid var(--border); }
