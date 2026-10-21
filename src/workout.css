@@ -756,7 +756,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
    отступы плотнее — в зале треть экрана уходила на хром */
 .workout__header { padding: var(--space-2) var(--space-4) var(--space-2); }
 .workout__header h2 { margin-top: 2px; }
-.workout__header > p { margin: 0; font-size: var(--text-xs); }
+.workout__header > p { margin: 0; font-size: var(--text-sm); }
 .workout__metrics { margin-top: var(--space-2); gap: var(--space-3); }
 .workout__metrics strong { font-size: var(--text-lg); }
 .workout__toolbar--head { margin-top: var(--space-2); }
@@ -780,12 +780,12 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__head-row .app__back { margin: 0; }
 .workout__finish-btn { height: 36px; min-height: 0; padding: 0 var(--space-3); border-radius: 10px; font-size: var(--text-sm); }
 .workout__header h2 { margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workout__title-meta { font-size: var(--text-xs); font-weight: 500; color: var(--text-secondary); letter-spacing: 0; }
+.workout__title-meta { font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); letter-spacing: 0; }
 .workout__line { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); min-width: 0; }
 .workout__line .workout__metrics { display: inline-flex; align-items: baseline; gap: 4px; margin: 0 auto 0 0; flex: 0 1 auto; min-width: 0; white-space: nowrap; font-size: var(--text-base); color: var(--text-secondary); }
 .workout__line .workout__metrics strong { display: inline; margin: 0; font-size: var(--text-lg); }
 .workout__line .workout__metrics b { font-weight: 600; color: var(--text); }
-.workout__rest-pick { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 4px 0 10px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--text-xs); white-space: nowrap; }
+.workout__rest-pick { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 4px 0 10px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--text-sm); white-space: nowrap; }
 .workout__rest-pick select { height: 100%; min-height: 0; margin: 0; padding: 0 2px; border: 0; background: transparent; color: var(--text); font-size: 15px; font-weight: 600; }
 .workout__pause { height: 36px; min-height: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); font-size: var(--text-sm); }
 .workout__line .workout__pick-toggle { height: 36px; min-height: 0; padding: 0 10px; border-radius: 10px; font-size: var(--text-sm); }
@@ -820,4 +820,6 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__title-row { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
 .workout__title-row h2 { flex: 0 1 auto; min-width: 0; }
 .workout__title-row .workout__title-meta { flex: 0 0 auto; margin: 0; }
-.workout__title-meta { font-size: var(--text-xs); font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+/* Подписи шапки — 13 (FT-665): «месяц · статус» стоит в строке названия,
+   а отдых — в поле фиксированной высоты, поэтому шапка не растёт (166 px, 20.10) */
+.workout__title-meta { font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); white-space: nowrap; }

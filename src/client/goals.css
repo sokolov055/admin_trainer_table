@@ -14,16 +14,18 @@
   gap: var(--space-3);
 }
 
+/* Заголовок карточки — раздел (md/600), счёт справа — число с серой
+   единицей «из 9» (Qty, FT-665) того же кегля */
 .goal-card__title {
   margin: 0;
-  font-size: var(--text-base);
-  font-weight: 620;
+  font-size: var(--text-md);
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .goal-card__count {
-  font-size: var(--text-base);
-  font-weight: 700;
+  font-size: var(--text-md);
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

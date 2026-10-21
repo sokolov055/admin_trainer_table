@@ -198,10 +198,12 @@
   letter-spacing: -0.02em;
 }
 
+/* Единица при числе — как .qty__unit: 13, обычным весом, серым (FT-665) */
 .card__kcal i {
   font-style: normal;
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 450;
+  letter-spacing: 0;
   color: var(--text-muted);
   margin-left: 3px;
 }
@@ -250,7 +252,7 @@
 
 .card__out {
   margin: 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
@@ -312,7 +314,7 @@
 .deck__left {
   min-width: 82px;
   text-align: center;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -320,7 +322,7 @@
 .deck__hint {
   margin: 0 0 var(--space-4);
   text-align: center;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-muted);
   line-height: 1.4;
 }
@@ -473,7 +475,7 @@
   flex-direction: column;
   gap: 1px;
   margin: calc(var(--space-2) * -1) 0 var(--space-3);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
@@ -486,7 +488,7 @@
 .extras__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 12px var(--space-4); border-bottom: 1px solid var(--border); }
 .extras__row:last-child { border-bottom: 0; }
 .extras__name { font-weight: 600; overflow-wrap: anywhere; }
-.extras__meta { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.extras__meta { font-size: var(--text-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .extras__add { margin-top: var(--space-2); }
 .extras__form { display: grid; gap: var(--space-3); }
 .extras__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
@@ -523,7 +525,7 @@
 .ration__tags::-webkit-scrollbar { display: none; }
 
 /* Яйца штуками: граммы рядом, мельче — для тех, кто взвешивает */
-.amount__grams { color: var(--text-muted); font-size: var(--text-xs); margin-left: 4px; }
+.amount__grams { color: var(--text-muted); font-size: var(--text-sm); margin-left: 4px; }
 .eggs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 var(--space-3); }
 .eggs__hint { flex-basis: 100%; margin: 0; }
 .day__bar--done .day__bar-head { color: var(--good-text); font-weight: 600; }

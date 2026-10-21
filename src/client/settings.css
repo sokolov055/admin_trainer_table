@@ -40,8 +40,11 @@
   cursor: pointer;
   border-radius: var(--radius-sm);
   -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-press) var(--ease-out);
 }
 
+/* Нажатие — подсветка строки, как у .conn-link и строк «Как пользоваться» */
+.conn-row__main--button:active { background: var(--surface-active); }
 .conn-row__main--button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 @media (hover: hover) and (pointer: fine) {
@@ -154,6 +157,7 @@
 .switch input:disabled + .switch__track { opacity: 0.45; }
 
 @media (prefers-reduced-motion: reduce) {
+  .conn-row__main--button,
   .switch__track,
   .switch__track::after { transition: none; }
 }

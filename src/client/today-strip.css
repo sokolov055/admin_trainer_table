@@ -10,9 +10,16 @@
   transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 .today-strip__tile:active { transform: scale(0.97); background: var(--surface-active); }
-.today-strip__tile strong { font-size: 22px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Число в ряду — xl (FT-665); «тыс.» — серой единицей через Qty. Три плитки
+   на 360 px дают по 69 px внутри: «8,4 тыс.» 22-м кеглем с единицей 13 входит */
+.today-strip__tile strong { font-size: var(--text-xl); font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .today-strip__tile span { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.3; }
 .today-strip__tile.is-done { border-color: var(--good-line); background: var(--good-fill); }
 .today-strip__tile.is-done strong { color: var(--good-text); }
 .today-strip__tile:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
+/* 320 px: внутри плитки 60 px — число на ступень меньше, иначе «10 250» и «12/12» вылезают */
+@media (max-width: 359px) {
+  .today-strip__tile { padding: 10px; }
+  .today-strip__tile strong { font-size: var(--text-lg); }
+}
 @media (prefers-reduced-motion: reduce) { .today-strip__tile { transition: none; } .today-strip__tile:active { transform: none; } }
