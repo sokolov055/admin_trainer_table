@@ -37,7 +37,8 @@ test('FT-551: реальное локальное OCR и штрихкод, че�
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
   const scanner = page.getByRole('region', { name: 'Сканер продукта' });
-  await scanner.getByRole('button', { name: 'Распознать этикетку', exact: true }).click();
+  // П. 9 плана: способы — плитками под поиском, сканер открывается сразу в нужном режиме
+  await page.getByRole('dialog').getByRole('button', { name: 'Фото этикетки', exact: true }).click();
   const labelPng = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 650;
     const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1200, 650);
@@ -75,7 +76,7 @@ test('FT-551: реальное локальное OCR и штрихкод, че�
   await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.evaluate(() => { const key = 'nutrition_demo_server:3', state = JSON.parse(localStorage.getItem(key)); state.foods[0].barcode = '4006381333931'; localStorage.setItem(key, JSON.stringify(state)); });
   await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
-  await scanner.getByRole('button', { name: 'Сканировать штрихкод', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Штрихкод', exact: true }).click();
   // Синтетический EAN-13: стандартные таблицы модулей, декодирует настоящий ZXing.
   const barcodePng = await page.evaluate(() => {
     const code = '4006381333931', odd = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
@@ -96,7 +97,7 @@ test('FT-551: реальное локальное OCR и штрихкод, че�
   assert.equal(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).flatMap(d => d.entries).length), 0);
   await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
-  await scanner.getByRole('button', { name: 'Сканировать штрихкод', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Штрихкод', exact: true }).click();
   await scanner.getByLabel('Цифры штрихкода').fill('4006381333932');
   await scanner.getByRole('button', { name: 'Найти по штрихкоду', exact: true }).click();
   await scanner.getByText(/контрольная цифра не совпадает/).waitFor();

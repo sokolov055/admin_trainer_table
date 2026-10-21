@@ -170,3 +170,13 @@ button.diary-food-main:active { background: var(--surface-active); }
 .diary-product__macros dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .diary-product__macros dd.is-missing { font-weight: 500; color: var(--text-muted); }
 .diary-product__source { margin: 2px 0 0; }
+
+/* «Добавить еду» со всеми способами (план трёх разборов, п. 9): плитки под поиском */
+.diary-ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
+.diary-way { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 76px; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; font-size: var(--text-sm); text-align: center; line-height: 1.2; cursor: pointer; transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.diary-way svg { color: var(--accent-solid); }
+.diary-way:active { transform: scale(0.96); }
+.diary-way.is-on { border: 2px solid var(--accent-solid); padding: calc(var(--space-2) - 1px); }
+.diary-pickbar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-3) calc(-1 * var(--space-2)) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border: 1px solid var(--border); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-md); font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.diary-pickbar .button { min-height: 40px; border-radius: 999px; }
+@media (prefers-reduced-motion: reduce) { .diary-way { transition: none; } .diary-way:active { transform: none; } }

@@ -6,12 +6,15 @@ import { parseLabel, validBarcode } from './label-model.js';
 import ScanGuide from './ScanGuide.jsx';
 import './food-scan.css';
 
-export default function FoodScan({ onDraft, onFound, disabled = false }) {
+// start — способ, выбранный плиткой на экране «Добавить еду» (п. 9 плана):
+// сканер сразу открывается в нём; compact — без своих кнопок запуска
+export default function FoodScan({ onDraft, onFound, disabled = false, start = '', compact = false, onClose }) {
   const [mode, setMode] = useState(''), [image, setImage] = useState(null), [busy, setBusy] = useState(''), [error, setError] = useState('');
   const [code, setCode] = useState(''), [found, setFound] = useState(null), [searched, setSearched] = useState(false), [text, setText] = useState(''), [percent, setPercent] = useState(0);
   const camera = useRef(null), gallery = useRef(null), canvas = useRef(null), photo = useRef(null), rotation = useRef(0), sequence = useRef(0), job = useRef(null);
   const cancel = () => { ++sequence.current; job.current?.stop(); job.current = null; setBusy(''); };
   useEffect(() => () => { ++sequence.current; job.current?.stop(); }, []);
+  useEffect(() => { if (start) reset(start); }, [start]);
   const reset = next => { cancel(); setMode(next); setImage(null); setError(''); setText(''); setCode(''); setFound(null); setSearched(false); photo.current = null; canvas.current = null; rotation.current = 0; };
   const loadPhoto = async file => {
     if (!file) return;
@@ -65,8 +68,8 @@ export default function FoodScan({ onDraft, onFound, disabled = false }) {
   };
   const parsed = parseLabel(text), locked = !!busy || disabled;
   return <section className="food-scan" aria-label="Сканер продукта">
-    {!mode ? <div className="diary-inline-actions"><button type="button" className="button" disabled={disabled} onClick={() => reset('barcode')}>Сканировать штрихкод</button><button type="button" className="button" disabled={disabled} onClick={() => reset('label')}>Распознать этикетку</button></div> : <>
-      <div className="food-scan-head"><h3>{mode === 'barcode' ? 'Штрихкод продукта' : 'Фото этикетки'}</h3><button type="button" className="button button--ghost" onClick={() => reset('')}>Закрыть сканер</button></div>
+    {!mode ? compact ? null : <div className="diary-inline-actions"><button type="button" className="button" disabled={disabled} onClick={() => reset('barcode')}>Сканировать штрихкод</button><button type="button" className="button" disabled={disabled} onClick={() => reset('label')}>Распознать этикетку</button></div> : <>
+      <div className="food-scan-head"><h3>{mode === 'barcode' ? 'Штрихкод продукта' : 'Фото этикетки'}</h3><button type="button" className="button button--ghost" onClick={() => { reset(''); onClose?.(); }}>Закрыть сканер</button></div>
       {/* «Как снять» — до первого снимка; после снимка место занимает само фото */}
       {!image && !text && <ScanGuide mode={mode} />}
       <p className="small muted">Фото обрабатывается на телефоне и никуда не отправляется. Камера спросит разрешение при первом снимке.</p>
@@ -77,8 +80,8 @@ export default function FoodScan({ onDraft, onFound, disabled = false }) {
       {busy && <div role="status" className="small"><p>{busy}{percent > 0 ? ' ' + percent + '%' : ''}</p><button type="button" className="button button--ghost" onClick={cancel}>Отменить распознавание</button></div>}
       {error && <div role="alert"><Note tone="critical">{error}</Note></div>}
       {mode === 'barcode' && <><label className="field"><span className="field__label">Цифры штрихкода</span><input className="field__input" inputMode="numeric" maxLength={14} value={code} disabled={locked} onChange={e => { setCode(e.target.value); setFound(null); setSearched(false); setError(''); }} /></label><button className="button" type="button" disabled={locked || !code} onClick={lookup}>Найти по штрихкоду</button>
-        {searched && (found ? <div className="food-scan-result"><strong>{foodTitle(found)}</strong><p className="small">{found.kcal} ккал · Б {found.protein} · Ж {found.fat} · У {found.carbs} на {foodPer(found)}</p><p className="small muted">{found.source}. Сверьте с упаковкой.</p><button type="button" className="button button--primary" onClick={() => { onFound?.({ ...found, kind: 'food', unit: found.unit || 'g' }); reset(''); }}>Использовать продукт</button></div> : <div className="food-scan-result"><p className="small">В нашей базе такого штрихкода пока нет. Добавьте продукт по его этикетке.</p><button type="button" className="button" onClick={() => { onDraft({ barcode: code.trim() }); reset('label'); }}>Добавить с этикетки</button></div>)}</>}
-      {mode === 'label' && text && <><details className="food-scan-text"><summary>Прочитанный текст</summary><pre>{text}</pre></details>{parsed.warnings.map(w => <p className="small" key={w}>{w}</p>)}{(Object.keys(parsed.fields).length > 0 || parsed.unit === 'ml') && <><dl className="food-scan-values"><div><dt>На</dt><dd>{parsed.unit === 'ml' ? '100 мл' : '100 г'}</dd></div>{[['kcal', 'Ккал'], ['protein', 'Белки'], ['fat', 'Жиры'], ['carbs', 'Углеводы']].map(([key, title]) => <div key={key}><dt>{title}</dt><dd>{parsed.fields[key] ?? '—'}</dd></div>)}</dl><button className="button button--primary" type="button" onClick={() => { onDraft({ ...parsed.fields, unit: parsed.unit || 'g' }); reset(''); }}>Заполнить черновик</button></>}</>}
+        {searched && (found ? <div className="food-scan-result"><strong>{foodTitle(found)}</strong><p className="small">{found.kcal} ккал · Б {found.protein} · Ж {found.fat} · У {found.carbs} на {foodPer(found)}</p><p className="small muted">{found.source}. Сверьте с упаковкой.</p><button type="button" className="button button--primary" onClick={() => { onFound?.({ ...found, kind: 'food', unit: found.unit || 'g' }); reset(''); onClose?.(); }}>Использовать продукт</button></div> : <div className="food-scan-result"><p className="small">В нашей базе такого штрихкода пока нет. Добавьте продукт по его этикетке.</p><button type="button" className="button" onClick={() => { onDraft({ barcode: code.trim() }); reset(''); onClose?.(); }}>Добавить с этикетки</button></div>)}</>}
+      {mode === 'label' && text && <><details className="food-scan-text"><summary>Прочитанный текст</summary><pre>{text}</pre></details>{parsed.warnings.map(w => <p className="small" key={w}>{w}</p>)}{(Object.keys(parsed.fields).length > 0 || parsed.unit === 'ml') && <><dl className="food-scan-values"><div><dt>На</dt><dd>{parsed.unit === 'ml' ? '100 мл' : '100 г'}</dd></div>{[['kcal', 'Ккал'], ['protein', 'Белки'], ['fat', 'Жиры'], ['carbs', 'Углеводы']].map(([key, title]) => <div key={key}><dt>{title}</dt><dd>{parsed.fields[key] ?? '—'}</dd></div>)}</dl><button className="button button--primary" type="button" onClick={() => { onDraft({ ...parsed.fields, unit: parsed.unit || 'g' }); reset(''); onClose?.(); }}>Заполнить черновик</button></>}</>}
     </>}
   </section>;
 }
