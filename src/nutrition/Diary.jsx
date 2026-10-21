@@ -1,6 +1,7 @@
 import { foodTitle, foodUnit as unit } from './FoodFields.jsx';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { apiMutate } from '../api.js';
+import { apiStale, apiMutate } from '../api.js';
+import { palmUnit } from './palm-model.js';
 import { Section, Panel, Note, Loading, Chips, Sheet, formatNumber } from '../ui.jsx';
 import { IconPlus, IconClose, IconCopy, IconTrash, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
@@ -45,9 +46,11 @@ export function DiaryEntryForm({ product, entry, day = today(), meal = 'snack', 
   const operation = useOperation();
   const preview = totalEntries([{ product: p, amount: Number.isFinite(decimal(amount)) ? decimal(amount) : 0 }]);
   const dirty = amount !== initial.current.amount || selectedMeal !== initial.current.meal || date !== initial.current.day;
+  const palm = p.kind === 'palm';
   const submit = async e => {
     e.preventDefault(); const qty = decimal(amount);
-    if (!Number.isFinite(qty) || qty <= 0 || qty > (p.unit === 'portion' ? 30 : 5000)) { setAmountError('Проверьте количество: ' + (p.unit === 'portion' ? 'от 0,01 до 30 порций.' : 'от 0,01 до 5000 ' + unit(p) + '.')); return; }
+    // Порция рукой — как на сервере: от 0,5 до 10 шагом 0,5 (diary-approx.js); общая форма не должна обещать 0,01–30
+    if (palm ? (!Number.isFinite(qty) || qty < 0.5 || qty > 10 || Math.round(qty * 2) !== qty * 2) : (!Number.isFinite(qty) || qty <= 0 || qty > (p.unit === 'portion' ? 30 : 5000))) { setAmountError('Проверьте количество: ' + (palm ? 'от 0,5 до 10 порций, шагом 0,5.' : p.unit === 'portion' ? 'от 0,01 до 30 порций.' : 'от 0,01 до 5000 ' + unit(p) + '.')); return; }
     const payload = { day: date, meal: selectedMeal, amount: qty, ...(entry ? { id: entry.id, revision: entry.revision } : { product: { kind: p.kind, id: p.id }, preview: p }) };
     const signature = JSON.stringify(payload);
     if (token.current.signature !== signature) token.current = { signature, id: requestId() };
@@ -66,9 +69,9 @@ export function DiaryEntryForm({ product, entry, day = today(), meal = 'snack', 
     setBusy(true); setError(null);
     try { await operation('diary.entry.remove', { id: entry.id, revision: entry.revision }); onSaved(); } catch (e) { setError(e); } finally { setBusy(false); }
   };
-  const amountField = p.unit === 'portion' ? 'Количество порций' : 'Количество, ' + unit(p);
-  // Быстрые порции: стакан и банка у напитков, навески у еды
-  const quick = p.unit === 'portion' ? [.5, 1, 1.5] : p.unit === 'ml' ? [200, 250, 330] : [100, 150, 200];
+  const amountField = palm ? 'Порций рукой, ' + palmUnit(p.id, 5) : p.unit === 'portion' ? 'Количество порций' : 'Количество, ' + unit(p);
+  // Быстрые порции: стакан и банка у напитков, навески у еды, у «ладони» — те же, что в листе
+  const quick = palm ? [.5, 1, 1.5, 2] : p.unit === 'portion' ? [.5, 1, 1.5] : p.unit === 'ml' ? [200, 250, 330] : [100, 150, 200];
   return <Sheet title={entry ? 'Изменить запись' : 'Записать съеденное'} dirty={dirty} locked={busy} focus="#diary-amount" onClose={onClose}><form className="diary-form" onSubmit={submit}><h3>{foodTitle(p)}</h3><ProductFacts p={p} />{editWhen ? <><Field label="Дата" type="date" value={date} onChange={setDate} required min="2000-01-01" max="2099-12-31" /><label className="field"><span className="field__label">Приём пищи</span><select className="field__input" value={selectedMeal} onChange={e => setMeal(e.target.value)}>{DIARY_MEALS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select></label></> : <button type="button" className="diary-when" aria-expanded="false" onClick={() => setEditWhen(true)}><span>{dayLabel(date)} · {label(selectedMeal)}</span><small>изменить</small></button>}<Field id="diary-amount" label={amountField} inputMode="decimal" value={amount} onChange={v => { setAmount(v); setAmountError(''); }} onFocus={e => e.target.select()} error={amountError} required /><div className="diary-inline-actions">{quick.map(q => <button className="chip" key={q} type="button" onClick={() => { setAmount(String(q)); setAmountError(''); }}>{formatNumber(q)} {unit(p)}</button>)}</div><div className="diary-portion-preview"><strong>{n(preview.kcal)} ккал</strong><div>{macroLine(preview)}</div></div><ErrorNote error={error} /><div className="diary-form-footer"><button className="button button--primary" disabled={busy} type="submit">{busy ? 'Сохраняю…' : 'Записать в дневник'}</button></div>{entry && <div className="diary-form-remove"><button type="button" className="button button--ghost" disabled={busy} onClick={remove}><IconTrash size={16} /> Удалить запись</button></div>}</form></Sheet>;
 }
 
@@ -143,7 +146,22 @@ export default function NutritionDiary({ clientRow, readOnly = false, preview = 
   // запись той же дорогой убирается из очереди.
   const del = usePendingDelete(e => e.pending ? dropWrite(undefined, 'diaryEntry', e.params) : op('diary.entry.remove', { id: e.id, revision: e.revision }), { onDone: () => resource.reload(), onError: setError });
   const removeEntry = entry => { setModal(null); setError(null); setMessage(null); del.remove(entry.id, entry, 'Запись удалена'); };
-  const updateDay = async (patch, done = 'Сохранено.') => { setBusy(true); setError(null); try { await op('diary.day.save', { ...paramsOf(clientRow), day, revision: data.revision, ...patch }); resource.reload(); say(done); return true; } catch (e) { setError(e); resource.reload(); return false; } finally { setBusy(false); } };
+  // Ревизию дня сверяет только полнота; любая запись еды её поднимает, а дневник
+  // перечитывается после записи не мгновенно. 409 сразу после своей же записи —
+  // не чужое устройство: один раз перечитываем день и повторяем с свежей ревизией.
+  const updateDay = async (patch, done = 'Сохранено.') => {
+    setBusy(true); setError(null);
+    const save = revision => op('diary.day.save', { ...paramsOf(clientRow), day, revision, ...patch });
+    try {
+      try { await save(data.revision); }
+      catch (e) {
+        if (e?.code !== 409 || !patch.complete) throw e;
+        const fresh = await apiStale('diary.get', { ...paramsOf(clientRow), day }).promise;
+        await save(fresh.revision);
+      }
+      resource.reload(); say(done); return true;
+    } catch (e) { setError(e); resource.reload(); return false; } finally { setBusy(false); }
+  };
   const chooseDate = value => { if (value && /^20\d{2}-\d{2}-\d{2}$/.test(value)) { setDay(value); setModal(null); setMessage(null); setError(null); } };
   const shown = data.entries.filter(e => !del.hidden(e.id));
   const totals = shown.length === data.entries.length ? data.totals : totalEntries(shown);

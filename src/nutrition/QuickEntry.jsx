@@ -23,6 +23,8 @@ export function QuickEntry({ day = today(), meal = 'snack', onClose, onSaved }) 
     e.preventDefault();
     if (!Number.isFinite(kcal) || kcal < 1 || kcal > 5000) { setKcalError('Калории: от 1 до 5000.'); return; }
     const product = { kind: 'quick', name: fields.name.trim(), kcal, protein: optional(fields.protein), fat: optional(fields.fat), carbs: optional(fields.carbs) };
+    // Пределы Б/Ж/У — как на сервере (diary-approx.js): иначе запись из офлайн-очереди упадёт уже при отправке
+    if (['protein', 'fat', 'carbs'].some(k => product[k] !== '' && (!Number.isFinite(product[k]) || product[k] < 0 || product[k] > 500))) { setError('Белки, жиры и углеводы: от 0 до 500 г.'); return; }
     const preview = { ...product, name: product.name || 'Примерно', protein: product.protein === '' ? null : product.protein, fat: product.fat === '' ? null : product.fat, carbs: product.carbs === '' ? null : product.carbs, id: 'pending', unit: 'portion', approx: true, source: 'Примерно · без продукта' };
     const payload = { day, meal, amount: 1, product, preview };
     const signature = JSON.stringify(payload);
