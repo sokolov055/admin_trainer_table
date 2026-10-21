@@ -25,6 +25,16 @@ export const POWERS = Object.freeze({
   negative: Object.freeze({ name: 'Негатив', effect: 'цепочка катится назад' }),
   pause: Object.freeze({ name: 'Пауза', effect: 'цепочка почти встаёт' }),
   technique: Object.freeze({ name: 'Техника', effect: 'прицел и быстрые броски' }),
+  // По мотивам «Молнии» из Zuma's Revenge (разбор 22.10.2026)
+  superset: Object.freeze({ name: 'Суперсет', effect: 'снимает все блины этого цвета' }),
+});
+
+// Еда на поле (по мотивам фруктов Zuma's Revenge): сбей брошенным блином — тоннаж в план
+export const FOOD = Object.freeze({
+  banana: Object.freeze({ name: 'Банан', kg: 120 }),
+  apple: Object.freeze({ name: 'Яблоко', kg: 100 }),
+  broccoli: Object.freeze({ name: 'Брокколи', kg: 150 }),
+  bar: Object.freeze({ name: 'Протеиновый батончик', kg: 200 }),
 });
 
 export const TUNING = Object.freeze({
@@ -37,6 +47,7 @@ export const TUNING = Object.freeze({
   backSpeed: 1.1, negativeTicks: 260, pauseTicks: 650, techniqueTicks: 900,
   recoilTicks: 26, // откат после цепной реакции, на каждое звено
   powerLife: 1500, saveBack: .35,
+  foodLife: 900, foodRadius: 16, // еда лежит 9 секунд
 });
 
 /**
@@ -53,21 +64,26 @@ export const LEVELS = Object.freeze([
   { track: 'dumbbell', speed: .14, start: .22, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 60 },
   { track: 'stadium', speed: .7, start: .34, target: 2300, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
   { track: 'kitchen', speed: .6, start: .3, target: 2400, colors: 4, slow: 2.6, powerEvery: 1400, par: 100 },
-  { track: 'snake', speed: .2, start: .3, target: 2600, colors: 5, slow: 2.6, powerEvery: 1400, par: 155 },
-  { track: 'dumbbell', speed: .14, start: .26, target: 2500, colors: 5, slow: 2.6, powerEvery: 1400, par: 85 },
-  { track: 'stadium', speed: .6, start: .34, target: 2800, colors: 5, slow: 2.2, powerEvery: 1300, par: 100 },
-  { track: 'kitchen', speed: .6, start: .34, target: 3000, colors: 5, slow: 2, powerEvery: 1200, par: 155 },
-  { track: 'snake', speed: .26, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 160 },
-  { track: 'dumbbell', speed: .18, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
+  { track: 'snake', speed: .22, start: .3, target: 2600, colors: 5, slow: 2.6, powerEvery: 1400, par: 155 },
+  { track: 'dumbbell', speed: .16, start: .26, target: 2500, colors: 5, slow: 2.6, powerEvery: 1400, par: 85 },
+  { track: 'stadium', speed: .62, start: .34, target: 2800, colors: 5, slow: 2.2, powerEvery: 1300, par: 100 },
+  { track: 'kitchen', speed: .64, start: .34, target: 3000, colors: 5, slow: 2, powerEvery: 1200, par: 155 },
+  { track: 'snake', speed: .29, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 160 },
+  { track: 'dumbbell', speed: .21, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
 ].map(level => Object.freeze(level)));
 
-const DEFAULTS = Object.freeze({ repeat: .42, lives: 0, powers: Object.keys(POWERS) });
+const DEFAULTS = Object.freeze({ repeat: .42, lives: 0, powers: Object.keys(POWERS), foodEvery: 1700, clearBonus: 300 });
+// Подстройка сложности (по мотивам DDS Zuma's Revenge): после неудач на уровне
+// темп ниже на 6 % и план ниже на 5 % за каждую, не больше трёх ступеней.
+export const EASE_STEPS = 3;
 
 /** Правила уровня: свободная игра по номеру или задание карьеры целиком. */
-export function levelRules(source = 0) {
+export function levelRules(source = 0, ease = 0) {
   const base = typeof source === 'number' ? LEVELS[Math.max(0, Math.min(LEVELS.length - 1, source))] : source;
   if (!base || !TRACKS[base.track]) throw new Error('Нет такой трассы');
-  return Object.freeze({ ...DEFAULTS, ...base, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)) });
+  const steps = Math.max(0, Math.min(EASE_STEPS, ease | 0));
+  const eased = steps ? { speed: +(base.speed * (1 - .06 * steps)).toFixed(3), target: Math.round(base.target * (1 - .05 * steps) / 50) * 50, ease: steps } : {};
+  return Object.freeze({ ...DEFAULTS, ...base, ...eased, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)) });
 }
 
 /** Правила задания карьеры: уровень свободной игры со своим планом; пояс — одна страховка. */
@@ -84,7 +100,8 @@ export function createBlini(seed = 21, source = 0) {
   const rules = levelRules(source), track = TRACKS[rules.track];
   const game = {
     version: RULES_VERSION, rules, track, seed: seed >>> 0 || 1, nextId: 0, tick: 0,
-    chains: track.paths.map(path => ({ path, balls: [], rush: true, back: 0, last: -1, danger: false })),
+    chains: track.paths.map(path => ({ path, balls: [], rush: true, back: 0, last: -1, danger: false, visible: false })),
+    pickups: [], foodAt: Math.round(rules.foodEvery * .7),
     shots: [], score: 0, full: false, mode: 'playing', lives: rules.lives, reload: 0,
     negative: 0, pause: 0, technique: 0, streak: 0, bestChain: 0, bestStreak: 0, cleared: 0, shotsFired: 0,
     powerAt: Math.round(rules.powerEvery * .6), aim: -Math.PI / 2, events: [],
@@ -189,14 +206,60 @@ function resolveAt(game, chainIndex, index, depth, fromShot) {
   }
   // Пока стык не сомкнулся, тянуть начинают со следующего шага
   if (head < b.length) b[head].pull = 0;
-  if (!game.full && game.score >= game.rules.target) {
-    game.full = true;
-    // План выполнен: блины, что ещё не въехали на поле, не выходят
-    for (const c of game.chains) c.balls = c.balls.filter(x => x.s >= 0);
-    emit(game, { kind: 'full' });
+  const superset = removed.find(r => r.power === 'superset');
+  if (superset) {
+    const gained = []; let spot = null;
+    for (const c of game.chains) {
+      const keep = [];
+      for (const x of c.balls) {
+        if (x.color === superset.color && x.s >= 0) { gained.push(x); if (!spot) spot = platePoint(c, x); } else keep.push(x);
+      }
+      c.balls = keep;
+    }
+    if (gained.length) {
+      const extra = pointsFor(gained, depth, 1);
+      game.score += extra; game.cleared += gained.length;
+      emit(game, { kind: 'clear', chain: chainIndex, x: spot.x, y: spot.y, points: extra, depth, streak: 0, plates: gained.map(g => g.color), kg: gained.reduce((sum, g) => sum + PLATES[g.color].kg, 0) });
+    }
   }
+  checkFull(game);
   refreshShooter(game);
   return true;
+}
+
+/** План выполнен: блины, что ещё не въехали на поле, не выходят. */
+function checkFull(game) {
+  if (game.full || game.score < game.rules.target) return;
+  game.full = true;
+  for (const c of game.chains) c.balls = c.balls.filter(x => x.s >= 0);
+  emit(game, { kind: 'full' });
+}
+
+// Где класть еду: в стороне от трасс, не вплотную к Михалычу — одна сетка на трассу
+const foodSpots = new Map();
+function spotsFor(track) {
+  if (foodSpots.has(track.id)) return foodSpots.get(track.id);
+  const spots = [], { x: sx, y: sy } = track.shooter;
+  for (let y = 40; y <= FIELD.height - 40; y += 20) for (let x = 30; x <= FIELD.width - 30; x += 20) {
+    const away = Math.hypot(x - sx, y - sy);
+    if (away < 72) continue;
+    let ok = true;
+    for (const path of track.paths) for (let i = 0; i <= path.length && ok; i += 6) if ((path.xs[i] - x) ** 2 + (path.ys[i] - y) ** 2 < (D * .5 + TUNING.foodRadius + 6) ** 2) ok = false;
+    if (ok) spots.push([x, y]);
+  }
+  foodSpots.set(track.id, spots);
+  return spots;
+}
+function stepFood(game) {
+  game.pickups = game.pickups.filter(f => game.tick - f.born < TUNING.foodLife);
+  if (game.tick < game.foodAt || game.full) return;
+  game.foodAt = game.tick + Math.round(game.rules.foodEvery * (.8 + random(game) * .4));
+  const spots = spotsFor(game.track);
+  if (!spots.length || game.pickups.length >= 2) return;
+  const [x, y] = spots[Math.floor(random(game) * spots.length)];
+  const kinds = Object.keys(FOOD), kind = kinds[Math.floor(random(game) * kinds.length)];
+  game.pickups.push({ id: ++game.nextId, kind, x, y, born: game.tick });
+  emit(game, { kind: 'food-spawn', food: kind, x, y });
 }
 
 function stepChain(game, chainIndex) {
@@ -278,6 +341,15 @@ function stepShots(game) {
     const shot = game.shots[k];
     shot.x += shot.vx * (speedUp ? TUNING.fastShot / TUNING.shotSpeed : 1);
     shot.y += shot.vy * (speedUp ? TUNING.fastShot / TUNING.shotSpeed : 1);
+    for (let f = game.pickups.length - 1; f >= 0; f--) {
+      const food = game.pickups[f];
+      if ((food.x - shot.x) ** 2 + (food.y - shot.y) ** 2 > (TUNING.foodRadius + D * .4) ** 2) continue;
+      game.pickups.splice(f, 1);
+      const points = FOOD[food.kind].kg;
+      game.score += points;
+      emit(game, { kind: 'food', food: food.kind, x: food.x, y: food.y, points });
+      checkFull(game);
+    }
     let hit = null;
     for (let c = 0; c < game.chains.length && !hit; c++) {
       const chain = game.chains[c];
@@ -332,6 +404,19 @@ export function step(game) {
   if (game.technique > 0) game.technique--;
   stepShots(game);
   for (let c = 0; c < game.chains.length && game.mode === 'playing'; c++) stepChain(game, c);
+  // Сняли всю цепочку раньше плана — «Чистая трасса!»: бонус, новая въезжает быстро
+  for (const chain of game.chains) {
+    let visible = false;
+    for (const b of chain.balls) if (b.s >= 0) { visible = true; break; }
+    if (chain.visible && !visible && !game.full && game.mode === 'playing') {
+      game.score += game.rules.clearBonus;
+      const at = pointInto(chain.path, chain.path.length * .5, SCRATCH);
+      emit(game, { kind: 'cleartrack', x: at.x, y: at.y, points: game.rules.clearBonus });
+      checkFull(game);
+    }
+    chain.visible = visible;
+  }
+  stepFood(game);
   stepPowers(game);
   if (game.mode === 'playing' && game.full && game.chains.every(c => !c.balls.length) && !game.shots.length) {
     game.mode = 'won';
@@ -403,11 +488,12 @@ export function aimEnd(game) {
 // Сохранение партии (FT-700, 22.10.2026): продолжить с того же места — на этом
 // устройстве или на другом, если прогресс сохраняется в аккаунте. Трасса —
 // по имени из правил; броски в полёте и вспышки не сохраняются.
-const SAVED = ['seed', 'nextId', 'tick', 'score', 'full', 'mode', 'lives', 'reload', 'negative', 'pause', 'technique', 'streak', 'bestChain', 'bestStreak', 'cleared', 'shotsFired', 'powerAt', 'aim', 'current', 'next'];
+const SAVED = ['seed', 'nextId', 'tick', 'score', 'full', 'mode', 'lives', 'reload', 'negative', 'pause', 'technique', 'streak', 'bestChain', 'bestStreak', 'cleared', 'shotsFired', 'powerAt', 'foodAt', 'aim', 'current', 'next'];
 export function serializeGame(game) {
   const out = { version: RULES_VERSION, rules: { ...game.rules, powers: [...game.rules.powers] } };
   for (const key of SAVED) out[key] = game[key];
-  out.chains = game.chains.map(c => ({ rush: c.rush, back: c.back, last: c.last, danger: c.danger, balls: c.balls.map(b => ({ ...b, enter: null })) }));
+  out.chains = game.chains.map(c => ({ rush: c.rush, back: c.back, last: c.last, danger: c.danger, visible: c.visible, balls: c.balls.map(b => ({ ...b, enter: null })) }));
+  out.pickups = game.pickups.map(f => ({ ...f }));
   return out;
 }
 const finite = n => typeof n === 'number' && Number.isFinite(n);
@@ -421,13 +507,14 @@ export function restoreGame(data) {
     const colors = game.rules.colors;
     game.chains.forEach((chain, i) => {
       const saved = data.chains[i];
-      chain.rush = !!saved.rush; chain.back = Math.max(0, saved.back | 0); chain.danger = !!saved.danger;
+      chain.rush = !!saved.rush; chain.back = Math.max(0, saved.back | 0); chain.danger = !!saved.danger; chain.visible = !!saved.visible;
       chain.last = Number.isInteger(saved.last) && saved.last < colors ? saved.last : -1;
       chain.balls = (Array.isArray(saved.balls) ? saved.balls : [])
         .filter(b => b && finite(b.s) && Number.isInteger(b.color) && b.color >= 0 && b.color < PLATES.length && finite(b.size))
         .map(b => ({ id: b.id | 0, color: b.color, s: b.s, size: Math.max(.2, Math.min(1, b.size)), power: POWERS[b.power] ? b.power : null, powerUntil: b.powerUntil | 0, pull: 0, combo: b.combo | 0, gap: !!b.gap, fresh: !!b.fresh, shot: !!b.shot, enter: null }));
     });
     game.shots = []; game.events = [];
+    game.pickups = (Array.isArray(data.pickups) ? data.pickups : []).filter(f => f && FOOD[f.kind] && finite(f.x) && finite(f.y) && finite(f.born)).map(f => ({ id: f.id | 0, kind: f.kind, x: f.x, y: f.y, born: f.born }));
     if (!['playing', 'won', 'lost'].includes(game.mode)) game.mode = 'playing';
     if (!PLATES[game.current]) game.current = 0;
     if (!PLATES[game.next]) game.next = 0;

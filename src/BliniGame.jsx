@@ -15,6 +15,17 @@ import './blini-game.css';
 
 const kg = value => value.toLocaleString('ru-RU') + ' кг';
 const seconds = value => `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, '0')}`;
+// Советы Михалыча перед уровнем (по мотивам подсказок Zuma's Revenge)
+const TIPS = [
+  'Сбивай еду на поле — это тоннаж в план. Батончик даёт больше всего.',
+  'Сними всю цепочку раньше плана — «Чистая трасса!» и бонус.',
+  '«Суперсет» снимает все блины этого цвета разом — ищи его свечение.',
+  'Цепь откатывает блины назад: ставь блин так, чтобы после снятия сошлись одинаковые.',
+  'Блины ближе к помосту опаснее — снимай их первыми.',
+  'Коснись Михалыча — он возьмёт следующий блин, если этот не подходит.',
+  'Серия удачных бросков подряд делает каждый следующий дороже.',
+  'На «Гантели» две цепочки — следи за обеими.',
+];
 const colorsLabel = n => n + ' ' + (n === 1 ? 'цвет' : n >= 2 && n <= 4 ? 'цвета' : 'цветов');
 
 function Sound({ enabled }) {
@@ -30,6 +41,7 @@ function PowerMark({ power }) {
     {power === 'negative' && <path d="M8.8 6H3.4M5.8 3.4 3.2 6l2.6 2.6" />}
     {power === 'pause' && <path d="M4.4 3.4v5.2M7.6 3.4v5.2" />}
     {power === 'technique' && <><circle cx="6" cy="6" r="2.4" /><path d="M6 1.8v8.4M1.8 6h8.4" /></>}
+    {power === 'superset' && <path d="M7 1.6 3.6 6.6H6.4L5 10.4" />}
   </svg></span>;
 }
 
@@ -79,7 +91,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   const soundOn = useRef(sound); soundOn.current = sound;
   const title = useId();
   const reduced = useRef(false);
-  const rules = state.mission ? missionRules(state.mission.goal, state.mission.boost) : levelRules(level);
+  const rules = state.mission ? missionRules(state.mission.goal, state.mission.boost) : levelRules(level, session.easeOf(level));
   const track = TRACKS[rules.track];
   const shownPanel = help || mode !== 'playing';
 
@@ -155,10 +167,13 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           if (soundOn.current) {
             if (['shot', 'insert', 'power', 'danger'].includes(e.kind)) audio.current?.play(e.kind);
             if (e.kind === 'clear') audio.current?.play('clear', e.depth);
+            if (e.kind === 'food') audio.current?.play('power');
+            if (e.kind === 'cleartrack') audio.current?.play('clear', 4);
           }
           if (e.kind === 'clear') buzz(e.depth > 1 ? 'great' : 'good');
           if (e.kind === 'danger') buzz('bad');
-          if (e.kind === 'saved') buzz('great');
+          if (e.kind === 'saved' || e.kind === 'cleartrack') buzz('great');
+          if (e.kind === 'food') buzz('good');
         }
       }
       draw();
@@ -292,7 +307,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
             <div><span className="blini-rule-plates"><Plate color={3} /></span><span><strong>План</strong>Набери тоннаж — новые блины перестанут выходить. Сними оставшиеся</span></div>
           </div>
           <div className="blini-powers">{Object.entries(POWERS).map(([id, power]) => <div key={id}><PowerMark power={id} /><span><strong>{power.name}</strong>{power.effect}</span></div>)}</div>
-          <p className="blini-panel__fine">Бонус светится на блине — сними его, пока не погас. Гиря Михалыч, 16 кг харизмы: коснись его или кнопки «Поменять», и он возьмёт следующий блин.</p>
+          <p className="blini-panel__fine">Еда на поле — банан, яблоко, брокколи, протеиновый батончик: попади в неё брошенным блином, и её вес уйдёт в тоннаж. Бонус светится на блине — сними его, пока не погас. Гиря Михалыч, 16 кг харизмы: коснись его или кнопки «Поменять», и он возьмёт следующий блин.</p>
           <button className="blini-primary" ref={primary} onClick={() => { setHelp(false); if (mode === 'paused') resume(); }}>Понятно</button>
         </> : mode === 'ready' ? <>
           <span className="blini-chapter">Уровень {level + 1} из {LEVELS.length}</span>
@@ -300,6 +315,8 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           <p>{track.note}</p>
           <MissionNote game="blini" mission={mission} />
           <div className="blini-mission"><span>План {kg(rules.target)}</span><span>{colorsLabel(rules.colors)}</span><span>Норматив {seconds(rules.par)}</span></div>
+          {!state.mission && rules.ease > 0 && <p className="blini-ease">Михалыч сбавил темп: блины на {rules.ease * 6} % медленнее, план на {rules.ease * 5} % меньше. Выиграешь — уровень станет обычным.</p>}
+          <p className="blini-tip"><b>Совет Михалыча.</b> {TIPS[(level + serial) % TIPS.length]}</p>
           {!state.mission && unlocked > 0 && <div className="blini-levels" role="group" aria-label="Выбор уровня">
             <button type="button" onClick={() => session.choose(level - 1, token.current)} disabled={level === 0} aria-label="Предыдущий уровень">‹</button>
             <span>Открыто {unlocked + 1} из {LEVELS.length}</span>

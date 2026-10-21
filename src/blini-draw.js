@@ -2,7 +2,7 @@
 // карта с фоном и предметами, трасса, помост, блины, Гиря Михалыч, броски и вспышки.
 // Фон карты рисуется один раз на размер экрана, каждый кадр — только движущееся.
 import { FIELD, pointAt, pointInto } from './blini-tracks.js';
-import { PLATES, POWERS, TUNING, platePoint, aimEnd } from './blini-model.js';
+import { PLATES, POWERS, FOOD, TUNING, platePoint, aimEnd } from './blini-model.js';
 
 const R = TUNING.plate / 2;
 const TAU = Math.PI * 2;
@@ -136,6 +136,7 @@ function plate(ctx, x, y, color, size = 1, roll = 0, power = null, t = 0, alpha 
     if (power === 'negative') { ctx.moveTo(3.2, 0); ctx.lineTo(-2.8, 0); ctx.moveTo(-.2, -3); ctx.lineTo(-3.2, 0); ctx.lineTo(-.2, 3); }
     if (power === 'pause') { ctx.moveTo(-1.8, -3); ctx.lineTo(-1.8, 3); ctx.moveTo(1.8, -3); ctx.lineTo(1.8, 3); }
     if (power === 'technique') { ctx.arc(0, 0, 3, 0, TAU); ctx.moveTo(0, -4.6); ctx.lineTo(0, 4.6); ctx.moveTo(-4.6, 0); ctx.lineTo(4.6, 0); }
+    if (power === 'superset') { ctx.moveTo(1.2, -4.2); ctx.lineTo(-2.2, .6); ctx.lineTo(1, .6); ctx.lineTo(-1.2, 4.4); }
     ctx.stroke();
   }
   ctx.restore();
@@ -230,6 +231,12 @@ const DECOR = {
     ctx.fillStyle = '#fffaf0'; for (let i = 0; i < 14; i++) ctx.fillRect(-21 + (i * 7) % 18, -12 + Math.floor(i / 3) * 5, 3, 2);
     ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.roundRect(3, -13, 18, 10, 3); ctx.fill();
     for (const [x, y] of [[7, 7], [13, 6], [18, 8], [10, 11]]) { ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fillStyle = '#2e7d32'; ctx.fill(); }
+  },
+  bar(ctx) {
+    ctx.fillStyle = '#3b2a6b'; ctx.beginPath(); ctx.roundRect(-16, -7, 32, 14, 3); ctx.fill();
+    ctx.fillStyle = '#f1c232'; ctx.fillRect(-6, -7, 12, 14);
+    ctx.fillStyle = '#3b2a6b'; ctx.font = '900 7px Manrope, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PRO', 0, .5);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(-16, -7, 32, 2);
   },
   water(ctx) {
     ctx.beginPath(); ctx.arc(0, 0, 11, 0, TAU); ctx.fillStyle = 'rgba(200,230,250,.8)'; ctx.fill();
@@ -547,6 +554,8 @@ const LINES = {
   danger: ['Кто так кладёт блины?!', 'Помост близко!', 'Страхуй!'],
   drop: ['Дроп-сет!'], negative: ['Негатив — назад!'], pause: ['Отдышусь…'], technique: ['Вижу цель!'],
   full: ['План закрыт! Добиваем!'], saved: ['Пояс спас спину!'], start: ['Погнали!', 'Разминка окончена!', 'Ну, за тоннаж!'],
+  superset: ['Суперсет!'], banana: ['Калий для мышц!'], apple: ['Яблочко — витамин!'], broccoli: ['Клетчатка — сила!'], bar: ['Белок пошёл!'],
+  cleartrack: ['Чисто сработано!', 'Вот это тренировка!'],
 };
 function line(fx, kind) { fx.lines = (fx.lines || 0) + 1; const list = LINES[kind]; return list[fx.lines % list.length]; }
 const POOL = { parts: 160, texts: 24, rings: 32 };
@@ -587,6 +596,15 @@ export function addEvents(fx, game, events, t, reduced = false) {
     if (e.kind === 'full') { fx.banner = { born: t, text: 'План выполнен! Сними остаток' }; fx.say = { text: line(fx, 'full'), born: t }; fx.flex = t; }
     if (e.kind === 'saved') { fx.banner = { born: t, text: 'Пояс выручил: блины откатились' }; fx.say = { text: line(fx, 'saved'), born: t }; }
     if (e.kind === 'danger') fx.say = { text: line(fx, 'danger'), born: t };
+    if (e.kind === 'food') {
+      const ring = take(fx, 'rings', t); ring.x = e.x; ring.y = e.y; ring.big = true; ring.dust = false;
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y - 14; text.text = `+${e.points} кг · ${FOOD[e.food].name}`; text.size = 15; text.gold = true;
+      fx.say = { text: line(fx, e.food), born: t };
+    }
+    if (e.kind === 'cleartrack') {
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y; text.text = `+${e.points} кг`; text.size = 18; text.gold = true;
+      fx.banner = { born: t, text: 'Чистая трасса! Новая цепочка уже едет' }; fx.flex = t; fx.say = { text: line(fx, 'cleartrack'), born: t };
+    }
   }
   if (fx.banner && t - fx.banner.born > 1800) fx.banner = null;
 }
@@ -645,6 +663,18 @@ export function drawScene(ctx, game, fx, { t, aiming = false, view, background =
   for (const shot of game.shots) {
     if (!reduced) for (let k = 3; k >= 1; k--) plate(ctx, shot.x - shot.vx * k * 1.6, shot.y - shot.vy * k * 1.6, shot.color, 1 - k * .08, t / 60, null, t, .32 - k * .08);
     plate(ctx, shot.x, shot.y, shot.color, 1, t / 60);
+  }
+  // Еда на поле: светится, а кольцо вокруг показывает, сколько ей осталось лежать
+  for (const food of game.pickups) {
+    const left = 1 - (game.tick - food.born) / TUNING.foodLife;
+    if (left <= 0) continue;
+    ctx.save(); ctx.translate(food.x, food.y);
+    if (left < .25 && !reduced && Math.floor(t / 120) % 2) ctx.globalAlpha = .45;
+    const pulse = reduced ? .5 : .5 + .5 * Math.sin(t / 180);
+    ctx.beginPath(); ctx.arc(0, 0, 19 + pulse * 2, 0, TAU); ctx.fillStyle = 'rgba(255,240,150,.35)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 21, -Math.PI / 2, -Math.PI / 2 + TAU * left); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffe17a'; ctx.stroke();
+    DECOR[food.kind](ctx, 0);
+    ctx.restore();
   }
   mihalych(ctx, game, fx, t, danger, reduced);
   for (const ring of fx.rings) {

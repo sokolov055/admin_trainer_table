@@ -82,6 +82,8 @@
 .blini-rule-plates .blini-plate { --size: 26px; margin-right: -3px; }
 /* Цифра на блине и знак бонуса — своего цвета, не цвета подписи рядом */
 .blini-game .blini-power { color: #fff6c4; }
+.blini-game .blini-panel .blini-tip { margin: -6px 0 14px; padding: 9px 12px; border-radius: 12px; background: #fff3cf; color: #5b4317; font-size: 12.5px; text-align: left; }
+.blini-game .blini-panel .blini-ease { margin: -6px 0 12px; color: #286749; font-size: 12.5px; font-weight: 700; }
 .blini-panel--win { box-shadow: 0 0 0 3px #f1c232, 0 16px 40px #0e2c3670; }
 
 @keyframes blini-panel-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }

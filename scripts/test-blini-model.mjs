@@ -245,3 +245,62 @@ test('сессия: сохранение из аккаунта новее — п
   session.save();
   assert.equal(saves.at(-1).game, null, 'задание карьеры не сохраняется как партия');
 });
+
+test('суперсет снимает все блины своего цвета на поле, сверх тройки', () => {
+  const game = rig([1, 0, 2, 0, 3, 3, 4, 0]);
+  game.chains[0].balls[4].power = 'superset'; game.chains[0].balls[4].powerUntil = 1e9;
+  hit(game, 5, 3);
+  const events = settle(game);
+  assert.ok(events.some(e => e.kind === 'power' && e.power === 'superset'));
+  assert.equal(game.chains[0].balls.filter(b => b.color === 3).length, 0, 'тройка снята');
+  assert.equal(game.chains[0].balls.filter(b => b.color === 0).length, 3, 'чужой цвет не тронут');
+  const extra = rig([1, 3, 2, 0, 0, 3, 4]);
+  extra.chains[0].balls[3].power = 'superset'; extra.chains[0].balls[3].powerUntil = 1e9;
+  hit(extra, 4, 0);
+  settle(extra);
+  assert.deepEqual(extra.chains[0].balls.map(b => b.color).filter(c => c === 0), [], 'все красные — и не в тройке тоже');
+});
+
+test('еда на поле: появляется в стороне от трассы, бросок её собирает и идёт дальше', async () => {
+  const { FOOD } = await import('../src/blini-model.js');
+  const game = createBlini(3, { track: 'stadium', speed: .2, start: .2, target: 99999, colors: 4, slow: 1, powerEvery: 1e9, par: 60, foodEvery: 50 });
+  advance(game, 200);
+  assert.ok(game.pickups.length >= 1 && game.pickups.length <= 2, 'еда появилась, но не больше двух');
+  const food = game.pickups[0], { shooter } = game.track;
+  for (const path of game.track.paths) for (let s = 0; s <= path.length; s += 8) assert.ok(Math.hypot(path.xs[s] - food.x, path.ys[s] - food.y) > 20, 'не на трассе');
+  const before = game.score;
+  const a = Math.atan2(food.y - shooter.y, food.x - shooter.x);
+  game.shots.push({ x: food.x - Math.cos(a) * 30, y: food.y - Math.sin(a) * 30, vx: Math.cos(a) * 6, vy: Math.sin(a) * 6, color: 0 });
+  const events = []; for (let i = 0; i < 12; i++) { step(game); events.push(...drain(game)); }
+  const got = events.find(e => e.kind === 'food');
+  assert.ok(got, 'собрана'); assert.equal(game.score - before >= FOOD[got.food].kg, true);
+  assert.equal(game.pickups.some(f => f.id === food.id), false);
+  advance(game, 2000);
+  assert.ok(game.pickups.every(f => game.tick - f.born < 900), 'старая еда исчезает');
+});
+
+test('чистая трасса: сняли всю видимую цепочку раньше плана — бонус в тоннаж', () => {
+  const game = rig([2]);
+  game.full = false;
+  const chain = game.chains[0];
+  chain.visible = true; chain.balls[0].s = -5; // видимых блинов не осталось, хвост ещё за краем
+  step(game);
+  const bonus = drain(game).find(e => e.kind === 'cleartrack');
+  assert.ok(bonus); assert.equal(bonus.points, game.rules.clearBonus); assert.equal(game.score, game.rules.clearBonus);
+  step(game);
+  assert.equal(drain(game).some(e => e.kind === 'cleartrack'), false, 'один раз, а не каждый шаг');
+});
+
+test('подстройка сложности: после неудач темп и план ниже, не больше трёх ступеней', () => {
+  const base = levelRules(5), one = levelRules(5, 1), max = levelRules(5, 9);
+  assert.ok(one.speed < base.speed && one.target < base.target);
+  assert.equal(max.ease, 3); assert.ok(Math.abs(max.speed - base.speed * .82) < .01);
+  assert.equal(levelRules(5, 0).ease, undefined);
+  const session = createBliniSession({ seed: 2, now: () => 0 });
+  const token = {}; session.claim(token, () => false);
+  session.start(token); session.game().mode = 'lost'; session.frame(token);
+  assert.equal(session.easeOf(0), 1);
+  assert.ok(session.game().rules.speed <= levelRules(0).speed, 'следующая попытка — уже мягче');
+  session.start(token);
+  assert.equal(session.game().rules.ease, 1);
+});
