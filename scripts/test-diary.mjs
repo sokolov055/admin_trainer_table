@@ -5,7 +5,8 @@ import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
-import { totalEntries, withPending } from '../src/nutrition/diary-model.js';
+import { totalEntries, withPending, DIARY_MEALS, today, mealNow, dayVerdict } from '../src/nutrition/diary-model.js';
+import { palmSnapshot, palmNorm, palmUnit, palmCount } from '../src/nutrition/palm-model.js';
 
 const food = { kind: 'food', id: 1, name: 'Йогурт', kcal: 70, protein: 8, fat: 2, carbs: 5, unit: 'g' };
 test('КБЖУ: граммы и порции используют разные базы расчёта', () => {
@@ -37,14 +38,15 @@ const stubs = {
   SwipeRow: `import React from 'react'; export default ({children,onDelete,label,disabled})=><div data-swipe={label} data-disabled={disabled?'1':''}><button aria-label={label} onClick={onDelete}>x</button>{children}</div>;`,
   pendingDelete: `export const usePendingDelete=(commit,{onDone,onError}={})=>({remove:(id,payload)=>{globalThis.__diary.removed.push(id);Promise.resolve(commit(payload)).then(()=>onDone&&onDone(payload),e=>onError&&onError(e));},hidden:()=>false,bar:null,flush(){}});`,
 };
-const bundle = await build({ entryPoints: ['src/nutrition/Diary.jsx'], bundle: true, write: false, format: 'cjs', platform: 'node', external: ['react'], logLevel: 'silent', plugins: [{ name: 'diary-stubs', setup(b) {
+// «+» нижнего меню: requestQuick — из той же сборки, что и дневник (одна очередь запросов)
+const bundle = await build({ stdin: { contents: "export * from './src/nutrition/Diary.jsx'; export { default } from './src/nutrition/Diary.jsx'; export { requestQuick } from './src/quick-actions.js';", resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'cjs', platform: 'node', external: ['react'], logLevel: 'silent', plugins: [{ name: 'diary-stubs', setup(b) {
   b.onResolve({ filter: /\/(api|gestures|ui|icons|offline-writes|offline-account|SwipeRow|pendingDelete)\.(js|jsx)$/ }, a => ({ path: ({ 'offline-writes': 'offline', 'offline-account': 'account' })[a.path.split('/').at(-1).split('.')[0]] || a.path.split('/').at(-1).split('.')[0], namespace: 'stub' }));
   b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: stubs[a.path], loader: 'jsx' }));
   b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
 } }] });
 const module = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + bundle.outputFiles[0].text + '\n})')(createRequire(import.meta.url), module, module.exports);
-const { useDiaryResource, DiaryEntryForm, default: NutritionDiary } = module.exports;
+const { useDiaryResource, DiaryEntryForm, default: NutritionDiary, requestQuick } = module.exports;
 globalThis.window = { addEventListener() {}, removeEventListener() {} };
 globalThis.document = { activeElement: null, addEventListener() {}, removeEventListener() {} };
 globalThis.__diary = { queued: [], removed: [] };
@@ -141,4 +143,121 @@ test('итог дня: в пределах 10 % — норма, меньше и 
   assert.match(dayVerdict(2200, 1800).text, /на 400 ккал/);
   assert.equal(dayVerdict(500, 0).tone, 'neutral');
   assert.equal(mealNow(8), 'breakfast'); assert.equal(mealNow(13), 'lunch'); assert.equal(mealNow(19), 'dinner'); assert.equal(mealNow(23), 'snack');
+});
+
+// Проверка плана трёх разборов (21.10.2026): «+» нижнего меню, правка записей «ладонью» и «примерно», дневник глазами тренера
+const settle = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
+const textOf = node => node === null || node === undefined || typeof node === 'boolean' ? '' : typeof node === 'string' || typeof node === 'number' ? String(node) : Array.isArray(node) ? node.map(textOf).join(' ') : node.children !== undefined ? textOf(node.children) : node.props ? textOf(node.props.children) : '';
+const screen = tree => textOf(tree.toJSON()).replace(/\s+/g, ' ');
+const buttonsText = tree => tree.root.findAllByType('button').map(b => textOf(b.props.children).replace(/\s+/g, ' ').trim()).filter(Boolean);
+const dialogTitle = tree => { const d = tree.root.findAll(n => n.type === 'section' && n.props.role === 'dialog'); return d.length ? textOf(d.at(-1).findByType('h2').props.children) : ''; };
+const mealLabel = id => DIARY_MEALS.find(m => m.id === id).label;
+const dayAnswer = (p, { entries = [], settings, targets = { kcal: 2000, protein: 100, fat: 60, carbs: 250 }, complete = false } = {}) => ({ day: p.day, entries, totals: totalEntries(entries), targets, complete, waterMl: 0, comment: '', revision: 1, ...(settings ? { settings } : {}) });
+async function mountDiary(props = {}, opts = {}) {
+  __diary.read = async (a, p) => a === 'diary.get' ? dayAnswer(p, opts) : { products: [] };
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(NutritionDiary, props)); });
+  await settle();
+  return tree;
+}
+const palmEntry = { id: 11, revision: 1, day: today(), meal: 'lunch', amount: 1.5, product: palmSnapshot('protein') };
+const quickEntry = { id: 12, revision: 1, day: today(), meal: 'dinner', amount: 2, product: { kind: 'quick', id: 'q1', name: 'Бизнес-ланч', kcal: 600, protein: 20, fat: 20, carbs: 70, unit: 'portion', approx: true, source: 'Только калории · примерно' } };
+
+test('«+» → «Еда» до открытия дневника: при показе — «Добавить еду» на приём по часам; «Вода» — +250 мл; у тренера запрос не берётся', async () => {
+  const calls = [];
+  __diary.mutate = async (a, p) => { calls.push([a, p]); return {}; };
+  requestQuick('food');
+  let tree = await mountDiary({});
+  assert.equal(dialogTitle(tree), 'Добавить еду · ' + mealLabel(mealNow()));
+  tree.unmount();
+  requestQuick('water');
+  tree = await mountDiary({});
+  await settle();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'diary.day.save'); assert.equal(calls[0][1].waterDelta, 250); assert.equal(calls[0][1].day, today());
+  assert.match(screen(tree), /Вода: \+250 мл\./);
+  assert.equal(dialogTitle(tree), '', 'вода — без листа');
+  tree.unmount();
+  // Тренер в карточке клиента запрос не берёт — он остаётся дневнику клиента
+  requestQuick('food');
+  tree = await mountDiary({ clientRow: 5, readOnly: true });
+  assert.equal(dialogTitle(tree), '');
+  assert.equal(calls.length, 1);
+  tree.unmount();
+  tree = await mountDiary({});
+  assert.match(dialogTitle(tree), /^Добавить еду · /);
+  tree.unmount();
+});
+
+// Сервер принимает порции ладонью от 0,5 до 10 шагом 0,5 (diary-handlers.js); форма должна отказать сама, не ждать ответа.
+// Пока открывается общая DiaryEntryForm с пределом «до 30 порций» — тест красный до правки Diary.jsx.
+test('запись «ладонью»: 1,3 порции отклоняется формой до отправки — подсказка про шаг 0,5', async () => {
+  const calls = [];
+  __diary.mutate = async (a, p) => { calls.push([a, p]); return {}; };
+  const tree = await mountDiary({}, { entries: [palmEntry] });
+  assert.match(screen(tree), /1\.5 ладони · примерно/);
+  await act(async () => tree.root.findByProps({ 'aria-label': 'Изменить: Белок · ладонь' }).props.onClick());
+  const input = tree.root.findAll(n => n.type === 'input' && n.props.id === 'diary-amount')[0];
+  await act(async () => input.props.onChange({ target: { value: '1,3' } }));
+  await act(async () => tree.root.findByType('form').props.onSubmit({ preventDefault() {} }));
+  await settle();
+  assert.equal(calls.length, 0, 'на сервер не ушло');
+  assert.match(screen(tree), /0,5/, 'подсказка про шаг 0,5');
+  tree.unmount();
+});
+
+test('«примерная» запись («Только калории»): правка открывает общую форму с «Количество порций» — текущее поведение', async () => {
+  const tree = await mountDiary({}, { entries: [quickEntry] });
+  const text = screen(tree);
+  assert.match(text, /примерно · ×2/);
+  assert.match(text, /≈ 1200 ккал/);
+  assert.match(text, /из съеденного примерно 1200 ккал/);
+  await act(async () => tree.root.findByProps({ 'aria-label': 'Изменить: Бизнес-ланч' }).props.onClick());
+  assert.equal(dialogTitle(tree), 'Изменить запись');
+  assert.equal(tree.root.findAll(n => n.type === 'span' && n.props.className === 'field__label' && n.props.children === 'Количество порций').length, 1);
+  assert.equal(tree.root.findAll(n => n.type === 'input' && n.props.id === 'diary-amount')[0].props.value, '2');
+  tree.unmount();
+});
+
+test('тренер в карточке клиента: видит «примерно», круги «Ладони» и норму приёма; завершить день, режим, норму по приёмам — нет', async () => {
+  const entries = [quickEntry, palmEntry, { id: 13, revision: 1, day: today(), meal: 'breakfast', amount: 100, product: food }];
+  const tree = await mountDiary({ clientRow: 5, readOnly: true }, { entries, settings: { mode: 'palm', meals: { breakfast: 25, lunch: 35, dinner: 30, snack: 10 }, chosen: true } });
+  const text = screen(tree);
+  assert.match(text, /примерно · ×2/);
+  assert.match(text, /1\.5 ладони · примерно/);
+  assert.equal(tree.root.findAll(n => n.type === 'div' && n.props.className === 'palm-summary').length, 1, 'круги «Ладони» при mode = palm');
+  assert.match(text, /Съедено ≈ 1473 ккал из 2000/, '70 + 1,5 × 135 + 2 × 600');
+  assert.match(text, /Ужин 1200 из 600 ккал на 600 больше/, 'перебор по приёму — словами');
+  assert.match(text, /70 из 500 ккал/, 'норма завтрака — 25 % от 2000');
+  assert.match(text, /Клиент ещё не завершил этот день/);
+  let buttons = buttonsText(tree);
+  assert.doesNotMatch(buttons.join(' | '), /Завершить день|Дописать|Режим|Добавить еду|Отметить порции|Повторить еду|\+ 250 мл/);
+  assert.ok(buttons.includes('Назначить цель') && buttons.includes('Сохранить комментарий'), 'тренер назначает цель и пишет комментарий');
+  assert.equal(tree.root.findAllByProps({ 'aria-label': 'Добавить в завтрак' }).length, 0);
+  assert.equal(tree.root.findByProps({ 'aria-label': 'Изменить: Йогурт' }).props.disabled, true, 'записи клиента тренер не правит');
+  assert.equal(tree.root.findByProps({ 'aria-label': 'Удалить: Йогурт' }).parent.props['data-disabled'], '1');
+  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Ещё').props.onClick());
+  buttons = buttonsText(tree);
+  assert.doesNotMatch(buttons.join(' | '), /Норма по приёмам|Как считать еду/);
+  assert.match(screen(tree), /Как читать этикетку/, 'уроки — есть');
+  tree.unmount();
+});
+
+test('границы: итог ровно на 10 % — норма; приём по часам — 11, 16, 21; «Ладонь» — пределы нормы, склонения, счёт', () => {
+  assert.equal(dayVerdict(1620, 1800).tone, 'good'); assert.equal(dayVerdict(1619, 1800).tone, 'under');
+  assert.equal(dayVerdict(1980, 1800).tone, 'good'); assert.equal(dayVerdict(1981, 1800).tone, 'over');
+  assert.match(dayVerdict(1619, 1800).text, /на 181 ккал/); assert.match(dayVerdict(1981, 1800).text, /на 181 ккал/);
+  assert.equal(dayVerdict(0, 1800).tone, 'under');
+  assert.equal(dayVerdict(100, NaN).tone, 'neutral'); assert.equal(dayVerdict(100, -5).tone, 'neutral'); assert.equal(dayVerdict(100, undefined).tone, 'neutral');
+  assert.deepEqual([0, 10, 11, 15, 16, 20, 21, 23].map(mealNow), ['breakfast', 'breakfast', 'lunch', 'lunch', 'dinner', 'dinner', 'snack', 'snack']);
+  // Норма в порциях: пределы 2–10 ладоней, 1–12 горстей, 1–10 пальцев; овощей — не меньше ладоней
+  assert.deepEqual(palmNorm({ kcal: 3000, protein: 400, fat: 200, carbs: 600 }), { protein: 10, carbs: 12, fat: 10, veg: 10 });
+  assert.deepEqual(palmNorm({ kcal: 1500, protein: 100, fat: 10, carbs: 150 }), { protein: 4, carbs: 6, fat: 1, veg: 4 }, 'жира меньше, чем с белком, — всё равно один палец');
+  assert.deepEqual(palmNorm({ kcal: '1800', protein: '120' }), { protein: 5, carbs: 1, fat: 1, veg: 5 }, 'строки с сервера и пустые поля');
+  assert.equal(palmNorm({ kcal: -1 }), null); assert.equal(palmNorm(undefined), null);
+  assert.deepEqual([1, 2, 5, 11, 21, 2.5, 0.5].map(k => palmUnit('protein', k)), ['ладонь', 'ладони', 'ладоней', 'ладоней', 'ладонь', 'ладони', 'ладони']);
+  assert.deepEqual([1, 3, 7].map(k => palmUnit('veg', k)), ['кулак', 'кулака', 'кулаков']);
+  assert.deepEqual([palmUnit('carbs', 1), palmUnit('fat', 1), palmUnit('fat', 5)], ['горсть', 'большой палец', 'больших пальцев']);
+  assert.deepEqual(palmCount([{ amount: '2', product: { kind: 'palm', id: 'veg' } }, { amount: 1, product: { kind: 'palm', id: 'sugar' } }, { amount: 3 }, { amount: 'x', product: { kind: 'palm', id: 'fat' } }]), { protein: 0, carbs: 0, fat: 0, veg: 2 });
+  assert.deepEqual(palmSnapshot('veg'), { kind: 'palm', id: 'veg', name: 'Овощи · кулак', kcal: 25, protein: 1.5, fat: 0, carbs: 5, unit: 'portion', approx: true, source: 'Ладонь · примерно' });
 });
