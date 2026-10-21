@@ -1,0 +1,159 @@
+/* ==========================================================================
+   «Подключения» и «Напоминания» в «Настройках» клиента
+   (client/Settings.jsx, макет Settings.dc.html, 21.10.2026).
+   Строка — название, под ним состояние, справа одно действие: кнопка или
+   переключатель. Строки делит волосяная линия, как в системных настройках.
+   ========================================================================== */
+
+.conn-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.conn-row:last-child { border-bottom: 0; }
+
+.conn-row--wide { padding-top: var(--space-2); padding-bottom: var(--space-3); }
+
+.conn-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Строка напоминания — кнопка: касанием открывается время */
+.conn-row__main--button {
+  margin: -10px 0 -10px -14px;
+  padding: 10px 0 10px 14px;
+  min-height: 60px;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.conn-row__main--button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .conn-row__main--button:hover { background: var(--surface-hover); }
+}
+
+.conn-row__title {
+  font-size: var(--text-base);
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.conn-row__note,
+.conn-row__sub {
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.conn-row__note--good { color: var(--good-text); }
+.conn-row__note--bad { color: var(--critical-text); }
+
+.conn-row__action { flex-shrink: 0; }
+
+/* Время и день — под строкой, на сером, чтобы читалось как часть строки */
+.conn-row__edit {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) 14px var(--space-4);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border);
+}
+
+.conn-row__edit:last-child { border-bottom: 0; }
+
+.reminders__times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.reminders__denied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.reminders__denied .conn-caption { margin: 0; flex: 1 1 200px; }
+
+.conn-caption {
+  margin: var(--space-2) 2px 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-muted);
+  max-width: 52ch;
+}
+
+.conn-caption--bad { color: var(--critical-text); }
+
+/* --- переключатель ---
+   Квадрат 52×44 — цель касания; дорожка 50×30 по центру. Чекбокс
+   прозрачный поверх всего: читалка экрана и клавиатура работают с ним */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.switch input:disabled { cursor: not-allowed; }
+
+.switch__track {
+  position: relative;
+  width: 50px;
+  height: 30px;
+  border-radius: 15px;
+  background: var(--border-strong);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.switch__track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--dur) var(--ease-out);
+}
+
+.switch input:checked + .switch__track { background: var(--accent-solid); }
+.switch input:checked + .switch__track::after { transform: translateX(20px); }
+.switch input:focus-visible + .switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch input:disabled + .switch__track { opacity: 0.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .switch__track,
+  .switch__track::after { transition: none; }
+}

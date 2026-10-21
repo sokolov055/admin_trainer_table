@@ -15,10 +15,13 @@ import { APP_VERSION } from '../version.js';
 import { screensNote } from '../native-bridge.js';
 import Profile from './Profile.jsx';
 import PushSetting from '../PushSetting.jsx';
+import { pushSupported } from '../push.js';
 import DeleteAccount from '../DeleteAccount.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import ThemeSetting from '../ThemeSetting.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
+import { Connections, Reminders } from './Settings.jsx';
+import { syncReminders, remindersAvailable } from '../native-reminders.js';
 import Family from './Family.jsx';
 import WatchSuggest from './WatchSuggest.jsx';
 import { apiPublic } from '../api.js';
@@ -89,7 +92,7 @@ const MENU = [
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
   // У тренера журнал клиентов в меню остался
   { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта', Icon: IconUsers },
-  { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
+  { id: 'settings', label: 'Настройки', note: 'Напоминания, подключения, тема', Icon: IconSliders },
 ];
 
 // Семья — в меню, только если тренер открыл её этому человеку и в ней
@@ -161,6 +164,22 @@ export default function ClientApp({ me, clientRow, preview }) {
     document.addEventListener('visibilitychange', refresh);
     return () => { alive = false; clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [own, me?.unlinked, me?.consentNeeded, consented]);
+  // Напоминания телефона (пункт 14 плана): пересчёт при открытии и при
+  // возврате в приложение — «занятие по плану» узнаёт о переносе. Только
+  // свой кабинет в приложении; не чаще раза в 2 минуты, без включённых —
+  // почти даром
+  useEffect(() => {
+    if (!own || !remindersAvailable()) return undefined;
+    let last = 0;
+    const sync = () => {
+      if (document.visibilityState === 'hidden' || Date.now() - last < 120000) return;
+      last = Date.now();
+      syncReminders().catch(() => {});
+    };
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, [own]);
   // Первые шаги (FT-561, FT-510): подсказка первого действия, первый день
   // в режиме, уведомления. Только свой кабинет и не поверх анкеты
   const firstSteps = useFirstSteps(own && !onboardingOpen && !(me && me.consentNeeded && !consented));
@@ -487,14 +506,30 @@ export default function ClientApp({ me, clientRow, preview }) {
             <Section title="Внешний вид">
               <ThemeSetting />
             </Section>
-            <Section title="Уведомления">
-              {/* В режиме просмотра — без кнопки: она подписала бы на
-                  уведомления клиента телефон тренера */}
+            {/* Подключения и напоминания (план трёх разборов, пункт 14):
+                «глазами клиента» телефон тренерский — его состояние
+                выдавалось бы за клиентское, поэтому только описание */}
+            <Section title="Подключения">
               {preview
-                ? <PreviewOnly text="Здесь клиент включает уведомления: напоминания о взвешивании, замерах и конце отдыха." />
-                : <PushSetting clientRow={clientRow} />}
+                ? <PreviewOnly text="Здесь клиент видит, откуда приходят шаги и тренировки с часов и разрешены ли уведомления на его телефоне." />
+                : <Connections />}
+            </Section>
+            <Section title="Напоминания">
+              {preview
+                ? <PreviewOnly text="Здесь клиент включает напоминания телефона: занятие по плану, взвешивание, замеры и еда." />
+                : <Reminders />}
               <RestSignalSetting />
             </Section>
+            {/* Без «Конца отдыха» раздел может оказаться пустым — тогда его нет */}
+            {(preview || pushSupported()) && (
+              <Section title="Уведомления">
+                {/* В режиме просмотра — без кнопки: она подписала бы на
+                    уведомления клиента телефон тренера */}
+                {preview
+                  ? <PreviewOnly text="Здесь клиент включает уведомления: напоминания о взвешивании, замерах и конце отдыха." />
+                  : <PushSetting clientRow={clientRow} />}
+              </Section>
+            )}
 
 
             {/* Выход стоит последним: это конец разговора, а не раздел.

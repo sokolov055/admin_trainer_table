@@ -382,6 +382,8 @@ export async function logout() {
   clearToken();
   // Виджеты iPhone: на экране блокировки не должно остаться занятий
   import('./native-widget.js').then((m) => m.forgetWidgets()).catch(() => {});
+  // Напоминания телефона — расписание прежнего человека (native-reminders.js)
+  import('./native-reminders.js').then((m) => m.forgetReminders()).catch(() => {});
 }
 
 /**
