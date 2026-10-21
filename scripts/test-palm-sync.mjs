@@ -1,7 +1,7 @@
 /**
  * «Ладонь» (план трёх разборов, п. 8): КБЖУ порции рукой заданы дважды —
  * в src/nutrition/palm-model.js (экран считает итог и норму) и в
- * server/src/api/diary-handlers.js (сервер пишет запись). Разойдутся —
+ * server/src/lib/diary-approx.js (сервер пишет запись). Разойдутся —
  * дневник покажет одни калории, а неделя и тренер увидят другие.
  *
  * Сервер лежит в соседнем репозитории (../server относительно webapp/);
@@ -15,8 +15,10 @@ import { fileURLToPath } from 'node:url';
 import { PALM } from '../src/nutrition/palm-model.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-// webapp/ лежит рядом с server/; worktree веба (worktrees/<имя>) — на уровень глубже
-const serverFile = ['..', '../..'].map((up) => path.resolve(root, up, 'server', 'src', 'api', 'diary-handlers.js')).find((f) => fs.existsSync(f)) || '';
+// webapp/ лежит рядом с server/; worktree веба (worktrees/<имя>) — на уровень глубже.
+// PALM сервера — в lib/diary-approx.js (с 21.10.2026), раньше — в api/diary-handlers.js
+const serverFile = ['..', '../..'].flatMap((up) => [['lib', 'diary-approx.js'], ['api', 'diary-handlers.js']].map((p) => path.resolve(root, up, 'server', 'src', ...p)))
+  .find((f) => fs.existsSync(f) && /export const PALM = \{/.test(fs.readFileSync(f, 'utf8'))) || '';
 
 /** Вырезать `export const PALM = {...};` из исходника сервера, не исполняя его */
 export function palmFromSource(source) {
@@ -28,7 +30,7 @@ export function palmFromSource(source) {
 test('PALM сервера и веба совпадают', (t) => {
   if (!serverFile) { t.skip('сервер рядом не лежит'); return; }
   const server = palmFromSource(fs.readFileSync(serverFile, 'utf8'));
-  assert.ok(server, 'в diary-handlers.js не нашёлся export const PALM = {...};');
+  assert.ok(server, 'в ' + serverFile + ' не нашёлся export const PALM = {...};');
   assert.deepEqual(server, PALM);
 });
 
