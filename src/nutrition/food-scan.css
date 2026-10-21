@@ -1,4 +1,6 @@
 .food-scan { margin-block: 16px; padding-block: 16px; border-block: 1px solid var(--border); }
+/* В «Добавить еду» сканер без режима пуст — не рисовать пустую полосу с двумя линиями */
+.food-scan:empty { display: none; }
 .food-scan .diary-inline-actions { flex-wrap: wrap; }
 .food-scan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .food-scan-head h3 { margin: 0; }

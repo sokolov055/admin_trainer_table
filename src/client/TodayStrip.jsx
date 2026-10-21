@@ -13,7 +13,8 @@ import './today-strip.css';
  * Показывается только у самого клиента: у тренера в карточке клиента те же
  * цифры уже есть в разделах, а лишние запросы на каждого клиента не нужны.
  */
-const thousands = (v) => (v >= 1000 ? formatNumber(Math.round(v / 100) / 10) + ' тыс.' : formatNumber(v));
+// «8 тыс.» не рвётся на две строки в узкой плитке
+const thousands = (v) => (v >= 1000 ? formatNumber(Math.round(v / 100) / 10) + ' тыс.' : formatNumber(v));
 // То же для крупной цифры плитки: «тыс.» — серой единицей (Qty, FT-665)
 const thousandsQty = (v) => (v >= 1000 ? <Qty value={formatNumber(Math.round(v / 100) / 10)} unit="тыс." /> : formatNumber(v));
 

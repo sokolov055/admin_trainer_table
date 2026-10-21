@@ -75,7 +75,7 @@ const SCENARIOS = [
     S.dialog(/^Добавить \d/), S.wait(700), S.shot('05-quick-saved', true),
     S.click('Добавить еду'), S.dialog('Фото этикетки'), S.wait(400), S.shot('06-scan-guide'),
     S.close(), S.wait(300),
-    S.click('+250'), S.wait(500), S.shot('07-water', true),
+    S.click(/250 мл/), S.wait(500), S.shot('07-water', true),
     S.click('Завершить день'), S.wait(400), S.shot('08-finish-sheet'),
     S.dialog('Завершить день'), S.wait(700), S.shot('09-day-done', true),
     S.click('Дописать'), S.wait(500), S.shot('10-reopened', true),
@@ -93,7 +93,7 @@ const SCENARIOS = [
     S.tab('Питание'), S.click('Считаю калории и хочу точности'), S.click('Продолжить'), S.wait(600),
     S.click('Рецепты'), S.wait(600), S.shot('01-recipes', true),
     S.click('Ужин'), S.click('Быстро'), S.wait(300), S.shot('02-filtered', true),
-    S.eval(async page => { await page.locator('.nutrition-diary').getByRole('button', { name: /^Добавить / }).first().click(); }), S.wait(400), S.shot('03-add-sheet'),
+    S.eval(async page => { await page.locator('.nutrition-diary').getByRole('button', { name: /^Добавить$/ }).first().click(); }), S.wait(400), S.shot('03-add-sheet'),
     S.dialog(/^Записать/), S.wait(700), S.click('Дневник'), S.wait(400), S.shot('04-added', true),
     S.click('Рецепты'), S.click('Из того, что есть'), S.wait(600), S.shot('05-fridge', true),
   ] },
@@ -247,8 +247,10 @@ async function main() {
       page.on('pageerror', e => errors.push(e.message));
       page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
       await page.addInitScript(() => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('tour_seen_v1', '1'); localStorage.setItem('first_run_seen_v1', '1'); });
-      if (size.big) await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = 'html{font-size:24px !important}'; document.head.appendChild(s); }); });
+      // Тему приложение берёт из своей настройки (telegram.js), а не только из prefers-color-scheme
+      if (size.dark) await page.addInitScript(() => { localStorage.setItem('app_theme_v1', 'dark'); });
       await page.goto(origin + (sc.role === 'trainer' ? '/trainer' : '/') + sc.query);
+      if (size.big) await page.addStyleTag({ content: 'html { font-size: 24px !important; }' });
       await page.waitForTimeout(1800);
       // Первый запуск и туры не должны мешать сценариям: закрыть, если показались
       { const b = page.locator('.tour__skip'); if (await b.count()) { try { await b.first().click({ timeout: 1000 }); await page.waitForTimeout(300); } catch (_) { /* не было */ } } }
