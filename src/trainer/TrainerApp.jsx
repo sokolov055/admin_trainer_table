@@ -23,7 +23,7 @@ import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconSliders, IconMenu, IconClose, IconPhone, IconSearch, IconMoney,
-  IconPlan, IconCalendar, IconKey, IconProgress, IconEye,
+  IconPlan, IconCalendar, IconKey, IconProgress, IconEye, IconPalette,
 } from '../icons.jsx';
 import { WorkoutJournal } from '../client/screens.jsx';
 import { Deferred } from '../lazy.js';
@@ -31,6 +31,7 @@ import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Admin, { ADMIN_PANES } from './Admin.jsx';
 import TrainerProfile from './TrainerProfile.jsx';
+import Appearance from '../Appearance.jsx';
 import { screensNote } from '../native-bridge.js';
 import { useSelfCard, selfPick } from './selfCard.js';
 
@@ -96,7 +97,9 @@ const MENU = [
   // Панель владельца сервиса (FT-562): аналитика, тренеры, тарифы, флаги,
   // логи. Заявки тренеров и журнал действий теперь здесь же — вкладками
   { id: 'admin', label: 'Управление', note: 'Аналитика, тренеры, тарифы, флаги, логи', Icon: IconKey, owner: true },
-  { id: 'settings', label: 'Настройки', note: 'Тема и уведомления', Icon: IconSliders },
+  // Тема и персональные цвета (21.10.2026) — тем же экраном, что у клиента
+  { id: 'appearance', label: 'Оформление', note: 'Тема и персональные цвета', Icon: IconPalette },
+  { id: 'settings', label: 'Настройки', note: 'Уведомления и выход', Icon: IconSliders },
 ];
 
 /** Клиенты: работающие и ушедшие — один список людей в двух состояниях,
@@ -423,6 +426,7 @@ export default function TrainerApp({ me }) {
         {view === 'expenses' && <Expenses />}
         {view === 'profile' && <TrainerProfile />}
         {view === 'admin' && owner && <div key={adminPane}><Admin pane={adminPane} /></div>}
+        {view === 'appearance' && <Appearance />}
         {view === 'settings' && <Settings owner={owner} />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
       </main>

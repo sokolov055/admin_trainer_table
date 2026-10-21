@@ -153,7 +153,7 @@
 .is-current .signin__dot {
   border-color: var(--accent-solid);
   background: var(--accent-solid);
-  color: #fff;
+  color: var(--accent-text);
   box-shadow: 0 0 0 4px var(--accent-wash);
 }
 .is-done .signin__dot {

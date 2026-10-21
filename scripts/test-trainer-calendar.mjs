@@ -35,6 +35,7 @@ const output = await build({
       stub(/AuthTransfer\.jsx$/, 'transfer');
       stub(/Invites\.jsx$/, 'invites');
       stub(/TrainerProfile\.jsx$/, 'trainer-profile');
+      stub(/Appearance\.jsx$/, 'appearance');
       stub(/version\.js$/, 'version');
       stub(/ui\.jsx$/, 'ui');
       stub(/useData\.js$/, 'data');
@@ -68,7 +69,7 @@ const output = await build({
           contents: `import React from 'react'; const I=()=> <i />;
             export const IconPlus=I; export const IconUsers=I; export const IconChart=I; export const IconLog=I; export const IconSheet=I;
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
-            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I; export const IconEye=I;`,
+            export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I; export const IconEye=I; export const IconPalette=I;`,
         };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }];` };
@@ -83,6 +84,7 @@ const output = await build({
         if (args.path === 'transfer') return { loader: 'jsx', contents: `export const TelegramTransferCard=()=>null;` };
         if (args.path === 'invites') return { loader: 'jsx', contents: `export const Invites=()=>null;` };
         if (args.path === 'trainer-profile') return { loader: 'jsx', contents: `export default () => null;` };
+        if (args.path === 'appearance') return { loader: 'jsx', contents: `export default () => null;` };
         if (args.path === 'version') return { contents: `export const APP_VERSION='test';` };
         if (args.path === 'data') return { contents: `export const useData=()=>({loading:false,data:{clients:[]},error:null,reload(){}});` };
         if (args.path === 'telegram') return { contents: `export const haptic=()=>{};` };

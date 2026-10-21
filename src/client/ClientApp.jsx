@@ -7,7 +7,7 @@ import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../ge
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion } from '../viewMotion.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink, IconGuide } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink, IconGuide, IconPalette } from '../icons.jsx';
 import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
 import { BackButton, Drawer, Section, SignOut, Loading } from '../ui.jsx';
@@ -18,7 +18,7 @@ import PushSetting from '../PushSetting.jsx';
 import { pushSupported } from '../push.js';
 import DeleteAccount from '../DeleteAccount.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
-import ThemeSetting from '../ThemeSetting.jsx';
+import Appearance from '../Appearance.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
 import { Connections, Reminders, Support } from './Settings.jsx';
 import { syncReminders, remindersAvailable } from '../native-reminders.js';
@@ -92,7 +92,9 @@ const MENU = [
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
   // У тренера журнал клиентов в меню остался
   { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта', Icon: IconUsers },
-  { id: 'settings', label: 'Настройки', note: 'Напоминания, подключения, тема', Icon: IconSliders },
+  // Тема и персональные цвета — свой пункт (21.10.2026), а не строка настроек
+  { id: 'appearance', label: 'Оформление', note: 'Тема и персональные цвета', Icon: IconPalette },
+  { id: 'settings', label: 'Настройки', note: 'Напоминания, подключения, поддержка', Icon: IconSliders },
 ];
 
 // Семья — в меню, только если тренер открыл её этому человеку и в ней
@@ -516,11 +518,12 @@ export default function ClientApp({ me, clientRow, preview }) {
           ? <PreviewOnly text="Здесь клиент видит свой ID «FT-…», своего тренера и запросы на привязку." />
           : <MyTrainer />)}
 
+        {/* Оформление — этого телефона: и «глазами клиента» тренер меняет
+            свой вид, клиентского выбора отсюда не видно и не тронуть */}
+        {view === 'appearance' && <Appearance />}
+
         {view === 'settings' && (
           <>
-            <Section title="Внешний вид">
-              <ThemeSetting />
-            </Section>
             {/* Подключения и напоминания (план трёх разборов, пункт 14):
                 «глазами клиента» телефон тренерский — его состояние
                 выдавалось бы за клиентское, поэтому только описание */}

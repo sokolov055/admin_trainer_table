@@ -14,7 +14,6 @@ import { useBackGesture, usePullRefresh, captureScreen } from '../gestures.jsx';
 import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck, IconChevron, IconSliders, IconExit } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
-import ThemeSetting from '../ThemeSetting.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
 import { onlineDaysLeft, onlineLabel, addOnlineMonth } from '../online.js';
 import { SOURCES } from './Metrics.jsx';
@@ -1487,7 +1486,8 @@ function SheetView({ name, onBack }) {
 /**
  * Настройки приложения.
  *
- * Тема и уведомления. Раньше уведомления висели отдельным блоком прямо в
+ * Уведомления и выход; тема с 21.10.2026 — в «Оформлении» (Appearance.jsx)
+ * вместе с персональными цветами. Раньше уведомления висели отдельным блоком прямо в
  * боковом меню, над списком разделов, — и это было не место: меню отвечает
  * на вопрос «куда пойти», а не «как оно себя ведёт». Настройка, которую
  * трогают один раз, стояла там, где каждый день ищут переход.
@@ -1495,9 +1495,6 @@ function SheetView({ name, onBack }) {
 export function Settings({ owner = false }) {
   return (
     <>
-      <Section title="Внешний вид">
-        <ThemeSetting />
-      </Section>
       {owner && <OnboardingSetting />}
 
       {/* Уведомления тренеру нужны не меньше, чем клиенту: отдых во время
