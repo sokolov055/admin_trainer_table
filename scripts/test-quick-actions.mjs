@@ -113,6 +113,21 @@ test('лист: сверху занятие по программе, ниже �
   await s.close();
 });
 
+test('на «Прогрессе» главное — вес, занятие встаёт на его место', async () => {
+  setRights(null);
+  let s = await sheet({ tab: 'progress' });
+  assert.match(s.main, /^Записать вес/);
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Занятие', 'Замеры', 'Тренеру']);
+  assert.deepEqual(await s.press(0), ['progress', 'weight']);
+  assert.deepEqual(await s.press(3), ['plan', 'workout', { title: 'Ноги и ягодицы' }]);
+  await s.close();
+  setRights({ plus: false });
+  s = await sheet({ tab: 'progress' });
+  assert.deepEqual(s.tiles, ['Занятие', 'Замеры', 'Тренеру']);
+  await s.close();
+  setRights(null);
+});
+
 test('на «Питании» главное — еда, занятие встаёт на её место, остальные плитки где были', async () => {
   setRights(null);
   let s = await sheet({ tab: 'nutrition' });

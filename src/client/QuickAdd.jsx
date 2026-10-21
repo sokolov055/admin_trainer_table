@@ -46,19 +46,22 @@ export default function QuickAdd({ me, clientRow, preview, tab, onClose, onPick,
   const actions = {
     workout: { kind: 'workout', tab: 'plan', label: workout.payload.session ? 'К занятию' : 'Занятие', title: workout.title, note: workout.note, payload: workout.payload, Icon: IconPlay },
     food: { kind: 'food', tab: 'nutrition', label: 'Еда', title: 'Добавить еду', hint: mealLabel(mealNow()), note: mealLabel(mealNow()) + ' · по времени, можно сменить', Icon: IconNutrition, off: !own },
+    weight: { kind: 'weight', tab: 'progress', label: 'Вес', title: 'Записать вес', note: 'Лучше утром, до завтрака — так честнее сравнивать', Icon: IconScale },
   };
-  // Еда — главной на «Питании», если её можно записать
-  const mainKind = tab === 'nutrition' && food && own ? 'food' : 'workout';
+  // Главное — по вкладке: еда на «Питании» (если её можно записать), вес
+  // на «Прогрессе», иначе занятие (владелец, 21.10.2026)
+  const mainKind = tab === 'nutrition' && food && own ? 'food' : tab === 'progress' ? 'weight' : 'workout';
   const main = actions[mainKind];
-  const swapped = mainKind === 'food' ? actions.workout : (food ? actions.food : null);
 
+  // Плитки не прыгают: ушедшее наверх действие уступает своё место
+  // занятию, остальные стоят там же, где на любой вкладке
   const tiles = [
-    ...(swapped ? [swapped] : []),
+    ...(food ? [actions.food] : []),
     ...(food ? [{ kind: 'water', tab: 'nutrition', label: 'Вода', hint: '+250 мл', name: 'Вода, плюс 250 мл', Icon: IconDrop, off: !own }] : []),
-    { kind: 'weight', tab: 'progress', label: 'Вес', Icon: IconScale },
+    actions.weight,
     { kind: 'measure', tab: 'progress', label: 'Замеры', Icon: IconRuler },
     ...(coach ? [{ kind: 'wish', tab: 'plan', label: 'Тренеру', name: 'Написать тренеру', Icon: IconSend, off: !own }] : []),
-  ];
+  ].map((t) => (t.kind === mainKind ? actions.workout : t));
   const locked = tiles.some((t) => t.off);
   // Занятию нужен payload (что начать), остальным — нет
   const pick = (a) => (a.payload ? onPick(a.tab, a.kind, a.payload) : onPick(a.tab, a.kind));
