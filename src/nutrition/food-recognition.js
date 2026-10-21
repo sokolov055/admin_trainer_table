@@ -1,4 +1,5 @@
-import { validBarcode } from './label-model.js';
+import { validBarcode, parseLabel, labelScore } from './label-model.js';
+import { localContrast } from './label-image.js';
 export async function preparePhoto(file, rotation = 0) {
   if (!file || file.size > 20 * 1024 * 1024) throw new Error('Фото слишком большое. Выберите изображение до 20 МБ.');
   // Некоторые файловые менеджеры Android отдают файл без типа — тогда судит decode() ниже.
@@ -33,7 +34,7 @@ export function createRecognition({ progress = () => {}, base = document.baseURI
   let worker, stopped = false;
   const controller = new AbortController(), blobs = [];
   const stop = () => { stopped = true; controller.abort(); if (worker) { void worker.terminate(); worker = null; } for (const url of blobs.splice(0)) URL.revokeObjectURL(url); };
-  return { stop, async recognize(canvas) {
+  const open = async () => {
     const { createWorker } = await import('tesseract.js');
     if (stopped) throw new Error('Распознавание отменено.');
     const root = new URL('./ocr/', base).href;
@@ -64,7 +65,39 @@ export function createRecognition({ progress = () => {}, base = document.baseURI
     catch (e) { stop(); throw e; }
     worker = pending;
     if (stopped) { await pending.terminate(); worker = null; throw new Error('Распознавание отменено.'); }
-    try { const result = await worker.recognize(canvas); return result.data.text; }
-    finally { stop(); }
-  } };
+    return pending;
+  };
+  return { stop,
+    async recognize(canvas) {
+      const ocr = await open();
+      try { const result = await ocr.recognize(canvas); return result.data.text; }
+      finally { stop(); }
+    },
+    // Этикетка: до трёх прочтений одного фото, пока не найдены база и все четыре цифры.
+    // 1) контраст по соседям, текст одним блоком; 2) он же, разрозненные строки (банка,
+    // изгиб, наклон); 3) исходное фото разрозненными строками. parseLabel сводит прочтения
+    // и берёт поле, только когда они не спорят.
+    async readLabel(canvas, onPass = () => {}) {
+      const ocr = await open();
+      try {
+        const contrast = contrastCanvas(canvas), passes = [[contrast, '6'], [contrast, '11'], [canvas, '11']], texts = [];
+        for (let i = 0; i < passes.length; i++) {
+          if (stopped) throw new Error('Распознавание отменено.');
+          onPass(i + 1, passes.length);
+          await ocr.setParameters({ tessedit_pageseg_mode: passes[i][1] });
+          texts.push((await ocr.recognize(passes[i][0])).data.text);
+          if (labelScore(parseLabel(texts)) === 5) break;
+        }
+        return texts;
+      } finally { stop(); }
+    },
+  };
+}
+// Серый снимок «тёмный текст на белом» той же величины (label-image.js)
+function contrastCanvas(canvas) {
+  const { width, height } = canvas, out = document.createElement('canvas');
+  out.width = width; out.height = height;
+  const pixels = canvas.getContext('2d').getImageData(0, 0, width, height);
+  out.getContext('2d').putImageData(new ImageData(localContrast(pixels.data, width, height), width, height), 0, 0);
+  return out;
 }
