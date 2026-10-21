@@ -1,0 +1,60 @@
+/* Режим «Ладонь» и вопрос «Как вы считаете еду?» (план трёх разборов, п. 8) */
+.palm-approach { margin-bottom: var(--space-4); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.palm-approach h2 { margin: 0 0 4px; font-size: 20px; font-weight: 700; }
+.palm-approach > p { margin: 0 0 var(--space-3); }
+.palm-approach__options { display: grid; gap: var(--space-2); }
+.palm-option { display: flex; align-items: flex-start; gap: var(--space-3); width: 100%; min-height: 64px; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out); }
+.palm-option:active { transform: scale(0.985); }
+.palm-option.is-on { border: 2px solid var(--accent-solid); padding: calc(var(--space-3) - 1px); }
+.palm-option__text { flex: 1; min-width: 0; }
+.palm-option__text strong { display: block; font-size: var(--text-base); }
+.palm-option__text small { display: block; margin-top: 2px; font-size: var(--text-sm); color: var(--text-secondary); }
+.palm-option__radio { flex: none; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; border: 2px solid var(--border-strong); box-sizing: border-box; transition: border-width var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.palm-option.is-on .palm-option__radio { border: 6px solid var(--accent-solid); }
+.palm-approach__result { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius); background: var(--surface-sunken); }
+.palm-approach__result small { font-size: var(--text-sm); color: var(--text-secondary); }
+.palm-approach__result strong { display: block; font-size: var(--text-md); margin: 2px 0 var(--space-2); }
+.palm-approach__result p { margin: var(--space-2) 0 0; }
+.palm-approach__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.palm-tag { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 999px; font-size: var(--text-sm); font-weight: 600; }
+.palm-tag--easy { background: var(--good-fill); color: var(--good-text); }
+.palm-tag--approx { background: var(--warning-fill); color: var(--warning-text); }
+.palm-tag--exact { background: var(--info-fill); color: var(--info-text); }
+.palm-approach__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.palm-approach__actions .button--primary { flex: 1; min-height: 48px; }
+
+/* Итог порциями: четыре круга с прогрессом по норме */
+/* inherits: true — значение ставится на .palm-ring, а рисует его вложенный круг */
+@property --palm-progress { syntax: '<number>'; inherits: true; initial-value: 0; }
+.palm-summary__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.palm-ring { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; text-align: center; }
+.palm-ring__circle { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; color: var(--text); background: radial-gradient(closest-side, var(--surface) 82%, transparent 84%), conic-gradient(var(--palm-color, var(--accent-solid)) calc(var(--palm-progress) * 1%), var(--surface-sunken) 0); transition: --palm-progress 480ms var(--ease-ios); }
+.palm-ring strong { font-size: var(--text-md); font-weight: 700; font-variant-numeric: tabular-nums; }
+.palm-ring small { font-size: var(--text-sm); color: var(--text-secondary); }
+.palm-ring--protein { --palm-color: #c2410c; }
+.palm-ring--carbs { --palm-color: #b7791f; }
+.palm-ring--fat { --palm-color: #2672cd; }
+.palm-ring--veg { --palm-color: #1a7f3c; }
+.palm-ring.is-done .palm-ring__circle { color: var(--good-text); }
+.palm-summary > p { margin: var(--space-3) 0 0; }
+
+/* Лист «Порции» */
+.palm-sheet > p { margin: 0 0 var(--space-3); }
+.palm-group { padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.palm-group__head strong { display: block; font-size: var(--text-base); }
+.palm-group__head small { display: block; font-size: var(--text-sm); color: var(--text-secondary); }
+.palm-group__hands { display: flex; align-items: center; gap: 4px; margin-top: var(--space-2); flex-wrap: wrap; }
+.palm-hand { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: var(--surface-sunken); color: var(--text-muted); cursor: pointer; transition: transform var(--dur-press) var(--ease-out), color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.palm-hand:active { transform: scale(0.9); }
+.palm-hand.is-on { color: var(--accent-solid); background: var(--accent-wash); }
+.palm-hand.is-half { color: var(--accent-solid); background: linear-gradient(90deg, var(--accent-wash) 50%, var(--surface-sunken) 50%); }
+.palm-half { min-width: 44px; height: 44px; padding: 0 10px; border: 1px dashed var(--border-strong); border-radius: 12px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.palm-group__count { margin: 6px 0 0; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.palm-sheet__footer { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.palm-sheet__footer .button--primary { flex: 1; }
+.palm-mode-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .palm-option, .palm-option__radio, .palm-hand, .palm-ring__circle { transition: none; }
+  .palm-option:active, .palm-hand:active { transform: none; }
+}

@@ -532,3 +532,31 @@ test('план трёх разборов, п. 1: «Только калории»
   await page.screenshot({ path: join(shots, 'diary-product-390.png') });
   await page.close();
 });
+
+test('план трёх разборов, п. 8: «Как вы считаете еду?» → режим «Ладонь», порции за несколько касаний', { timeout: 90000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', reducedMotion: 'reduce' });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.removeItem('nutrition_demo_server:3'); });
+  await page.goto(origin);
+  await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
+  await diary.getByRole('heading', { name: 'Как вы считаете еду?' }).waitFor();
+  await diary.getByRole('radio', { name: /Никогда не считал/ }).click();
+  await diary.getByText('Точность: примерная').waitFor();
+  await diary.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await diary.getByText(/Норма в порциях посчитана/).waitFor();
+  assert.equal(await diary.getByRole('heading', { name: 'Как вы считаете еду?' }).count(), 0);
+  await diary.getByRole('button', { name: 'Отметить порции', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Белок: 2 ладони', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Ещё половина: Овощи', exact: true }).click();
+  await dialog().getByText('2 ладони', { exact: true }).waitFor();
+  await page.screenshot({ path: join(shots, 'diary-palm-sheet-390.png') });
+  await dialog().getByRole('button', { name: /^Сохранить · ≈ 283 ккал$/ }).click();
+  const row = diary.getByRole('button', { name: 'Изменить: Белок · ладонь', exact: true });
+  await row.waitFor();
+  assert.match(await row.innerText(), /2 ладони · примерно/);
+  await diary.getByRole('button', { name: 'Изменить: Овощи · кулак', exact: true }).waitFor();
+  assert.match(await diary.innerText(), /2\/5/);
+  await page.screenshot({ path: join(shots, 'diary-palm-390.png') });
+  await page.close();
+});
