@@ -1,0 +1,399 @@
+// «Блины» (21.10.2026): правила игры по мотивам жанра Zuma, переделанные под фитнес.
+// Цепочка олимпийских блинов катится по трассе к помосту, стрелок в центре
+// вставляет в неё блины. Три и больше одного цвета подряд снимаются, разрыв
+// стягивается, и если на стыке снова совпал цвет — цепная реакция, которая
+// откатывает цепочку назад. Очки — поднятый тоннаж, кг. План выполнен — новые
+// блины больше не выходят; сними оставшиеся и уровень пройден.
+// Время идёт шагами по 10 мс, случайность — в состоянии: партия воспроизводима.
+// Разбор жанра — docs/research/2026-10-21-Zuma.md основного репозитория.
+import { FIELD, TRACKS, pointAt, nearestS } from './blini-tracks.js';
+
+export const RULES_VERSION = 1;
+export const TICK_MS = 10;
+
+// Цвета олимпийских блинов (IWF): цвет и вес совпадают с настоящими
+export const PLATES = Object.freeze([
+  { kg: 25, color: '#d8343f', ink: '#fff', name: 'красный 25 кг' },
+  { kg: 20, color: '#2d6bd3', ink: '#fff', name: 'синий 20 кг' },
+  { kg: 15, color: '#f1c232', ink: '#3a2a00', name: 'жёлтый 15 кг' },
+  { kg: 10, color: '#2c9a55', ink: '#fff', name: 'зелёный 10 кг' },
+  { kg: 5, color: '#f3f0e6', ink: '#33302a', name: 'белый 5 кг' },
+].map(p => Object.freeze(p)));
+
+export const POWERS = Object.freeze({
+  drop: Object.freeze({ name: 'Дроп-сет', effect: 'снимает блины вокруг' }),
+  negative: Object.freeze({ name: 'Негатив', effect: 'цепочка катится назад' }),
+  pause: Object.freeze({ name: 'Пауза', effect: 'цепочка почти встаёт' }),
+  technique: Object.freeze({ name: 'Техника', effect: 'прицел и быстрые броски' }),
+});
+
+export const TUNING = Object.freeze({
+  plate: 26, // диаметр блина в единицах поля
+  shotSpeed: 6, fastShot: 11, reload: 16, maxShots: 2,
+  grow: .16, // вставленный блин раздвигает соседей за ~6 шагов
+  pull: .16, pullMax: 4.5, // разрыв с одинаковыми цветами стягивается с ускорением
+  rush: 3.2, // скорость въезда цепочки в начале
+  danger: .2, // последние 20 % пути — опасная зона
+  backSpeed: 1.1, negativeTicks: 260, pauseTicks: 650, techniqueTicks: 900,
+  recoilTicks: 26, // откат после цепной реакции, на каждое звено
+  powerLife: 1500, saveBack: .35,
+});
+
+/**
+ * Уровни свободной игры: трассы повторяются с растущим темпом, как храмы в Zuma.
+ * Начало новой тройки трасс — передышка: план и темп чуть ниже конца прошлой.
+ * speed — единиц пути за шаг, start — до какой доли пути цепочка въезжает сразу,
+ * target — план, кг; slow — во сколько раз цепочка медленнее у помоста;
+ * powerEvery — шагов между бонусами; par — норматив, секунд.
+ */
+export const LEVELS = Object.freeze([
+  { track: 'stadium', speed: .45, start: .3, target: 1800, colors: 4, slow: 3, powerEvery: 1500, par: 50 },
+  { track: 'snake', speed: .16, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 90 },
+  { track: 'dumbbell', speed: .16, start: .22, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 60 },
+  { track: 'stadium', speed: .6, start: .34, target: 2300, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
+  { track: 'snake', speed: .24, start: .3, target: 2500, colors: 4, slow: 2.6, powerEvery: 1400, par: 110 },
+  { track: 'dumbbell', speed: .2, start: .26, target: 2500, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
+  { track: 'stadium', speed: .5, start: .34, target: 2600, colors: 5, slow: 2.3, powerEvery: 1300, par: 90 },
+  { track: 'snake', speed: .16, start: .3, target: 2800, colors: 5, slow: 2.3, powerEvery: 1300, par: 145 },
+  { track: 'dumbbell', speed: .16, start: .26, target: 2800, colors: 5, slow: 2.3, powerEvery: 1300, par: 95 },
+  { track: 'stadium', speed: .65, start: .38, target: 3000, colors: 5, slow: 2, powerEvery: 1200, par: 115 },
+  { track: 'snake', speed: .22, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 170 },
+  { track: 'dumbbell', speed: .2, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
+].map(level => Object.freeze(level)));
+
+const DEFAULTS = Object.freeze({ repeat: .42, lives: 0, powers: Object.keys(POWERS) });
+
+/** Правила уровня: свободная игра по номеру или задание карьеры целиком. */
+export function levelRules(source = 0) {
+  const base = typeof source === 'number' ? LEVELS[Math.max(0, Math.min(LEVELS.length - 1, source))] : source;
+  if (!base || !TRACKS[base.track]) throw new Error('Нет такой трассы');
+  return Object.freeze({ ...DEFAULTS, ...base, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)) });
+}
+
+/** Правила задания карьеры: уровень свободной игры со своим планом; пояс — одна страховка. */
+export function missionRules(goal, boost = false) {
+  return levelRules({ ...LEVELS[goal.level], target: goal.target, lives: boost ? 1 : 0 });
+}
+
+function random(game) {
+  game.seed = (Math.imul(game.seed, 1664525) + 1013904223) >>> 0;
+  return game.seed / 4294967296;
+}
+
+export function createBlini(seed = 21, source = 0) {
+  const rules = levelRules(source), track = TRACKS[rules.track];
+  const game = {
+    version: RULES_VERSION, rules, track, seed: seed >>> 0 || 1, nextId: 0, tick: 0,
+    chains: track.paths.map(path => ({ path, balls: [], rush: true, back: 0, last: -1, danger: false })),
+    shots: [], score: 0, full: false, mode: 'playing', lives: rules.lives, reload: 0,
+    negative: 0, pause: 0, technique: 0, streak: 0, bestChain: 0, bestStreak: 0, cleared: 0, shotsFired: 0,
+    powerAt: Math.round(rules.powerEvery * .6), aim: -Math.PI / 2, events: [],
+  };
+  game.current = Math.floor(random(game) * rules.colors);
+  game.next = Math.floor(random(game) * rules.colors);
+  return game;
+}
+
+const D = TUNING.plate;
+const need = (a, b) => D * (a.size + b.size) / 2;
+const touching = (b, i) => b[i + 1].s - b[i].s <= need(b[i], b[i + 1]) + .75;
+const emit = (game, event) => game.events.push(event);
+/** Точка блина на поле: положение по пути, а только что вставленный — ещё летит к месту. */
+export function platePoint(chain, ball) {
+  const p = pointAt(chain.path, ball.s);
+  if (!ball.enter) return p;
+  const k = ball.enter.t;
+  return { x: p.x + (ball.enter.x - p.x) * k, y: p.y + (ball.enter.y - p.y) * k };
+}
+
+function newColor(game, chain) {
+  const { colors, repeat } = game.rules;
+  if (chain.last >= 0 && random(game) < repeat) return chain.last;
+  let c = Math.floor(random(game) * (colors - (chain.last >= 0 ? 1 : 0)));
+  if (chain.last >= 0 && c >= chain.last) c++;
+  return c;
+}
+
+function newBall(game, chain, s) {
+  const color = newColor(game, chain); chain.last = color;
+  return { id: ++game.nextId, color, s, size: 1, power: null, powerUntil: 0, pull: 0, combo: 0, gap: false, fresh: false, shot: false, enter: null };
+}
+
+/** Цвета, что есть на поле: стрелку дают только их — как в Zuma, не бывает «пустых» бросков. */
+export function colorsOnField(game) {
+  const set = new Set();
+  for (const chain of game.chains) for (const b of chain.balls) if (b.s > -D) set.add(b.color);
+  return set;
+}
+
+function pickColor(game) {
+  const present = [...colorsOnField(game)].sort();
+  if (!present.length) return Math.floor(random(game) * game.rules.colors);
+  return present[Math.floor(random(game) * present.length)];
+}
+
+function refreshShooter(game) {
+  const present = colorsOnField(game);
+  if (!present.size) return;
+  if (!present.has(game.current)) game.current = pickColor(game);
+  if (!present.has(game.next)) game.next = pickColor(game);
+}
+
+/** Сколько килограммов «поднято» за снятые блины — с множителем цепной реакции и серии. */
+export function pointsFor(removed, depth, streak) {
+  const kg = removed.reduce((sum, b) => sum + PLATES[b.color].kg, 0);
+  const series = 1 + Math.min(10, Math.max(0, streak - 1)) * .1;
+  return Math.round(kg * depth * series);
+}
+
+function activate(game, power, chainIndex) {
+  if (power === 'negative') game.negative = TUNING.negativeTicks;
+  if (power === 'pause') game.pause = TUNING.pauseTicks;
+  if (power === 'technique') game.technique = TUNING.techniqueTicks;
+  emit(game, { kind: 'power', power, chain: chainIndex });
+}
+
+/** Снять тройку (и больше) вокруг блина index. Возвращает, снялось ли что-то. */
+function resolveAt(game, chainIndex, index, depth, fromShot) {
+  const chain = game.chains[chainIndex], b = chain.balls;
+  if (!b[index]) return false;
+  const color = b[index].color;
+  let lo = index, hi = index;
+  while (lo > 0 && b[lo - 1].color === color && touching(b, lo - 1)) lo--;
+  while (hi + 1 < b.length && b[hi + 1].color === color && touching(b, hi)) hi++;
+  if (hi - lo + 1 < 3) return false;
+  const remove = new Set();
+  for (let i = lo; i <= hi; i++) remove.add(i);
+  // Дроп-сет снимает всё, что рядом с ним на трассе, любого цвета
+  for (let i = lo; i <= hi; i++) if (b[i].power === 'drop') for (let k = 0; k < b.length; k++) if (Math.abs(b[k].s - b[i].s) <= D * 3.2) remove.add(k);
+  const order = [...remove].sort((x, y) => x - y);
+  const removed = order.map(i => b[i]);
+  const at = platePoint(chain, b[index]);
+  if (fromShot) { game.streak++; game.bestStreak = Math.max(game.bestStreak, game.streak); }
+  const points = pointsFor(removed, depth, game.streak);
+  for (let k = order.length - 1; k >= 0; k--) b.splice(order[k], 1);
+  game.score += points; game.cleared += removed.length;
+  game.bestChain = Math.max(game.bestChain, depth);
+  emit(game, { kind: 'clear', chain: chainIndex, x: at.x, y: at.y, points, depth, streak: fromShot ? game.streak : 0, plates: removed.map(r => r.color), kg: removed.reduce((s, r) => s + PLATES[r.color].kg, 0) });
+  for (const r of removed) if (r.power && r.power !== 'drop') activate(game, r.power, chainIndex);
+  if (removed.some(r => r.power === 'drop')) emit(game, { kind: 'power', power: 'drop', chain: chainIndex });
+  // Цепная реакция откатывает цепочку назад — главный способ отыграть место
+  if (depth >= 2) chain.back = Math.max(chain.back, TUNING.recoilTicks * depth);
+  // Новый разрыв: одинаковые цвета на краях притянутся друг к другу — следующее звено реакции
+  const head = order[0];
+  if (head > 0 && head < b.length) {
+    b[head].gap = true;
+    b[head].combo = b[head - 1].color === b[head].color ? depth + 1 : 0;
+  }
+  // Пока стык не сомкнулся, тянуть начинают со следующего шага
+  if (head < b.length) b[head].pull = 0;
+  if (!game.full && game.score >= game.rules.target) {
+    game.full = true;
+    // План выполнен: блины, что ещё не въехали на поле, не выходят
+    for (const c of game.chains) c.balls = c.balls.filter(x => x.s >= 0);
+    emit(game, { kind: 'full' });
+  }
+  refreshShooter(game);
+  return true;
+}
+
+function stepChain(game, chainIndex) {
+  const chain = game.chains[chainIndex], b = chain.balls, L = chain.path.length, r = game.rules;
+  if (!game.full) while (!b.length || b[0].s > -D) b.unshift(newBall(game, chain, b.length ? b[0].s - D : -D));
+  if (!b.length) return;
+  // Всё снято, а план ещё не выполнен — новая цепочка снова въезжает быстро
+  if (!chain.rush && !game.full && b.every(x => x.s < 0)) chain.rush = true;
+  const head = b.at(-1);
+  let v = r.speed;
+  if (chain.rush) { v = TUNING.rush; if (head.s >= r.start * L) chain.rush = false; }
+  else {
+    if (head.s > L * (1 - TUNING.danger)) v /= r.slow;
+    if (game.pause > 0) v *= .25;
+    if (chain.back > 0 || game.negative > 0) v = -TUNING.backSpeed;
+  }
+  if (chain.back > 0) chain.back--;
+  // Толкает только хвост: передние куски за разрывом стоят, пока их не догонят
+  let end = 0;
+  while (end + 1 < b.length && touching(b, end)) end++;
+  if (v > 0) b[0].s += v;
+  else if (v < 0 && b[end].s > D) for (let i = 0; i <= end; i++) b[i].s += v;
+  for (const ball of b) {
+    if (ball.enter) { ball.enter.t -= .14; if (ball.enter.t <= 0) ball.enter = null; }
+    if (ball.fresh) ball.size = Math.min(1, ball.size + TUNING.grow);
+  }
+  // Касание раздвигает: и хвост, который толкает, и блин, который растёт после вставки
+  for (let i = 0; i + 1 < b.length; i++) { const n = need(b[i], b[i + 1]); if (b[i + 1].s < b[i].s + n) b[i + 1].s = b[i].s + n; }
+  // Разрыв, на краях которого один цвет, стягивается: передний кусок едет назад
+  for (let i = 0; i + 1 < b.length; i++) {
+    if (touching(b, i)) continue;
+    const front = b[i + 1];
+    front.gap = true;
+    if (front.color !== b[i].color || b[i].s < -D / 2) { front.pull = 0; continue; }
+    front.pull = Math.min(TUNING.pullMax, front.pull + TUNING.pull);
+    let j = i + 1;
+    while (j + 1 < b.length && touching(b, j)) j++;
+    const room = front.s - b[i].s - need(b[i], front);
+    const step = Math.min(front.pull, room);
+    for (let k = i + 1; k <= j; k++) b[k].s -= step;
+  }
+  // Стык, который только что сомкнулся: одинаковый цвет — следующее звено реакции
+  for (let i = 0; i + 1 < b.length; i++) {
+    const front = b[i + 1];
+    if (!front.gap || !touching(b, i)) continue;
+    front.gap = false; front.pull = 0;
+    const depth = Math.max(1, front.combo); front.combo = 0;
+    if (front.color === b[i].color && resolveAt(game, chainIndex, i, depth, false)) return;
+  }
+  // Вставленный блин встал на место — проверяем тройку
+  for (let i = 0; i < b.length; i++) {
+    const ball = b[i];
+    if (!ball.fresh || ball.size < 1) continue;
+    ball.fresh = false;
+    const shot = ball.shot; ball.shot = false;
+    if (!resolveAt(game, chainIndex, i, 1, shot) && shot) game.streak = 0;
+    return;
+  }
+  const last = b.at(-1);
+  if (!last) return;
+  const danger = last.s > L * (1 - TUNING.danger);
+  if (danger && !chain.danger) emit(game, { kind: 'danger', chain: chainIndex });
+  chain.danger = danger;
+  if (last.s >= L) {
+    if (game.lives > 0) {
+      game.lives--;
+      for (const ball of b) ball.s -= L * TUNING.saveBack;
+      emit(game, { kind: 'saved', chain: chainIndex });
+    } else {
+      game.mode = 'lost';
+      emit(game, { kind: 'lost', chain: chainIndex });
+    }
+  }
+}
+
+function stepShots(game) {
+  const speedUp = game.technique > 0;
+  for (let k = game.shots.length - 1; k >= 0; k--) {
+    const shot = game.shots[k];
+    shot.x += shot.vx * (speedUp ? TUNING.fastShot / TUNING.shotSpeed : 1);
+    shot.y += shot.vy * (speedUp ? TUNING.fastShot / TUNING.shotSpeed : 1);
+    let hit = null;
+    for (let c = 0; c < game.chains.length && !hit; c++) {
+      const chain = game.chains[c];
+      for (let i = 0; i < chain.balls.length; i++) {
+        const ball = chain.balls[i];
+        if (ball.s < 0 || ball.s > chain.path.length) continue;
+        const p = pointAt(chain.path, ball.s);
+        if ((p.x - shot.x) ** 2 + (p.y - shot.y) ** 2 < (D * .9) ** 2) { hit = { c, i }; break; }
+      }
+    }
+    if (hit) {
+      game.shots.splice(k, 1);
+      insert(game, hit.c, hit.i, shot);
+      continue;
+    }
+    if (shot.x < -D || shot.y < -D || shot.x > FIELD.width + D || shot.y > FIELD.height + D) {
+      game.shots.splice(k, 1); game.streak = 0;
+      emit(game, { kind: 'miss' });
+    }
+  }
+}
+
+function insert(game, chainIndex, index, shot) {
+  const chain = game.chains[chainIndex], b = chain.balls, hit = b[index];
+  // Сторона вставки — по тому, куда по трассе ближе точка попадания
+  const at = nearestS(chain.path, shot.x, shot.y, hit.s - D, hit.s + D);
+  const ahead = at >= hit.s;
+  const ball = { id: ++game.nextId, color: shot.color, s: hit.s + (ahead ? D / 2 : -D / 2), size: .2, power: null, powerUntil: 0, pull: 0, combo: 0, gap: false, fresh: true, shot: true, enter: { x: shot.x, y: shot.y, t: 1 } };
+  b.splice(ahead ? index + 1 : index, 0, ball);
+  emit(game, { kind: 'insert', chain: chainIndex, x: shot.x, y: shot.y });
+}
+
+function stepPowers(game) {
+  for (const chain of game.chains) for (const b of chain.balls) if (b.power && game.tick > b.powerUntil) b.power = null;
+  if (game.tick < game.powerAt || !game.rules.powers.length) return;
+  const candidates = [];
+  for (const chain of game.chains) for (const b of chain.balls) if (!b.power && !b.fresh && b.s > chain.path.length * .08 && b.s < chain.path.length * .85) candidates.push(b);
+  game.powerAt = game.tick + Math.round(game.rules.powerEvery * (.75 + random(game) * .5));
+  if (!candidates.length) return;
+  const ball = candidates[Math.floor(random(game) * candidates.length)];
+  ball.power = game.rules.powers[Math.floor(random(game) * game.rules.powers.length)];
+  ball.powerUntil = game.tick + TUNING.powerLife;
+}
+
+/** Один шаг партии (10 мс). События шага — в game.events, их забирает экран. */
+export function step(game) {
+  if (game.mode !== 'playing') return game;
+  game.tick++;
+  if (game.reload > 0) game.reload--;
+  if (game.negative > 0) game.negative--;
+  if (game.pause > 0) game.pause--;
+  if (game.technique > 0) game.technique--;
+  stepShots(game);
+  for (let c = 0; c < game.chains.length && game.mode === 'playing'; c++) stepChain(game, c);
+  stepPowers(game);
+  if (game.mode === 'playing' && game.full && game.chains.every(c => !c.balls.length) && !game.shots.length) {
+    game.mode = 'won';
+    emit(game, { kind: 'won', ace: secondsOf(game) <= game.rules.par });
+  }
+  return game;
+}
+
+export function advance(game, ticks = 1) {
+  for (let i = 0; i < ticks && game.mode === 'playing'; i++) step(game);
+  return game;
+}
+
+export const secondsOf = game => game.tick * TICK_MS / 1000;
+
+/** Повернуть стрелка к точке поля. */
+export function aim(game, x, y) {
+  const { shooter } = game.track;
+  if (Math.hypot(x - shooter.x, y - shooter.y) > 4) game.aim = Math.atan2(y - shooter.y, x - shooter.x);
+  return game.aim;
+}
+
+/** Бросок в сторону точки поля. Перезарядка и не больше двух блинов в полёте. */
+export function shoot(game, x, y) {
+  if (game.mode !== 'playing' || game.reload > 0 || game.shots.length >= TUNING.maxShots) return false;
+  if (x != null) aim(game, x, y);
+  const { shooter } = game.track, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
+  game.shots.push({ x: shooter.x + dx * 22, y: shooter.y + dy * 22, vx: dx * TUNING.shotSpeed, vy: dy * TUNING.shotSpeed, color: game.current });
+  game.current = game.next; game.next = pickColor(game);
+  game.reload = game.technique > 0 ? Math.round(TUNING.reload / 2) : TUNING.reload;
+  game.shotsFired++;
+  emit(game, { kind: 'shot' });
+  return true;
+}
+
+/** Поменять текущий и следующий блин. */
+export function swap(game) {
+  if (game.mode !== 'playing') return false;
+  [game.current, game.next] = [game.next, game.current];
+  emit(game, { kind: 'swap' });
+  return true;
+}
+
+/** Забрать события, накопленные с прошлого раза. */
+export function drain(game) {
+  const out = game.events; game.events = []; return out;
+}
+
+/** Насколько близко к помосту самая опасная цепочка, 0…1. */
+export function dangerOf(game) {
+  return game.chains.reduce((max, c) => c.balls.length ? Math.max(max, Math.max(0, c.balls.at(-1).s) / c.path.length) : max, 0);
+}
+
+/** Куда упрётся прицел: первая точка луча, где он задевает блин, или край поля. */
+export function aimEnd(game) {
+  const { shooter } = game.track, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
+  for (let t = 22; t < 900; t += 4) {
+    const x = shooter.x + dx * t, y = shooter.y + dy * t;
+    if (x < 0 || y < 0 || x > FIELD.width || y > FIELD.height) return { x, y, hit: false };
+    for (const chain of game.chains) for (const b of chain.balls) {
+      if (b.s < 0 || b.s > chain.path.length) continue;
+      const p = pointAt(chain.path, b.s);
+      if ((p.x - x) ** 2 + (p.y - y) ** 2 < (D * .9) ** 2) return { x, y, hit: true };
+    }
+  }
+  return { x: shooter.x + dx * 900, y: shooter.y + dy * 900, hit: false };
+}

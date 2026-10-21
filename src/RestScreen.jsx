@@ -2,6 +2,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PlankGame from './PlankGame.jsx';
 import ScooterGame from './ScooterGame.jsx';
 import MatchGame from './MatchGame.jsx';
+import BliniGame from './BliniGame.jsx';
+import { useBliniSession } from './BliniSession.jsx';
 import { useMatchSession } from './MatchSession.jsx';
 import { useScooterSession } from './ScooterSession.jsx';
 import { usePlankSession } from './PlankSession.jsx';
@@ -11,7 +13,7 @@ import { alarmRings, alarmClosed } from './native-rest.js';
 import { ringOnce, stopVibration } from './rest-alarm.js';
 import { isNativeApp } from './native-bridge.js';
 import { IconDelta, IconChevron } from './icons.jsx';
-import { IconPlankGame, IconScooterGame, IconMatchGame } from './game-icons.jsx';
+import { IconPlankGame, IconScooterGame, IconMatchGame, IconBliniGame } from './game-icons.jsx';
 import { enterFullscreen } from './game-feel.js';
 import './rest.css';
 import './game-shell.css';
@@ -29,6 +31,8 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const [gameKind, setGameKind] = useState('plank');
   const [match, matchSession] = useMatchSession();
   const matchActive = ['playing', 'paused'].includes(match.mode);
+  const [blini, bliniSession] = useBliniSession();
+  const bliniActive = ['playing', 'paused'].includes(blini.mode);
   const scooterSession = useScooterSession();
   const scooterActive = ['playing', 'countdown', 'paused'].includes(scooterSession.game.phase);
   const [plank, plankSession] = usePlankSession();
@@ -41,8 +45,9 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
       plankSession.pause('rest', Date.now(), until);
       scooterSession.pause();
       matchSession.pause('rest');
+      bliniSession.pause('rest');
     }
-  }, [over, until, allowGame, plankSession, scooterSession, matchSession]);
+  }, [over, until, allowGame, plankSession, scooterSession, matchSession, bliniSession]);
   const stopRef = useRef(onStop);
   const swipe = useRef(null);
   stopRef.current = onStop;
@@ -93,8 +98,10 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const R = 120;
   const C = 2 * Math.PI * R;
   if (!over && allowGame && gameUntil === until) return (
-    <div className={'rest-screen rest-screen--game' + (gameKind === 'scooter' ? ' rest-screen--scooter' : gameKind === 'match' ? ' rest-screen--match' : '')} role="dialog" aria-modal="true" aria-label="Игра во время отдыха">
-      {gameKind === 'match'
+    <div className={'rest-screen rest-screen--game' + (gameKind === 'scooter' ? ' rest-screen--scooter' : gameKind === 'match' ? ' rest-screen--match' : gameKind === 'blini' ? ' rest-screen--blini' : '')} role="dialog" aria-modal="true" aria-label="Игра во время отдыха">
+      {gameKind === 'blini'
+        ? <BliniGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />
+        : gameKind === 'match'
         ? <MatchGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />
         : gameKind === 'scooter'
         ? <ScooterGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />
@@ -141,12 +148,13 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
             </>}
         </div>
       )}
-      {over && allowGame && (activeRound(plank.round) || scooterActive || matchActive) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
+      {over && allowGame && (activeRound(plank.round) || scooterActive || matchActive || bliniActive) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
       {!over && allowGame && <>
         <div className="rest-screen__games" aria-label="Игры на отдыхе">
           <button type="button" onClick={(event) => { openGame(event, 'plank'); }}><IconPlankGame size={64} /><span>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</span></button>
           <button type="button" onClick={(event) => { openGame(event, 'scooter'); }}><IconScooterGame size={64} /><span>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</span></button>
           <button type="button" onClick={(event) => { openGame(event, 'match'); }}><IconMatchGame size={64} /><span>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</span></button>
+          <button type="button" onClick={(event) => { openGame(event, 'blini'); }}><IconBliniGame size={64} /><span>{bliniActive ? 'Продолжить блины' : 'Блины'}</span></button>
         </div>
       </>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>

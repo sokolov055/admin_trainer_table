@@ -44,6 +44,7 @@ import { PlankAccess } from './plank-access.js';
 import { PlankSessionProvider } from './PlankSession.jsx';
 import { ScooterSessionProvider } from './ScooterSession.jsx';
 import { MatchSessionProvider } from './MatchSession.jsx';
+import { BliniSessionProvider } from './BliniSession.jsx';
 import { CareerProvider } from './CareerSession.jsx';
 
 /**
@@ -260,6 +261,7 @@ export default function App() {
     <PlankSessionProvider key={[me.identityType, me.chatId, me.email, me.role, me.member, me.plankGameEnabled].join(':')}>
     <ScooterSessionProvider>
     <MatchSessionProvider>
+    <BliniSessionProvider>
     <CareerProvider key={[me.identityType, me.chatId, me.email, me.member].join(':')} id={[me.identityType, me.chatId || me.email || '', me.member || ''].join(':')}>
       <Deferred fallback={waitingPage}>
         {me.role === 'trainer' ? <TrainerApp me={me} />
@@ -283,6 +285,7 @@ export default function App() {
         ? <AppHint active={!initData} />
         : <InstallHint active={!initData} installReady={installReady} />}
     </CareerProvider>
+    </BliniSessionProvider>
     </MatchSessionProvider>
     </ScooterSessionProvider>
     </PlankSessionProvider>

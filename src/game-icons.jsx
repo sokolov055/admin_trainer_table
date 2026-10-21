@@ -21,3 +21,15 @@ export function IconCareerGame({ size = 48 }) {
     <circle cx="12.5" cy="33.5" r="2.6" fill="#fffdf2" />
   </svg>;
 }
+// «Блины» (21.10.2026): три олимпийских блина катятся по желобу к помосту — цвета и вес как в игре
+export function IconBliniGame({ size = 48 }) {
+  const id = useId();
+  const plate = (cx, cy, fill, ink, kg) => <g key={kg}><circle cx={cx} cy={cy + .8} r="7.6" fill="#0b231d" opacity=".45" /><circle cx={cx} cy={cy} r="7.6" fill={fill} /><circle cx={cx} cy={cy} r="5.2" fill="none" stroke="#ffffff" strokeOpacity=".3" /><text x={cx} y={cy + 2.3} textAnchor="middle" fontSize="6.4" fontWeight="800" fontFamily="Manrope, sans-serif" fill={ink}>{kg}</text></g>;
+  return <svg className="game-menu-icon" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" style={{ flexShrink: 0 }}>
+    <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#2b5a4e" /><stop offset="1" stopColor="#123630" /></linearGradient></defs>
+    <rect width="48" height="48" rx="11.5" fill={`url(#${id})`} />
+    <path d="M6 33c6-15 18-21 36-17" fill="none" stroke="#0e2a24" strokeWidth="11" strokeLinecap="round" />
+    <rect x="33" y="31" width="10" height="10" rx="2" fill="#9c6a39" stroke="#5d3b1d" />
+    {plate(11, 28, '#d8343f', '#fff', 25)}{plate(22, 20, '#2d6bd3', '#fff', 20)}{plate(34, 17, '#f1c232', '#3a2a00', 15)}
+  </svg>;
+}

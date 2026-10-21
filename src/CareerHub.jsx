@@ -2,13 +2,14 @@ import React, { useRef, useState } from 'react';
 import { CAREER, GAMES, ITEMS, coins, goalText, itemEffect, priceOf, rankComplete, rankOf } from './career-model.js';
 import { useCareer } from './CareerSession.jsx';
 import { useGameChrome, buzz } from './game-feel.js';
-import { IconPlankGame, IconScooterGame, IconMatchGame } from './game-icons.jsx';
+import { IconPlankGame, IconScooterGame, IconMatchGame, IconBliniGame } from './game-icons.jsx';
 import './career.css';
 
 const GAME = {
   scooter: { name: 'На самокате до зала', Icon: IconScooterGame, item: 'energy' },
   plank: { name: 'Тренер в планке', Icon: IconPlankGame, item: 'cheat' },
   match: { name: 'Три в ряд', Icon: IconMatchGame, item: 'protein' },
+  blini: { name: 'Блины', Icon: IconBliniGame, item: 'belt' },
 };
 
 function Coin() {
@@ -17,7 +18,7 @@ function Coin() {
 
 /**
  * «Карьера в фитнесе» (FT-563): десять ступеней от турника во дворе до своей
- * сети клубов. На ступени — задание в каждой из трёх игр; все три — повышение.
+ * сети клубов. На ступени — задание в каждой игре; все выполнены — повышение.
  */
 export default function CareerHub({ onClose, onPlay }) {
   const root = useRef(null);

@@ -23,9 +23,11 @@ html.game-is-open .rest-pill { z-index: 85; }
 
 .game-shell--plank { background: #e7ede2; }
 .game-shell--match { background: #173e34; }
+.game-shell--blini { background: #173a32; }
 
 /* Те же игры на отдыхе: экран отдыха уже на весь экран, игра занимает его целиком */
 .rest-screen.rest-screen--game { display: block; padding: 0; overflow: hidden; overscroll-behavior: none; touch-action: none; cursor: default !important; background: #e7ede2; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; animation: none; }
 .rest-screen.rest-screen--game > * { height: 100%; }
 .rest-screen.rest-screen--scooter { background: #173c34; }
 .rest-screen.rest-screen--match { background: #173e34; }
+.rest-screen.rest-screen--blini { background: #173a32; }

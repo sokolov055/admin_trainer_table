@@ -31,6 +31,7 @@ import { accountState, pendingTrainerLink } from '../trainer-link.js';
 import PlankGame from '../PlankGame.jsx';
 import ScooterGame from '../ScooterGame.jsx';
 import MatchGame from '../MatchGame.jsx';
+import BliniGame from '../BliniGame.jsx';
 import { usePlankAccess } from '../plank-access.js';
 import Onboarding from './Onboarding.jsx';
 import { signupLead, clearSignupLead } from '../login-route.js';
@@ -43,7 +44,7 @@ import { forgetFocus } from './focus.jsx';
 import { isNativeApp, iosApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
 import GameShell from '../GameShell.jsx';
-import { IconPlankGame, IconScooterGame, IconMatchGame, IconCareerGame } from '../game-icons.jsx';
+import { IconPlankGame, IconScooterGame, IconMatchGame, IconBliniGame, IconCareerGame } from '../game-icons.jsx';
 import CareerHub from '../CareerHub.jsx';
 import { useCareer } from '../CareerSession.jsx';
 import QuickAdd from './QuickAdd.jsx';
@@ -87,6 +88,7 @@ const MENU = [
   { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlankGame, game: true },
   { id: 'scooter-game', label: 'На самокате до зала', note: 'Бесконечный заезд и рейтинг игроков', Icon: IconScooterGame, game: true },
   { id: 'match-game', label: 'Три в ряд', note: 'Собери свой лучший каскад', Icon: IconMatchGame, game: true },
+  { id: 'blini-game', label: 'Блины', note: 'Не дай блинам докатиться до помоста', Icon: IconBliniGame, game: true },
   // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
@@ -223,7 +225,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   const guide = { id: 'guide', label: 'Как пользоваться', note: tours.length ? 'Короткие туры и инструкция' : guideNote(storyTopics), Icon: IconGuide };
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['career', 'plank-game', 'scooter-game', 'match-game'].includes(m.id) || plankEnabled), ...(tours.length || hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['career', 'plank-game', 'scooter-game', 'match-game', 'blini-game'].includes(m.id) || plankEnabled), ...(tours.length || hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const VIEWS = TABS.concat(menu);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
@@ -490,9 +492,11 @@ export default function ClientApp({ me, clientRow, preview }) {
         {view === 'career-plank' && plankEnabled && <GameShell kind="plank"><PlankGame career onClose={() => go('career')} /></GameShell>}
         {view === 'career-scooter' && plankEnabled && <GameShell kind="scooter"><ScooterGame immersive career onClose={() => go('career')} /></GameShell>}
         {view === 'career-match' && plankEnabled && <GameShell kind="match"><MatchGame career onClose={() => go('career')} /></GameShell>}
+        {view === 'career-blini' && plankEnabled && <GameShell kind="blini"><BliniGame career onClose={() => go('career')} /></GameShell>}
         {view === 'plank-game' && plankEnabled && <GameShell kind="plank"><PlankGame onClose={() => go(lastTab)} /></GameShell>}
         {view === 'scooter-game' && plankEnabled && <GameShell kind="scooter"><ScooterGame immersive onClose={() => go(lastTab)} /></GameShell>}
         {view === 'match-game' && plankEnabled && <GameShell kind="match"><MatchGame onClose={() => go(lastTab)} /></GameShell>}
+        {view === 'blini-game' && plankEnabled && <GameShell kind="blini"><BliniGame onClose={() => go(lastTab)} /></GameShell>}
         {view === 'profile' && (
           <>
             <p className="small muted">
