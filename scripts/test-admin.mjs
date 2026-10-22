@@ -82,3 +82,25 @@ test('цена ступени на клиента: цена ÷ граница д
   assert.match(perClientNote({ upTo: 11, price: 110 }), /при 11 клиентах$/);
   assert.match(perClientNote({ upTo: 1000, price: 25000 }), /^≈ 25 ₽ за клиента в месяц при 1\s000 клиентах$/);
 });
+
+test('«Вид»: файл темы проверяется до отправки, список — встроенные и загруженные', async () => {
+  const { readThemeFile, themeRows } = await import('../src/trainer/admin-model.js');
+  const good = { format: 'fittrack-theme', id: 'new-year', name: 'Новый год', accent: '#d23b3b', bg: '#0f2a4a', fill: '#e8c15a', light: '#b02a2a', dark: '#e05555' };
+  assert.equal(readThemeFile('﻿' + JSON.stringify(good)).theme.id, 'new-year', 'BOM из «Файлов» не мешает');
+  assert.match(readThemeFile('{oops').error, /JSON/);
+  assert.match(readThemeFile(JSON.stringify({ ...good, format: 'x' })).error, /не файл темы/);
+  assert.match(readThemeFile(JSON.stringify({ ...good, bg: 'blue' })).error, /bg/);
+
+  const builtIn = [{ id: 'standard', name: 'Стандартный', swatch: [] }, { id: 'halloween', name: 'Хэллоуин', swatch: ['#1', '#2', '#3'], scheme: 'dark' }];
+  const rows = themeRows(builtIn, { themes: [{ ...good, closed: true, at: '2026-10-22T10:00:00Z' }], closed: ['halloween'] });
+  assert.deepEqual(rows.map((r) => [r.id, r.builtIn, r.closed]), [['halloween', true, true], ['new-year', false, true]]);
+  assert.equal(rows[0].dark, true);
+});
+
+test('«Версии»: форма и обратно — номер сборки числом', async () => {
+  const { versionsForm, versionsPayload } = await import('../src/trainer/admin-model.js');
+  const form = versionsForm({ appStore: { version: '1.5', build: 22, url: 'https://apps.apple.com/ru/app/id1' }, testflight: { version: '1.6', build: 25, url: 'itms-beta://x' } });
+  assert.equal(form.appStore.build, '22');
+  form.testflight.build = ' 26 ';
+  assert.deepEqual(versionsPayload(form).testflight, { version: '1.6', build: 26, url: 'itms-beta://x' });
+});

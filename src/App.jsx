@@ -12,6 +12,7 @@ import { canOpenInApp } from './open-in-app.js';
 import { lazyPage, Deferred, warmUp } from './lazy.js';
 import { setOfflineAccount } from './offline-account.js';
 import { setRights } from './rights.js';
+import { refreshThemes } from './remote-themes.js';
 
 // Кабинеты и экраны входа — по требованию (lazy.js): клиенту не нужен
 // кабинет тренера, вошедшему — экраны входа
@@ -91,6 +92,8 @@ export default function App() {
   // Кабинет показан — догружаем остальное, пока человек смотрит на него
   const role = state.me && state.me.role;
   useEffect(() => { if (role) warmUp(LATER[role] || LATER.client); }, [role]);
+  // Темы оформления из панели владельца (remote-themes.js) — после входа
+  useEffect(() => { if (role) refreshThemes(); }, [role]);
 
   // Работа без сети (FT-566): чьи данные на телефоне — сразу, как известно,
   // кто вошёл; отправка неотправленных занятий и запас программы — чуть

@@ -184,6 +184,31 @@ const FLAG_TEXT = {
   },
 };
 const mockStories = { topics: null, at: null, history: [] };
+
+// Темы файлом (22.10.2026): загруженные лежат в том же хранилище, что и у
+// приложения (palettes.js, THEMES_KEY), — чтобы демо и снимки скилла
+// app-theme (shots.mjs кладёт тему туда заранее) показывали её после
+// обновления списка, а не теряли
+const mockThemes = { history: [] };
+const readMockThemes = () => {
+  try { return JSON.parse(localStorage.getItem('app_themes_v1')) || { themes: [], closed: [] }; } catch (_) { return { themes: [], closed: [] }; }
+};
+const mockThemeDoc = () => {
+  if (!mockThemes.doc) {
+    const pub = readMockThemes();
+    mockThemes.doc = { themes: (pub.themes || []).map((t) => ({ ...t, closed: !!t.closed, at: new Date().toISOString(), by: 'owner@fittrack.demo' })), closed: pub.closed || [] };
+  }
+  return mockThemes.doc;
+};
+const mockThemesState = () => ({ ...mockThemeDoc(), max: 20, history: mockThemes.history });
+const mockThemeLog = (text) => mockThemes.history.unshift({ at: new Date().toISOString(), text: text + ' · owner@fittrack.demo' });
+const mockVersions = {
+  appStore: { version: '1.5', build: 22, url: 'https://apps.apple.com/ru/app/id6816619723', source: 'lookup', at: '2026-10-18T18:52:49Z' },
+  testflight: { version: '1.6', build: 25, url: 'itms-beta://beta.itunes.apple.com/v1/app/6816619723', source: 'build', at: '2026-10-21T12:00:00Z', visible: true },
+  builds: [{ version: '1.6', build: 25 }, { version: '1.6', build: 24 }, { version: '1.5', build: 22 }],
+  lookup: { ok: true, version: '1.5', at: '2026-10-22T09:00:00Z' },
+  history: [],
+};
 const mockStoriesState = () => ({
   topics: mockStories.topics, updatedAt: mockStories.at, updatedBy: mockStories.at ? 'owner@fittrack.demo' : null,
   limits: { topics: 8, frames: 24, label: 24, caption: 80, heading: 90, body: 700, date: 30 },
@@ -1339,6 +1364,51 @@ const MOCK = {
     mockStories.at = null;
     mockStories.history.unshift({ at: new Date().toISOString(), text: 'Возвращены встроенные · owner@fittrack.demo' });
     return mockStoriesState();
+  },
+  // Демо-тренер — владелец: закрытые тоже, для примерки (как на сервере)
+  'app.themes': () => {
+    const doc = mockThemeDoc();
+    return { themes: doc.themes.map(({ closed, at, by, ...t }) => (closed ? { ...t, closed: true } : t)), closed: doc.closed, trial: true };
+  },
+  'owner.themes': () => mockThemesState(),
+  'owner.themes.upload': (p) => {
+    const t = p.theme || {};
+    if (t.format !== 'fittrack-theme' || !t.id) throw new Error('Это не файл темы Fit Track.');
+    const doc = mockThemeDoc();
+    const row = { ...t, closed: true, at: new Date().toISOString(), by: 'owner@fittrack.demo' };
+    const i = doc.themes.findIndex((x) => x.id === t.id);
+    if (i >= 0) doc.themes[i] = row; else doc.themes.push(row);
+    mockThemeLog(`${i >= 0 ? 'Обновлена' : 'Загружена'} «${t.name}» (${t.id})`);
+    return mockThemesState();
+  },
+  'owner.themes.close': (p) => {
+    const doc = mockThemeDoc();
+    const own = doc.themes.find((t) => t.id === p.id);
+    const closed = p.closed !== false;
+    if (own) own.closed = closed;
+    else doc.closed = closed ? [...new Set([...doc.closed, p.id])] : doc.closed.filter((x) => x !== p.id);
+    mockThemeLog(`${closed ? 'Закрыта' : 'Открыта'} ${own ? `«${own.name}»` : p.id}`);
+    return mockThemesState();
+  },
+  'owner.themes.remove': (p) => {
+    const doc = mockThemeDoc();
+    const own = doc.themes.find((t) => t.id === p.id);
+    if (!own) throw new Error('Такой загруженной темы нет.');
+    doc.themes = doc.themes.filter((t) => t !== own);
+    mockThemeLog(`Удалена «${own.name}» (${own.id})`);
+    return mockThemesState();
+  },
+  'owner.versions': () => mockVersions,
+  'owner.versions.save': (p) => {
+    const at = new Date().toISOString();
+    mockVersions.appStore = { ...p.appStore, source: 'manual', at };
+    mockVersions.testflight = { ...p.testflight, source: 'manual', at, visible: true };
+    mockVersions.history.unshift({ at, text: `App Store ${p.appStore.version} (${p.appStore.build}), TestFlight ${p.testflight.version} (${p.testflight.build}) · owner@fittrack.demo` });
+    return { ...mockVersions };
+  },
+  'owner.versions.check': () => {
+    mockVersions.lookup = { ok: true, version: mockVersions.appStore.version, at: new Date().toISOString() };
+    return { ...mockVersions };
   },
   'owner.flags': () => mockFlagState(),
   'owner.flag.set': (p) => {

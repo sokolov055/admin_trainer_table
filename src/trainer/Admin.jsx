@@ -12,6 +12,8 @@ import { haptic } from '../telegram.js';
 import Trainers from './Trainers.jsx';
 import Games from './Games.jsx';
 import AdminStories from './AdminStories.jsx';
+import AdminLook from './AdminLook.jsx';
+import AdminVersions from './AdminVersions.jsx';
 import { Logs } from './screens.jsx';
 import {
   PLATFORM_NAMES, flagStatus, growthPoints, monthName, needsConfirm, percent, perClientNote, sourceTotals,
@@ -25,6 +27,9 @@ import {
  * отвечает отказом всем остальным (owner: true в api/routes.js) — экран
  * без этой проверки ничего бы не открыл, только показал ошибку.
  *
+ * «Вид» — темы оформления файлом, «Версии» — последние версии iPhone
+ * для «Вышла новая версия» (22.10.2026).
+ *
  * Аналитика — одни числа: имён и адресов в ней нет (docs/legal/
  * 2026-10-17-admin-panel.md в основном репозитории).
  */
@@ -37,6 +42,10 @@ export const ADMIN_PANES = [
   { value: 'flags', label: 'Флаги' },
   // «Что нового» и «Инструкция» у всех пользователей — без сборки (FT-615)
   { value: 'stories', label: 'Истории' },
+  // Темы оформления файлом — загрузить, закрыть (22.10.2026)
+  { value: 'look', label: 'Вид' },
+  // Последние версии iPhone: «Вышла новая версия» в старых (22.10.2026)
+  { value: 'versions', label: 'Версии' },
   // Журнал действий: платежи, пересчёты, переносы, переключения флагов
   { value: 'logs', label: 'Логи' },
   // Справочные разделы базы файлом — переслать разработчику (18.10.2026)
@@ -49,6 +58,8 @@ export default function Admin({ pane }) {
   if (pane === 'games') return <Games />;
   if (pane === 'flags') return <Flags />;
   if (pane === 'stories') return <AdminStories />;
+  if (pane === 'look') return <AdminLook />;
+  if (pane === 'versions') return <AdminVersions />;
   if (pane === 'logs') return <Logs />;
   if (pane === 'export') return <Export />;
   return <Stats />;

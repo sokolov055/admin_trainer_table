@@ -107,3 +107,54 @@ export function perClientNote(tier, opts) {
   const word = n % 10 === 1 && n % 100 !== 11 ? 'клиенте' : 'клиентах';
   return `≈ ${each.toLocaleString('ru-RU')} ₽ за клиента в месяц при ${n.toLocaleString('ru-RU')} ${word}`;
 }
+
+/* --- «Вид»: темы файлом (22.10.2026) --- */
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * Файл темы, выбранный на телефоне: разобрать и коротко проверить до
+ * отправки — чтобы «не тот файл» было видно сразу. Окончательная проверка
+ * (скрипты, ссылки в SVG) — на сервере (lib/theme-file.js).
+ */
+export function readThemeFile(text) {
+  let theme;
+  try { theme = JSON.parse(String(text || '').replace(/^﻿/, '')); } catch (_) {
+    return { error: 'Это не файл темы: не читается как JSON.' };
+  }
+  if (!theme || theme.format !== 'fittrack-theme') return { error: 'Это не файл темы Fit Track.' };
+  if (!theme.id || !theme.name) return { error: 'В файле нет id или названия темы.' };
+  const bad = ['accent', 'bg', 'fill', 'light', 'dark'].filter((k) => !HEX6.test(theme[k] || ''));
+  if (bad.length) return { error: `Неверные цвета: ${bad.join(', ')}.` };
+  return { theme };
+}
+
+/**
+ * Список «Темы»: встроенные (кроме стандартной) и загруженные, у каждой —
+ * открыта ли она людям. builtIn — PALETTES из palettes.js, state — owner.themes.
+ */
+export function themeRows(builtIn, state) {
+  const closed = new Set((state && state.closed) || []);
+  const own = (state && state.themes) || [];
+  return [
+    ...builtIn.filter((p) => p.id !== 'standard').map((p) => ({
+      id: p.id, name: p.name, swatch: p.swatch, builtIn: true, closed: closed.has(p.id), dark: p.scheme === 'dark',
+    })),
+    ...own.filter((t) => !builtIn.some((p) => p.id === t.id)).map((t) => ({
+      id: t.id, name: t.name, swatch: [t.accent, t.bg, t.fill], builtIn: false, closed: !!t.closed,
+      dark: t.scheme === 'dark', at: t.at, by: t.by, theme: t,
+    })),
+  ];
+}
+
+/* --- «Версии» iPhone (22.10.2026) --- */
+
+export function versionsForm(state) {
+  const rec = (r) => ({ version: String((r && r.version) || ''), build: String((r && r.build) || ''), url: String((r && r.url) || '') });
+  return { appStore: rec(state && state.appStore), testflight: rec(state && state.testflight) };
+}
+
+export function versionsPayload(form) {
+  const rec = (r) => ({ version: r.version.trim(), build: Number(String(r.build).trim()), url: r.url.trim() });
+  return { appStore: rec(form.appStore), testflight: rec(form.testflight) };
+}

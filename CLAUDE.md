@@ -128,6 +128,13 @@ API здесь не применяется — данные никуда не п
 (`../.claude/skills/app-theme/SKILL.md`): свой рисунок по референсам, снимки
 скриптом скилла, показ владельцу до выкладки.
 
+С 22.10.2026 тема по умолчанию — файлом (`themes/<id>/theme.mjs` → файл, загрузка
+в «Управление → Вид», `trainer/AdminLook.jsx`); приложение держит загруженные
+рядом со встроенными (`palettes.js`: `setRemoteThemes`, `listPalettes`,
+`remote-themes.js`). Закрытая владельцем тема у человека — «Стандартный».
+«Вышла новая версия» на iPhone — `app-update.js` и `native.js` (`checkIosUpdate`),
+версии в «Управление → Версии» (`trainer/AdminVersions.jsx`).
+
 ## Граф кода (graphify)
 
 `graphify-out/` в корне `webapp/` (в `.gitignore`) — локальный граф вызовов и

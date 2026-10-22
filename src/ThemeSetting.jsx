@@ -30,7 +30,7 @@ const HINTS = {
 
 /** forced — тема, которую ставит палитра («Хэллоуин» — тёмная): выбор
  *  запоминается, но действует после смены палитры */
-export default function ThemeSetting({ bare = false, forced = null }) {
+export default function ThemeSetting({ bare = false, forced = null, forcedBy = 'Хэллоуин' }) {
   // Читаем один раз при первом рендере: значение уже применено к странице
   // в telegram.js, и спрашивать хранилище на каждый рендер незачем.
   const [mode, setMode] = useState(getThemeMode);
@@ -46,7 +46,7 @@ export default function ThemeSetting({ bare = false, forced = null }) {
           disabled={!!forced}
           onChange={(next) => withColorShift(() => setMode(setThemeMode(next)))}
         />
-        <div className="setting__note">{forced ? 'У «Хэллоуина» тема всегда тёмная. Выберите другие цвета — вернётся ваша тема.' : HINTS[mode]}</div>
+        <div className="setting__note">{forced ? `У темы «${forcedBy}» оформление всегда тёмное. Выберите другие цвета — вернётся ваша тема.` : HINTS[mode]}</div>
       </div>
     </Panel>
   );

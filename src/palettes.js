@@ -204,7 +204,92 @@ export function paletteTokens(palette, scheme) {
   };
 }
 
-const BY_ID = new Map(PALETTES.map((p) => [p.id, p]));
+/*
+ * Темы файлом (22.10.2026): владелец загружает файл темы в «Управление →
+ * Вид» (сервер — lib/themes.js), приложение берёт открытые при запуске
+ * (remote-themes.js) и держит их здесь же, рядом со встроенными. Там же
+ * владелец закрывает темы, которые больше не к месту, — и встроенные
+ * («Хэллоуин» после праздника): их нет в списке, а у кого такая была
+ * выбрана, getPaletteId вернёт стандартную.
+ *
+ * Владельцу сервер отдаёт и закрытые (closed: true, trial) — примерить у
+ * себя до «Открыть для всех» и после «Закрыть»: в списке их нет, но
+ * поставить можно, и выбранная видна в «Оформлении» с галочкой.
+ *
+ * Последний ответ сервера лежит на устройстве (THEMES_KEY): выбранная
+ * загруженная тема ставится до первого кадра и без сети, как встроенная.
+ * Тема — только данные (цвета и SVG), рисунки идут картинками: фоном CSS
+ * и в <img> (ThemeMascot.jsx) — скрипты SVG там не исполняются.
+ */
+export const THEMES_KEY = 'app_themes_v1';
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+const svgUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+
+/** Тема из файла (ответ app.themes) → палитра; что-то не так — null */
+export function paletteFromTheme(t) {
+  if (!t || typeof t.id !== 'string' || !t.name) return null;
+  if (!['accent', 'bg', 'fill', 'light', 'dark'].every((k) => HEX6.test(t[k] || ''))) return null;
+  const art = typeof t.art === 'string' && t.art.startsWith('<svg') ? svgUrl(t.art) : null;
+  const mascot = t.mascot && typeof t.mascot.svg === 'string' && t.mascot.svg.startsWith('<svg')
+    ? { glow: t.mascot.glow, lit: t.mascot.lit, src: 'data:image/svg+xml,' + encodeURIComponent(t.mascot.svg) }
+    : null;
+  return {
+    id: t.id, name: String(t.name), accent: t.accent, bg: t.bg, fill: t.fill, light: t.light, dark: t.dark,
+    ...(t.scheme === 'dark' ? { scheme: 'dark' } : {}),
+    ...(art ? { art: () => art } : {}),
+    ...(mascot ? { mascot } : {}),
+    swatch: [t.accent, t.bg, t.fill],
+    remote: true,
+  };
+}
+
+let remote = [];
+let closed = new Set();
+// Закрытые, которые этому устройству можно поставить (владелец — примерка)
+let trial = false;
+const BY_ID = new Map();
+function rebuild() {
+  BY_ID.clear();
+  // Встроенная главнее: файл не подменит «Стандартный» и остальные
+  for (const p of [...PALETTES, ...remote]) if (!BY_ID.has(p.id)) BY_ID.set(p.id, p);
+  remote = remote.filter((p) => BY_ID.get(p.id) === p);
+}
+
+function loadThemes(doc) {
+  const themes = doc && Array.isArray(doc.themes) ? doc.themes : [];
+  remote = themes.map(paletteFromTheme).filter(Boolean);
+  closed = new Set(doc && Array.isArray(doc.closed) ? doc.closed.filter((id) => id !== STANDARD) : []);
+  themes.forEach((t) => { if (t && t.closed) closed.add(t.id); });
+  trial = !!(doc && doc.trial);
+  rebuild();
+}
+
+try {
+  const saved = typeof localStorage !== 'undefined' && localStorage.getItem(THEMES_KEY);
+  loadThemes(saved ? JSON.parse(saved) : null);
+} catch (_) {
+  loadThemes(null);
+}
+
+const isOpen = (id) => !!id && BY_ID.has(id) && (!closed.has(id) || trial);
+
+/** Палитры для выбора в «Оформлении»: встроенные без закрытых, затем загруженные;
+ *  закрытая на примерке у владельца — тоже, пока она у него стоит */
+export function listPalettes() {
+  const mine = getPaletteId();
+  return [...PALETTES, ...remote].filter((p) => !closed.has(p.id) || p.id === mine);
+}
+
+/** Можно ли этому устройству ставить закрытые темы (владелец, примерка) */
+export function canTryClosed() {
+  return trial;
+}
+
+/** Закрыта ли тема владельцем (панель «Вид») */
+export function isClosedTheme(id) {
+  return closed.has(id);
+}
 
 export function paletteById(id) {
   return BY_ID.get(id) || BY_ID.get(STANDARD);
@@ -214,7 +299,7 @@ export function paletteById(id) {
 export function getPaletteId() {
   try {
     const saved = localStorage.getItem(PALETTE_KEY);
-    if (saved && BY_ID.has(saved)) return saved;
+    if (isOpen(saved)) return saved;
   } catch (_) {}
   return STANDARD;
 }
@@ -229,7 +314,7 @@ const block = (selector, tokens) => selector + ' {\n' + Object.keys(tokens).map(
 export function paletteCss() {
   const out = [];
   const dark = [];
-  PALETTES.forEach((p) => {
+  [...PALETTES, ...remote].forEach((p) => {
     if (!p.light) return;
     const sel = `:root[data-palette='${p.id}']`;
     out.push(block(sel, paletteTokens(p, 'light')));
@@ -249,7 +334,7 @@ export function applyPalette(id = getPaletteId()) {
     document.head.appendChild(style);
   }
   const root = document.documentElement;
-  if (id && id !== STANDARD && BY_ID.has(id)) root.setAttribute('data-palette', id);
+  if (id && id !== STANDARD && isOpen(id)) root.setAttribute('data-palette', id);
   else root.removeAttribute('data-palette');
   if (paletteById(id).mascot) root.setAttribute('data-mascot', id);
   else root.removeAttribute('data-mascot');
@@ -273,16 +358,46 @@ export function withColorShift(change) {
   shiftTimer = setTimeout(() => root.classList.remove('color-shift'), 420);
 }
 
-/** Подписка на смену палитры (ThemeMascot.jsx); возвращает отписку */
+/** Подписка на смену палитры и списка тем (ThemeMascot.jsx, Appearance.jsx); возвращает отписку */
 const listeners = new Set();
 export function onPalette(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
+/** Номер версии списка тем — для useSyncExternalStore */
+let themesVersion = 0;
+export function getThemesVersion() {
+  return themesVersion;
+}
+
+/**
+ * Свежий ответ сервера (app.themes): запомнить на устройстве, обновить
+ * стили. Вернёт true, если выбранная тема пропала (закрыта или удалена) и
+ * стоит стандартная — тогда тему (светлая/тёмная) пора пересчитать.
+ */
+export function setRemoteThemes(doc) {
+  const before = getPaletteId();
+  const raw = JSON.stringify({ themes: (doc && doc.themes) || [], closed: (doc && doc.closed) || [], ...(doc && doc.trial ? { trial: true } : {}) });
+  try {
+    if (localStorage.getItem(THEMES_KEY) === raw) return false;
+    localStorage.setItem(THEMES_KEY, raw);
+  } catch (_) {}
+  loadThemes(JSON.parse(raw));
+  themesVersion += 1;
+  if (typeof document !== 'undefined') {
+    const style = document.getElementById('palette-css');
+    if (style) style.textContent = paletteCss();
+  }
+  const after = getPaletteId();
+  applyPalette(after);
+  listeners.forEach((fn) => fn());
+  return after !== before;
+}
+
 /** Сохраняем выбор и сразу применяем */
 export function setPaletteId(id) {
-  const next = BY_ID.has(id) ? id : STANDARD;
+  const next = isOpen(id) ? id : STANDARD;
   try { localStorage.setItem(PALETTE_KEY, next); } catch (_) {}
   withColorShift(() => applyPalette(next));
   listeners.forEach((fn) => fn());

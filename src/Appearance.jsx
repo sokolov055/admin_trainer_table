@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { Panel, Section } from './ui.jsx';
 import ThemeSetting from './ThemeSetting.jsx';
 import ThemeMascot from './ThemeMascot.jsx';
-import { PALETTES, getPaletteId, setPaletteId, forcedScheme } from './palettes.js';
+import { listPalettes, getPaletteId, setPaletteId, forcedScheme, onPalette, getThemesVersion, paletteById } from './palettes.js';
 import { haptic, refreshTheme } from './telegram.js';
 import { IconCheck, IconHome, IconPlan, IconProgress, IconNutrition, IconPlus } from './icons.jsx';
 import './appearance.css';
@@ -20,7 +20,11 @@ import './appearance.css';
 export default function Appearance() {
   // Палитра — здесь, а не в сетке: «Хэллоуин» сам ставит тёмную тему, и
   // переключатель темы должен об этом знать (FT-702)
-  const [palette, setPalette] = useState(getPaletteId);
+  const [chosen, setPalette] = useState(getPaletteId);
+  // Список тем приходит с сервера (remote-themes.js) и может смениться,
+  // пока экран открыт: закрытая владельцем тема — уже «Стандартный»
+  useSyncExternalStore(onPalette, getThemesVersion, getThemesVersion);
+  const palette = chosen === getPaletteId() ? chosen : getPaletteId();
   const pick = (id) => {
     setPalette(setPaletteId(id));
     refreshTheme();
@@ -29,7 +33,7 @@ export default function Appearance() {
     <>
       <LookPreview />
       <Section title="Тема">
-        <ThemeSetting bare forced={forcedScheme(palette)} />
+        <ThemeSetting bare forced={forcedScheme(palette)} forcedBy={paletteById(palette).name} />
       </Section>
       <Section title="Персональные цвета" note="Кнопки, вкладки, выделение и фон. Запоминается на этом устройстве.">
         <PalettePicker current={palette} onPick={pick} />
@@ -84,7 +88,7 @@ function PalettePicker({ current, onPick }) {
   return (
     <Panel pad>
       <div className="palettes" role="radiogroup" aria-label="Персональные цвета">
-        {PALETTES.map((p) => {
+        {listPalettes().map((p) => {
           const on = p.id === current;
           const [a, b, c] = p.swatch;
           return (

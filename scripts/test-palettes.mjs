@@ -189,3 +189,64 @@ test('тема с картинкой вместо «+»: data-mascot стави�
     assert.equal(attrs.has('data-mascot'), false, 'у палитры без картинки — плюс');
   } finally { delete globalThis.document; delete globalThis.window; store.delete(PALETTE_KEY); }
 });
+
+test('тема файлом (22.10.2026): загруженная — в списке и со своими токенами, закрытая — стандартная', async () => {
+  const { setRemoteThemes, listPalettes, isClosedTheme, THEMES_KEY } = await import('../src/palettes.js');
+  const art = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844"><circle cx="40" cy="40" r="30" fill="#fff"/></svg>';
+  const theme = {
+    format: 'fittrack-theme', id: 'new-year', name: 'Новый год', accent: '#d23b3b', bg: '#0f2a4a', fill: '#e8c15a',
+    light: '#b02a2a', dark: '#e05555', scheme: 'dark', art,
+    mascot: { svg: '<svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="20"/></svg>', glow: 'rgba(255, 80, 80, 0.45)', lit: 'rgba(255, 120, 120, 0.8)' },
+  };
+  try {
+    setRemoteThemes({ themes: [theme, { ...theme, id: 'broken', accent: 'red' }, { ...theme, id: 'fig', name: 'Подмена' }], closed: [] });
+    assert.ok(store.get(THEMES_KEY), 'ответ сервера — на устройстве');
+    const names = listPalettes().map((p) => p.name);
+    assert.deepEqual(names, ['Стандартный', 'Кокос', 'Фламинго', 'Авокадо', 'Инжир', 'Хэллоуин', 'Новый год'], 'битая — пропущена, встроенную не подменить');
+    const p = paletteById('new-year');
+    assert.equal(forcedScheme('new-year'), 'dark');
+    for (const scheme of ['light', 'dark']) {
+      const t = paletteTokens(p, scheme);
+      assert.match(t['--bg-art'], /^url\("data:image\/svg\+xml,%3Csvg/);
+      assert.equal(t['--mascot-glow'], 'rgba(255, 80, 80, 0.45)');
+      const c = paletteColors(p, scheme);
+      for (const g of [c.bg, c.surface, c.sunken]) {
+        for (const text of BASE[scheme].text) assert.ok(contrast(text, g) >= AA, `new-year/${scheme}: текст на ${g}`);
+      }
+      assert.ok(contrast(c.onButton, c.accent) >= AA, 'текст на кнопке');
+    }
+    assert.match(p.mascot.src, /^data:image\/svg\+xml,/);
+    assert.ok(paletteCss().includes(":root[data-palette='new-year'] {"));
+
+    assert.equal(setPaletteId('new-year'), 'new-year');
+    assert.equal(getPaletteId(), 'new-year');
+    // Тот же ответ — ничего не меняется
+    assert.equal(setRemoteThemes({ themes: [theme, { ...theme, id: 'broken', accent: 'red' }, { ...theme, id: 'fig', name: 'Подмена' }], closed: [] }), false);
+    // Владелец закрыл (сервер её больше не отдаёт) — стандартная, и тема пересчитывается
+    assert.equal(setRemoteThemes({ themes: [], closed: ['halloween'] }), true);
+    assert.equal(getPaletteId(), STANDARD);
+    assert.equal(setPaletteId('new-year'), STANDARD);
+    // Встроенный «Хэллоуин» закрыт — его нет в списке, выбрать нельзя
+    assert.ok(isClosedTheme('halloween'));
+    assert.ok(!listPalettes().some((x) => x.id === 'halloween'));
+    assert.equal(setPaletteId('halloween'), STANDARD);
+    // «Стандартный» закрыть нельзя
+    setRemoteThemes({ themes: [], closed: ['standard'] });
+    assert.equal(listPalettes()[0].id, STANDARD);
+
+    // Владелец (trial): закрытую загруженную и закрытый «Хэллоуин» можно
+    // примерить у себя; в списке закрытая — только пока она у него стоит
+    setRemoteThemes({ themes: [{ ...theme, closed: true }], closed: ['halloween'], trial: true });
+    assert.ok(!listPalettes().some((x) => x.id === 'new-year'), 'закрытая не в списке');
+    assert.equal(setPaletteId('new-year'), 'new-year', 'но примерить можно');
+    assert.ok(listPalettes().some((x) => x.id === 'new-year'), 'стоит у владельца — видна с галочкой');
+    assert.equal(setPaletteId('halloween'), 'halloween');
+    // Тот же ответ без trial (не владелец) — закрытая снимается
+    assert.equal(setRemoteThemes({ themes: [{ ...theme, closed: true }], closed: ['halloween'] }), true);
+    assert.equal(getPaletteId(), STANDARD);
+  } finally {
+    setRemoteThemes({ themes: [], closed: [] });
+    store.delete(PALETTE_KEY);
+    store.delete(THEMES_KEY);
+  }
+});

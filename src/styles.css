@@ -2635,6 +2635,24 @@ th.sticky, td.sticky {
 .admin-flag .trainer-row__actions { justify-content: flex-end; }
 .admin-flag { display: grid; gap: var(--space-2); }
 .admin-flag__text { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+/* «Вид»: темы файлом (AdminLook.jsx, 22.10.2026) */
+.admin-theme__disc { flex: none; width: 36px; height: 36px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border); }
+.admin-theme__copy { flex: 1; min-width: 0; }
+.admin-theme { display: flex; gap: var(--space-3); align-items: flex-start; }
+.admin-theme__art {
+  position: relative; flex: none; width: 96px; aspect-ratio: 390 / 844;
+  border-radius: var(--radius); overflow: hidden;
+  background-size: cover; background-position: center;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.admin-theme__mascot { position: absolute; left: 50%; bottom: 10px; width: 40px; height: 46px; transform: translateX(-50%); }
+.admin-theme__swatches { display: flex; gap: 6px; margin-top: 4px; }
+.admin-theme__dot { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border); }
+/* «Версии» iPhone (AdminVersions.jsx) */
+.admin-version { display: grid; gap: var(--space-3); }
+.admin-version__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-3); }
+.admin-version__fields > .field:last-child { grid-column: 1 / -1; }
+.admin-version__actions { margin-top: var(--space-3); justify-content: flex-end; }
 
 .transfer-card {
   margin: 0 var(--space-4) var(--space-5);

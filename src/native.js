@@ -11,10 +11,12 @@
  *   - системная кнопка «Назад» ведёт по экранам приложения, как жест
  *     «смахнуть вправо», а с главного экрана сворачивает приложение;
  *   - строка состояния телефона — цвета фона приложения и в тёмной теме;
- *   - вышла новая версия самой оболочки — внизу «Обновить» (checkUpdate).
+ *   - вышла новая версия самой оболочки — внизу «Обновить» (checkUpdate);
+ *     на iPhone — со ссылкой на App Store или TestFlight (app-update.js).
  */
 import { goBack } from './gestures.jsx';
-import { isNativeApp, plugin } from './native-bridge.js';
+import { isNativeApp, plugin, iosApp } from './native-bridge.js';
+import { iosUpdate, updateText } from './app-update.js';
 import { refreshNativePush, listenNativeTaps } from './native-push.js';
 import { syncSteps, syncWorkouts, reportDevice, noteAppBuild } from './native-steps.js';
 import { linkWatch } from './native-watch.js';
@@ -106,6 +108,7 @@ export function startNative() {
 function checkUpdate(info) {
   const mine = Number(info && info.build) || 0;
   if (!mine) return;
+  if (iosApp()) { checkIosUpdate(info); return; }
   // С адреса API, а не сайта (FT-566): с экранами внутри APK адрес сайта
   // оболочка отдаёт из своих файлов, и latest.json там тот, с которым
   // собирали, — новой версии приложение бы не увидело. Тот же файл с сайта
@@ -124,13 +127,35 @@ function checkUpdate(info) {
     .catch(() => {});
 }
 
+/**
+ * iPhone (22.10.2026): из App Store — на App Store, из TestFlight — на
+ * TestFlight (app-update.js). Последние версии — с сервера: App Store он
+ * узнаёт у Apple сам, о TestFlight сообщает сборка. Ссылку оболочка отдаёт
+ * системе — откроется App Store или TestFlight.
+ */
+function checkIosUpdate(info) {
+  loadApiConfig()
+    .then(() => {
+      const api = String(currentApiUrl() || '').replace(/\/$/, '');
+      return api ? fetch(api + '/ios/versions.json', { cache: 'no-store' }) : null;
+    })
+    .then((res) => (res && res.ok ? res.json() : null))
+    .then((versions) => {
+      const update = iosUpdate(versions, info);
+      if (!update) return;
+      try { if (sessionStorage.getItem('native_update_later') === String(update.build)) return; } catch (_) {}
+      showUpdate({ versionCode: update.build, apk: update.url, text: updateText(update) });
+    })
+    .catch(() => {});
+}
+
 function showUpdate(latest) {
   if (document.querySelector('.update-bar')) return;
   const bar = document.createElement('div');
   bar.className = 'undo-bar update-bar';
   bar.setAttribute('role', 'status');
   const text = document.createElement('span');
-  text.textContent = 'Вышла новая версия приложения';
+  text.textContent = latest.text || 'Вышла новая версия приложения';
   const later = document.createElement('button');
   later.type = 'button';
   later.className = 'button button--ghost';
