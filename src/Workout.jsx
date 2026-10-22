@@ -95,6 +95,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const readyRef = useRef(false);
   readyRef.current = ready;
   const takingLiveActions = useRef(false);
+  // Нажали на часах, пока журнал ещё забирается, — забрать ещё раз после
+  const liveActionsAgain = useRef(false);
   // id занятия, которое человек только что завершил на этом экране (оценка)
   const finishedHere = useRef('');
   const conflictRef = useRef(null);
@@ -390,7 +392,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Отдых, начатый кнопкой на плашке, пока приложение спало: в занятие —
   // и на сервер. Уведомление о конце уже поставил телефон (restLocal)
   const applyPendingRest = async () => {
-    if (!readyRef.current || takingLiveActions.current) return;
+    if (!readyRef.current) return;
+    if (takingLiveActions.current) { liveActionsAgain.current = true; return; }
     const sessionId = state.current?.session?.id;
     if (!sessionId) return;
     takingLiveActions.current = true;
@@ -410,11 +413,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       save();
     } finally {
       takingLiveActions.current = false;
+      if (liveActionsAgain.current) { liveActionsAgain.current = false; applyPendingRest(); }
     }
   };
   useEffect(() => { if (ready) applyPendingRest(); }, [ready]);
-  // «+30 с» / «Закрыть» на будильнике отдыха (iPhone, часы) — сразу в
-  // занятие, а не при следующем открытии экрана
+  // «+30 с» / «Закрыть» на будильнике отдыха (iPhone, часы) и любое нажатие
+  // на часах или плашке («watch», 22.10.2026) — сразу в занятие, а не после
+  // сворачивания приложения
   useEffect(() => onLiveAction(({ kind, restUntil }) => {
     if (!ready) return;
     if (kind === 'extend') alarmMovedTo(restUntil);

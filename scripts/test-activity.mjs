@@ -24,6 +24,7 @@ const stub = `
     update: async (p) => { f().calls.push(['update', p]); return { shown: true }; },
     end: async () => { f().calls.push(['end']); },
     takePendingRest: async () => { const r = f().pending || {}; f().pending = null; return r; },
+    addListener: async (name, cb) => { (f().listeners ||= {})[name] = cb; return { remove: () => { delete f().listeners[name]; } }; },
   });`;
 
 const dir = mkdtempSync(join(tmpdir(), 'activity-test-'));
@@ -306,4 +307,17 @@ test('FT-628 на часах: вес помощи в поле веса, вес �
   assert.deepEqual(next.exercises[0].sets.map((x) => x.assist), ['56', '50', '50'], 'колёсико крутит помощь');
   next = la.applyActions(next, [{ kind: 'setEdit', sessionId: 's1', exerciseId: 'g', who: '', setIndex: 2, weight: '40' }]);
   assert.equal(next.exercises[0].sets[2].assist, '40', 'правка подхода с часов — тоже помощь');
+});
+
+test('нажатие на часах — событие «watch»: экран забирает журнал, отдых не трогает (22.10.2026)', async () => {
+  const got = [];
+  const off = la.onLiveAction((e) => got.push(e));
+  await new Promise((r) => setTimeout(r, 0));
+  const fire = fake.listeners.liveAction;
+  fire({ sessionId: 's1', kind: 'watch', restUntil: 0 });
+  fire({ sessionId: 's1', kind: 'extend', restUntil: 5000 });
+  fire({ sessionId: 's1', kind: 'что-то новое' });
+  assert.deepEqual(got.map((e) => e.kind), ['watch', 'extend', 'stop']);
+  off();
+  assert.equal(fake.listeners.liveAction, undefined);
 });

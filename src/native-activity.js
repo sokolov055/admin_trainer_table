@@ -477,7 +477,8 @@ export function isWorkoutOpen() { return workoutOpen; }
 
 /**
  * Нажали кнопку будильника отдыха — «+30 с» или «Закрыть» (iPhone и часы,
- * сборка 1.4 (16)+): cb({ sessionId, kind: 'extend' | 'stop', restUntil }).
+ * сборка 1.4 (16)+): cb({ sessionId, kind: 'extend' | 'stop' | 'watch', restUntil }).
+ * «watch» — нажали на часах или плашке (сборка 1.7+): отдых не трогать, только забрать журнал.
  * Нажатое уже в журнале (takeActions) — экран тренировки забирает его сразу.
  * Возвращает отписку
  */
@@ -487,7 +488,7 @@ export function onLiveAction(cb) {
   let handle = null;
   let gone = false;
   Promise.resolve(la.addListener('liveAction', (e) => cb({
-    sessionId: String((e && e.sessionId) || ''), kind: e && e.kind === 'extend' ? 'extend' : 'stop',
+    sessionId: String((e && e.sessionId) || ''), kind: e && ['extend', 'watch'].includes(e.kind) ? e.kind : 'stop',
     restUntil: Math.round(Number(e && e.restUntil) || 0),
   }))).then((h) => { if (gone && h && h.remove) h.remove(); else handle = h; }).catch(() => {});
   return () => { gone = true; if (handle && handle.remove) handle.remove(); };
