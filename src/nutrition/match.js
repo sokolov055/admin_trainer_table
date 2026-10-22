@@ -1,5 +1,6 @@
 import { STAPLES, MAIN_GRAMS, MEALS, GROUPS } from './recipes.js';
 import { CATALOG } from './catalog.js';
+import { carbLevel } from './carbs.js';
 
 /**
  * ==========================================================================
@@ -175,10 +176,13 @@ const SERVINGS = [1, 1.5, 2];
 /** С какого недобора калорий имеет смысл предлагать добавку. */
 const NEED_MORE = 0.08;
 
+/** Штраф за блюдо не того уровня углеводов в день тренировки или отдыха */
+const CARB_MISS = 0.06;
+
 /** Сколько вариантов держим в уме, чтобы после склейки осталось из чего выбрать. */
 const KEEP = 60;
 
-function search(pool, target, servings) {
+function search(pool, target, servings, bias = null) {
   const slots = [];
   for (const { id } of MEALS) {
     const options = pool.filter((r) => r.meal === id);
@@ -208,7 +212,7 @@ function search(pool, target, servings) {
 
   const consider = (sum) => {
     if (chosen.length < 2) return;
-    const score = penalty(sum, target);
+    const score = penalty(sum, target) + (sum.bias || 0);
     if (best.length === KEEP && score >= best[best.length - 1].score) return;
     let at = best.length;
     while (at > 0 && best[at - 1].score > score) at--;
@@ -231,6 +235,7 @@ function search(pool, target, servings) {
         protein: sum.protein + per.protein * count,
         fat: sum.fat + per.fat * count,
         carbs: sum.carbs + per.carbs * count,
+        bias: (sum.bias || 0) + (bias ? bias(option.recipe) : 0),
       });
       chosen.pop();
     }
@@ -257,14 +262,24 @@ function search(pool, target, servings) {
  * которого тренер не давал и который здесь давать нельзя. Перекус,
  * наоборот, необязателен: он и в жизни необязателен.
  */
-export function planVariants(likedIds, target, { limit = 6 } = {}) {
+export function planVariants(likedIds, target, { limit = 6, prefer = null } = {}) {
   const liked = new Set(likedIds || []);
   const pool = CATALOG.RECIPES.filter((r) => liked.has(r.id));
   if (!target || !target.kcal || !pool.length) return [];
 
-  let found = search(pool, target, [1]);
+  // День тренировки или отдыха (FT-709): prefer — 'high' или 'low'. Блюдо
+  // другого уровня углеводов не запрещено, а слегка штрафуется: «средне» —
+  // как промах на 1,5 % калорий, противоположный уровень — на 3 %. День
+  // по-прежнему собирается под норму, просто из похожих по калориям наборов
+  // выше встаёт тот, что подходит дню.
+  const bias = prefer ? (recipe) => {
+    const level = carbLevel(recipe.per);
+    return level === prefer ? 0 : level === 'mid' ? CARB_MISS / 2 : CARB_MISS;
+  } : null;
+
+  let found = search(pool, target, [1], bias);
   if (found.length && dayTotals(found[0].dishes).kcal < target.kcal * (1 - NEED_MORE)) {
-    found = search(pool, target, SERVINGS);
+    found = search(pool, target, SERVINGS, bias);
   }
 
   // Склейка по набору блюд. «Другой вариант» должен показывать другую еду, а

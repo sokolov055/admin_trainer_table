@@ -2,6 +2,9 @@
 import { FOOD, RECIPES } from './recipes.js';
 import { today, shiftDay, totalEntries } from './diary-model.js';
 import { PALM, palmSnapshot } from './palm-model.js';
+import { cycleTargets } from './carbs.js';
+// Демо-расписание (FT-709): занятия по понедельникам, средам и пятницам в 18:00
+const demoCarbDay = (d, s) => { const train = [1, 3, 5].includes(new Date(d + 'T12:00:00Z').getUTCDay()), percent = s.carbCycle ?? 20; return { kind: train ? 'train' : 'rest', at: train ? '18:00' : null, source: train ? 'calendar' : null, percent, ...(percent ? { base: s.targets } : {}) }; };
 const copy = x => JSON.parse(JSON.stringify(x));
 const fail = (code, text) => { throw Object.assign(new Error(text), { code }); };
 export function diaryMock(action, p = {}) {
@@ -10,7 +13,7 @@ export function diaryMock(action, p = {}) {
   try { s = JSON.parse(localStorage.getItem(key)); } catch { /* пустой стенд */ }
   s ||= { days: {}, targets: { kcal: 2000, protein: 130, fat: 65, carbs: 224 }, recipes: [], foods: [{ id: 551, kind: 'food', name: 'Йогурт 2%', kcal: 70, protein: 8, fat: 2, carbs: 5, unit: 'g', source: 'Демо: данные с этикетки' }], likes: ['food:551', 'dish:' + RECIPES[0].id], operations: {} };
   const dayOf = d => { s.days[d] ||= { day: d, entries: [], complete: false, waterMl: 0, comment: '', revision: 0 }; return s.days[d]; };
-  const present = d => ({ ...copy(dayOf(d)), totals: totalEntries(dayOf(d).entries), targets: s.targets, settings: s.settings || { mode: 'count', meals: null, chosen: false } });
+  const present = d => ({ ...copy(dayOf(d)), totals: totalEntries(dayOf(d).entries), targets: cycleTargets(s.targets, demoCarbDay(d, s).kind, demoCarbDay(d, s).percent), carbDay: demoCarbDay(d, s), settings: s.settings || { mode: 'count', meals: null, chosen: false } });
   const catalog = () => [
     ...s.recipes, ...s.foods,
     ...Object.entries(FOOD).map(([name, f]) => ({ kind: 'ingredient', id: name, name, ...f, unit: 'g', source: 'Справочник · вес до приготовления' })),
@@ -59,7 +62,7 @@ export function diaryMock(action, p = {}) {
   } else if (action === 'diary.week') {
     const days = Array.from({ length: 7 }, (_, i) => present(shiftDay(day, i - 6))), full = days.filter(d => d.complete);
     result = { days, fullDays: full.length, average: full.length ? Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, full.reduce((sum, d) => sum + d.totals[k], 0) / full.length])) : null };
-  } else if (action === 'diary.target.save') { s.targets = Object.fromEntries(Object.entries(p.targets).map(([k, v]) => [k, Number(v)])); result = { targets: s.targets }; }
+  } else if (action === 'diary.target.save') { s.targets = Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, Number(p.targets[k])])); if (p.carbCycle !== undefined) s.carbCycle = Number(p.carbCycle) || 0; result = { targets: s.targets, carbCycle: s.carbCycle ?? 20 }; }
   else if (action === 'diary.recipe.save') {
     const ingredients = p.ingredients.map(i => ({ product: resolve(i.product), amount: Number(i.amount) })), total = totalEntries(ingredients), id = p.id || 'recipe-' + p.requestId;
     const old = s.recipes.find(r => r.id === p.id);

@@ -13,6 +13,9 @@ import Extras from './Extras.jsx';
 import { DiaryEntryForm } from './Diary.jsx';
 import { mealFromRecipe } from './diary-model.js';
 import { EGG_SIZES, getEggSize, saveEggSize, pieceLabel, mlLabel } from './pieces.js';
+import { carbLevel, carbTag, preferredLevel, carbDayLine } from './carbs.js';
+import { nextSwap, applySwaps } from './swap.js';
+import './carbs.css';
 
 /** Размер яиц, выбранный человеком: по нему «110 г» показываются как «2 яйца» */
 const EggContext = createContext(EGG_SIZES[2]);
@@ -328,10 +331,16 @@ function Recipe({ recipe }) {
   );
 }
 
-/** Метки блюда: быстро, вегетарианское, без молочного… */
+/** Метки блюда: быстро, вегетарианское, без молочного… и уровень углеводов (FT-709) */
 function Tags({ recipe }) {
-  if (!recipe.tags || !recipe.tags.length) return null;
-  return <div className="card__tags">{recipe.tags.map((t) => <span key={t} className="card__tag">{t}</span>)}</div>;
+  const level = carbLevel(recipe.per);
+  if (!level && (!recipe.tags || !recipe.tags.length)) return null;
+  return (
+    <div className="card__tags">
+      {level && <span className={'card__tag card__tag--carbs card__tag--carbs-' + level}>{carbTag(level)}</span>}
+      {(recipe.tags || []).map((t) => <span key={t} className="card__tag">{t}</span>)}
+    </div>
+  );
 }
 
 /**
@@ -591,9 +600,10 @@ function Bar({ label, value, goal, unit, doneText }) {
   );
 }
 
-function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSize, onOther, onRestart, onPantry, onEat }) {
+function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSize, onOther, onRestart, onPantry, onEat, swaps, swapFor, onSwap }) {
   // Своё может закрыть норму целиком — тогда блюд не остаётся, и это не ошибка
-  const plan = variants.length ? variants[index % variants.length] : { dishes: [], totals: { kcal: 0, protein: 0, fat: 0, carbs: 0 } };
+  // Замены блюд (FT-709) накладываются поверх варианта, итоги пересчитываются
+  const plan = applySwaps(variants.length ? variants[index % variants.length] : { dishes: [], totals: { kcal: 0, protein: 0, fat: 0, carbs: 0 } }, swaps);
   const list = useMemo(() => shoppingList(plan.dishes, pantry), [plan, pantry]);
   const groups = useMemo(foodByGroup, []);
 
@@ -659,8 +669,10 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
       <Section title="Что есть сегодня" note={'вариант ' + (index % variants.length + 1) + ' из ' + variants.length}>
         <Panel>
           <div className="day__dishes">
-            {plan.dishes.map((dish) => {
+            {plan.dishes.map((dish, i) => {
               const meal = MEALS.find((m) => m.id === dish.recipe.meal) || {};
+              const swap = swapFor ? swapFor(i) : null;
+              const level = carbLevel(dish.recipe.per);
               return (
                 <div key={dish.recipe.id} className="day__dish">
                   {/* Приём пищи — колонкой слева: день читается сверху вниз
@@ -676,8 +688,15 @@ function Day({ variants, index, targets, pantry, eaten, extras, eggSize, onEggSi
                         {' '}У {formatNumber(Math.round(dish.recipe.per.carbs * dish.servings * 10) / 10)}
                       </span>
                       {dish.servings !== 1 && <span className="day__servings">{servingLabel(dish.servings)}</span>}
+                      {level && <span className="day__carbs">{carbTag(level)}</span>}
                     </p>
                     <Recipe recipe={dish.recipe} />
+                    {/* Заменить одно блюдо на похожее: тот же приём, те же углеводы, ±15 % калорий */}
+                    {swap && (
+                      <button type="button" className="button button--ghost day__swap" onClick={() => { haptic(); onSwap(i, swap); }}>
+                        Заменить на похожее
+                      </button>
+                    )}
                     {onEat && <button type="button" className="button button--primary diary-plan-eat" onClick={() => onEat(dish.recipe, dish.servings)}>Съедено — записать</button>}
                   </div>
                 </div>
@@ -775,13 +794,15 @@ export default function Ration({ targets: calculatedTargets, onClose, trial = fa
   const diaryMode = !trial && !!diaryDay;
   const [diaryTotals, setDiaryTotals] = useState(consumed);
   const [diaryTargets, setDiaryTargets] = useState(null);
+  // День тренировки или отдыха (FT-709): что сервер знает о расписании
+  const [carbDay, setCarbDay] = useState(null);
   const targets = diaryMode && diaryTargets ? diaryTargets : calculatedTargets;
   const [recordMeal, setRecordMeal] = useState(null);
   const [diaryMessage, setDiaryMessage] = useState('');
   useEffect(() => {
     if (!diaryMode) return undefined;
     let alive = true;
-    apiPublic('diary.get', { day: diaryDay }).then(data => { if (alive) { setDiaryTotals(data.totals); setDiaryTargets(data.targets); } }).catch(error => { if (alive) setDiaryMessage('Не удалось загрузить дневник: ' + error.message + ' Подбор пока рассчитан на полную норму.'); });
+    apiPublic('diary.get', { day: diaryDay }).then(data => { if (alive) { setDiaryTotals(data.totals); setDiaryTargets(data.targets); setCarbDay(data.carbDay || null); } }).catch(error => { if (alive) setDiaryMessage('Не удалось загрузить дневник: ' + error.message + ' Подбор пока рассчитан на полную норму.'); });
     return () => { alive = false; };
   }, [diaryMode, diaryDay]);
   const key = trial ? TRIAL_STORE : STORE;
@@ -908,15 +929,37 @@ export default function Ration({ targets: calculatedTargets, onClose, trial = fa
     return ['быстро', 'высокобелковое', 'вегетарианское', 'без молочного', 'бюджетно'].filter((t) => seenTags.has(t));
   }, [catalogVersion]);
 
+  // В день тренировки первыми — блюда с углеводами, в день отдыха — без
+  // (FT-709); внутри одного числа недостающих продуктов, порядок «что
+  // готовится из наличного» не ломается
+  const prefer = preferredLevel(carbDay);
   const deck = useMemo(
-    () => rankRecipes(pantry)
-      .filter((entry) => !seen.includes(entry.recipe.id))
-      .filter((entry) => !tag || (entry.recipe.tags || []).includes(tag)),
-    [pantry, seen, tag, catalogVersion]
+    () => {
+      const cards = rankRecipes(pantry)
+        .filter((entry) => !seen.includes(entry.recipe.id))
+        .filter((entry) => !tag || (entry.recipe.tags || []).includes(tag));
+      if (!prefer) return cards;
+      const rank = (entry) => { const level = carbLevel(entry.recipe.per); return level === prefer ? 0 : level === 'mid' ? 1 : 2; };
+      return cards.sort((a, b) => a.missing.length - b.missing.length || rank(a) - rank(b));
+    },
+    [pantry, seen, tag, catalogVersion, prefer]
   );
 
   // Блюда подбираются под то, что осталось от нормы после своего
-  const variants = useMemo(() => planVariants(liked, rest), [liked, rest, catalogVersion]);
+  const variants = useMemo(() => planVariants(liked, rest, { prefer }), [liked, rest, catalogVersion, prefer]);
+
+  // Замены блюд в показанном варианте (FT-709): { номер блюда: блюдо }.
+  // Новый вариант или пересборка дня — замены сбрасываются
+  const [swaps, setSwaps] = useState({});
+  useEffect(() => { setSwaps({}); }, [variants, variant]);
+  const shownPlan = variants.length ? variants[variant % variants.length] : null;
+  const swapFor = (i) => {
+    if (!shownPlan || !shownPlan.dishes[i]) return null;
+    const current = swaps[i] || shownPlan.dishes[i].recipe;
+    const others = shownPlan.dishes.map((d, k) => (swaps[k] || d.recipe).id).filter((_, k) => k !== i);
+    return nextSwap(shownPlan.dishes[i].recipe, current, { liked, exclude: others });
+  };
+  const carbHint = carbDayLine(carbDay, { today: !diaryDay || diaryDay === new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10) });
 
   const toggle = (name) => setPantry((list) => (
     list.includes(name) ? list.filter((n) => n !== name) : [...list, name]
@@ -982,6 +1025,8 @@ export default function Ration({ targets: calculatedTargets, onClose, trial = fa
         <Pantry pantry={pantry} onToggle={toggle} onNext={() => setStep('swipe')} />
       )}
 
+      {carbHint && step !== 'pantry' && <p className="carb-hint">{carbHint}</p>}
+
       {step === 'swipe' && tagOptions.length > 0 && (
         <div className="ration__tags" role="radiogroup" aria-label="Какие блюда показывать">
           {[''].concat(tagOptions).map((t) => (
@@ -1036,6 +1081,9 @@ export default function Ration({ targets: calculatedTargets, onClose, trial = fa
           extras={diaryMode ? null : (
             <Extras extras={extras} products={products} onAdd={addExtra} onRemove={removeExtra} trial={trial} />
           )}
+          swaps={swaps}
+          swapFor={swapFor}
+          onSwap={(i, recipe) => setSwaps((old) => ({ ...old, [i]: recipe }))}
           onOther={() => setVariant((n) => n + 1)}
           onRestart={restart}
           onPantry={() => setStep('pantry')}

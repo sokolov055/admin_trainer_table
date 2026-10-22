@@ -273,3 +273,49 @@ test('границы: итог ровно на 10 % — норма; приём �
   assert.deepEqual(palmCount([{ amount: '2', product: { kind: 'palm', id: 'veg' } }, { amount: 1, product: { kind: 'palm', id: 'sugar' } }, { amount: 3 }, { amount: 'x', product: { kind: 'palm', id: 'fat' } }]), { protein: 0, carbs: 0, fat: 0, veg: 2 });
   assert.deepEqual(palmSnapshot('veg'), { kind: 'palm', id: 'veg', name: 'Овощи · кулак', kcal: 25, protein: 1.5, fat: 0, carbs: 5, unit: 'portion', approx: true, source: 'Ладонь · примерно' });
 });
+
+// Углеводы по дням тренировок (FT-709): цель дня с пояснением, «Рецепты» по дню, переключатель тренера
+const carbDay = { kind: 'train', at: '18:00', source: 'calendar', percent: 20, base: { kcal: 2000, protein: 100, fat: 60, carbs: 250 } };
+const carbDishes = [
+  { kind: 'dish', id: 'kasha', name: 'Каша с бананом', meal: 'завтрак', kcal: 400, protein: 12, fat: 8, carbs: 70, unit: 'portion' },
+  { kind: 'dish', id: 'omlet', name: 'Омлет с сыром', meal: 'завтрак', kcal: 400, protein: 28, fat: 30, carbs: 5, unit: 'portion' },
+];
+const carbRead = async (a, p) => a === 'diary.get' ? { ...dayAnswer(p, { targets: { kcal: 2000, protein: 100, fat: 47, carbs: 300 } }), carbDay } : { products: carbDishes };
+test('углеводы по дням: клиент видит цель дня с пояснением, «Рецепты» сначала с углеводами и строкой почему', async () => {
+  __diary.read = carbRead;
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(NutritionDiary, {})); });
+  await settle();
+  assert.match(screen(tree), /День тренировки: углеводов на 20 % больше, жиров меньше — калории и белок те же\./);
+  assert.match(screen(tree), /Углеводы 0 \/ 300 г/, 'цель дня — уже со сдвигом');
+  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Рецепты').props.onClick());
+  await settle();
+  const text = screen(tree);
+  assert.match(text, /Сегодня тренировка в 18:00 — больше углеводов, особенно в перекус до неё и в ужин после\./);
+  assert.match(text, /Каша с бананом/);
+  assert.doesNotMatch(text, /Омлет с сыром/, 'в день тренировки по умолчанию — блюда с углеводами');
+  assert.match(text, /углеводов много/, 'подпись уровня у блюда');
+  await act(async () => tree.root.findAll(n => n.type === 'button' && n.props.children === 'Любые')[0].props.onClick());
+  assert.match(screen(tree), /Омлет с сыром/);
+  tree.unmount();
+});
+test('углеводы по дням: тренер открывает цель с базовыми цифрами, видит дни и отправляет процент', async () => {
+  const calls = [];
+  __diary.read = carbRead;
+  __diary.mutate = async (a, p) => { calls.push([a, p]); return {}; };
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(NutritionDiary, { clientRow: 5, readOnly: true })); });
+  await settle();
+  await act(async () => tree.root.findAll(n => n.type === 'button' && textOf(n.props.children) === 'Назначить цель')[0].props.onClick());
+  const text = screen(tree);
+  assert.match(text, /Углеводы по дням тренировок/);
+  assert.match(text, /День тренировки: У 300 г · Ж 38 г/, 'предпросмотр из базовой цели 250 г, а не из цели дня');
+  assert.match(text, /День отдыха: У 200 г · Ж 82 г/);
+  await act(async () => tree.root.findAll(n => n.type === 'button' && n.props.children?.join?.('') === '±10 %')[0].props.onClick());
+  await act(async () => tree.root.findByType('form').props.onSubmit({ preventDefault() {} }));
+  const [action, params] = calls.find(c => c[0] === 'diary.target.save');
+  assert.equal(action, 'diary.target.save');
+  assert.equal(params.carbCycle, 10);
+  assert.equal(Number(params.targets.carbs), 250, 'уходит базовая цель, не цель дня');
+  tree.unmount();
+});

@@ -9,6 +9,8 @@ import {
 import { IconAlert, IconBack, IconNutrition } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { EGG_SIZES, pieceLabel, mlLabel } from '../nutrition/pieces.js';
+import { carbLevel, carbTag } from '../nutrition/carbs.js';
+import '../nutrition/carbs.css';
 
 /**
  * Блюда для рациона клиентов (Шаблоны → Блюда).
@@ -146,8 +148,12 @@ function DishView({ dish, onBack, onEdit, onChanged }) {
         <p className="dish__per">
           <strong>{dish.per.kcal} ккал</strong> на порцию · Б {formatNumber(dish.per.protein)} · Ж {formatNumber(dish.per.fat)} · У {formatNumber(dish.per.carbs)}
         </p>
-        {dish.tags.length > 0 && (
-          <div className="dish__tags">{dish.tags.map((t) => <span key={t} className="card__tag">{t}</span>)}</div>
+        {/* Уровень углеводов считается из КБЖУ порции (FT-709), руками не ставится */}
+        {(dish.tags.length > 0 || carbLevel(dish.per)) && (
+          <div className="dish__tags">
+            {carbLevel(dish.per) && <span className={'card__tag card__tag--carbs-' + carbLevel(dish.per)}>{carbTag(carbLevel(dish.per))}</span>}
+            {dish.tags.map((t) => <span key={t} className="card__tag">{t}</span>)}
+          </div>
         )}
 
         <h3 className="dish__h">Состав на всё блюдо</h3>
