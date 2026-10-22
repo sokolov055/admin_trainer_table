@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Panel, Section } from './ui.jsx';
 import ThemeSetting from './ThemeSetting.jsx';
-import { PALETTES, getPaletteId, setPaletteId } from './palettes.js';
-import { haptic } from './telegram.js';
+import Pumpkin from './Pumpkin.jsx';
+import { PALETTES, getPaletteId, setPaletteId, forcedScheme } from './palettes.js';
+import { haptic, refreshTheme } from './telegram.js';
 import { IconCheck, IconHome, IconPlan, IconProgress, IconNutrition, IconPlus } from './icons.jsx';
 import './appearance.css';
 
@@ -17,14 +18,21 @@ import './appearance.css';
  */
 
 export default function Appearance() {
+  // Палитра — здесь, а не в сетке: «Хэллоуин» сам ставит тёмную тему, и
+  // переключатель темы должен об этом знать (FT-702)
+  const [palette, setPalette] = useState(getPaletteId);
+  const pick = (id) => {
+    setPalette(setPaletteId(id));
+    refreshTheme();
+  };
   return (
     <>
       <LookPreview />
       <Section title="Тема">
-        <ThemeSetting bare />
+        <ThemeSetting bare forced={forcedScheme(palette)} />
       </Section>
-      <Section title="Персональные цвета" note="Кнопки, вкладки и выделение. Запоминается на этом устройстве.">
-        <PalettePicker />
+      <Section title="Персональные цвета" note="Кнопки, вкладки, выделение и фон. Запоминается на этом устройстве.">
+        <PalettePicker current={palette} onPick={pick} />
       </Section>
     </>
   );
@@ -58,7 +66,7 @@ function LookPreview() {
       <div className="look-preview__tabbar">
         <span className="is-on"><IconHome size={20} /></span>
         <span><IconPlan size={20} /></span>
-        <span className="look-preview__plus"><IconPlus size={20} /></span>
+        <span className="look-preview__plus"><IconPlus size={20} /><Pumpkin className="look-preview__pumpkin" size={38} /></span>
         <span><IconProgress size={20} /></span>
         <span><IconNutrition size={20} /></span>
       </div>
@@ -66,13 +74,11 @@ function LookPreview() {
   );
 }
 
-function PalettePicker() {
-  const [current, setCurrent] = useState(getPaletteId);
-
+function PalettePicker({ current, onPick }) {
   const pick = (id) => {
     if (id === current) return;
     haptic('light');
-    setCurrent(setPaletteId(id));
+    onPick(id);
   };
 
   return (

@@ -22,6 +22,12 @@
  *
  * Выбор — на устройстве (localStorage), как и тема: это вкус человека на
  * этом телефоне, а не данные аккаунта.
+ *
+ * 22.10.2026 (FT-702): из 13 палитр оставлены 6 непохожих — у кого была
+ * убранная, getPaletteId вернёт стандартную. Фон богаче: у каждой палитры
+ * свечение акцентом и третьим цветом по углам (--bg-art), у «Хэллоуина» —
+ * свой рисунок: тыквы с горящими лицами на тёмно-бордовом. «Хэллоуин»
+ * всегда тёмный (scheme: 'dark', telegram.js) — светлого Хэллоуина не бывает.
  */
 
 export const PALETTE_KEY = 'app_palette_v1';
@@ -48,20 +54,13 @@ export const PALETTES = [
     // Без своих значений: остаются токены styles.css как есть
     light: null, dark: null,
   },
-  { id: 'mandarin', name: 'Мандаринка', accent: '#d0692c', bg: '#c98a5a', fill: '#1f3352', light: '#ae5113', dark: '#d96c23' },
   { id: 'macaw', name: 'Ара', accent: '#c8302a', bg: '#e3a62b', fill: '#1f4f8f', light: '#c72e23', dark: '#da6860' },
   { id: 'coconut', name: 'Кокос', accent: '#6e4b33', bg: '#ece1cf', fill: '#a07c5a', light: '#745239', dark: '#a7836a' },
-  { id: 'red-panda', name: 'Красная панда', accent: '#a8462a', bg: '#b5583a', fill: '#4a2c1e', light: '#933f2a', dark: '#c77560' },
-  { id: 'sea', name: 'Море и скалы', accent: '#6e8499', bg: '#5f86a3', fill: '#8c8073', light: '#4f708c', dark: '#748da2' },
-  { id: 'pheasant', name: 'Золотой фазан', accent: '#24439a', bg: '#d6a12f', fill: '#b8322a', light: '#2948ae', dark: '#7087d4' },
-  { id: 'pistachio', name: 'Фисташка', accent: '#8f9a55', bg: '#9aa95a', fill: '#6b2c42', light: '#6d6f3c', dark: '#8c8e5a' },
   { id: 'flamingo', name: 'Фламинго', accent: '#e8a9a1', bg: '#e8a9a1', fill: '#2f7c80', light: '#b83d52', dark: '#c57280' },
   { id: 'avocado', name: 'Авокадо', accent: '#6f8f3a', bg: '#b8c46a', fill: '#5b3b27', light: '#537630', dark: '#6f9549' },
-  { id: 'orca', name: 'Косатка', accent: '#1c2b47', bg: '#2a4170', fill: '#121215', light: '#213763', dark: '#6e8bc4' },
-  { id: 'snow-leopard', name: 'Снежный барс', accent: '#a29d97', bg: '#9c9893', fill: '#3b3936', light: '#55524e', dark: '#8d8a86' },
   { id: 'fig', name: 'Инжир', accent: '#6e2f4e', bg: '#8a3a62', fill: '#b38f4d', light: '#743459', dark: '#b6779c' },
-  // Хэллоуин (владелец, 21.10.2026): тыква, фиолетовая ночь, зелёное зелье
-  { id: 'halloween', name: 'Хэллоуин', accent: '#ef7d1a', bg: '#5b2a86', fill: '#6fbf3a', light: '#b8560f', dark: '#f08a2c' },
+  // Хэллоуин (владелец, 21–22.10.2026): тыква на тёмно-бордовой ночи, зелёный хвостик
+  { id: 'halloween', name: 'Хэллоуин', accent: '#ef7d1a', bg: '#6b1a2a', fill: '#6fbf3a', light: '#b8560f', dark: '#f08a2c', scheme: 'dark' },
 ].map((p) => (p.swatch ? p : { ...p, swatch: [p.accent, p.bg, p.fill] }));
 
 /* --- цвет: смешение, светлота, контраст --- */
@@ -145,12 +144,61 @@ export function paletteColors(palette, scheme) {
   return { bg, surface, sunken, accent, onButton, fill: palette.fill, ink2, wash };
 }
 
+/**
+ * Фон «богаче» (FT-702): свечение акцентом сверху справа и третьим цветом
+ * снизу слева — неподвижный слой под содержимым (styles.css, body::after).
+ * Свечение — оттенок, а не темнее/светлее: цвет той же светлоты, что фон
+ * (tint), поэтому текст темы на нём держит контраст. ART — светлота и доля
+ * цвета на пике; artPeaks — что видит глаз в самой яркой точке (тест).
+ */
+export const ART = { light: { lum: 0.875, alpha: [0.9, 0.75] }, dark: { lum: 0.0118, alpha: [0.9, 0.8] } };
+const glowColors = (palette, scheme) => {
+  const { lum: target } = ART[scheme];
+  return [tint(palette.accent, target, scheme === 'dark' ? 0.7 : 0.9), tint(palette.fill, target, scheme === 'dark' ? 0.6 : 0.8)];
+};
+export function artPeaks(palette, scheme) {
+  const c = paletteColors(palette, scheme), [a, f] = glowColors(palette, scheme), [ka, kf] = ART[scheme].alpha;
+  return [over(a, ka, c.bg), over(f, kf, c.bg)];
+}
+const glow = (palette, scheme) => {
+  const [a, f] = glowColors(palette, scheme), [ka, kf] = ART[scheme].alpha;
+  return `radial-gradient(110% 55% at 100% 0%, ${rgba(a, ka)}, transparent 70%), radial-gradient(90% 50% at 0% 100%, ${rgba(f, kf)}, transparent 70%)`;
+};
+
+/*
+ * Тыквы «Хэллоуина» — свой рисунок (образцы владельца с Pinterest не берём:
+ * права). Обои из мелких тыкв: тёмные бока, лица горят изнутри, вокруг
+ * ореол. Обои, а не одна картинка: экран почти весь под карточками, и
+ * тыквы должны выглядывать в каждом промежутке. Лица неяркие — текст на
+ * фоне читается.
+ */
+const PUMPKIN = '<g id="p"><circle cx="26" cy="30" r="30" fill="url(#h)"/>'
+  + '<g fill="url(#b)" stroke="#2a0a05" stroke-opacity=".6" stroke-width="1"><ellipse cx="14" cy="31" rx="11" ry="14"/><ellipse cx="38" cy="31" rx="11" ry="14"/><ellipse cx="20" cy="31" rx="10" ry="15.5"/><ellipse cx="32" cy="31" rx="10" ry="15.5"/><ellipse cx="26" cy="31" rx="8" ry="16"/></g>'
+  + '<path d="M24.5 16c.2-4 1-7 3.6-9.4l2 1.6c-2 2-2.6 4.6-2.4 8z" fill="#34501d"/>'
+  + '<g fill="#f5a531"><path d="M14.5 29 20.5 29 17.5 22.5z"/><path d="M31.5 29 37.5 29 34.5 22.5z"/><path d="M24.6 33 27.4 33 26 30.4z"/><path d="M12.5 35Q26 46 39.5 35L36.6 36.2 34.6 39.4 31.6 37 26 40.6 20.4 37 17.4 39.4 15.4 36.2z"/></g></g>';
+/** Плитка 200×220: тыквы [x, y, масштаб, наклон] и искры-светлячки */
+const TILE = [[46, 52, 0.78, -12], [150, 118, 0.7, 14], [62, 176, 0.55, 6], [176, 14, 0.4, -6]];
+const SPARKS = [[110, 40, 1.4], [18, 120, 1.1], [120, 196, 1.2], [190, 180, 0.9]];
+const SCENE = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="220" viewBox="0 0 200 220">'
+  + '<defs><radialGradient id="b" cx=".42" cy=".36" r=".75"><stop offset="0" stop-color="#9a3f0e"/><stop offset=".6" stop-color="#5c1f08"/><stop offset="1" stop-color="#2a0b05"/></radialGradient>'
+  + '<radialGradient id="h"><stop offset="0" stop-color="#ff8a1e" stop-opacity=".3"/><stop offset="1" stop-color="#ff8a1e" stop-opacity="0"/></radialGradient>' + PUMPKIN + '</defs>'
+  + '<g opacity=".72">' + TILE.map(([x, y, k, r]) => `<use xlink:href="#p" href="#p" transform="translate(${x} ${y}) rotate(${r}) scale(${k}) translate(-26 -30)"/>`).join('')
+  + SPARKS.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#ffc760" opacity=".55"/>`).join('')
+  + '</g></svg>';
+const halloweenArt = () => `url("data:image/svg+xml,${encodeURIComponent(SCENE)}") 0 0 / 200px 220px repeat, radial-gradient(120% 60% at 50% 100%, rgba(255, 120, 30, 0.16), transparent 70%)`;
+
+/** Тема, которую палитра ставит сама: «Хэллоуин» — всегда тёмная, остальные — как выбрано */
+export function forcedScheme(id = getPaletteId()) {
+  return paletteById(id).scheme || null;
+}
+
 /** Токены палитры для одной темы (CSS-переменные) */
 export function paletteTokens(palette, scheme) {
   const c = paletteColors(palette, scheme);
   if (!c) return null;
   const fillWash = rgba(c.fill, c.wash);
   return {
+    '--bg-art': palette.id === 'halloween' ? halloweenArt() : glow(palette, scheme),
     '--bg': c.bg,
     '--surface': c.surface,
     '--surface-sunken': c.sunken,

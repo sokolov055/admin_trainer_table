@@ -19,6 +19,7 @@
  * теряется, поэтому разобранные параметры сразу складываются в
  * sessionStorage.
  */
+import { forcedScheme } from './palettes.js';
 
 const STORAGE_KEY = 'tg_init_params_v1';
 
@@ -138,6 +139,11 @@ export function getThemeMode() {
   return 'auto';
 }
 
+/** Палитра сменилась — тема могла смениться вместе с ней (forcedScheme) */
+export function refreshTheme() {
+  applyTheme();
+}
+
 /** Сохраняем выбор и сразу применяем: тема не должна ждать перезапуска */
 export function setThemeMode(mode) {
   const next = THEME_MODES.indexOf(mode) !== -1 ? mode : 'auto';
@@ -157,7 +163,8 @@ function applyTheme() {
   if (typeof document === 'undefined') return;
 
   const root = document.documentElement;
-  const mode = getThemeMode();
+  // Палитра со своей темой («Хэллоуин» — всегда тёмная, FT-702) главнее выбора
+  const mode = forcedScheme() || getThemeMode();
 
   // Ручной выбор перебивает Telegram целиком, вместе с его цветами.
   // Оставить их нельзя: --bg собран как var(--tg-bg, своё), и «Светлая»

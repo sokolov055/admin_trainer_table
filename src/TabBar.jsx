@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { IconPlus } from './icons.jsx';
+import Pumpkin from './Pumpkin.jsx';
 import './tabbar-action.css';
 
 /**
@@ -81,6 +82,7 @@ export default function TabBar({ tabs, active, onSelect, action = null }) {
           >
             <span className="tabbar__action-disc">
               <span className="tabbar__action-glyph"><IconPlus size={26} strokeWidth={2.4} /></span>
+              <Pumpkin className="tabbar__pumpkin" />
             </span>
           </button>
           <div className="tabbar__group">{tabs.slice(half).map(item)}</div>

@@ -416,6 +416,20 @@ body::before {
   pointer-events: none;
 }
 
+/* Фон палитры (palettes.js, --bg-art; FT-702): свечение по углам или
+   рисунок «Хэллоуина». Неподвижный слой под содержимым: фон самой страницы
+   красит html, body прозрачный — иначе он закрыл бы слой с z-index −1.
+   Стандартной палитре слой не нужен. */
+:root[data-palette] body { background: transparent; }
+:root[data-palette] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-art, none);
+  pointer-events: none;
+}
+
 /* В просмотре глазами клиента под часами стоит сама плашка «Вы смотрите
    как клиент», и подложка не нужна. Мешала она при анимации: пока
    страница въезжала или уезжала жестом, плашка оказывалась под подложкой,

@@ -16,7 +16,7 @@ globalThis.localStorage = {
   setItem: (k, v) => { if (broken) throw new Error('denied'); store.set(k, String(v)); },
 };
 
-const { PALETTES, STANDARD, PALETTE_KEY, BASE, WASH, paletteTokens, paletteColors, paletteCss, getPaletteId, setPaletteId, paletteById, contrast, over, lum } = await import('../src/palettes.js');
+const { PALETTES, STANDARD, PALETTE_KEY, BASE, WASH, artPeaks, paletteTokens, paletteColors, paletteCss, getPaletteId, setPaletteId, paletteById, forcedScheme, contrast, over, lum } = await import('../src/palettes.js');
 
 const HEX = /^#[0-9a-f]{6}$/;
 
@@ -45,12 +45,9 @@ test('основа палитр — те же цвета, что у тем style
   }
 });
 
-test('палитры владельца — все на месте, стандартная первой, Хэллоуин последним', () => {
+test('палитры владельца — стандартная первой, Хэллоуин последним, семь непохожих (FT-702)', () => {
   assert.equal(PALETTES[0].id, STANDARD);
-  assert.deepEqual(PALETTES.map((p) => p.name), [
-    'Стандартный', 'Мандаринка', 'Ара', 'Кокос', 'Красная панда', 'Море и скалы', 'Золотой фазан',
-    'Фисташка', 'Фламинго', 'Авокадо', 'Косатка', 'Снежный барс', 'Инжир', 'Хэллоуин',
-  ]);
+  assert.deepEqual(PALETTES.map((p) => p.name), ['Стандартный', 'Ара', 'Кокос', 'Фламинго', 'Авокадо', 'Инжир', 'Хэллоуин']);
   assert.equal(new Set(PALETTES.map((p) => p.id)).size, PALETTES.length, 'id не повторяются');
   for (const p of PALETTES) {
     assert.equal(p.swatch.length, 3, p.id + ': три цвета кружка');
@@ -65,8 +62,10 @@ test('три роли: фон — второй цвет, мелкое — тре
       const t = paletteTokens(p, scheme);
       assert.deepEqual(Object.keys(t).sort(), [
         '--accent', '--accent-2', '--accent-2-ink', '--accent-2-wash', '--accent-ink', '--accent-solid',
-        '--accent-text', '--accent-wash', '--bg', '--chip-bg', '--surface', '--surface-sunken',
+        '--accent-text', '--accent-wash', '--bg', '--bg-art', '--chip-bg', '--surface', '--surface-sunken',
       ], p.id);
+      // Фон богаче: свечение у всех, у «Хэллоуина» — ещё и рисунок тыкв
+      assert.match(t['--bg-art'], p.id === 'halloween' ? /^url\("data:image\/svg\+xml,.+radial-gradient/ : /^radial-gradient\(.+radial-gradient\(/, p.id);
       ['--bg', '--surface', '--surface-sunken', '--accent'].forEach((k) => assert.match(t[k], HEX, `${p.id}/${scheme}/${k}`));
       // Подложки мелкого — третьим цветом, полупрозрачные
       assert.match(t['--chip-bg'], /^rgba\(\d+, \d+, \d+, 0\.\d+\)$/);
@@ -74,7 +73,7 @@ test('три роли: фон — второй цвет, мелкое — тре
       assert.notEqual(t['--bg'], BASE[scheme].bg, p.id + ': фон подкрашен');
       bgs.add(t['--bg']);
     }
-    assert.ok(bgs.size >= 10, scheme + ': фоны разные, а не одна бежевая — ' + bgs.size);
+    assert.ok(bgs.size >= PALETTES.length - 2, scheme + ': фоны разные, а не одна бежевая — ' + bgs.size);
   }
   assert.equal(paletteTokens(paletteById(STANDARD), 'light'), null, 'стандартная — токены styles.css');
 });
@@ -98,6 +97,12 @@ test('контраст: текст темы, кнопка, акцент и на�
       for (const g of [...grounds, ...washes]) {
         assert.ok(contrast(c.accent, g) >= AA, at('акцент на ' + g, contrast(c.accent, g)));
         assert.ok(contrast(c.ink2, g) >= AA, at('третий цвет текстом на ' + g, contrast(c.ink2, g)));
+      }
+      // На пике свечения (--bg-art) текст темы держит контраст так же
+      if (p.id !== 'halloween') {
+        for (const peak of artPeaks(p, scheme)) {
+          for (const text of BASE[scheme].text) assert.ok(contrast(text, peak) >= AA, at('текст ' + text + ' на свечении ' + peak, contrast(text, peak)));
+        }
       }
       // Тёмная остаётся тёмной, светлая — светлой: строка состояния и
       // системные элементы подбираются по фону
@@ -130,6 +135,22 @@ test('выбор: сохраняется, чужое значение и сло�
   assert.equal(setPaletteId('neon'), STANDARD);
   broken = true;
   assert.equal(getPaletteId(), STANDARD);
-  assert.equal(setPaletteId('orca'), 'orca', 'не упали — выбор применён хотя бы до перезапуска');
+  assert.equal(setPaletteId('fig'), 'fig', 'не упали — выбор применён хотя бы до перезапуска');
   broken = false;
+  // Убранная 22.10.2026 палитра (FT-702) — стандартная, без ошибки
+  for (const gone of ['mandarin', 'red-panda', 'sea', 'pheasant', 'pistachio', 'orca', 'snow-leopard']) {
+    store.set(PALETTE_KEY, gone);
+    assert.equal(getPaletteId(), STANDARD, gone);
+  }
+});
+
+test('«Хэллоуин» всегда тёмный, остальные — по выбору человека (FT-702)', () => {
+  assert.equal(forcedScheme('halloween'), 'dark');
+  for (const p of PALETTES.filter((x) => x.id !== 'halloween')) assert.equal(forcedScheme(p.id), null, p.id);
+  store.set(PALETTE_KEY, 'halloween');
+  assert.equal(forcedScheme(), 'dark');
+  store.delete(PALETTE_KEY);
+  // telegram.js спрашивает палитру прежде выбора темы
+  const tg = readFileSync(new URL('../src/telegram.js', import.meta.url), 'utf8');
+  assert.match(tg, /const mode = forcedScheme\(\) \|\| getThemeMode\(\);/);
 });
