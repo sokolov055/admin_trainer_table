@@ -77,21 +77,48 @@ export function createRecognition({ progress = () => {}, base = document.baseURI
     // 1) контраст по соседям, текст одним блоком; 2) он же, разрозненные строки (банка,
     // изгиб, наклон); 3) исходное фото разрозненными строками. parseLabel сводит прочтения
     // и берёт поле, только когда они не спорят.
-    async readLabel(canvas, onPass = () => {}) {
+    // Фото боком (FT-701: холодец снят поперёк) Tesseract читает мусором без «на 100 г».
+    // Тогда первое прочтение повторяем на фото, повёрнутом на 90° и 270°, и дальше читаем
+    // ту сторону, где база нашлась; onRotate получает угол и повёрнутое фото для превью.
+    async readLabel(canvas, onPass = () => {}, onRotate = () => {}) {
       const ocr = await open();
+      const read = async (image, mode) => {
+        if (stopped) throw new Error('Распознавание отменено.');
+        await ocr.setParameters({ tessedit_pageseg_mode: mode });
+        return (await ocr.recognize(image)).data.text;
+      };
       try {
-        const contrast = contrastCanvas(canvas), passes = [[contrast, '6'], [contrast, '11'], [canvas, '11']], texts = [];
-        for (let i = 0; i < passes.length; i++) {
-          if (stopped) throw new Error('Распознавание отменено.');
-          onPass(i + 1, passes.length);
-          await ocr.setParameters({ tessedit_pageseg_mode: passes[i][1] });
-          texts.push((await ocr.recognize(passes[i][0])).data.text);
-          if (labelScore(parseLabel(texts)) === 5) break;
+        let photo = canvas, contrast = contrastCanvas(canvas);
+        onPass(1, 3);
+        let texts = [await read(contrast, '6')];
+        if (!labelScore(parseLabel(texts))) {
+          for (const angle of [90, 270]) {
+            onPass(0, 0, angle);
+            const turned = rotateCanvas(contrast, angle), text = await read(turned, '6');
+            if (!labelScore(parseLabel(text))) continue;
+            photo = rotateCanvas(canvas, angle); contrast = turned; texts = [text];
+            onRotate(angle, photo);
+            break;
+          }
+        }
+        const passes = [[contrast, '11'], [photo, '11']];
+        for (let i = 0; i < passes.length && labelScore(parseLabel(texts)) < 5; i++) {
+          onPass(i + 2, 3);
+          texts.push(await read(...passes[i]));
         }
         return texts;
       } finally { stop(); }
     },
   };
+}
+// Поворот по часовой стрелке на 90°/180°/270°
+function rotateCanvas(canvas, angle) {
+  const out = document.createElement('canvas'), sideways = angle % 180 !== 0;
+  out.width = sideways ? canvas.height : canvas.width; out.height = sideways ? canvas.width : canvas.height;
+  const ctx = out.getContext('2d');
+  ctx.translate(out.width / 2, out.height / 2); ctx.rotate(angle * Math.PI / 180);
+  ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+  return out;
 }
 // Серый снимок «тёмный текст на белом» той же величины (label-image.js)
 function contrastCanvas(canvas) {

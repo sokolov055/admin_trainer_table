@@ -44,12 +44,14 @@ export default function FoodScan({ onDraft, onFound, disabled = false, start = '
     try {
       const recognition = await import('./food-recognition.js');
       if (ticket !== sequence.current) return;
-      // Этикетку читаем до трёх раз разными способами — запас по времени больше
-      const timeout = new Promise((_, reject) => { timer = setTimeout(() => { job.current?.stop(); reject(new Error('Распознавание заняло слишком долго. Попробуйте фото крупнее или заполните поля вручную.')); }, mode === 'barcode' ? 90000 : 150000); });
+      // Этикетку читаем до трёх раз разными способами и, если фото боком, ещё дважды повёрнутой — запас по времени больше
+      const timeout = new Promise((_, reject) => { timer = setTimeout(() => { job.current?.stop(); reject(new Error('Распознавание заняло слишком долго. Попробуйте фото крупнее или заполните поля вручную.')); }, mode === 'barcode' ? 90000 : 210000); });
       const action = mode === 'barcode' ? recognition.decodeBarcode(canvas.current) : (() => {
-        let pass = 1, total = 1;
-        job.current = recognition.createRecognition({ progress: event => { if (ticket === sequence.current && event.status === 'recognizing text') { setBusy(pass === 1 ? 'Читаем этикетку…' : `Перечитываем другим способом, ${pass} из ${total}…`); setPercent(Math.round(event.progress * 100)); } } });
-        return job.current.readLabel(canvas.current, (n, of) => { pass = n; total = of; });
+        let pass = 1, total = 1, turn = 0;
+        job.current = recognition.createRecognition({ progress: event => { if (ticket === sequence.current && event.status === 'recognizing text') { setBusy(turn ? 'Текст не читается — пробуем фото повёрнутым…' : pass === 1 ? 'Читаем этикетку…' : `Перечитываем другим способом, ${pass} из ${total}…`); setPercent(Math.round(event.progress * 100)); } } });
+        // Фото оказалось боком — превью и «Повернуть фото» дальше идут от найденной стороны
+        const turned = (angle, picture) => { if (ticket !== sequence.current) return; rotation.current += angle; canvas.current = picture; setImage(picture.toDataURL('image/jpeg', 0.9)); };
+        return job.current.readLabel(canvas.current, (n, of, angle = 0) => { pass = n; total = of; turn = angle; }, turned);
       })();
       const result = await Promise.race([action, timeout]);
       if (ticket !== sequence.current) return;

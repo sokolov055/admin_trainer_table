@@ -56,6 +56,20 @@ test('FT-551: реальное локальное OCR и штрихкод, че�
     return createRecognition({ base: base + '/', useBlobWorker: true }).recognize(canvas);
   }, { base: origin, png: labelPng });
   assert.deepEqual(parseLabel(localText).fields, { protein: '8.5', fat: '2', carbs: '12', kcal: '100' });
+  // FT-701: холодец снят боком — сканер сам находит сторону, где читается «100г продукта»
+  const sideways = await page.evaluate(async ({ base }) => {
+    const { createRecognition } = await import(base + '/recognition-test.js');
+    const text = document.createElement('canvas'); text.width = 1200; text.height = 420;
+    let ctx = text.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1200, 420); ctx.fillStyle = '#000'; ctx.font = '40px Arial';
+    ['Пищевая ценность 100г продукта (средние', 'значения): белки-10г, жиры-10г, энергетическая', 'ценность (калорийность): 540 кДж (130 ккал)'].forEach((line, i) => ctx.fillText(line, 30, 90 + i * 110));
+    const canvas = document.createElement('canvas'); canvas.width = 420; canvas.height = 1200;
+    ctx = canvas.getContext('2d'); ctx.translate(420, 0); ctx.rotate(Math.PI / 2); ctx.drawImage(text, 0, 0);
+    let turned = null;
+    const texts = await createRecognition({ base: base + '/', useBlobWorker: true }).readLabel(canvas, () => {}, (angle, photo) => { turned = { angle, width: photo.width }; });
+    return { texts, turned };
+  }, { base: origin });
+  assert.deepEqual(sideways.turned, { angle: 270, width: 1200 });
+  assert.deepEqual(parseLabel(sideways.texts).fields, { protein: '10', fat: '10', kcal: '130' });
   await scanner.getByLabel('Выбрать фото продукта').setInputFiles({ name: 'synthetic-label.png', mimeType: 'image/png', buffer: Buffer.from(labelPng, 'base64') });
   await scanner.getByRole('button', { name: 'Прочитать этикетку', exact: true }).click();
   await scanner.getByRole('button', { name: 'Отменить распознавание', exact: true }).click();

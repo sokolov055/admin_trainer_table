@@ -63,7 +63,8 @@ function variants(token) {
 }
 
 function extract(text) {
-  const raw = String(text || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\S\n]/g, ' ');
+  // «1OOг», «1О0 г»: буква «о» внутри числа — ноль (длина та же, позиции не сдвигаются)
+  const raw = String(text || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\S\n]/g, ' ').replace(/[\doо]*\d[\doо]*/g, m => m.replace(/[oо]/g, '0'));
   const t = cyr(raw);
   const grams = both(GRAM_BASIS, t, raw), ml = both(ML_BASIS, t, raw), portion = both(PORTION, t, raw);
   const basis = portion ? 'portion' : grams && ml ? 'mixed' : grams ? '100g' : ml ? '100ml' : 'unknown';
