@@ -7,7 +7,7 @@ import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWor
 import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { clock, closeSets, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, cloneSet, editSetField } from './workout-model.js';
+import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, cloneSet, editSetField } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
@@ -177,7 +177,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         return;
       }
       const result = await journalGet(clientRow, id);
-      store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: Date.now() });
+      store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: serverTick(result.session) });
     } catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
   };
@@ -349,7 +349,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       // Отмеченное здесь, пока шёл запрос, досылаем тем же путём — сервер
       // вольёт и его, повтор безопасен
       if (result.absorbed && result.session.id !== r.session.id) {
-        store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: Date.now(), pending: null });
+        store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: serverTick(result.session), pending: null });
         if (!unchanged) apiMutate('workout.save', { ...params, session: current.session, revision: 0, requestId: uid() }).catch(() => {});
         if (mounted.current) { setMessage(''); list().catch(() => {}); }
         return;
@@ -505,7 +505,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const take = (session, r) => {
       if (!mounted.current || !session || state.current?.dirty || state.current?.pending || saving.current
         || conflictRef.current || state.current?.session.id !== r.session.id) return false;
-      if (session.revision !== r.revision) store({ session, revision: session.revision, serverTitle: session.title, dirty: false, tick: Date.now() });
+      if (session.revision !== r.revision) store({ session, revision: session.revision, serverTitle: session.title, dirty: false, tick: serverTick(session) });
       return true;
     };
     const refresh = async () => {
@@ -760,7 +760,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     catch (_) { setMessage('Скачайте черновик перед загрузкой другой версии.'); return; }
     const remote = conflict.session;
     conflictRef.current = null; setConflict(null);
-    store({ session: remote, revision: remote.revision, serverTitle: remote.title, dirty: false, tick: Date.now() });
+    store({ session: remote, revision: remote.revision, serverTitle: remote.title, dirty: false, tick: serverTick(remote) });
   };
 
 

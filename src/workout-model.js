@@ -442,3 +442,15 @@ export function editSetField(ex, si, key, value) {
   }
   return { ...ex, sets };
 }
+
+/**
+ * С какого момента досчитывать время занятия, взятого с сервера: его
+ * elapsedMs досчитан до updatedAt (как у сервера, watch-workout.js), и
+ * идущее занятие с тех пор шло дальше. Отсчёт «с открытия» терял всё
+ * между сохранением и открытием — телефон в кармане, ведут часы: 45 минут
+ * вместо 60 (22.10.2026). Не дальше 3 часов назад (забытое занятие не растёт сутками) и не в будущем
+ */
+export const serverTick = (session, now = Date.now()) => {
+  const at = Date.parse((session && session.updatedAt) || '');
+  return session && session.status === 'active' && at > 0 ? Math.min(now, Math.max(at, now - 3 * 3600000)) : now;
+};

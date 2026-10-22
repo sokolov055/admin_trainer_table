@@ -1440,3 +1440,18 @@ test('отдых упражнения меняется в занятии: пан
   assert.match(text(timer), /^(2:00|1:59)$/, 'отдых две минуты — выбранный у упражнения');
   local.unmount();
 });
+
+test('время занятия с сервера досчитывается от его updatedAt, а не от открытия (22.10.2026)', async () => {
+  const { serverTick } = await import('../src/workout-model.js');
+  const now = Date.parse('2026-10-22T18:00:00Z');
+  const at = (min) => new Date(now - min * 60000).toISOString();
+  // Сохранили 15 минут назад, телефон был заблокирован — эти 15 минут — тренировка
+  assert.equal(serverTick({ status: 'active', updatedAt: at(15) }, now), now - 15 * 60000);
+  // На паузе и завершённое не идут
+  assert.equal(serverTick({ status: 'paused', updatedAt: at(15) }, now), now);
+  assert.equal(serverTick({ status: 'completed', updatedAt: at(15) }, now), now);
+  // Забытое со вчера — не больше трёх часов; часы сервера впереди — не в будущее
+  assert.equal(serverTick({ status: 'active', updatedAt: at(24 * 60) }, now), now - 3 * 3600000);
+  assert.equal(serverTick({ status: 'active', updatedAt: at(-2) }, now), now);
+  assert.equal(serverTick({ status: 'active' }, now), now);
+});
