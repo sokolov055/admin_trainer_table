@@ -3,8 +3,9 @@ import { useData } from '../useData.js';
 import { Section, Panel, Badge, formatNumber, formatTime } from '../ui.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import WatchHelp from './WatchHelp.jsx';
+import { HealthSheet } from './HealthConnect.jsx';
 import { ensureBackgroundSync } from '../native-sync.js';
-import { connectWorkouts, syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIphone, onHuawei, WORKOUTS_SENT } from '../native-steps.js';
+import { syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIphone, onHuawei, WORKOUTS_SENT } from '../native-steps.js';
 
 /**
  * Тренировки с часов — в прогрессе, рядом с шагами: у клиента (с 02.10.2026,
@@ -56,6 +57,8 @@ function facts(w) {
   const out = [Math.round(w.duration / 60) + ' мин'];
   if (w.kcal) out.push(formatNumber(Math.round(w.kcal)) + ' ккал');
   if (w.distance) out.push(formatNumber(w.distance / 1000, 1) + ' км');
+  // Пульс за время тренировки (FT-708) — только с согласием на данные о здоровье
+  if (w.hrAvg) out.push('пульс ' + w.hrAvg + (w.hrMax ? ', макс ' + w.hrMax : ''));
   if (w.source) out.push(w.source);
   return out.join(' · ');
 }
@@ -69,6 +72,8 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
   const [on, setOn] = useState(workoutsOn());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  // «Подключить тренировки» — общий экран «Здоровье» (FT-708): одно окно на всё
+  const [sheet, setSheet] = useState(false);
 
   useEffect(() => {
     const again = () => reload();
@@ -81,10 +86,11 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
   const list = data.workouts || [];
 
   const connect = async () => {
+    if (!on) { setSheet(true); return; }
     setBusy(true);
     setMessage('');
     try {
-      const res = on ? await syncWorkouts(true) : await connectWorkouts();
+      const res = await syncWorkouts(true);
       if (res.ok === false) setMessage(res.reason);
       else {
         setOn(true);
@@ -158,6 +164,7 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
           {!huawei && <WatchHelp />}
           {message && <p className="small" role="status" style={{ marginBottom: 0 }}>{message}</p>}
         </Panel>
+        {sheet && <HealthSheet self={self} onClose={() => { setSheet(false); setOn(workoutsOn()); reload(); }} />}
       </Section>
     );
   }

@@ -12,6 +12,10 @@
 import { apiMutate, apiPrimary } from './api.js';
 import { plugin, bridge, isNativeApp } from './native-bridge.js';
 import { APP_VERSION } from './version.js';
+import {
+  healthScope, healthReads, shouldAskHealth, DAILY_TYPES, sleepByDay, lastByDay, avgByDay,
+  aggregatedByDay, totalKcalByDay, fatPercent, mergeHealthDays, hrFromAggregated,
+} from './health-model.js';
 
 /** iPhone: шаги из «Здоровья» (HealthKit). Apple не говорит приложению,
  *  выдано ли чтение, — поэтому там «подключено» значит «прошли окно» */
@@ -274,34 +278,108 @@ export async function connectWorkouts() {
   return { ok: true, ...sent };
 }
 
+/*
+ * Данные о здоровье одним окном (FT-708, владелец 22.10.2026): кроме шагов и
+ * тренировок — сон с фазами, пульс покоя и ВСР, пульс на тренировке, вес и
+ * % жира с весов, активные и общие ккал за день, рост, VO2max. Только
+ * чтение. Новые типы — только в новых сборках (iPhone 26+, Android 11+,
+ * health-model.js); Huawei и старые сборки — шаги и тренировки, как раньше.
+ * Решение человека хранит сервер (health.access.*), а «читать на этом
+ * телефоне» — флаг здесь: согласие одно на аккаунт, телефонов бывает два.
+ */
+const HEALTH_ON_KEY = 'native_health_on_v1';
+const HEALTH_SENT_KEY = 'native_health_sent_v1';
+/** Показали экран на полном устройстве — повторно из-за «basic» не спрашиваем */
+const HEALTH_FULL_ASKED_KEY = 'native_health_full_asked_v1';
+/** Пульс тренировок, уже прочитанный: platformId → [средний, макс] */
+const HR_CACHE_KEY = 'native_workout_hr_v1';
+/** Событие «данные о здоровье ушли на сервер» — блок «Здоровье» перечитывает */
+export const HEALTH_SENT = 'fittrack:health-sent';
+
+/** Что умеет это устройство: 'full', 'basic' или '' (нет «Здоровья»/Health Connect) */
+export async function deviceHealthScope() {
+  await pickSource();
+  if (!health() || !(await stepsAvailability()).available) return '';
+  // Номер сборки — свежий: после обновления в памяти ещё прежний
+  let build = appBuild();
+  try {
+    const app = plugin('App');
+    const info = app && app.getInfo ? await app.getInfo() : null;
+    if (info && info.build) { noteAppBuild(info); build = Number(info.build) || build; }
+  } catch (_) {}
+  return healthScope({ platform: onIphone() ? 'ios' : 'android', build, huawei });
+}
+
+/** Читаем ли сон, пульс и вес на этом телефоне */
+export function healthDailyOn() {
+  try { return !!localStorage.getItem(HEALTH_ON_KEY); } catch (_) { return false; }
+}
+
+export function healthFullAsked() {
+  try { return localStorage.getItem(HEALTH_FULL_ASKED_KEY) === '1'; } catch (_) { return false; }
+}
+
+export function markHealthFullAsked() {
+  try { localStorage.setItem(HEALTH_FULL_ASKED_KEY, '1'); } catch (_) {}
+}
+
+/** Отключить новые данные на этом телефоне; шаги и тренировки не трогаем */
+export function disconnectHealth() {
+  try { [HEALTH_ON_KEY, HEALTH_SENT_KEY, HR_CACHE_KEY].forEach((k) => localStorage.removeItem(k)); } catch (_) {}
+}
+
+/** Спросить ли экран «Здоровье» при входе: решение сервера + что умеет телефон */
+export async function healthAskNeeded(access) {
+  const deviceScope = await deviceHealthScope().catch(() => '');
+  return shouldAskHealth({ access, deviceScope, fullAsked: healthFullAsked() }) ? deviceScope : '';
+}
+
 /**
- * Шаги и тренировки одним окном — для анкеты (FT-510): человек один раз
- * читает, зачем это, и видит одно системное окно, а не два подряд. Дальше
- * — те же отправки, что у кнопок «Подключить» в «Прогрессе»: второго
- * импорта нет.
+ * Записать решение на сервер. Ошибку не бросаем: старый сервер этих
+ * действий не знает, а шаги и тренировки работают и без записи
+ */
+export async function saveHealthAccess(decision, scope, consent = false) {
+  try {
+    return await apiMutate('health.access.set', {
+      decision, scope, ...(consent ? { consent: true } : {}), device: onIphone() ? 'ios' : 'android',
+    }, { quiet: true });
+  } catch (_) { return null; }
+}
+
+/**
+ * Всё одним окном — экран «Здоровье» (client/HealthConnect.jsx) и анкета
+ * (FT-510): человек один раз читает, что берём и зачем, и видит одно
+ * системное окно. consent — галочка отдельного согласия на данные о
+ * здоровье: без неё (или на старой сборке) просим только шаги и тренировки,
+ * их покрывает общее согласие. Дальше — те же отправки, что у кнопок
+ * «Подключить» в «Прогрессе»: второго импорта нет.
  *
- * Итог честный: steps/workouts — 'ok' (данные ушли), 'empty' (записей нет;
- * на iPhone так же выглядит и запрет), 'denied' (Android сказал «не
+ * Итог честный: steps/workouts/daily — 'ok' (данные ушли), 'empty' (записей
+ * нет; на iPhone так же выглядит и запрет), 'denied' (Android сказал «не
  * выдано»), 'error' (чтение упало), 'off' (на телефоне этого нет).
  */
-export async function connectHealth() {
+export async function connectHealth({ consent = false } = {}) {
   await pickSource();
   const h = health();
-  if (!h || !(await stepsAvailability()).available) return { ok: false, steps: 'off', workouts: 'off' };
+  if (!h || !(await stepsAvailability()).available) return { ok: false, steps: 'off', workouts: 'off', daily: 'off', scope: '' };
+  const deviceScope = await deviceHealthScope();
+  const scope = deviceScope === 'full' && consent ? 'full' : 'basic';
   const withWorkouts = workoutsAvailable();
-  const read = onIphone()
-    ? (withWorkouts ? ['steps', 'workouts'] : ['steps'])
-    : (withWorkouts ? ['steps', ...ANDROID_WORKOUT_READS] : ['steps']);
+  const read = healthReads(onIphone() ? 'ios' : 'android', scope, withWorkouts);
   let granted = null;
   try {
+    // На повторном окне после обновления система покажет только новые пункты
     const res = await h.requestAuthorization({ read });
     granted = res && res.readAuthorized;
   } catch (_) {
-    return { ok: false, steps: 'error', workouts: withWorkouts ? 'error' : 'off' };
+    return { ok: false, steps: 'error', workouts: withWorkouts ? 'error' : 'off', daily: 'off', scope };
   }
+  if (deviceScope === 'full') markHealthFullAsked();
+  // Решение — на сервер до первой отправки: без согласия он не примет сон и пульс
+  await saveHealthAccess('granted', scope, scope === 'full');
   // Android честно говорит, что выдано; iPhone — нет, там «прошли окно»
   const allowed = (type) => onIphone() || (granted || []).includes(type);
-  const out = { ok: true, steps: 'off', workouts: 'off' };
+  const out = { ok: true, steps: 'off', workouts: 'off', daily: 'off', scope };
   const run = async (on, key, sync) => {
     if (!on) return 'denied';
     try { localStorage.setItem(key, '1'); } catch (_) {}
@@ -310,10 +388,134 @@ export async function connectHealth() {
       return r.reason === 'ok' ? 'ok' : r.reason === 'denied' ? 'denied' : 'empty';
     } catch (_) { return 'error'; }
   };
+  // Пульс тренировок читается вместе с ними — флаг раньше их отправки
+  const daily = scope === 'full' && DAILY_TYPES.concat('heartRate').some(allowed);
+  if (daily) { try { localStorage.setItem(HEALTH_ON_KEY, '1'); } catch (_) {} }
   out.steps = await run(allowed('steps'), ON_KEY, syncSteps);
   if (withWorkouts) out.workouts = await run(allowed('workouts'), WORKOUTS_ON_KEY, syncWorkouts);
-  out.ok = out.steps !== 'denied' || out.workouts === 'ok';
+  if (scope === 'full') out.daily = await run(daily, HEALTH_ON_KEY, syncHealthDaily);
+  out.ok = out.steps !== 'denied' || out.workouts === 'ok' || out.daily === 'ok';
   return out;
+}
+
+/**
+ * Сон, пульс покоя, ВСР, ккал, вес, % жира, VO2max за 30 дней и рост —
+ * по дням, на сервер (health.daily.sync). Как шаги: при запуске, при
+ * возврате (не чаще раза в 3 минуты) и после подключения.
+ *
+ * Чтение по типам по очереди: Health Connect ограничивает частоту запросов,
+ * а отказ в одном типе (человек выключил его в окне) не должен оставлять
+ * без остальных. Android говорит, что выдано, — читаем только это; iPhone
+ * не говорит — запрет там выглядит как «пусто».
+ */
+export async function syncHealthDaily(force = false) {
+  await pickSource();
+  const h = health();
+  if (!h || huawei) return { sent: 0, reason: 'app' };
+  if (!healthDailyOn()) return { sent: 0, reason: 'off' };
+  if (!force) {
+    try {
+      const last = Number(localStorage.getItem(HEALTH_SENT_KEY) || 0);
+      if (Date.now() - last < EVERY_MS) return { sent: 0, reason: 'recent' };
+    } catch (_) {}
+  }
+  let allowed = DAILY_TYPES;
+  if (!onIphone()) {
+    try { allowed = ((await h.checkAuthorization({ read: DAILY_TYPES })).readAuthorized) || []; } catch (_) { allowed = []; }
+    if (!allowed.length) return { sent: 0, reason: 'denied' };
+  }
+  // Не старше 30 дней: глубже Health Connect пускает только по отдельному
+  // разрешению (READ_HEALTH_DATA_HISTORY), его мы не просим
+  const end = new Date();
+  const floor = new Date(end.getTime() - DAYS * 86400000 + 60000);
+  const start = new Date(end);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (DAYS - 1));
+  const range = { startDate: start.toISOString(), endDate: end.toISOString() };
+  const read = async (type, fn) => {
+    if (!allowed.includes(type) || (onIphone() && type === 'totalCalories')) return null;
+    try { return await fn(); } catch (_) { return null; }
+  };
+  const samples = (type, extra = {}) => read(type, async () => ((await h.readSamples({ dataType: type, ...range, limit: 1000, ...extra })).samples) || []);
+  const aggregated = (type, aggregation) => read(type, async () => ((await h.queryAggregated({ dataType: type, ...range, bucket: 'day', aggregation })).samples) || []);
+
+  // Ночь на первый день началась накануне вечером — сколько пускает предел
+  const sleepFrom = new Date(Math.max(start.getTime() - 12 * 3600000, floor.getTime()));
+  const sleep = await samples('sleep', { startDate: sleepFrom.toISOString(), ascending: true });
+  const rhr = await aggregated('restingHeartRate', 'average');
+  const hrv = await samples('heartRateVariability', { limit: 2000 });
+  const active = await aggregated('calories', 'sum');
+  // Общий расход Health Connect не суммирует сам — сырые записи
+  const total = await samples('totalCalories', { limit: 5000 });
+  const weight = await samples('weight');
+  const fat = await samples('bodyFat');
+  const vo2 = await samples('vo2Max');
+  // Рост — последний за те же 30 дней: глубже не читаем
+  const heights = await samples('height', { startDate: floor.toISOString(), limit: 50 });
+
+  const days = mergeHealthDays({
+    sleep: sleep ? sleepByDay(sleep) : {},
+    restingHr: rhr ? aggregatedByDay(rhr, 'average') : {},
+    hrvMs: hrv ? avgByDay(hrv) : {},
+    activeKcal: active ? aggregatedByDay(active, 'sum') : {},
+    totalKcal: total ? totalKcalByDay(total) : {},
+    weightKg: weight ? lastByDay(weight) : {},
+    bodyFatPct: fat ? lastByDay(fat, fatPercent) : {},
+    vo2max: vo2 ? lastByDay(vo2) : {},
+  });
+  const lastHeight = Object.entries(heights ? lastByDay(heights) : {}).sort((a, b) => (a[0] < b[0] ? -1 : 1)).pop();
+  const heightCm = lastHeight ? Math.round(lastHeight[1]) : null;
+  if (!days.length && !heightCm) return { sent: 0, reason: 'empty' };
+  const res = await apiMutate('health.daily.sync', {
+    days, ...(heightCm ? { heightCm } : {}), source: onIphone() ? 'healthkit' : 'health-connect',
+  }, { quiet: true });
+  try { localStorage.setItem(HEALTH_SENT_KEY, String(Date.now())); } catch (_) {}
+  // Сервер без действующего согласия ничего не пишет — так и говорим
+  if (res && res.skipped === 'no-consent') return { sent: 0, reason: 'no-consent' };
+  try { window.dispatchEvent(new Event(HEALTH_SENT)); } catch (_) {}
+  return { sent: days.length, reason: 'ok' };
+}
+
+function readHrCache() {
+  try { return JSON.parse(localStorage.getItem(HR_CACHE_KEY) || '{}') || {}; } catch (_) { return {}; }
+}
+
+/**
+ * Средний и максимальный пульс за время каждой тренировки — при данных о
+ * здоровье на этом телефоне. Прочитанное помним: за месяц тренировок
+ * десятки, а отправка — при каждом возврате в приложение
+ */
+async function withHeartRate(list) {
+  if (!healthDailyOn() || huawei || !list.length) return list;
+  if (!onIphone()) {
+    try {
+      const res = await health().checkAuthorization({ read: ['heartRate'] });
+      if (!(res.readAuthorized || []).includes('heartRate')) return list;
+    } catch (_) { return list; }
+  }
+  const cache = readHrCache();
+  const kept = {};
+  for (const w of list) {
+    const key = w.platformId || w.startDate;
+    let hr = cache[key];
+    if (!hr) {
+      try {
+        const res = await health().queryAggregated({
+          dataType: 'heartRate', startDate: w.startDate, endDate: w.endDate, bucket: 'day', aggregation: ['average', 'max'],
+        });
+        const got = hrFromAggregated(res.samples);
+        hr = [got.hrAvg, got.hrMax];
+        // Пусто у свежей — часы могли ещё не передать пульс: спросим в следующий раз
+        if (!got.hrAvg && Date.now() - Date.parse(w.endDate) < 86400000) hr = null;
+      } catch (_) { hr = null; }
+    }
+    if (hr) {
+      kept[key] = hr;
+      if (hr[0]) { w.hrAvg = hr[0]; if (hr[1]) w.hrMax = hr[1]; }
+    }
+  }
+  try { localStorage.setItem(HR_CACHE_KEY, JSON.stringify(kept)); } catch (_) {}
+  return list;
 }
 
 /**
@@ -341,6 +543,7 @@ export async function syncWorkouts(force = false) {
     sourceName: sourceLabel(w.sourceName),
   }));
   if (!workouts.length) return { sent: 0, reason: 'empty' };
+  await withHeartRate(workouts);
   await apiMutate('health.workouts.sync', { workouts });
   try { localStorage.setItem(WORKOUTS_SENT_KEY, String(Date.now())); } catch (_) {}
   try { window.dispatchEvent(new Event(WORKOUTS_SENT)); } catch (_) {}

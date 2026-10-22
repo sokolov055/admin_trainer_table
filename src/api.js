@@ -540,13 +540,21 @@ async function tryEndpointNow(url, payload, timeoutMs) {
   } catch (error) {
     if (error && error.name === 'AbortError') return TIMED_OUT;
     // Дневник содержит данные о питании и комментарии: в URL их не переносим.
-    if (String(payload.action || '').startsWith('diary.') || (Array.isArray(payload.requests) && payload.requests.some(r => String(r.action || '').startsWith('diary.')))) return null;
+    // Данные о здоровье (FT-708) — тоже: сервер принимает их только POST-ом
+    if (noGet(payload.action) || (Array.isArray(payload.requests) && payload.requests.some(r => noGet(r.action)))) return null;
     try {
       return await getJson(url, payload, timeoutMs);
     } catch (_) {
       return null;
     }
   }
+}
+
+/** Чего нельзя повторять GET-ом: данные ушли бы в адрес и журналы */
+const POST_ONLY = new Set(['health.daily.sync', 'health.access.set', 'health.access.revoke', 'health.workouts.sync']);
+function noGet(action) {
+  const a = String(action || '');
+  return a.startsWith('diary.') || POST_ONLY.has(a);
 }
 
 async function postJson(url, payload, timeoutMs) {

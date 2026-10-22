@@ -39,6 +39,10 @@
 .permissions__list li, .permissions__result li { display: grid; gap: 2px; line-height: 1.5; }
 .permissions__list span, .permissions__result span { color: var(--text-secondary); }
 
+/* Экран «Здоровье» (HealthConnect.jsx, FT-708): «Подключить» и под ним «Не сейчас» */
+.onboarding__footer .button + .button { margin-top: 8px; }
+.health-revoke { flex: 1; font-size: var(--text-sm); line-height: 1.4; }
+
 @media (prefers-reduced-motion: reduce) {
   .first-hint, .first-regime__day.is-on .first-regime__dot { animation: none; }
 }

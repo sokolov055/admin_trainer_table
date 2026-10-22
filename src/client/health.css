@@ -1,0 +1,45 @@
+/* ==========================================================================
+   Блок «Здоровье» в «Прогрессе» (client/HealthDaily.jsx, FT-708).
+   Сон — главный показатель, крупно и с полосой фаз; остальное — сеткой
+   фактов, как под главным числом на «Обзоре» (.fact). Цвета фаз — от
+   акцента темы: глубокий насыщеннее, лёгкий бледнее, пробуждения — тёплым.
+   ========================================================================== */
+
+.health__big { font-size: var(--text-num); font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.2; margin: 2px 0; }
+
+.health__phases {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin-top: var(--space-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.health__phase { display: block; min-width: 4px; flex-basis: 0; }
+.health__phase--deep { background: var(--accent-solid); }
+.health__phase--rem { background: color-mix(in srgb, var(--accent-solid) 62%, var(--surface, #fff)); }
+.health__phase--light { background: color-mix(in srgb, var(--accent-solid) 30%, var(--surface, #fff)); }
+.health__phase--awake { background: var(--warning); }
+
+.health__legend {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.health__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.health__dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+.health__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+.health__facts--below { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.health__facts .fact__label { margin-bottom: 2px; }
+
+.health__spent { margin: var(--space-2) 0 0; }

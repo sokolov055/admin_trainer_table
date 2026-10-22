@@ -12,6 +12,8 @@ export const PRIVACY_URL = 'https://app.fitness100.ru/privacy.html';
 /** Согласие на обработку ПДн и пользовательское соглашение — отдельные тексты (156-ФЗ) */
 export const CONSENT_URL = 'https://app.fitness100.ru/consent.html';
 export const TERMS_URL = 'https://app.fitness100.ru/terms.html';
+/** Отдельное согласие на данные о здоровье: сон, пульс, вес (FT-708) */
+export const HEALTH_CONSENT_URL = 'https://app.fitness100.ru/health-consent.html';
 /** Поддержка — почта разработчика (App Store 1.5: способ связаться) */
 export const SUPPORT_URL = 'https://app.fitness100.ru/support.html';
 

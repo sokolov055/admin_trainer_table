@@ -541,6 +541,41 @@ function mockPhoneConfirm(p = {}) {
 }
 
 let mockGoal = { week: 2, steps: 8000, setBy: null, updatedAt: null };
+// Данные о здоровье (FT-708): решение человека и месяц показателей с часов
+let mockHealthAccess = { decision: 'granted', scope: 'full', decidedAt: daysAgo(12), consent: true };
+let mockHealthRevoked = false;
+
+function mockHealthDaily(params = {}) {
+  const access = { ...mockHealthAccess };
+  if (Number(params.clientRow) === 5 || mockHealthRevoked) return { from: daysAgo(29).slice(0, 10), days: [], latest: {}, access };
+  const days = [];
+  const sleep = [452, 398, 471, 425, 503, 386, 444, 462, 417, 489, 431, 376, 458, 447];
+  const pulse = [58, 57, 59, 61, 58, 56, 57, 60, 62, 59, 57, 56, 58, 55];
+  const hrv = [44, 47, 41, 38, 45, 49, 46, 42, 37, 43, 48, 50, 45, 52];
+  const weights = { 27: 78.4, 24: 78.1, 20: 77.9, 17: 77.6, 13: 77.5, 10: 77.2, 6: 77.1, 3: 76.9, 1: 76.8 };
+  for (let i = 29; i >= 0; i -= 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const k = i % 14;
+    const min = sleep[k];
+    const row = {
+      member: '', date, sleepMin: min,
+      sleepDeepMin: Math.round(min * 0.17), sleepRemMin: Math.round(min * 0.22), sleepLightMin: min - Math.round(min * 0.17) - Math.round(min * 0.22),
+      sleepAwakeMin: 12 + (k % 4) * 5, restingHr: pulse[k], hrvMs: hrv[k],
+      activeKcal: i === 0 ? 386 : 420 + ((k * 73) % 360), totalKcal: i === 0 ? 1690 : 2210 + ((k * 73) % 360),
+      vo2max: i % 7 === 2 ? 41.8 + (29 - i) * 0.03 : null, weightKg: weights[i] || null, bodyFatPct: weights[i] ? Math.round((19.6 - (29 - i) * 0.04) * 10) / 10 : null,
+    };
+    days.push(row);
+  }
+  const lastOf = (key) => [...days].reverse().find((r) => r[key] !== null) || {};
+  const latest = {
+    weightKg: lastOf('weightKg').weightKg, weightDate: lastOf('weightKg').date,
+    bodyFatPct: lastOf('bodyFatPct').bodyFatPct, bodyFatDate: lastOf('bodyFatPct').date,
+    vo2max: Math.round(lastOf('vo2max').vo2max * 10) / 10, vo2maxDate: lastOf('vo2max').date,
+  };
+  return { from: days[0].date, days, latest, access };
+}
 
 function mockAwards(params = {}) {
   const now = new Date();
@@ -2109,14 +2144,34 @@ const MOCK = {
     const at = (dAgo, h, m) => { const d = new Date(); d.setDate(d.getDate() - dAgo); d.setHours(h, m, 0, 0); return d.toISOString(); };
     return {
       workouts: [
-        { id: 'hw1', type: 'traditionalStrengthTraining', startedAt: at(1, 19, 12), endedAt: at(1, 20, 20), duration: 4080, kcal: 412, distance: null, source: 'Apple Watch',
+        { id: 'hw1', type: 'traditionalStrengthTraining', startedAt: at(1, 19, 12), endedAt: at(1, 20, 20), duration: 4080, kcal: 412, distance: null, source: 'Apple Watch', hrAvg: 118, hrMax: 162,
           session: { id: 's1', title: 'Верх', minutes: 75, notes: ['часы включили на 7 мин позже'] } },
-        { id: 'hw2', type: 'running', startedAt: at(3, 8, 5), endedAt: at(3, 8, 41), duration: 2160, kcal: 356, distance: 5230, source: 'Apple Watch' },
+        { id: 'hw2', type: 'running', startedAt: at(3, 8, 5), endedAt: at(3, 8, 41), duration: 2160, kcal: 356, distance: 5230, source: 'Apple Watch', hrAvg: 149, hrMax: 176 },
         { id: 'hw3', type: 'walking', startedAt: at(5, 18, 30), endedAt: at(5, 19, 25), duration: 3300, kcal: 190, distance: 4800, source: 'iPhone' },
       ],
     };
   },
   'health.workouts.sync': (params) => ({ saved: (params.workouts || []).length }),
+  // Данные о здоровье (FT-708, client/HealthDaily.jsx): месяц сна, пульса,
+  // калорий и взвешиваний. У Дмитрия (строка 5) — ничего: блока нет.
+  // Отозвали согласие в «Моих данных» — данных нет до новой отправки
+  'health.daily.list': (params = {}) => mockHealthDaily(params),
+  'health.daily.sync': (params) => (mockHealthAccess.consent ? { saved: (params.days || []).length } : { saved: 0, skipped: 'no-consent' }),
+  'health.access.get': () => ({ ...mockHealthAccess }),
+  'health.access.set': (p) => {
+    if (p.decision === 'granted' && p.scope === 'full' && p.consent !== true && !mockHealthAccess.consent) mockFail('Отметьте согласие на обработку данных о здоровье.');
+    mockHealthAccess = {
+      decision: p.decision, scope: p.scope || mockHealthAccess.scope, decidedAt: new Date().toISOString(),
+      consent: p.decision === 'granted' && p.scope === 'full' ? (p.consent === true || mockHealthAccess.consent) : false,
+    };
+    if (mockHealthAccess.consent) mockHealthRevoked = false;
+    return { ...mockHealthAccess };
+  },
+  'health.access.revoke': () => {
+    mockHealthAccess = { ...mockHealthAccess, decision: 'declined', consent: false, decidedAt: new Date().toISOString() };
+    mockHealthRevoked = true;
+    return { ...mockHealthAccess };
+  },
   // «Записать подходы?» на «Обзоре» (пункт 12): в демо — только с
   // ?mockWatch=1, чтобы проверки «Обзора» видели прежний экран. id
   // тренировки пустой, как у демо-программы: «Тренировки» найдут её по названию

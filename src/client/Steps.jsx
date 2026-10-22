@@ -4,8 +4,9 @@ import { Section, Panel, formatNumber, formatDate, plural } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import WatchHelp from './WatchHelp.jsx';
+import { HealthSheet } from './HealthConnect.jsx';
 import { connectSteps, stepsConnected, stepsOn, onIphone, onHuawei, syncSteps, reportDevice, openHealthSettings, STEPS_SENT } from '../native-steps.js';
-import { backgroundSyncAvailable, backgroundSyncStatus, ensureBackgroundSync, requestBackgroundAccess } from '../native-sync.js';
+import { backgroundSyncAvailable, backgroundSyncStatus, requestBackgroundAccess } from '../native-sync.js';
 
 /**
  * Строка под графиком на Android (APK 5+): шлёт ли телефон шаги сам, в
@@ -111,6 +112,8 @@ export default function Steps({ clientRow, self = false, preview = false }) {
   const [problem, setProblem] = useState('');
   // Итог «Проверить ещё раз» — словами: раньше кнопка молчала при любом исходе
   const [checked, setChecked] = useState('');
+  // «Подключить шаги» — общий экран «Здоровье» (FT-708): одно окно на всё
+  const [sheet, setSheet] = useState(false);
 
   const recheck = async () => {
     setBusy(true);
@@ -158,24 +161,11 @@ export default function Steps({ clientRow, self = false, preview = false }) {
   const member = rows.length ? rows[0].member : '';
   const byDate = new Map(rows.filter((r) => r.member === member).map((r) => [r.date, r.steps]));
 
-  const connect = async () => {
-    setBusy(true);
-    setProblem('');
-    try {
-      const res = await connectSteps();
-      if (!res.ok) setProblem(res.reason);
-      else {
-        setConnected(true);
-        reload();
-        // Android: ключ фоновой задаче — дальше шаги уходят и без приложения
-        ensureBackgroundSync().catch(() => {});
-      }
-    } catch (e) {
-      setProblem(e.message || 'Не получилось подключить шаги.');
-    } finally {
-      setBusy(false);
-      reportDevice(true);
-    }
+  const connect = () => { setProblem(''); setSheet(true); };
+  const sheetClosed = () => {
+    setSheet(false);
+    stepsConnected().then((ok) => setConnected(ok && stepsOn())).catch(() => {});
+    reload();
   };
 
   if (!byDate.size) {
@@ -189,8 +179,8 @@ export default function Steps({ clientRow, self = false, preview = false }) {
             <p className="steps__lead">Тренер увидит, сколько вы ходите, — без ручного ввода.</p>
             <p className="small muted">
               {ios
-                ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает шаги — больше ничего.'
-                : 'Шаги берутся из «Здоровья» на iPhone или Health Connect на Android: туда их пишут часы, браслеты и фитнес-приложения. Приложение только читает шаги — больше ничего.'}
+                ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает — ничего не записывает.'
+                : 'Шаги берутся из «Здоровья» на iPhone или Health Connect на Android: туда их пишут часы, браслеты и фитнес-приложения. Приложение только читает — ничего не записывает.'}
             </p>
             <div className="survey__actions">
               <button className="button button--primary" disabled>Подключить шаги</button>
@@ -249,10 +239,10 @@ export default function Steps({ clientRow, self = false, preview = false }) {
               <p className="steps__lead">{self ? 'Шаги с этого телефона появятся в вашем прогрессе, без ручного ввода.' : 'Тренер увидит, сколько вы ходите, — без ручного ввода.'}</p>
               <p className="small muted">
                 {onIphone()
-                  ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает шаги — больше ничего.'
+                  ? 'Шаги берутся из приложения «Здоровье»: туда их пишут iPhone, Apple Watch и браслеты. Приложение только читает — ничего не записывает.'
                   : onHuawei()
-                    ? 'Шаги берутся из Huawei Health: туда их пишут телефон и часы Huawei. Приложение только читает шаги — больше ничего.'
-                    : 'Шаги берутся из Health Connect на телефоне: туда их пишут Google Fit, Samsung Health, Mi Fitness и браслеты. Приложение только читает шаги — больше ничего.'}
+                    ? 'Шаги берутся из Huawei Health: туда их пишут телефон и часы Huawei. Приложение только читает — ничего не записывает.'
+                    : 'Шаги берутся из Health Connect на телефоне: туда их пишут Google Fit, Samsung Health, Mi Fitness и браслеты. Приложение только читает — ничего не записывает.'}
               </p>
               {!onHuawei() && <WatchHelp />}
               <div className="survey__actions">
@@ -264,6 +254,7 @@ export default function Steps({ clientRow, self = false, preview = false }) {
           )}
           {problem && <p className="small muted">{problem}</p>}
         </Panel>
+        {sheet && <HealthSheet self={self} onClose={sheetClosed} />}
       </Section>
     );
   }

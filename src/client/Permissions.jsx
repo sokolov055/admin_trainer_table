@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { isNativeApp } from '../native-bridge.js';
 import { detectBrowser } from '../browser.js';
-import { stepsAvailability, stepsOn, connectHealth, healthHub, onIphone, workoutsAvailable } from '../native-steps.js';
+import { stepsAvailability, stepsOn, connectHealth, deviceHealthScope, healthHub, onIphone, workoutsAvailable } from '../native-steps.js';
+import { healthResultLines } from './HealthConnect.jsx';
+import { HEALTH_CONSENT_URL } from '../PrivacyLink.jsx';
 import { ensureBackgroundSync, backgroundSyncAvailable, backgroundSyncStatus, requestBackgroundAccess } from '../native-sync.js';
 import { notifyPermission, askNotifyPermission } from '../native-rest.js';
 import './onboarding.css';
@@ -15,9 +17,12 @@ import './first-steps.css';
  * регистрации. Один раз на телефоне.
  *
  * Шаги считает сам телефон — берём суммы по дням из «Здоровья» или Health
- * Connect; тренировки — те, что записали телефон или часы. Пульс, сон и вес
- * не просим. Согласие на шаги и тренировки (редакция 2026-10-02) человек уже
- * подтвердил при регистрации.
+ * Connect; тренировки — те, что записали телефон или часы. Согласие на шаги
+ * и тренировки (редакция 2026-10-02) человек уже подтвердил при регистрации.
+ * Сон, пульс, вес и остальное (FT-708) — только на новых сборках и только с
+ * галочкой отдельного согласия здесь же: без неё системное окно спросит
+ * одни шаги и тренировки. Решение уходит на сервер (health.access.set) —
+ * второй раз экран «Здоровье» при входе не покажется.
  *
  * Перед системными окнами — свой экран с одной кнопкой «Продолжить», без
  * «Не сейчас»: App Review (5.1.1(iv)) отклоняет экраны перед запросом с
@@ -41,10 +46,11 @@ function markAsked() {
 /** Что на этом телефоне ещё можно спросить; null — пока проверяем */
 async function pending() {
   const health = !stepsOn() && !!(await stepsAvailability().catch(() => ({}))).available;
+  const scope = health ? await deviceHealthScope().catch(() => 'basic') : '';
   const notify = (await notifyPermission()) === 'prompt';
   const bgStatus = !onIphone() && backgroundSyncAvailable() ? await backgroundSyncStatus() : null;
   const background = !!(bgStatus && bgStatus.supported && !bgStatus.background);
-  return { health, workouts: health && workoutsAvailable(), notify, background: background && health };
+  return { health, scope, workouts: health && workoutsAvailable(), notify, background: background && health };
 }
 
 /** Нужен ли экран: приложение, ещё не спрашивали, есть что спросить */
@@ -75,6 +81,9 @@ function healthLine(r) {
 
 export default function Permissions({ need, onDone }) {
   const [busy, setBusy] = useState(false);
+  // Галочка не отмечена заранее: согласие — отдельное действие человека
+  const [consent, setConsent] = useState(false);
+  const full = need.health && need.scope === 'full';
   const [lines, setLines] = useState(null);
   const heading = useRef(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [lines]);
@@ -85,8 +94,9 @@ export default function Permissions({ need, onDone }) {
     const out = [];
     let health = null;
     if (need.health) {
-      try { health = await connectHealth(); } catch (_) { health = { steps: 'error' }; }
+      try { health = await connectHealth({ consent: full && consent }); } catch (_) { health = { steps: 'error' }; }
       out.push(['Шаги и тренировки', healthLine(health)]);
+      if (health.scope === 'full') out.push(...healthResultLines(health).filter(([title]) => title === 'Сон, пульс и вес'));
     }
     if (need.notify) {
       const p = await askNotifyPermission();
@@ -115,11 +125,18 @@ export default function Permissions({ need, onDone }) {
           <p className="onboarding__intro">Чтобы приложение работало полностью, телефону нужно кое-что разрешить. Дальше он спросит сам — отказаться можно в каждом окне.</p>
           <ul className="permissions__list">
             {need.health && <li><strong>Шаги</strong><span>Телефон считает их сам — берём суммы по дням из {fromHub()}. Их видите вы и ваш тренер.</span></li>}
-            {need.workouts && <li><strong>Тренировки</strong><span>Записанные телефоном или часами: вид, время, калории и дистанция.</span></li>}
+            {need.workouts && <li><strong>Тренировки</strong><span>Записанные телефоном или часами: вид, время, калории и дистанция{full ? ', с согласием — пульс' : ''}.</span></li>}
+            {full && <li><strong>Сон, пульс, вес — с вашего согласия</strong><span>Сон и его фазы, пульс покоя и ВСР, вес и % жира с весов, калории за день, рост и VO2max — тренер видит восстановление и подбирает нагрузку.</span></li>}
             {need.notify && <li><strong>Уведомления</strong><span>Сигнал, когда закончился отдых между подходами, — даже с заблокированным экраном.</span></li>}
             {need.background && <li><strong>Отправка в фоне</strong><span>Шаги уходят сами, примерно раз в 30 минут, даже когда приложение закрыто.</span></li>}
           </ul>
-          <p className="small muted">{need.health ? 'Пульс, сон и вес не читаем. ' : ''}Без разрешений приложением можно пользоваться как обычно.</p>
+          {full && (
+            <label className="ob-consent">
+              <input type="checkbox" checked={consent} disabled={busy} onChange={(e) => setConsent(e.target.checked)} />
+              <span>Даю <a href={HEALTH_CONSENT_URL} target="_blank" rel="noopener noreferrer">отдельное согласие на обработку данных о здоровье</a>. Без него возьмём только шаги и тренировки.</span>
+            </label>
+          )}
+          <p className="small muted">{need.health && !full ? 'Пульс, сон и вес не читаем. ' : ''}Без разрешений приложением можно пользоваться как обычно.</p>
         </>}
     </div>
     <footer className="onboarding__footer">

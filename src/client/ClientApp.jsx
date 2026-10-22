@@ -43,6 +43,7 @@ import { tourSections, markTourPassed } from './tour-model.js';
 import { forgetFocus } from './focus.jsx';
 import { isNativeApp, iosApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
+import { HealthConnectScreen, HealthSettings, useHealthAsk } from './HealthConnect.jsx';
 import GameShell from '../GameShell.jsx';
 import { GAME_ITEMS } from '../game-icons.jsx';
 import CareerHub from '../CareerHub.jsx';
@@ -89,7 +90,7 @@ const MENU = [
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
   // У тренера журнал клиентов в меню остался
-  { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта', Icon: IconUsers },
+  { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта, здоровье', Icon: IconUsers },
   // Тема и персональные цвета — свой пункт (21.10.2026), а не строка настроек
   { id: 'appearance', label: 'Оформление', note: 'Тема и персональные цвета', Icon: IconPalette },
   { id: 'settings', label: 'Настройки', note: 'Напоминания, подключения, поддержка', Icon: IconSliders },
@@ -183,6 +184,11 @@ export default function ClientApp({ me, clientRow, preview }) {
   // Первые шаги (FT-561, FT-510): подсказка первого действия, первый день
   // в режиме, уведомления. Только свой кабинет и не поверх анкеты
   const firstSteps = useFirstSteps(own && !onboardingOpen && !(me && me.consentNeeded && !consented));
+  // «Здоровье» при входе (FT-708): один раз, своему кабинету в приложении.
+  // Не поверх согласия, анкеты и разрешений после регистрации — там свой
+  // экран (Permissions.jsx); только что зарегистрированным — со следующего входа
+  const [healthAsk, dropHealthAsk] = useHealthAsk(!clientRow && !preview && !justSignedUp && !lead
+    && !onboardingOpen && !(me && me.consentNeeded && !consented));
   const fs = firstSteps.state;
   // Подсказка «Начать тренировку» стоит на «Тренировках» — туда и ведём.
   // Новый сервер вместо неё даёт тур (FT-577): разделы он открывает сам
@@ -344,6 +350,9 @@ export default function ClientApp({ me, clientRow, preview }) {
     if (platform) return <AppOffer platform={platform} onDone={() => setPermsDone(true)} />;
   }
 
+  // Без тренера («сам по себе») — «видите только вы»
+  if (healthAsk) return <HealthConnectScreen scope={healthAsk} self={!!(me && me.unlinked)} onDone={dropHealthAsk} />;
+
   return (
     <div className="app">
       {preview && (
@@ -500,6 +509,15 @@ export default function ClientApp({ me, clientRow, preview }) {
               Заполнять всё сразу не обязательно.
             </p>
             <Profile clientRow={clientRow} />
+            {/* Данные о здоровье (FT-708): что читается, подключить, отозвать
+                согласие. Путь «Мои данные» → «Здоровье» назван в документах */}
+            {(!clientRow || preview) && (
+              <Section title="Здоровье">
+                {preview
+                  ? <PreviewOnly text="Здесь клиент видит, какие данные о здоровье приложение читает с его телефона, подключает их и может отозвать согласие." />
+                  : <HealthSettings self={!!(me && me.unlinked)} />}
+              </Section>
+            )}
           </>
         )}
 

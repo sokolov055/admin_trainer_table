@@ -18,7 +18,7 @@ import { goBack } from './gestures.jsx';
 import { isNativeApp, plugin, iosApp } from './native-bridge.js';
 import { iosUpdate, updateText } from './app-update.js';
 import { refreshNativePush, listenNativeTaps } from './native-push.js';
-import { syncSteps, syncWorkouts, reportDevice, noteAppBuild } from './native-steps.js';
+import { syncSteps, syncWorkouts, syncHealthDaily, reportDevice, noteAppBuild } from './native-steps.js';
 import { linkWatch } from './native-watch.js';
 import { localLink } from './open-in-app.js';
 import { ensureBackgroundSync } from './native-sync.js';
@@ -51,7 +51,8 @@ export function startNative() {
     // Вернулись в приложение — шаги за это время могли прибавиться
     app.addListener('resume', () => {
       syncSteps().catch(() => {}).then(() => reportDevice());
-      syncWorkouts().catch(() => {});
+      // Сон, пульс и вес (FT-708) — после тренировок: Health Connect не любит залп запросов
+      syncWorkouts().catch(() => {}).then(() => syncHealthDaily()).catch(() => {});
       linkWatch();
       // Плашка iPhone: «Завершить» с неё — сохранить, забытую — убрать
       settleLive().catch(() => {});
@@ -70,7 +71,8 @@ export function startNative() {
   // Android: дальше шаги шлёт фоновая задача раз в 30 минут (native-sync.js)
   ensureBackgroundSync().catch(() => {});
   // Тренировки с часов — только если подключали на этом телефоне
-  syncWorkouts(true).catch(() => {});
+  // и данные о здоровье (FT-708) — только если подключали на этом телефоне
+  syncWorkouts(true).catch(() => {}).then(() => syncHealthDaily(true)).catch(() => {});
   // Apple Watch: ключ входа часам, если он им нужен (native-watch.js)
   linkWatch();
   // Плашка iPhone (live-settle.js) — когда вход уже прочитан

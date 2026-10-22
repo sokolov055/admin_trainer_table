@@ -9,6 +9,7 @@ import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures }
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
+import HealthDaily, { SpentKcal } from './HealthDaily.jsx';
 import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
@@ -1751,6 +1752,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
           ) : null}
         />
         {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
+        {!familyRow && <HealthDaily clientRow={clientRow} />}
       {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
       </>
     );
@@ -1967,6 +1969,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         )}
 
       {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
+      {!familyRow && <HealthDaily clientRow={clientRow} />}
       {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
     </>
   );
@@ -2403,7 +2406,7 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
 
   return (
     <>
-      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} onPlan={self || (!clientRow && hasPlus(rights)) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} dayNote={(day) => <SpentKcal clientRow={clientRow} day={day} />} onPlan={self || (!clientRow && hasPlus(rights)) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
       {(!diaryEnabled || diaryTab === 'settings' || editing) && <>
       {configured && (
         <Lead
