@@ -59,10 +59,15 @@
 .diary-meal + .diary-meal { border-top: 1px solid var(--border); }
 .diary-meal-head { display: flex; align-items: center; gap: var(--space-3); min-height: 60px; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
 .diary-meal-head h3 { font-size: var(--text-base); font-weight: 600; margin: 0; }
-/* «+» приёма — действие, а не значок: акцент на мягкой подложке */
-.nutrition-diary .diary-meal-head .icon-button { color: var(--accent); }
-.diary-meal-head .icon-button::before { content: ''; position: absolute; width: 34px; height: 34px; border-radius: 999px; background: var(--accent-wash); z-index: -1; }
-.diary-meal-head .icon-button { position: relative; isolation: isolate; }
+/* «+» приёма — главная кнопка экрана (22.10.2026, у клиента «Добавить еду»
+   внизу убрана): залитый акцентом круг 40 px с тенью, касание 48 px за счёт
+   невидимого поля. Мягкая подложка 34 px тонула в тёмных темах */
+.diary-meal-add { flex: none; position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-text); cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, .2), 0 3px 8px -2px rgba(0, 0, 0, .28); -webkit-tap-highlight-color: transparent; transition: transform var(--dur-press) var(--ease-out), filter var(--dur-press) var(--ease-out); }
+.diary-meal-add::after { content: ''; position: absolute; inset: -4px; border-radius: inherit; }
+.diary-meal-add svg { stroke-width: 2.4; }
+.diary-meal-add:active { transform: scale(.92); filter: brightness(.94); }
+.diary-meal-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (hover: hover) { .diary-meal-add:hover { filter: brightness(1.07); } }
 .diary-meal-list { padding-bottom: var(--space-1); }
 .diary-meals__copy { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 52px; padding: 0 var(--space-4); border: 0; border-top: 1px solid var(--border); background: none; color: var(--accent); font: inherit; font-size: var(--text-sm); font-weight: 600; text-align: left; cursor: pointer; transition: background-color var(--dur-press) var(--ease-out); }
 .diary-meals__copy:active { background: var(--surface-active); }
@@ -178,8 +183,8 @@ button.diary-food-main:active { background: var(--surface-active); }
 .diary-notice { margin: var(--space-3) 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .diary-ring, .diary-track > span, .diary-daybar-fill, .diary-food-main, .diary-like, .diary-when, .diary-more, .diary-lesson, .diary-meals__copy { transition: none; }
-  .diary-like:active { transform: none; }
+  .diary-ring, .diary-track > span, .diary-daybar-fill, .diary-food-main, .diary-like, .diary-when, .diary-more, .diary-lesson, .diary-meals__copy, .diary-meal-add { transition: none; }
+  .diary-like:active, .diary-meal-add:active { transform: none; }
 }
 
 .food-catalog-row { display: flex; flex-direction: column; width: 100%; text-align: left; padding: var(--space-4); border-bottom: 1px solid var(--border); }

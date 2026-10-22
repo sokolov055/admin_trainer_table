@@ -35,7 +35,7 @@ test('FT-551: реальное локальное OCR и штрихкод, че�
   await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
-  await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   const scanner = page.getByRole('region', { name: 'Сканер продукта' });
   // П. 9 плана: способы — плитками под поиском, сканер открывается сразу в нужном режиме
   await page.getByRole('dialog').getByRole('button', { name: 'Фото этикетки', exact: true }).click();
@@ -89,7 +89,7 @@ test('FT-551: реальное локальное OCR и штрихкод, че�
   await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.evaluate(() => { const key = 'nutrition_demo_server:3', state = JSON.parse(localStorage.getItem(key)); state.foods[0].barcode = '4006381333931'; localStorage.setItem(key, JSON.stringify(state)); });
-  await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Штрихкод', exact: true }).click();
   // Синтетический EAN-13: стандартные таблицы модулей, декодирует настоящий ZXing.
   const barcodePng = await page.evaluate(() => {
@@ -110,7 +110,7 @@ test('FT-551: реальное локальное OCR и штрихкод, че�
   await page.getByRole('button', { name: 'Записать в дневник', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).flatMap(d => d.entries).length), 0);
   await page.getByRole('dialog').getByRole('button', { name: 'Закрыть', exact: true }).click();
-  await page.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Штрихкод', exact: true }).click();
   await scanner.getByLabel('Цифры штрихкода').fill('4006381333932');
   await scanner.getByRole('button', { name: 'Найти по штрихкоду', exact: true }).click();
@@ -130,7 +130,7 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary');
-  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).waitFor();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).waitFor();
   await diary.getByRole('button', { name: 'Добавить в ужин', exact: true }).click();
   const dialog = () => page.getByRole('dialog');
   await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
@@ -146,7 +146,7 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await dialog().getByLabel('Количество, г', { exact: true }).fill('200');
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
   await diary.getByText('200 г', { exact: true }).waitFor();
-  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await dialog().getByRole('button', { name: 'Убрать из любимых: Йогурт 2%', exact: true }).click();
   await dialog().getByRole('button', { name: 'Все', exact: true }).click();
   await dialog().getByLabel('Поиск продуктов и блюд').fill('Йогурт 2%');
@@ -199,7 +199,7 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
   assert.equal(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0)), before + 1);
   await page.screenshot({ path: join(shots, 'mobile.png'), fullPage: true });
-  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).waitFor();
   await page.screenshot({ path: join(shots, 'mobile-favorites.png'), fullPage: true });
   await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
@@ -220,7 +220,7 @@ test('FT-642: удаление записи — «Удалено · Вернут
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
   const entries = () => page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0));
-  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).waitFor();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).waitFor();
   assert.deepEqual(await diary.getByRole('tab').allInnerTexts(), ['Дневник', 'Неделя', 'Рецепты', 'Ещё']);
   await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
@@ -275,7 +275,7 @@ test('FT-551: собственный каталог, бренд, этикетк�
   await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
-  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Свой продукт', exact: true }).click();
   const form = page.getByRole('dialog');
   await form.getByLabel('Название продукта', { exact: true }).fill('Творог 5%');
@@ -327,7 +327,7 @@ test('напиток с этикетки на 100 мл: единица хран�
   await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
-  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Свой продукт', exact: true }).click();
   const form = page.getByRole('dialog');
   await form.getByLabel('Название продукта', { exact: true }).fill('Крюшон');
@@ -344,7 +344,7 @@ test('напиток с этикетки на 100 мл: единица хран�
   await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Изменить: Крюшон', exact: true }).waitFor();
   await page.getByTestId('nutrition-diary').getByText('250 мл', { exact: true }).waitFor();
   // В каталоге напиток подписан «на 100 мл»
-  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Поиск продуктов и блюд').fill('Крюшон');
   await page.getByRole('dialog').getByRole('button', { name: 'Все', exact: true }).click();
   await page.getByRole('dialog').getByText(/42 ккал \/ 100 мл/).waitFor();
@@ -367,7 +367,7 @@ test('FT-551: тренер назначает цель и оставляет к�
   await page.getByRole('button').filter({ hasText: 'Анна Морозова' }).first().click();
   await page.getByRole('tab', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary');
-  assert.equal(await diary.getByRole('button', { name: 'Добавить еду', exact: true }).count(), 0);
+  assert.equal(await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).count(), 0);
   await diary.getByRole('button', { name: 'Назначить цель', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Калории', { exact: true }).fill('1900');
   await page.getByRole('dialog').getByRole('button', { name: 'Сохранить цель', exact: true }).click();
@@ -391,7 +391,7 @@ test('FT-643: диалоги дневника на общем листе — с�
   const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
   const sheets = () => page.evaluate(() => document.querySelectorAll('.sheet').length);
   const noSheets = () => page.waitForFunction(() => !document.querySelector('.sheet'));
-  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).waitFor();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).waitFor();
   await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await dialog().getByRole('heading', { name: 'Добавить еду · Обед' }).waitFor();
   // Лист живёт в body, страница под ним заперта
@@ -509,7 +509,7 @@ test('FT-644: плашка вместо анкеты, день словом, ч�
   await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
   // Продукт с белком выше нормы: название со счётчиком, потом «набран»
-  await diary.getByRole('button', { name: 'Добавить еду', exact: true }).click();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Свой продукт', exact: true }).click();
   const form = page.getByRole('dialog');
   await form.getByLabel('Название продукта', { exact: true }).fill('Протеин');
@@ -579,7 +579,7 @@ test('план трёх разборов, п. 8: «Как вы считаете 
   await diary.getByRole('button', { name: 'Продолжить', exact: true }).click();
   await diary.getByText(/Норма в порциях посчитана/).waitFor();
   assert.equal(await diary.getByRole('heading', { name: 'Как вы считаете еду?' }).count(), 0);
-  await diary.getByRole('button', { name: 'Отметить порции', exact: true }).click();
+  await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await dialog().getByRole('button', { name: 'Белок: 2 ладони', exact: true }).click();
   await dialog().getByRole('button', { name: 'Ещё половина: Овощи', exact: true }).click();
   await dialog().getByText('2 ладони', { exact: true }).waitFor();
