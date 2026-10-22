@@ -28,6 +28,10 @@ import './settings.css';
  *
  * «Не сейчас» при входе — 'declined' на сервере, больше не спрашиваем;
  * шаги и тренировки, уже подключённые на телефоне, работают как раньше.
+ * На iPhone кнопки «Не сейчас» нет: Apple отклоняет экран перед системным
+ * окном, с которого можно его пропустить (5.1.1(iv)). Там одна кнопка —
+ * она открывает окно «Здоровья», а отказать человек может в нём самом;
+ * спрашиваем всё равно один раз.
  * Без галочки (или на старой сборке и Huawei) — только шаги и тренировки:
  * их покрывает общее согласие.
  */
@@ -160,7 +164,7 @@ export function HealthConnectScreen({ scope, self = false, onDone }) {
           <button type="button" className="button button--primary button--block" disabled={busy || leaving} onClick={() => run(full && consent)}>
             {busy ? 'Спрашиваем…' : full && !consent ? 'Подключить шаги и тренировки' : 'Подключить'}
           </button>
-          <button type="button" className="button button--block" disabled={busy || leaving} onClick={later}>Не сейчас</button>
+          {!onIphone() && <button type="button" className="button button--block" disabled={busy || leaving} onClick={later}>Не сейчас</button>}
         </>}
     </footer>
   </main>;
@@ -197,7 +201,7 @@ export function HealthSheet({ self = false, onClose, onConnected }) {
             <button type="button" className="button button--primary" disabled={busy || scope === null} onClick={() => run(full && consent)}>
               {busy ? 'Спрашиваем…' : full && !consent ? 'Подключить шаги и тренировки' : 'Подключить'}
             </button>
-            <button type="button" className="button" disabled={busy} onClick={onClose}>Не сейчас</button>
+            {!onIphone() && <button type="button" className="button" disabled={busy} onClick={onClose}>Не сейчас</button>}
           </>}
       </div>
     </Sheet>

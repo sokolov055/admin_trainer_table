@@ -100,9 +100,10 @@ export function ConsentGate({ onDone }) {
         <div className="login__inner consent-gate">
           <h1 className="login__title">Подтвердите согласие</h1>
           <p className="login__text">
-            С сентября 2025 года согласие на обработку персональных данных оформляется
-            отдельно. Отметьте оба пункта, чтобы продолжить — без этого кабинет
-            работать не сможет.
+            Мы обновили пользовательское соглашение (22.10.2026): отметка флажка
+            с кнопкой в приложении теперь считается вашей электронной подписью.
+            Отметьте оба пункта, чтобы продолжить — без этого кабинет работать
+            не сможет.
           </p>
           <ConsentChecks value={value} onChange={setValue} disabled={busy} />
           {problem && <p className="login__problem" role="alert">{problem}</p>}
