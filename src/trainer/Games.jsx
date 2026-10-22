@@ -5,6 +5,7 @@ import { useData } from '../useData.js';
 import { Empty, ErrorState, Loading, Note, Panel, Search, Section, Tag } from '../ui.jsx';
 import { IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import AdminGamePacks from './AdminGamePacks.jsx';
 
 /**
  * Доступ к играм — вкладка «Управления» (17.10.2026). Владелец открывает
@@ -48,6 +49,7 @@ export default function Games() {
         следующем открытии приложения, обновлять приложение не нужно. Тестовым клиентам игры открыты всегда.
       </Note>
       {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      <AdminGamePacks />
       <Section title="Клиенты" note={'Игры открыты: ' + open}>
         <Search value={query} onChange={setQuery} placeholder="Имя клиента или тренера" />
         {shown.length === 0

@@ -158,3 +158,32 @@ export function versionsPayload(form) {
   const rec = (r) => ({ version: r.version.trim(), build: Number(String(r.build).trim()), url: r.url.trim() });
   return { appStore: rec(form.appStore), testflight: rec(form.testflight) };
 }
+
+/* --- «Игры»: наборы вопросов и уровней файлом (22.10.2026) --- */
+
+const BLINI_MAPS = { stadium: 'Стадион', kitchen: 'Кухня', snake: 'Зал', dumbbell: 'Гантель', couch: 'Гостиная' };
+
+/**
+ * Файл набора, выбранный на телефоне: разобрать и показать, что внутри, до
+ * отправки. Окончательная проверка — на сервере (lib/game-pack-file.js).
+ */
+export function readPackFile(text) {
+  let pack;
+  try { pack = JSON.parse(String(text || '').replace(/^﻿/, '')); } catch (_) {
+    return { error: 'Это не файл набора: не читается как JSON.' };
+  }
+  if (!pack || pack.format !== 'fittrack-game') return { error: 'Это не файл набора для игр Fit Track.' };
+  if (!pack.id || !pack.name) return { error: 'В файле нет id или названия набора.' };
+  if (pack.game === 'plank') {
+    const qs = Array.isArray(pack.questions) ? pack.questions : [];
+    if (!qs.length) return { error: 'В наборе нет вопросов.' };
+    const cats = Array.isArray(pack.categories) ? pack.categories : [];
+    return { pack: { ...pack, summary: `${qs.length} вопр.${cats.length ? `, новых тем ${cats.length}` : ''}`, preview: qs.slice(0, 3).map((q, i) => ({ label: `${i + 1}`, text: q.text })) } };
+  }
+  if (pack.game === 'blini') {
+    const ls = Array.isArray(pack.levels) ? pack.levels : [];
+    if (!ls.length) return { error: 'В наборе нет уровней.' };
+    return { pack: { ...pack, summary: `${ls.length} ур.`, preview: ls.slice(0, 5).map((l, i) => ({ label: `${i + 1}`, text: `${BLINI_MAPS[l.track] || l.track} · ${l.boss ? `Диван ${l.boss.hp} ♥` : `план ${l.target} кг`} · норматив ${l.par} с` })) } };
+  }
+  return { error: 'Неизвестная игра в файле.' };
+}

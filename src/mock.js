@@ -202,6 +202,18 @@ const mockThemeDoc = () => {
 };
 const mockThemesState = () => ({ ...mockThemeDoc(), max: 20, history: mockThemes.history });
 const mockThemeLog = (text) => mockThemes.history.unshift({ at: new Date().toISOString(), text: text + ' · owner@fittrack.demo' });
+// Наборы для игр (22.10.2026): как на сервере, демо-тренер — владелец
+const mockPacks = { history: [] };
+const mockPackDoc = () => {
+  if (!mockPacks.list) {
+    try { mockPacks.list = (JSON.parse(localStorage.getItem('app_game_packs_v1')) || {}).packs || []; } catch (_) { mockPacks.list = []; }
+    mockPacks.list = mockPacks.list.map((p) => ({ ...p, closed: !!p.closed, at: new Date().toISOString(), by: 'owner@fittrack.demo' }));
+  }
+  return mockPacks.list;
+};
+const mockPackSummary = (p) => (p.game === 'plank' ? `${(p.questions || []).length} вопр.` : `${(p.levels || []).length} ур.`);
+const mockPacksState = () => ({ packs: mockPackDoc().map((p) => ({ ...p, summary: mockPackSummary(p) })), max: 30, history: mockPacks.history });
+const mockPackLog = (text) => mockPacks.history.unshift({ at: new Date().toISOString(), text: text + ' · owner@fittrack.demo' });
 const mockVersions = {
   appStore: { version: '1.5', build: 22, url: 'https://apps.apple.com/ru/app/id6816619723', source: 'lookup', at: '2026-10-18T18:52:49Z' },
   testflight: { version: '1.6', build: 25, url: 'itms-beta://beta.itunes.apple.com/v1/app/6816619723', source: 'build', at: '2026-10-21T12:00:00Z', visible: true },
@@ -1397,6 +1409,33 @@ const MOCK = {
     doc.themes = doc.themes.filter((t) => t !== own);
     mockThemeLog(`Удалена «${own.name}» (${own.id})`);
     return mockThemesState();
+  },
+  'app.gamepacks': () => ({ packs: mockPackDoc().map(({ at, by, closed, ...p }) => (closed ? { ...p, closed: true } : p)), trial: true }),
+  'owner.gamepacks': () => mockPacksState(),
+  'owner.gamepacks.upload': (p) => {
+    const { summary, preview, ...pack } = p.pack || {};
+    if (pack.format !== 'fittrack-game' || !pack.id) throw new Error('Это не файл набора для игр Fit Track.');
+    const list = mockPackDoc();
+    const row = { ...pack, closed: true, at: new Date().toISOString(), by: 'owner@fittrack.demo' };
+    const i = list.findIndex((x) => x.id === pack.id);
+    if (i >= 0) list[i] = row; else list.push(row);
+    mockPackLog(`${i >= 0 ? 'Обновлён' : 'Загружен'} «${pack.name}»`);
+    return mockPacksState();
+  },
+  'owner.gamepacks.close': (p) => {
+    const pack = mockPackDoc().find((x) => x.id === p.id);
+    if (!pack) throw new Error('Такого набора нет.');
+    pack.closed = p.closed !== false;
+    mockPackLog(`${pack.closed ? 'Закрыт' : 'Открыт для всех'} «${pack.name}»`);
+    return mockPacksState();
+  },
+  'owner.gamepacks.remove': (p) => {
+    const list = mockPackDoc();
+    const pack = list.find((x) => x.id === p.id);
+    if (!pack) throw new Error('Такого набора нет.');
+    mockPacks.list = list.filter((x) => x !== pack);
+    mockPackLog(`Удалён «${pack.name}»`);
+    return mockPacksState();
   },
   'owner.versions': () => mockVersions,
   'owner.versions.save': (p) => {

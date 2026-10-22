@@ -1,6 +1,27 @@
-import { QUESTION_BANK } from './plank-questions.js';
-export { CATEGORIES, LEVELS } from './plank-questions.js';
-export const QUESTIONS = QUESTION_BANK;
+import { QUESTION_BANK, CATEGORIES as BUILT_IN_CATEGORIES } from './plank-questions.js';
+import { onGamePacks } from './game-packs-store.js';
+export { LEVELS } from './plank-questions.js';
+// Вопросы и темы — встроенные и из наборов владельца («Управление → Игры»,
+// remote-games.js, 22.10.2026). let — живая привязка: игра берёт свежий список
+export let QUESTIONS = QUESTION_BANK;
+export let CATEGORIES = BUILT_IN_CATEGORIES;
+
+/** Наборы вопросов (ответ app.gamepacks, только plank) — к встроенному банку */
+export function setQuestionPacks(packs = []) {
+  const categories = [...BUILT_IN_CATEGORIES];
+  const extra = [];
+  for (const pack of packs) {
+    for (const c of pack.categories || []) if (!categories.some((x) => x.id === c.id)) categories.push({ id: c.id, name: c.name });
+    (pack.questions || []).forEach((q, i) => extra.push({
+      id: `${pack.id}-${i + 1}`, category: q.category, level: q.level, text: q.text,
+      answers: [q.right, ...q.wrong], correct: 0, why: q.why,
+    }));
+  }
+  const known = new Set(categories.map((c) => c.id));
+  QUESTIONS = [...QUESTION_BANK, ...extra.filter((q) => known.has(q.category))];
+  CATEGORIES = categories;
+}
+onGamePacks('plank', setQuestionPacks);
 export const ROUND_MS = 10000;
 export function shuffle(items, random = Math.random) {
   const result = [...items];

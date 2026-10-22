@@ -7,6 +7,7 @@
 // Время идёт шагами по 10 мс, случайность — в состоянии: партия воспроизводима.
 // Разбор жанра — docs/research/2026-10-21-Zuma.md основного репозитория.
 import { FIELD, TRACKS, pointAt, pointInto, nearestS } from './blini-tracks.js';
+import { onGamePacks } from './game-packs-store.js';
 
 export const RULES_VERSION = 1;
 export const TICK_MS = 10;
@@ -64,7 +65,7 @@ export const TUNING = Object.freeze({
  * Круг кончается боссом (по мотивам Zuma's Revenge, 22.10.2026): «Гостиная», boss.hp —
  * сердца Дивана; плана по тоннажу нет — Диван повержен, и уровень взят.
  */
-export const LEVELS = Object.freeze([
+const BUILT_IN_LEVELS = Object.freeze([
   { track: 'stadium', speed: .5, start: .3, target: 1800, colors: 4, slow: 3, powerEvery: 1500, par: 50 },
   { track: 'kitchen', speed: .5, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 75 },
   { track: 'snake', speed: .16, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 85 },
@@ -81,6 +82,16 @@ export const LEVELS = Object.freeze([
   { track: 'dumbbell', speed: .21, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
   { track: 'couch', speed: .15, start: .4, target: 0, colors: 5, slow: 2, powerEvery: 1200, par: 70, rail: true, rampAt: 0, boss: { hp: 10 } },
 ].map(level => Object.freeze(level)));
+// Уровни — встроенные и из наборов владельца («Управление → Игры», remote-games.js,
+// 22.10.2026): новые идут после 15-го, номера встроенных не сдвигаются — прогресс цел.
+// let — живая привязка: игра берёт свежий список
+export let LEVELS = BUILT_IN_LEVELS;
+/** Наборы уровней (ответ app.gamepacks, только blini) — после встроенных */
+export function setLevelPacks(packs = []) {
+  const extra = packs.flatMap((pack) => pack.levels || []).filter((l) => TRACKS[l.track]);
+  LEVELS = Object.freeze([...BUILT_IN_LEVELS, ...extra.map((l) => Object.freeze({ ...l, ...(l.boss ? { boss: Object.freeze({ ...l.boss }) } : {}) }))]);
+}
+onGamePacks('blini', setLevelPacks);
 /** Номер уровня до боссов (12 уровней, 22.10.2026) → нынешний: в каждом круге после «Гантели» встал босс. */
 export const levelBeforeBosses = old => old + Math.floor(old / 4);
 
