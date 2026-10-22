@@ -123,6 +123,7 @@ test('блины: победа открывает следующий урове�
   assert.equal(state.level, 1); assert.equal(state.unlocked, 1); assert.equal(state.mode, 'ready');
   await page.getByRole('heading', { name: '«Кухня»' }).waitFor();
   await page.getByText('Медалей 2 из 36').waitFor();
+  await page.getByText('С 0:40 — пятый цвет и быстрее').waitFor();
   assert.equal(await page.locator('.blini-medals li.is-earned').count(), 0, 'у нового уровня медалей ещё нет');
   await page.getByRole('button', { name: 'Предыдущий уровень' }).click();
   assert.equal(await page.locator('.blini-medals li.is-earned').count(), 2, 'у пройденного — бронза и серебро');

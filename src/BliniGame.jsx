@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useBliniSession } from './BliniSession.jsx';
-import { LEVELS, PLATES, POWERS, MEDALS, GOLD_CHAIN, levelRules, missionRules } from './blini-model.js';
+import { LEVELS, PLATES, POWERS, MEDALS, GOLD_CHAIN, TICK_MS, levelRules, missionRules } from './blini-model.js';
 import { FIELD, TRACKS } from './blini-tracks.js';
 import { createFx, addEvents, drawScene, bakeBackground, plateImage } from './blini-draw.js';
 import { createBliniAudio } from './blini-audio.js';
@@ -190,11 +190,13 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
             if (e.kind === 'clear') audio.current?.play('clear', e.depth);
             if (e.kind === 'food') audio.current?.play('power');
             if (e.kind === 'cleartrack') audio.current?.play('clear', 4);
+            if (e.kind === 'ramp') audio.current?.play('danger');
           }
           if (e.kind === 'clear') buzz(e.depth > 1 ? 'great' : 'good');
           if (e.kind === 'danger') buzz('bad');
           if (e.kind === 'saved' || e.kind === 'cleartrack') buzz('great');
           if (e.kind === 'food') buzz('good');
+          if (e.kind === 'ramp') buzz('bad');
         }
       }
       draw();
@@ -286,6 +288,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     : hud.full ? 'План выполнен — сними оставшиеся блины'
     : hud.danger >= .85 ? 'Блины у помоста! Снимай ближние'
     : hud.streak >= 3 ? `Серия ×${hud.streak}: каждое попадание дороже`
+    : hud.ramp && hud.seconds < rules.rampAt * TICK_MS / 1000 + 6 ? 'Темп растёт — не зевай'
     : 'Касание поля — бросок, Михалыча — обмен');
   const backLabel = mission ? 'Вернуться в карьеру' : `Вернуться ${restLeft == null ? 'в приложение' : 'к отдыху'}`;
 
@@ -326,6 +329,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
             <div><span className="blini-rule-plates"><Plate color={0} /><Plate color={0} /><Plate color={0} /></span><span><strong>Три одного цвета</strong>Снимаются, а вес идёт в тоннаж</span></div>
             <div><span className="blini-rule-plates"><Plate color={1} /><Plate color={2} /><Plate color={1} /></span><span><strong>Цепь</strong>После снятия на стыке снова один цвет — блины откатываются назад, очки ×2, ×3…</span></div>
             <div><span className="blini-rule-plates"><Plate color={3} /></span><span><strong>План</strong>Набери тоннаж — новые блины перестанут выходить. Сними оставшиеся</span></div>
+            <div><span className="blini-rule-plates"><Plate color={4} /></span><span><strong>Темп растёт</strong>Через 40 секунд блины катятся быстрее, а где их было четыре — выходит пятый цвет</span></div>
           </div>
           <div className="blini-powers">{Object.entries(POWERS).map(([id, power]) => <div key={id}><PowerMark power={id} /><span><strong>{power.name}</strong>{power.effect}</span></div>)}</div>
           <p className="blini-panel__fine">Еда на поле — банан, яблоко, брокколи, протеиновый батончик: попади в неё брошенным блином, и её вес уйдёт в тоннаж. Бонус светится на блине — сними его, пока не погас. Гиря Михалыч, 16 кг харизмы: коснись его или кнопки «Поменять», и он возьмёт следующий блин.</p>
@@ -335,7 +339,8 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           <h3 id={title}>«{track.name}»</h3>
           <p>{track.note}</p>
           <MissionNote game="blini" mission={mission} />
-          <div className="blini-mission"><span>План {kg(rules.target)}</span><span>{colorsLabel(rules.colors)}</span><span>Норматив {seconds(rules.par)}</span></div>
+          <div className="blini-mission"><span>План {kg(rules.target)}</span><span>{colorsLabel(rules.colors)}</span><span>Норматив {seconds(rules.par)}</span>
+            {rules.rampAt > 0 && <span>С {seconds(rules.rampAt * TICK_MS / 1000)} — {rules.colors < PLATES.length ? 'пятый цвет и ' : ''}быстрее</span>}</div>
           {!state.mission && rules.ease > 0 && <p className="blini-ease">Михалыч сбавил темп: блины на {rules.ease * 6} % медленнее, план на {rules.ease * 5} % меньше. Выиграешь — уровень станет обычным.</p>}
           {!state.mission && <MedalGoals best={medals[level] || 0} par={rules.par} />}
           <p className="blini-tip"><b>Совет Михалыча.</b> {TIPS[(level + serial) % TIPS.length]}</p>

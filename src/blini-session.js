@@ -46,7 +46,7 @@ function hudOf(game) {
   return {
     score: game.score, target: game.rules.target, full: game.full, current: game.current, next: game.next,
     lives: game.lives, danger: Math.round(dangerOf(game) * 20) / 20, streak: game.streak,
-    negative: game.negative > 0, pause: game.pause > 0, technique: game.technique > 0,
+    negative: game.negative > 0, pause: game.pause > 0, technique: game.technique > 0, ramp: game.ramp,
     seconds: Math.floor(secondsOf(game)),
   };
 }

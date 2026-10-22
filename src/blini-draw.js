@@ -556,6 +556,7 @@ const LINES = {
   full: ['План закрыт! Добиваем!'], saved: ['Пояс спас спину!'], start: ['Погнали!', 'Разминка окончена!', 'Ну, за тоннаж!'],
   superset: ['Суперсет!'], banana: ['Калий для мышц!'], apple: ['Яблочко — витамин!'], broccoli: ['Клетчатка — сила!'], bar: ['Белок пошёл!'],
   cleartrack: ['Чисто сработано!', 'Вот это тренировка!'],
+  ramp: ['Добавим веса!', 'Разминка кончилась!'],
 };
 function line(fx, kind) { fx.lines = (fx.lines || 0) + 1; const list = LINES[kind]; return list[fx.lines % list.length]; }
 const POOL = { parts: 160, texts: 24, rings: 32 };
@@ -596,6 +597,7 @@ export function addEvents(fx, game, events, t, reduced = false) {
     if (e.kind === 'full') { fx.banner = { born: t, text: 'План выполнен! Сними остаток' }; fx.say = { text: line(fx, 'full'), born: t }; fx.flex = t; }
     if (e.kind === 'saved') { fx.banner = { born: t, text: 'Пояс выручил: блины откатились' }; fx.say = { text: line(fx, 'saved'), born: t }; }
     if (e.kind === 'danger') fx.say = { text: line(fx, 'danger'), born: t };
+    if (e.kind === 'ramp') { fx.banner = { born: t, text: e.color >= 0 ? `Темп растёт: в цепочке ${PLATES[e.color].name}` : 'Темп растёт: блины быстрее' }; fx.say = { text: line(fx, 'ramp'), born: t }; }
     if (e.kind === 'food') {
       const ring = take(fx, 'rings', t); ring.x = e.x; ring.y = e.y; ring.big = true; ring.dust = false;
       const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y - 14; text.text = `+${e.points} кг · ${FOOD[e.food].name}`; text.size = 15; text.gold = true;

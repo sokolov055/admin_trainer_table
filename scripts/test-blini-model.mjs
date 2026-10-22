@@ -330,3 +330,27 @@ test('медали: бронза — пройден, серебро — в но�
   win(3, 100);
   assert.equal(session.getSnapshot().medals[2], undefined, 'задание карьеры медаль уровню не даёт');
 });
+
+test('темп растёт внутри уровня: через 40 с пятый цвет и быстрее, один раз; переживает сохранение', async () => {
+  const { serializeGame, restoreGame } = await import('../src/blini-model.js');
+  const game = createBlini(4, 0), chain = game.chains[0];
+  assert.equal(game.rules.colors, 4); assert.equal(game.colors, 4);
+  advance(game, game.rules.rampAt - 1); drain(game);
+  assert.equal(game.ramp, false);
+  step(game);
+  const events = drain(game).filter(e => e.kind === 'ramp');
+  assert.equal(events.length, 1); assert.equal(events[0].color, 4, 'вышел белый');
+  assert.equal(game.colors, 5); assert.equal(game.ramp, true);
+  const fast = rig([0, 1, 2, 3], { head: 300, rampAt: 5 }); fast.full = false;
+  const lead = fast.chains[0].balls.at(-1), was = lead.s;
+  advance(fast, 10);
+  assert.ok(fast.ramp && Math.abs(lead.s - was - fast.rules.speed * (4 + 6 * fast.rules.rampSpeed)) < 1e-6, 'после роста цепочка катится быстрее');
+  advance(game, 3000);
+  assert.equal(drain(game).filter(e => e.kind === 'ramp').length, 0, 'только один раз');
+  const copy = restoreGame(JSON.parse(JSON.stringify(serializeGame(game))));
+  assert.deepEqual([copy.colors, copy.ramp], [5, true]);
+  const five = createBlini(4, 6); advance(five, five.rules.rampAt);
+  assert.deepEqual([five.colors, drain(five).find(e => e.kind === 'ramp')?.color], [5, -1], 'пять цветов — только быстрее');
+  const off = createBlini(4, { ...LEVELS[0], rampAt: 0 }); advance(off, 5000);
+  assert.equal(off.ramp, false, 'rampAt: 0 — без роста');
+});

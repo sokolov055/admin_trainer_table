@@ -72,7 +72,9 @@ export const LEVELS = Object.freeze([
   { track: 'dumbbell', speed: .21, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
 ].map(level => Object.freeze(level)));
 
-const DEFAULTS = Object.freeze({ repeat: .42, lives: 0, powers: Object.keys(POWERS), foodEvery: 1700, clearBonus: 300 });
+// Сложность растёт внутри уровня (по мотивам Zuma's Revenge, 22.10.2026): через rampAt
+// шагов на трассу выходит пятый цвет, если их было меньше, и темп растёт в rampSpeed раз
+const DEFAULTS = Object.freeze({ repeat: .42, lives: 0, powers: Object.keys(POWERS), foodEvery: 1700, clearBonus: 300, rampAt: 4000, rampSpeed: 1.1 });
 // Подстройка сложности (по мотивам DDS Zuma's Revenge): после неудач на уровне
 // темп ниже на 6 % и план ниже на 5 % за каждую, не больше трёх ступеней.
 export const EASE_STEPS = 3;
@@ -112,12 +114,12 @@ export function createBlini(seed = 21, source = 0) {
     version: RULES_VERSION, rules, track, seed: seed >>> 0 || 1, nextId: 0, tick: 0,
     chains: track.paths.map(path => ({ path, balls: [], rush: true, back: 0, last: -1, danger: false, visible: false })),
     pickups: [], foodAt: Math.round(rules.foodEvery * .7),
-    shots: [], score: 0, full: false, mode: 'playing', lives: rules.lives, reload: 0,
+    shots: [], score: 0, full: false, mode: 'playing', lives: rules.lives, reload: 0, colors: rules.colors, ramp: false,
     negative: 0, pause: 0, technique: 0, streak: 0, bestChain: 0, bestStreak: 0, cleared: 0, shotsFired: 0,
     powerAt: Math.round(rules.powerEvery * .6), aim: -Math.PI / 2, events: [],
   };
-  game.current = Math.floor(random(game) * rules.colors);
-  game.next = Math.floor(random(game) * rules.colors);
+  game.current = Math.floor(random(game) * game.colors);
+  game.next = Math.floor(random(game) * game.colors);
   return game;
 }
 
@@ -136,7 +138,7 @@ export function platePoint(chain, ball, out = { x: 0, y: 0 }) {
 const SCRATCH = { x: 0, y: 0 };
 
 function newColor(game, chain) {
-  const { colors, repeat } = game.rules;
+  const { colors } = game, { repeat } = game.rules;
   if (chain.last >= 0 && random(game) < repeat) return chain.last;
   let c = Math.floor(random(game) * (colors - (chain.last >= 0 ? 1 : 0)));
   if (chain.last >= 0 && c >= chain.last) c++;
@@ -157,7 +159,7 @@ export function colorsOnField(game) {
 
 function pickColor(game) {
   const present = [...colorsOnField(game)].sort();
-  if (!present.length) return Math.floor(random(game) * game.rules.colors);
+  if (!present.length) return Math.floor(random(game) * game.colors);
   return present[Math.floor(random(game) * present.length)];
 }
 
@@ -279,7 +281,7 @@ function stepChain(game, chainIndex) {
   // Всё снято, а план ещё не выполнен — новая цепочка снова въезжает быстро
   if (!chain.rush && !game.full && b.every(x => x.s < 0)) chain.rush = true;
   const head = b.at(-1);
-  let v = r.speed;
+  let v = game.ramp ? r.speed * r.rampSpeed : r.speed;
   if (chain.rush) { v = TUNING.rush; if (head.s >= r.start * L) chain.rush = false; }
   else {
     if (head.s > L * (1 - TUNING.danger)) v /= r.slow;
@@ -412,6 +414,13 @@ export function step(game) {
   if (game.negative > 0) game.negative--;
   if (game.pause > 0) game.pause--;
   if (game.technique > 0) game.technique--;
+  // Уровень набирает темп: пятый цвет и быстрее — один раз, пока план не выполнен
+  if (!game.ramp && game.rules.rampAt > 0 && game.tick >= game.rules.rampAt && !game.full) {
+    game.ramp = true;
+    const added = game.colors < PLATES.length;
+    if (added) game.colors++;
+    emit(game, { kind: 'ramp', color: added ? game.colors - 1 : -1 });
+  }
   stepShots(game);
   for (let c = 0; c < game.chains.length && game.mode === 'playing'; c++) stepChain(game, c);
   // Сняли всю цепочку раньше плана — «Чистая трасса!»: бонус, новая въезжает быстро
@@ -498,7 +507,7 @@ export function aimEnd(game) {
 // Сохранение партии (FT-700, 22.10.2026): продолжить с того же места — на этом
 // устройстве или на другом, если прогресс сохраняется в аккаунте. Трасса —
 // по имени из правил; броски в полёте и вспышки не сохраняются.
-const SAVED = ['seed', 'nextId', 'tick', 'score', 'full', 'mode', 'lives', 'reload', 'negative', 'pause', 'technique', 'streak', 'bestChain', 'bestStreak', 'cleared', 'shotsFired', 'powerAt', 'foodAt', 'aim', 'current', 'next'];
+const SAVED = ['seed', 'nextId', 'tick', 'score', 'full', 'mode', 'lives', 'reload', 'colors', 'ramp', 'negative', 'pause', 'technique', 'streak', 'bestChain', 'bestStreak', 'cleared', 'shotsFired', 'powerAt', 'foodAt', 'aim', 'current', 'next'];
 export function serializeGame(game) {
   const out = { version: RULES_VERSION, rules: { ...game.rules, powers: [...game.rules.powers] } };
   for (const key of SAVED) out[key] = game[key];
@@ -514,7 +523,8 @@ export function restoreGame(data) {
     const game = createBlini(data.seed, data.rules);
     if (!Array.isArray(data.chains) || data.chains.length !== game.chains.length) return null;
     for (const key of SAVED) if (key in data && typeof data[key] === typeof game[key]) game[key] = data[key];
-    const colors = game.rules.colors;
+    game.colors = Math.max(game.rules.colors, Math.min(PLATES.length, game.colors | 0));
+    const colors = game.colors;
     game.chains.forEach((chain, i) => {
       const saved = data.chains[i];
       chain.rush = !!saved.rush; chain.back = Math.max(0, saved.back | 0); chain.danger = !!saved.danger; chain.visible = !!saved.visible;
