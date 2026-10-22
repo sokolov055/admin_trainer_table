@@ -1,4 +1,4 @@
-import { createBlini, advance, drain, shoot, swap, aim, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, medalOf, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
+import { createBlini, advance, drain, shoot, swap, aim, walk, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, medalOf, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
 
 // Одна партия «Блинов» на кабинет: меню, отдых и карьера видят одну и ту же.
 // Пауза и смена экрана сохраняют её целиком. Открытые уровни и незаконченная
@@ -199,7 +199,9 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
       if (Date.now() - lastPersist > 10000) persist();
       return events;
     },
-    aim(x, y, token) { if (mine(token) && snapshot.mode === 'playing') aim(game, x, y); },
+    /** Прицел на точку; на скамье Михалыч ещё и идёт под неё, если follow. */
+    aim(x, y, token, follow = true) { if (mine(token) && snapshot.mode === 'playing') aim(game, x, y, follow); },
+    walk(dx, token) { return mine(token) && snapshot.mode === 'playing' && walk(game, dx); },
     shoot(x, y, token) {
       if (!mine(token) || snapshot.mode !== 'playing' || expired()) return false;
       const ok = shoot(game, x, y);

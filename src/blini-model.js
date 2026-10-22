@@ -47,6 +47,7 @@ export const TUNING = Object.freeze({
   backSpeed: 1.1, negativeTicks: 260, pauseTicks: 650, techniqueTicks: 900,
   recoilTicks: 26, // откат после цепной реакции, на каждое звено
   powerLife: 1500, saveBack: .35,
+  walk: 3.5, // Михалыч на скамье: единиц за шаг — через всю скамью меньше чем за секунду
   foodLife: 900, foodRadius: 16, // еда лежит 9 секунд
 });
 
@@ -55,7 +56,7 @@ export const TUNING = Object.freeze({
  * Начало новой тройки трасс — передышка: план и темп чуть ниже конца прошлой.
  * speed — единиц пути за шаг, start — до какой доли пути цепочка въезжает сразу,
  * target — план, кг; slow — во сколько раз цепочка медленнее у помоста;
- * powerEvery — шагов между бонусами; par — норматив, секунд.
+ * powerEvery — шагов между бонусами; par — норматив, секунд; rail — Михалыч ходит по скамье.
  */
 export const LEVELS = Object.freeze([
   { track: 'stadium', speed: .5, start: .3, target: 1800, colors: 4, slow: 3, powerEvery: 1500, par: 50 },
@@ -64,11 +65,11 @@ export const LEVELS = Object.freeze([
   { track: 'dumbbell', speed: .14, start: .22, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 60 },
   { track: 'stadium', speed: .7, start: .34, target: 2300, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
   { track: 'kitchen', speed: .6, start: .3, target: 2400, colors: 4, slow: 2.6, powerEvery: 1400, par: 100 },
-  { track: 'snake', speed: .22, start: .3, target: 2600, colors: 5, slow: 2.6, powerEvery: 1400, par: 155 },
+  { track: 'snake', speed: .22, start: .3, target: 2600, colors: 5, slow: 2.6, powerEvery: 1400, par: 175, rail: true },
   { track: 'dumbbell', speed: .16, start: .26, target: 2500, colors: 5, slow: 2.6, powerEvery: 1400, par: 85 },
   { track: 'stadium', speed: .62, start: .34, target: 2800, colors: 5, slow: 2.2, powerEvery: 1300, par: 100 },
   { track: 'kitchen', speed: .64, start: .34, target: 3000, colors: 5, slow: 2, powerEvery: 1200, par: 155 },
-  { track: 'snake', speed: .29, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 160 },
+  { track: 'snake', speed: .29, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 190, rail: true },
   { track: 'dumbbell', speed: .21, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
 ].map(level => Object.freeze(level)));
 
@@ -85,7 +86,7 @@ export function levelRules(source = 0, ease = 0) {
   if (!base || !TRACKS[base.track]) throw new Error('Нет такой трассы');
   const steps = Math.max(0, Math.min(EASE_STEPS, ease | 0));
   const eased = steps ? { speed: +(base.speed * (1 - .06 * steps)).toFixed(3), target: Math.round(base.target * (1 - .05 * steps) / 50) * 50, ease: steps } : {};
-  return Object.freeze({ ...DEFAULTS, ...base, ...eased, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)) });
+  return Object.freeze({ ...DEFAULTS, ...base, ...eased, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)), rail: !!base.rail && !!TRACKS[base.track].rail });
 }
 
 // Медали за уровень (по мотивам Zuma's Revenge, 22.10.2026): бронза — пройден,
@@ -115,6 +116,8 @@ export function createBlini(seed = 21, source = 0) {
     chains: track.paths.map(path => ({ path, balls: [], rush: true, back: 0, last: -1, danger: false, visible: false })),
     pickups: [], foodAt: Math.round(rules.foodEvery * .7),
     shots: [], score: 0, full: false, mode: 'playing', lives: rules.lives, reload: 0, colors: rules.colors, ramp: false,
+    // Где стоит Михалыч: на скамье он идёт к goal, а прицел держит точку aimAt
+    shooter: { x: track.shooter.x, y: track.shooter.y, vx: 0 }, rail: rules.rail ? track.rail : null, goal: track.shooter.x, aimAt: null,
     negative: 0, pause: 0, technique: 0, streak: 0, bestChain: 0, bestStreak: 0, cleared: 0, shotsFired: 0,
     powerAt: Math.round(rules.powerEvery * .6), aim: -Math.PI / 2, events: [],
   };
@@ -247,14 +250,20 @@ function checkFull(game) {
   emit(game, { kind: 'full' });
 }
 
-// Где класть еду: в стороне от трасс, не вплотную к Михалычу — одна сетка на трассу
+/** Расстояние от точки до места Михалыча — до самого стрелка или до его скамьи. */
+export function awayFromShooter(track, x, y) {
+  const { shooter, rail } = track;
+  const nx = rail ? Math.max(rail.x0, Math.min(rail.x1, x)) : shooter.x;
+  return Math.hypot(x - nx, y - shooter.y);
+}
+
+// Где класть еду: в стороне от трасс, не вплотную к Михалычу и его скамье — одна сетка на трассу
 const foodSpots = new Map();
 function spotsFor(track) {
   if (foodSpots.has(track.id)) return foodSpots.get(track.id);
-  const spots = [], { x: sx, y: sy } = track.shooter;
+  const spots = [];
   for (let y = 40; y <= FIELD.height - 40; y += 20) for (let x = 30; x <= FIELD.width - 30; x += 20) {
-    const away = Math.hypot(x - sx, y - sy);
-    if (away < 72) continue;
+    if (awayFromShooter(track, x, y) < 72) continue;
     let ok = true;
     for (const path of track.paths) for (let i = 0; i <= path.length && ok; i += 6) if ((path.xs[i] - x) ** 2 + (path.ys[i] - y) ** 2 < (D * .5 + TUNING.foodRadius + 6) ** 2) ok = false;
     if (ok) spots.push([x, y]);
@@ -406,6 +415,18 @@ function stepPowers(game) {
   ball.powerUntil = game.tick + TUNING.powerLife;
 }
 
+/** Михалыч идёт по скамье к goal и держит прицел на точке, куда показывают. */
+function stepShooter(game) {
+  const me = game.shooter;
+  me.vx = 0;
+  if (!game.rail) return;
+  const diff = game.goal - me.x;
+  if (Math.abs(diff) < .01) return;
+  me.vx = Math.sign(diff) * Math.min(TUNING.walk, Math.abs(diff));
+  me.x += me.vx;
+  if (game.aimAt && Math.hypot(game.aimAt.x - me.x, game.aimAt.y - me.y) > 4) game.aim = Math.atan2(game.aimAt.y - me.y, game.aimAt.x - me.x);
+}
+
 /** Один шаг партии (10 мс). События шага — в game.events, их забирает экран. */
 export function step(game) {
   if (game.mode !== 'playing') return game;
@@ -414,6 +435,7 @@ export function step(game) {
   if (game.negative > 0) game.negative--;
   if (game.pause > 0) game.pause--;
   if (game.technique > 0) game.technique--;
+  stepShooter(game);
   // Уровень набирает темп: пятый цвет и быстрее — один раз, пока план не выполнен
   if (!game.ramp && game.rules.rampAt > 0 && game.tick >= game.rules.rampAt && !game.full) {
     game.ramp = true;
@@ -451,18 +473,31 @@ export function advance(game, ticks = 1) {
 
 export const secondsOf = game => game.tick * TICK_MS / 1000;
 
-/** Повернуть стрелка к точке поля. */
-export function aim(game, x, y) {
-  const { shooter } = game.track;
+/**
+ * Повернуть стрелка к точке поля. На скамье он ещё и идёт под палец (follow),
+ * не сходя со скамьи, а прицел по пути держит ту же точку.
+ */
+export function aim(game, x, y, follow = true) {
+  const shooter = game.shooter;
+  if (game.rail && follow) { game.goal = Math.max(game.rail.x0, Math.min(game.rail.x1, x)); game.aimAt = { x, y }; }
+  else game.aimAt = null;
   if (Math.hypot(x - shooter.x, y - shooter.y) > 4) game.aim = Math.atan2(y - shooter.y, x - shooter.x);
   return game.aim;
+}
+
+/** Шаг по скамье с клавиатуры: dx единиц влево (−) или вправо (+). */
+export function walk(game, dx) {
+  if (!game.rail) return false;
+  game.goal = Math.max(game.rail.x0, Math.min(game.rail.x1, game.goal + dx));
+  game.aimAt = null;
+  return true;
 }
 
 /** Бросок в сторону точки поля. Перезарядка и не больше двух блинов в полёте. */
 export function shoot(game, x, y) {
   if (game.mode !== 'playing' || game.reload > 0 || game.shots.length >= TUNING.maxShots) return false;
   if (x != null) aim(game, x, y);
-  const { shooter } = game.track, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
+  const shooter = game.shooter, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
   game.shots.push({ x: shooter.x + dx * 34, y: shooter.y + dy * 34, vx: dx * TUNING.shotSpeed, vy: dy * TUNING.shotSpeed, color: game.current });
   game.current = game.next; game.next = pickColor(game);
   game.reload = game.technique > 0 ? Math.round(TUNING.reload / 2) : TUNING.reload;
@@ -491,7 +526,7 @@ export function dangerOf(game) {
 
 /** Куда упрётся прицел: первая точка луча, где он задевает блин, или край поля. */
 export function aimEnd(game) {
-  const { shooter } = game.track, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
+  const shooter = game.shooter, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
   for (let t = 34; t < 900; t += 4) {
     const x = shooter.x + dx * t, y = shooter.y + dy * t;
     if (x < 0 || y < 0 || x > FIELD.width || y > FIELD.height) return { x, y, hit: false };
@@ -513,6 +548,7 @@ export function serializeGame(game) {
   for (const key of SAVED) out[key] = game[key];
   out.chains = game.chains.map(c => ({ rush: c.rush, back: c.back, last: c.last, danger: c.danger, visible: c.visible, balls: c.balls.map(b => ({ ...b, enter: null })) }));
   out.pickups = game.pickups.map(f => ({ ...f }));
+  out.shooterX = game.shooter.x; out.goal = game.goal;
   return out;
 }
 const finite = n => typeof n === 'number' && Number.isFinite(n);
@@ -535,6 +571,11 @@ export function restoreGame(data) {
     });
     game.shots = []; game.events = [];
     game.pickups = (Array.isArray(data.pickups) ? data.pickups : []).filter(f => f && FOOD[f.kind] && finite(f.x) && finite(f.y) && finite(f.born)).map(f => ({ id: f.id | 0, kind: f.kind, x: f.x, y: f.y, born: f.born }));
+    if (game.rail) {
+      const clamp = x => Math.max(game.rail.x0, Math.min(game.rail.x1, x));
+      if (finite(data.shooterX)) game.shooter.x = clamp(data.shooterX);
+      game.goal = finite(data.goal) ? clamp(data.goal) : game.shooter.x;
+    }
     if (!['playing', 'won', 'lost'].includes(game.mode)) game.mode = 'playing';
     if (!PLATES[game.current]) game.current = 0;
     if (!PLATES[game.next]) game.next = 0;

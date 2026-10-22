@@ -73,6 +73,8 @@ function resample(dense) {
 const PI = Math.PI;
 // Карта — трасса и тема фона (blini-draw.js). У «Гантели» две цепочки, как у
 // «боссов» Zuma. Стрелок стоит там, где до всех витков не меньше 45 единиц.
+// rail — скамья, по которой Михалыч ходит на уровнях с rail: true (по мотивам
+// подвижной лягушки Zuma's Revenge): от x0 до x1 на высоте стрелка.
 const SOURCES = [
   {
     id: 'stadium', name: 'Стадион', theme: 'stadium', shooter: [180, 320],
@@ -85,7 +87,7 @@ const SOURCES = [
     paths: [() => builder(-30, 30).corners([[340, 30], [340, 610], [20, 610], [20, 84], [286, 84], [286, 556], [74, 556], [74, 138], [232, 138], [232, 420]], 24).points()],
   },
   {
-    id: 'snake', name: 'Зал', theme: 'gym', shooter: [176, 320],
+    id: 'snake', name: 'Зал', theme: 'gym', shooter: [176, 320], rail: [40, 280],
     note: 'Змейка между гантелями и скамьями — длинная, сверху и снизу.',
     paths: [() => builder(-30, 40).line(300, 40).arc(300, 80, PI).line(70, 120).arc(70, 160, -PI).line(300, 200)
       .arc(300, 240, PI / 2).line(340, 400).arc(300, 400, PI / 2).line(70, 440).arc(70, 480, -PI).line(300, 520)
@@ -103,7 +105,8 @@ const SOURCES = [
 
 function build(source) {
   const paths = source.paths.map(make => Object.freeze(resample(make())));
-  return Object.freeze({ id: source.id, name: source.name, theme: source.theme, note: source.note, shooter: Object.freeze({ x: source.shooter[0], y: source.shooter[1] }), paths: Object.freeze(paths) });
+  const rail = source.rail ? Object.freeze({ x0: source.rail[0], x1: source.rail[1], y: source.shooter[1] }) : null;
+  return Object.freeze({ id: source.id, name: source.name, theme: source.theme, note: source.note, shooter: Object.freeze({ x: source.shooter[0], y: source.shooter[1] }), rail, paths: Object.freeze(paths) });
 }
 
 export const TRACKS = Object.freeze(Object.fromEntries(SOURCES.map(s => [s.id, build(s)])));

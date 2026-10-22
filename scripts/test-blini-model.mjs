@@ -354,3 +354,32 @@ test('темп растёт внутри уровня: через 40 с пяты
   const off = createBlini(4, { ...LEVELS[0], rampAt: 0 }); advance(off, 5000);
   assert.equal(off.ramp, false, 'rampAt: 0 — без роста');
 });
+
+test('скамья: Михалыч идёт под палец, не сходит со скамьи, прицел держит точку; позиция сохраняется', async () => {
+  const { walk, serializeGame, restoreGame, awayFromShooter } = await import('../src/blini-model.js');
+  for (const track of Object.values(TRACKS)) if (track.rail) for (let x = track.rail.x0; x <= track.rail.x1; x += 2)
+    for (const path of track.paths) for (let s = 0; s <= path.length; s += 2)
+      assert.ok(Math.hypot(path.xs[s] - x, path.ys[s] - track.rail.y) > 50, `${track.id}: скамья в ${x} задевает трассу`);
+  const level = LEVELS.findIndex(l => l.rail);
+  assert.ok(level > 3, 'на первом круге Михалыч стоит');
+  const fixed = createBlini(5, 2); aim(fixed, 20, 100); advance(fixed, 100);
+  assert.deepEqual([fixed.shooter.x, fixed.rail], [fixed.track.shooter.x, null], 'без скамьи не ходит');
+  const game = createBlini(5, level), { rail } = game.track;
+  assert.ok(game.rail && game.shooter.x === game.track.shooter.x);
+  aim(game, 5, 120);
+  assert.equal(game.goal, rail.x0, 'дальше края скамьи не идёт');
+  step(game);
+  assert.ok(game.shooter.x < game.track.shooter.x && game.shooter.vx < 0);
+  advance(game, 200);
+  assert.equal(game.shooter.x, rail.x0);
+  assert.ok(Math.abs(game.aim - Math.atan2(120 - rail.y, 5 - rail.x0)) < 1e-9, 'прицел — на ту же точку с нового места');
+  shoot(game);
+  assert.ok(Math.abs(game.shots[0].x - (rail.x0 + Math.cos(game.aim) * 34)) < 1e-9, 'бросок — оттуда, где стоит');
+  walk(game, 50); advance(game, 50);
+  assert.equal(game.shooter.x, rail.x0 + 50, 'шаг с клавиатуры');
+  aim(game, 300, 100, false); advance(game, 50);
+  assert.equal(game.shooter.x, rail.x0 + 50, 'поворот стрелками не двигает');
+  const copy = restoreGame(JSON.parse(JSON.stringify(serializeGame(game))));
+  assert.deepEqual([copy.shooter.x, copy.goal], [game.shooter.x, game.goal]);
+  assert.equal(awayFromShooter(game.track, rail.x1 + 10, rail.y), 10, 'еда и предметы не ложатся на скамью');
+});

@@ -161,7 +161,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
       el.dataset.field = [view.current.ox, view.current.oy, s].map(n => n.toFixed(2)).join(' ');
       el.dataset.quality = String(dpr);
       // Фон карты — отдельный неподвижный слой: каждый кадр рисуется только то, что движется
-      bakeBackground(track, view.current, bg);
+      bakeBackground(track, view.current, bg, rules.rail);
       draw();
     };
     refit.current = fit;
@@ -170,7 +170,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     observer?.observe(box);
     window.addEventListener('resize', fit);
     return () => { observer?.disconnect(); window.removeEventListener('resize', fit); };
-  }, [track]);
+  }, [track, rules.rail]);
 
   // Пока партия идёт — кадр за кадром; на паузе и в панелях — одна неподвижная картинка
   useEffect(() => {
@@ -253,18 +253,21 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   const up = event => {
     if (!aiming.current) return;
     aiming.current = false;
-    const p = toField(event), { shooter } = track;
+    const p = toField(event), { shooter } = session.game();
     // Касание Михалыча — поменять блин в руке на следующий
     if (Math.hypot(p.x - shooter.x, p.y - shooter.y) < 32) { swap(); return; }
     session.shoot(p.x, p.y, token.current);
   };
   const turn = delta => {
-    const game = session.game(), { shooter } = game.track, a = game.aim + delta;
-    session.aim(shooter.x + Math.cos(a) * 100, shooter.y + Math.sin(a) * 100, token.current);
+    const game = session.game(), { shooter } = game, a = game.aim + delta;
+    session.aim(shooter.x + Math.cos(a) * 100, shooter.y + Math.sin(a) * 100, token.current, false);
   };
   const keys = event => {
     if (mode !== 'playing' || help) return;
-    if (event.key === 'ArrowLeft') { event.preventDefault(); turn(-.09); }
+    // Shift со стрелкой (или A и D) — шаг по скамье
+    const step = event.code === 'KeyA' || (event.shiftKey && event.key === 'ArrowLeft') ? -24 : event.code === 'KeyD' || (event.shiftKey && event.key === 'ArrowRight') ? 24 : 0;
+    if (step && rules.rail) { event.preventDefault(); session.walk(step, token.current); }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); turn(-.09); }
     else if (event.key === 'ArrowRight') { event.preventDefault(); turn(.09); }
     else if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); session.shoot(undefined, undefined, token.current); }
     else if (event.code === 'KeyX' || event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); swap(); }
@@ -289,6 +292,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     : hud.danger >= .85 ? 'Блины у помоста! Снимай ближние'
     : hud.streak >= 3 ? `Серия ×${hud.streak}: каждое попадание дороже`
     : hud.ramp && hud.seconds < rules.rampAt * TICK_MS / 1000 + 6 ? 'Темп растёт — не зевай'
+    : rules.rail ? 'Веди пальцем — Михалыч идёт по скамье, отпусти — бросок'
     : 'Касание поля — бросок, Михалыча — обмен');
   const backLabel = mission ? 'Вернуться в карьеру' : `Вернуться ${restLeft == null ? 'в приложение' : 'к отдыху'}`;
 
@@ -329,6 +333,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
             <div><span className="blini-rule-plates"><Plate color={0} /><Plate color={0} /><Plate color={0} /></span><span><strong>Три одного цвета</strong>Снимаются, а вес идёт в тоннаж</span></div>
             <div><span className="blini-rule-plates"><Plate color={1} /><Plate color={2} /><Plate color={1} /></span><span><strong>Цепь</strong>После снятия на стыке снова один цвет — блины откатываются назад, очки ×2, ×3…</span></div>
             <div><span className="blini-rule-plates"><Plate color={3} /></span><span><strong>План</strong>Набери тоннаж — новые блины перестанут выходить. Сними оставшиеся</span></div>
+            <div><span className="blini-rule-plates"><Plate color={2} /><Plate color={2} /></span><span><strong>Скамья</strong>На «Зале» со второго круга Михалыч ходит по скамье: веди пальцем — он идёт под него, отпусти — бросит. С клавиатуры — Shift со стрелками или A и D</span></div>
             <div><span className="blini-rule-plates"><Plate color={4} /></span><span><strong>Темп растёт</strong>Через 40 секунд блины катятся быстрее, а где их было четыре — выходит пятый цвет</span></div>
           </div>
           <div className="blini-powers">{Object.entries(POWERS).map(([id, power]) => <div key={id}><PowerMark power={id} /><span><strong>{power.name}</strong>{power.effect}</span></div>)}</div>
@@ -340,7 +345,8 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           <p>{track.note}</p>
           <MissionNote game="blini" mission={mission} />
           <div className="blini-mission"><span>План {kg(rules.target)}</span><span>{colorsLabel(rules.colors)}</span><span>Норматив {seconds(rules.par)}</span>
-            {rules.rampAt > 0 && <span>С {seconds(rules.rampAt * TICK_MS / 1000)} — {rules.colors < PLATES.length ? 'пятый цвет и ' : ''}быстрее</span>}</div>
+            {rules.rampAt > 0 && <span>С {seconds(rules.rampAt * TICK_MS / 1000)} — {rules.colors < PLATES.length ? 'пятый цвет и ' : ''}быстрее</span>}
+            {rules.rail && <span>Михалыч ходит по скамье</span>}</div>
           {!state.mission && rules.ease > 0 && <p className="blini-ease">Михалыч сбавил темп: блины на {rules.ease * 6} % медленнее, план на {rules.ease * 5} % меньше. Выиграешь — уровень станет обычным.</p>}
           {!state.mission && <MedalGoals best={medals[level] || 0} par={rules.par} />}
           <p className="blini-tip"><b>Совет Михалыча.</b> {TIPS[(level + serial) % TIPS.length]}</p>

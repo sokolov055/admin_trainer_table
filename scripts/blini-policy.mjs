@@ -25,12 +25,18 @@ export function botTurn(game, noise = 0) {
   const other = targets(game, game.next)[0];
   if (other && (!best || other.value > best.value + 4)) { swap(game); best = other; }
   if (!best) return false;
-  const { shooter } = game.track;
+  const { shooter } = game;
   const p = pointAt(best.chain.path, best.ball.s);
+  // На скамье — как человек: сначала довести Михалыча под цель, бросить на следующем ходу
+  if (game.rail) {
+    const x = Math.max(game.rail.x0, Math.min(game.rail.x1, p.x));
+    if (Math.abs(shooter.x - x) > 24) { aim(game, p.x, p.y); return false; }
+  }
   const travel = Math.hypot(p.x - shooter.x, p.y - shooter.y) / TUNING.shotSpeed;
   const lead = pointAt(best.chain.path, best.ball.s + game.rules.speed * travel);
-  const angle = Math.atan2(lead.y - shooter.y, lead.x - shooter.x) + noise;
-  aim(game, shooter.x + Math.cos(angle) * 100, shooter.y + Math.sin(angle) * 100);
+  const angle = Math.atan2(lead.y - shooter.y, lead.x - shooter.x) + noise, far = Math.hypot(lead.x - shooter.x, lead.y - shooter.y);
+  // Касание цели, как у человека: на скамье Михалыч пойдёт под неё
+  aim(game, shooter.x + Math.cos(angle) * far, shooter.y + Math.sin(angle) * far);
   return shoot(game);
 }
 

@@ -144,3 +144,25 @@ test('блины на отдыхе: четвёртая кнопка, а коне
   assert.equal(state.mode, 'paused'); assert.equal(state.reason, 'rest');
   await page.getByRole('heading', { name: 'Пора к подходу' }).waitFor();
 });
+
+test('блины: со второго круга на «Зале» Михалыч идёт по скамье за пальцем', async t => {
+  const page = await setup(t);
+  await page.evaluate(() => { localStorage.setItem('ft.blini.v1', JSON.stringify({ unlocked: 11 })); showBlini({ identity: 'rail' }); });
+  await page.getByRole('button', { name: 'Играть', exact: true }).waitFor();
+  await page.evaluate(() => bliniFixture.choose(6));
+  await page.getByText('Михалыч ходит по скамье').waitFor();
+  await play(page);
+  const before = await game(page);
+  assert.ok(before.rail, 'скамья включена');
+  const f = await field(page);
+  await page.mouse.move(f.x + before.shooter.x * f.s, f.y + 200 * f.s);
+  await page.mouse.down();
+  await page.mouse.move(f.x + 60 * f.s, f.y + 200 * f.s, { steps: 4 });
+  await page.clock.runFor(1000);
+  const moved = await game(page);
+  assert.ok(Math.abs(moved.shooter.x - 60) < 1, `Михалыч под пальцем: ${moved.shooter.x}`);
+  assert.equal(moved.fired, before.fired, 'пока палец на поле — не бросает');
+  await page.screenshot({ path: 'reports/blini/rail.png' });
+  await page.mouse.up();
+  assert.equal((await game(page)).fired, before.fired + 1, 'отпустил — бросок');
+});
