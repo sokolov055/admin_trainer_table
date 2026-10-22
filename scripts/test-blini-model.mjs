@@ -304,3 +304,29 @@ test('подстройка сложности: после неудач темп 
   session.start(token);
   assert.equal(session.game().rules.ease, 1);
 });
+
+test('медали: бронза — пройден, серебро — в нормативе, золото — ещё и цепь ×3; лучшая не теряется', async () => {
+  const { medalOf, GOLD_CHAIN } = await import('../src/blini-model.js');
+  const rules = levelRules(0);
+  assert.equal(medalOf({ won: false, seconds: 1, bestChain: 9 }, rules), 0);
+  assert.equal(medalOf({ won: true, seconds: rules.par + 1, bestChain: 9 }, rules), 1);
+  assert.equal(medalOf({ won: true, seconds: rules.par, bestChain: GOLD_CHAIN - 1 }, rules), 2);
+  assert.equal(medalOf({ won: true, seconds: rules.par, bestChain: GOLD_CHAIN }, rules), 3);
+  let clock = 0;
+  const session = createBliniSession({ seed: 2, now: () => clock });
+  const saves = []; session.onPersist(data => saves.push(data));
+  const token = {}; session.claim(token, () => false);
+  const win = (chain, ticks) => { session.start(token); const g = session.game(); g.tick = ticks; g.bestChain = chain; g.full = true; g.chains.forEach(c => { c.balls = []; }); clock += 20; session.frame(token); };
+  win(3, 100);
+  let snap = session.getSnapshot();
+  assert.deepEqual([snap.mode, snap.result.medal, snap.result.newMedal, snap.medals[0]], ['won', 3, true, 3]);
+  assert.equal(saves.at(-1).medals[0], 3, 'медаль уходит в сохранение');
+  win(1, rules.par * 100 + 500);
+  snap = session.getSnapshot();
+  assert.deepEqual([snap.result.medal, snap.result.newMedal, snap.medals[0]], [1, false, 3], 'бронза после золота не затирает его');
+  assert.equal(session.hydrate({ unlocked: 2, level: 1, savedAt: Date.now() + 1000, medals: { 0: 1, 1: 2, 40: 3, 2: 'x' } }), true);
+  assert.deepEqual(session.getSnapshot().medals, { 0: 3, 1: 2 }, 'из аккаунта — лучшая по каждому уровню, мусор отброшен');
+  session.mission({ goal: { level: 2, target: 500 }, boost: false });
+  win(3, 100);
+  assert.equal(session.getSnapshot().medals[2], undefined, 'задание карьеры медаль уровню не даёт');
+});

@@ -86,6 +86,16 @@ export function levelRules(source = 0, ease = 0) {
   return Object.freeze({ ...DEFAULTS, ...base, ...eased, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)) });
 }
 
+// Медали за уровень (по мотивам Zuma's Revenge, 22.10.2026): бронза — пройден,
+// серебро — в нормативе, золото — в нормативе и с цепью ×3 и длиннее
+export const MEDALS = Object.freeze(['', 'Бронза', 'Серебро', 'Золото']);
+export const GOLD_CHAIN = 3;
+export function medalOf({ won, seconds, bestChain }, rules) {
+  if (!won) return 0;
+  if (seconds > rules.par) return 1;
+  return bestChain >= GOLD_CHAIN ? 3 : 2;
+}
+
 /** Правила задания карьеры: уровень свободной игры со своим планом; пояс — одна страховка. */
 export function missionRules(goal, boost = false) {
   return levelRules({ ...LEVELS[goal.level], target: goal.target, lives: boost ? 1 : 0 });

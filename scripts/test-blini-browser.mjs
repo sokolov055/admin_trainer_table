@@ -116,11 +116,17 @@ test('блины: победа открывает следующий урове�
   await page.clock.runFor(300);
   assert.equal((await read(page)).mode, 'won');
   await page.getByRole('heading', { name: /Уровень взят|Уложился в норматив/ }).waitFor();
+  await page.getByText('Новая медаль: серебро').waitFor();
   await page.screenshot({ path: 'reports/blini/won.png' });
   await page.getByRole('button', { name: 'Следующий уровень' }).click();
   const state = await read(page);
   assert.equal(state.level, 1); assert.equal(state.unlocked, 1); assert.equal(state.mode, 'ready');
   await page.getByRole('heading', { name: '«Кухня»' }).waitFor();
+  await page.getByText('Медалей 2 из 36').waitFor();
+  assert.equal(await page.locator('.blini-medals li.is-earned').count(), 0, 'у нового уровня медалей ещё нет');
+  await page.getByRole('button', { name: 'Предыдущий уровень' }).click();
+  assert.equal(await page.locator('.blini-medals li.is-earned').count(), 2, 'у пройденного — бронза и серебро');
+  await page.screenshot({ path: 'reports/blini/medals.png' });
 });
 
 test('блины на отдыхе: четвёртая кнопка, а конец отдыха ставит партию на паузу', async t => {

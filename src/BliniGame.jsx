@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useBliniSession } from './BliniSession.jsx';
-import { LEVELS, PLATES, POWERS, levelRules, missionRules } from './blini-model.js';
+import { LEVELS, PLATES, POWERS, MEDALS, GOLD_CHAIN, levelRules, missionRules } from './blini-model.js';
 import { FIELD, TRACKS } from './blini-tracks.js';
 import { createFx, addEvents, drawScene, bakeBackground, plateImage } from './blini-draw.js';
 import { createBliniAudio } from './blini-audio.js';
@@ -44,6 +44,27 @@ function PowerMark({ power }) {
     {power === 'superset' && <path d="M7 1.6 3.6 6.6H6.4L5 10.4" />}
   </svg></span>;
 }
+// Медаль уровня: лента и диск цвета металла; не взятая — бледный контур
+const METAL = ['', '#c27a3e', '#aeb8bf', '#e9b52a'];
+function Medal({ rank, earned = true, size = 30 }) {
+  const fill = earned ? METAL[rank] : '#e3e3d3', ink = earned ? '#fff9e0' : '#b6b8a6';
+  return <svg className="blini-medal-icon" viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
+    <path d="M9 2h6l3 8h-6Z" fill={earned ? '#d8343f' : '#d6d6c6'} /><path d="M23 2h-6l-3 8h6Z" fill={earned ? '#2d6bd3' : '#cacabb'} />
+    <circle cx="16" cy="19.5" r="10" fill={fill} stroke={earned ? '#00000030' : '#c9cab8'} strokeWidth="1.5" />
+    <circle cx="16" cy="19.5" r="6.6" fill="none" stroke={ink} strokeOpacity=".55" strokeWidth="1.2" />
+    <text x="16" y="23.4" textAnchor="middle" fontSize="10.5" fontWeight="900" fill={ink} fontFamily="Manrope, sans-serif">{rank}</text>
+  </svg>;
+}
+/** Три медали уровня и за что каждая: взятые — цветные. */
+function MedalGoals({ best, par }) {
+  const goals = ['', 'Пройти уровень', `Уложиться в ${seconds(par)}`, `${seconds(par)} и цепь ×${GOLD_CHAIN}`];
+  return <ul className="blini-medals" aria-label="Медали уровня">
+    {[1, 2, 3].map(rank => <li key={rank} className={best >= rank ? 'is-earned' : ''}>
+      <Medal rank={rank} earned={best >= rank} /><span><strong>{MEDALS[rank]}</strong>{goals[rank]}</span>
+      {best >= rank && <span className="blini-visually-hidden">— есть</span>}
+    </li>)}
+  </ul>;
+}
 
 /**
  * «Блины» (21.10.2026): цепочка олимпийских блинов катится к помосту,
@@ -53,7 +74,7 @@ function PowerMark({ power }) {
  */
 export default function BliniGame({ onClose, restLeft, restUntil = Infinity, career = false }) {
   const [state, session] = useBliniSession();
-  const { mode, hud, level, unlocked, result, sound, reason, serial } = state;
+  const { mode, hud, level, unlocked, medals, result, sound, reason, serial } = state;
   const { mission, outcome, report } = useMission('blini', career);
   const reported = useRef(null);
   // Задание карьеры — свой уровень и план, пояс — одна страховка; без задания — свободная игра
@@ -316,10 +337,11 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           <MissionNote game="blini" mission={mission} />
           <div className="blini-mission"><span>План {kg(rules.target)}</span><span>{colorsLabel(rules.colors)}</span><span>Норматив {seconds(rules.par)}</span></div>
           {!state.mission && rules.ease > 0 && <p className="blini-ease">Михалыч сбавил темп: блины на {rules.ease * 6} % медленнее, план на {rules.ease * 5} % меньше. Выиграешь — уровень станет обычным.</p>}
+          {!state.mission && <MedalGoals best={medals[level] || 0} par={rules.par} />}
           <p className="blini-tip"><b>Совет Михалыча.</b> {TIPS[(level + serial) % TIPS.length]}</p>
           {!state.mission && unlocked > 0 && <div className="blini-levels" role="group" aria-label="Выбор уровня">
             <button type="button" onClick={() => session.choose(level - 1, token.current)} disabled={level === 0} aria-label="Предыдущий уровень">‹</button>
-            <span>Открыто {unlocked + 1} из {LEVELS.length}</span>
+            <span>Открыто {unlocked + 1} из {LEVELS.length}<br />Медалей {Object.values(medals).reduce((sum, n) => sum + n, 0)} из {LEVELS.length * 3}</span>
             <button type="button" onClick={() => session.choose(level + 1, token.current)} disabled={level >= unlocked} aria-label="Следующий уровень">›</button>
           </div>}
           <button className="blini-primary" ref={primary} onClick={start}>Играть</button>
@@ -339,6 +361,11 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           <h3 id={title}>{mode === 'won' ? (result?.ace ? 'Уложился в норматив!' : 'Уровень взят!') : 'Блины на помосте'}</h3>
           <p>{mode === 'won' ? (result?.ace ? `Быстрее ${seconds(rules.par)} — как по секундомеру.` : `Норматив — ${seconds(rules.par)}. В следующий раз быстрее.`) : 'Цепочка докатилась до помоста. Снимай ближние к нему блины первыми.'}</p>
           <div className="blini-result"><strong>{kg(result?.score ?? hud.score)}</strong><span>поднято за {seconds(result?.seconds ?? hud.seconds)}</span></div>
+          {mode === 'won' && result?.medal > 0 && <div className={'blini-award' + (result.newMedal ? ' is-new' : '')}>
+            <Medal rank={result.medal} size={46} />
+            <span><strong>{result.newMedal ? `Новая медаль: ${MEDALS[result.medal].toLowerCase()}` : MEDALS[result.medal]}</strong>
+              {result.medal === 1 ? `Серебро — уложись в ${seconds(rules.par)}` : result.medal === 2 ? `Золото — ещё и цепь ×${GOLD_CHAIN}` : 'Лучшая медаль уровня'}</span>
+          </div>}
           {(result?.bestChain > 1 || result?.bestStreak > 1) && <p className="blini-panel__fine">{[result.bestChain > 1 && `Лучшая цепь ×${result.bestChain}`, result.bestStreak > 1 && `серия ×${result.bestStreak}`].filter(Boolean).join(' · ')}</p>}
           <MissionNote game="blini" mission={mission} outcome={outcome} />
           {mission ? <button className="blini-primary" ref={primary} onClick={() => mode === 'won' ? close() : start()}>{mode === 'won' ? 'К карьере' : 'Повторить задание'}</button>

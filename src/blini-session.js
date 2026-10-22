@@ -1,4 +1,4 @@
-import { createBlini, advance, drain, shoot, swap, aim, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
+import { createBlini, advance, drain, shoot, swap, aim, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, medalOf, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
 
 // Одна партия «Блинов» на кабинет: меню, отдых и карьера видят одну и ту же.
 // Пауза и смена экрана сохраняют её целиком. Открытые уровни и незаконченная
@@ -8,7 +8,7 @@ const PROGRESS = 'ft.blini.v1';
 const MAX_TICKS = 25; // кадр позже 250 мс (фон, медленный телефон) не прокручивает партию рывком
 
 const clampLevel = n => Number.isInteger(n) ? Math.max(0, Math.min(LEVELS.length - 1, n)) : 0;
-const EMPTY = Object.freeze({ unlocked: 0, level: 0, game: null, savedAt: 0, fails: {} });
+const EMPTY = Object.freeze({ unlocked: 0, level: 0, game: null, savedAt: 0, fails: {}, medals: {} });
 // Неудачи подряд на уровне — для подстройки сложности (по мотивам DDS Zuma's Revenge)
 function cleanFails(value) {
   const out = {};
@@ -18,11 +18,21 @@ function cleanFails(value) {
   }
   return out;
 }
-/** Сохранение: открытые уровни, выбранный уровень и незаконченная партия. */
+// Лучшая медаль уровня: 1 — бронза, 2 — серебро, 3 — золото
+function cleanMedals(value) {
+  const out = {};
+  if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) {
+    const level = Number(k), n = Number(v);
+    if (Number.isInteger(level) && level >= 0 && level < LEVELS.length && Number.isInteger(n) && n > 0) out[level] = Math.min(3, n);
+  }
+  return out;
+}
+const bestOf = (a, b) => { const out = { ...a }; for (const [k, v] of Object.entries(b)) out[k] = Math.max(out[k] || 0, v); return out; };
+/** Сохранение: открытые уровни, выбранный уровень, медали и незаконченная партия. */
 export function readSaved(value) {
   if (!value || typeof value !== 'object') return null;
   const unlocked = clampLevel(value.unlocked);
-  return { unlocked, level: Math.min(unlocked, clampLevel(value.level ?? unlocked)), game: value.game || null, savedAt: Number(value.savedAt) || 0, fails: cleanFails(value.fails) };
+  return { unlocked, level: Math.min(unlocked, clampLevel(value.level ?? unlocked)), game: value.game || null, savedAt: Number(value.savedAt) || 0, fails: cleanFails(value.fails), medals: cleanMedals(value.medals) };
 }
 function loadProgress() {
   try { return readSaved(JSON.parse(localStorage.getItem(PROGRESS))) || EMPTY; } catch (_) { return EMPTY; }
@@ -44,13 +54,13 @@ const sameHud = (a, b) => Object.keys(a).every(k => a[k] === b[k]);
 
 export function createBliniSession({ seed = Date.now(), now = () => Date.now() } = {}) {
   const progress = loadProgress();
-  let serial = 0, savedAt = progress.savedAt, lastPersist = 0, fails = { ...progress.fails };
+  let serial = 0, savedAt = progress.savedAt, lastPersist = 0, fails = { ...progress.fails }, medals = { ...progress.medals };
   const free = level => levelRules(level, fails[level] || 0);
   // Незаконченная партия с прошлого раза — на паузе «Партия сохранена»
   const restored = restoreGame(progress.game);
   const resumed = !!restored && restored.mode === 'playing';
   let game = resumed ? restored : createBlini(seed, free(progress.level));
-  let snapshot = { mode: resumed ? 'paused' : 'ready', level: progress.level, unlocked: progress.unlocked, mission: null, reason: resumed ? 'saved' : '', sound: false, serial: 0, hud: hudOf(game), result: null };
+  let snapshot = { mode: resumed ? 'paused' : 'ready', level: progress.level, unlocked: progress.unlocked, medals, mission: null, reason: resumed ? 'saved' : '', sound: false, serial: 0, hud: hudOf(game), result: null };
   const listeners = new Set(), persisters = new Set();
   const owners = [];
   let carry = 0, last = now();
@@ -58,7 +68,7 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
   // Партия свободной игры сохраняется целиком; задание карьеры — нет: оно живёт, пока открыта карьера
   const persist = () => {
     savedAt = Date.now(); lastPersist = savedAt;
-    const data = { v: 1, unlocked: snapshot.unlocked, level: snapshot.mission ? snapshot.unlocked : snapshot.level, savedAt, fails,
+    const data = { v: 1, unlocked: snapshot.unlocked, level: snapshot.mission ? snapshot.unlocked : snapshot.level, savedAt, fails, medals,
       game: !snapshot.mission && ['playing', 'paused'].includes(snapshot.mode) && game.mode === 'playing' ? serializeGame(game) : null };
     saveProgress(data);
     persisters.forEach(fn => { try { fn(data); } catch (_) { /* сеть повторит сама */ } });
@@ -79,6 +89,10 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
   const finish = () => {
     const won = game.mode === 'won', seconds = secondsOf(game);
     const result = { won, seconds, ace: won && seconds <= game.rules.par, score: game.score, bestChain: game.bestChain, bestStreak: game.bestStreak, cleared: game.cleared };
+    // Медаль — за свободную игру; в задании карьеры она показывается, но не записывается
+    result.medal = medalOf(result, game.rules);
+    result.newMedal = !snapshot.mission && result.medal > (medals[snapshot.level] || 0);
+    if (result.newMedal) medals = { ...medals, [snapshot.level]: result.medal };
     let unlocked = snapshot.unlocked;
     if (won && !snapshot.mission && snapshot.level >= unlocked && snapshot.level < LEVELS.length - 1) unlocked = snapshot.level + 1;
     // Проиграл — в следующий раз уровень чуть мягче; выиграл — снова обычный
@@ -86,7 +100,7 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
       fails = { ...fails };
       if (won) delete fails[snapshot.level]; else fails[snapshot.level] = Math.min(EASE_STEPS, (fails[snapshot.level] || 0) + 1);
     }
-    emit({ mode: won ? 'won' : 'lost', result, unlocked, hud: hudOf(game) });
+    emit({ mode: won ? 'won' : 'lost', result, unlocked, medals, hud: hudOf(game) });
     persist();
   };
   const rulesNow = () => snapshot.mission ? missionRules(snapshot.mission.goal, snapshot.mission.boost) : free(snapshot.level);
@@ -110,19 +124,21 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
       if (!saved || saved.savedAt <= savedAt) return false;
       savedAt = saved.savedAt;
       const unlocked = Math.max(snapshot.unlocked, saved.unlocked);
+      // Медали не теряются ни с одной стороны: берётся лучшая по каждому уровню
+      medals = bestOf(medals, saved.medals);
       if (snapshot.mode === 'playing' || snapshot.mission) {
-        emit({ unlocked }); saveProgress({ ...loadProgress(), unlocked, savedAt }); return true;
+        emit({ unlocked, medals }); saveProgress({ ...loadProgress(), unlocked, savedAt, medals }); return true;
       }
       const next = restoreGame(saved.game);
       if (next && next.mode === 'playing') {
         serial++; carry = 0; last = now(); game = next;
-        emit({ mode: 'paused', reason: 'saved', unlocked, level: saved.level, result: null, hud: hudOf(game), serial });
+        emit({ mode: 'paused', reason: 'saved', unlocked, level: saved.level, medals, result: null, hud: hudOf(game), serial });
       } else {
-        snapshot = { ...snapshot, unlocked, level: saved.level };
+        snapshot = { ...snapshot, unlocked, level: saved.level, medals };
         fails = { ...saved.fails };
         fresh(free(saved.level), { mode: 'ready', level: saved.level, unlocked });
       }
-      saveProgress({ ...saved, unlocked });
+      saveProgress({ ...saved, unlocked, medals });
       return true;
     },
     claim(token, isExpired) {
