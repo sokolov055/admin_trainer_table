@@ -44,7 +44,7 @@ import { forgetFocus } from './focus.jsx';
 import { isNativeApp, iosApp } from '../native-bridge.js';
 import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } from './Permissions.jsx';
 import GameShell from '../GameShell.jsx';
-import { IconPlankGame, IconScooterGame, IconMatchGame, IconBliniGame, IconCareerGame } from '../game-icons.jsx';
+import { GAME_ITEMS } from '../game-icons.jsx';
 import CareerHub from '../CareerHub.jsx';
 import { useCareer } from '../CareerSession.jsx';
 import QuickAdd from './QuickAdd.jsx';
@@ -83,12 +83,8 @@ const TABS = [
  * зашедший включить уведомления не должен листать свой рост и телефон.
  */
 const MENU = [
-  // Карьера связывает три игры сюжетом (FT-563, 19.10.2026)
-  { id: 'career', label: 'Карьера в фитнесе', note: 'От турника во дворе до своей сети клубов', Icon: IconCareerGame, game: true },
-  { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlankGame, game: true },
-  { id: 'scooter-game', label: 'На самокате до зала', note: 'Бесконечный заезд и рейтинг игроков', Icon: IconScooterGame, game: true },
-  { id: 'match-game', label: 'Три в ряд', note: 'Собери свой лучший каскад', Icon: IconMatchGame, game: true },
-  { id: 'blini-game', label: 'Блины', note: 'Не дай блинам докатиться до помоста', Icon: IconBliniGame, game: true },
+  // Игры — общий список с «Моими тренировками» владельца (game-icons.jsx)
+  ...GAME_ITEMS.map((g) => ({ ...g, game: true })),
   // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.

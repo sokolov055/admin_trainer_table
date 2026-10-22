@@ -258,21 +258,24 @@ export default function App() {
   }
 
   const me = state.me;
+  // Игры: клиенту — если открыты, владельцу — всегда, из «Моих тренировок»
+  // и в отдыхе (22.10.2026); играет он своей карточкой (сервер — selfAsClient)
+  const games = (me.role === 'client' && me.plankGameEnabled === true) || (me.role === 'trainer' && me.owner === true);
 
   return (
-    <PlankAccess.Provider value={me.role === 'client' && me.plankGameEnabled === true}>
+    <PlankAccess.Provider value={games}>
     <PlankSessionProvider key={[me.identityType, me.chatId, me.email, me.role, me.member, me.plankGameEnabled].join(':')}>
     <ScooterSessionProvider>
     <MatchSessionProvider>
     <BliniSessionProvider>
-    <CareerProvider key={[me.identityType, me.chatId, me.email, me.member].join(':')} id={[me.identityType, me.chatId || me.email || '', me.member || ''].join(':')} sync={me.role === 'client' && !me.member && me.plankGameEnabled === true}>
+    <CareerProvider key={[me.identityType, me.chatId, me.email, me.member].join(':')} id={[me.identityType, me.chatId || me.email || '', me.member || ''].join(':')} sync={games && !me.member}>
       <Deferred fallback={waitingPage}>
         {me.role === 'trainer' ? <TrainerApp me={me} />
           : me.role === 'candidate' ? <CandidateApp me={me} onApproved={load} />
             : <ClientApp me={me} />}
       </Deferred>
       <Gestures />
-      <RestLayer allowGame={me.role === 'client' && me.plankGameEnabled === true} />
+      <RestLayer allowGame={games} />
       {/* Подсказка живёт не только сразу после входа. Ставят приложение
           редко с первого раза: человек заходит посмотреть баланс, закрывает
           вкладку и через неделю снова ищет ссылку в переписке. Поэтому она

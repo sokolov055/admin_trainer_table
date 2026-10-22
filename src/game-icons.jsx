@@ -33,3 +33,16 @@ export function IconBliniGame({ size = 48 }) {
     {plate(11, 28, '#d8343f', '#fff', 25)}{plate(22, 20, '#2d6bd3', '#fff', 20)}{plate(34, 17, '#f1c232', '#3a2a00', 15)}
   </svg>;
 }
+
+/**
+ * Игры в меню — один список на клиента (ClientApp.jsx) и владельца в
+ * «Моих тренировках» (trainer/MyGames.jsx, 22.10.2026). Карьера связывает
+ * игры сюжетом (FT-563).
+ */
+export const GAME_ITEMS = [
+  { id: 'career', label: 'Карьера в фитнесе', note: 'От турника во дворе до своей сети клубов', Icon: IconCareerGame },
+  { id: 'plank-game', label: 'Тренер в планке', note: 'Фитнес-викторина на 10 секунд', Icon: IconPlankGame },
+  { id: 'scooter-game', label: 'На самокате до зала', note: 'Бесконечный заезд и рейтинг игроков', Icon: IconScooterGame },
+  { id: 'match-game', label: 'Три в ряд', note: 'Собери свой лучший каскад', Icon: IconMatchGame },
+  { id: 'blini-game', label: 'Блины', note: 'Не дай блинам докатиться до помоста', Icon: IconBliniGame },
+];

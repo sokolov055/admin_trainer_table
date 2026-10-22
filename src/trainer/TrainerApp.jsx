@@ -26,7 +26,7 @@ import {
   IconPlan, IconCalendar, IconKey, IconProgress, IconEye, IconPalette,
 } from '../icons.jsx';
 import { WorkoutJournal } from '../client/screens.jsx';
-import { Deferred } from '../lazy.js';
+import { Deferred, lazyPage } from '../lazy.js';
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
 import Admin, { ADMIN_PANES } from './Admin.jsx';
@@ -34,6 +34,9 @@ import TrainerProfile from './TrainerProfile.jsx';
 import Appearance from '../Appearance.jsx';
 import { screensNote } from '../native-bridge.js';
 import { useSelfCard, selfPick } from './selfCard.js';
+
+// Игры тяжёлые (картинки, звук) — грузятся, только когда открыли вкладку
+const MyGames = lazyPage(() => import('./MyGames.jsx'));
 
 /**
  * Панель тренера.
@@ -520,6 +523,8 @@ const MY_VIEWS = [
   { value: 'plan', label: 'Тренировки', Screen: Plan },
   { value: 'progress', label: 'Прогресс', Screen: Progress },
   { value: 'nutrition', label: 'Питание', Screen: Nutrition },
+  // Игры, как у клиента (22.10.2026): «Мои тренировки» — только у владельца
+  { value: 'games', label: 'Игры', Screen: MyGames },
 ];
 
 /**
@@ -551,7 +556,9 @@ function MyWorkouts() {
           data-view={v.value}
           style={{ marginTop: 'var(--space-4)' }}
         >
-          <v.Screen clientRow={self.card.clientRow} self />
+          <Deferred fallback={<Loading lead={false} rows={3} />}>
+            <v.Screen clientRow={self.card.clientRow} self />
+          </Deferred>
         </div>
       ))}
     </>

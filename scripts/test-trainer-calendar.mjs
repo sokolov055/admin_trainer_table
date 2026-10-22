@@ -31,6 +31,7 @@ const output = await build({
       stub(/Payments\.jsx$/, 'payments');
       stub(/Library\.jsx$/, 'library');
       stub(/Admin\.jsx$/, 'admin');
+      stub(/MyGames\.jsx$/, 'my-games');
       stub(/stories\.jsx$/, 'stories');
       stub(/AuthTransfer\.jsx$/, 'transfer');
       stub(/Invites\.jsx$/, 'invites');
@@ -71,6 +72,7 @@ const output = await build({
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
             export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I; export const IconEye=I; export const IconPalette=I;`,
         };
+        if (args.path === 'my-games') return { loader: 'jsx', contents: 'export default () => null;' };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }];` };
         if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Clients=()=>null; export const Processes=()=>null;` };
