@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { plugin } from './native-bridge.js';
+import { isNativeApp, plugin } from './native-bridge.js';
 
 /**
  * Общие повадки трёх игр (FT-563, 19.10.2026): игра занимает весь экран —
@@ -26,8 +26,14 @@ export function buzz(kind = 'tap') {
   try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(PATTERNS[kind] || PATTERNS.tap); } catch (_) {}
 }
 
-/** Во весь экран браузера — только из обработчика касания: без жеста браузер откажет. */
+/**
+ * Во весь экран браузера — только из обработчика касания: без жеста браузер откажет.
+ * В приложении не просим: оно и так на весь экран, строку состояния убирает
+ * useGameChrome, а iPhone на запрос показывает плашку «capacitor://localhost
+ * открыто на весь экран» (22.10.2026).
+ */
 export function enterFullscreen(node) {
+  if (isNativeApp()) return;
   const scene = node && node.closest ? (node.closest('.game-shell') || node.closest('.rest-screen')) : null;
   if (typeof document === 'undefined' || document.fullscreenElement || !scene || !scene.requestFullscreen) return;
   try { scene.requestFullscreen().catch(() => {}); } catch (_) {}

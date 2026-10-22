@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { QUESTIONS, CATEGORIES, shuffledQuestions, judgeAnswer, makeDeck } from '../src/plank-game.js';
 import { createPlankSession } from '../src/plank-session.js';
+import { enterFullscreen } from '../src/game-feel.js';
 
 test('викторина: правильный ответ до дедлайна, ошибка и истечение времени', () => {
   const q = QUESTIONS[0];
@@ -94,4 +95,23 @@ test('колода содержит каждый вопрос ровно оди�
   assert.equal(deck.length, QUESTIONS.length);
   assert.deepEqual(QUESTIONS, original);
   for (const q of QUESTIONS) assert.ok(q.correct >= 0 && q.correct < q.answers.length);
+});
+
+test('игра просит весь экран только в браузере: в приложении iPhone иначе плашка «capacitor://localhost открыто на весь экран»', () => {
+  let asked = 0;
+  const scene = { requestFullscreen: () => { asked++; return Promise.resolve(); } };
+  const node = { closest: sel => (sel === '.game-shell' ? scene : null) };
+  const before = { window: globalThis.window, document: globalThis.document };
+  globalThis.document = { fullscreenElement: null };
+  try {
+    globalThis.window = { Capacitor: { isNativePlatform: () => true } };
+    enterFullscreen(node);
+    assert.equal(asked, 0);
+    globalThis.window = {};
+    enterFullscreen(node);
+    assert.equal(asked, 1);
+  } finally {
+    globalThis.window = before.window;
+    globalThis.document = before.document;
+  }
 });
