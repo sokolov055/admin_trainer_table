@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBlini, step, advance, drain, shoot, swap, aim, levelRules, missionRules, pointsFor, colorsOnField, platePoint, secondsOf, LEVELS, PLATES, TUNING } from '../src/blini-model.js';
+import { createBlini, step, advance, drain, shoot, swap, aim, levelRules, missionRules, pointsFor, colorsOnField, platePoint, secondsOf, levelBeforeBosses, LEVELS, PLATES, TUNING } from '../src/blini-model.js';
 import { TRACKS, FIELD, pointAt } from '../src/blini-tracks.js';
 import { createBliniSession } from '../src/blini-session.js';
 import { botTurn } from './blini-policy.mjs';
@@ -43,13 +43,17 @@ test('трассы: шаг в одну единицу, въезд из-за кр
   }
 });
 
-test('уровни: двенадцать, все трассы, цвета 4–5, план растёт от круга к кругу', () => {
-  assert.equal(LEVELS.length, 12);
+test('уровни: три круга по пять, круг кончается боссом, цвета 4–5, план и сердца растут от круга к кругу', () => {
+  assert.equal(LEVELS.length, 15);
   assert.deepEqual([...new Set(LEVELS.map(l => l.track))].sort(), Object.keys(TRACKS).sort());
   for (const [i, level] of LEVELS.entries()) {
     assert.ok(level.colors >= 4 && level.colors <= 5 && level.speed > 0 && level.par > 0, `уровень ${i + 1}`);
-    if (i >= 4) assert.ok(level.target > LEVELS[i - 4].target, `уровень ${i + 1}: план выше, чем на той же трассе кругом раньше`);
+    assert.equal(!!level.boss, i % 5 === 4, `уровень ${i + 1}: босс — последний в круге`);
+    if (i >= 5 && !level.boss) assert.ok(level.target > LEVELS[i - 5].target, `уровень ${i + 1}: план выше, чем на той же трассе кругом раньше`);
+    if (i >= 5 && level.boss) assert.ok(level.boss.hp > LEVELS[i - 5].boss.hp, `уровень ${i + 1}: у Дивана больше сердец`);
   }
+  assert.deepEqual([0, 3, 4, 7, 8, 11].map(levelBeforeBosses), [0, 3, 5, 8, 10, 13], 'старые номера — на свои трассы');
+  for (let old = 0; old < 12; old++) assert.equal(LEVELS[levelBeforeBosses(old)].track, ['stadium', 'kitchen', 'snake', 'dumbbell'][old % 4]);
   assert.equal(levelRules(99).track, LEVELS.at(-1).track, 'номер больше последнего — последний');
   assert.equal(missionRules({ level: 2, target: 777 }, true).lives, 1, 'пояс — одна страховка');
   assert.equal(missionRules({ level: 2, target: 777 }).target, 777);
@@ -232,7 +236,7 @@ test('сессия: сохранение из аккаунта новее — п
   const session = createBliniSession({ seed: 5, now: () => 0 });
   const saves = []; session.onPersist(data => saves.push(data));
   const remote = createBlini(9, 2); advance(remote, 600);
-  assert.equal(session.hydrate({ unlocked: 4, level: 2, savedAt: Date.now() + 1000, game: serializeGame(remote) }), true);
+  assert.equal(session.hydrate({ v: 2, unlocked: 4, level: 2, savedAt: Date.now() + 1000, game: serializeGame(remote) }), true);
   const snap = session.getSnapshot();
   assert.deepEqual([snap.mode, snap.reason, snap.level, snap.unlocked], ['paused', 'saved', 2, 4]);
   assert.equal(session.game().tick, remote.tick);
@@ -349,7 +353,7 @@ test('темп растёт внутри уровня: через 40 с пяты
   assert.equal(drain(game).filter(e => e.kind === 'ramp').length, 0, 'только один раз');
   const copy = restoreGame(JSON.parse(JSON.stringify(serializeGame(game))));
   assert.deepEqual([copy.colors, copy.ramp], [5, true]);
-  const five = createBlini(4, 6); advance(five, five.rules.rampAt);
+  const five = createBlini(4, LEVELS.findIndex(l => l.colors === 5 && !l.boss)); advance(five, five.rules.rampAt);
   assert.deepEqual([five.colors, drain(five).find(e => e.kind === 'ramp')?.color], [5, -1], 'пять цветов — только быстрее');
   const off = createBlini(4, { ...LEVELS[0], rampAt: 0 }); advance(off, 5000);
   assert.equal(off.ramp, false, 'rampAt: 0 — без роста');
@@ -382,4 +386,72 @@ test('скамья: Михалыч идёт под палец, не сходит
   const copy = restoreGame(JSON.parse(JSON.stringify(serializeGame(game))));
   assert.deepEqual([copy.shooter.x, copy.goal], [game.shooter.x, game.goal]);
   assert.equal(awayFromShooter(game.track, rail.x1 + 10, rail.y), 10, 'еда и предметы не ложатся на скамью');
+});
+
+test('босс «Диван»: попадание снимает сердце, подушка и дрожь отбивают, на половине — ярость', () => {
+  const level = LEVELS.findIndex(l => l.boss), game = createBlini(8, level), boss = game.boss;
+  assert.deepEqual([game.rules.rampAt, !!game.rail, boss.hp, boss.max], [0, true, 6, 6]);
+  const throwAt = (x = boss.x, y = boss.y + TUNING.bossH / 2 + 2) => game.shots.push({ x, y, vx: 0, vy: -1, color: 0 });
+  game.chains[0].balls = []; game.full = false; boss.throwAt = boss.shieldAt = 1e9;
+  throwAt(); const one = settle(game, 2);
+  assert.equal(one.find(e => e.kind === 'boss-hit')?.hp, 5); assert.equal(boss.hp, 5);
+  throwAt(); settle(game, 2);
+  assert.equal(boss.hp, 5, 'пока дрожит — блин отскакивает');
+  boss.flinch = 0; boss.shield = 50;
+  throwAt(); const blocked = settle(game, 2);
+  assert.ok(blocked.some(e => e.kind === 'boss-block' && e.shield)); assert.equal(boss.hp, 5, 'подушка');
+  boss.shield = 0;
+  for (const hp of [4, 3]) { boss.flinch = 0; throwAt(); settle(game, 2); assert.equal(boss.hp, hp); }
+  assert.equal(boss.rage, true, 'на половине сердец — ярость');
+  game.score = 1e6; step(game);
+  assert.equal(game.full, false, 'у босса нет плана по тоннажу');
+});
+
+test('босс: пончики оглушают Михалыча, сбитый пончик — в тоннаж, в ярости летят по два', () => {
+  const game = createBlini(8, LEVELS.findIndex(l => l.boss)), boss = game.boss;
+  boss.shieldAt = 1e9; boss.throwAt = game.tick + 1;
+  const thrown = settle(game, 3).find(e => e.kind === 'donut');
+  assert.equal(thrown?.count, 1); assert.equal(game.donuts.length, 1);
+  let stunned = null;
+  for (let i = 0; i < 400 && !stunned; i++) { step(game); stunned = drain(game).find(e => e.kind === 'stunned'); }
+  assert.ok(stunned, 'долетел до стоящего Михалыча'); assert.ok(game.stun > 0);
+  game.reload = 0; game.shots = [];
+  assert.equal(shoot(game, 180, 100), false, 'оглушён — не бросает');
+  settle(game, TUNING.stunTicks); game.reload = 0;
+  assert.equal(shoot(game, 180, 100), true);
+  game.shots = []; boss.throwAt = game.tick + 1; settle(game, 3);
+  const donut = game.donuts[0], before = game.score;
+  game.shots.push({ x: donut.x + donut.vx * 4, y: donut.y + donut.vy * 4, vx: 0, vy: 0, color: 1 });
+  const down = settle(game, 6).find(e => e.kind === 'donut-down');
+  assert.ok(down); assert.equal(game.score - before, TUNING.donutKg); assert.equal(game.donuts.length, 0);
+  boss.rage = true; boss.throwAt = game.tick + 1;
+  assert.equal(settle(game, 3).find(e => e.kind === 'donut').count, 2); assert.equal(game.donuts.length, 2);
+});
+
+test('босс повержен: оставшиеся блины — в тоннаж, уровень взят; партия с боссом сохраняется', async () => {
+  const { serializeGame, restoreGame } = await import('../src/blini-model.js');
+  const game = createBlini(8, LEVELS.findIndex(l => l.boss)), boss = game.boss;
+  advance(game, 900); drain(game);
+  const copy = restoreGame(JSON.parse(JSON.stringify(serializeGame(game))));
+  assert.deepEqual([copy.boss.hp, copy.boss.phase, copy.boss.throwAt, copy.donuts.length], [boss.hp, boss.phase, boss.throwAt, game.donuts.length]);
+  const plates = game.chains[0].balls.filter(b => b.s >= 0).length;
+  assert.ok(plates > 5);
+  boss.hp = 1; boss.flinch = 0; boss.shield = 0; boss.shieldAt = 1e9;
+  const score = game.score;
+  game.shots = [{ x: boss.x, y: boss.y + TUNING.bossH / 2 + 2, vx: 0, vy: -1, color: 0 }];
+  const events = settle(game, 5);
+  const down = events.find(e => e.kind === 'boss-down');
+  assert.ok(down); assert.equal(down.plates.length, plates);
+  assert.ok(game.score - score >= TUNING.bossBonus + down.kg);
+  assert.equal(game.mode, 'won'); assert.equal(game.donuts.length, 0);
+  assert.equal(levelRules(LEVELS.findIndex(l => l.boss), 3).boss.hp, 3, 'облегчение — минус сердце за ступень, не меньше половины');
+});
+
+test('сохранение до боссов (12 уровней) переводится на нынешние номера', async () => {
+  const { readSaved, SAVE_VERSION } = await import('../src/blini-session.js');
+  const old = readSaved({ unlocked: 8, level: 7, fails: { 7: 2, 11: 1 }, medals: { 3: 3, 4: 1 }, savedAt: 5 });
+  assert.deepEqual([old.unlocked, old.level, old.fails, old.medals], [10, 8, { 8: 2, 13: 1 }, { 3: 3, 5: 1 }]);
+  assert.equal(LEVELS[old.level].track, 'dumbbell');
+  const fresh = readSaved({ v: SAVE_VERSION, unlocked: 9, level: 9, medals: { 4: 2 } });
+  assert.deepEqual([fresh.unlocked, fresh.level, fresh.medals], [9, 9, { 4: 2 }], 'новое сохранение не трогается');
 });

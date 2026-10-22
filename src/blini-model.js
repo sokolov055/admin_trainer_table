@@ -48,6 +48,10 @@ export const TUNING = Object.freeze({
   recoilTicks: 26, // откат после цепной реакции, на каждое звено
   powerLife: 1500, saveBack: .35,
   walk: 3.5, // Михалыч на скамье: единиц за шаг — через всю скамью меньше чем за секунду
+  // Босс «Диван»: размер, качание по комнате, подушка-щит, пончики и оглушение Михалыча
+  bossW: 130, bossH: 64, bossSwing: 50, bossSwingTicks: 700, bossFlinch: 150,
+  bossShieldEvery: 900, bossShieldTicks: 220, bossThrow: 320, bossBonus: 500,
+  donutSpeed: 2.4, donutRadius: 10, donutKg: 40, stunTicks: 110,
   foodLife: 900, foodRadius: 16, // еда лежит 9 секунд
 });
 
@@ -57,21 +61,28 @@ export const TUNING = Object.freeze({
  * speed — единиц пути за шаг, start — до какой доли пути цепочка въезжает сразу,
  * target — план, кг; slow — во сколько раз цепочка медленнее у помоста;
  * powerEvery — шагов между бонусами; par — норматив, секунд; rail — Михалыч ходит по скамье.
+ * Круг кончается боссом (по мотивам Zuma's Revenge, 22.10.2026): «Гостиная», boss.hp —
+ * сердца Дивана; плана по тоннажу нет — Диван повержен, и уровень взят.
  */
 export const LEVELS = Object.freeze([
   { track: 'stadium', speed: .5, start: .3, target: 1800, colors: 4, slow: 3, powerEvery: 1500, par: 50 },
   { track: 'kitchen', speed: .5, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 75 },
   { track: 'snake', speed: .16, start: .26, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 85 },
   { track: 'dumbbell', speed: .14, start: .22, target: 2000, colors: 4, slow: 3, powerEvery: 1500, par: 60 },
+  { track: 'couch', speed: .16, start: .42, target: 0, colors: 4, slow: 3, powerEvery: 1400, par: 45, rail: true, rampAt: 0, boss: { hp: 6 } },
   { track: 'stadium', speed: .7, start: .34, target: 2300, colors: 4, slow: 2.6, powerEvery: 1400, par: 70 },
   { track: 'kitchen', speed: .6, start: .3, target: 2400, colors: 4, slow: 2.6, powerEvery: 1400, par: 100 },
   { track: 'snake', speed: .22, start: .3, target: 2600, colors: 5, slow: 2.6, powerEvery: 1400, par: 175, rail: true },
   { track: 'dumbbell', speed: .16, start: .26, target: 2500, colors: 5, slow: 2.6, powerEvery: 1400, par: 85 },
+  { track: 'couch', speed: .125, start: .4, target: 0, colors: 5, slow: 2.6, powerEvery: 1300, par: 45, rail: true, rampAt: 0, boss: { hp: 8 } },
   { track: 'stadium', speed: .62, start: .34, target: 2800, colors: 5, slow: 2.2, powerEvery: 1300, par: 100 },
   { track: 'kitchen', speed: .64, start: .34, target: 3000, colors: 5, slow: 2, powerEvery: 1200, par: 155 },
   { track: 'snake', speed: .29, start: .34, target: 3200, colors: 5, slow: 1.8, powerEvery: 1200, par: 190, rail: true },
   { track: 'dumbbell', speed: .21, start: .3, target: 3200, colors: 5, slow: 1.6, powerEvery: 1100, par: 115 },
+  { track: 'couch', speed: .15, start: .4, target: 0, colors: 5, slow: 2, powerEvery: 1200, par: 70, rail: true, rampAt: 0, boss: { hp: 10 } },
 ].map(level => Object.freeze(level)));
+/** Номер уровня до боссов (12 уровней, 22.10.2026) → нынешний: в каждом круге после «Гантели» встал босс. */
+export const levelBeforeBosses = old => old + Math.floor(old / 4);
 
 // Сложность растёт внутри уровня (по мотивам Zuma's Revenge, 22.10.2026): через rampAt
 // шагов на трассу выходит пятый цвет, если их было меньше, и темп растёт в rampSpeed раз
@@ -86,7 +97,9 @@ export function levelRules(source = 0, ease = 0) {
   if (!base || !TRACKS[base.track]) throw new Error('Нет такой трассы');
   const steps = Math.max(0, Math.min(EASE_STEPS, ease | 0));
   const eased = steps ? { speed: +(base.speed * (1 - .06 * steps)).toFixed(3), target: Math.round(base.target * (1 - .05 * steps) / 50) * 50, ease: steps } : {};
-  return Object.freeze({ ...DEFAULTS, ...base, ...eased, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)), rail: !!base.rail && !!TRACKS[base.track].rail });
+  // У босса облегчение — минус сердце за ступень, но не меньше половины
+  const boss = base.boss && TRACKS[base.track].boss ? Object.freeze({ hp: Math.max(Math.ceil(base.boss.hp / 2), base.boss.hp - steps) }) : null;
+  return Object.freeze({ ...DEFAULTS, ...base, ...eased, colors: Math.max(2, Math.min(PLATES.length, base.colors || 4)), rail: !!base.rail && !!TRACKS[base.track].rail, boss });
 }
 
 // Медали за уровень (по мотивам Zuma's Revenge, 22.10.2026): бронза — пройден,
@@ -120,6 +133,9 @@ export function createBlini(seed = 21, source = 0) {
     shooter: { x: track.shooter.x, y: track.shooter.y, vx: 0 }, rail: rules.rail ? track.rail : null, goal: track.shooter.x, aimAt: null,
     negative: 0, pause: 0, technique: 0, streak: 0, bestChain: 0, bestStreak: 0, cleared: 0, shotsFired: 0,
     powerAt: Math.round(rules.powerEvery * .6), aim: -Math.PI / 2, events: [],
+    // Босс: сердца, подушка (shield), дрожь после попадания (flinch), качание (phase), ярость
+    boss: rules.boss ? { x: track.boss.x, y: track.boss.y, hp: rules.boss.hp, max: rules.boss.hp, shield: 0, flinch: 0, phase: 0, rage: false, throwAt: 260, shieldAt: 700 } : null,
+    donuts: [], stun: 0,
   };
   game.current = Math.floor(random(game) * game.colors);
   game.next = Math.floor(random(game) * game.colors);
@@ -244,7 +260,7 @@ function resolveAt(game, chainIndex, index, depth, fromShot) {
 
 /** План выполнен: блины, что ещё не въехали на поле, не выходят. */
 function checkFull(game) {
-  if (game.full || game.score < game.rules.target) return;
+  if (game.full || game.rules.boss || game.score < game.rules.target) return;
   game.full = true;
   for (const c of game.chains) c.balls = c.balls.filter(x => x.s >= 0);
   emit(game, { kind: 'full' });
@@ -386,6 +402,22 @@ function stepShots(game) {
       insert(game, hit.c, hit.i, shot);
       continue;
     }
+    // Пончик в полёте блин сбивает, в Дивана — попадает
+    let gone = false;
+    for (let d = game.donuts.length - 1; d >= 0 && !gone; d--) {
+      const donut = game.donuts[d];
+      if ((donut.x - shot.x) ** 2 + (donut.y - shot.y) ** 2 > (TUNING.donutRadius + D * .4) ** 2) continue;
+      game.donuts.splice(d, 1); game.shots.splice(k, 1); gone = true;
+      game.score += TUNING.donutKg;
+      emit(game, { kind: 'donut-down', x: donut.x, y: donut.y, points: TUNING.donutKg });
+    }
+    if (gone) continue;
+    const boss = game.boss;
+    if (boss && boss.hp > 0 && Math.abs(shot.x - boss.x) < TUNING.bossW / 2 + D * .3 && Math.abs(shot.y - boss.y) < TUNING.bossH / 2 + D * .3) {
+      game.shots.splice(k, 1);
+      hitBoss(game, shot);
+      continue;
+    }
     if (shot.x < -D || shot.y < -D || shot.x > FIELD.width + D || shot.y > FIELD.height + D) {
       game.shots.splice(k, 1); game.streak = 0;
       emit(game, { kind: 'miss' });
@@ -415,6 +447,59 @@ function stepPowers(game) {
   ball.powerUntil = game.tick + TUNING.powerLife;
 }
 
+/** Блин долетел до Дивана: подушка и дрожь после прошлого попадания его отбивают. */
+function hitBoss(game, shot) {
+  const boss = game.boss;
+  if (boss.shield > 0 || boss.flinch > 0) { emit(game, { kind: 'boss-block', x: shot.x, y: shot.y, shield: boss.shield > 0 }); return; }
+  boss.hp--; boss.flinch = TUNING.bossFlinch;
+  game.streak++; game.bestStreak = Math.max(game.bestStreak, game.streak);
+  emit(game, { kind: 'boss-hit', x: shot.x, y: shot.y, hp: boss.hp, color: shot.color });
+  if (!boss.rage && boss.hp > 0 && boss.hp <= boss.max / 2) { boss.rage = true; emit(game, { kind: 'rage', x: boss.x, y: boss.y }); }
+  if (boss.hp > 0) return;
+  // Диван повержен: оставшиеся блины разлетаются в тоннаж, новые не выходят
+  const removed = [];
+  for (const chain of game.chains) { for (const b of chain.balls) if (b.s >= 0) removed.push(b); chain.balls = []; }
+  const points = TUNING.bossBonus + pointsFor(removed, 1, 1);
+  game.score += points; game.cleared += removed.length;
+  game.donuts = []; game.full = true;
+  emit(game, { kind: 'boss-down', x: boss.x, y: boss.y, points, plates: removed.map(b => b.color), kg: removed.reduce((sum, b) => sum + PLATES[b.color].kg, 0) });
+}
+
+/** Диван качается по комнате, прикрывается подушкой и кидает пончики в Михалыча. */
+function stepBoss(game) {
+  const boss = game.boss, me = game.shooter;
+  if (!boss) return;
+  for (let k = game.donuts.length - 1; k >= 0; k--) {
+    const d = game.donuts[k];
+    d.x += d.vx; d.y += d.vy;
+    if (Math.hypot(d.x - me.x, d.y - (me.y - 4)) < TUNING.donutRadius + 20) {
+      game.donuts.splice(k, 1);
+      game.stun = TUNING.stunTicks; game.streak = 0;
+      emit(game, { kind: 'stunned', x: me.x, y: me.y - 20 });
+    } else if (d.y > FIELD.height + 20 || d.x < -20 || d.x > FIELD.width + 20) game.donuts.splice(k, 1);
+  }
+  if (boss.hp <= 0) return;
+  if (boss.flinch > 0) boss.flinch--;
+  if (boss.shield > 0) boss.shield--;
+  boss.phase += boss.rage ? 1.6 : 1;
+  boss.x = game.track.boss.x + TUNING.bossSwing * Math.sin(boss.phase / TUNING.bossSwingTicks * Math.PI * 2);
+  const calm = boss.rage ? .62 : 1;
+  if (game.tick >= boss.shieldAt) {
+    boss.shield = TUNING.bossShieldTicks;
+    boss.shieldAt = game.tick + TUNING.bossShieldTicks + Math.round(TUNING.bossShieldEvery * calm * (.8 + random(game) * .4));
+    emit(game, { kind: 'shield', x: boss.x, y: boss.y });
+  }
+  if (game.tick >= boss.throwAt) {
+    boss.throwAt = game.tick + Math.round(TUNING.bossThrow * calm * (.8 + random(game) * .4));
+    const fromY = boss.y + TUNING.bossH / 2, base = Math.atan2(me.y - 10 - fromY, me.x - boss.x);
+    const speed = TUNING.donutSpeed * (boss.rage ? 1.2 : 1);
+    for (const spread of boss.rage ? [-.2, .2] : [0]) {
+      game.donuts.push({ id: ++game.nextId, x: boss.x, y: fromY, vx: Math.cos(base + spread) * speed, vy: Math.sin(base + spread) * speed });
+    }
+    emit(game, { kind: 'donut', x: boss.x, y: fromY, count: boss.rage ? 2 : 1 });
+  }
+}
+
 /** Михалыч идёт по скамье к goal и держит прицел на точке, куда показывают. */
 function stepShooter(game) {
   const me = game.shooter;
@@ -435,6 +520,7 @@ export function step(game) {
   if (game.negative > 0) game.negative--;
   if (game.pause > 0) game.pause--;
   if (game.technique > 0) game.technique--;
+  if (game.stun > 0) game.stun--;
   stepShooter(game);
   // Уровень набирает темп: пятый цвет и быстрее — один раз, пока план не выполнен
   if (!game.ramp && game.rules.rampAt > 0 && game.tick >= game.rules.rampAt && !game.full) {
@@ -457,6 +543,7 @@ export function step(game) {
     }
     chain.visible = visible;
   }
+  stepBoss(game);
   stepFood(game);
   stepPowers(game);
   if (game.mode === 'playing' && game.full && game.chains.every(c => !c.balls.length) && !game.shots.length) {
@@ -495,7 +582,7 @@ export function walk(game, dx) {
 
 /** Бросок в сторону точки поля. Перезарядка и не больше двух блинов в полёте. */
 export function shoot(game, x, y) {
-  if (game.mode !== 'playing' || game.reload > 0 || game.shots.length >= TUNING.maxShots) return false;
+  if (game.mode !== 'playing' || game.reload > 0 || game.stun > 0 || game.shots.length >= TUNING.maxShots) return false;
   if (x != null) aim(game, x, y);
   const shooter = game.shooter, dx = Math.cos(game.aim), dy = Math.sin(game.aim);
   game.shots.push({ x: shooter.x + dx * 34, y: shooter.y + dy * 34, vx: dx * TUNING.shotSpeed, vy: dy * TUNING.shotSpeed, color: game.current });
@@ -542,13 +629,14 @@ export function aimEnd(game) {
 // Сохранение партии (FT-700, 22.10.2026): продолжить с того же места — на этом
 // устройстве или на другом, если прогресс сохраняется в аккаунте. Трасса —
 // по имени из правил; броски в полёте и вспышки не сохраняются.
-const SAVED = ['seed', 'nextId', 'tick', 'score', 'full', 'mode', 'lives', 'reload', 'colors', 'ramp', 'negative', 'pause', 'technique', 'streak', 'bestChain', 'bestStreak', 'cleared', 'shotsFired', 'powerAt', 'foodAt', 'aim', 'current', 'next'];
+const SAVED = ['seed', 'nextId', 'tick', 'score', 'full', 'mode', 'lives', 'reload', 'colors', 'ramp', 'stun', 'negative', 'pause', 'technique', 'streak', 'bestChain', 'bestStreak', 'cleared', 'shotsFired', 'powerAt', 'foodAt', 'aim', 'current', 'next'];
 export function serializeGame(game) {
   const out = { version: RULES_VERSION, rules: { ...game.rules, powers: [...game.rules.powers] } };
   for (const key of SAVED) out[key] = game[key];
   out.chains = game.chains.map(c => ({ rush: c.rush, back: c.back, last: c.last, danger: c.danger, visible: c.visible, balls: c.balls.map(b => ({ ...b, enter: null })) }));
   out.pickups = game.pickups.map(f => ({ ...f }));
   out.shooterX = game.shooter.x; out.goal = game.goal;
+  if (game.boss) { out.boss = { ...game.boss }; out.donuts = game.donuts.map(d => ({ ...d })); }
   return out;
 }
 const finite = n => typeof n === 'number' && Number.isFinite(n);
@@ -575,6 +663,13 @@ export function restoreGame(data) {
       const clamp = x => Math.max(game.rail.x0, Math.min(game.rail.x1, x));
       if (finite(data.shooterX)) game.shooter.x = clamp(data.shooterX);
       game.goal = finite(data.goal) ? clamp(data.goal) : game.shooter.x;
+    }
+    if (game.boss && data.boss && typeof data.boss === 'object') {
+      const b = data.boss, boss = game.boss;
+      if (Number.isInteger(b.hp)) boss.hp = Math.max(0, Math.min(boss.max, b.hp));
+      for (const key of ['shield', 'flinch', 'phase', 'throwAt', 'shieldAt']) if (finite(b[key])) boss[key] = Math.max(0, b[key]);
+      boss.rage = !!b.rage;
+      game.donuts = (Array.isArray(data.donuts) ? data.donuts : []).filter(d => d && ['x', 'y', 'vx', 'vy'].every(k => finite(d[k]))).map(d => ({ id: d.id | 0, x: d.x, y: d.y, vx: d.vx, vy: d.vy }));
     }
     if (!['playing', 'won', 'lost'].includes(game.mode)) game.mode = 'playing';
     if (!PLATES[game.current]) game.current = 0;

@@ -75,6 +75,7 @@ const PI = Math.PI;
 // «боссов» Zuma. Стрелок стоит там, где до всех витков не меньше 45 единиц.
 // rail — скамья, по которой Михалыч ходит на уровнях с rail: true (по мотивам
 // подвижной лягушки Zuma's Revenge): от x0 до x1 на высоте стрелка.
+// boss — где стоит Диван на уровнях-боссах: цепочка обходит его петлёй, Михалыч внизу.
 const SOURCES = [
   {
     id: 'stadium', name: 'Стадион', theme: 'stadium', shooter: [180, 320],
@@ -101,12 +102,18 @@ const SOURCES = [
       () => builder(390, 610).line(180, 610).spiral(180, 490, 165, 120, 62, 46, PI / 2, 1.4).points(),
     ],
   },
+  {
+    id: 'couch', name: 'Гостиная', theme: 'living', shooter: [180, 560], rail: [50, 310], boss: [180, 285],
+    note: 'Босс круга — Диван. Бей его блинами в просветы цепочки и уворачивайся от пончиков.',
+    paths: [() => builder(-30, 40).corners([[330, 40], [330, 440], [30, 440], [30, 130], [250, 130]], 40).points()],
+  },
 ];
 
 function build(source) {
   const paths = source.paths.map(make => Object.freeze(resample(make())));
   const rail = source.rail ? Object.freeze({ x0: source.rail[0], x1: source.rail[1], y: source.shooter[1] }) : null;
-  return Object.freeze({ id: source.id, name: source.name, theme: source.theme, note: source.note, shooter: Object.freeze({ x: source.shooter[0], y: source.shooter[1] }), rail, paths: Object.freeze(paths) });
+  const boss = source.boss ? Object.freeze({ x: source.boss[0], y: source.boss[1] }) : null;
+  return Object.freeze({ id: source.id, name: source.name, theme: source.theme, note: source.note, shooter: Object.freeze({ x: source.shooter[0], y: source.shooter[1] }), rail, boss, paths: Object.freeze(paths) });
 }
 
 export const TRACKS = Object.freeze(Object.fromEntries(SOURCES.map(s => [s.id, build(s)])));

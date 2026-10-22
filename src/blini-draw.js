@@ -259,6 +259,25 @@ const DECOR = {
     ctx.strokeStyle = '#6b3d1e'; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(0, 0, 18, 12, 0, 0, TAU); ctx.stroke();
     ctx.fillStyle = '#c0c6ca'; ctx.fillRect(14, -5, 7, 10);
   },
+  // Гостиная Дивана: всё, что манит не тренироваться
+  plant(ctx) {
+    ctx.fillStyle = '#b5653b'; ctx.beginPath(); ctx.arc(0, 0, 11, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5b3a24'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, TAU); ctx.fill();
+    for (let i = 0; i < 7; i++) { const a = i / 7 * TAU; ctx.fillStyle = i % 2 ? '#3f8f43' : '#2e7032'; ctx.beginPath(); ctx.ellipse(Math.cos(a) * 9, Math.sin(a) * 9, 9, 4, a, 0, TAU); ctx.fill(); }
+  },
+  remote(ctx) {
+    ctx.fillStyle = '#25292d'; ctx.beginPath(); ctx.roundRect(-6, -15, 12, 30, 4); ctx.fill();
+    ctx.fillStyle = '#d8343f'; ctx.beginPath(); ctx.arc(0, -9, 2.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#8b949a'; for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) ctx.fillRect(-3.6 + c * 4.4, -3 + r * 5, 2.8, 2.6);
+  },
+  pizza(ctx) {
+    ctx.fillStyle = '#e2a24f'; ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(13, 12); ctx.quadraticCurveTo(0, 17, -13, 12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#f6d36b'; ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(9.5, 9); ctx.quadraticCurveTo(0, 12, -9.5, 9); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c8392f'; for (const [x, y] of [[0, -3], [-4, 5], [4.5, 5]]) { ctx.beginPath(); ctx.arc(x, y, 2.6, 0, TAU); ctx.fill(); }
+  },
+  slippers(ctx) {
+    for (const k of [-1, 1]) { ctx.fillStyle = '#6fa8dc'; ctx.beginPath(); ctx.ellipse(k * 7, 0, 5.5, 12, k * .12, 0, TAU); ctx.fill(); ctx.fillStyle = '#f4f1ea'; ctx.beginPath(); ctx.ellipse(k * 7, -5, 5, 5, 0, 0, TAU); ctx.fill(); }
+  },
   barbell(ctx, k) {
     ctx.fillStyle = '#b8c0c5'; ctx.fillRect(-62, -2, 124, 4);
     const side = x => { ctx.fillStyle = PLATES[k % 4].color; ctx.beginPath(); ctx.roundRect(x - 4, -18, 8, 36, 2); ctx.fill(); ctx.fillStyle = '#8b949a'; ctx.fillRect(x + (x > 0 ? 4 : -7), -4, 3, 8); };
@@ -324,6 +343,26 @@ const THEMES = {
       ctx.restore();
     },
   },
+  living: {
+    kinds: ['plant', 'remote', 'pizza', 'slippers', 'bottle', 'kettlebell', 'towel'], count: 12, spot: { plant: 20, remote: 16, pizza: 17, slippers: 16, bottle: 18, kettlebell: 14, towel: 20 },
+    groove: [['#7b5a3c', 40], ['#d8c29d', 35], ['rgba(0,0,0,.05)', 2]],
+    base(ctx, v) {
+      // Паркет ёлочкой попроще — доски вразбежку, и ковёр под Диваном
+      const h = 22;
+      for (let y = Math.floor(v.y / h) * h, row = 0; y < v.y + v.h; y += h, row++) {
+        for (let x = Math.floor(v.x / 90) * 90 - (row % 2) * 45; x < v.x + v.w; x += 90) {
+          ctx.fillStyle = ['#b07a4a', '#a8713f', '#b98552'][(row + Math.round(x / 90)) % 3]; ctx.fillRect(x, y, 90, h);
+          ctx.strokeStyle = 'rgba(70,40,15,.3)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, 90, h);
+        }
+      }
+      ctx.save(); ctx.translate(180, 290);
+      ctx.fillStyle = '#7a2e3b'; ctx.beginPath(); ctx.roundRect(-118, -82, 236, 164, 18); ctx.fill();
+      ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(-106, -70, 212, 140, 12); ctx.stroke();
+      ctx.strokeStyle = 'rgba(232,194,122,.45)'; ctx.lineWidth = 1.5;
+      for (const r of [22, 40]) { ctx.beginPath(); ctx.ellipse(0, 0, r * 1.9, r, 0, 0, TAU); ctx.stroke(); }
+      ctx.restore();
+    },
+  },
   platform: {
     kinds: ['chalk', 'handprint', 'plate', 'handprint', 'belt', 'bottle', 'kettlebell', 'barbell'], count: 13, spot: { chalk: 20, handprint: 12, plate: 16, belt: 22, bottle: 18, kettlebell: 14, barbell: 64 },
     groove: [['#aab3b9', 40], ['#2c3135', 35], ['rgba(255,255,255,.07)', 2]],
@@ -351,6 +390,7 @@ function freeSpots(track, view, theme, random) {
     const kind = theme.kinds[placed.length % theme.kinds.length], size = theme.spot[kind] || 16;
     const x = view.x + size + random() * (view.w - size * 2), y = view.y + size + random() * (view.h - size * 2);
     if (awayFromShooter(track, x, y) < 66 + size) continue;
+    if (track.boss && Math.hypot(x - track.boss.x, y - track.boss.y) < 110 + size) continue;
     let ok = true;
     for (let i = 0; i < samples.length && ok; i += 2) if ((samples[i] - x) ** 2 + (samples[i + 1] - y) ** 2 < (size + R + 8) ** 2) ok = false;
     for (const p of placed) if (Math.hypot(p.x - x, p.y - y) < p.size + size + 6) ok = false;
@@ -554,6 +594,87 @@ function mihalych(ctx, game, fx, t, danger, reduced) {
   ctx.restore();
 }
 
+/* ── Босс «Диван»: лентяй с подушкой. Сердца сверху, глаза следят за Михалычем,
+      после попадания вздрагивает, в ярости краснеет ── */
+function heart(ctx, x, y, size, filled) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 10, size / 10);
+  ctx.beginPath(); ctx.moveTo(0, 3.6); ctx.bezierCurveTo(-6, -.6, -4.6, -6, 0, -3); ctx.bezierCurveTo(4.6, -6, 6, -.6, 0, 3.6); ctx.closePath();
+  ctx.fillStyle = filled ? '#e8483a' : 'rgba(255,255,255,.28)'; ctx.fill();
+  ctx.lineWidth = 1.2; ctx.strokeStyle = filled ? '#7a1d16' : 'rgba(0,0,0,.35)'; ctx.stroke();
+  ctx.restore();
+}
+function couch(ctx, game, t, reduced) {
+  const boss = game.boss;
+  if (!boss) return;
+  const W = TUNING.bossW, H = TUNING.bossH, down = boss.hp <= 0;
+  const hitFlash = boss.flinch > TUNING.bossFlinch - 14;
+  ctx.save(); ctx.translate(boss.x, boss.y);
+  if (boss.flinch > 0 && !reduced && !down) ctx.translate(Math.sin(t / 22) * 2.2 * boss.flinch / TUNING.bossFlinch, 0);
+  if (down) { ctx.translate(0, 10); ctx.rotate(-.08); ctx.globalAlpha = .75; }
+  ctx.beginPath(); ctx.ellipse(0, H / 2 + 5, W / 2 + 4, 8, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fill();
+  const base = boss.rage ? '#a2394a' : '#6b4c9a', dark = boss.rage ? '#6e2230' : '#4a3270', light = boss.rage ? '#c25566' : '#8a6cba';
+  ctx.fillStyle = '#3a2618';
+  for (const x of [-W / 2 + 10, W / 2 - 14]) ctx.fillRect(x, H / 2 - 4, 6, 9);
+  // Спинка, подлокотники, сиденье
+  ctx.fillStyle = base; ctx.beginPath(); ctx.roundRect(-W / 2 + 12, -H / 2, W - 24, H * .66, 16); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.beginPath(); ctx.roundRect(-W / 2 + 18, -H / 2 + 4, W - 36, 6, 3); ctx.fill();
+  ctx.fillStyle = light;
+  for (const k of [-1, 1]) { ctx.beginPath(); ctx.roundRect(k > 0 ? 2 : -W / 2 + 22, 4, W / 2 - 24, 22, 9); ctx.fill(); }
+  ctx.fillStyle = dark;
+  for (const k of [-1, 1]) { ctx.beginPath(); ctx.roundRect(k > 0 ? W / 2 - 26 : -W / 2, -H / 2 + 14, 26, H - 12, 11); ctx.fill(); }
+  ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, 24); ctx.stroke();
+  // Лицо на спинке: глаза следят за Михалычем
+  const me = game.shooter, look = Math.atan2(me.y - boss.y, me.x - boss.x), lx = Math.cos(look) * 2.6, ly = Math.sin(look) * 2.2;
+  for (const k of [-1, 1]) {
+    const ex = k * 17, ey = -H / 2 + 16;
+    if (down) { ctx.strokeStyle = '#1b1020'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(ex - 4, ey - 4); ctx.lineTo(ex + 4, ey + 4); ctx.moveTo(ex + 4, ey - 4); ctx.lineTo(ex - 4, ey + 4); ctx.stroke(); continue; }
+    ctx.fillStyle = '#fffdf6'; ctx.beginPath(); ctx.ellipse(ex, ey, 8, hitFlash ? 2 : 6.5, 0, 0, TAU); ctx.fill();
+    if (!hitFlash) { ctx.fillStyle = boss.rage ? '#c0141e' : '#1b1020'; ctx.beginPath(); ctx.arc(ex + lx, ey + ly + 1, 3.2, 0, TAU); ctx.fill(); }
+    ctx.strokeStyle = '#1b1020'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(ex - k * 9, ey - 10 - (boss.rage ? 2 : 0)); ctx.lineTo(ex + k * 6, ey - 6); ctx.stroke();
+  }
+  ctx.strokeStyle = '#1b1020'; ctx.lineWidth = 2.2;
+  if (boss.rage && !down) { ctx.fillStyle = '#3a0d14'; ctx.beginPath(); ctx.roundRect(-10, -H / 2 + 26, 20, 8, 3); ctx.fill(); ctx.fillStyle = '#fff'; for (let i = 0; i < 4; i++) ctx.fillRect(-8.5 + i * 4.5, -H / 2 + 26, 3, 3); }
+  else { ctx.beginPath(); ctx.arc(0, -H / 2 + 34, 7, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); }
+  if (hitFlash && !down) { ctx.globalAlpha = .55; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-W / 2, -H / 2, W, H, 14); ctx.fill(); ctx.globalAlpha = 1; }
+  // Подушка-щит перед собой
+  if (boss.shield > 0 && !down) {
+    const k = Math.min(1, (TUNING.bossShieldTicks - boss.shield) / 12, boss.shield / 12);
+    ctx.save(); ctx.translate(0, 8); ctx.scale(.6 + .4 * k, .6 + .4 * k); ctx.rotate(Math.sin(t / 300) * .05);
+    ctx.fillStyle = '#f2d27a'; ctx.beginPath(); ctx.roundRect(-38, -20, 76, 40, 14); ctx.fill();
+    ctx.strokeStyle = '#b88f3a'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.roundRect(-32, -14, 64, 28, 10); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#b88f3a'; for (const [x, y] of [[-38, -20], [38, -20], [-38, 20], [38, 20]]) { ctx.beginPath(); ctx.arc(x, y, 3.4, 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  if (!down) {
+    const size = 9, gap = 11, from = -(boss.max - 1) * gap / 2;
+    for (let i = 0; i < boss.max; i++) heart(ctx, from + i * gap, -H / 2 - 12, size, i < boss.hp);
+  }
+  ctx.restore();
+}
+function donut(ctx, d, t) {
+  ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(t / 160 + d.id);
+  ctx.beginPath(); ctx.arc(0, 0, TUNING.donutRadius, 0, TAU); ctx.fillStyle = '#d29a55'; ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, TUNING.donutRadius - 1.6, 0, TAU); ctx.fillStyle = '#f07aa8'; ctx.fill();
+  const colors = ['#fff', '#6fd3f7', '#ffe17a', '#7be08a'];
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; ctx.save(); ctx.rotate(a); ctx.fillStyle = colors[i % 4]; ctx.fillRect(5.6, -.8, 2.6, 1.6); ctx.restore(); }
+  ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, TAU); ctx.fillStyle = '#5a3a1e'; ctx.fill();
+  ctx.restore();
+}
+/** Оглушённый пончиком Михалыч: звёздочки кругом над головой. */
+function stars(ctx, game, t) {
+  const { x, y } = game.shooter;
+  for (let i = 0; i < 3; i++) {
+    const a = t / 260 + i / 3 * TAU, sx = x + Math.cos(a) * 18, sy = y - 62 + Math.sin(a) * 5;
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate(t / 200);
+    ctx.beginPath(); for (let k = 0; k < 10; k++) { const r = k % 2 ? 2.4 : 5.6, b = k / 10 * TAU - Math.PI / 2; ctx.lineTo(Math.cos(b) * r, Math.sin(b) * r); }
+    ctx.closePath(); ctx.fillStyle = '#ffe17a'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#8a6a10'; ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function bubble(ctx, game, fx, t) {
   if (!fx.say || t - fx.say.born > 1700) return;
   const k = Math.min(1, (t - fx.say.born) / 140), out = Math.max(0, (t - fx.say.born - 1400) / 300);
@@ -580,6 +701,9 @@ const LINES = {
   superset: ['Суперсет!'], banana: ['Калий для мышц!'], apple: ['Яблочко — витамин!'], broccoli: ['Клетчатка — сила!'], bar: ['Белок пошёл!'],
   cleartrack: ['Чисто сработано!', 'Вот это тренировка!'],
   ramp: ['Добавим веса!', 'Разминка кончилась!'],
+  bosshit: ['Подъём, лентяй!', 'Получай, Диван!', 'Вставай на зарядку!'], block: ['Опять подушка…', 'Не пробил!'],
+  rage: ['Злится — значит, работает!'], stunned: ['Ням… нельзя!', 'Это не по плану!'], donut: ['Сахар — мимо!', 'Пончик сбит!'],
+  bossdown: ['Диван повержен! Все на тренировку!'],
 };
 function line(fx, kind) { fx.lines = (fx.lines || 0) + 1; const list = LINES[kind]; return list[fx.lines % list.length]; }
 const POOL = { parts: 160, texts: 24, rings: 32 };
@@ -620,6 +744,33 @@ export function addEvents(fx, game, events, t, reduced = false) {
     if (e.kind === 'full') { fx.banner = { born: t, text: 'План выполнен! Сними остаток' }; fx.say = { text: line(fx, 'full'), born: t }; fx.flex = t; }
     if (e.kind === 'saved') { fx.banner = { born: t, text: 'Пояс выручил: блины откатились' }; fx.say = { text: line(fx, 'saved'), born: t }; }
     if (e.kind === 'danger') fx.say = { text: line(fx, 'danger'), born: t };
+    if (e.kind === 'boss-hit') {
+      const ring = take(fx, 'rings', t); ring.x = e.x; ring.y = e.y; ring.big = true; ring.dust = false;
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y - 10; text.text = e.hp > 0 ? `−1 ♥ · осталось ${e.hp}` : 'Последнее сердце!'; text.size = 16; text.gold = true;
+      if (!reduced) for (let k = 0; k < 8; k++) { const a = k / 8 * TAU, part = take(fx, 'parts', t); part.x = e.x; part.y = e.y; part.vx = Math.cos(a) * 60; part.vy = Math.sin(a) * 60 - 20; part.spin = k - 4; part.color = PLATES[e.color].color; }
+      if (!reduced) fx.shake = { born: t, power: 2.5 };
+      fx.flex = t; fx.say = { text: line(fx, 'bosshit'), born: t };
+    }
+    if (e.kind === 'boss-block') {
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y; text.text = e.shield ? 'Подушка!' : 'Ещё трясётся'; text.size = 14; text.gold = false;
+      if (e.shield) fx.say = { text: line(fx, 'block'), born: t };
+    }
+    if (e.kind === 'rage') { fx.banner = { born: t, text: 'Диван в ярости: пончики по два' }; fx.say = { text: line(fx, 'rage'), born: t }; }
+    if (e.kind === 'stunned') {
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y - 30; text.text = 'Пончик! Секунду…'; text.size = 15; text.gold = false;
+      fx.say = { text: line(fx, 'stunned'), born: t };
+    }
+    if (e.kind === 'donut-down') {
+      const ring = take(fx, 'rings', t); ring.x = e.x; ring.y = e.y; ring.big = false; ring.dust = false;
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y - 10; text.text = `+${e.points} кг · пончик`; text.size = 14; text.gold = true;
+      fx.say = { text: line(fx, 'donut'), born: t };
+    }
+    if (e.kind === 'boss-down') {
+      const text = take(fx, 'texts', t); text.x = e.x; text.y = e.y - 40; text.text = `+${e.points.toLocaleString('ru-RU')} кг`; text.size = 22; text.gold = true;
+      for (let k = 0; k < 3; k++) { const ring = take(fx, 'rings', t); ring.x = e.x + (k - 1) * 30; ring.y = e.y; ring.big = true; ring.dust = k !== 1; }
+      if (!reduced) { fx.shake = { born: t, power: 5 }; e.plates.slice(0, 24).forEach((c, i) => { const a = i * 2.4, part = take(fx, 'parts', t); part.x = e.x; part.y = e.y; part.vx = Math.cos(a) * 90; part.vy = Math.sin(a) * 90 - 40; part.spin = (i % 5) - 2; part.color = PLATES[c].color; }); }
+      fx.banner = { born: t, text: 'Диван повержен!' }; fx.flex = t; fx.say = { text: line(fx, 'bossdown'), born: t };
+    }
     if (e.kind === 'ramp') { fx.banner = { born: t, text: e.color >= 0 ? `Темп растёт: в цепочке ${PLATES[e.color].name}` : 'Темп растёт: блины быстрее' }; fx.say = { text: line(fx, 'ramp'), born: t }; }
     if (e.kind === 'food') {
       const ring = take(fx, 'rings', t); ring.x = e.x; ring.y = e.y; ring.big = true; ring.dust = false;
@@ -701,7 +852,10 @@ export function drawScene(ctx, game, fx, { t, aiming = false, view, background =
     DECOR[food.kind](ctx, 0);
     ctx.restore();
   }
+  couch(ctx, game, t, reduced);
+  for (const d of game.donuts) donut(ctx, d, t);
   mihalych(ctx, game, fx, t, danger, reduced);
+  if (game.stun > 0) stars(ctx, game, reduced ? 0 : t);
   for (const ring of fx.rings) {
     const age = t - ring.born;
     if (ring.dust) {

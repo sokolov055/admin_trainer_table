@@ -9,14 +9,14 @@ await server.listen(); const origin = `http://127.0.0.1:${server.httpServer.addr
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, locale: 'ru-RU' });
 const page = await ctx.newPage();
-await page.addInitScript(() => localStorage.setItem('ft.blini.v1', JSON.stringify({ unlocked: 11 })));
+await page.addInitScript(() => localStorage.setItem('ft.blini.v1', JSON.stringify({ v: 2, unlocked: 14 })));
 await page.goto(origin + '/scripts/fixtures/blini-game.html');
 await page.getByRole('button', { name: 'Играть', exact: true }).waitFor();
 const cdp = await ctx.newCDPSession(page);
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.argv[2]) || 1 });
 await cdp.send('Performance.enable');
-for (const level of [0, 1, 2, 3]) {
-  await page.evaluate(l => { localStorage.setItem('ft.blini.v1', JSON.stringify({ unlocked: 11 })); showBlini({ identity: 'p' + l }); }, level);
+for (const level of [0, 1, 2, 3, 4]) {
+  await page.evaluate(l => { localStorage.setItem('ft.blini.v1', JSON.stringify({ v: 2, unlocked: 14 })); showBlini({ identity: 'p' + l }); }, level);
   await page.getByRole('button', { name: 'Играть', exact: true }).waitFor();
   await page.evaluate(l => bliniFixture.choose(l), level);
   await page.getByRole('button', { name: 'Играть', exact: true }).click();

@@ -38,6 +38,9 @@
 .blini-progress { height: 8px; border-radius: 5px; background: #dddccb; overflow: hidden; box-shadow: inset 0 2px 3px #183f361f; }
 .blini-progress > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: #d8343f; transform-origin: left; transition: transform 280ms var(--bg-ease); }
 .blini-progress.is-full > span { background: #2c9a55; }
+.blini-progress--boss > span { background: #6b4c9a; }
+.blini-progress--boss.is-rage > span { background: #a2394a; }
+.blini-rule-boss { display: grid; place-items: center; height: 30px; color: #e8483a; font-size: 26px; line-height: 1; }
 .blini-belt { position: absolute; top: -7px; right: 8px; padding: 1px 7px; border-radius: 8px; background: #8b5a2b; color: #fff4dc; font-size: 10px; font-style: normal; font-weight: 850; }
 
 .blini-bottom { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 640px; margin: 0 auto; }

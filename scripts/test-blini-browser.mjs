@@ -122,7 +122,7 @@ test('блины: победа открывает следующий урове�
   const state = await read(page);
   assert.equal(state.level, 1); assert.equal(state.unlocked, 1); assert.equal(state.mode, 'ready');
   await page.getByRole('heading', { name: '«Кухня»' }).waitFor();
-  await page.getByText('Медалей 2 из 36').waitFor();
+  await page.getByText('Медалей 2 из 45').waitFor();
   await page.getByText('С 0:40 — пятый цвет и быстрее').waitFor();
   assert.equal(await page.locator('.blini-medals li.is-earned').count(), 0, 'у нового уровня медалей ещё нет');
   await page.getByRole('button', { name: 'Предыдущий уровень' }).click();
@@ -147,9 +147,9 @@ test('блины на отдыхе: четвёртая кнопка, а коне
 
 test('блины: со второго круга на «Зале» Михалыч идёт по скамье за пальцем', async t => {
   const page = await setup(t);
-  await page.evaluate(() => { localStorage.setItem('ft.blini.v1', JSON.stringify({ unlocked: 11 })); showBlini({ identity: 'rail' }); });
+  await page.evaluate(() => { localStorage.setItem('ft.blini.v1', JSON.stringify({ v: 2, unlocked: 14 })); showBlini({ identity: 'rail' }); });
   await page.getByRole('button', { name: 'Играть', exact: true }).waitFor();
-  await page.evaluate(() => bliniFixture.choose(6));
+  await page.evaluate(() => bliniFixture.choose(7));
   await page.getByText('Михалыч ходит по скамье').waitFor();
   await play(page);
   const before = await game(page);
@@ -165,4 +165,26 @@ test('блины: со второго круга на «Зале» Михалы�
   await page.screenshot({ path: 'reports/blini/rail.png' });
   await page.mouse.up();
   assert.equal((await game(page)).fired, before.fired + 1, 'отпустил — бросок');
+});
+
+test('блины: босс круга — Диван, сердца вместо плана, блин в Дивана снимает сердце', async t => {
+  const page = await setup(t);
+  await page.evaluate(() => { localStorage.setItem('ft.blini.v1', JSON.stringify({ v: 2, unlocked: 4 })); showBlini({ identity: 'boss' }); });
+  await page.getByRole('button', { name: 'Играть', exact: true }).waitFor();
+  await page.evaluate(() => bliniFixture.choose(4));
+  await page.getByRole('heading', { name: '«Гостиная»' }).waitFor();
+  await page.getByText('Диван: 6 ♥').waitFor();
+  await page.getByText(/Босс круга · Уровень 5 из 15/).waitFor();
+  await page.screenshot({ path: 'reports/blini/boss-ready.png' });
+  await page.getByRole('button', { name: 'Играть', exact: true }).click();
+  await page.clock.runFor(1500);
+  const before = await game(page);
+  assert.deepEqual([before.boss.hp, before.boss.max], [6, 6]);
+  await page.getByRole('progressbar', { name: 'Сердца Дивана' }).waitFor();
+  await tap(page, before.boss.x, before.boss.y);
+  await page.clock.runFor(1200);
+  const after = await game(page);
+  assert.equal(after.boss.hp, 5, 'попадание снимает сердце');
+  await page.getByText('Диван ♥ 5 из 6').waitFor();
+  await page.screenshot({ path: 'reports/blini/boss.png' });
 });

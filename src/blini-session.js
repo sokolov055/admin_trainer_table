@@ -1,4 +1,4 @@
-import { createBlini, advance, drain, shoot, swap, aim, walk, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, medalOf, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
+import { createBlini, advance, drain, shoot, swap, aim, walk, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, medalOf, levelBeforeBosses, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
 
 // Одна партия «Блинов» на кабинет: меню, отдых и карьера видят одну и ту же.
 // Пауза и смена экрана сохраняют её целиком. Открытые уровни и незаконченная
@@ -28,11 +28,18 @@ function cleanMedals(value) {
   return out;
 }
 const bestOf = (a, b) => { const out = { ...a }; for (const [k, v] of Object.entries(b)) out[k] = Math.max(out[k] || 0, v); return out; };
-/** Сохранение: открытые уровни, выбранный уровень, медали и незаконченная партия. */
+/**
+ * Сохранение: открытые уровни, выбранный уровень, медали и незаконченная партия.
+ * До боссов (v1, 12 уровней) номера были другими — переводятся на нынешние.
+ */
+export const SAVE_VERSION = 2;
 export function readSaved(value) {
   if (!value || typeof value !== 'object') return null;
-  const unlocked = clampLevel(value.unlocked);
-  return { unlocked, level: Math.min(unlocked, clampLevel(value.level ?? unlocked)), game: value.game || null, savedAt: Number(value.savedAt) || 0, fails: cleanFails(value.fails), medals: cleanMedals(value.medals) };
+  const old = value.v !== SAVE_VERSION;
+  const map = n => (old && Number.isInteger(Number(n)) ? levelBeforeBosses(Number(n)) : n);
+  const remap = obj => (obj && typeof obj === 'object' ? Object.fromEntries(Object.entries(obj).map(([k, v]) => [map(k), v])) : obj);
+  const unlocked = clampLevel(map(value.unlocked));
+  return { unlocked, level: Math.min(unlocked, clampLevel(map(value.level ?? value.unlocked))), game: value.game || null, savedAt: Number(value.savedAt) || 0, fails: cleanFails(remap(value.fails)), medals: cleanMedals(remap(value.medals)) };
 }
 function loadProgress() {
   try { return readSaved(JSON.parse(localStorage.getItem(PROGRESS))) || EMPTY; } catch (_) { return EMPTY; }
@@ -48,6 +55,8 @@ function hudOf(game) {
     lives: game.lives, danger: Math.round(dangerOf(game) * 20) / 20, streak: game.streak,
     negative: game.negative > 0, pause: game.pause > 0, technique: game.technique > 0, ramp: game.ramp,
     seconds: Math.floor(secondsOf(game)),
+    boss: game.boss ? game.boss.hp : 0, bossMax: game.boss ? game.boss.max : 0, shield: !!game.boss && game.boss.shield > 0,
+    rage: !!game.boss?.rage, stun: game.stun > 0,
   };
 }
 const sameHud = (a, b) => Object.keys(a).every(k => a[k] === b[k]);
@@ -68,7 +77,7 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
   // Партия свободной игры сохраняется целиком; задание карьеры — нет: оно живёт, пока открыта карьера
   const persist = () => {
     savedAt = Date.now(); lastPersist = savedAt;
-    const data = { v: 1, unlocked: snapshot.unlocked, level: snapshot.mission ? snapshot.unlocked : snapshot.level, savedAt, fails, medals,
+    const data = { v: SAVE_VERSION, unlocked: snapshot.unlocked, level: snapshot.mission ? snapshot.unlocked : snapshot.level, savedAt, fails, medals,
       game: !snapshot.mission && ['playing', 'paused'].includes(snapshot.mode) && game.mode === 'playing' ? serializeGame(game) : null };
     saveProgress(data);
     persisters.forEach(fn => { try { fn(data); } catch (_) { /* сеть повторит сама */ } });
@@ -127,7 +136,7 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
       // Медали не теряются ни с одной стороны: берётся лучшая по каждому уровню
       medals = bestOf(medals, saved.medals);
       if (snapshot.mode === 'playing' || snapshot.mission) {
-        emit({ unlocked, medals }); saveProgress({ ...loadProgress(), unlocked, savedAt, medals }); return true;
+        emit({ unlocked, medals }); saveProgress({ ...loadProgress(), v: SAVE_VERSION, unlocked, savedAt, medals }); return true;
       }
       const next = restoreGame(saved.game);
       if (next && next.mode === 'playing') {
@@ -138,7 +147,7 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
         fails = { ...saved.fails };
         fresh(free(saved.level), { mode: 'ready', level: saved.level, unlocked });
       }
-      saveProgress({ ...saved, unlocked, medals });
+      saveProgress({ ...saved, v: SAVE_VERSION, unlocked, medals });
       return true;
     },
     claim(token, isExpired) {

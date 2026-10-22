@@ -22,17 +22,17 @@ export const CAREER = Object.freeze([
   { title: 'Координатор тренажёрного зала', place: 'Расписание всего зала', story: 'Теперь на тебе весь тренажёрный зал: смены тренеров, инвентарь и очередь к стойке.',
     scooter: { difficulty: 'medium', metres: 450 }, plank: { level: 2, streak: 6 }, match: { chapter: 2, moves: 18, target: 2400, count: 15 }, blini: { level: 3, target: 2000 }, salary: 300 },
   { title: 'Фитнес-директор клуба', place: 'Все тренеры клуба', story: 'Ты отвечаешь за качество тренировок во всём клубе. Тренеры приходят к тебе за советом.',
-    scooter: { difficulty: 'medium', metres: 480 }, plank: { level: 3, streak: 5 }, match: { chapter: 2, moves: 18, target: 2500, count: 15 }, blini: { level: 4, target: 2300 }, salary: 400 },
+    scooter: { difficulty: 'medium', metres: 480 }, plank: { level: 3, streak: 5 }, match: { chapter: 2, moves: 18, target: 2500, count: 15 }, blini: { level: 5, target: 2300 }, salary: 400 },
   { title: 'Управляющий клуба', place: 'Клуб целиком', story: 'Под тобой весь клуб: касса, ремонт, продажи и довольные гости.',
-    scooter: { difficulty: 'medium', metres: 600 }, plank: { level: 3, streak: 7 }, match: { chapter: 2, moves: 17, target: 2650, count: 16 }, blini: { level: 6, target: 2500 }, salary: 520 },
+    scooter: { difficulty: 'medium', metres: 600 }, plank: { level: 3, streak: 7 }, match: { chapter: 2, moves: 17, target: 2650, count: 16 }, blini: { level: 7, target: 2500 }, salary: 520 },
   { title: 'Директор региона', place: 'Клубы в трёх городах', story: 'Тебе доверили регион. Между клубами — сотни километров и тысяча вопросов.',
-    scooter: { difficulty: 'extreme', metres: 300 }, plank: { level: 4, streak: 5 }, match: { chapter: 3, moves: 16, target: 2800, count: 17 }, blini: { level: 7, target: 2500 }, salary: 660 },
+    scooter: { difficulty: 'extreme', metres: 300 }, plank: { level: 4, streak: 5 }, match: { chapter: 3, moves: 16, target: 2800, count: 17 }, blini: { level: 8, target: 2500 }, salary: 660 },
   { title: 'Управление сетью клубов', place: 'Вся сеть', story: 'Ты руководишь сетью. Открытия, команды, отчёты — и всё равно хочется самому потренироваться.',
-    scooter: { difficulty: 'extreme', metres: 320 }, plank: { level: 4, streak: 7 }, match: { chapter: 3, moves: 16, target: 2950, count: 18 }, blini: { level: 9, target: 2800 }, salary: 820 },
+    scooter: { difficulty: 'extreme', metres: 320 }, plank: { level: 4, streak: 7 }, match: { chapter: 3, moves: 16, target: 2950, count: 18 }, blini: { level: 11, target: 2800 }, salary: 820 },
   { title: 'Генеральный директор сети', place: 'Кабинет на последнем этаже', story: 'Совет директоров ждёт рекордов. Покажи, что генеральный в форме лучше всех.',
-    scooter: { difficulty: 'extreme', metres: 360 }, plank: { level: 4, streak: 9 }, match: { chapter: 3, moves: 15, target: 3050, count: 18 }, blini: { level: 10, target: 3200 }, salary: 1000 },
+    scooter: { difficulty: 'extreme', metres: 360 }, plank: { level: 4, streak: 9 }, match: { chapter: 3, moves: 15, target: 3050, count: 18 }, blini: { level: 12, target: 3200 }, salary: 1000 },
   { title: 'Собственник сети', place: 'Своя сеть клубов', story: 'Последний шаг: сеть клубов становится твоей. От турника во дворе до собственного бизнеса.',
-    scooter: { difficulty: 'extreme', metres: 420 }, plank: { level: 4, streak: 12 }, match: { chapter: 3, moves: 14, target: 3200, count: 19 }, blini: { level: 11, target: 3400 }, salary: 1250 },
+    scooter: { difficulty: 'extreme', metres: 420 }, plank: { level: 4, streak: 12 }, match: { chapter: 3, moves: 14, target: 3200, count: 19 }, blini: { level: 13, target: 3400 }, salary: 1250 },
 ].map(rank => Object.freeze({ ...rank, scooter: Object.freeze(rank.scooter), plank: Object.freeze(rank.plank), match: Object.freeze(rank.match), blini: Object.freeze(rank.blini) })));
 
 export const GAMES = Object.freeze(['scooter', 'plank', 'match', 'blini']);

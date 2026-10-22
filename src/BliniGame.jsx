@@ -26,6 +26,12 @@ const TIPS = [
   'Серия удачных бросков подряд делает каждый следующий дороже.',
   'На «Гантели» две цепочки — следи за обеими.',
 ];
+const BOSS_TIPS = [
+  'Пока Диван прикрыт подушкой, снимай блины — бросок в подушку пропадёт.',
+  'Пончик летит туда, где ты стоишь сейчас: шагни по скамье — и мимо.',
+  'Пончик можно сбить блином — это ещё и тоннаж.',
+  'После попадания Диван трясётся секунду — следующий блин отскочит.',
+];
 const colorsLabel = n => n + ' ' + (n === 1 ? 'цвет' : n >= 2 && n <= 4 ? 'цвета' : 'цветов');
 
 function Sound({ enabled }) {
@@ -189,13 +195,18 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
             if (['shot', 'insert', 'power', 'danger'].includes(e.kind)) audio.current?.play(e.kind);
             if (e.kind === 'clear') audio.current?.play('clear', e.depth);
             if (e.kind === 'food') audio.current?.play('power');
-            if (e.kind === 'cleartrack') audio.current?.play('clear', 4);
+            if (e.kind === 'cleartrack' || e.kind === 'boss-down') audio.current?.play('clear', 4);
+            if (e.kind === 'boss-hit') audio.current?.play('clear', 2);
+            if (e.kind === 'stunned') audio.current?.play('danger');
+            if (e.kind === 'donut-down') audio.current?.play('power');
             if (e.kind === 'ramp') audio.current?.play('danger');
           }
           if (e.kind === 'clear') buzz(e.depth > 1 ? 'great' : 'good');
           if (e.kind === 'danger') buzz('bad');
           if (e.kind === 'saved' || e.kind === 'cleartrack') buzz('great');
-          if (e.kind === 'food') buzz('good');
+          if (e.kind === 'food' || e.kind === 'donut-down') buzz('good');
+          if (e.kind === 'boss-hit' || e.kind === 'boss-down') buzz('great');
+          if (e.kind === 'stunned') buzz('bad');
           if (e.kind === 'ramp') buzz('bad');
         }
       }
@@ -283,8 +294,12 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
   };
 
   const active = mode === 'playing' && !help;
-  const progress = Math.min(1, hud.score / hud.target);
+  const boss = hud.bossMax > 0;
+  const progress = boss ? hud.boss / hud.bossMax : Math.min(1, hud.score / hud.target);
   const message = soundError
+    || (boss && hud.stun ? 'Михалыч объелся пончиком — секунду'
+    : boss && hud.shield ? 'Диван прикрылся подушкой — снимай блины'
+    : boss && hud.danger < .85 ? (hud.rage ? 'Диван в ярости: уходи от пончиков по скамье' : 'Бей Дивана в просветы цепочки, уходи от пончиков') : '')
     || (hud.technique ? `${POWERS.technique.name}: ${POWERS.technique.effect}`
     : hud.negative ? `${POWERS.negative.name}: ${POWERS.negative.effect}`
     : hud.pause ? `${POWERS.pause.name}: ${POWERS.pause.effect}`
@@ -308,8 +323,13 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           ? <div className="blini-chip blini-chip--rest" title="Пора к подходу? Игра подождёт."><span>Отдых</span><strong role="timer">{clock(Math.max(0, restLeft))}</strong></div>
           : <div className="blini-chip"><span>Уровень</span><strong>{level + 1}</strong></div>}
         <div className="blini-plan">
-          <div className="blini-plan__numbers"><strong data-blini="score">{kg(hud.score)}</strong><span>{hud.full ? <><IconCheck size={14} /> План</> : `из ${hud.target.toLocaleString('ru-RU')}`}</span></div>
-          <div className={'blini-progress' + (hud.full ? ' is-full' : '')} role="progressbar" aria-label="Тоннаж до плана" aria-valuenow={Math.min(hud.score, hud.target)} aria-valuemin={0} aria-valuemax={hud.target}><span style={{ transform: `scaleX(${progress})` }} /></div>
+          {boss ? <>
+            <div className="blini-plan__numbers"><strong data-blini="score">{kg(hud.score)}</strong><span>{hud.boss > 0 ? `Диван ♥ ${hud.boss} из ${hud.bossMax}` : <><IconCheck size={14} /> Повержен</>}</span></div>
+            <div className={'blini-progress blini-progress--boss' + (hud.rage ? ' is-rage' : '')} role="progressbar" aria-label="Сердца Дивана" aria-valuenow={hud.boss} aria-valuemin={0} aria-valuemax={hud.bossMax}><span style={{ transform: `scaleX(${progress})` }} /></div>
+          </> : <>
+            <div className="blini-plan__numbers"><strong data-blini="score">{kg(hud.score)}</strong><span>{hud.full ? <><IconCheck size={14} /> План</> : `из ${hud.target.toLocaleString('ru-RU')}`}</span></div>
+            <div className={'blini-progress' + (hud.full ? ' is-full' : '')} role="progressbar" aria-label="Тоннаж до плана" aria-valuenow={Math.min(hud.score, hud.target)} aria-valuemin={0} aria-valuemax={hud.target}><span style={{ transform: `scaleX(${progress})` }} /></div>
+          </>}
           {hud.lives > 0 && <em className="blini-belt" aria-label="Пояс: одна страховка">Пояс</em>}
         </div>
         <button type="button" className="blini-icon blini-round" onClick={toggleSound} aria-label={sound ? 'Выключить звук' : 'Включить звук'} aria-pressed={sound}><Sound enabled={sound} /></button>
@@ -337,19 +357,20 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
             <div><span className="blini-rule-plates"><Plate color={4} /></span><span><strong>Темп растёт</strong>Через 40 секунд блины катятся быстрее, а где их было четыре — выходит пятый цвет</span></div>
           </div>
           <div className="blini-powers">{Object.entries(POWERS).map(([id, power]) => <div key={id}><PowerMark power={id} /><span><strong>{power.name}</strong>{power.effect}</span></div>)}</div>
+          <div className="blini-rules"><div><span className="blini-rule-plates blini-rule-boss" aria-hidden="true">♥</span><span><strong>Босс круга — Диван</strong>Брошенный в него блин снимает сердце, но подушка и дрожь после попадания его отбивают — тогда снимай блины. Пончики уводят Михалыча в нокаут на секунду: уходи по скамье или сбей пончик блином. Повержен Диван — все блины на трассе идут в тоннаж</span></div></div>
           <p className="blini-panel__fine">Еда на поле — банан, яблоко, брокколи, протеиновый батончик: попади в неё брошенным блином, и её вес уйдёт в тоннаж. Бонус светится на блине — сними его, пока не погас. Гиря Михалыч, 16 кг харизмы: коснись его или кнопки «Поменять», и он возьмёт следующий блин.</p>
           <button className="blini-primary" ref={primary} onClick={() => { setHelp(false); if (mode === 'paused') resume(); }}>Понятно</button>
         </> : mode === 'ready' ? <>
-          <span className="blini-chapter">Уровень {level + 1} из {LEVELS.length}</span>
+          <span className="blini-chapter">{rules.boss ? 'Босс круга · ' : ''}Уровень {level + 1} из {LEVELS.length}</span>
           <h3 id={title}>«{track.name}»</h3>
           <p>{track.note}</p>
           <MissionNote game="blini" mission={mission} />
-          <div className="blini-mission"><span>План {kg(rules.target)}</span><span>{colorsLabel(rules.colors)}</span><span>Норматив {seconds(rules.par)}</span>
+          <div className="blini-mission">{rules.boss ? <span>Диван: {rules.boss.hp} ♥</span> : <span>План {kg(rules.target)}</span>}<span>{colorsLabel(rules.colors)}</span><span>Норматив {seconds(rules.par)}</span>
             {rules.rampAt > 0 && <span>С {seconds(rules.rampAt * TICK_MS / 1000)} — {rules.colors < PLATES.length ? 'пятый цвет и ' : ''}быстрее</span>}
             {rules.rail && <span>Михалыч ходит по скамье</span>}</div>
-          {!state.mission && rules.ease > 0 && <p className="blini-ease">Михалыч сбавил темп: блины на {rules.ease * 6} % медленнее, план на {rules.ease * 5} % меньше. Выиграешь — уровень станет обычным.</p>}
+          {!state.mission && rules.ease > 0 && <p className="blini-ease">Михалыч сбавил темп: блины на {rules.ease * 6} % медленнее, {rules.boss ? `у Дивана ${rules.boss.hp} ♥ вместо ${LEVELS[level].boss.hp}` : `план на ${rules.ease * 5} % меньше`}. Выиграешь — уровень станет обычным.</p>}
           {!state.mission && <MedalGoals best={medals[level] || 0} par={rules.par} />}
-          <p className="blini-tip"><b>Совет Михалыча.</b> {TIPS[(level + serial) % TIPS.length]}</p>
+          <p className="blini-tip"><b>Совет Михалыча.</b> {rules.boss ? BOSS_TIPS[(level + serial) % BOSS_TIPS.length] : TIPS[(level + serial) % TIPS.length]}</p>
           {!state.mission && unlocked > 0 && <div className="blini-levels" role="group" aria-label="Выбор уровня">
             <button type="button" onClick={() => session.choose(level - 1, token.current)} disabled={level === 0} aria-label="Предыдущий уровень">‹</button>
             <span>Открыто {unlocked + 1} из {LEVELS.length}<br />Медалей {Object.values(medals).reduce((sum, n) => sum + n, 0)} из {LEVELS.length * 3}</span>
@@ -362,15 +383,15 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           <div className="blini-panel-mark"><span className="blini-pause-icon" /></div>
           <h3 id={title}>{reason === 'rest' ? 'Пора к подходу' : reason === 'saved' ? 'Партия сохранена' : 'Можно выдохнуть'}</h3>
           <p>{reason === 'rest' ? 'Блины замерли на месте. Продолжим на следующем отдыхе.' : reason === 'saved' ? `Уровень ${level + 1}, «${track.name}». Блины стоят там же, где ты остановился.` : 'Цепочка стоит. Продолжишь с того же места.'}</p>
-          <div className="blini-mission"><span><strong>{kg(hud.score)}</strong> из {kg(hud.target)}</span><span>{seconds(hud.seconds)}</span></div>
+          <div className="blini-mission"><span>{boss ? <>Диван: <strong>{hud.boss} ♥</strong> из {hud.bossMax}</> : <><strong>{kg(hud.score)}</strong> из {kg(hud.target)}</>}</span><span>{seconds(hud.seconds)}</span></div>
           <label className="blini-toggle"><input type="checkbox" checked={vibration} onChange={event => { setVibration(event.target.checked); setVibrationState(event.target.checked); if (event.target.checked) buzz('tap'); }} />Вибрация</label>
           <button className="blini-primary" ref={primary} onClick={resume}>Продолжить игру</button>
           <button className="blini-secondary" onClick={close}>{backLabel}</button>
           <GameProgressCard />
         </> : <>
           <span className="blini-chapter">Уровень {level + 1} · «{track.name}»</span>
-          <h3 id={title}>{mode === 'won' ? (result?.ace ? 'Уложился в норматив!' : 'Уровень взят!') : 'Блины на помосте'}</h3>
-          <p>{mode === 'won' ? (result?.ace ? `Быстрее ${seconds(rules.par)} — как по секундомеру.` : `Норматив — ${seconds(rules.par)}. В следующий раз быстрее.`) : 'Цепочка докатилась до помоста. Снимай ближние к нему блины первыми.'}</p>
+          <h3 id={title}>{mode === 'won' ? (rules.boss ? 'Диван повержен!' : result?.ace ? 'Уложился в норматив!' : 'Уровень взят!') : 'Блины на помосте'}</h3>
+          <p>{mode === 'won' ? (result?.ace ? `Быстрее ${seconds(rules.par)} — как по секундомеру.` : `Норматив — ${seconds(rules.par)}. В следующий раз быстрее.`) : rules.boss ? 'Диван отсиделся за цепочкой. Снимай блины перед ним — в просветы бросок долетит.' : 'Цепочка докатилась до помоста. Снимай ближние к нему блины первыми.'}</p>
           <div className="blini-result"><strong>{kg(result?.score ?? hud.score)}</strong><span>поднято за {seconds(result?.seconds ?? hud.seconds)}</span></div>
           {mode === 'won' && result?.medal > 0 && <div className={'blini-award' + (result.newMedal ? ' is-new' : '')}>
             <Medal rank={result.medal} size={46} />

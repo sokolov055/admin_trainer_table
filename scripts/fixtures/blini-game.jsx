@@ -14,7 +14,7 @@ function Fixture({ menu = true, rest = false, until = Infinity, now = Date.now()
   const [, session] = useBliniSession();
   window.bliniFixture = {
     read: () => { const s = session.getSnapshot(); return { mode: s.mode, level: s.level, unlocked: s.unlocked, hud: s.hud, reason: s.reason, result: s.result, mission: s.mission }; },
-    game: () => { const g = session.game(); return { tick: g.tick, shots: g.shots.length, fired: g.shotsFired, score: g.score, mode: g.mode, current: g.current, next: g.next, aim: g.aim, shooter: { x: g.shooter.x, y: g.shooter.y }, rail: g.rail, balls: g.chains.map(c => c.balls.filter(b => b.s >= 0).map(b => ({ color: b.color, ...platePoint(c, b) }))) }; },
+    game: () => { const g = session.game(); return { tick: g.tick, shots: g.shots.length, fired: g.shotsFired, score: g.score, mode: g.mode, current: g.current, next: g.next, aim: g.aim, shooter: { x: g.shooter.x, y: g.shooter.y }, rail: g.rail, boss: g.boss && { hp: g.boss.hp, max: g.boss.max, x: g.boss.x, y: g.boss.y }, donuts: g.donuts.length, balls: g.chains.map(c => c.balls.filter(b => b.s >= 0).map(b => ({ color: b.color, ...platePoint(c, b) }))) }; },
     win: () => { const g = session.game(); g.score = g.rules.target; g.full = true; g.chains.forEach(c => { c.balls = []; }); },
     setRest: setRestHere,
     choose: level => session.choose(level),

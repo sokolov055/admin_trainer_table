@@ -1,7 +1,7 @@
 // «Блины»: бот для проверки баланса. Видит только поле, как игрок: цвет в руке,
 // следующий цвет и цепочки. Целится в группу своего цвета ближе к помосту,
 // с упреждением по скорости цепочки; реакция и разброс прицела — как у человека.
-import { TUNING, pointAt, shoot, swap, aim, createBlini, step, drain, secondsOf } from './blini-shim.mjs';
+import { TUNING, pointAt, shoot, swap, aim, createBlini, step, drain, secondsOf, dangerOf } from './blini-shim.mjs';
 
 function targets(game, color) {
   const out = [];
@@ -19,8 +19,48 @@ function targets(game, color) {
   return out.sort((a, b) => b.value - a.value);
 }
 
+/** Свободна ли линия броска: ни один блин цепочки не стоит на пути. */
+function clearLine(game, x0, y0, x1, y1) {
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  for (let t = 34; t < len; t += 6) {
+    const x = x0 + (x1 - x0) * t / len, y = y0 + (y1 - y0) * t / len;
+    for (const chain of game.chains) for (const b of chain.balls) {
+      if (b.s < 0) continue;
+      const p = pointAt(chain.path, b.s);
+      if ((p.x - x) ** 2 + (p.y - y) ** 2 < (TUNING.plate * .95) ** 2) return false;
+    }
+  }
+  return true;
+}
+
+/** Ход против Дивана: уйти из-под пончика, бросить в него, если линия свободна, или встать туда, откуда она свободна. */
+function bossTurn(game, noise) {
+  const boss = game.boss, me = game.shooter, rail = game.rail;
+  const threat = game.donuts.find(d => d.vy > 0 && Math.abs(d.x + d.vx * (me.y - d.y) / d.vy - me.x) < 34);
+  if (threat && rail) {
+    const side = me.x - rail.x0 > rail.x1 - me.x ? -1 : 1;
+    aim(game, me.x + side * 80, me.y - 120);
+    return true;
+  }
+  if (dangerOf(game) > .7) return false; // цепочка близко к помосту — сначала она
+  if (boss.shield > 0 || boss.flinch > 40) return false;
+  if (clearLine(game, me.x, me.y, boss.x, boss.y)) {
+    const angle = Math.atan2(boss.y - me.y, boss.x - me.x) + noise, far = Math.hypot(boss.x - me.x, boss.y - me.y);
+    aim(game, me.x + Math.cos(angle) * far, me.y + Math.sin(angle) * far, false);
+    shoot(game);
+    return true;
+  }
+  if (!rail) return false;
+  let best = null;
+  for (let x = rail.x0; x <= rail.x1; x += 20) if (clearLine(game, x, me.y, boss.x, boss.y) && (best == null || Math.abs(x - me.x) < Math.abs(best - me.x))) best = x;
+  if (best == null) return false;
+  aim(game, best, boss.y);
+  return true;
+}
+
 /** Один ход бота: подумать, может быть поменять блин, прицелиться и бросить. */
 export function botTurn(game, noise = 0) {
+  if (game.boss && game.boss.hp > 0 && bossTurn(game, noise)) return true;
   let best = targets(game, game.current)[0];
   const other = targets(game, game.next)[0];
   if (other && (!best || other.value > best.value + 4)) { swap(game); best = other; }
