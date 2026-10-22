@@ -1409,7 +1409,7 @@ test('отдых упражнения из программы важнее об�
     await delay();
   });
   await mark('Тяжело');
-  assert.match(text(timer()), /^(3:30|3:29)$/, '«тяжело» — +30 с к своему отдыху');
+  assert.match(text(timer()), /^(4:00|3:59)$/, '«тяжело» — +60 с к своему отдыху (22.10.2026)');
   await act(async () => {
     const stop = local.root.findAll(n => n.type === 'button' && /Закончить отдых/.test(text(n)))[0];
     await stop.props.onClick();

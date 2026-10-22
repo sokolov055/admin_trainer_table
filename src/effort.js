@@ -9,37 +9,20 @@
  *   норм   — в запасе 1–2 повтора;
  *   тяжело — на пределе или не добил.
  *
- * Вес — главный рычаг, отдых — запасной:
- *   1. Легко → следующим подходам +шаг. Не больше двух прибавок за
- *      занятие на упражнение (случайное «легко» не уводит вес далеко);
- *      прибавлять некуда (свой вес без нагрузки, помощь уже 0) — отдых
- *      на 30 с короче (capped). Легко на лёгком подходе лесенки или после
- *      двух прибавок — отдых обычный: вес впереди ещё растёт.
- *   2. Норм → вес и отдых как есть.
- *   3. Тяжело и повторов меньше плана → −шаг сразу: не добил.
- *   4. Тяжело второй раз подряд → −шаг, но один раз: прошлое «тяжело»
- *      уже сняло шаг — третье подряд вес не трогает (20.10.2026).
- *   5. Тяжело один раз, повторы сделаны → вес держим, отдых на 30 с дольше:
- *      следующие подходы не тяжелее сделанного (21.10.2026 — сделал 45
- *      вместо подобранных 50, тяжело, а дальше стояло 50; лесенка прошлого
- *      раза сохраняется). Тяжело всегда даёт +30 с отдыха.
- *   Разминочные подходы вес не двигают. Новый вес встаёт только в
- *   нетронутые подходы того же человека: что вписано руками — не трогаем.
+ * Вес — главный рычаг, отдых — запасной. Правила — владельца, 22.10.2026
+ * (44 ответа «как поступил бы тренер», Notion «Подбор веса как у
+ * тренера»), подробно — у rateSet. Главное: отсчёт только от сделанного
+ * сейчас — после «тяжело» следующий подход не тяжелее сделанного, даже если
+ * в прошлый раз дальше шла лесенка (до 22.10 она сохранялась, и после
+ * «тяжело» вес рос). Тяжело — отдых на 60 с дольше.
+ *   Разминочные подходы оценок не имеют («Готово») и вес не двигают. Новый
+ *   вес встаёт только в нетронутые подходы того же человека: что вписано
+ *   руками — не трогаем.
  *
  * Суперсет: оценка — у каждого упражнения круга, вес правится у каждого
  * своим шагом. Не последнее в круге — отдых не запускает, это «дальше».
- * Последнее — отдых по кругу: хоть одно тяжело → +30 с; все легко и
+ * Последнее — отдых по кругу: хоть одно тяжело → +60 с; все легко и
  * прибавить было некуда → −30 с; иначе как выбран.
- *
- * Вес следующих подходов отсчитывается от сделанного сейчас, а не от веса
- * прошлой тренировки: прошлый раз 50 · 50 · 50, сегодня 60 и «легко» — дальше
- * 62,5, а не 50. Лесенка прошлого раза сохраняется (подход, что был тяжелее
- * на столько-то, тяжелее и теперь); подходы, что были легче, — свои.
- *
- * Внутри занятия подходы идут лесенкой (100 · 120 · 140 · 160) или первый
- * легче остальных, поэтому «легко» прибавляет только после самого
- * тяжёлого подхода — лёгкий разминочный и должен быть лёгким; «тяжело»
- * снимает шаг со всех следующих подходов не легче этого.
  *
  * Следующее занятие — подходы как в последний раз у клиента в этом
  * упражнении, сдвинутые по оценкам; считает сервер (server/src/lib/
@@ -163,15 +146,17 @@ function measure(assist) {
     : { has: (s) => num(s.weight) > 0, value: (s) => num(s.weight), load: (s) => num(s.weight), key: 'weight' };
 }
 
+/** На сколько дольше отдых после «тяжело» (владелец, 22.10.2026; было 30 с) */
+export const HARD_REST = 60;
+
 /**
- * Отдых после подхода: тяжело — +30 с; легко и прибавлять некуда (свой вес,
- * помощь уже 0 — capped из rateSet) — −30 с; иначе как выбран. «Легко» на
- * лёгком подходе лесенки или после двух прибавок отдых не трогает: вес
- * впереди ещё растёт (до 20.10.2026 укорачивался любой отдых без прибавки)
+ * Отдых после подхода: тяжело — +60 с; легко и прибавлять некуда (помощь
+ * уже 0 — capped из rateSet) — −30 с; иначе как выбран. «Легко» на лёгком
+ * подходе лесенки отдых не трогает: вес впереди ещё растёт
  */
 export function restFor(effort, base, capped = false) {
   if (!base) return 0;
-  if (effort === 'hard') return Math.min(1800, base + 30);
+  if (effort === 'hard') return Math.min(1800, base + HARD_REST);
   if (effort === 'easy' && capped) return Math.max(30, base - 30);
   return base;
 }
@@ -182,15 +167,10 @@ export function restFor(effort, base, capped = false) {
  */
 export function roundRest(efforts, base, capped = false) {
   if (!base) return 0;
-  if (efforts.includes('hard')) return Math.min(1800, base + 30);
+  if (efforts.includes('hard')) return Math.min(1800, base + HARD_REST);
   if (efforts.length && efforts.every((e) => e === 'easy') && capped) return Math.max(30, base - 30);
   return base;
 }
-
-/** Сколько прибавок веса за занятие на одно упражнение */
-/** Сколько прибавок веса за занятие на одно упражнение */
-/** Сколько прибавок веса за занятие на одно упражнение */
-export const MAX_RAISES = 2;
 
 const EFFORT_SET = ['easy', 'ok', 'hard'];
 export const isEffort = (e) => EFFORT_SET.includes(e);
@@ -252,9 +232,51 @@ function wasLoad(ex, i) {
 }
 
 /**
+ * Сколько «Легко» прибавляет (владелец, 22.10.2026): при шаге 2,5 и меньше
+ * — два шага (60 → 65), при крупном шаге (5, 10) и у гантелей — один
+ * (присед 100 → 110, гантели 20 → 22)
+ */
+export function raiseOf(ex, step) {
+  return step >= 5 || isDumbbell(ex) ? step : step * 2;
+}
+
+/** Повторы плана: «8–12» → { lo: 8, hi: 12 }, «10» → { lo: 10, hi: 10 }; нет — null */
+function repsPlan(ex) {
+  const g = repsGoal(ex);
+  if (g) return g;
+  const t = targetOf(ex);
+  return t > 0 ? { lo: t, hi: t } : null;
+}
+
+/** Свой вес без отягощения (FT-620): двигаются повторы, а не вес */
+function bodyweight(ex, set) {
+  return !!(ex.track && ex.track.kind === 'bodyweight') && !(num(set.weight) > 0) && num(set.reps) > 0;
+}
+
+/**
  * Подход si отмечен оценкой effort: у подхода — оценка, у следующих
- * подходов того же человека — новый вес (у помощи — помощь) с причиной в
- * suggest. Вес, вписанный руками (own), и разминку не трогаем
+ * неотмеченных рабочих того же человека — новый вес (у помощи — помощь, у
+ * своего веса — повторы) с причиной в suggest. Правила владельца
+ * 22.10.2026 (Notion, «Подбор веса как у тренера»). Отсчёт — только от
+ * сделанного сейчас: лесенка прошлого раза ничего не решает — после
+ * «тяжело» следующий подход не тяжелее сделанного.
+ *
+ *   Тяжело, не добил повторы  → вес по формуле от сделанного, вниз до блина
+ *                               и хотя бы на блин легче (60 × 8 из 10 → 55);
+ *   тяжело второй раз подряд  → −шаг, один раз (третье подряд не снимает);
+ *   тяжело на первом подходе лесенки → −шаг: разминочный и тот тяжело;
+ *   тяжело, повторы сделаны   → дальше не тяжелее сделанного (лесенка не
+ *                               растёт, ровные — как были), отдых дольше;
+ *   легко на первом подходе лесенки → лесенка как была;
+ *   легко дальше по лесенке   → следующим их вес + шаг;
+ *   легко на ровных           → +2 шага (крупный шаг, гантели — +1), а если
+ *                               раньше в упражнении было «тяжело» — +1 шаг;
+ *   больше повторов, чем в плане (легко, норм) → вес по формуле на план,
+ *                               вниз до блина; у «легко» — не меньше прибавки;
+ *   норм и не добил           → первый раз держим, второй — −шаг;
+ *   свой вес: легко — +2 повтора, тяжело и не добил — цель по сделанному.
+ * Разминку оценка не двигает (на ней «Готово»), вписанное руками — тоже.
+ * Ограничения на число прибавок за занятие нет.
  */
 export function rateSet(ex, si, effort) {
   const set = ex.sets[si];
@@ -262,62 +284,102 @@ export function rateSet(ex, si, effort) {
   const m = measure(assist);
   const who = set.who || '';
   const mine = (x) => (x.who || '') === who;
-  const cur = m.load(set);
-  const work = set.kind !== 'warmup';
-  const own = ex.sets.filter((x) => mine(x) && x.kind !== 'warmup' && m.has(x));
+  // Что можно сдвигать: следующие неотмеченные рабочие того же человека, не вписанные руками
+  const open = (x, i) => i > si && mine(x) && x.state === 'pending' && x.kind !== 'warmup' && !x.own;
   const before = ex.sets.slice(0, si).filter((x) => mine(x) && x.state === 'done' && x.kind !== 'warmup');
   const last = before[before.length - 1];
-  const raises = before.filter((x) => x.raised).length;
-  const heaviest = m.has(set) && cur >= Math.max(...own.map(m.load));
+  const plan = repsPlan(ex);
+  const reps = num(set.reps);
+  const short = !!plan && reps > 0 && reps < plan.lo;
+  const over = !!plan && reps > 0 && reps > plan.hi;
+  let key = m.key;
+  // to(значение следующего подхода) → новое или null — не трогать
+  let to = null;
   let dir = 0;
   let suggest = '';
-  if (work && m.has(set)) {
-    const target = targetOf(ex);
-    const short = target > 0 && num(set.reps) > 0 && num(set.reps) < target;
-    if (effort === 'easy' && heaviest && raises < MAX_RAISES) { dir = 1; suggest = 'easy'; }
-    else if (effort === 'hard' && short) { dir = -1; suggest = 'short'; }
-    // «Тяжело» второй раз подряд — −шаг, но не второй раз за одно и то же:
-    // прошлое «тяжело» уже сняло шаг (lowered) — хватит (20.10.2026)
-    else if (effort === 'hard' && last && last.effort === 'hard' && !last.lowered) { dir = -1; suggest = 'hard'; }
+  if (set.kind !== 'warmup' && isEffort(effort) && m.has(set)) {
+    const cur = m.load(set);
+    const step = assist ? assistStep(ex) : stepOf(ex, cur);
+    const unit = assist ? step : unitOf(ex);
+    const nextAt = ex.sets.map((x, i) => (open(x, i) && m.has(x) ? i : -1)).filter((i) => i >= 0);
+    // Какая схема впереди — лесенка (дальше тяжелее) или нет: по прошлому
+    // разу, если он есть, — подобранный вес могли поправить руками
+    // (21.10.2026: подобрано 50, сделал 45 — это не лесенка); нет — по тому,
+    // что стоит в подходах
+    const was = wasLoad(ex, si);
+    const thenAt = nextAt.map((i) => wasLoad(ex, i));
+    const history = was !== null && thenAt.length > 0 && thenAt.every((w) => w !== null);
+    const from = history ? was : cur;
+    const loads = history ? thenAt : nextAt.map((i) => m.load(ex.sets[i]));
+    // Без прошлого раза вес этого подхода, вписанный руками легче
+    // подобранного, — тоже не лесенка: человек сам сбавил
+    const ladder = !(set.own && !history) && loads.some((w) => w > from);
+    // Подход не легче этого (по прошлому разу или по тому, что стоит):
+    // его «легко» подтягивает, а сброс и облегчённый последний — свои
+    const level = new Map(nextAt.map((i, k) => [i, loads[k] >= from]));
+    const first = !before.length;
+    // Не выше cap: сколько можно, столько и оставить
+    const cap = (c) => (w) => (w > c ? c : null);
+    // Не ниже top: следующие не легче этого подтянуть
+    const lift = (top) => (w, i) => ((w >= cur || level.get(i)) && w < top ? top : null);
+    // По формуле вверх — только вес; у помощи формулы нет
+    const scaled = over && !assist ? scaleTo(ex, cur, reps, plan.hi) : null;
+    if (effort === 'hard') {
+      if (short) {
+        const lack = plan.lo - reps;
+        // У помощи формулы нет: +шаг, не добил 4 и больше — +2 шага
+        to = cap(assist ? cur - step * (lack >= 4 ? 2 : 1) : Math.min(scaleTo(ex, cur, reps, plan.lo), cur - unit));
+        dir = -1; suggest = 'short';
+      } else if (last && last.effort === 'hard' && !last.lowered) {
+        to = cap(cur - step); dir = -1; suggest = 'hard';
+      } else if (first && ladder) {
+        to = cap(cur - step); dir = -1; suggest = 'first';
+      } else {
+        to = cap(cur); suggest = 'held';
+      }
+    } else if (effort === 'easy') {
+      dir = 1;
+      suggest = over ? 'over' : 'easy';
+      if (ladder && !over) to = first ? null : (w) => (w >= cur ? w + step : null);
+      else {
+        const raise = before.some((x) => x.effort === 'hard') ? step : raiseOf(ex, step);
+        to = lift(scaled === null ? cur + raise : Math.max(cur + raise, scaled));
+      }
+    } else if (effort === 'ok') {
+      if (scaled !== null && scaled > cur) { to = lift(scaled); dir = 1; suggest = 'over'; }
+      else if (short && before.some((x) => num(x.reps) > 0 && num(x.reps) < plan.lo)) { to = cap(cur - step); dir = -1; suggest = 'again'; }
+    }
+  } else if (set.kind !== 'warmup' && isEffort(effort) && !assist && bodyweight(ex, set)) {
+    key = 'reps';
+    if (effort === 'easy') { to = (r) => (r < reps + 2 ? reps + 2 : null); dir = 1; suggest = 'more'; }
+    else if (effort === 'hard' && short) { to = (r) => (!r || r > reps ? reps : null); dir = -1; suggest = 'fewer'; }
   }
-  // Тяжело, повторы сделаны — вес держим: подобранное тяжелее сделанного
-  // опускается до сделанного (шаг не снимается, lowered не ставится)
-  const hold = !dir && effort === 'hard' && work && m.has(set);
-  if (hold) suggest = 'held';
-  const step = (load) => (assist ? assistStep(ex) : stepOf(ex, load));
   let changed = false;
-  // Что сдвинула эта оценка — чтобы «не то нажал» вернуло веса (unrateAt)
+  // Что сдвинула эта оценка — чтобы «не то нажал» вернуло (unrateAt)
   const moved = [];
   const sets = ex.sets.map((x, i) => {
     if (i === si) return { ...x, state: 'done', effort };
-    if ((!dir && !hold) || i < si || !mine(x) || x.state !== 'pending' || x.kind === 'warmup' || x.own) return x;
-    if (!m.has(x)) return x;
-    const w = m.load(x);
-    // Отсчёт — от того, что сделано сейчас, а не от веса прошлой тренировки
-    // (владелец, 16.10.2026): сделали 60 при прошлых 50·50·50 — следующим
-    // 60 ± шаг, а не 50. Лесенка прошлого раза сохраняется: подход, который
-    // был тяжелее на столько-то, тяжелее и теперь
-    const was = wasLoad(ex, si);
-    const then = wasLoad(ex, i);
-    let base;
-    if (was !== null && then !== null && then >= was) base = cur + (then - was);
-    // Нет истории — как было: не легче этого, лесенка ниже — своя
-    else if (hold) base = cur;
-    else if (w >= cur) base = w;
-    else return x;
-    if (hold && w <= base) return x;
-    const to = hold ? base : base + dir * step(base);
-    const next = text(assist ? Math.max(0, -to) : Math.max(0, to));
+    if (!to || !open(x, i)) return x;
+    let value;
+    if (key === 'reps') {
+      const r = to(num(x.reps));
+      if (r === null) return x;
+      value = String(r);
+    } else {
+      if (!m.has(x)) return x;
+      const n = to(m.load(x), i);
+      if (n === null) return x;
+      value = text(assist ? Math.max(0, -n) : Math.max(0, n));
+    }
     // Сдвигать некуда (помощь уже 0) — подход как был
-    if (num(next) === num(x[m.key])) return x;
+    if (num(value) === num(x[key]) && String(x[key] ?? '') !== '') return x;
     changed = true;
-    moved.push({ i, key: m.key, from: String(x[m.key] ?? ''), to: next, suggest: x.suggest || '' });
-    return { ...x, [m.key]: next, suggest };
+    moved.push({ i, key, from: String(x[key] ?? ''), to: value, suggest: x.suggest || '' });
+    return { ...x, [key]: value, suggest };
   });
-  // raised / lowered — оценка сдвинула вес следующих подходов; capped —
-  // хотели прибавить, а некуда (потолок прибавок не считается: это не
-  // «некуда», а «хватит»). По capped отдых короче (restFor)
-  const capped = effort === 'easy' && work && m.has(set) && heaviest && dir > 0 && !changed;
+  // raised / lowered — оценка сдвинула следующие подходы; capped — хотели
+  // прибавить, а некуда (помощь уже 0): по нему отдых короче (restFor)
+  const capped = effort === 'easy' && key !== 'reps' && dir > 0 && !!to && !changed;
   sets[si] = { ...sets[si], ...(moved.length ? { moved } : {}), ...(dir > 0 && changed ? { raised: true } : {}),
     ...(dir < 0 && changed ? { lowered: true } : {}), ...(capped ? { capped: true } : {}) };
   return { ex: { ...ex, sets }, raised: dir > 0 && changed, lowered: dir < 0 && changed, capped };
@@ -351,11 +413,22 @@ export function rerate(ex, si, effort) {
   return rateSet(unrateAt(ex, si), si, effort);
 }
 
-const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело', held: 'было тяжело' };
+const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело', held: 'было тяжело',
+  first: 'тяжело уже на первом', over: 'повторов больше плана', again: 'снова не добил', more: 'было легко', fewer: 'не добил повторы' };
 
-/** Подпись подобранного веса: «+2,5 кг · было легко»; у помощи — «−5 кг помощи · было легко» */
+/**
+ * Подпись подобранного веса: «+2,5 кг · было легко»; у помощи — «−5 кг
+ * помощи · было легко»; у своего веса — «+2 повт. · было легко»
+ */
 export function suggestText(set, prev, ex = null) {
   if (!set.suggest || !prev) return '';
+  if (set.suggest === 'more' || set.suggest === 'fewer') {
+    const b = num(set.reps);
+    const a = num(prev.reps);
+    if (!(a > 0) || !(b > 0)) return '';
+    if (set.suggest === 'fewer') return 'цель ' + b + ' повт. · ' + WHY.fewer;
+    return b > a ? '+' + (b - a) + ' повт. · ' + WHY.more : '';
+  }
   const assist = isAssisted(ex);
   const key = assist ? 'assist' : 'weight';
   const b = num(set[key]);
@@ -464,8 +537,14 @@ function todayText(last, assist) {
     // Перерыв (FT-627): давно не делали — легче
     down: last.reason === 'break'
       ? 'с тех пор ' + (weeks > 0 ? weeks + ' ' + plural(weeks, 'неделя', 'недели', 'недель') : 'давно') + ' — сегодня ' + kg(-1) + ', втянуться'
-      : 'сегодня ' + kg(-1),
-    same: 'сегодня так же',
+      // 22.10.2026: не добили или тяжело второй раз подряд
+      : last.reason === 'short' ? 'не добили повторы — сегодня ' + kg(-1)
+        : last.reason === 'hard' ? 'тяжело второй раз подряд — сегодня ' + kg(-1)
+          : 'сегодня ' + kg(-1),
+    // Тяжело, но повторы сделаны — закрепляем вес (22.10.2026)
+    same: last.reason === 'held' ? 'было тяжело, но сделали — сегодня так же, закрепляем' : 'сегодня так же',
+    // Тренер поменял вес в программе после того раза (сервер, 22.10.2026)
+    trainer: 'тренер поставил ' + String(last.trainer || '').replace('.', ',') + ' кг — сегодня с него',
     // Повторы другие — вес пересчитан в соотношении (сервер, scaleTo)
     scaled: 'сегодня на ' + (lo || '') + ' ' + plural(lo, 'повтор', 'повтора', 'повторов') + ', это примерно ' + String(last.scaled || '').replace('.', ',') + ' кг',
   }[last.action] || '';

@@ -201,11 +201,14 @@ export function setQueue(s) {
         + (set.kind === 'warmup' ? ', разминка' : '')].filter(Boolean).join(' · '),
       ...(strength ? { weight: String(set[key] || '').trim() } : {}),
       ...(assist ? { assist: true } : {}),
+      // Разминка (владелец, 22.10.2026): оценок нет — на часах одна «Готово»
+      ...(set.kind === 'warmup' ? { warmup: true } : {}),
       // Для оценки на часах: шаг колёсика (гантели — 1 кг), шаг прибавки и
       // почему у подхода такой вес
       // У разминки шага нет: «Легко» на ней вес не прибавляет (FT-620)
       ...(strength ? { dumbbell: isDumbbell(ex), ...(set.kind !== 'warmup' ? { step: assist ? assistStep(ex) : stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}) } : {}),
-      ...(strength && suggestText(set, prevOf(ex, set), ex) ? { suggest: suggestText(set, prevOf(ex, set), ex) } : {}),
+      // Свой вес — и повторы: «+2 повт. · было легко» (22.10.2026)
+      ...(suggestText(set, prevOf(ex, set), ex) ? { suggest: suggestText(set, prevOf(ex, set), ex) } : {}),
       // Отдых после этого подхода, если у упражнения он свой (20.10.2026)
       ...(ex.rest ? { rest: ex.rest } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
