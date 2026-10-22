@@ -1,4 +1,4 @@
-import { validBarcode, parseLabel, labelScore } from './label-model.js';
+import { gtinFromCode, parseLabel, labelScore } from './label-model.js';
 import { localContrast } from './label-image.js';
 export async function preparePhoto(file, rotation = 0) {
   if (!file || file.size > 20 * 1024 * 1024) throw new Error('Фото слишком большое. Выберите изображение до 20 МБ.');
@@ -27,8 +27,9 @@ export async function decodeBarcode(canvas) {
   let code;
   try { code = new BrowserMultiFormatReader().decodeFromCanvas(canvas).getText(); }
   catch { throw new Error('Штрихкод не прочитан. Снимите его ближе без бликов или впишите цифры.'); }
-  if (!validBarcode(code)) throw new Error('Прочитан неподдерживаемый код. Нужен товарный штрихкод EAN/UPC, а не QR-код.');
-  return code;
+  const gtin = gtinFromCode(code);
+  if (!gtin) throw new Error('Прочитан неподдерживаемый код. Нужен штрихкод EAN/UPC или квадратный код «Честного знака», а не QR-ссылка.');
+  return gtin;
 }
 export function createRecognition({ progress = () => {}, base = document.baseURI, useBlobWorker = !/^https?:$/.test(new URL(base).protocol) } = {}) {
   let worker, stopped = false;

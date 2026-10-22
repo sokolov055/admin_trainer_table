@@ -1,12 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validBarcode, parseLabel, labelScore } from '../src/nutrition/label-model.js';
+import { validBarcode, gtinFromCode, parseLabel, labelScore } from '../src/nutrition/label-model.js';
 import { ocrAssets } from './ocr-assets.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { localContrast } from '../src/nutrition/label-image.js';
 test('товарный штрихкод: контрольная цифра, ведущие нули и неподдерживаемый QR', () => {
   for (const code of ['4601234567893', '4006381333931', '96385074', '012345678905']) assert.ok(validBarcode(code), code);
   for (const code of ['4006381333932', '123', 'https://example.org', '', '460123456789']) assert.equal(validBarcode(code), false, code);
+});
+test('код «Честного знака»: берём только GTIN в виде с упаковки, серию и криптохвост отбрасываем', () => {
+  const gs = String.fromCharCode(29);
+  assert.equal(gtinFromCode(`${gs}0104601234567893215Ab1c${gs}93dGVz`), '4601234567893');
+  assert.equal(gtinFromCode(']d20104601234567893215Ab1c'), '4601234567893');
+  assert.equal(gtinFromCode('(01)04601234567893(21)5Ab1c'), '4601234567893');
+  assert.equal(gtinFromCode('0100000096385074215Ab1c'), '96385074');
+  assert.equal(gtinFromCode('0100012345678905215Ab1c'), '012345678905');
+  assert.equal(gtinFromCode('04601234567893'), '4601234567893');
+  assert.equal(gtinFromCode('14601234567890'), '14601234567890');
+  assert.equal(gtinFromCode('4601234567893'), '4601234567893');
+  for (const code of ['0104601234567894215Ab1c', 'https://example.org/01/04601234567893', '215Ab1c', '', '0104601234']) assert.equal(gtinFromCode(code), '', code);
 });
 test('этикетка на 100 г: запятые, нули и кДж не заменяют ккал', () => {
   assert.deepEqual(parseLabel('Пищевая ценность на 100 г\nЭнергия 503 кДж / 120 ккал\nБелки 8,5 г\nЖиры 0 г\nУглеводы 20.5 г').fields, { protein: '8.5', fat: '0', carbs: '20.5', kcal: '120' });

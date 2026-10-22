@@ -9,6 +9,18 @@ export function validBarcode(value) {
   return (10 - sum % 10) % 10 === check;
 }
 
+// Код «Честного знака» (GS1 DataMatrix): 01 + GTIN-14, дальше 21 + серийный номер и
+// криптохвост. Берём только GTIN — серия и подпись принадлежат одной пачке, хранить их
+// незачем. GTIN-14 сокращаем до вида с упаковки (EAN-13, UPC-A, EAN-8), как в базе.
+// Сканер отдаёт код с префиксом «]d2» или символом GS (FNC1) в начале, человек — «(01)…».
+export function gtinFromCode(value) {
+  const code = String(value || '').trim();
+  const gtin = validBarcode(code) ? code : code.replace(/^\][dQC]\d/, '').replace(/^\x1d+/, '').match(/^(?:\(01\)|01)(\d{14})/)?.[1];
+  if (!gtin || !validBarcode(gtin)) return '';
+  if (gtin.length < 14) return gtin;
+  return gtin.startsWith('000000') ? gtin.slice(6) : gtin.startsWith('00') ? gtin.slice(2) : gtin.startsWith('0') ? gtin.slice(1) : gtin;
+}
+
 // Tesseract с rus+eng путает похожие буквы: «на» → «ha», «г» → «r», «ккал» → «kkaл».
 // Замена посимвольная, длина строки не меняется: позиции совпадают с исходным текстом,
 // английские слова (protein, kcal) ищем в исходном, русские — в заменённом.

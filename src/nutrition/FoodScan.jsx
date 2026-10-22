@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { apiPublic } from '../api.js';
 import { Note } from '../ui.jsx';
 import { foodTitle, foodPer } from './FoodFields.jsx';
-import { parseLabel, validBarcode } from './label-model.js';
+import { parseLabel, gtinFromCode } from './label-model.js';
 import ScanGuide from './ScanGuide.jsx';
 import './food-scan.css';
 
@@ -61,12 +61,14 @@ export default function FoodScan({ onDraft, onFound, disabled = false, start = '
     finally { clearTimeout(timer); if (ticket === sequence.current) { job.current?.stop(); job.current = null; setBusy(''); } }
   };
   const lookup = async () => {
-    if (!validBarcode(code)) { setError('Проверьте цифры штрихкода: контрольная цифра не совпадает или длина неверна.'); return; }
+    const gtin = gtinFromCode(code);
+    if (!gtin) { setError('Проверьте цифры штрихкода: контрольная цифра не совпадает или длина неверна.'); return; }
+    if (gtin !== code) setCode(gtin);
     const ticket = ++sequence.current; setBusy('Ищем в нашей базе…'); setError(''); setFound(null); setSearched(false);
     try {
-      const data = await apiPublic('food.search', { q: code.trim(), separateBrand: true });
+      const data = await apiPublic('food.search', { q: gtin, separateBrand: true });
       if (ticket !== sequence.current) return;
-      setFound((data.foods || []).find(f => f.barcode === code.trim()) || null); setSearched(true);
+      setFound((data.foods || []).find(f => f.barcode === gtin) || null); setSearched(true);
     } catch (e) { if (ticket === sequence.current) { console.error('Поиск по штрихкоду', e); setError('Не удалось проверить нашу базу. Подключитесь к интернету и повторите поиск.'); } }
     finally { if (ticket === sequence.current) setBusy(''); }
   };
