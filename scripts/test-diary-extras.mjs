@@ -1,0 +1,197 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import React from 'react';
+import renderer, { act } from 'react-test-renderer';
+import vm from 'node:vm';
+import { createRequire } from 'node:module';
+import { FOOD, RECIPES } from '../src/nutrition/recipes.js';
+import { similarFoods, swapDistance, sameKcalGrams, foodRole, foodUsage, snackIdeas, snackPortion, FREE, freeSnapshot, swapQuestion, SWAP_LIMIT } from '../src/nutrition/diary-extras.js';
+import { DIARY_LESSONS } from '../src/nutrition/diary-lessons.js';
+import { diaryMock } from '../src/nutrition/diary-mock.js';
+
+// «Конструктор рационов» (FT-709): замены с похожим КБЖУ, «Что влезет»,
+// «без ограничений», уроки. Справочник — встроенный (recipes.js, 56
+// продуктов); полный серверный (101) проверен так же при разработке.
+const usage = foodUsage(RECIPES);
+const names = (name, opts = {}) => similarFoods(name, FOOD, { usage, ...opts }).map(s => s.name);
+
+test('замены: рис ↔ гречка, куриная грудка ↔ индейка — в первых трёх', () => {
+  assert.ok(names('рис').includes('гречка'), names('рис').join(', '));
+  assert.ok(names('гречка').includes('рис'), names('гречка').join(', '));
+  assert.ok(names('куриная грудка').includes('индейка филе'), names('куриная грудка').join(', '));
+  assert.ok(names('индейка филе').includes('куриная грудка'), names('индейка филе').join(', '));
+  for (const n of ['рис', 'гречка', 'куриная грудка', 'творог 5%', 'масло растительное']) assert.ok(names(n).length >= 1 && names(n).length <= 3, n);
+});
+
+test('замены: только той же роли — рис не меняется на муку, хлеб или сухари; масла — между собой', () => {
+  for (const n of Object.keys(FOOD)) {
+    const role = foodRole(n, FOOD[n].group);
+    for (const s of similarFoods(n, FOOD, { usage, limit: 10 })) {
+      assert.equal(foodRole(s.name, FOOD[s.name].group), role, n + ' → ' + s.name);
+      assert.ok(s.distance <= SWAP_LIMIT, n + ' → ' + s.name);
+    }
+  }
+  assert.ok(!names('рис', { limit: 10 }).some(n => /мука|хлеб|сухари|хлопья/.test(n)));
+  assert.equal(foodRole('печень куриная', 'meat'), 'group:meat', 'печень — не печенье');
+  assert.equal(foodRole('масло сливочное', 'dairy'), foodRole('масло растительное', 'other'));
+  assert.ok(names('масло сливочное').includes('масло растительное'));
+  assert.deepEqual(similarFoods('нет такого', FOOD), []);
+  assert.deepEqual(similarFoods('рис', {}), []);
+});
+
+test('замены: граммы — на те же калории, мера симметрична, без привычности — по близости', () => {
+  const rice = FOOD['рис'], buckwheat = FOOD['гречка'];
+  assert.equal(swapDistance(rice, rice), 0);
+  assert.equal(swapDistance(rice, buckwheat), swapDistance(buckwheat, rice));
+  assert.equal(swapDistance(rice, { kcal: 0, protein: 0, fat: 0, carbs: 0 }), Infinity);
+  // 70 г риса = 241 ккал = 76,9 г гречки → до 5 г: 75
+  assert.equal(sameKcalGrams(rice, buckwheat, 70), 75);
+  assert.equal(sameKcalGrams(FOOD['масло растительное'], FOOD['масло сливочное'], 10), 12);
+  const row = similarFoods('рис', FOOD, { grams: 70, usage }).find(s => s.name === 'гречка');
+  assert.equal(row.grams, 75);
+  assert.ok(row.proteinDelta > 4, 'в гречке на те же калории больше белка');
+  const plain = similarFoods('рис', FOOD);
+  assert.deepEqual(plain.map(s => s.distance), [...plain.map(s => s.distance)].sort((a, b) => a - b));
+  // Привычность — блюда, где продукт основной (от 20 г на порцию)
+  assert.deepEqual(foodUsage([{ portions: 2, items: [{ food: 'рис', grams: 140 }, { food: 'соль', grams: 10 }] }]), { рис: 1 });
+});
+
+test('«Что влезет»: всё в остатке, сначала белок, сладкое не спрятано, сырое мясо и крупы — нет', () => {
+  const dishes = [
+    { id: 'a', name: 'Творог с ягодами', meal: 'перекус', status: 'published', per: { kcal: 200, protein: 30, fat: 5, carbs: 15 }, items: [] },
+    { id: 'b', name: 'Финики с орехами', meal: 'перекус', status: 'published', per: { kcal: 180, protein: 3, fat: 9, carbs: 25 }, items: [{ food: 'финики', grams: 30 }] },
+    { id: 'c', name: 'Черновик', meal: 'перекус', status: 'draft', per: { kcal: 100, protein: 40, fat: 1, carbs: 1 }, items: [] },
+    { id: 'd', name: 'Обед', meal: 'обед', status: 'published', per: { kcal: 150, protein: 50, fat: 1, carbs: 1 }, items: [] },
+  ];
+  assert.deepEqual(snackIdeas({ remaining: 0, foods: FOOD, dishes }), []);
+  const list = snackIdeas({ remaining: 250, foods: FOOD, dishes });
+  assert.ok(list.length > 3 && list.length <= 8);
+  assert.ok(list.every(r => r.kcal <= 250 && r.kcal > 0));
+  assert.ok(list.some(r => r.sweet), 'сладкое в списке');
+  assert.ok(!list.some(r => ['c', 'd'].includes(r.product.id)), 'черновик и обед — не перекус');
+  assert.ok(!list.some(r => /грудка|гречка|рис|мука/.test(r.product.name)));
+  const ordered = list.filter(r => !r.sweet);
+  assert.deepEqual(ordered.map(r => r.protein), [...ordered.map(r => r.protein)].sort((a, b) => b - a));
+  assert.equal(list[0].product.id, 'a');
+  // Продукт — запись дневника в граммах, блюдо — одна порция
+  const curd = list.find(r => r.product.kind === 'ingredient');
+  assert.equal(curd.product.unit, 'g'); assert.equal(curd.amount, snackPortion(curd.product.name));
+  assert.equal(list.find(r => r.product.id === 'a').amount, 1);
+  // Маленький остаток — только то, что помещается
+  assert.ok(snackIdeas({ remaining: 60, foods: FOOD, dishes }).every(r => r.kcal <= 60));
+});
+
+test('«Без ограничений»: 0 ккал, неизвестная отметка — нет; демо записывает и считает 0', () => {
+  assert.deepEqual(Object.keys(FREE), ['tea', 'coffee', 'spices', 'greens', 'sweetener']);
+  const tea = freeSnapshot('tea');
+  assert.equal(tea.kind, 'free'); assert.equal(tea.kcal, 0); assert.equal(tea.unit, 'portion');
+  assert.equal(freeSnapshot('cake'), null); assert.equal(freeSnapshot('constructor'), null);
+  globalThis.localStorage = { store: {}, getItem(k) { return this.store[k] ?? null; }, setItem(k, v) { this.store[k] = String(v); } };
+  const entry = diaryMock('diary.entry.save', { clientRow: 77, day: '2026-10-22', meal: 'breakfast', amount: 1, product: { kind: 'free', id: 'coffee' }, requestId: 'free-1' });
+  assert.equal(entry.product.name, 'Кофе без сахара и молока');
+  assert.equal(diaryMock('diary.get', { clientRow: 77, day: '2026-10-22' }).totals.kcal, 0);
+  assert.throws(() => diaryMock('diary.entry.save', { clientRow: 77, day: '2026-10-22', meal: 'snack', amount: 1, product: { kind: 'free', id: 'cake' }, requestId: 'free-2' }));
+});
+
+test('вопрос тренеру о замене и три урока', () => {
+  assert.equal(swapQuestion({ dish: 'Плов', food: 'рис', grams: 70, to: { name: 'гречка', grams: 75 } }), 'Питание: можно в блюде «Плов» заменить «рис» (70 г) на «гречка» (75 г)?');
+  assert.equal(swapQuestion({ food: 'рис' }), 'Питание: чем можно заменить «рис»?');
+  const ids = DIARY_LESSONS.map(l => l.id);
+  for (const id of ['oil', 'cafe', 'family']) assert.ok(ids.includes(id), id);
+  const oil = DIARY_LESSONS.find(l => l.id === 'oil').paragraphs.join(' ');
+  assert.ok(/5 мл/.test(oil) && /45 ккал/.test(oil));
+  assert.ok(new Set(ids).size === ids.length);
+});
+
+// Экраны: состав в «Рецептах», вопрос тренеру, отметка «без ограничений»
+const stubs = {
+  api: `export const apiPublic=(a,p)=>globalThis.__x.read(a,p); export const apiStale=(a,p)=>({data:null,promise:globalThis.__x.read(a,p)}); export const apiMutate=(a,p)=>globalThis.__x.mutate(a,p);`,
+  offline: `export const queueWrite=async(k,p)=>{globalThis.__x.queued.push({kind:k,params:p})}; export const isOffline=e=>e?.code===0; export const localWrites=async()=>[]; export const onWritesChange=()=>()=>{}; export const dropWrite=async()=>{};`,
+  ui: `import React from 'react'; export const Section=({children})=><section>{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Loading=()=> <div>Загрузка</div>;export const Sheet=({title,children})=><section role="dialog"><h2>{title}</h2>{children}</section>;export const formatNumber=n=>String(n);export const Qty=({value,unit})=><span>{value}{unit?' '+unit:''}</span>;`,
+  icons: `import React from 'react';const I=()=> <i/>; export const IconPlus=I,IconCheck=I;`,
+};
+const bundle = await build({ stdin: { contents: "export * from './src/nutrition/DiaryExtras.jsx'; export { Recipes } from './src/nutrition/Recipes.jsx'; export { CATALOG } from './src/nutrition/catalog.js';", resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'cjs', platform: 'node', external: ['react'], logLevel: 'silent', plugins: [{ name: 'extras-stubs', setup(b) {
+  b.onResolve({ filter: /\/(api|ui|icons|offline-writes)\.(js|jsx)$/ }, a => ({ path: ({ 'offline-writes': 'offline' })[a.path.split('/').at(-1).split('.')[0]] || a.path.split('/').at(-1).split('.')[0], namespace: 'stub' }));
+  b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: stubs[a.path], loader: 'jsx' }));
+  b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
+} }] });
+const module = { exports: {} };
+vm.runInThisContext('(function(require,module,exports){' + bundle.outputFiles[0].text + '\n})')(createRequire(import.meta.url), module, module.exports);
+const { Recipes, FreeMarks, SnackIdeas } = module.exports;
+globalThis.window ||= { addEventListener() {}, removeEventListener() {} };
+globalThis.document ||= { activeElement: null, addEventListener() {}, removeEventListener() {} };
+globalThis.__x = { queued: [], read: async () => ({}), mutate: async () => ({}) };
+const text = tree => JSON.stringify(tree.toJSON());
+const button = (tree, label) => tree.root.findAll(n => n.type === 'button' && (n.props['aria-label'] === label || [].concat(n.props.children).join('') === label))[0];
+
+test('«Рецепты»: касание блюда раскрывает состав с заменами; вопрос тренеру уходит пожеланием', async () => {
+  const pilaf = RECIPES.find(r => r.items.some(i => i.food === 'рис' && i.grams / r.portions >= 20));
+  assert.ok(pilaf, 'в наборе есть блюдо с рисом');
+  const sent = [];
+  __x.read = async () => { throw new Error('нет сервера'); };
+  __x.mutate = async (a, p) => { sent.push([a, p]); return { id: 1 }; };
+  const row = { kind: 'dish', id: pilaf.id, name: pilaf.name, ...pilaf.per, unit: 'portion', meal: pilaf.meal };
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(Recipes, { rows: [row], remaining: 0, canAsk: true, onAdd() {}, onEdit() {}, onNew() {} })); });
+  assert.ok(!text(tree).includes('Можно заменить'));
+  const open = tree.root.findAll(n => n.type === 'button' && n.props['aria-expanded'] === false)[0];
+  await act(async () => open.props.onClick());
+  assert.ok(text(tree).includes('Можно заменить'));
+  assert.ok(text(tree).includes('гречка'));
+  await act(async () => button(tree, 'Спросить тренера о замене').props.onClick());
+  const area = tree.root.findByType('textarea');
+  assert.ok(area.props.value.startsWith('Питание:'));
+  await act(async () => tree.root.findByType('form').props.onSubmit({ preventDefault() {} }));
+  assert.equal(sent[0][0], 'wish.create');
+  assert.ok(sent[0][1].text.includes(pilaf.name));
+  assert.ok(text(tree).includes('Отправлено'));
+  tree.unmount();
+  // Тренер и «Мои тренировки» — состав виден, спросить некого
+  await act(async () => { tree = renderer.create(React.createElement(Recipes, { rows: [row], remaining: 0, readOnly: true, canAsk: false, onAdd() {}, onEdit() {}, onNew() {} })); });
+  await act(async () => tree.root.findAll(n => n.type === 'button' && n.props['aria-expanded'] === false)[0].props.onClick());
+  assert.ok(text(tree).includes('Можно заменить'));
+  assert.equal(button(tree, 'Спросить тренера о замене'), undefined);
+  tree.unmount();
+});
+
+test('«Без ограничений»: одно нажатие — запись 0 ккал; без связи — в очередь телефона', async () => {
+  const calls = [], saved = [];
+  __x.mutate = async (a, p) => { calls.push([a, p]); return {}; };
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(FreeMarks, { day: '2026-10-22', meal: 'breakfast', onSaved: t => saved.push(t), onError: e => { throw e; } })); });
+  await act(async () => button(tree, 'Чай без сахара: записать, 0 ккал').props.onClick());
+  assert.equal(calls[0][0], 'diary.entry.save');
+  assert.deepEqual(calls[0][1].product, { kind: 'free', id: 'tea' });
+  assert.equal(calls[0][1].preview.kcal, 0); assert.equal(calls[0][1].meal, 'breakfast');
+  assert.ok(saved[0].includes('0 ккал'));
+  __x.mutate = async () => { throw Object.assign(new Error('Нет связи'), { code: 0 }); };
+  __x.queued = [];
+  await act(async () => button(tree, 'Кофе без сахара и молока: записать, 0 ккал').props.onClick());
+  assert.equal(__x.queued[0].params.product.id, 'coffee');
+  assert.ok(saved[1].includes('телефоне'));
+  tree.unmount();
+});
+
+test('«Что влезет»: выбор отдаёт продукт и порцию в форму записи', async () => {
+  let picked = null, tree;
+  await act(async () => { tree = renderer.create(React.createElement(SnackIdeas, { remaining: 300, onClose() {}, onPick: (p, amount) => { picked = { p, amount }; } })); });
+  assert.ok(text(tree).includes('Что влезет в 300 ккал'));
+  const first = tree.root.findAll(n => n.type === 'button' && [].concat(n.props.children).join('') === 'Записать')[0];
+  await act(async () => first.props.onClick());
+  assert.ok(picked && picked.amount > 0);
+  assert.ok(['ingredient', 'dish'].includes(picked.p.kind));
+  tree.unmount();
+});
+
+test('карточка «Рациона»: «Чем заменить» — только основные продукты с заменами', async () => {
+  const { CardSwaps } = module.exports;
+  let tree;
+  await act(async () => { tree = renderer.create(React.createElement(CardSwaps, { recipe: { portions: 2, items: [{ food: 'рис', grams: 140 }, { food: 'соль', grams: 5 }, { food: 'зелень', grams: 10 }] } })); });
+  const out = text(tree);
+  assert.ok(out.includes('Чем заменить') && out.includes('гречка'));
+  assert.ok(!out.includes('зелень'), 'приправа — не основной продукт');
+  await act(async () => tree.update(React.createElement(CardSwaps, { recipe: { portions: 1, items: [{ food: 'соль', grams: 5 }] } })));
+  assert.equal(tree.toJSON(), null);
+  tree.unmount();
+});

@@ -15,7 +15,7 @@ import { palmUnit } from './palm-model.js';
 export const n = v => formatNumber(Math.round(Number(v || 0)));
 export const macroLine = t => `Б ${n(t.protein)} · Ж ${n(t.fat)} · У ${n(t.carbs)} г`;
 // Подпись количества в строке еды: у примерной записи — «примерно», у ладони — порции рукой
-export const amountLabel = e => e.product.kind === 'quick' ? 'примерно' + (e.amount !== 1 ? ' · ×' + formatNumber(e.amount) : '') : e.product.kind === 'palm' ? formatNumber(e.amount) + ' ' + palmUnit(e.product.id, e.amount) + ' · примерно' : formatNumber(e.amount) + ' ' + unit(e.product);
+export const amountLabel = e => e.product.kind === 'free' ? 'без ограничений' + (e.amount !== 1 ? ' · ×' + formatNumber(e.amount) : '') : e.product.kind === 'quick' ? 'примерно' + (e.amount !== 1 ? ' · ×' + formatNumber(e.amount) : '') : e.product.kind === 'palm' ? formatNumber(e.amount) + ' ' + palmUnit(e.product.id, e.amount) + ' · примерно' : formatNumber(e.amount) + ' ' + unit(e.product);
 
 // Не показываем ответ прошлого дня/клиента, пришедший после переключения.
 export function useDiaryResource(action, params) {

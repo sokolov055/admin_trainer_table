@@ -5,6 +5,7 @@ import { PALM, palmSnapshot } from './palm-model.js';
 import { cycleTargets } from './carbs.js';
 // Демо-расписание (FT-709): занятия по понедельникам, средам и пятницам в 18:00
 const demoCarbDay = (d, s) => { const train = [1, 3, 5].includes(new Date(d + 'T12:00:00Z').getUTCDay()), percent = s.carbCycle ?? 20; return { kind: train ? 'train' : 'rest', at: train ? '18:00' : null, source: train ? 'calendar' : null, percent, ...(percent ? { base: s.targets } : {}) }; };
+import { freeSnapshot } from './diary-extras.js';
 const copy = x => JSON.parse(JSON.stringify(x));
 const fail = (code, text) => { throw Object.assign(new Error(text), { code }); };
 export function diaryMock(action, p = {}) {
@@ -19,9 +20,9 @@ export function diaryMock(action, p = {}) {
     ...Object.entries(FOOD).map(([name, f]) => ({ kind: 'ingredient', id: name, name, ...f, unit: 'g', source: 'Справочник · вес до приготовления' })),
     ...RECIPES.map(r => ({ kind: 'dish', id: r.id, name: r.name, ...r.per, unit: 'portion', source: 'Рецепт тренера · одна порция', ingredients: r.items, steps: r.steps, meal: r.meal, minutes: r.minutes, tags: r.minutes && r.minutes <= 20 ? ['быстро'] : [] })),
   ].map(f => ({ ...f, liked: s.likes.includes(f.kind + ':' + f.id) }));
-  // «Только калории» и «Ладонь» — как на сервере (diary-handlers.js resolveProduct)
+  // «Только калории», «Ладонь» и «без ограничений» (FT-709) — как на сервере (diary-handlers.js resolveProduct)
   const quick = ref => { const kcal = Number(ref.kcal); if (!(kcal >= 1 && kcal <= 5000)) fail(400, 'Калории: от 1 до 5000.'); const m = k => ref[k] === '' || ref[k] == null ? null : Number(ref[k]); const name = String(ref.name || '').trim() || 'Примерно'; return { kind: 'quick', id: 'q-' + name.toLowerCase() + '-' + kcal, name, kcal, protein: m('protein'), fat: m('fat'), carbs: m('carbs'), unit: 'portion', approx: true, source: 'Примерно · без продукта' }; };
-  const resolve = ref => ref?.kind === 'quick' ? quick(ref) : ref?.kind === 'palm' ? (PALM[ref.id] ? palmSnapshot(ref.id) : fail(400, 'Выберите группу.')) : catalog().find(f => f.kind === ref.kind && String(f.id) === String(ref.id)) || fail(404, 'Продукт не найден.');
+  const resolve = ref => ref?.kind === 'free' ? freeSnapshot(ref.id) || fail(400, 'Выберите отметку.') : ref?.kind === 'quick' ? quick(ref) : ref?.kind === 'palm' ? (PALM[ref.id] ? palmSnapshot(ref.id) : fail(400, 'Выберите группу.')) : catalog().find(f => f.kind === ref.kind && String(f.id) === String(ref.id)) || fail(404, 'Продукт не найден.');
   const day = p.day || today();
   if (p.requestId && s.operations[p.requestId]) return copy(s.operations[p.requestId]);
   let result;

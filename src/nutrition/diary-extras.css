@@ -1,0 +1,25 @@
+/* «Конструктор рационов» (FT-709): состав с заменами, «Что влезет», «без ограничений» */
+
+/* ---------- Состав блюда и замены ---------- */
+.diary-food-main .swap-toggle { color: var(--accent); font-weight: 600; }
+.swap-box { margin: 0 0 var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--surface-sunken); }
+.swap-box__head { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+.swap-box__why { margin: var(--space-2) 0 0; }
+.swap-box__ask { margin-top: var(--space-2); }
+.swap-list { list-style: none; margin: 0; padding: 0; }
+.swap-list li { padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
+.swap-list li:last-child { border-bottom: 0; }
+.swap-list__row { display: flex; justify-content: space-between; gap: var(--space-3); font-size: var(--text-base); }
+.swap-list__g { flex: none; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.swap-line { display: block; margin-top: 2px; font-size: var(--text-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.swap-line b { font-weight: 600; color: var(--text); }
+.swap-details .swap-list { margin-top: var(--space-1, 4px); }
+
+/* ---------- «Что влезет» ---------- */
+.diary-snack-btn { min-height: 36px; padding-block: 0; margin-left: var(--space-2); vertical-align: middle; }
+.snack-list { margin-top: var(--space-2); }
+.snack-list .diary-catalog-row .button { flex: none; }
+
+/* ---------- Без ограничений, рядом с водой ---------- */
+.free-marks { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.free-marks__head { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }

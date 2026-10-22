@@ -16,6 +16,7 @@ import { EGG_SIZES, getEggSize, saveEggSize, pieceLabel, mlLabel } from './piece
 import { carbLevel, carbTag, preferredLevel, carbDayLine } from './carbs.js';
 import { nextSwap, applySwaps } from './swap.js';
 import './carbs.css';
+import { CardSwaps } from './DiaryExtras.jsx';
 
 /** Размер яиц, выбранный человеком: по нему «110 г» показываются как «2 яйца» */
 const EggContext = createContext(EGG_SIZES[2]);
@@ -412,6 +413,8 @@ function Card({ entry, offset, style, handlers, flying }) {
       </p>
 
       <Recipe recipe={recipe} />
+      {/* Замены с похожим КБЖУ (FT-709) — свёрнуто, как рецепт */}
+      <CardSwaps recipe={recipe} />
     </article>
   );
 }
