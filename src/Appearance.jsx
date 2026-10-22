@@ -66,7 +66,7 @@ function LookPreview() {
       <div className="look-preview__tabbar">
         <span className="is-on"><IconHome size={20} /></span>
         <span><IconPlan size={20} /></span>
-        <span className="look-preview__plus"><IconPlus size={20} /><Pumpkin className="look-preview__pumpkin" size={38} /></span>
+        <span className="look-preview__plus"><IconPlus size={20} /><Pumpkin className="look-preview__pumpkin" size={46} /></span>
         <span><IconProgress size={20} /></span>
         <span><IconNutrition size={20} /></span>
       </div>

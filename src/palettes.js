@@ -30,6 +30,8 @@
  * всегда тёмный (scheme: 'dark', telegram.js) — светлого Хэллоуина не бывает.
  */
 
+import { halloweenArt } from './halloween-art.js';
+
 export const PALETTE_KEY = 'app_palette_v1';
 export const STANDARD = 'standard';
 
@@ -165,27 +167,7 @@ const glow = (palette, scheme) => {
   return `radial-gradient(110% 55% at 100% 0%, ${rgba(a, ka)}, transparent 70%), radial-gradient(90% 50% at 0% 100%, ${rgba(f, kf)}, transparent 70%)`;
 };
 
-/*
- * Тыквы «Хэллоуина» — свой рисунок (образцы владельца с Pinterest не берём:
- * права). Обои из мелких тыкв: тёмные бока, лица горят изнутри, вокруг
- * ореол. Обои, а не одна картинка: экран почти весь под карточками, и
- * тыквы должны выглядывать в каждом промежутке. Лица неяркие — текст на
- * фоне читается.
- */
-const PUMPKIN = '<g id="p"><circle cx="26" cy="30" r="30" fill="url(#h)"/>'
-  + '<g fill="url(#b)" stroke="#2a0a05" stroke-opacity=".6" stroke-width="1"><ellipse cx="14" cy="31" rx="11" ry="14"/><ellipse cx="38" cy="31" rx="11" ry="14"/><ellipse cx="20" cy="31" rx="10" ry="15.5"/><ellipse cx="32" cy="31" rx="10" ry="15.5"/><ellipse cx="26" cy="31" rx="8" ry="16"/></g>'
-  + '<path d="M24.5 16c.2-4 1-7 3.6-9.4l2 1.6c-2 2-2.6 4.6-2.4 8z" fill="#34501d"/>'
-  + '<g fill="#f5a531"><path d="M14.5 29 20.5 29 17.5 22.5z"/><path d="M31.5 29 37.5 29 34.5 22.5z"/><path d="M24.6 33 27.4 33 26 30.4z"/><path d="M12.5 35Q26 46 39.5 35L36.6 36.2 34.6 39.4 31.6 37 26 40.6 20.4 37 17.4 39.4 15.4 36.2z"/></g></g>';
-/** Плитка 200×220: тыквы [x, y, масштаб, наклон] и искры-светлячки */
-const TILE = [[46, 52, 0.78, -12], [150, 118, 0.7, 14], [62, 176, 0.55, 6], [176, 14, 0.4, -6]];
-const SPARKS = [[110, 40, 1.4], [18, 120, 1.1], [120, 196, 1.2], [190, 180, 0.9]];
-const SCENE = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="220" viewBox="0 0 200 220">'
-  + '<defs><radialGradient id="b" cx=".42" cy=".36" r=".75"><stop offset="0" stop-color="#9a3f0e"/><stop offset=".6" stop-color="#5c1f08"/><stop offset="1" stop-color="#2a0b05"/></radialGradient>'
-  + '<radialGradient id="h"><stop offset="0" stop-color="#ff8a1e" stop-opacity=".3"/><stop offset="1" stop-color="#ff8a1e" stop-opacity="0"/></radialGradient>' + PUMPKIN + '</defs>'
-  + '<g opacity=".72">' + TILE.map(([x, y, k, r]) => `<use xlink:href="#p" href="#p" transform="translate(${x} ${y}) rotate(${r}) scale(${k}) translate(-26 -30)"/>`).join('')
-  + SPARKS.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#ffc760" opacity=".55"/>`).join('')
-  + '</g></svg>';
-const halloweenArt = () => `url("data:image/svg+xml,${encodeURIComponent(SCENE)}") 0 0 / 200px 220px repeat, radial-gradient(120% 60% at 50% 100%, rgba(255, 120, 30, 0.16), transparent 70%)`;
+/* Рисунок «Хэллоуина» — halloween-art.js */
 
 /** Тема, которую палитра ставит сама: «Хэллоуин» — всегда тёмная, остальные — как выбрано */
 export function forcedScheme(id = getPaletteId()) {

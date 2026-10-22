@@ -77,12 +77,12 @@ export default function TabBar({ tabs, active, onSelect, action = null }) {
             aria-label={action.label}
             aria-haspopup="dialog"
             aria-expanded={!!action.open}
-            onClick={action.onClick}
+            onClick={(e) => { hop(e.currentTarget); action.onClick(e); }}
             tabIndex={onTab ? undefined : -1}
           >
             <span className="tabbar__action-disc">
               <span className="tabbar__action-glyph"><IconPlus size={26} strokeWidth={2.4} /></span>
-              <Pumpkin className="tabbar__pumpkin" />
+              <Pumpkin className="tabbar__pumpkin" size={72} tall={1.15} />
             </span>
           </button>
           <div className="tabbar__group">{tabs.slice(half).map(item)}</div>
@@ -90,6 +90,17 @@ export default function TabBar({ tabs, active, onSelect, action = null }) {
       ) : tabs.map(item)}
     </nav>
   );
+}
+
+/**
+ * Подпрыгнуть по нажатию (тыква «Хэллоуина», tabbar-action.css): класс
+ * снимаем и ставим заново, чтобы анимация шла с начала и при частых
+ * касаниях. У круга с плюсом правила для .is-hop нет — ничего не меняется.
+ */
+function hop(el) {
+  el.classList.remove('is-hop');
+  void el.offsetWidth;
+  el.classList.add('is-hop');
 }
 
 /**

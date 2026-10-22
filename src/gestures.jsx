@@ -406,16 +406,45 @@ function moving() {
   return liveRegion ? [liveRegion] : liveParts();
 }
 
+/**
+ * Фон палитры (рисунок «Хэллоуина», свечение) стоит на месте, листаются
+ * только разделы поверх него (владелец, 22.10.2026). Всё, что едет, —
+ * непрозрачное: под ним лежит сосед. Поэтому каждому такому слою дан тот
+ * же рисунок (styles.css, .live-art и слои сцены), и на каждом кадре он
+ * сдвигается навстречу движению слоя (--art-x/--art-y = −положение слоя
+ * на экране). Слой едет, рисунок на нём стоит ровно там же, где фон.
+ * Без палитры с рисунком цикл не запускается.
+ */
+const PINNED = '.live-art, .swipeback__prev, .swipeback__cur, .swipeback--pager';
+let pinning = false;
+function pinArt() {
+  if (pinning || !document.documentElement.hasAttribute('data-palette')) return;
+  pinning = true;
+  const frame = () => {
+    const layers = document.querySelectorAll(PINNED);
+    if (!layers.length) { pinning = false; return; }
+    layers.forEach((el) => {
+      const box = el.getBoundingClientRect();
+      el.style.setProperty('--art-x', -box.left + 'px');
+      el.style.setProperty('--art-y', -box.top + 'px');
+    });
+    requestAnimationFrame(frame);
+  };
+  frame();
+}
+
 function goLive(region = null) {
   liveRegion = region;
   // Сплошной фон — только тому, что едет. Когда листается область под
   // баром, остальная страница прозрачна, и сквозь неё виден сосед.
   if (region) {
-    region.style.background = 'var(--bg)';
+    region.style.backgroundColor = 'var(--bg)';
     document.documentElement.classList.add('live-region');
   } else {
     document.documentElement.classList.add('live-moving');
   }
+  moving().forEach((el) => el.classList.add('live-art'));
+  pinArt();
 }
 
 function moveLive(x, fade = null) {
@@ -426,8 +455,11 @@ function moveLive(x, fade = null) {
 }
 
 function stopLive() {
-  moving().forEach((el) => { el.style.transform = ''; el.style.opacity = ''; });
-  if (liveRegion) liveRegion.style.background = '';
+  moving().forEach((el) => {
+    el.style.transform = ''; el.style.opacity = '';
+    el.classList.remove('live-art'); el.style.removeProperty('--art-x'); el.style.removeProperty('--art-y');
+  });
+  if (liveRegion) liveRegion.style.backgroundColor = '';
   liveRegion = null;
   keepChrome = false;
   document.documentElement.classList.remove('live-moving', 'live-region');

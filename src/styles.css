@@ -417,17 +417,34 @@ body::before {
 }
 
 /* Фон палитры (palettes.js, --bg-art; FT-702): свечение по углам или
-   рисунок «Хэллоуина». Неподвижный слой под содержимым: фон самой страницы
-   красит html, body прозрачный — иначе он закрыл бы слой с z-index −1.
+   цельный рисунок «Хэллоуина» — одна картинка на экран, лежит сзади.
+   Неподвижный слой под содержимым: фон самой страницы красит html, body
+   прозрачный — иначе он закрыл бы слой с отрицательным z-index. −2, а не
+   −1: на −1 во время жеста лежит соседний раздел (.swipeback--live), и
+   слой, стоящий в документе позже, рисовался бы поверх него — тыквы
+   выходили вперёд карточек. На время жеста тот же рисунок получают
+   страница, которая едет (.live-art), сосед и подложка под часами, и
+   gestures.jsx (pinArt) каждый кадр сдвигает его навстречу движению слоя:
+   фон стоит на месте, листаются только разделы.
    Стандартной палитре слой не нужен. */
 :root[data-palette] body { background: transparent; }
 :root[data-palette] body::after {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: -1;
-  background: var(--bg-art, none);
+  z-index: -2;
   pointer-events: none;
+}
+:root[data-palette] body::after,
+:root[data-palette] body::before,
+:root[data-palette] .live-art,
+:root[data-palette] .swipeback__prev,
+:root[data-palette] .swipeback__cur,
+:root[data-palette] .swipeback--pager {
+  background-image: var(--bg-art, none);
+  background-size: 100vw 100vh;
+  background-repeat: no-repeat;
+  background-position: var(--art-x, 0px) var(--art-y, 0px);
 }
 
 /* В просмотре глазами клиента под часами стоит сама плашка «Вы смотрите
@@ -3919,7 +3936,7 @@ code {
 .swipeback--cover { z-index: 15; }
 
 .live-moving #root .app > :not(.tabbar):not(.drawer):not(.client-preview) {
-  background: var(--bg);
+  background-color: var(--bg);
   will-change: transform;
 }
 

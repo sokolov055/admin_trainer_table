@@ -65,7 +65,7 @@ test('три роли: фон — второй цвет, мелкое — тре
         '--accent-text', '--accent-wash', '--bg', '--bg-art', '--chip-bg', '--surface', '--surface-sunken',
       ], p.id);
       // Фон богаче: свечение у всех, у «Хэллоуина» — ещё и рисунок тыкв
-      assert.match(t['--bg-art'], p.id === 'halloween' ? /^url\("data:image\/svg\+xml,.+radial-gradient/ : /^radial-gradient\(.+radial-gradient\(/, p.id);
+      assert.match(t['--bg-art'], p.id === 'halloween' ? /^url\("data:image\/svg\+xml,[^"]+"\)$/ : /^radial-gradient\(.+radial-gradient\(/, p.id);
       ['--bg', '--surface', '--surface-sunken', '--accent'].forEach((k) => assert.match(t[k], HEX, `${p.id}/${scheme}/${k}`));
       // Подложки мелкого — третьим цветом, полупрозрачные
       assert.match(t['--chip-bg'], /^rgba\(\d+, \d+, \d+, 0\.\d+\)$/);
@@ -153,4 +153,21 @@ test('«Хэллоуин» всегда тёмный, остальные — п�
   // telegram.js спрашивает палитру прежде выбора темы
   const tg = readFileSync(new URL('../src/telegram.js', import.meta.url), 'utf8');
   assert.match(tg, /const mode = forcedScheme\(\) \|\| getThemeMode\(\);/);
+});
+
+test('«Хэллоуин»: цельный рисунок, предметы не налезают друг на друга (FT-702)', async () => {
+  const { SCENE, sceneSvg, halloweenArt } = await import('../src/halloween-art.js');
+  const kinds = new Set(SCENE.map((s) => s.kind));
+  for (const k of ['web', 'bat', 'ghost', 'pumpkin']) assert.ok(kinds.has(k), 'есть ' + k);
+  for (const { kind, box: [x, y, w, h] } of SCENE) assert.ok(x >= 0 && y >= 0 && x + w <= 390 && y + h <= 844, kind + ' в рамке 390×844');
+  for (let i = 0; i < SCENE.length; i += 1) {
+    for (let j = i + 1; j < SCENE.length; j += 1) {
+      const [a, b] = [SCENE[i].box, SCENE[j].box];
+      const apart = a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1];
+      assert.ok(apart, `${SCENE[i].kind} ${a} и ${SCENE[j].kind} ${b} налезают`);
+    }
+  }
+  // Одна картинка, а не обои из нескольких слоёв
+  assert.equal((halloweenArt().match(/url\("data:/g) || []).length, 1);
+  assert.ok(sceneSvg().startsWith('<svg') && sceneSvg().includes('preserveAspectRatio="xMidYMid slice"'));
 });
