@@ -32,7 +32,7 @@ import { HistoryPick } from './trainer/HistoryMove.jsx';
 
 import { useData } from './useData.js';
 import { MachineNote } from './media.jsx';
-import { EFFORT_WORD, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, otherMachineText, wasSet, repsGoalText, repsLeftText, isAssisted } from './effort.js';
+import { EFFORT_WORD, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, otherMachineText, wasSet, repsGoalText, repsLeftText, isAssisted, settleOrder } from './effort.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
@@ -287,7 +287,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const r = state.current;
     if (!r) return;
     const elapsed = r.session.status === 'active' ? Math.max(0, Date.now() - r.tick) : 0;
-    const session = transform({ ...r.session, elapsedMs: Math.min(604800000, r.session.elapsedMs + elapsed) });
+    const next = transform({ ...r.session, elapsedMs: Math.min(604800000, r.session.elapsedMs + elapsed) });
+    // Порядок и усталость (22.10.2026): упражнение, начатое после другого на
+    // те же мышцы (а в прошлый раз — нет), — на шаг легче (effort.js)
+    const settled = next && Array.isArray(next.exercises) ? settleOrder(next.exercises) : null;
+    const session = settled && settled !== next.exercises ? { ...next, exercises: settled } : next;
     store({ ...r, session, tick: Date.now(), dirty: true, edit: (r.edit || 0) + 1 });
     setMessage('');
     // Вписали недостающее — подсказка под кнопкой круга больше не нужна
@@ -1272,7 +1276,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {members.some(({ ex }) => planText(ex.prescription)) && (
         <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '')).join('; ')}</p>
       )}
-      {members.map(({ ex }) => <LastRunHint key={'last' + ex.id} last={ex.lastRun} name={ex.name} />)}
+      {members.map(({ ex }) => <LastRunHint key={'last' + ex.id} last={ex.lastRun} name={ex.name} tired={ex.tired} />)}
       {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
       {members.map(({ ex }) => ex.exerciseId && setups[ex.exerciseId]
         ? <WorkoutGuidance key={'about' + ex.id} info={setups[ex.exerciseId]} trainer={!asClient} title={ex.name} /> : null)}
@@ -2085,7 +2089,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {/* Цель диапазона — к ней клиент стремится (19.10.2026) */}
           {repsGoalText(ex) && <p className="workout__goal">{repsGoalText(ex)}</p>}
-          <LastRunHint last={ex.lastRun} />
+          <LastRunHint last={ex.lastRun} tired={ex.tired} />
           {/* Разминка — сверху, над подходами (FT-532): встаёт перед рабочими */}
           {trackOf(ex).kind !== 'cardio' && !ex.sets.some(x => x.who) && (
             <button type="button" className="button button--ghost button--block workout__add workout__add--warmup" disabled={ex.sets.length >= 20} onClick={() => updateExercise(ei, withWarmup)}>

@@ -14,7 +14,7 @@
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
 import { trackOf, volumeOf, setText as trackSetText } from './exercise-track.js';
 import { closeSets, withSet, withWarmup } from './workout-model.js';
-import { rateSet, isDumbbell, stepOf, suggestText, isAssisted, assistStep } from './effort.js';
+import { rateSet, isDumbbell, stepOf, suggestText, isAssisted, assistStep, settleOrder, tiredText } from './effort.js';
 
 const isEffort = (e) => ['easy', 'ok', 'hard'].includes(e);
 /** Подход перед этим у того же человека — для подписи подобранного веса */
@@ -208,7 +208,7 @@ export function setQueue(s) {
       // У разминки шага нет: «Легко» на ней вес не прибавляет (FT-620)
       ...(strength ? { dumbbell: isDumbbell(ex), ...(set.kind !== 'warmup' ? { step: assist ? assistStep(ex) : stepOf(ex, Number(String(set.weight || '').replace(',', '.')) || 0) } : {}) } : {}),
       // Свой вес — и повторы: «+2 повт. · было легко» (22.10.2026)
-      ...(suggestText(set, prevOf(ex, set), ex) ? { suggest: suggestText(set, prevOf(ex, set), ex) } : {}),
+      ...(suggestText(set, prevOf(ex, set), ex) || tiredText(ex, set) ? { suggest: suggestText(set, prevOf(ex, set), ex) || tiredText(ex, set) } : {}),
       // Отдых после этого подхода, если у упражнения он свой (20.10.2026)
       ...(ex.rest ? { rest: ex.rest } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
@@ -438,7 +438,11 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         elapsedMs: Math.max(0, (s.elapsedMs || 0) - ran), exercises: closeSets(s.exercises) };
     }
   }
-  return s;
+  // Порядок и усталость (22.10.2026), как на сервере: effort.js settleOrder.
+  // Нажатий для этого занятия не было — занятие то же
+  if (s === session) return s;
+  const settled = settleOrder(s.exercises);
+  return settled === s.exercises ? s : { ...s, exercises: settled };
 }
 
 /** Занятие завершено или отменено — плашку убрать. sessionId — только

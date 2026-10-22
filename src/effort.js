@@ -414,7 +414,8 @@ export function rerate(ex, si, effort) {
 }
 
 const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело', held: 'было тяжело',
-  first: 'тяжело уже на первом', over: 'повторов больше плана', again: 'снова не добил', more: 'было легко', fewer: 'не добил повторы' };
+  first: 'тяжело уже на первом', over: 'повторов больше плана', again: 'снова не добил', more: 'было легко', fewer: 'не добил повторы',
+  tired: 'после другого на эти мышцы' };
 
 /**
  * Подпись подобранного веса: «+2,5 кг · было легко»; у помощи — «−5 кг
@@ -438,6 +439,66 @@ export function suggestText(set, prev, ex = null) {
   const diff = text(Math.abs(b - a)).replace('.', ',');
   // Без стрелки-символа: направление рисует значок (IconDelta, на часах — SF Symbol)
   return (b > a ? '+' : '−') + diff + (assist ? ' кг помощи · ' : ' кг · ') + (WHY[set.suggest] || '');
+}
+
+/**
+ * Группа мышц упражнения — чтобы знать, что до него делали (22.10.2026):
+ * из базы, нет — по названию (ноги, спина, грудь); прочее — ''
+ */
+export function muscleOf(ex) {
+  const muscle = String((ex && ex.load && ex.load.muscle) || '').trim().toLowerCase();
+  if (muscle) return muscle === 'ягодицы' ? 'ноги' : muscle;
+  return { legs: 'ноги', back: 'спина', chest: 'грудь' }[groupOf(ex || {})] || '';
+}
+
+/** Сделан хоть один рабочий подход (у пары упражнения не считаем) */
+const worked = (ex) => (ex.sets || []).some((s) => s.state === 'done' && s.kind !== 'warmup' && !s.who);
+
+/**
+ * Порядок и усталость (владелец, 22.10.2026): жим штанги в прошлый раз был
+ * первым, сегодня штанга занята — сначала сведения, потом жим. Начальный
+ * вес жима — на шаг легче, с подсказкой «после сведений».
+ *
+ * began — каким по счёту упражнение начали (первый сделанный рабочий
+ * подход): по нему следующий раз знает, что шло до него, даже если в списке
+ * порядок не меняли (сервер, lastRun.before). tired — вес уже снят, второй
+ * раз не снимается; вписанное руками и суперсет не трогаем. Можно звать
+ * сколько угодно раз — сдвигает один раз; ничего не поменялось — тот же
+ * список (занятие без нажатий остаётся тем же объектом)
+ */
+export function settleOrder(exercises) {
+  const list = exercises || [];
+  let n = Math.max(0, ...list.map((ex) => Number(ex.began) || 0));
+  const out = list.map((ex) => (worked(ex) && !(Number(ex.began) > 0) ? { ...ex, began: ++n } : ex));
+  const settled = out.map((ex) => {
+    if (ex.tired || ex.supersetGroup || worked(ex) || (ex.sets || []).some((s) => s.who)) return ex;
+    const before = ex.lastRun && Array.isArray(ex.lastRun.before) ? ex.lastRun.before : null;
+    const key = muscleOf(ex);
+    if (!before || !key || before.includes(key)) return ex;
+    const after = out.find((x) => x !== ex && worked(x) && muscleOf(x) === key);
+    if (!after) return ex;
+    const assist = isAssisted(ex);
+    const m = measure(assist);
+    let step = 0;
+    const sets = ex.sets.map((s) => {
+      if (s.state !== 'pending' || s.kind === 'warmup' || s.own || !m.has(s)) return s;
+      const w = m.load(s);
+      const one = assist ? assistStep(ex) : stepOf(ex, w);
+      const value = text(assist ? Math.max(0, one - w) : Math.max(0, w - one));
+      if (num(value) === num(s[m.key])) return s;
+      step = one;
+      return { ...s, [m.key]: value, suggest: 'tired' };
+    });
+    return step ? { ...ex, sets, tired: { after: String(after.name || '').slice(0, 80), step: text(step) } } : ex;
+  });
+  return settled.every((ex, i) => ex === list[i]) ? list : settled;
+}
+
+/** Подпись снятого шага: «−2,5 кг · после «Сведения рук»»; у помощи — «+5 кг помощи · …» */
+export function tiredText(ex, set) {
+  if (!ex || !ex.tired || !set || set.suggest !== 'tired' || set.state !== 'pending') return '';
+  const step = String(ex.tired.step || '').replace('.', ',');
+  return (isAssisted(ex) ? '+' + step + ' кг помощи' : '−' + step + ' кг') + ' · после «' + ex.tired.after + '»';
 }
 
 const plural = (n, one, few, many) => {
