@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Panel, Section } from './ui.jsx';
 import ThemeSetting from './ThemeSetting.jsx';
-import Pumpkin from './Pumpkin.jsx';
+import ThemeMascot from './ThemeMascot.jsx';
 import { PALETTES, getPaletteId, setPaletteId, forcedScheme } from './palettes.js';
 import { haptic, refreshTheme } from './telegram.js';
 import { IconCheck, IconHome, IconPlan, IconProgress, IconNutrition, IconPlus } from './icons.jsx';
@@ -66,7 +66,7 @@ function LookPreview() {
       <div className="look-preview__tabbar">
         <span className="is-on"><IconHome size={20} /></span>
         <span><IconPlan size={20} /></span>
-        <span className="look-preview__plus"><IconPlus size={20} /><Pumpkin className="look-preview__pumpkin" size={46} /></span>
+        <span className="look-preview__plus"><IconPlus size={20} /><ThemeMascot className="look-preview__mascot" size={46} /></span>
         <span><IconProgress size={20} /></span>
         <span><IconNutrition size={20} /></span>
       </div>

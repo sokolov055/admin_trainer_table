@@ -63,10 +63,10 @@
   display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
   background: var(--accent); color: var(--accent-text);
 }
-.look-preview__pumpkin { display: none; }
-:root[data-palette='halloween'] .look-preview__plus { background: none; }
-:root[data-palette='halloween'] .look-preview__plus > :not(.look-preview__pumpkin) { display: none; }
-:root[data-palette='halloween'] .look-preview__pumpkin { display: block; margin: -4px; transform: translateY(-3px); }
+/* Тема со своей картинкой вместо «+» (ThemeMascot.jsx) */
+:root[data-mascot] .look-preview__plus { background: none; }
+:root[data-mascot] .look-preview__plus > :not(.look-preview__mascot) { display: none; }
+.look-preview__mascot { display: block; flex: none; margin: -4px; transform: translateY(-3px); }
 
 /* --- сетка палитр ---
    Кружок 56 px и подпись под ним, три в ряд: «Стандартный» 13-м кеглем —

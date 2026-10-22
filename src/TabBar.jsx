@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { IconPlus } from './icons.jsx';
-import Pumpkin from './Pumpkin.jsx';
+import ThemeMascot from './ThemeMascot.jsx';
 import './tabbar-action.css';
 
 /**
@@ -82,7 +82,7 @@ export default function TabBar({ tabs, active, onSelect, action = null }) {
           >
             <span className="tabbar__action-disc">
               <span className="tabbar__action-glyph"><IconPlus size={26} strokeWidth={2.4} /></span>
-              <Pumpkin className="tabbar__pumpkin" size={72} tall={1.15} />
+              <ThemeMascot className="tabbar__mascot" size={72} tall={1.15} />
             </span>
           </button>
           <div className="tabbar__group">{tabs.slice(half).map(item)}</div>
@@ -93,7 +93,7 @@ export default function TabBar({ tabs, active, onSelect, action = null }) {
 }
 
 /**
- * Подпрыгнуть по нажатию (тыква «Хэллоуина», tabbar-action.css): класс
+ * Подпрыгнуть по нажатию (картинка темы вместо «+», tabbar-action.css): класс
  * снимаем и ставим заново, чтобы анимация шла с начала и при частых
  * касаниях. У круга с плюсом правила для .is-hop нет — ничего не меняется.
  */

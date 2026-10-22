@@ -97,32 +97,31 @@
 }
 .tabbar__action[aria-expanded="true"] .tabbar__action-glyph { transform: rotate(45deg); }
 
-/* «Хэллоуин» (FT-702): вместо круга с плюсом — тыква. Крупнее круга и
-   выше капсулы (владелец, 22.10.2026: «больше, особенно по высоте»);
-   касание то же, место под кнопкой то же. Лист открыт — тыква остаётся,
-   лицо горит ярче; закрывается ею же */
-.tabbar__pumpkin { display: none; }
-:root[data-palette='halloween'] .tabbar__action-disc {
+/* Тема со своей картинкой вместо круга с плюсом (ThemeMascot.jsx,
+   data-mascot; у «Хэллоуина» — тыква, FT-702). Крупнее круга и выше
+   капсулы (владелец, 22.10.2026: «больше, особенно по высоте»); касание
+   то же, место под кнопкой то же. Лист открыт — картинка остаётся и горит
+   ярче; закрывается ею же. Свечение — цветами темы (--mascot-glow/-lit) */
+:root[data-mascot] .tabbar__action-disc {
   background: none;
   box-shadow: none;
-  filter: drop-shadow(0 4px 10px rgba(255, 128, 20, 0.45));
+  filter: drop-shadow(0 4px 10px var(--mascot-glow, rgba(0, 0, 0, 0.3)));
 }
-:root[data-palette='halloween'] .tabbar__action-glyph { display: none; }
-:root[data-palette='halloween'] .tabbar__pumpkin {
+:root[data-mascot] .tabbar__action-glyph { display: none; }
+.tabbar__mascot {
   display: block;
   flex: none;
   margin: -16px -10px 0;
   transform-origin: 50% 100%;
 }
-:root[data-palette='halloween'] .tabbar__action[aria-expanded="true"] .tabbar__action-disc {
-  filter: drop-shadow(0 0 14px rgba(255, 170, 40, 0.8)) brightness(1.12);
+:root[data-mascot] .tabbar__action[aria-expanded="true"] .tabbar__action-disc {
+  filter: drop-shadow(0 0 14px var(--mascot-lit, rgba(255, 255, 255, 0.5))) brightness(1.12);
 }
-:root[data-palette='halloween'] .tabbar__action:active .tabbar__action-disc { transform: scale(0.94); }
 
-/* Нажали — тыква приседает, подпрыгивает и покачивается (squash and
+/* Нажали — картинка приседает, подпрыгивает и покачивается (squash and
    stretch). Только transform, 560 мс; «Уменьшить движение» — без неё */
-:root[data-palette='halloween'] .tabbar__action.is-hop .tabbar__pumpkin { animation: pumpkin-hop 560ms var(--ease-out); }
-@keyframes pumpkin-hop {
+.tabbar__action.is-hop .tabbar__mascot { animation: mascot-hop 560ms var(--ease-out); }
+@keyframes mascot-hop {
   0% { transform: none; }
   18% { transform: scale(1.14, 0.84); }
   42% { transform: translateY(-12px) scale(0.92, 1.1) rotate(-7deg); }
@@ -177,5 +176,5 @@
   .tabbar__action-glyph { transition: none; }
   .tabbar__action:active .tabbar__action-disc { transform: none; }
   .tabbar__action--hint .tabbar__action-disc::after { animation: none; }
-  :root[data-palette='halloween'] .tabbar__action.is-hop .tabbar__pumpkin { animation: none; }
+  .tabbar__action.is-hop .tabbar__mascot { animation: none; }
 }

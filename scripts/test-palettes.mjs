@@ -62,10 +62,10 @@ test('три роли: фон — второй цвет, мелкое — тре
       const t = paletteTokens(p, scheme);
       assert.deepEqual(Object.keys(t).sort(), [
         '--accent', '--accent-2', '--accent-2-ink', '--accent-2-wash', '--accent-ink', '--accent-solid',
-        '--accent-text', '--accent-wash', '--bg', '--bg-art', '--chip-bg', '--surface', '--surface-sunken',
+        '--accent-text', '--accent-wash', '--bg', '--bg-art', '--chip-bg', ...(p.mascot ? ['--mascot-glow', '--mascot-lit'] : []), '--surface', '--surface-sunken',
       ], p.id);
-      // Фон богаче: свечение у всех, у «Хэллоуина» — ещё и рисунок тыкв
-      assert.match(t['--bg-art'], p.id === 'halloween' ? /^url\("data:image\/svg\+xml,[^"]+"\)$/ : /^radial-gradient\(.+radial-gradient\(/, p.id);
+      // Фон богаче: свечение у всех, у темы с рисунком (art) — цельная картинка
+      assert.match(t['--bg-art'], p.art ? /^url\("data:image\/svg\+xml,[^"]+"\)$/ : /^radial-gradient\(.+radial-gradient\(/, p.id);
       ['--bg', '--surface', '--surface-sunken', '--accent'].forEach((k) => assert.match(t[k], HEX, `${p.id}/${scheme}/${k}`));
       // Подложки мелкого — третьим цветом, полупрозрачные
       assert.match(t['--chip-bg'], /^rgba\(\d+, \d+, \d+, 0\.\d+\)$/);
@@ -170,4 +170,22 @@ test('«Хэллоуин»: цельный рисунок, предметы не
   // Одна картинка, а не обои из нескольких слоёв
   assert.equal((halloweenArt().match(/url\("data:/g) || []).length, 1);
   assert.ok(sceneSvg().startsWith('<svg') && sceneSvg().includes('preserveAspectRatio="xMidYMid slice"'));
+});
+
+test('тема с картинкой вместо «+»: data-mascot ставится и снимается вместе с палитрой', () => {
+  const attrs = new Map();
+  globalThis.document = {
+    documentElement: { setAttribute: (k, v) => attrs.set(k, v), removeAttribute: (k) => attrs.delete(k), classList: { add() {}, remove() {} } },
+    getElementById: () => ({}),
+  };
+  globalThis.window = { matchMedia: () => ({ matches: true }) };
+  try {
+    for (const p of PALETTES.filter((x) => x.mascot)) {
+      assert.match(p.mascot.glow, /^rgba\(/, p.id); assert.match(p.mascot.lit, /^rgba\(/, p.id);
+      setPaletteId(p.id);
+      assert.equal(attrs.get('data-mascot'), p.id);
+    }
+    setPaletteId('fig');
+    assert.equal(attrs.has('data-mascot'), false, 'у палитры без картинки — плюс');
+  } finally { delete globalThis.document; delete globalThis.window; store.delete(PALETTE_KEY); }
 });

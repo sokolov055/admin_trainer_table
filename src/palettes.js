@@ -62,7 +62,8 @@ export const PALETTES = [
   { id: 'avocado', name: 'Авокадо', accent: '#6f8f3a', bg: '#b8c46a', fill: '#5b3b27', light: '#537630', dark: '#6f9549' },
   { id: 'fig', name: 'Инжир', accent: '#6e2f4e', bg: '#8a3a62', fill: '#b38f4d', light: '#743459', dark: '#b6779c' },
   // Хэллоуин (владелец, 21–22.10.2026): тыква на тёмно-бордовой ночи, зелёный хвостик
-  { id: 'halloween', name: 'Хэллоуин', accent: '#ef7d1a', bg: '#6b1a2a', fill: '#6fbf3a', light: '#b8560f', dark: '#f08a2c', scheme: 'dark' },
+  { id: 'halloween', name: 'Хэллоуин', accent: '#ef7d1a', bg: '#6b1a2a', fill: '#6fbf3a', light: '#b8560f', dark: '#f08a2c', scheme: 'dark',
+    art: halloweenArt, mascot: { glow: 'rgba(255, 128, 20, 0.45)', lit: 'rgba(255, 170, 40, 0.8)' } },
 ].map((p) => (p.swatch ? p : { ...p, swatch: [p.accent, p.bg, p.fill] }));
 
 /* --- цвет: смешение, светлота, контраст --- */
@@ -167,7 +168,12 @@ const glow = (palette, scheme) => {
   return `radial-gradient(110% 55% at 100% 0%, ${rgba(a, ka)}, transparent 70%), radial-gradient(90% 50% at 0% 100%, ${rgba(f, kf)}, transparent 70%)`;
 };
 
-/* Рисунок «Хэллоуина» — halloween-art.js */
+/*
+ * Своя тема с рисунком (скилл app-theme): art — функция, которая отдаёт
+ * картинку для --bg-art (рисунок во весь экран, как halloween-art.js);
+ * mascot — картинка вместо «+» (ThemeMascot.jsx) и цвета её свечения;
+ * scheme: 'dark' — тема всегда тёмная. Без art — свечение по углам.
+ */
 
 /** Тема, которую палитра ставит сама: «Хэллоуин» — всегда тёмная, остальные — как выбрано */
 export function forcedScheme(id = getPaletteId()) {
@@ -180,7 +186,8 @@ export function paletteTokens(palette, scheme) {
   if (!c) return null;
   const fillWash = rgba(c.fill, c.wash);
   return {
-    '--bg-art': palette.id === 'halloween' ? halloweenArt() : glow(palette, scheme),
+    '--bg-art': palette.art ? palette.art() : glow(palette, scheme),
+    ...(palette.mascot ? { '--mascot-glow': palette.mascot.glow, '--mascot-lit': palette.mascot.lit } : {}),
     '--bg': c.bg,
     '--surface': c.surface,
     '--surface-sunken': c.sunken,
@@ -244,6 +251,8 @@ export function applyPalette(id = getPaletteId()) {
   const root = document.documentElement;
   if (id && id !== STANDARD && BY_ID.has(id)) root.setAttribute('data-palette', id);
   else root.removeAttribute('data-palette');
+  if (paletteById(id).mascot) root.setAttribute('data-mascot', id);
+  else root.removeAttribute('data-mascot');
 }
 
 /**
@@ -264,10 +273,18 @@ export function withColorShift(change) {
   shiftTimer = setTimeout(() => root.classList.remove('color-shift'), 420);
 }
 
+/** Подписка на смену палитры (ThemeMascot.jsx); возвращает отписку */
+const listeners = new Set();
+export function onPalette(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
 /** Сохраняем выбор и сразу применяем */
 export function setPaletteId(id) {
   const next = BY_ID.has(id) ? id : STANDARD;
   try { localStorage.setItem(PALETTE_KEY, next); } catch (_) {}
   withColorShift(() => applyPalette(next));
+  listeners.forEach((fn) => fn());
   return next;
 }
