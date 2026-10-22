@@ -1,4 +1,4 @@
-import { createBlini, advance, drain, shoot, swap, aim, walk, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, medalOf, levelBeforeBosses, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
+import { createBlini, advance, drain, shoot, swap, aim, walk, secondsOf, dangerOf, levelRules, missionRules, serializeGame, restoreGame, medalOf, inPar, levelBeforeBosses, LEVELS, TICK_MS, EASE_STEPS } from './blini-model.js';
 
 // Одна партия «Блинов» на кабинет: меню, отдых и карьера видят одну и ту же.
 // Пауза и смена экрана сохраняют её целиком. Открытые уровни и незаконченная
@@ -97,7 +97,7 @@ export function createBliniSession({ seed = Date.now(), now = () => Date.now() }
   };
   const finish = () => {
     const won = game.mode === 'won', seconds = secondsOf(game);
-    const result = { won, seconds, ace: won && seconds <= game.rules.par, score: game.score, bestChain: game.bestChain, bestStreak: game.bestStreak, cleared: game.cleared };
+    const result = { won, seconds, ace: won && inPar(seconds, game.rules.par), score: game.score, bestChain: game.bestChain, bestStreak: game.bestStreak, cleared: game.cleared };
     // Медаль — за свободную игру; в задании карьеры она показывается, но не записывается
     result.medal = medalOf(result, game.rules);
     result.newMedal = !snapshot.mission && result.medal > (medals[snapshot.level] || 0);

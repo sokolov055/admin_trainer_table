@@ -736,7 +736,7 @@ export function addEvents(fx, game, events, t, reduced = false) {
         const chain = take(fx, 'texts', t); chain.x = e.x; chain.y = e.y - 28; chain.text = `Цепь ×${e.depth}`; chain.size = 20; chain.gold = true;
         fx.flex = t; fx.say = { text: line(fx, 'chain'), born: t };
       } else if (e.streak >= 3) {
-        const streak = take(fx, 'texts', t); streak.x = e.x; streak.y = e.y - 28; streak.text = `Серия ×${e.streak}`; streak.size = 17; streak.gold = true;
+        const streak = take(fx, 'texts', t); streak.x = e.x; streak.y = e.y - 28; streak.text = `${e.streak} подряд!`; streak.size = 17; streak.gold = true;
         if (e.streak % 3 === 0) { fx.flex = t; fx.say = { text: line(fx, 'streak'), born: t }; }
       }
     }

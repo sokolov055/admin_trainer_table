@@ -106,9 +106,12 @@ export function levelRules(source = 0, ease = 0) {
 // серебро — в нормативе, золото — в нормативе и с цепью ×3 и длиннее
 export const MEDALS = Object.freeze(['', 'Бронза', 'Серебро', 'Золото']);
 export const GOLD_CHAIN = 3;
+// Время — целыми секундами, как его видит игрок: «за 1:25» при нормативе
+// 1:25 — уложился, а не «бронза, в следующий раз быстрее»
+export const inPar = (seconds, par) => Math.floor(seconds) <= par;
 export function medalOf({ won, seconds, bestChain }, rules) {
   if (!won) return 0;
-  if (seconds > rules.par) return 1;
+  if (!inPar(seconds, rules.par)) return 1;
   return bestChain >= GOLD_CHAIN ? 3 : 2;
 }
 
@@ -548,7 +551,7 @@ export function step(game) {
   stepPowers(game);
   if (game.mode === 'playing' && game.full && game.chains.every(c => !c.balls.length) && !game.shots.length) {
     game.mode = 'won';
-    emit(game, { kind: 'won', ace: secondsOf(game) <= game.rules.par });
+    emit(game, { kind: 'won', ace: inPar(secondsOf(game), game.rules.par) });
   }
   return game;
 }

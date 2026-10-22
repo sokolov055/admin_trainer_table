@@ -50,7 +50,9 @@ function PowerMark({ power }) {
     {power === 'superset' && <path d="M7 1.6 3.6 6.6H6.4L5 10.4" />}
   </svg></span>;
 }
-// Медаль уровня: лента и диск цвета металла; не взятая — бледный контур
+// Медаль уровня: лента и диск цвета металла, звезда в центре; не взятая —
+// бледный контур. Цифры нет (владелец, 22.10.2026): «3» на золоте читалась
+// как третье место — металл различает цвет
 const METAL = ['', '#c27a3e', '#aeb8bf', '#e9b52a'];
 function Medal({ rank, earned = true, size = 30 }) {
   const fill = earned ? METAL[rank] : '#e3e3d3', ink = earned ? '#fff9e0' : '#b6b8a6';
@@ -58,14 +60,32 @@ function Medal({ rank, earned = true, size = 30 }) {
     <path d="M9 2h6l3 8h-6Z" fill={earned ? '#d8343f' : '#d6d6c6'} /><path d="M23 2h-6l-3 8h6Z" fill={earned ? '#2d6bd3' : '#cacabb'} />
     <circle cx="16" cy="19.5" r="10" fill={fill} stroke={earned ? '#00000030' : '#c9cab8'} strokeWidth="1.5" />
     <circle cx="16" cy="19.5" r="6.6" fill="none" stroke={ink} strokeOpacity=".55" strokeWidth="1.2" />
-    <text x="16" y="23.4" textAnchor="middle" fontSize="10.5" fontWeight="900" fill={ink} fontFamily="Manrope, sans-serif">{rank}</text>
+    <path d="M16.0 14.8 17.2 17.9 20.6 18.1 18.0 20.2 18.8 23.5 16.0 21.7 13.2 23.5 14.0 20.2 11.4 18.1 14.8 17.9Z" fill={ink} fillOpacity={earned ? 0.9 : 1} />
   </svg>;
 }
+/**
+ * Медаль за партию в итоге. Подсказка — к следующей медали от лучшей на
+ * уровне, а не от этой партии: после золота бронза не зовёт «за серебром».
+ * Задание карьеры медаль не даёт — там блока нет.
+ */
+function Award({ medal, isNew, best, par }) {
+  const top = Math.max(medal, best);
+  const next = top === 1 ? `Дальше — серебро: уложись в ${seconds(par)}` : top === 2 ? `Дальше — золото: ${seconds(par)} и цепь ×${GOLD_CHAIN}` : 'Высшая медаль уровня';
+  const name = MEDALS[medal].toLowerCase();
+  return <div className={`blini-award is-tier-${medal}` + (isNew ? ' is-new' : '')}>
+    <Medal rank={medal} size={46} />
+    <span><strong>{isNew ? `Новая медаль: ${name}` : best > medal ? `За партию — ${name}` : `${MEDALS[medal]} — уже есть`}</strong>
+      {!isNew && best > medal ? `На уровне уже ${MEDALS[best].toLowerCase()}. ${top < 3 ? next : 'Это высшая медаль'}` : next}</span>
+  </div>;
+}
+// «3 попадания подряд» — серия бросков, а не множитель очков
+const inRow = n => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'попадание' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'попадания' : 'попаданий'} подряд`;
+
 /** Три медали уровня и за что каждая: взятые — цветные. */
 function MedalGoals({ best, par }) {
   const goals = ['', 'Пройти уровень', `Уложиться в ${seconds(par)}`, `${seconds(par)} и цепь ×${GOLD_CHAIN}`];
   return <ul className="blini-medals" aria-label="Медали уровня">
-    {[1, 2, 3].map(rank => <li key={rank} className={best >= rank ? 'is-earned' : ''}>
+    {[1, 2, 3].map(rank => <li key={rank} className={best >= rank ? 'is-earned is-tier-' + rank : ''}>
       <Medal rank={rank} earned={best >= rank} /><span><strong>{MEDALS[rank]}</strong>{goals[rank]}</span>
       {best >= rank && <span className="blini-visually-hidden">— есть</span>}
     </li>)}
@@ -305,7 +325,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
     : hud.pause ? `${POWERS.pause.name}: ${POWERS.pause.effect}`
     : hud.full ? 'План выполнен — сними оставшиеся блины'
     : hud.danger >= .85 ? 'Блины у помоста! Снимай ближние'
-    : hud.streak >= 3 ? `Серия ×${hud.streak}: каждое попадание дороже`
+    : hud.streak >= 3 ? `${inRow(hud.streak)}: каждое следующее дороже`
     : hud.ramp && hud.seconds < rules.rampAt * TICK_MS / 1000 + 6 ? 'Темп растёт — не зевай'
     : rules.rail ? 'Веди пальцем — Михалыч идёт по скамье, отпусти — бросок'
     : 'Касание поля — бросок, Михалыча — обмен');
@@ -382,7 +402,7 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
         </> : mode === 'paused' ? <>
           <div className="blini-panel-mark"><span className="blini-pause-icon" /></div>
           <h3 id={title}>{reason === 'rest' ? 'Пора к подходу' : reason === 'saved' ? 'Партия сохранена' : 'Можно выдохнуть'}</h3>
-          <p>{reason === 'rest' ? 'Блины замерли на месте. Продолжим на следующем отдыхе.' : reason === 'saved' ? `Уровень ${level + 1}, «${track.name}». Блины стоят там же, где ты остановился.` : 'Цепочка стоит. Продолжишь с того же места.'}</p>
+          <p>{reason === 'rest' ? 'Блины замерли на месте. Продолжим на следующем отдыхе.' : reason === 'saved' ? `Уровень ${level + 1}, «${track.name}». Блины стоят там же, где были.` : 'Цепочка стоит. Продолжишь с того же места.'}</p>
           <div className="blini-mission"><span>{boss ? <>Диван: <strong>{hud.boss} ♥</strong> из {hud.bossMax}</> : <><strong>{kg(hud.score)}</strong> из {kg(hud.target)}</>}</span><span>{seconds(hud.seconds)}</span></div>
           <label className="blini-toggle"><input type="checkbox" checked={vibration} onChange={event => { setVibration(event.target.checked); setVibrationState(event.target.checked); if (event.target.checked) buzz('tap'); }} />Вибрация</label>
           <button className="blini-primary" ref={primary} onClick={resume}>Продолжить игру</button>
@@ -390,15 +410,11 @@ export default function BliniGame({ onClose, restLeft, restUntil = Infinity, car
           <GameProgressCard />
         </> : <>
           <span className="blini-chapter">Уровень {level + 1} · «{track.name}»</span>
-          <h3 id={title}>{mode === 'won' ? (rules.boss ? 'Диван повержен!' : result?.ace ? 'Уложился в норматив!' : 'Уровень взят!') : 'Блины на помосте'}</h3>
-          <p>{mode === 'won' ? (result?.ace ? `Быстрее ${seconds(rules.par)} — как по секундомеру.` : `Норматив — ${seconds(rules.par)}. В следующий раз быстрее.`) : rules.boss ? 'Диван отсиделся за цепочкой. Снимай блины перед ним — в просветы бросок долетит.' : 'Цепочка докатилась до помоста. Снимай ближние к нему блины первыми.'}</p>
+          <h3 id={title}>{mode === 'won' ? (rules.boss ? 'Диван повержен!' : result?.ace ? 'Норматив выполнен!' : 'Уровень взят!') : 'Блины на помосте'}</h3>
+          <p>{mode === 'won' ? (result?.ace ? `Не дольше ${seconds(rules.par)} — как по секундомеру.` : `Норматив — ${seconds(rules.par)}. В следующий раз быстрее.`) : rules.boss ? 'Диван отсиделся за цепочкой. Снимай блины перед ним — в просветы бросок долетит.' : 'Цепочка докатилась до помоста. Снимай ближние к нему блины первыми.'}</p>
           <div className="blini-result"><strong>{kg(result?.score ?? hud.score)}</strong><span>поднято за {seconds(result?.seconds ?? hud.seconds)}</span></div>
-          {mode === 'won' && result?.medal > 0 && <div className={'blini-award' + (result.newMedal ? ' is-new' : '')}>
-            <Medal rank={result.medal} size={46} />
-            <span><strong>{result.newMedal ? `Новая медаль: ${MEDALS[result.medal].toLowerCase()}` : MEDALS[result.medal]}</strong>
-              {result.medal === 1 ? `Серебро — уложись в ${seconds(rules.par)}` : result.medal === 2 ? `Золото — ещё и цепь ×${GOLD_CHAIN}` : 'Лучшая медаль уровня'}</span>
-          </div>}
-          {(result?.bestChain > 1 || result?.bestStreak > 1) && <p className="blini-panel__fine">{[result.bestChain > 1 && `Лучшая цепь ×${result.bestChain}`, result.bestStreak > 1 && `серия ×${result.bestStreak}`].filter(Boolean).join(' · ')}</p>}
+          {mode === 'won' && !state.mission && result?.medal > 0 && <Award medal={result.medal} isNew={result.newMedal} best={medals[level] || 0} par={rules.par} />}
+          {(result?.bestChain > 1 || result?.bestStreak > 1) && <p className="blini-panel__fine">{[result.bestChain > 1 && `Лучшая цепь ×${result.bestChain}`, result.bestStreak > 1 && inRow(result.bestStreak)].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase())}</p>}
           <MissionNote game="blini" mission={mission} outcome={outcome} />
           {mission ? <button className="blini-primary" ref={primary} onClick={() => mode === 'won' ? close() : start()}>{mode === 'won' ? 'К карьере' : 'Повторить задание'}</button>
             : <button className="blini-primary" ref={primary} onClick={() => mode === 'won' && level < LEVELS.length - 1 ? session.nextLevel(token.current) : start()}>{mode === 'won' ? (level < LEVELS.length - 1 ? 'Следующий уровень' : 'Сыграть ещё раз') : 'Повторить уровень'}</button>}

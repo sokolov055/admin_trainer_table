@@ -316,6 +316,9 @@ test('медали: бронза — пройден, серебро — в но�
   assert.equal(medalOf({ won: true, seconds: rules.par + 1, bestChain: 9 }, rules), 1);
   assert.equal(medalOf({ won: true, seconds: rules.par, bestChain: GOLD_CHAIN - 1 }, rules), 2);
   assert.equal(medalOf({ won: true, seconds: rules.par, bestChain: GOLD_CHAIN }, rules), 3);
+  // Время целыми секундами, как на экране: 85,3 с при нормативе 1:25 — «за 1:25», в нормативе
+  assert.equal(medalOf({ won: true, seconds: rules.par + 0.3, bestChain: GOLD_CHAIN }, rules), 3);
+  assert.equal(medalOf({ won: true, seconds: rules.par + 1, bestChain: GOLD_CHAIN }, rules), 1);
   let clock = 0;
   const session = createBliniSession({ seed: 2, now: () => clock });
   const saves = []; session.onPersist(data => saves.push(data));

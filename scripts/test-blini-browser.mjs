@@ -115,8 +115,10 @@ test('блины: победа открывает следующий урове�
   await page.evaluate(() => bliniFixture.win());
   await page.clock.runFor(300);
   assert.equal((await read(page)).mode, 'won');
-  await page.getByRole('heading', { name: /Уровень взят|Уложился в норматив/ }).waitFor();
+  await page.getByRole('heading', { name: /Уровень взят|Норматив выполнен/ }).waitFor();
   await page.getByText('Новая медаль: серебро').waitFor();
+  // Без цифры на медали: «3» на золоте читалась как третье место
+  assert.equal(await page.locator('.blini-medal-icon text').count(), 0);
   await page.screenshot({ path: 'reports/blini/won.png' });
   await page.getByRole('button', { name: 'Следующий уровень' }).click();
   const state = await read(page);

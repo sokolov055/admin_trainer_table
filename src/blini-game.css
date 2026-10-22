@@ -91,6 +91,9 @@
 .blini-game .blini-medals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: -4px 0 14px; padding: 0; list-style: none; }
 .blini-medals li { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 8px; border-radius: 12px; background: #f3f2e3; color: var(--bg-muted); font-size: 11px; line-height: 1.25; text-align: center; }
 .blini-medals li.is-earned { background: #fff1c2; color: #5b4317; }
+/* Фон взятой медали — её металла: бронза, серебро, золото */
+.blini-medals li.is-tier-1, .blini-award.is-tier-1 { background: #f6e3d0; color: #5c3a1c; }
+.blini-medals li.is-tier-2, .blini-award.is-tier-2 { background: #e8edf1; color: #3c464d; }
 .blini-medals strong { display: block; color: var(--bg-ink); font-size: 12px; }
 .blini-award { display: flex; align-items: center; gap: 10px; margin: 0 auto 12px; padding: 8px 14px 8px 10px; width: fit-content; max-width: 100%; border-radius: 14px; background: #fff1c2; color: #5b4317; font-size: 12px; line-height: 1.3; text-align: left; }
 .blini-award strong { display: block; color: var(--bg-ink); font-size: 14px; }
