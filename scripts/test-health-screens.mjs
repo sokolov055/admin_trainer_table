@@ -20,7 +20,7 @@ import renderer, { act } from 'react-test-renderer';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.window = { addEventListener() {}, removeEventListener() {}, location: { search: '' } };
 globalThis.document = { addEventListener() {}, removeEventListener() {}, visibilityState: 'visible' };
-globalThis.__hs = { calls: [], saved: [], data: null };
+globalThis.__hs = { calls: [], saved: [], data: null, iphone: true };
 
 const stubs = {
   ui: `import React from 'react';
@@ -32,7 +32,7 @@ const stubs = {
     export const deviceHealthScope = async () => 'full'; export const healthAskNeeded = async () => 'full';
     export const saveHealthAccess = async (...a) => { globalThis.__hs.saved.push(a); return {}; };
     export const markHealthFullAsked = () => {}; export const healthDailyOn = () => false; export const disconnectHealth = () => {};
-    export const openHealthSettings = async () => {}; export const healthHub = () => '«Здоровье»'; export const onIphone = () => true;
+    export const openHealthSettings = async () => {}; export const healthHub = () => '«Здоровье»'; export const onIphone = () => globalThis.__hs.iphone;
     export const onHuawei = () => false; export const reportDevice = () => {}; export const HEALTH_SENT = 'x';`,
   sync: 'export const ensureBackgroundSync = async () => {};',
   bridge: 'export const isNativeApp = () => true;',
@@ -88,8 +88,9 @@ test('экран при входе: галочка не отмечена, без
   assert.match(screen(again), /Сон, пульс и вес/);
 });
 
-test('«Не сейчас» — отказ на сервер, больше не спрашиваем; на старой сборке галочки нет', async () => {
+test('«Не сейчас» (Android) — отказ на сервер, больше не спрашиваем; на старой сборке галочки нет', async () => {
   __hs.saved = [];
+  __hs.iphone = false;
   let done = 0;
   const tree = await draw(React.createElement(HealthConnectScreen, { scope: 'basic', onDone: () => { done += 1; } }));
   assert.equal(tree.root.findAll((n) => n.type === 'input').length, 0, 'шаги и тренировки покрывает общее согласие');
@@ -97,6 +98,12 @@ test('«Не сейчас» — отказ на сервер, больше не 
   await act(async () => { await button(tree, 'Не сейчас').props.onClick(); });
   assert.deepEqual(__hs.saved, [['declined', 'basic']]);
   assert.equal(done, 1);
+  __hs.iphone = true;
+});
+
+test('iPhone: экран без «Не сейчас» (5.1.1(iv)) — одна кнопка, отказ в окне «Здоровья»', async () => {
+  const tree = await draw(React.createElement(HealthConnectScreen, { scope: 'full', onDone: () => {} }));
+  assert.doesNotMatch(screen(tree), /Не сейчас/);
 });
 
 test('блок «Здоровье»: показываем только то, что есть; данных нет — блока нет', async () => {
