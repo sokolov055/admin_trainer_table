@@ -45,9 +45,9 @@ test('основа палитр — те же цвета, что у тем style
   }
 });
 
-test('палитры владельца — стандартная первой, Хэллоуин последним, семь непохожих (FT-702)', () => {
+test('палитры владельца — стандартная первой, Хэллоуин последним, шесть непохожих (FT-702)', () => {
   assert.equal(PALETTES[0].id, STANDARD);
-  assert.deepEqual(PALETTES.map((p) => p.name), ['Стандартный', 'Ара', 'Кокос', 'Фламинго', 'Авокадо', 'Инжир', 'Хэллоуин']);
+  assert.deepEqual(PALETTES.map((p) => p.name), ['Стандартный', 'Кокос', 'Фламинго', 'Авокадо', 'Инжир', 'Хэллоуин']);
   assert.equal(new Set(PALETTES.map((p) => p.id)).size, PALETTES.length, 'id не повторяются');
   for (const p of PALETTES) {
     assert.equal(p.swatch.length, 3, p.id + ': три цвета кружка');
@@ -138,7 +138,7 @@ test('выбор: сохраняется, чужое значение и сло�
   assert.equal(setPaletteId('fig'), 'fig', 'не упали — выбор применён хотя бы до перезапуска');
   broken = false;
   // Убранная 22.10.2026 палитра (FT-702) — стандартная, без ошибки
-  for (const gone of ['mandarin', 'red-panda', 'sea', 'pheasant', 'pistachio', 'orca', 'snow-leopard']) {
+  for (const gone of ['macaw', 'mandarin', 'red-panda', 'sea', 'pheasant', 'pistachio', 'orca', 'snow-leopard']) {
     store.set(PALETTE_KEY, gone);
     assert.equal(getPaletteId(), STANDARD, gone);
   }
