@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  iphoneTotalKcal,
   healthScope, shouldAskHealth, healthReads, sleepByDay, lastByDay, avgByDay, aggregatedByDay, totalKcalByDay,
   fatPercent, mergeHealthDays, hrFromAggregated, healthSummary, spentForDay, formatMinutes, localDate,
 } from '../src/health-model.js';
@@ -45,8 +46,10 @@ test('одно окно: basic — как раньше, full — все типы
   const ios = healthReads('ios', 'full');
   for (const t of ['sleep', 'restingHeartRate', 'heartRateVariability', 'heartRate', 'weight', 'bodyFat', 'height', 'vo2Max', 'calories']) assert.ok(ios.includes(t), t);
   assert.ok(!ios.includes('totalCalories'));
+  assert.ok(ios.includes('basalCalories'), 'iPhone: общий расход = активные + базовый обмен');
   const android = healthReads('android', 'full');
   assert.ok(android.includes('totalCalories'));
+  assert.ok(!android.includes('basalCalories'), 'Android: общий расход Health Connect даёт сам');
   assert.equal(new Set(android).size, android.length, 'без повторов');
   for (const t of ['bloodPressure', 'bloodGlucose', 'bodyTemperature', 'oxygenSaturation', 'respiratoryRate', 'mindfulness']) assert.ok(!android.includes(t) && !ios.includes(t), t);
 });
@@ -173,4 +176,9 @@ test('минуты словами', () => {
   assert.equal(formatMinutes(420), '7 ч');
   assert.equal(formatMinutes(35), '35 мин');
   assert.equal(localDate(new Date(2026, 9, 2)), '2026-10-02');
+});
+
+test('iPhone: общий расход — активные + базовый обмен, только когда есть оба', () => {
+  assert.deepEqual(iphoneTotalKcal({ '2026-10-21': 400, '2026-10-22': 120 }, { '2026-10-21': 1650 }), { '2026-10-21': 2050 });
+  assert.deepEqual(iphoneTotalKcal({}, { '2026-10-21': 1650 }), {});
 });

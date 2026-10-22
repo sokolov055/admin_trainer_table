@@ -50,16 +50,24 @@ const BASIC = {
   ios: ['steps', 'workouts'],
   android: ['steps', 'workouts', 'calories', 'totalCalories', 'distance'],
 };
-/** Новые типы. totalCalories на iPhone плагин читает как активные — там его не просим */
-const EXTRA = ['calories', 'totalCalories', 'sleep', 'restingHeartRate', 'heartRateVariability', 'heartRate', 'weight', 'bodyFat', 'height', 'vo2Max'];
+/**
+ * Новые типы. totalCalories на iPhone плагин читает как активные — там его
+ * не просим, а общий расход складываем из активных и базового обмена
+ * (basalCalories, решение владельца 22.10.2026). На Android общий расход
+ * Health Connect даёт сам — базовый обмен там не нужен
+ */
+const EXTRA = ['calories', 'totalCalories', 'basalCalories', 'sleep', 'restingHeartRate', 'heartRateVariability', 'heartRate', 'weight', 'bodyFat', 'height', 'vo2Max'];
+const IOS_SKIP = new Set(['totalCalories']);
+const ANDROID_SKIP = new Set(['basalCalories']);
 /** То, что приходит раз в день, — без шагов, тренировок и пульса на тренировке */
-export const DAILY_TYPES = ['sleep', 'restingHeartRate', 'heartRateVariability', 'calories', 'totalCalories', 'weight', 'bodyFat', 'vo2Max', 'height'];
+export const DAILY_TYPES = ['sleep', 'restingHeartRate', 'heartRateVariability', 'calories', 'totalCalories', 'basalCalories', 'weight', 'bodyFat', 'vo2Max', 'height'];
 
 /** Список на одно системное окно */
 export function healthReads(platform, scope, withWorkouts = true) {
   let list = [...BASIC[platform === 'ios' ? 'ios' : 'android']];
   if (!withWorkouts) list = ['steps'];
-  if (scope === 'full') list.push(...EXTRA.filter((t) => !(platform === 'ios' && t === 'totalCalories')));
+  const skip = platform === 'ios' ? IOS_SKIP : ANDROID_SKIP;
+  if (scope === 'full') list.push(...EXTRA.filter((t) => !skip.has(t)));
   return [...new Set(list)];
 }
 
@@ -188,6 +196,16 @@ export function totalKcalByDay(samples) {
     days[date][source] = (days[date][source] || 0) + value;
   }
   return Object.fromEntries(Object.entries(days).map(([d, bySource]) => [d, Math.max(...Object.values(bySource))]));
+}
+
+/** iPhone: общий расход дня = активные + базовый обмен, только если есть оба */
+export function iphoneTotalKcal(active, basal) {
+  const out = {};
+  for (const [date, a] of Object.entries(active || {})) {
+    const b = (basal || {})[date];
+    if (a > 0 && b > 0) out[date] = a + b;
+  }
+  return out;
 }
 
 /** % жира: iPhone отдаёт долю (0,22), Android — проценты (22) */

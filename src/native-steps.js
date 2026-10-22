@@ -14,7 +14,7 @@ import { plugin, bridge, isNativeApp } from './native-bridge.js';
 import { APP_VERSION } from './version.js';
 import {
   healthScope, healthReads, shouldAskHealth, DAILY_TYPES, sleepByDay, lastByDay, avgByDay,
-  aggregatedByDay, totalKcalByDay, fatPercent, mergeHealthDays, hrFromAggregated,
+  aggregatedByDay, totalKcalByDay, iphoneTotalKcal, fatPercent, mergeHealthDays, hrFromAggregated,
 } from './health-model.js';
 
 /** iPhone: шаги из «Здоровья» (HealthKit). Apple не говорит приложению,
@@ -433,7 +433,7 @@ export async function syncHealthDaily(force = false) {
   start.setDate(start.getDate() - (DAYS - 1));
   const range = { startDate: start.toISOString(), endDate: end.toISOString() };
   const read = async (type, fn) => {
-    if (!allowed.includes(type) || (onIphone() && type === 'totalCalories')) return null;
+    if (!allowed.includes(type) || (onIphone() ? type === 'totalCalories' : type === 'basalCalories')) return null;
     try { return await fn(); } catch (_) { return null; }
   };
   const samples = (type, extra = {}) => read(type, async () => ((await h.readSamples({ dataType: type, ...range, limit: 1000, ...extra })).samples) || []);
@@ -447,6 +447,8 @@ export async function syncHealthDaily(force = false) {
   const active = await aggregated('calories', 'sum');
   // Общий расход Health Connect не суммирует сам — сырые записи
   const total = await samples('totalCalories', { limit: 5000 });
+  // iPhone: общий расход — активные + базовый обмен
+  const basal = await aggregated('basalCalories', 'sum');
   const weight = await samples('weight');
   const fat = await samples('bodyFat');
   const vo2 = await samples('vo2Max');
@@ -458,7 +460,8 @@ export async function syncHealthDaily(force = false) {
     restingHr: rhr ? aggregatedByDay(rhr, 'average') : {},
     hrvMs: hrv ? avgByDay(hrv) : {},
     activeKcal: active ? aggregatedByDay(active, 'sum') : {},
-    totalKcal: total ? totalKcalByDay(total) : {},
+    totalKcal: total ? totalKcalByDay(total)
+      : basal && active ? iphoneTotalKcal(aggregatedByDay(active, 'sum'), aggregatedByDay(basal, 'sum')) : {},
     weightKg: weight ? lastByDay(weight) : {},
     bodyFatPct: fat ? lastByDay(fat, fatPercent) : {},
     vo2max: vo2 ? lastByDay(vo2) : {},
