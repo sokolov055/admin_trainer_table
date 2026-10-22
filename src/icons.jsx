@@ -351,6 +351,12 @@ export const IconPlus = (p) => (
   </Icon>
 );
 
+export const IconMinus = (p) => (
+  <Icon {...p}>
+    <path d="M5 12h14" />
+  </Icon>
+);
+
 /** «Начать» — занятие из быстрой записи */
 export const IconPlay = (p) => (
   <Icon {...p}>
