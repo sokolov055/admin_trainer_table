@@ -2,7 +2,7 @@
 // карта с фоном и предметами, трасса, помост, блины, Гиря Михалыч, броски и вспышки.
 // Фон карты рисуется один раз на размер экрана, каждый кадр — только движущееся.
 import { FIELD, pointAt, pointInto } from './blini-tracks.js';
-import { PLATES, POWERS, FOOD, TUNING, platePoint, aimEnd } from './blini-model.js';
+import { PLATES, POWERS, FOOD, TUNING, platePoint, aimEnd, awayFromShooter } from './blini-model.js';
 
 const R = TUNING.plate / 2;
 const TAU = Math.PI * 2;
@@ -51,10 +51,11 @@ function plateSprite(color, size = SPRITE) {
   ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   arcText(ctx, 'FIT TRACK', r * .73, r * .16);
   ctx.save(); ctx.rotate(Math.PI); arcText(ctx, 'FIT TRACK', r * .73, r * .16); ctx.restore();
+  // Вес — крупно, чтобы и мелкий блин на поле читался: белая «5» не должна казаться «1»
   const weight = side => {
-    ctx.save(); ctx.rotate(side); ctx.translate(-r * .73, 0);
-    ctx.font = `850 ${r * .2}px Manrope, sans-serif`; ctx.fillText(String(p.kg), 0, -r * .1);
-    ctx.font = `850 ${r * .16}px Manrope, sans-serif`; ctx.fillText('KG', 0, r * .11);
+    ctx.save(); ctx.rotate(side); ctx.translate(-r * .72, 0);
+    ctx.font = `900 ${r * .3}px Manrope, sans-serif`; ctx.fillText(String(p.kg), 0, -r * .06);
+    ctx.font = `850 ${r * .12}px Manrope, sans-serif`; ctx.fillText('KG', 0, r * .17);
     ctx.restore();
   };
   weight(0); weight(Math.PI);
@@ -349,7 +350,7 @@ function freeSpots(track, view, theme, random) {
   for (let tries = 0; tries < 1200 && placed.length < want; tries++) {
     const kind = theme.kinds[placed.length % theme.kinds.length], size = theme.spot[kind] || 16;
     const x = view.x + size + random() * (view.w - size * 2), y = view.y + size + random() * (view.h - size * 2);
-    if (Math.hypot(x - track.shooter.x, y - track.shooter.y) < 66 + size) continue;
+    if (awayFromShooter(track, x, y) < 66 + size) continue;
     let ok = true;
     for (let i = 0; i < samples.length && ok; i += 2) if ((samples[i] - x) ** 2 + (samples[i + 1] - y) ** 2 < (size + R + 8) ** 2) ok = false;
     for (const p of placed) if (Math.hypot(p.x - x, p.y - y) < p.size + size + 6) ok = false;
@@ -358,11 +359,28 @@ function freeSpots(track, view, theme, random) {
   return placed;
 }
 
+/** Длинная скамья, по которой ходит Михалыч: мягкая обивка, ножки по краям и посередине. */
+function bench(ctx, rail, s, dpr) {
+  const x0 = rail.x0 - 30, x1 = rail.x1 + 30, y = rail.y + 30;
+  ctx.save();
+  ctx.fillStyle = '#2f3438';
+  for (const x of [x0 + 10, (x0 + x1) / 2, x1 - 10]) { ctx.beginPath(); ctx.roundRect(x - 4, y + 6, 8, 12, 2); ctx.fill(); }
+  ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 6 * s * dpr; ctx.shadowOffsetY = 3 * s * dpr;
+  ctx.fillStyle = '#5c1c24'; ctx.beginPath(); ctx.roundRect(x0, y, x1 - x0, 11, 5.5); ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#8a2a35'; ctx.beginPath(); ctx.roundRect(x0, y - 1, x1 - x0, 8, 4); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(x0 + 6, y, x1 - x0 - 12, 1.6);
+  ctx.strokeStyle = 'rgba(0,0,0,.22)'; ctx.lineWidth = 1;
+  for (let x = x0 + 40; x < x1 - 20; x += 40) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 7); ctx.stroke(); }
+  ctx.restore();
+}
+
 /**
  * Фон карты на весь экран: основа темы, предметы, желоб трассы, люк въезда и помост.
- * view — как поле лежит на экране: масштаб s и сдвиг ox, oy в CSS-пикселях.
+ * view — как поле лежит на экране: масштаб s и сдвиг ox, oy в CSS-пикселях;
+ * rail — Михалыч на этом уровне ходит по скамье, её тоже печём в фон.
  */
-export function bakeBackground(track, view, target = null) {
+export function bakeBackground(track, view, target = null, rail = false) {
   const { width, height, dpr, s, ox, oy } = view;
   const c = target || canvasOf(Math.max(1, Math.round(width * dpr)), Math.max(1, Math.round(height * dpr)));
   const ctx = c.getContext('2d');
@@ -416,6 +434,7 @@ export function bakeBackground(track, view, target = null) {
     for (const bx of [-21, 21]) { ctx.fillStyle = '#3a4146'; ctx.beginPath(); ctx.roundRect(bx - 2.5, -8, 5, 16, 1.5); ctx.fill(); }
     ctx.restore();
   }
+  if (rail && track.rail) bench(ctx, track.rail, s, dpr);
   // Свет сверху и мягкое затемнение по краям экрана — глубина без лишних деталей
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const w = c.width, h = c.height;
@@ -442,7 +461,7 @@ function ball(ctx, x, y, r, fill = SKIN) {
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = SKIN_LINE; ctx.stroke();
 }
 function mihalych(ctx, game, fx, t, danger, reduced) {
-  const { x, y } = game.track.shooter, a = game.aim;
+  const { x, y, vx } = game.shooter, a = game.aim;
   const flexing = fx.flex && t - fx.flex < 750;
   const since = TUNING.reload - game.reload; // шагов после броска
   const throwing = game.reload > 0 && since < 6;
@@ -458,13 +477,17 @@ function mihalych(ctx, game, fx, t, danger, reduced) {
   ctx.restore();
   ctx.translate(0, bob);
   ctx.beginPath(); ctx.ellipse(0, 33 - bob, 25, 6, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fill();
+  // Идёт по скамье — наклон в сторону шага и подпрыгивание
+  const walking = vx !== 0 && !reduced;
+  if (walking) { ctx.translate(0, -Math.abs(Math.sin(t / 55)) * 2.4); ctx.translate(0, 30); ctx.rotate(Math.sign(vx) * .09); ctx.translate(0, -30); }
   // Присед при броске: чуть ниже и шире — бросок «от ног»
   if (throwing && !reduced) { ctx.translate(0, 30); ctx.scale(1.05, .93); ctx.translate(0, -30); }
-  // Ножки в кроссовках
+  // Ножки в кроссовках; на ходу переступают
   for (const k of [-1, 1]) {
-    limb(ctx, [[k * 8, 24], [k * 10, 31]], 5);
-    ctx.beginPath(); ctx.ellipse(k * 12, 32, 7.5, 4.2, 0, 0, TAU); ctx.fillStyle = '#fbfbf7'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#9aa3a8'; ctx.stroke();
-    ctx.fillStyle = '#e0453a'; ctx.fillRect(k * 12 - 4, 30.6, 8, 1.8);
+    const lift = walking ? Math.max(0, Math.sin(t / 55 + (k > 0 ? Math.PI : 0))) * 3 : 0;
+    limb(ctx, [[k * 8, 24], [k * 10, 31 - lift]], 5);
+    ctx.beginPath(); ctx.ellipse(k * 12, 32 - lift, 7.5, 4.2, 0, 0, TAU); ctx.fillStyle = '#fbfbf7'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#9aa3a8'; ctx.stroke();
+    ctx.fillStyle = '#e0453a'; ctx.fillRect(k * 12 - 4, 30.6 - lift, 8, 1.8);
   }
   // Следующий блин лежит у ног
   plate(ctx, 30, 24, game.next, .55);
@@ -534,7 +557,7 @@ function mihalych(ctx, game, fx, t, danger, reduced) {
 function bubble(ctx, game, fx, t) {
   if (!fx.say || t - fx.say.born > 1700) return;
   const k = Math.min(1, (t - fx.say.born) / 140), out = Math.max(0, (t - fx.say.born - 1400) / 300);
-  const { x, y } = game.track.shooter;
+  const { x, y } = game.shooter;
   ctx.save(); ctx.globalAlpha = Math.max(0, k - out);
   ctx.font = '800 12px Manrope, sans-serif';
   const w = ctx.measureText(fx.say.text).width + 18, h = 26;
@@ -612,7 +635,7 @@ export function addEvents(fx, game, events, t, reduced = false) {
 }
 
 function aimLine(ctx, game, strong) {
-  const { x, y } = game.track.shooter, end = aimEnd(game);
+  const { x, y } = game.shooter, end = aimEnd(game);
   ctx.save();
   ctx.setLineDash(strong ? [7, 6] : [3, 7]);
   ctx.lineWidth = strong ? 2.6 : 1.8;
