@@ -345,9 +345,33 @@
 /* Суперсет в тренировке — кругами: круг, в нём упражнения подряд */
 .workout__rounds-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .workout__rounds-head h3 { margin: 0; }
-.workout__round { border-top: 1px solid var(--border); padding-top: var(--space-2); margin-top: var(--space-2); }
-.workout__round-title { margin: 0 0 4px; font-size: var(--text-sm); color: var(--accent); font-weight: 700; }
-.workout__round-name { font-size: var(--text-sm); font-weight: 600; margin: 6px 0 2px; }
+/* Иерархия (владелец, 22.10.2026: «в суперсете всё сливается»):
+   круг > упражнение > интервал. Круги — линией и самым большим отступом;
+   упражнение круга — плашкой-дорожкой (без рамки и тени) с буквой A, B, C,
+   плашки между собой — зазором больше, чем от названия до полей; интервалы
+   кардио — внутри плашки, с отступом и мельче, чем название упражнения */
+.workout__round { border-top: 1px solid var(--border-strong); padding-top: var(--space-3); margin-top: var(--space-5); counter-reset: member; }
+.workout__round-title { margin: 0 0 var(--space-2); font-size: var(--text-base); color: var(--accent); font-weight: 700; }
+.workout__round-item { --swipe-bg: var(--surface-sunken); counter-increment: member; padding: var(--space-2); border-radius: var(--radius); background: var(--surface-sunken); }
+.workout__round-item + .workout__round-item { margin-top: var(--space-2); }
+.workout__round-name { font-size: var(--text-sm); font-weight: 600; margin: 0 0 var(--space-1); }
+/* Буква — счётчиком CSS: после перестановки упражнений идёт по новому порядку,
+   читалке экрана не мешает (пустой альтернативный текст) */
+.workout__round-name::before {
+  content: counter(member, upper-alpha);
+  content: counter(member, upper-alpha) / '';
+  display: inline-grid; place-items: center; vertical-align: middle;
+  width: 22px; height: 22px; margin-right: 8px; border-radius: 6px;
+  background: var(--accent-wash); color: var(--accent-ink, var(--accent));
+  font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+}
+/* Подход в плашке: линия над полями лишняя — его отделяет сама плашка */
+.workout__round-item .workout__set { border-top: 0; }
+.workout__round-item .workout__set--current > .swipe__content { background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface-sunken); }
+/* Интервалы кардио подчинены упражнению: отступ и тонкая линия слева
+   вместо линии сверху, название — мельче и тише названия упражнения */
+.workout__round-item .intervals-row__phase { margin-left: var(--space-1); padding: var(--space-1) 0 var(--space-1) var(--space-3); border-top: 0; border-left: 1px solid var(--border-strong); }
+.workout__round-item .intervals-row__name { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 /* В круге галочка одна на круг — строка упражнения только из полей */
 .workout__set-row--round { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); }
 .workout__set-row--round > span:first-child { display: none; }
@@ -511,7 +535,7 @@ button.workout__round-units { all: unset; white-space: pre-wrap; font-weight: 40
 button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 
 /* Перестановка удержанием: соседи расступаются, взятая строка — над ними */
-.workout__round > [data-member].workout__exercise--lifted { background: var(--surface); border-radius: var(--radius-sm); }
+.workout__round > [data-member].workout__exercise--lifted { --swipe-bg: var(--surface); background: var(--surface); }
 .workout__fields [data-unit], .workout__round > [data-member] { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
 .workout__exercise--lifted { position: relative; z-index: 3; transition: none !important; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); }
 
