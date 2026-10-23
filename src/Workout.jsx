@@ -755,6 +755,31 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     document.addEventListener('touchmove', stop, { passive: false });
     return () => document.removeEventListener('touchmove', stop);
   }, []);
+  // Прилипла ли шапка (24.10.2026): пока нет — под часами фон темы, как у
+  // страницы, без щели над шапкой; прилипла — слой под часами цвета шапки,
+  // и она тёмной уходит под самые часы. Класс на body читает styles.css
+  useEffect(() => {
+    // В тестах компонента нет ни прокрутки, ни body
+    if (typeof window.addEventListener !== 'function' || typeof requestAnimationFrame !== 'function' || !document.body?.classList) return undefined;
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const head = document.querySelector('.workout__header');
+      const stuck = !!head && window.scrollY > 0
+        && head.getBoundingClientRect().top <= (parseFloat(getComputedStyle(head).top) || 0) + 0.5;
+      document.body.classList.toggle('workout-stuck', stuck);
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(check); };
+    check();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+      document.body.classList.remove('workout-stuck');
+    };
+  }, []);
   const exportDraft = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(state.current, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'тренировка.json'; a.click(); URL.revokeObjectURL(url);

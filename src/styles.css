@@ -428,6 +428,11 @@ body:has(#root .workout__header, #root .cal-screen)::before {
   -webkit-mask-image: none;
   mask-image: none;
 }
+/* Шапка тренировки прилипла (Workout.jsx, класс на body) и расписание —
+   слой сплошной цвета шапки: она тёмной продолжается под часы, без полосы
+   рисунка над ней */
+body.workout-stuck:has(#root .workout__header)::before,
+body:has(#root .cal-screen)::before { background-image: none; }
 body::before {
   --fade: min(var(--top-fade), calc(env(safe-area-inset-top, 0px) * 100));
   content: '';
