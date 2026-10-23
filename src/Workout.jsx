@@ -1968,7 +1968,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   return <div className="workout">
     {/* В списке журнала — кнопка, куда вернёт: к программе или к списку клиентов */}
     {!s && <BackButton label={backLabel} onClick={close} />}
-    {!ready && <p role="status">Открываем журнал тренировок…</p>}
+    {/* Занятие уже на экране (снимок из черновика) — строка загрузки под его
+        шапкой, а не над ней: иначе шапка прыгала вверх, когда журнал
+        догружался (владелец, 24.10.2026) */}
+    {!ready && !s && <p role="status">Открываем журнал тренировок…</p>}
     {storageError && <p role="alert" className="workout__error">Устройство не сохранило черновик. Не закрывайте экран до сохранения в облаке.</p>}
     {message && <div role="alert" className="workout__error" data-reveal="off"><p>{message}</p><button className="button" disabled={busy} onClick={() => { setMessage(''); record?.dirty ? save() : list().catch(e => setMessage(e.message)); }}>Повторить</button></div>}
     {conflict && <div role="alert" className="workout__error" data-reveal="off">
@@ -2043,6 +2046,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             менялась на каждую правку, и экран прыгал. Не сохранилось —
             сообщение об ошибке вверху */}
       </header>
+      {!ready && <p role="status">Открываем журнал тренировок…</p>}
       <fieldset disabled={!editable || !!conflict} className="workout__fields" ref={fieldsRef}>
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
