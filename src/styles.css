@@ -404,14 +404,24 @@ body {
    по-прежнему липнут к окну. */
 #root { overflow-x: clip; }
 
+/* Подложка под часами. Нижний край не режет содержимое ножом: ещё 16 px
+   она растворяется, и уехавшие вверх карточки уходят под часы плавно, как
+   в iOS. Только когда есть вырез (в браузере на компьютере отступ ноль —
+   и перехода нет). Экранам, где шапка липнет прямо под часы (тренировка,
+   расписание), переход не нужен: он лёг бы на её верх. */
+body { --top-fade: 16px; }
+body:has(#root .workout__header, #root .cal-screen) { --top-fade: 0px; }
 body::before {
+  --fade: min(var(--top-fade), calc(env(safe-area-inset-top, 0px) * 100));
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: env(safe-area-inset-top);
+  height: calc(env(safe-area-inset-top) + var(--fade));
   background: var(--bg);
+  -webkit-mask-image: linear-gradient(#000 calc(100% - var(--fade)), transparent);
+  mask-image: linear-gradient(#000 calc(100% - var(--fade)), transparent);
   z-index: 25;
   pointer-events: none;
 }
@@ -837,7 +847,10 @@ button, input, select, textarea { font-family: inherit; }
   --inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
   --inset-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
 }
-.is-native body::before { height: var(--inset-top); }
+.is-native body::before {
+  --fade: min(var(--top-fade), calc(var(--inset-top) * 100));
+  height: calc(var(--inset-top) + var(--fade));
+}
 .is-native .client-preview { padding-top: calc(10px + var(--inset-top)); }
 .is-native .client-preview + .app__header { padding-top: var(--space-5); }
 .is-native .app__header {
