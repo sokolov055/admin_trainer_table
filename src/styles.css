@@ -422,11 +422,11 @@ body::before {
   right: 0;
   height: calc(env(safe-area-inset-top) + var(--fade));
   background: linear-gradient(
-    color-mix(in srgb, var(--bg) 78%, transparent),
-    color-mix(in srgb, var(--bg) 30%, transparent) 55%,
+    color-mix(in srgb, var(--bg) 60%, transparent),
+    color-mix(in srgb, var(--bg) 15%, transparent) 55%,
     transparent);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   /* Размытие тоже сходит на нет: целиком только у самого верха */
   -webkit-mask-image: linear-gradient(#000 25%, rgba(0, 0, 0, 0.6) 60%, transparent);
   mask-image: linear-gradient(#000 25%, rgba(0, 0, 0, 0.6) 60%, transparent);
