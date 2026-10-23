@@ -14,7 +14,7 @@
  */
 
 /** Редакция отдельного согласия на данные о здоровье (/health-consent.html) */
-export const HEALTH_CONSENT_VERSION = '2026-10-22';
+export const HEALTH_CONSENT_VERSION = '2026-10-24';
 export const IOS_FULL_BUILD = 26;
 export const ANDROID_FULL_BUILD = 11;
 
