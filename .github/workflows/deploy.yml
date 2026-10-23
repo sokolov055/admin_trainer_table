@@ -74,8 +74,8 @@ jobs:
           printf '%s\n' "$KEY" > ~/.ssh/web_deploy
           chmod 600 ~/.ssh/web_deploy
           # Ключ сервера закреплён: подменённый сервер сборку не получит
-          echo '194.58.102.135 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEQaceivhYg70FPYy+ZedCn+YYIFuo7GXO0/FDNQzlgZ' > ~/.ssh/known_hosts
-          tar -czf - -C dist . | ssh -i ~/.ssh/web_deploy -o BatchMode=yes webdeploy@194.58.102.135 "${GITHUB_SHA:0:7}"
+          echo '139.100.217.92 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ010Mkp9uk2T/Al8mlWTelyZRK/03iTFg4CEJJxx3Os' > ~/.ssh/known_hosts
+          tar -czf - -C dist . | ssh -i ~/.ssh/web_deploy -o BatchMode=yes webdeploy@139.100.217.92 "${GITHUB_SHA:0:7}"
           rm -f ~/.ssh/web_deploy
 
       - name: Проверить, что доехало
