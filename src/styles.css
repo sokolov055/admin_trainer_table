@@ -413,11 +413,16 @@ body {
    не нужен: он лёг бы на её верх. */
 body { --top-fade: 36px; }
 body:has(#root .workout__header, #root .cal-screen) { --top-fade: 0px; }
-/* У них шапка сплошная (--bg) и липнет прямо под часы — слой тоже сплошной,
-   того же цвета: шапка продолжается под часы, и уехавшее вверх содержимое
-   не просвечивает над ней (владелец, 24.10.2026). */
+/* У них шапка липнет прямо под часы — слой непрозрачный, чтобы уехавшее
+   вверх содержимое не просвечивало над ней, и с тем же рисунком темы, что
+   фон страницы: пока шапка не прилипла, между часами и ней нет щели
+   (владелец, 24.10.2026). */
 body:has(#root .workout__header, #root .cal-screen)::before {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--bg-art, none);
+  background-size: 100vw 100vh;
+  background-repeat: no-repeat;
+  background-position: var(--art-x, 0px) var(--art-y, 0px);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   -webkit-mask-image: none;
