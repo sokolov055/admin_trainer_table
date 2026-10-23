@@ -7,7 +7,7 @@ import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWor
 import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
-import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, cloneSet, editSetField } from './workout-model.js';
+import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, withoutSet, cloneSet, editSetField } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore } from './icons.jsx';
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
@@ -799,7 +799,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // (QA 20.10.2026) читались как шум
     const firstOwn = ex.sets.findIndex(x => (x.who || '') === (set.who || ''));
     const sideHere = track.kind === 'strength' && (si === firstOwn || setOneSide(set, track) !== setOneSide(ex.sets[firstOwn], track));
-    const removeSet = () => { setUndo(s.exercises, 'Подход удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
+    const removeSet = () => { setUndo(s.exercises, 'Подход удалён'); setOpenSet(''); updateExercise(ei, ex => withoutSet(ex, si)); };
     return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
             <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '') + (inRound ? ' workout__set-row--round' : '')} style={{ '--cols': fields.length }}>

@@ -129,3 +129,22 @@ test('20.10.2026: «прошлый раз» частями — для карто
   assert.equal(lastRunText(last), 'Последний раз (09.10) вы делали 100 · 120 кг на 8 повторов, вам было легко — сегодня +5 кг');
   assert.equal(lastRunParts(null), null);
 });
+
+test('23.10.2026: удалили лишнюю отметку — следующие подходы встают на её место и «было» берут по порядку', async () => {
+  const { withoutSet } = await import('../src/workout-model.js');
+  const set = (weight, state, was, kind = 'work') => ({ weight, reps: '12', state, kind, ...(was === undefined ? {} : { was }) });
+  const lastRun = { date: '2026-10-16', weights: ['10', '20', '30', '40', '35'], reps: ['12', '12', '12', '12', '12'], kinds: ['warmup', 'work', 'work', 'work', 'work'] };
+  // Свиридов, жим над головой: второй подход отметился сам через 3 с — его удалили
+  const ex = { id: 'e', name: 'Жим', lastRun, sets: [set('10', 'done', 0, 'warmup'), set('20', 'done', 1), set('30', 'pending', 2), set('40', 'pending', 3), set('35', 'pending', 4)] };
+  const fixed = withoutSet(ex, 1);
+  assert.deepEqual(fixed.sets.map((s) => s.weight), ['10', '30', '40', '35']);
+  assert.deepEqual(fixed.sets.map((s) => s.was), [0, 1, 2, 3], 'третий стал вторым — «было» второго');
+  assert.deepEqual(wasSet(fixed, 1), { weight: '20', reps: '12' });
+
+  // Неотмеченный удалили — подхода просто нет, «было» у остальных своё (FT-621)
+  const skipped = withoutSet(ex, 3);
+  assert.deepEqual(skipped.sets.map((s) => s.was), [0, 1, 2, 4]);
+  // Разминку не трогает: удалили отмеченный рабочий — разминка своё «было» держит
+  const warm = { ...ex, sets: [set('10', 'done', 0, 'warmup'), set('20', 'done', 1), set('10', 'pending', undefined, 'warmup'), set('30', 'pending', 2)] };
+  assert.deepEqual(withoutSet(warm, 1).sets.map((s) => s.was), [0, undefined, 1]);
+});

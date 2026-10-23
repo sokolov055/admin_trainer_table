@@ -405,6 +405,28 @@ export function withSet(ex) {
 }
 
 /**
+ * Удалить подход si. Неотмеченный — его просто нет: у остальных «было»
+ * своё (FT-621). Отмеченный удаляют, когда отметка лишняя (владелец,
+ * 23.10.2026: отдых оборвался, следующий подход отметился сам) — тогда
+ * неотмеченные того же вида встают на его место и «было» берут по
+ * порядку: третий стал вторым — и «было» у него второго
+ */
+export function withoutSet(ex, si) {
+  const gone = ex.sets[si];
+  const sets = ex.sets.filter((_, i) => i !== si);
+  if (!gone || gone.state !== 'done' || gone.who) return { ...ex, sets };
+  const kind = (x) => (x.kind === 'warmup' ? 'warmup' : 'work');
+  let was = gone.was;
+  return { ...ex, sets: sets.map((x, i) => {
+    if (i < si || x.who || x.state !== 'pending' || kind(x) !== kind(gone)) return x;
+    const { was: own, ...rest } = x;
+    const next = Number.isInteger(was) ? { ...rest, was } : rest;
+    was = own;
+    return next;
+  }) };
+}
+
+/**
  * Правка поля подхода si в занятии (из Workout.jsx, чтобы проверять тестом).
  *
  * Вписали вес (у веса помощи — помощь) — он свой (own): оценки этот подход

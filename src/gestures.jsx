@@ -222,11 +222,15 @@ export function usePullRefresh(fn) {
   useEffect(() => onPullRefresh(() => ref.current && ref.current()), []);
 }
 
+/** Дольше обновление не держит страницу сдвинутой: запрос в зале без связи
+ *  мог висеть минутами, и штанга крутилась над экраном (23.10.2026) */
+const REFRESH_MAX_MS = 15000;
+
 function runRefresh() {
   const jobs = [...refreshers].map((fn) => {
     try { return Promise.resolve(fn()); } catch (e) { return Promise.resolve(); }
   });
-  return Promise.allSettled(jobs);
+  return Promise.race([Promise.allSettled(jobs), new Promise((resolve) => setTimeout(resolve, REFRESH_MAX_MS))]);
 }
 
 /* ==========================================================================
@@ -712,6 +716,7 @@ export function Gestures() {
     let pagerX = 0;             // сдвиг ленты разделов, со знаком
     let scene = null;           // сцена «назад», пока жест идёт
     let refreshing = false;
+    let settle = null;          // пружина, что возвращает страницу после прерванного «потянуть»
 
     /* ---------------- отрисовка ---------------- */
 
@@ -838,6 +843,18 @@ export function Gestures() {
       if (done) done.scene.classList.add('swipeback--cover');
     };
 
+    /**
+     * Пружину «потянуть» остановило касание (onStart), а оно не стало
+     * «потянуть» — нажали «Норм», листнули вбок. Страница так и стояла
+     * сдвинутой на несколько пикселей, в щели над шапкой занятия была
+     * видна прокрученная страница и штанга (владелец, 23.10.2026).
+     * Обновление идёт — его конец вернёт страницу сам
+     */
+    const settlePull = () => {
+      if (refreshing || pullY <= 0 || settle) return;
+      settle = spring({ from: pullY, to: 0, onFrame: (y) => drawPull(y), onDone: () => { settle = null; } });
+    };
+
     /* ---------------- касания ---------------- */
 
     const onStart = (e) => {
@@ -857,6 +874,7 @@ export function Gestures() {
 
       // Перехват на лету: берём текущее положение, а не цель пружины
       if (anim) { anim.stop(); anim = null; }
+      if (settle) { settle.stop(); settle = null; }
 
       const t = e.touches[0];
       const free = !ownsHorizontal(e.target);
@@ -928,7 +946,7 @@ export function Gestures() {
           }
         }
 
-        if (!g.mode) { g = null; return; }
+        if (!g.mode) { g = null; settlePull(); return; }
       }
 
       if (e.cancelable) e.preventDefault();
@@ -983,8 +1001,9 @@ export function Gestures() {
     };
 
     const onEnd = () => {
-      if (!g || !g.mode) { g = null; return; }
+      if (!g || !g.mode) { g = null; settlePull(); return; }
       const mode = g.mode;
+      if (mode !== 'pull') settlePull();
 
       if (mode === 'pull') {
         const v = velocity('y');
@@ -1187,6 +1206,7 @@ export function Gestures() {
       document.removeEventListener('touchcancel', end);
       letGo();
       if (anim) anim.stop();
+      if (settle) settle.stop();
       dropScene();
       drawPull(0);
     };

@@ -897,6 +897,21 @@ test('смахнуть вправо возвращает из «Моих дан�
     await phone.waitForTimeout(700);
     assert.equal(await phone.locator('#root .app__title').textContent(), 'Настройки', 'короткий жест не уводит');
 
+    // Потянули чуть-чуть и сразу коснулись экрана, пока страница пружиной
+    // возвращалась (23.10.2026): касание останавливало пружину, и страница
+    // оставалась сдвинутой — над шапкой занятия была видна прокрученная страница
+    await swipe(phone, { x: 195, y: 160 }, { x: 195, y: 260 }, { steps: 8 });
+    await phone.evaluate(() => {
+      const target = document.elementFromPoint(195, 400) || document.body;
+      const t = new Touch({ identifier: 2, target, clientX: 195, clientY: 400 });
+      target.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      target.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+    });
+    await assert.doesNotReject(
+      phone.waitForFunction(() => [...document.querySelector('#root .app').children].every((el) => !el.style.transform), null, { timeout: 3000 }),
+      'касание посреди пружины — страница всё равно вернулась на место',
+    );
+
     // Потянуть вниз: индикатор докручивается до конца обновления и уходит
     await swipe(phone, { x: 195, y: 160 }, { x: 195, y: 520 }, { steps: 16 });
     await assert.doesNotReject(
