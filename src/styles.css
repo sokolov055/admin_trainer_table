@@ -404,14 +404,14 @@ body {
    по-прежнему липнут к окну. */
 #root { overflow-x: clip; }
 
-/* Под часами — матовое стекло, а не плашка (владелец, 23.10.2026): фон
-   темы виден до самого верха, уехавшие вверх карточки размываются под
-   временем и батареей, и цифры часов читаются поверх них. Нижний край
-   стекла ещё 24 px растворяется — без линии среза. Только когда есть
-   вырез (в браузере на компьютере отступ ноль — и стекла нет). Экранам,
-   где шапка липнет прямо под часы (тренировка, расписание), растворение
-   не нужно: оно легло бы на её верх. */
-body { --top-fade: 24px; }
+/* Под часами — не плашка, а плавное затемнение с лёгким размытием, как
+   в приложении Claude (владелец, 23.10.2026): у самого верха темнее и
+   мягче, книзу сходит на нет без всякого края, и содержимое под часами
+   видно. Цифры часов читаются за счёт затемнения. Только когда есть
+   вырез (в браузере на компьютере отступ ноль — и слоя нет). Экранам,
+   где шапка липнет прямо под часы (тренировка, расписание), хвост вниз
+   не нужен: он лёг бы на её верх. */
+body { --top-fade: 36px; }
 body:has(#root .workout__header, #root .cal-screen) { --top-fade: 0px; }
 body::before {
   --fade: min(var(--top-fade), calc(env(safe-area-inset-top, 0px) * 100));
@@ -421,11 +421,15 @@ body::before {
   left: 0;
   right: 0;
   height: calc(env(safe-area-inset-top) + var(--fade));
-  background: color-mix(in srgb, var(--bg) 40%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-mask-image: linear-gradient(#000 calc(100% - var(--fade)), transparent);
-  mask-image: linear-gradient(#000 calc(100% - var(--fade)), transparent);
+  background: linear-gradient(
+    color-mix(in srgb, var(--bg) 78%, transparent),
+    color-mix(in srgb, var(--bg) 30%, transparent) 55%,
+    transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  /* Размытие тоже сходит на нет: целиком только у самого верха */
+  -webkit-mask-image: linear-gradient(#000 25%, rgba(0, 0, 0, 0.6) 60%, transparent);
+  mask-image: linear-gradient(#000 25%, rgba(0, 0, 0, 0.6) 60%, transparent);
   z-index: 25;
   pointer-events: none;
 }
