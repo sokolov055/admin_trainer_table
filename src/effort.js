@@ -555,12 +555,27 @@ export function otherMachineText(other) {
 }
 
 /**
+ * Повторы в занятии поменяли (23.10.2026): «сегодня на 15 повторов, это
+ * примерно 37,5 кг» посчитано сервером под план и уже неправда — вес
+ * подходов пересчитан под новые повторы (editSetField). Все рабочие на
+ * одно другое число — «сегодня на 20 повторов — вес пересчитан от прошлого
+ * раза»; вразнобой — подсказки о сегодня нет (''). Не меняли — null
+ */
+function repsChanged(last, sets) {
+  if (!last || last.action !== 'scaled' || !Array.isArray(sets)) return null;
+  const lo = parseInt(last.planReps, 10);
+  const reps = [...new Set(sets.filter((s) => s.kind !== 'warmup' && !s.who).map((s) => parseInt(s.reps, 10)).filter((n) => n > 0))];
+  if (!reps.length || (reps.length === 1 && reps[0] === lo)) return null;
+  return reps.length === 1 ? 'сегодня на ' + reps[0] + ' ' + plural(reps[0], 'повтор', 'повтора', 'повторов') + ' — вес пересчитан от прошлого раза' : '';
+}
+
+/**
  * То же — частями, для карточки упражнения (20.10.2026): «Прошлый раз ·
  * 09.10 — 100 · 120 · 140 кг на 8 повторов, было легко» и отдельной
  * строкой «Сегодня +5 кг — было легко» со стрелкой. Одна длинная фраза
  * читалась плохо: в зале ищут глазами число и направление
  */
-export function lastRunParts(last) {
+export function lastRunParts(last, sets = null) {
   if (!last || !Array.isArray(last.weights) || !last.weights.length) return null;
   // Вес помощи (FT-628): «с помощью 30 · 30 кг», сдвиг — помощи
   const assist = last.mode === 'assist' && Array.isArray(last.assist);
@@ -572,6 +587,8 @@ export function lastRunParts(last) {
     ? values.join(' · ') + ' кг на ' + reps[0] + ' ' + plural(Number(reps[0]), 'повтор', 'повтора', 'повторов')
     : values.map((w, i) => w + (reps[i] ? '×' + reps[i] : '')).join(' · ') + ' кг');
   const felt = last.effort ? ', вам было ' + EFFORT_WORD[last.effort] : '';
+  const changed = repsChanged(last, sets);
+  if (changed !== null) return { date, was: what + felt, today: changed, action: 'same' };
   return { date, was: what + felt, today: todayText(last, assist), action: last.action || 'same' };
 }
 

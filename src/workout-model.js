@@ -1,5 +1,5 @@
 import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf, planOneSide, missing } from './exercise-track.js';
-import { wasSet, scaleTo, isAssisted } from './effort.js';
+import { wasSet, wasIndex, scaleTo, isAssisted } from './effort.js';
 
 export const uid = () => crypto.randomUUID();
 export const blankSet = () => ({ weight: '', reps: '', rpe: '', state: 'pending', kind: 'work' });
@@ -436,8 +436,24 @@ export function withoutSet(ex, si) {
  * без веса — это не рабочий вес остальных подходов.
  *
  * Поменяли повторы — вес этого подхода пересчитать от прошлого раза (тот же
- * подход, его вес и повторы), если вес не вписан руками.
+ * подход, его вес и повторы), если вес не вписан руками. У подхода сверх
+ * прошлого раза своего «было» нет — от «было» ближайшего рабочего перед ним
+ * (23.10.2026: 15 → 20 повторов, третий стал 35 × 20, а четвёртый так и
+ * остался 37,5 — посчитанный на 15)
  */
+function wasNear(ex, si) {
+  const own = wasSet(ex, si);
+  const set = ex.sets[si];
+  if (own || wasIndex(ex, si) >= 0 || set.kind === 'warmup') return own;
+  for (let k = si - 1; k >= 0; k -= 1) {
+    const s = ex.sets[k];
+    if ((s.who || '') !== (set.who || '') || s.kind === 'warmup') continue;
+    const was = wasSet(ex, k);
+    if (was) return was;
+  }
+  return null;
+}
+
 export function editSetField(ex, si, key, value) {
   const valueKey = isAssisted(ex) ? 'assist' : 'weight';
   const source = ex.sets[si];
@@ -446,7 +462,7 @@ export function editSetField(ex, si, key, value) {
     const { suggest, ...rest } = s;
     const mine = key === valueKey;
     const next = { ...rest, [key]: value, ...(!mine && suggest ? { suggest } : {}), ...(mine ? { own: true } : {}) };
-    const was = key === 'reps' && valueKey === 'weight' && !s.own && wasSet(ex, si);
+    const was = key === 'reps' && valueKey === 'weight' && !s.own && wasNear(ex, si);
     if (was && was.weight && Number(value) > 0 && Number(was.reps) > 0) {
       const w = scaleTo(ex, Number(String(was.weight).replace(',', '.')), Number(was.reps), Number(value));
       if (w > 0) next.weight = String(Math.round(w * 100) / 100);

@@ -71,6 +71,11 @@ test('пауза — секундомер стоит; отдых идёт — е
   assert.equal(la.activityPayload(record({ status: 'paused', restUntil: until })).restUntil, undefined, 'на паузе отдыха нет');
 });
 
+test('номер сохранения на сервере — часам: прочитанное раньше их нажатий они не берут (23.10.2026)', () => {
+  assert.equal(la.activityPayload({ ...record({}), revision: 41 }).revision, 41);
+  assert.equal(la.activityPayload(record({})).revision, undefined, 'ещё не на сервере — номера нет');
+});
+
 test('тема приложения: тёмная — тёмная плашка', () => {
   fake.theme = 'dark';
   assert.equal(la.activityPayload(record({})).dark, true);

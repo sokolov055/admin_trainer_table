@@ -148,3 +148,20 @@ test('23.10.2026: удалили лишнюю отметку — следующ�
   const warm = { ...ex, sets: [set('10', 'done', 0, 'warmup'), set('20', 'done', 1), set('10', 'pending', undefined, 'warmup'), set('30', 'pending', 2)] };
   assert.deepEqual(withoutSet(warm, 1).sets.map((s) => s.was), [0, undefined, 1]);
 });
+
+test('23.10.2026: повторы 15 → 20 — четвёртый подход без своего «было» пересчитан как третий, подсказка — по новым повторам', async () => {
+  const { lastRunParts } = await import('../src/effort.js');
+  // Свиридов, подъём на носки: в программе 15, прошлый раз 30 · 35 · 35 × 20
+  const lastRun = { date: '2026-10-16', weights: ['30', '35', '35'], reps: ['20', '20', '20'], kinds: ['work', 'work', 'work'], planReps: '15', scaled: '37.5', effort: 'ok', streak: 1, action: 'scaled', reason: 'plan', step: 2.5 };
+  const set = (weight, was) => ({ weight, reps: '15', state: 'pending', kind: 'work', ...(was === undefined ? {} : { was }) });
+  let ex = { id: 'e', name: 'Подъём на носки стоя', lastRun, load: { muscle: 'Ноги', equipment: 'Тренажёр' }, track: { kind: 'strength' }, target: '15', planReps: '15',
+    sets: [set('32.5', 0), set('37.5', 1), set('37.5', 2), set('37.5')] };
+  assert.equal(lastRunParts(lastRun, ex.sets).today, 'сегодня на 15 повторов, это примерно 37,5 кг', 'повторы как в плане — подсказка сервера');
+  for (let k = 0; k < 4; k += 1) ex = editSetField(ex, k, 'reps', '20');
+  assert.deepEqual(ex.sets.map((s) => s.weight), ['30', '35', '35', '35'], 'четвёртый — как третий, а не 37,5 × 20');
+  const parts = lastRunParts(lastRun, ex.sets);
+  assert.equal(parts.today, 'сегодня на 20 повторов — вес пересчитан от прошлого раза');
+  assert.equal(parts.action, 'same', 'без стрелки вниз');
+  assert.equal(lastRunParts(lastRun, [{ ...ex.sets[0], reps: '18' }, ...ex.sets.slice(1)]).today, '', 'повторы вразнобой — о сегодня молчим');
+  assert.equal(lastRunParts(lastRun).today, 'сегодня на 15 повторов, это примерно 37,5 кг', 'без подходов (часы, уведомления) — как раньше');
+});

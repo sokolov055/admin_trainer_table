@@ -7,10 +7,11 @@ import { IconDelta } from './icons.jsx';
  * одной длинной — что было (дата, веса × повторы, оценка) и что сегодня
  * (сдвиг веса со стрелкой или «так же»). В суперсете — с названием.
  * Текст тот же, что в lastRunText (уведомления, часы). tired — сегодня
- * упражнение после другого на те же мышцы, вес на шаг легче (22.10.2026)
+ * упражнение после другого на те же мышцы, вес на шаг легче (22.10.2026).
+ * sets — подходы занятия: повторы в них поменяли — «сегодня» по ним
  */
-export default function LastRunHint({ last, name = '', tired = null }) {
-  const p = lastRunParts(last);
+export default function LastRunHint({ last, name = '', tired = null, sets = null }) {
+  const p = lastRunParts(last, sets);
   if (!p) return null;
   const up = p.action === 'up';
   const down = p.action === 'down' || p.action === 'scaled';

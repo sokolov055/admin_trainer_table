@@ -177,6 +177,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         return;
       }
       const result = await journalGet(clientRow, id);
+      // Чтение ушло раньше, чем сервер принял нажатие часов, а пришло
+      // после него (23.10.2026): занятие старее того, что уже на экране, —
+      // подход снова не отмечен, отдых прошлый. Не берём
+      const cur = state.current;
+      if (cur && cur.session && cur.session.id === id && (cur.revision || 0) > (result.session.revision || 0)) return;
       store({ session: result.session, revision: result.session.revision, serverTitle: result.session.title, dirty: false, tick: serverTick(result.session) });
     } catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
@@ -1281,7 +1286,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {members.some(({ ex }) => planText(ex.prescription)) && (
         <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '')).join('; ')}</p>
       )}
-      {members.map(({ ex }) => <LastRunHint key={'last' + ex.id} last={ex.lastRun} name={ex.name} tired={ex.tired} />)}
+      {members.map(({ ex }) => <LastRunHint key={'last' + ex.id} last={ex.lastRun} name={ex.name} tired={ex.tired} sets={ex.sets} />)}
       {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
       {members.map(({ ex }) => ex.exerciseId && setups[ex.exerciseId]
         ? <WorkoutGuidance key={'about' + ex.id} info={setups[ex.exerciseId]} trainer={!asClient} title={ex.name} /> : null)}
@@ -1402,6 +1407,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // Вес (у веса помощи — помощь) руками — свой (own): оценки его не двигают
     const editAll = (key, value) => updateExercise(ei, x => {
       const valueKey = isAssisted(x) ? 'assist' : 'weight';
+      // Повторы всем — вес каждого пересчитать, как при правке одного
+      // подхода (editSetField, 23.10.2026): раньше менялись только повторы
+      if (key === 'reps') return x.sets.reduce((y, set, k) => (set.state === 'pending' ? editSetField(y, k, 'reps', value) : y), x);
       return { ...x, sets: x.sets.map(set => {
         if (set.state !== 'pending') return set;
         if (key !== valueKey) return { ...set, [key]: value };
@@ -2094,7 +2102,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {/* Цель диапазона — к ней клиент стремится (19.10.2026) */}
           {repsGoalText(ex) && <p className="workout__goal">{repsGoalText(ex)}</p>}
-          <LastRunHint last={ex.lastRun} tired={ex.tired} />
+          <LastRunHint last={ex.lastRun} tired={ex.tired} sets={ex.sets} />
           {/* Разминка — сверху, над подходами (FT-532): встаёт перед рабочими */}
           {trackOf(ex).kind !== 'cardio' && !ex.sets.some(x => x.who) && (
             <button type="button" className="button button--ghost button--block workout__add workout__add--warmup" disabled={ex.sets.length >= 20} onClick={() => updateExercise(ei, withWarmup)}>
