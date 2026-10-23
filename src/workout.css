@@ -50,6 +50,21 @@
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
+/* Фон шапки продолжается вверх до края экрана (владелец, 24.10.2026): в
+   верхней точке между часами и шапкой не видно щели с рисунком темы, а
+   при прокрутке над прилипшей шапкой ничего не просвечивает. Только когда
+   шапка первая: над ней бывают ошибка сохранения и окно конфликта — их фон
+   не закрывает */
+.workout__header:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 100vh;
+  background: var(--bg);
+  pointer-events: none;
+}
 
 .workout__header h2 {
   margin: 0;
