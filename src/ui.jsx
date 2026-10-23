@@ -853,8 +853,8 @@ const WEEKDAY_AT = [
  *
  * Считаем разницу в КАЛЕНДАРНЫХ днях, а не в сутках: занятие сегодня в
  * 18:00 — это «сегодня», хотя до него меньше суток, и «завтра», если
- * делить разницу в миллисекундах на 24 часа. Именно так ошибается
- * relativeDays, поэтому здесь отдельный расчёт.
+ * делить разницу в миллисекундах на 24 часа. Так же с 23.10.2026 считает
+ * и daysSince (relativeDays) ниже.
  */
 export function formatWhen(iso) {
   if (!iso) return '';
@@ -874,11 +874,14 @@ export function formatWhen(iso) {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + time;
 }
 
+// Тоже в календарных днях: делением на сутки тренировка в среду в 07:30
+// в пятницу в 06:58 выходила «вчера» (23.10.2026)
 export function daysSince(iso) {
   if (!iso) return null;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return null;
-  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  return Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
 }
 
 /** «3 дня назад» вместо даты там, где важна свежесть, а не сам день */
