@@ -8,7 +8,7 @@ import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, withoutSet, cloneSet, editSetField } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh } from './icons.jsx';
 import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -2004,6 +2004,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // У какого упражнения тренер открыл «делал под другим названием?» — пока
   // открыто, блок не прячется, даже когда веса уже подтянулись («Отменить»)
   const [historyPick, setHistoryPick] = useState(null);
+  // Меню «Ещё» у упражнения (toolsRow): id упражнения или null
+  const [exMenu, setExMenu] = useState(null);
   // Раскрытый список замен — на экран (FT-595). Ошибки сохранения — нет
   // (data-reveal="off"): они бывают и фоновые, и рывок к шапке посреди
   // подходов мешал бы
@@ -2119,31 +2121,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * регулировки не должны повторять инструкцию упражнения (FT-570).
    */
   const extrasView = (ex, ei, info) => {
-    const machines = info.machines || [];
     const split = ex.sets.some((x) => x.who);
-    // Основное не отмечено, а занятие уже знает тренажёр (закрепил тренер или
-    // взят по истории, exercise-history.js) — настройка этого тренажёра
-    const pinned = ex.machine && ex.machine.uid && machines.some((m) => m.uid === ex.machine.uid);
-    const guide = !info.primaryEquipmentUid && pinned ? { ...info, primaryEquipmentUid: ex.machine.uid } : info;
-    const primary = primaryEquipment(guide);
-    const alts = (info.alternatives || []).filter((a) => a.id !== Number(ex.exerciseId));
-    const started = ex.sets.some((x) => x.state === 'done');
+    const primary = primaryEquipment(guideOf(ex, info));
     return <>
-      {/* Тренажёр закрепил тренер (16.10.2026) — клиент его не выбирает */}
-      {machines.length > 0 && !split && (
-        <div className="workout__machines">
-          {/* Подсказка стоит до первой отметки, а не до первой цифры (аудит
-              24.10.2026): пропадая на вводе веса, она утаскивала строки
-              подходов из-под пальца. Вес, пришедший с программой, — не
-              «впишите», поэтому без вписанного здесь (own) смотрим на поля */}
-          {primary && editable && !ex.prevWeight && !ex.lastRun && trackOf(ex).kind === 'strength'
-            && !ex.sets.some((x) => x.state === 'done')
-            && (ex.sets.some((x) => x.own) || ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim())) && (
-            <p className="small muted">{otherMachineText(ex.otherRun) || 'Здесь ещё не делали — впишите вес, дальше он запомнится.'}</p>
-          )}
-        </div>
-      )}
-      <WorkoutGuidance info={guide} trainer={!asClient} />
+      {/* Шапка упражнения, вариант А2 (владелец, 24.10.2026): под названием —
+          тренажёр одной строкой, настройка клиента — плашкой (ради неё в зале
+          и смотрят), остальное — рядом кнопок (toolsRow) */}
+      {primary && !split && <p className="workout__machine-line">{primary.name}</p>}
       {/* Своя настройка — у каждого клиента своя, на виду, а не в
           раскрывашке: ради неё в зале и смотрят. У каждого тренажёра своя */}
       {!split && noteTargetsOf(info).map(({ target, label }) => (
@@ -2156,34 +2140,91 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           })} />
       ))}
       {split && splitView(ex, ei, info)}
-      {/* Замена (владелец, 16.10.2026: понятнее и удобнее): клиент меняет
-          упражнение, а не тренажёр — одной кнопкой, со списком и пояснением.
-          Связь в обе стороны (сервер), поэтому вернуться — тем же списком */}
-      {/* Только тренеру (владелец, 16.10.2026): то же упражнение под старым
-          названием — перенести веса и настройку из журнала клиента */}
-      {!asClient && clientRow && editable && ex.exerciseId && !started && renaming !== ex.id
-        && ((!ex.prevWeight && !ex.lastRun) || historyPick === ex.id) && (
-        <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
+    </>;
+  };
+
+  /**
+   * Для «Техники»: основное не отмечено, а занятие уже знает тренажёр
+   * (закрепил тренер или взят по истории, exercise-history.js) — настройка
+   * этого тренажёра
+   */
+  const guideOf = (ex, info) => {
+    const machines = info.machines || [];
+    const pinned = ex.machine && ex.machine.uid && machines.some((m) => m.uid === ex.machine.uid);
+    return !info.primaryEquipmentUid && pinned ? { ...info, primaryEquipmentUid: ex.machine.uid } : info;
+  };
+
+  /**
+   * Ряд кнопок под настройкой (вариант А2, 24.10.2026): «Техника» — листом
+   * снизу, «Заменить» — до первого подхода, «Ещё» — редкое: подходы и
+   * отдых, «делали под другим названием», удалить. Раньше всё это стояло
+   * восемью строками ссылок над подходами
+   */
+  const toolsRow = (ex, ei) => {
+    const info = ex.exerciseId ? setups[ex.exerciseId] : null;
+    const split = ex.sets.some((x) => x.who);
+    const started = ex.sets.some((x) => x.state === 'done');
+    const alts = info ? (info.alternatives || []).filter((a) => a.id !== Number(ex.exerciseId)) : [];
+    // После первого подхода замены нет (аудит 24.10.2026)
+    const canSwap = alts.length > 0 && editable && !started;
+    // Только тренеру (владелец, 16.10.2026): то же упражнение под старым
+    // названием — перенести веса и настройку из журнала клиента
+    const canRename = !!(!asClient && clientRow && editable && ex.exerciseId && !started && renaming !== ex.id);
+    const canTune = !split && !asClient;
+    const canDelete = editable && !asClient && s.exercises.length > 1;
+    const removeExercise = () => { const snapshot = s.exercises; setUndo('Упражнение удалено', v => putExercisesBack(v, snapshot, new Set([ex.id]))); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); };
+    const more = [
+      canTune && { key: 'tune', text: isFunctional(ex) ? 'Интервалы' : trackOf(ex).kind === 'cardio' ? 'Цели и настройки' : 'Подходы, вес и отдых', act: () => startTune(ex.id) },
+      // Как раньше ссылка — только пока у клиента нет истории этого упражнения
+      canRename && !ex.prevWeight && !ex.lastRun && { key: 'rename', text: 'Делали под другим названием', act: () => setHistoryPick(ex.id) },
+      canDelete && { key: 'delete', text: 'Удалить упражнение', critical: true, act: removeExercise },
+    ].filter(Boolean);
+    const menuOpen = exMenu === ex.id;
+    // Здесь ещё не делали — до первой отметки, а не до первой цифры (аудит
+    // 24.10.2026): пропадая на вводе веса, подсказка утаскивала строки
+    // подходов из-под пальца. Вес, пришедший с программой, — не «впишите»,
+    // поэтому без вписанного здесь (own) смотрим на поля
+    const machines = (info && info.machines) || [];
+    const hint = !!info && machines.length > 0 && !split && !!primaryEquipment(guideOf(ex, info)) && editable && !ex.prevWeight && !ex.lastRun
+      && trackOf(ex).kind === 'strength' && !started
+      && (ex.sets.some((x) => x.own) || ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim()));
+    if (!info && !more.length) return null;
+    return <>
+      <div className="workout__tools">
+        {info && <WorkoutGuidance info={guideOf(ex, info)} trainer={!asClient} chip />}
+        {canSwap && <button type="button" className="workout__chip workout__alts-toggle" aria-expanded={swapping === ex.id}
+          onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
+          <IconRefresh size={16} aria-hidden="true" />{swapping === ex.id ? 'Не заменять' : 'Заменить'}
+        </button>}
+        {more.length > 0 && <div className="workout__tools-more">
+          <button type="button" className="workout__chip" aria-label={ex.name + ': ещё'} aria-haspopup="menu" aria-expanded={menuOpen}
+            onClick={() => { haptic(); setExMenu(menuOpen ? null : ex.id); }}>
+            Ещё<IconChevron size={14} aria-hidden="true" className={menuOpen ? 'workout__chip-up' : undefined} />
+          </button>
+          {menuOpen && <>
+            <div className="workout__more-scrim" onClick={() => setExMenu(null)} aria-hidden="true" />
+            <div className="workout__menu workout__menu--tools" role="menu" aria-label={ex.name + ': ещё'}>
+              {more.map((m) => <button type="button" role="menuitem" key={m.key} className={'workout__menu-item' + (m.critical ? ' workout__menu-item--critical' : '')}
+                onClick={() => { setExMenu(null); m.act(); }}>{m.text}</button>)}
+            </div>
+          </>}
+        </div>}
+      </div>
+      {/* Замена (владелец, 16.10.2026): клиент меняет упражнение, а не
+          тренажёр — списком с пояснением. Связь в обе стороны (сервер) */}
+      {canSwap && swapping === ex.id && <div className="workout__alts-list" ref={altsRef}>
+        <p className="small muted">Тренажёр занят или упражнение не подходит — выберите, чем заменить. Вес подтянется с прошлого раза.</p>
+        {alts.map((a) => (
+          <button type="button" key={a.id} className="workout__alts-item"
+            onClick={() => { haptic(); setSwapping(null); replaceExercise(ei, { name: a.name, exerciseId: a.id }); }}>{a.name}</button>
+        ))}
+      </div>}
+      {canRename && historyPick === ex.id && (
+        <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }} autoOpen
           onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
           after="Веса и настройка — уже в этом занятии." />
       )}
-      {/* После первого подхода замены нет — и постоянной строки об этом тоже
-          (аудит 24.10.2026): она стояла под каждым начатым упражнением */}
-      {alts.length > 0 && editable && !started && (
-        <div className="workout__alts">
-          <button type="button" className="workout__alts-toggle" aria-expanded={swapping === ex.id}
-            onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
-            {swapping === ex.id ? 'Не заменять' : 'Заменить упражнение'}
-          </button>
-          {swapping === ex.id && <div className="workout__alts-list" ref={altsRef}>
-            <p className="small muted">Тренажёр занят или упражнение не подходит — выберите, чем заменить. Вес подтянется с прошлого раза.</p>
-            {alts.map((a) => (
-              <button type="button" key={a.id} className="workout__alts-item"
-                onClick={() => { haptic(); setSwapping(null); replaceExercise(ei, { name: a.name, exerciseId: a.id }); }}>{a.name}</button>
-            ))}
-          </div>}
-        </div>
-      )}
+      {hint && <p className="small muted workout__first-hint">{otherMachineText(ex.otherRun) || 'Здесь ещё не делали — впишите вес, дальше он запомнится.'}</p>}
     </>;
   };
 
@@ -2383,20 +2424,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {/* «4 × 12» крупно убрано (владелец, 09.10.2026): подходы и повторы
               и так видны в строках. Единицы — касанием: подходы, вес, время,
               у кардио — цели и интервалы, как в круге суперсета */}
-          {!ex.sets.some(x => x.who) && !asClient && <button type="button" className="workout__units-tap" aria-expanded={tuning === ex.id} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id)}>
-            {isFunctional(ex) ? 'Интервалы' : trackOf(ex).kind === 'cardio' ? 'Цели и настройки' : 'Подходы, вес и отдых'}<IconSliders size={12} aria-hidden="true" />
-          </button>}
+          {toolsRow(ex, ei)}
           {tuning === ex.id && tuneEditor(ex, ei, ex.id)}
           {/* Последнее выполнение клиентом — с повторами и оценкой */}
           {/* Цель диапазона — к ней клиент стремится (19.10.2026) */}
           {repsGoalText(ex) && <p className="workout__goal">{repsGoalText(ex)}</p>}
           <LastRunHint last={ex.lastRun} tired={ex.tired} sets={ex.sets} />
-          {/* Разминка — сверху, над подходами (FT-532): встаёт перед рабочими */}
-          {trackOf(ex).kind !== 'cardio' && !ex.sets.some(x => x.who) && (
-            <button type="button" className="button button--ghost button--block workout__add workout__add--warmup" disabled={ex.sets.length >= 20} onClick={() => updateExercise(ei, withWarmup)}>
-              Добавить разминочный подход
-            </button>
-          )}
           {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}</div>}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
           {trackOf(ex).kind === 'cardio' && !isFunctional(ex) && metricAdd(ex, ei)}
@@ -2407,10 +2440,16 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             const round = who.length
               ? who.map(w => cloneSet([...ex.sets].reverse().find(x => x.who === w)))
               : [cloneSet(ex.sets[ex.sets.length - 1])];
+            // Разминка — кнопкой рядом (вариант А2, 24.10.2026); встаёт перед
+            // рабочими (FT-532)
+            const warm = trackOf(ex).kind !== 'cardio' && !who.length;
             return (
-              <button className="button button--ghost button--block workout__add" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
-                {who.length > 1 ? 'Добавить круг' : trackOf(ex).kind === 'cardio' ? 'Добавить отрезок' : 'Добавить подход'}
-              </button>
+              <div className="workout__add-row">
+                <button className="button button--ghost button--block workout__add" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
+                  {who.length > 1 ? 'Добавить круг' : trackOf(ex).kind === 'cardio' ? 'Добавить отрезок' : 'Добавить подход'}
+                </button>
+                {warm && <button type="button" className="button button--ghost workout__add workout__add--warmup" aria-label="Добавить разминочный подход" disabled={ex.sets.length >= 20} onClick={() => updateExercise(ei, withWarmup)}>+ Разминка</button>}
+              </div>
             );
           })()}
           {/* Заметка — свёрнута, пока пустая: поле ввода на всю ширину в

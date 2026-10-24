@@ -485,27 +485,30 @@ test('суперсет показан одной группой с числом 
 });
 
 /**
- * FT-570: один раздел «Тренажёр и техника» — свёрнут; внутри по порядку
- * настройка тренажёра (один источник), техника с ошибкой один раз, мышцы.
- * Своя настройка клиента — на виду и при свёрнутом разделе.
+ * FT-570: один раздел «Тренажёр и техника»; внутри по порядку настройка
+ * тренажёра (один источник), техника с ошибкой один раз, мышцы. С варианта
+ * А2 (24.10.2026) — кнопкой «Техника», текст — листом снизу. Своя настройка
+ * клиента — на виду, плашкой в карточке.
  */
 test('в активной тренировке один раздел: настройка, техника, мышцы', async () => {
   await section('Тренировка 2 — низ').getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('heading', { name: 'Тренировка 2 — низ' }).first().waitFor({ timeout: 20000 });
 
   const squat = page.locator('.workout__exercise').filter({ hasText: 'Присед со штангой' });
-  const about = squat.locator('details.workout__about');
-  await about.first().waitFor({ timeout: 10000 });
-  assert.equal(await about.count(), 1, 'справка — одним разделом');
-  assert.equal(await about.evaluate((d) => d.open), false, 'по умолчанию свёрнут');
+  const chip = squat.locator('.workout__about');
+  await chip.first().waitFor({ timeout: 10000 });
+  assert.equal(await chip.count(), 1, 'справка — одной кнопкой');
   await squat.getByText('Крюки на 4-й, упоры на 2-й').waitFor({ timeout: 5000 });
-  await about.locator('summary').first().click();
+  await chip.first().click();
+  const about = page.locator('.guide-sheet');
   await about.getByRole('heading', { name: 'Подготовка', exact: true }).waitFor({ timeout: 5000 });
   assert.equal(await about.locator('.guide__avoid').count(), 1, 'ошибки — одним блоком');
   const text = await about.evaluate((d) => d.textContent);
   assert.ok(text.indexOf('Подготовка') < text.indexOf('Движение'), 'сначала подготовка, потом движение');
   assert.ok(text.indexOf('Движение') < text.indexOf('Чего избегать'), 'ошибки — после шагов');
   assert.ok(text.indexOf('Чего избегать') < text.indexOf('Мышцы'), 'мышцы — в конце');
+  await page.keyboard.press('Escape');
+  await about.waitFor({ state: 'detached', timeout: 5000 });
   assert.equal(await squat.getByText('Крюки на 4-й, упоры на 2-й').isVisible(), true, 'своя настройка на виду');
 
   await page.getByRole('button', { name: 'Ещё', exact: true }).click();

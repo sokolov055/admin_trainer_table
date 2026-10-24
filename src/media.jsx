@@ -218,9 +218,11 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
         <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} label={label} />
         <button type="button" className="workout__note-edit" onClick={() => setEditing(true)}>Изменить</button>
       </div>
+      // Пустая — плашкой на том же месте, что записанная (вариант А2,
+      // владелец, 24.10.2026): видно сразу, что её нет, и искать не надо
       : <button type="button" className="workout__note-add" onClick={() => setEditing(true)}>
-        {/* Короче (владелец, 09.10.2026): клиенту — своя, тренеру — клиента */}
-        {(trainer ? '+ Настройка клиента' : '+ Моя настройка') + (label ? ' · ' + label : '')}
+        <span className="workout__note-add-text">{(trainer ? 'Настройка клиента не записана' : 'Моя настройка не записана') + (label ? ' · ' + label : '')}</span>
+        <span className="workout__note-add-act">Записать</span>
       </button>;
   }
   return <div className="workout__note-form" ref={formRef}>

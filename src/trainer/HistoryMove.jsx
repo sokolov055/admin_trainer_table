@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useReveal } from '../reveal.js';
@@ -81,7 +81,8 @@ function plural(n) {
  * его под старым названием — тренер выбирает его из журнала клиента, и
  * веса с настройкой переезжают сюда (HistoryMove). Только тренеру.
  */
-export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '«Было» и веса — уже в программе.' }) {
+/** autoOpen — открыт сразу, без своей ссылки (занятие: пункт меню «Ещё») */
+export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '«Было» и веса — уже в программе.', autoOpen = false }) {
   const [list, setList] = useState(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -102,9 +103,11 @@ export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '
     }
   };
   const close = () => { setOpen(false); setFrom(null); setQuery(''); if (onClose) onClose(); };
+  useEffect(() => { if (autoOpen) show(); }, []);
 
   if (from) return <HistoryMove clientRow={clientRow} from={from} to={to} onClose={close} onMoved={onMoved} after={after} />;
   if (!open) {
+    if (autoOpen) return null;
     return <button type="button" className="history-move__link" onClick={show}>Это упражнение делали под другим названием?</button>;
   }
   const words = query.trim().toLowerCase();

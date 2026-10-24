@@ -835,25 +835,27 @@ test('FT-570, вариант А: шаги одной нумерацией, ош�
       await delay();
     });
 
-    const about = local.root.find(n => n.type === 'details' && n.props.className === 'workout__setup workout__about');
-    assert.equal(text(about), 'Тренажёр и техникаTechnogym · 2 шага · видео', 'закрыто: заголовок и что внутри');
-    assert.equal(about.findAllByType('img').length, 0, 'медиа ещё не смонтированы');
+    // Вариант А2 (24.10.2026): «Техника» — кнопкой в ряду, текст — листом снизу
+    const chip = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__about'));
+    assert.equal(text(chip), 'Техника');
+    assert.equal(chip.props['aria-label'], 'Техника: Technogym · 2 шага · видео', 'закрыто: что внутри — для чтения вслух');
+    assert.equal(local.root.findAll(n => n.props && n.props.className === 'guide-sheet').length, 0, 'лист закрыт — медиа не смонтированы');
+    assert.ok(local.root.findAll(n => n.type === 'p' && n.props.className === 'workout__machine-line' && text(n) === 'Technogym').length === 1, 'тренажёр — строкой под названием');
     const weights = () => local.root.findAllByType('input').filter(n => /подход [123], вес в кг/.test(n.props['aria-label'] || ''));
     await act(async () => { weights()[0].props.onChange({ target: { value: '37' } }); await delay(); });
     const before = weights().map(n => n.props.value);
-    await act(async () => { about.props.onToggle({ currentTarget: { open: true } }); });
+    await act(async () => { chip.props.onClick(); await delay(); });
+    const about = local.root.find(n => n.type === 'div' && n.props.className === 'guide-sheet');
     assert.equal(text(about.find(n => n.props.className === 'guide__machine-name')), 'Technogym');
     assert.deepEqual(about.findAll(n => n.props.className === 'guide__h').map(text), ['Подготовка', 'Движение', 'Чего избегать', 'Мышцы']);
-    assert.equal(about.findAllByType('details').length, 1, 'мышцы — без вложенной раскрывашки');
+    assert.equal(about.findAllByType('details').length, 0, 'мышцы — без вложенной раскрывашки');
     assert.ok(!text(about).includes('рукоятки на уровне плеч'), 'резервная инструкция не показана');
     assert.equal(about.findAll(n => n.props.className === 'guide__steps').length, 2, 'подготовка и движение — одним видом');
     assert.equal(about.findAll(n => n.props.className === 'guide__avoid').length, 1, 'ошибки настройки и техники — одним блоком');
     assert.ok(text(about).includes('Не тяните рычаг под нагрузкой.'), 'ошибка тренажёра в общем блоке');
     assert.equal(text(about).split('Не раскачивайтесь.').length - 1, 1, 'ошибка не дублируется');
     assert.ok(about.findAllByType('img').length >= 3, 'фото и анимация доступны вместе с техникой');
-    await act(async () => { about.props.onToggle({ currentTarget: { open: false } }); });
-    assert.deepEqual(weights().map(n => n.props.value), before, 'введённые веса сохраняются при раскрытии');
-    assert.equal(about.findAllByType('img').length, 0);
+    assert.deepEqual(weights().map(n => n.props.value), before, 'введённые веса сохраняются при открытии');
   } finally {
     exerciseSetupResponse = null;
     if (local) local.unmount();
@@ -917,11 +919,12 @@ test('тренажёры закрепил тренер: выбора нет, п�
     });
     assert.equal(local.root.findAll(n => n.props.role === 'radiogroup').length, 0, 'выбирать тренажёр нечего');
     assert.ok(calls.some(([a, q]) => a === 'workout.exercise.history' && q.machineUid === 'bar1'), 'первый подставлен сам — с весом на нём');
-    const about = local.root.find(n => n.type === 'details' && n.props.className === 'workout__setup workout__about');
-    await act(async () => { about.props.onToggle({ currentTarget: { open: true } }); });
+    const chip = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__about'));
+    await act(async () => { chip.props.onClick(); await delay(); });
+    const about = local.root.find(n => n.type === 'div' && n.props.className === 'guide-sheet');
     assert.ok(text(about).includes('Дополнительно: Скамья'));
     assert.deepEqual(local.root.findAll(n => n.props.className === 'machine__note').map(text), ['Ваша настройка · ГрифХват 81']);
-    assert.ok(local.root.findAllByType('button').some(b => text(b) === '+ Моя настройка · Скамья'), 'у скамьи своя');
+    assert.ok(local.root.findAllByType('button').some(b => text(b) === 'Моя настройка не записана · СкамьяЗаписать'), 'у скамьи своя — плашкой «не записана»');
 
     const edit = local.root.findAllByType('button').find(b => text(b) === 'Изменить');
     await act(async () => { edit.props.onClick(); await delay(); });
@@ -961,12 +964,12 @@ test('замена упражнения: кнопка, список, новое 
     });
     const button = (label) => local.root.findAllByType('button').find((b) => text(b) === label);
     assert.equal(button('Жим гантелей'), undefined, 'список свёрнут');
-    await act(async () => { button('Заменить упражнение').props.onClick(); await delay(); });
+    await act(async () => { button('Заменить').props.onClick(); await delay(); });
     assert.ok(local.root.findAllByType('p').some((p) => /выберите, чем заменить/.test(text(p))), 'пояснение');
     await act(async () => { button('Жим гантелей').props.onClick(); await delay(); });
     assert.ok(local.root.findAllByType('h3').some((n) => text(n).includes('Жим гантелей')), 'упражнение заменено');
     assert.ok(calls.some(([a, q]) => a === 'workout.exercise.history' && Number(q.exerciseId) === 78), 'вес — с прошлого раза на новом');
-    await act(async () => { button('Заменить упражнение').props.onClick(); await delay(); });
+    await act(async () => { button('Заменить').props.onClick(); await delay(); });
     assert.ok(button('Жим штанги'), 'вернуться — тем же списком');
   } finally {
     globalThis.__workoutApi = api;
@@ -992,7 +995,16 @@ test('«делал под другим названием?» — только т
   data.clear();
   exerciseSetupResponse = { setups: { 90: { name: 'Подтягивания узким хватом с резиновой петлёй', setup: '', notes: '', machines: [], alternatives: [],
     noteKey: 'e:подтягивания', muscles: { primary: [], secondary: [] }, media: null } }, notes: {} };
-  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Это упражнение делали под другим названием?');
+  // Вариант А2 (24.10.2026): пункт меню «Ещё» у упражнения
+  const has = async (node) => {
+    const more = node.root.findAllByType('button').find((b) => b.props['aria-label'] === 'Подтягивания узким хватом с резиновой петлёй: ещё');
+    if (!more) return false;
+    await act(async () => { more.props.onClick(); await delay(); });
+    const item = node.root.findAllByType('button').find((b) => text(b) === 'Делали под другим названием');
+    if (!item) return false;
+    await act(async () => { item.props.onClick(); await delay(); });
+    return node.root.findAll((n) => n.type === 'p' && /Что из журнала/.test(text(n))).length === 1;
+  };
   let local;
   try {
     for (const [clientRow, seen] of [[undefined, false], [3, true]]) {
@@ -1002,7 +1014,7 @@ test('«делал под другим названием?» — только т
         }, month: 'Октябрь 2026' }, onClose() {} }));
         await delay();
       });
-      assert.equal(has(local), seen, clientRow ? 'тренер видит' : 'клиент не видит');
+      assert.equal(await has(local), seen, clientRow ? 'тренер видит и открывает' : 'клиент не видит');
       local.unmount();
       local = null;
     }
@@ -1273,7 +1285,8 @@ test('обычное упражнение: касание плана — под�
     const press = async b => { assert.ok(b); await act(async () => { b.props.onClick(); await delay(); }); };
     const sets = () => local.root.findAllByType('input').filter(n => /^Жим ногами, подход \d, повторы$/.test(n.props['aria-label'] || ''));
     assert.ok(!local.root.findAllByType('summary').some(n => text(n) === 'Изменить упражнение'), 'меню нет');
-    await press(byLabel('Жим ногами: настройки'));
+    await press(byLabel('Жим ногами: ещё'));
+    await press(button('Подходы, вес и отдых'));
     await press(byLabel('Добавить подход'));
     assert.equal(sets().length, 4);
     const reps = local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Жим ногами: повторы, всем подходам');
@@ -1349,14 +1362,14 @@ test('клиент не меняет ни названия, ни состава 
 
     // FT-532: разминочный — сверху, перед рабочими, половина веса кратно 2,5
     const weight = (n) => local.root.findAllByType('input').find(x => x.props['aria-label'] === `Жим ногами, подход ${n}, вес в кг`);
-    const warm = buttons().find(b => text(b) === 'Добавить разминочный подход');
-    assert.ok(warm, 'кнопка над подходами — и у клиента');
+    const warm = buttons().find(b => text(b) === '+ Разминка');
+    assert.ok(warm, 'кнопка рядом с «Добавить подход» — и у клиента');
     await act(async () => { warm.props.onClick(); await delay(); });
     assert.equal(weight(1).props.value, '50');
     assert.equal(weight(2).props.value, '100', 'рабочие — после разминки');
     assert.equal(weight(4).props.value, '100');
     // Второй разминочный — после первого, всё ещё перед рабочими
-    await act(async () => { buttons().find(b => text(b) === 'Добавить разминочный подход').props.onClick(); await delay(); });
+    await act(async () => { buttons().find(b => text(b) === '+ Разминка').props.onClick(); await delay(); });
     assert.equal(weight(2).props.value, '50');
     assert.equal(weight(3).props.value, '100');
     assert.equal(local.root.findAll(n => n.type === 'span' && n.props.className === 'workout__set-sub' && text(n) === 'Разминка').length, 2, 'оба помечены «Разминка» (было «1 · Р»)');
@@ -1516,7 +1529,8 @@ test('отдых упражнения меняется в занятии: пан
   });
   const byLabel = label => local.root.findAllByType('button').find(b => b.props['aria-label'] === label);
   const press = async b => { assert.ok(b); await act(async () => { b.props.onClick(); await delay(); }); };
-  await press(byLabel('Жим ногами: настройки'));
+  await press(byLabel('Жим ногами: ещё'));
+  await press(local.root.findAllByType('button').find(b => text(b) === 'Подходы, вес и отдых'));
   const chips = local.root.findAll(n => n.props && n.props.role === 'radiogroup' && n.props['aria-label'] === 'Отдых после подхода');
   assert.equal(chips.length, 1, 'в панели настроек — отдых упражнения');
   await press(chips[0].findAll(n => n.type === 'button' && text(n) === '2:00')[0]);
@@ -1611,7 +1625,7 @@ test('аудит 24.10.2026: место под настройки упражне
     assert.equal(waits().length, 1, 'скелетон — только у упражнения из базы, пока настройки в пути');
     await act(async () => { release(info); await delay(); });
     assert.equal(waits().length, 0, 'приехали — на месте скелетона настройки');
-    assert.ok(local.root.findAll(n => n.type === 'details' && n.props.className === 'workout__setup workout__about').length === 1);
+    assert.ok(local.root.findAll(n => n.type === 'button' && String(n.props.className || '').includes('workout__about')).length === 1);
     assert.ok(local.root.findAll(n => n.type === 'p' && /Здесь ещё не делали/.test(text(n))).length === 1, 'подсказка про вес на месте');
     assert.equal(buzz.length, 0, 'тренажёр подставлен сам — телефон не вибрирует');
     // Подсказка не пропадает на первой цифре — только после отметки подхода
@@ -1629,7 +1643,7 @@ test('аудит 24.10.2026: место под настройки упражне
     exerciseSetupResponse = new Promise(() => {});
     await act(async () => { local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Октябрь 2026' }, onClose() {} })); await delay(); });
     assert.equal(waits().length, 0, 'из запаса — без скелетона');
-    assert.ok(local.root.findAll(n => n.type === 'details' && n.props.className === 'workout__setup workout__about').length === 1);
+    assert.ok(local.root.findAll(n => n.type === 'button' && String(n.props.className || '').includes('workout__about')).length === 1);
   } finally {
     globalThis.__haptic = null;
     globalThis.__workoutStale = null;

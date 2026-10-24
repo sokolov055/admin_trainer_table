@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { resolveGuidance, guideSteps, stepLabel } from './equipment-guidance.js';
 import { MachinePhoto, Media } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
+import { Sheet } from './ui.jsx';
+import { IconPlay } from './icons.jsx';
 
 /** Шаги одной нумерацией: start — сколько шагов уже было выше */
 function Steps({ lines, start = 0 }) {
@@ -26,7 +28,10 @@ function stepsWord(n) {
  * Состояние раскрытия изолировано от состояния занятия.
  */
 // title — чьё это упражнение: в круге суперсета разделы идут подряд
-export default function WorkoutGuidance({ info, trainer = false, title = '' }) {
+// chip — кнопка «Техника» в ряду под настройкой (вариант А2, владелец,
+// 24.10.2026): текст открывается листом снизу, а не раскрывается внутри
+// карточки и не сдвигает подходы
+export default function WorkoutGuidance({ info, trainer = false, title = '', chip = false }) {
   const [open, setOpen] = useState(false);
   const [figure, setFigure] = useState(false);
   const g = resolveGuidance(info);
@@ -35,12 +40,7 @@ export default function WorkoutGuidance({ info, trainer = false, title = '' }) {
   const both = prep.length > 0 && move.length > 0;
   const hasMuscles = !!(g.muscles?.primary?.length || g.muscles?.secondary?.length);
   const meta = [g.primary?.name, total ? total + ' ' + stepsWord(total) : '', g.media ? 'видео' : ''].filter(Boolean).join(' · ');
-  return <details className="workout__setup workout__about" onToggle={(e) => setOpen(e.currentTarget.open)}>
-    <summary>
-      <span>{title ? title + ': ' : ''}{info.machines?.length ? (title ? 'тренажёр и техника' : 'Тренажёр и техника') : (title ? 'техника выполнения' : 'Техника выполнения')}</span>
-      {!open && meta && <span className="guide__meta">{meta}</span>}
-    </summary>
-    {open && <div className="guide">
+  const body = () => <div className="guide">
       {g.primary && <div className="guide__machine">
         <p className="guide__machine-name">{g.primary.name}</p>
         <MachinePhoto machine={g.primary} />
@@ -70,6 +70,25 @@ export default function WorkoutGuidance({ info, trainer = false, title = '' }) {
         {figure && <div className="guide__figure"><MuscleFigure primary={g.muscles.primary} secondary={g.muscles.secondary} size="lg" captions /></div>}
         <MuscleNames primary={g.muscles.primary} secondary={g.muscles.secondary} max={20} />
       </section>}
-    </div>}
+    </div>;
+  if (chip) {
+    // Без настоящей страницы (проверки компонента) лист рисуется на месте
+    const dom = typeof document !== 'undefined' && !!document.body && document.body.nodeType === 1;
+    return <>
+      <button type="button" className="workout__chip workout__about" aria-haspopup="dialog" aria-expanded={open}
+        aria-label={'Техника' + (meta ? ': ' + meta : '')} onClick={() => setOpen(true)}>
+        <IconPlay size={16} aria-hidden="true" />Техника
+      </button>
+      {open && (dom
+        ? <Sheet title="Техника" onClose={() => setOpen(false)} className="guide-sheet">{body()}</Sheet>
+        : <div className="guide-sheet">{body()}</div>)}
+    </>;
+  }
+  return <details className="workout__setup workout__about" onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <summary>
+      <span>{title ? title + ': ' : ''}{info.machines?.length ? (title ? 'тренажёр и техника' : 'Тренажёр и техника') : (title ? 'техника выполнения' : 'Техника выполнения')}</span>
+      {!open && meta && <span className="guide__meta">{meta}</span>}
+    </summary>
+    {open && body()}
   </details>;
 }
