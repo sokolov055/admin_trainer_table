@@ -16,6 +16,7 @@ import { notifyPermission, askNotifyPermission } from '../native-rest.js';
 import { openPhoneSettings, canRateInStore, openStorePage, deviceInfo } from '../native-review.js';
 import { readReminders, saveReminders, syncReminders, remindersAvailable } from '../native-reminders.js';
 import { WEEKDAYS_SHORT, reminderNote, validTime } from '../reminders-model.js';
+import { SCHEDULE_UNKNOWN } from './schedule-text.js';
 import './settings.css';
 
 /**
@@ -23,9 +24,14 @@ import './settings.css';
  * трёх разборов, пункт 14 и пункт 6, 21.10.2026; макет Settings.dc.html).
  *
  * Подключения — только состояние того, что уже есть на телефоне: откуда
- * шаги, приходят ли тренировки с часов, разрешены ли уведомления. Новых
- * разрешений не просим без объяснения: «Подключить» и «Разрешить» — по
- * нажатию, под строками сказано, что берём.
+ * шаги и приходят ли тренировки с часов. Новых разрешений не просим без
+ * объяснения: «Подключить» и «Разрешить» — по нажатию, под строками
+ * сказано, что берём.
+ *
+ * Разрешение на уведомления — первой строкой «Напоминаний»: всё про
+ * уведомления в одном разделе «Уведомления» (ClientApp.jsx) — разрешение
+ * телефона, напоминания, сигнал отдыха. Раньше оно было в трёх местах
+ * (аудит 24.10.2026).
  *
  * Напоминания ставит сам телефон (native-reminders.js), расписание — только
  * на нём. В браузере раздел виден, переключатели неактивны.
@@ -51,7 +57,7 @@ async function readConnections() {
       watch = !!(st && st.paired && st.installed);
     } catch (_) { /* старая сборка — без часов */ }
   }
-  return { steps, workouts, watch, notify: await notifyPermission(), hub: healthHub() };
+  return { steps, workouts, watch, hub: healthHub() };
 }
 
 /** Перечитать, когда вернулись из настроек телефона или «Здоровья» */
@@ -141,20 +147,10 @@ export function Connections() {
           note={state.workouts === 'on' ? hub + ' · подключено' + (state.watch ? ' · Apple Watch' : '') : state.workouts === 'off' ? 'Не подключено' : missing(state.workouts)}>
           {state.workouts === 'off' && <button type="button" className="button conn-row__action" disabled={!!busy} onClick={() => run('workouts', connectWorkouts)}>{busy === 'workouts' ? 'Подключаю…' : 'Подключить'}</button>}
         </ConnRow>
-        <ConnRow title="Уведомления в системе"
-          tone={state.notify === 'granted' ? 'good' : state.notify === 'denied' ? 'bad' : ''}
-          note={state.notify === 'granted' ? 'Разрешены' : state.notify === 'denied' ? 'Выключены в настройках телефона' : state.notify === 'prompt' ? 'Ещё не разрешены' : 'Нет — обновите приложение'}>
-          {state.notify === 'prompt' && <button type="button" className="button conn-row__action" disabled={!!busy} onClick={() => run('notify', askNotifyPermission)}>Разрешить</button>}
-        </ConnRow>
-        {state.notify === 'denied' && (
-          <div className="conn-row conn-row--wide">
-            <button type="button" className="button button--block" onClick={() => openPhoneSettings('notifications')}>Открыть настройки телефона</button>
-          </div>
-        )}
       </Panel>
       {problem && <p className="conn-caption conn-caption--bad" role="status">{problem}</p>}
       <p className="conn-caption">
-        Шаги считает телефон или часы, мы берём только суммы по дням. Сон, пульс и вес с часов — в «Моих данных» → «Здоровье». Уведомления нужны для напоминаний ниже и сигнала конца отдыха.
+        Шаги считает телефон или часы, мы берём только суммы по дням. Сон, пульс и вес с часов — в «Моих данных» → «Здоровье».
       </p>
     </>
   );
@@ -178,27 +174,48 @@ function Switch({ checked, onChange, label, disabled }) {
 const WEEK = [1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: WEEKDAYS_SHORT[d] }));
 
 const KINDS = [
-  { id: 'plan', title: 'Занятие по плану' },
+  { id: 'plan', title: 'Тренировка по плану' },
   { id: 'weigh', title: 'Взвешивание' },
   { id: 'measure', title: 'Замеры' },
   { id: 'food', title: 'Еда' },
 ];
 
-/** Ближайшее занятие под «Занятием по плану» — то же, что на «Обзоре» */
+/**
+ * Ближайшая тренировка под «Тренировкой по плану» — то же, что на «Обзоре».
+ * Расписание не ответило — так и пишем, а не «тренировок нет»: это разные
+ * новости (scheduleKnown, как в главной карточке; аудит 24.10.2026)
+ */
 function PlanNext() {
   const { data } = useData('client.overview', {}, []);
   if (!data) return null;
-  return <span className="conn-row__sub">{data.nextTrainingDate ? 'Ближайшее — ' + formatWhen(data.nextTrainingDate) : 'В расписании пока нет занятий'}</span>;
+  const text = data.nextTrainingDate
+    ? 'Ближайшая — ' + formatWhen(data.nextTrainingDate)
+    : data.scheduleKnown === true ? 'В расписании пока нет тренировок' : capital(SCHEDULE_UNKNOWN);
+  return <span className="conn-row__sub">{text}</span>;
 }
+
+const capital = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Состояние разрешения словами — первая строка «Напоминаний» */
+const NOTIFY_NOTE = {
+  granted: 'Разрешены',
+  denied: 'Выключены в настройках телефона',
+  prompt: 'Ещё не разрешены',
+};
 
 export function Reminders() {
   const can = remindersAvailable();
   const [s, setS] = useState(readReminders);
   const [open, setOpen] = useState('');
   const [busy, setBusy] = useState(false);
-  // Уведомления телефона запрещены: напоминания не придут, пока их не включат
+  // Разрешение телефона на уведомления: первой строкой раздела (аудит
+  // 24.10.2026). Запрещены — напоминания не придут, пока их не включат
+  const [perm, setPerm] = useState(null);
   const [denied, setDenied] = useState(false);
-  const check = () => { if (can) notifyPermission().then((p) => setDenied(p === 'denied')).catch(() => {}); };
+  const check = () => {
+    if (!can) return;
+    notifyPermission().then((p) => { setPerm(p); setDenied(p === 'denied'); }).catch(() => {});
+  };
   useEffect(check, []);
   useOnReturn(check);
 
@@ -222,9 +239,18 @@ export function Reminders() {
     let p = await notifyPermission();
     if (p === 'prompt') p = await askNotifyPermission();
     setBusy(false);
+    setPerm(p);
     if (p !== 'granted') { setDenied(true); return; }
     setDenied(false);
     change(kind, { on: true });
+  };
+  const allow = async () => {
+    haptic();
+    setBusy(true);
+    const p = await askNotifyPermission().catch(() => perm);
+    setBusy(false);
+    setPerm(p);
+    setDenied(p === 'denied');
   };
 
   const editor = (kind) => {
@@ -252,6 +278,13 @@ export function Reminders() {
   return (
     <>
       <Panel>
+        {can && perm && (
+          <ConnRow title="Уведомления в системе"
+            tone={perm === 'granted' ? 'good' : perm === 'denied' ? 'bad' : ''}
+            note={NOTIFY_NOTE[perm] || 'Нет — обновите приложение'}>
+            {perm === 'prompt' && <button type="button" className="button conn-row__action" disabled={busy} onClick={allow}>Разрешить</button>}
+          </ConnRow>
+        )}
         {KINDS.map(({ id, title }) => {
           const editable = can && id !== 'plan';
           const expanded = editable && open === id;

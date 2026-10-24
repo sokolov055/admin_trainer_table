@@ -1,0 +1,11 @@
+/* «Обзор» клиента: заглушки на время загрузки (аудит 24.10.2026).
+   Ряд историй держит высоту настоящего — плитка 92 px, отступы ряда те же
+   (.stories в styles.css), поэтому главная карточка не прыгает. */
+.stories--wait { overflow: hidden; pointer-events: none; }
+.stories__wait {
+  flex: 0 0 auto;
+  width: 92px;
+  height: 92px;
+  margin: 0;
+  border-radius: 18px;
+}

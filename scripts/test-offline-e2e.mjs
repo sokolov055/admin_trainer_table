@@ -126,7 +126,7 @@ test('без сети: две тренировки подряд, перезап�
     await page.reload();
     await page.getByRole('button', { name: 'Тренировки', exact: true }).click({ timeout: 60000 });
     await page.getByRole('heading', { name: 'Тренировка 2 — низ' }).waitFor({ timeout: 20000 });
-    await page.getByText(/Нет связи\. Программа и занятия — сохранённые на телефоне/).waitFor({ timeout: 20000 });
+    await page.getByText(/Нет связи\. Программа и тренировки — сохранённые на телефоне/).waitFor({ timeout: 20000 });
 
     // Две тренировки подряд: вторая начинается, хотя первая не отправлена
     await runWorkout(page, 'Тренировка 1 — верх');

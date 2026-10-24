@@ -86,14 +86,14 @@ async function draw(Component, props = {}) {
 test('браузер: четыре переключателя напоминаний неактивны, строки не раскрываются, под ними — почему', async () => {
   const tree = await draw(Reminders);
   const switches = tree.root.findAll((n) => n.type === 'input' && n.props.role === 'switch');
-  assert.deepEqual(switches.map((s) => s.props['aria-label']), ['Занятие по плану', 'Взвешивание', 'Замеры', 'Еда']);
+  assert.deepEqual(switches.map((s) => s.props['aria-label']), ['Тренировка по плану', 'Взвешивание', 'Замеры', 'Еда']);
   assert.ok(switches.every((s) => s.props.disabled === true && s.props.checked === false));
   assert.equal(tree.root.findAll((n) => n.type === 'button').length, 0, 'ни раскрыть строку, ни «Открыть настройки телефона»');
   const text = screen(tree);
   assert.match(text, /Напоминания работают в приложении для iPhone и Android\./);
   assert.match(text, /Понедельник, 7:30/);
   assert.match(text, /За 2 часа до начала/);
-  assert.doesNotMatch(text, /Ближайшее|В расписании/, 'ближайшее занятие — только когда напоминание включено на телефоне');
+  assert.doesNotMatch(text, /Ближайш|В расписании|недоступно|Уведомления в системе/, 'ближайшая тренировка и разрешение — только в приложении на телефоне');
   assert.equal(store.size, 0, 'в браузере ничего не сохраняем');
   await act(async () => tree.unmount());
 });

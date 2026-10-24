@@ -227,13 +227,24 @@ function AwardList({ awards }) {
 
 // preview — тренер смотрит «глазами клиента»: всё видно, править нельзя
 export default function Goals({ clientRow, preview = false }) {
-  const { data } = useData('client.awards', clientRow ? { clientRow } : {}, [clientRow]);
+  const { data, loading } = useData('client.awards', clientRow ? { clientRow } : {}, [clientRow]);
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(false);
 
-  // Блок не главный на экране: пока едет или не доехал — его просто нет,
-  // замеры и шаги ниже от него не зависят
-  if (!data) return null;
+  // Пока едет — заглушки карточек недели, месяца и года: блок, вставленный
+  // позже, толкал вниз всё под ним (аудит 24.10.2026). Не доехал — его
+  // просто нет: замеры и шаги ниже от него не зависят
+  if (!data) {
+    return loading ? (
+      <Section title="Цели">
+        <div className="goals" aria-busy="true">
+          <div className="skeleton goals__wait" />
+          <div className="skeleton goals__wait" />
+          <div className="skeleton goals__wait goals__wait--year" />
+        </div>
+      </Section>
+    ) : null;
+  }
 
   // Кто смотрит: тренер в карточке клиента или в «Моих тренировках» — тренер;
   // клиент и «глазами клиента» — клиент

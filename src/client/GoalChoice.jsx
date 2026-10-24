@@ -28,16 +28,19 @@ export default function GoalChoice() {
   const [picked, setPicked] = useState(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(null);
+  // Ответа ещё нет — заглушка: блок стоит над анкетой «Моих данных» и,
+  // вставленный позже, толкал её вниз (аудит 24.10.2026)
+  const [failed, setFailed] = useState(false);
 
   const take = (r) => { setData(r); if (r.answers) setForm(r.answers); setPicked(null); };
   useEffect(() => {
     let alive = true;
     // Старый сервер этого не знает — блок просто не показывается
-    apiPublic('client.onboarding.choice').then((r) => { if (alive) take(r); }).catch(() => {});
+    apiPublic('client.onboarding.choice').then((r) => { if (alive) take(r); }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, []);
 
-  if (!data) return null;
+  if (!data) return failed ? null : <div className="skeleton goal-choice__wait" aria-busy="true" />;
   if (!data.editable) {
     if (data.reason !== 'trainer') return null;
     return (
@@ -119,7 +122,7 @@ export default function GoalChoice() {
           <div className="ob-programs" role="radiogroup" aria-label="Программы под новые ответы">
             {data.programs.map((p, i) => <Program key={p.id} p={p} i={i} best={i === 0} on={picked === p.id} onPick={() => setPicked(p.id)} />)}
           </div>
-          {picked && <p className="small muted">Программа этого месяца заменится на новую. Прошлые занятия и веса останутся в журнале.</p>}
+          {picked && <p className="small muted">Программа этого месяца заменится на новую. Прошлые тренировки и веса останутся в журнале.</p>}
           <button className="button button--primary button--block" onClick={replace} disabled={busy || !picked}>
             {busy ? 'Минуту…' : picked ? 'Заменить программу' : 'Выберите программу'}
           </button>

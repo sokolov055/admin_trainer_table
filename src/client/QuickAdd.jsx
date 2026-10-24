@@ -44,7 +44,7 @@ export default function QuickAdd({ me, clientRow, preview, tab, onClose, onPick,
   const coach = own ? !!(me && !me.unlinked) : !!preview;
 
   const actions = {
-    workout: { kind: 'workout', tab: 'plan', label: workout.payload.session ? 'К занятию' : 'Занятие', title: workout.title, note: workout.note, payload: workout.payload, Icon: IconPlay },
+    workout: { kind: 'workout', tab: 'plan', label: workout.payload.session ? 'К тренировке' : 'Тренировка', title: workout.title, note: workout.note, payload: workout.payload, Icon: IconPlay },
     food: { kind: 'food', tab: 'nutrition', label: 'Еда', title: 'Добавить еду', hint: mealLabel(mealNow()), note: mealLabel(mealNow()) + ' · по времени, можно сменить', Icon: IconNutrition, off: !own },
     weight: { kind: 'weight', tab: 'progress', label: 'Вес', title: 'Записать вес', note: 'Лучше утром, до завтрака — так честнее сравнивать', Icon: IconScale },
   };
@@ -110,21 +110,22 @@ function useMainAction(clientRow, preview) {
   const journal = useData('workout.list', clientRow ? { clientRow: Number(clientRow) } : {}, [clientRow]);
 
   // Пока не знаем, что идёт и что следующее, — без названия: что начать,
-  // решат сами «Тренировки», когда загрузятся
-  if (!plan.data || !journal.data) return { title: 'Начать занятие', note: '', payload: {} };
+  // решат сами «Тренировки», когда загрузятся. Клиенту везде «тренировка»,
+  // не «занятие» (аудит 24.10.2026)
+  if (!plan.data || !journal.data) return { title: 'Начать тренировку', note: '', payload: {} };
 
   const sessions = journal.data.sessions || [];
   const live = sessions.find((s) => s.status === 'active' || s.status === 'paused');
   if (live) {
     return {
-      title: 'Вернуться к занятию',
+      title: 'Вернуться к тренировке',
       note: live.title + (live.status === 'paused' ? ' · на паузе' : ' · идёт'),
       payload: { session: live.id },
     };
   }
 
   const next = (plan.data.blocks || []).find((b) => !blockSessions(sessions, b, plan.data.month).length);
-  if (next) return { title: 'Начать занятие', note: next.title + ' · следующая по плану', payload: { title: next.title } };
+  if (next) return { title: 'Начать тренировку', note: next.title + ' · следующая по плану', payload: { title: next.title } };
 
   return { title: 'Свободная тренировка', note: 'Без программы: что сделаете, то и запишется', payload: { free: true } };
 }

@@ -118,9 +118,9 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
       return (
         <Section title="Тренировки с часов">
           <Panel pad>
-            <p className="steps__lead">Тренировки с часов — рядом с занятиями из приложения.</p>
+            <p className="steps__lead">Тренировки с часов — рядом с записанными в приложении.</p>
             <p className="small muted">
-              Приложение читает тренировки, которые часы и фитнес-приложения записали в «Здоровье» или Health Connect: вид, время, калории и дистанцию. Совпала с занятием в приложении — покажем их как одну тренировку.
+              Приложение читает тренировки, которые часы и фитнес-приложения записали в «Здоровье» или Health Connect: вид, время, калории и дистанцию. Совпала с тренировкой в приложении — покажем их как одну.
             </p>
             <div className="survey__actions">
               <button className="button button--primary" disabled>Подключить тренировки</button>
@@ -139,7 +139,7 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
       <Section title="Тренировки с часов">
         <Panel pad>
           <p className="steps__lead">
-            {on ? 'Тренировки пока не пришли.' : (ios ? 'Тренировки из «Здоровья»' : huawei ? 'Тренировки из Huawei Health' : 'Тренировки из Health Connect') + ' — рядом с занятиями из приложения.'}
+            {on ? 'Тренировки пока не пришли.' : (ios ? 'Тренировки из «Здоровья»' : huawei ? 'Тренировки из Huawei Health' : 'Тренировки из Health Connect') + ' — рядом с записанными в приложении.'}
           </p>
           <p className="small muted">
             {on
@@ -153,7 +153,7 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
                 : huawei
                   ? 'Приложение читает тренировки из Huawei Health: вид, время, калории и дистанцию.'
                   : 'Приложение читает тренировки, которые часы и фитнес-приложения записали в Health Connect: вид, время, калории и дистанцию.')
-                + ' Совпала с занятием в приложении — покажем их как одну тренировку.'}
+                + ' Совпала с тренировкой в приложении — покажем их как одну.'}
           </p>
           <div className="survey__actions">
             <button className="button button--primary" onClick={connect} disabled={busy}>

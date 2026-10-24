@@ -29,7 +29,7 @@ import './first-steps.css';
 const HINTS = {
   workout: {
     target: () => document.querySelector('main.app__body:not([hidden]) [data-first-action="workout"]'),
-    title: 'Начните первое занятие',
+    title: 'Начните первую тренировку',
     text: 'Нажмите «Начать тренировку» — откроются упражнения программы. Подходы отмечаете по ходу.',
   },
   steps: {

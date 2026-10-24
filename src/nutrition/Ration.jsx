@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, createContext, useContext } from 'react';
-import { Section, Panel, Note, Search, formatNumber, plural } from '../ui.jsx';
-import { IconCheck, IconClose, IconBack, IconNutrition, IconShare } from '../icons.jsx';
+import { Section, Panel, Note, Search, BackButton, formatNumber, plural } from '../ui.jsx';
+import { IconCheck, IconClose, IconNutrition, IconShare } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useTabLock, useBackGesture } from '../gestures.jsx';
 import { MEALS } from './recipes.js';
@@ -998,14 +998,9 @@ export default function Ration({ targets: calculatedTargets, onClose, trial = fa
       {diaryMessage && <Note tone="info">{diaryMessage}</Note>}
       {recordMeal && <DiaryEntryForm product={{ ...recordMeal.recipe.per, kind: 'dish', id: recordMeal.recipe.id, name: recordMeal.recipe.name, unit: 'portion', source: 'Рецепт тренера · одна порция' }} amount={recordMeal.servings} meal={mealFromRecipe(recordMeal.recipe.meal)} day={diaryDay} onClose={() => setRecordMeal(null)} onSaved={async (message) => { setRecordMeal(null); setDiaryMessage(typeof message === 'string' ? message : 'Порция записана в дневник.'); try { const fresh = await apiPublic('diary.get', { day: diaryDay }); setDiaryTotals(fresh.totals); } catch { setDiaryMessage('Порция сохранена. Откройте дневник для обновлённых итогов.'); } }} />}
       <div className="ration__head">
-        <button
-          type="button"
-          className="ration__back"
-          onClick={back}
-        >
-          <IconBack size={18} />
-          {step === 'pantry' ? 'К норме' : 'Назад'}
-        </button>
+        {/* «Назад» — общая кнопка приложения (акцентом, 17 px), а не своя
+            серая (аудит 24.10.2026) */}
+        <BackButton label={step === 'pantry' ? 'К норме' : 'Назад'} onClick={back} />
         <h2 className="ration__title">{titles[step]}</h2>
       </div>
 

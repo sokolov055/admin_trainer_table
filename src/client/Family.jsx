@@ -2,14 +2,14 @@ import { useReturnScroll } from '../scroll.js';
 import React, { useState } from 'react';
 import { Plan, Progress } from './screens.jsx';
 import { Chips, Section, Empty } from '../ui.jsx';
-import { IconBack, IconUsers } from '../icons.jsx';
+import { IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 
 /**
  * Семья — плательщик и те, за кого он платит.
  *
- * Тренировки и показатели родных — только посмотреть: начать занятие или
+ * Тренировки и показатели родных — только посмотреть: начать тренировку или
  * записать замер за другого человека нельзя, и кнопок для этого здесь
  * нет вовсе. Деньги и питание не показываются — сервер их и не отдаёт.
  * Кто попадает в список, решает тренер: участие включается каждому
@@ -17,8 +17,12 @@ import { useBackGesture } from '../gestures.jsx';
  */
 // preview — тренер смотрит глазами клиента: данные берутся его правами по
 // номеру строки, familyRow при этом оставляет экраны только для чтения.
-export default function Family({ members, preview = false }) {
-  const [open, setOpen] = useState(null);
+//
+// Открытый человек (open) живёт в ClientApp: «назад» с него — та же кнопка
+// в шапке («← Семья» вместо «← Обзор»), а не вторая в теле под первой
+// (аудит 24.10.2026)
+export default function Family({ members, preview = false, open = null, onOpen }) {
+  const setOpen = onOpen;
   const [tab, setTab] = useState('plan');
 
   // Жест «назад» с человека возвращает к списку семьи
@@ -28,12 +32,11 @@ export default function Family({ members, preview = false }) {
   if (open) {
     return (
       <>
-        <button className="button button--ghost library__back" onClick={() => { setOpen(null); haptic(); }}>
-          <IconBack size={16} />
-          Семья
-        </button>
         <h2 className="family__name">{open.name}</h2>
+        {/* Подразделы человека — дорожкой «где я», как в «Питании» */}
         <Chips
+          variant="nav"
+          label={'Разделы: ' + open.name}
           items={[{ value: 'plan', label: 'Тренировки' }, { value: 'progress', label: 'Прогресс' }]}
           value={tab}
           onChange={setTab}

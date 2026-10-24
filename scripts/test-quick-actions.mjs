@@ -98,7 +98,7 @@ async function sheet({ me = { name: 'Клиент' }, clientRow, preview = false
 test('лист: сверху занятие по программе, ниже — только существующие действия', async () => {
   setRights(null);
   const s = await sheet();
-  assert.match(s.main, /^Начать занятие/);
+  assert.match(s.main, /^Начать тренировку/);
   assert.match(s.main, /Ноги и ягодицы · следующая по плану$/);
   assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
   assert.deepEqual(s.off, []);
@@ -117,13 +117,13 @@ test('на «Прогрессе» главное — вес, занятие вс
   setRights(null);
   let s = await sheet({ tab: 'progress' });
   assert.match(s.main, /^Записать вес/);
-  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Занятие', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Тренировка', 'Замеры', 'Тренеру']);
   assert.deepEqual(await s.press(0), ['progress', 'weight']);
   assert.deepEqual(await s.press(3), ['plan', 'workout', { title: 'Ноги и ягодицы' }]);
   await s.close();
   setRights({ plus: false });
   s = await sheet({ tab: 'progress' });
-  assert.deepEqual(s.tiles, ['Занятие', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Тренировка', 'Замеры', 'Тренеру']);
   await s.close();
   setRights(null);
 });
@@ -132,21 +132,21 @@ test('на «Питании» главное — еда, занятие вста
   setRights(null);
   let s = await sheet({ tab: 'nutrition' });
   assert.match(s.main, /^Добавить еду/);
-  assert.deepEqual(s.tiles, ['Занятие', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Тренировка', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
   assert.deepEqual(await s.press(0), ['nutrition', 'food']);
   assert.deepEqual(await s.press(1), ['plan', 'workout', { title: 'Ноги и ягодицы' }]);
   await s.close();
 
   // Идёт занятие — плитка зовёт вернуться к нему
   s = await sheet({ tab: 'nutrition', sessions: [{ id: 's1', status: 'active', title: 'Спина' }] });
-  assert.equal(s.tiles[0], 'К занятию');
+  assert.equal(s.tiles[0], 'К тренировке');
   assert.deepEqual(await s.press(1), ['plan', 'workout', { session: 's1' }]);
   await s.close();
 
   // Без «Плюса» еды нет — и на «Питании» главным остаётся занятие
   setRights({ plus: false });
   s = await sheet({ tab: 'nutrition' });
-  assert.match(s.main, /^Начать занятие/);
+  assert.match(s.main, /^Начать тренировку/);
   assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Тренеру']);
   await s.close();
   setRights(null);
@@ -167,7 +167,7 @@ test('без «Плюса» нет еды и воды, без тренера —
 test('тренер «глазами клиента»: набор как у клиента, но еда, вода и «Тренеру» не нажимаются', async () => {
   setRights(null);
   const s = await sheet({ clientRow: 7, preview: true, tab: 'nutrition' });
-  assert.match(s.main, /^Начать занятие/, 'дневник в просмотре только для чтения — главной еда не становится');
+  assert.match(s.main, /^Начать тренировку/, 'дневник в просмотре только для чтения — главной еда не становится');
   assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
   assert.deepEqual(s.off, ['Еда', 'Вода', 'Тренеру']);
   await s.close();
@@ -180,7 +180,7 @@ test('тренер «глазами клиента»: набор как у кл�
 
 test('главная кнопка решает, как «Тренировки»: идущее занятие, следующая, свободная', async () => {
   let s = await sheet({ sessions: [{ id: 's1', status: 'paused', title: 'Спина' }] });
-  assert.match(s.main, /^Вернуться к занятию/);
+  assert.match(s.main, /^Вернуться к тренировке/);
   assert.match(s.main, /Спина · на паузе$/);
   assert.deepEqual(await s.press(0), ['plan', 'workout', { session: 's1' }]);
   await s.close();
@@ -204,7 +204,7 @@ test('программы нет — сразу «Свободная тренир
   await s.close();
 
   s = await sheet({ sessions: [{ id: 's2', status: 'active', title: 'Ноги и ягодицы' }] });
-  assert.match(s.main, /^Вернуться к занятию/);
+  assert.match(s.main, /^Вернуться к тренировке/);
   assert.match(s.main, /Ноги и ягодицы · идёт$/);
   assert.deepEqual(await s.press(0), ['plan', 'workout', { session: 's2' }]);
   await s.close();
@@ -213,7 +213,7 @@ test('программы нет — сразу «Свободная тренир
   globalThis.__quick = { 'client.plan': null, 'workout.list': null };
   let root;
   await act(async () => { root = renderer.create(React.createElement(QuickAdd, { me: { name: 'Клиент' }, onClose: () => {}, onPick: () => {} })); });
-  assert.equal(textOf(buttonsOf(root.toJSON())[0]), 'Начать занятие');
+  assert.equal(textOf(buttonsOf(root.toJSON())[0]), 'Начать тренировку');
   await act(async () => { root.unmount(); });
 });
 

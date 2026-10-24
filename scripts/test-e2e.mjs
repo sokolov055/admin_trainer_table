@@ -21,7 +21,7 @@ test('FT-565: предложенное время статики принима�
     }, session);
     await phone.reload();
     await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
-    await phone.getByRole('button', { name: /Вернуться к занятию/ }).click();
+    await phone.getByRole('button', { name: /Вернуться к тренировке/ }).click();
     const times = phone.getByRole('textbox', { name: /подход [12], время, с$/ });
     await times.first().waitFor();
     assert.equal(await times.count(), 4);
@@ -1058,12 +1058,12 @@ test('FT-567: видимый «назад» и Back браузера на экр
     await phone.getByRole('button', { name: 'Начать тренировку' }).first().click();
     await phone.locator('.workout__header').waitFor({ timeout: 20000 });
     await phone.getByRole('button', { name: 'Назад: Программа' }).click();
-    await phone.getByRole('button', { name: /Вернуться к занятию/ }).click();
+    await phone.getByRole('button', { name: /Вернуться к тренировке/ }).click();
     await phone.locator('.workout__header').waitFor({ timeout: 10000 });
     // Back браузера из занятия — тоже к программе, занятие идёт
     await phone.waitForTimeout(100);
     await phone.goBack();
-    await phone.getByRole('button', { name: /Вернуться к занятию/ }).waitFor({ timeout: 5000 });
+    await phone.getByRole('button', { name: /Вернуться к тренировке/ }).waitFor({ timeout: 5000 });
     assert.equal(phone.url(), home);
 
     // Рацион: Back браузера (как жест и системный Back) — на шаг, как кнопка

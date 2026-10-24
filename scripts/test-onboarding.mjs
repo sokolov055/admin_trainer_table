@@ -67,7 +67,7 @@ test('дата рождения: полных лет до и после дня �
 test('первый вход — прежний поток: нижнее меню, «Ещё», первое действие последним', () => {
   const steps = tourSteps({ action: 'workout' });
   assert.deepEqual(steps.map((s) => s.title),
-    ['Обзор — главное на сегодня', 'Тренировки', 'Прогресс', 'Питание', 'Меню «Ещё»', 'Начните первое занятие']);
+    ['Обзор — главное на сегодня', 'Тренировки', 'Прогресс', 'Питание', 'Меню «Ещё»', 'Начните первую тренировку']);
   assert.deepEqual(steps.map((s) => s.tab), ['overview', 'plan', 'progress', 'nutrition', 'overview', 'plan']);
   assert.equal(steps[0].target, '.tabbar [data-tab="overview"]');
   assert.equal(steps[5].action, 'workout');

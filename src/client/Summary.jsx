@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useData } from '../useData.js';
 import { Section, Panel, Segmented, Qty, plural } from '../ui.jsx';
+import './summary.css';
 import { IconChevron, IconDelta } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { MuscleSummary } from '../muscles/MuscleMap.jsx';
@@ -41,20 +42,27 @@ export default function Summary({ clientRow }) {
   const [offset, setOffset] = useState(0);
   const touch = useRef(null);
   const params = { period, offset, ...(clientRow ? { clientRow } : {}) };
-  const { data } = useData('client.summary', params, [clientRow, period, offset]);
+  const { data, loading } = useData('client.summary', params, [clientRow, period, offset]);
 
-  // Пока едет первый ответ или сервер не ответил — блока нет, как у
-  // «Целей»: замеры ниже от него не зависят
-  if (!data) return null;
+  // Пока едет первый ответ — заглушка той же примерно высоты: блок,
+  // вставленный позже, толкал вниз всё под ним (аудит 24.10.2026). Сервер
+  // не ответил — блока нет: замеры ниже от него не зависят
+  if (!data) {
+    return loading
+      ? <Section title="Итоги"><div className="skeleton summary__wait" aria-busy="true" /></Section>
+      : null;
+  }
 
   const s = data;
   // Ответ ещё за прошлый период — приглушаем его до нового
   const pending = s.period !== period || s.offset !== offset;
   const shown = localPeriod(period, offset);
   const older = pending ? true : s.older;
-  const rows = metricRows(s);
-  const lead = rows[0];
-  const facts = rows.slice(1);
+  // «Тренировки X из N по цели» за идущий период здесь не повторяем — их
+  // показывают карточки «Неделя» и месяца в «Целях» прямо над блоком
+  // (аудит 24.10.2026: на экране было трижды). За прошлый период целей
+  // уже нет — там тренировки остаются первым фактом
+  const facts = metricRows(s).filter((r) => r.id !== 'trainings' || offset > 0);
 
   const go = (d) => {
     const next = Math.max(0, offset + d);
@@ -78,8 +86,6 @@ export default function Summary({ clientRow }) {
     // Вправо — в прошлое, как листают календарь
     go(dx > 0 ? 1 : -1);
   };
-
-  const unit = period === 'week' ? 'неделю' : 'месяц';
 
   return (
     <Section title="Итоги">
@@ -139,19 +145,8 @@ export default function Summary({ clientRow }) {
               </p>
             ) : (
               <>
-                <div className="summary__lead">
-                  <div className="summary__label">Тренировки</div>
-                  <div className="summary__lead-row">
-                    <span className="summary__lead-value">{lead.value}</span>
-                    <span className="summary__lead-goal">
-                      из {s.target} по цели на {unit}
-                    </span>
-                  </div>
-                  <div className="summary__compare">
-                    <Change row={lead} />
-                    <span>{compareText(s)}</span>
-                  </div>
-                </div>
+                {/* С чем сравнивают стрелки под цифрами */}
+                <p className="summary__compare">Стрелки — {compareText(s)}</p>
 
                 <dl className="summary__facts">
                   {facts.map((r) => (

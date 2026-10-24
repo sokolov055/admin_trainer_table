@@ -539,7 +539,7 @@ export function Program({ p, i, best, on, onPick }) {
             <span>{timesWeek(p.days)}</span>
             {p.minutes ? <span>{minutesText(p)}</span> : null}
             {PLACES[p.place] ? <span>{PLACES[p.place]}</span> : null}
-            <span>{sessions.length} {plural(sessions.length, 'занятие', 'занятия', 'занятий')}{p.blocks.length > sessions.length ? ' по кругу' : ''}</span>
+            <span>{sessions.length} {plural(sessions.length, 'тренировка', 'тренировки', 'тренировок')}{p.blocks.length > sessions.length ? ' по кругу' : ''}</span>
           </span>
           {p.description && <span className="ob-program__text">{p.description}</span>}
         </span>
@@ -552,7 +552,7 @@ export function Program({ p, i, best, on, onPick }) {
           </span>
         </span>}
       </button>
-      <div className="ob-sessions" role="list" aria-label="Занятия программы">
+      <div className="ob-sessions" role="list" aria-label="Тренировки программы">
         {sessions.map((b, j) => (
           <button key={j} type="button" role="listitem" className="ob-session" onClick={() => setOpen(j)}>
             <span className="ob-session__num">{j + 1}</span>

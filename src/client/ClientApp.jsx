@@ -50,6 +50,7 @@ import CareerHub from '../CareerHub.jsx';
 import { useCareer } from '../CareerSession.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import { requestQuick } from '../quick-actions.js';
+import './overview.css';
 
 /**
  * Панель клиента.
@@ -93,7 +94,7 @@ const MENU = [
   { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта, здоровье', Icon: IconUsers },
   // Тема и персональные цвета — свой пункт (21.10.2026), а не строка настроек
   { id: 'appearance', label: 'Оформление', note: 'Тема и персональные цвета', Icon: IconPalette },
-  { id: 'settings', label: 'Настройки', note: 'Напоминания, подключения, поддержка', Icon: IconSliders },
+  { id: 'settings', label: 'Настройки', note: 'Уведомления, подключения, поддержка', Icon: IconSliders },
 ];
 
 // Семья — в меню, только если тренер открыл её этому человеку и в ней
@@ -114,6 +115,9 @@ export default function ClientApp({ me, clientRow, preview }) {
   // карточки.
   // Не ждём и не показываем ошибок: нет ответа — нет и пункта в меню.
   const [familyMembers, setFamilyMembers] = useState([]);
+  // Открытый в «Семье» человек — здесь, а не в Family: «назад» с него ведёт
+  // кнопка шапки, одна на экран (аудит 24.10.2026)
+  const [familyOpen, setFamilyOpen] = useState(null);
   useEffect(() => {
     if (clientRow && !preview) return undefined;
     let alive = true;
@@ -293,6 +297,7 @@ export default function ClientApp({ me, clientRow, preview }) {
     // Уход с вкладки в экран меню — снимок для жеста «назад»
     else if (TABS.some((t) => t.id === view)) captureScreen();
     setView(id);
+    setFamilyOpen(null);
     setMenuOpen(false);
     setQuickOpen(false);
     setQuickX(false);
@@ -353,6 +358,20 @@ export default function ClientApp({ me, clientRow, preview }) {
   // Без тренера («сам по себе») — «видите только вы»
   if (healthAsk) return <HealthConnectScreen scope={healthAsk} self={!!(me && me.unlinked)} onDone={dropHealthAsk} />;
 
+  // Под главной карточкой «Обзора» (Overview, afterLead): силовая с часов
+  // без занятия в приложении — «Записать подходы?» (пункт 12 плана трёх
+  // разборов, только свой кабинет) и первый день в режиме (FT-561)
+  const overviewExtras = (
+    <>
+      {own && <WatchSuggest trainer={!(me && me.unlinked)} onOpen={go} />}
+      {fs && (fs.regime || fs.notify) && (
+        <FirstRegime regime={fs.regime} notify={fs.notify}
+          onSeen={() => firstSteps.send('client.firstSteps.regimeSeen', {})}
+          onNotify={(result) => firstSteps.send('client.firstSteps.notify', { result })} />
+      )}
+    </>
+  );
+
   return (
     <div className="app">
       {preview && (
@@ -384,7 +403,9 @@ export default function ClientApp({ me, clientRow, preview }) {
         {/* Экран меню закрывает нижние вкладки — видимый путь назад, туда,
             откуда пришли (FT-567). Здесь главное — где человек, поэтому
             крупно название экрана, а имя — строкой под ним */}
-        {!onTab && <BackButton label={(TABS.find((t) => t.id === lastTab) || TABS[0]).label} onClick={() => go(lastTab)} />}
+        {!onTab && (view === 'family' && familyOpen
+          ? <BackButton label="Семья" onClick={() => { setFamilyOpen(null); haptic(); }} />
+          : <BackButton label={(TABS.find((t) => t.id === lastTab) || TABS[0]).label} onClick={() => go(lastTab)} />)}
         <div className="app__bar">
           <div className="app__headline">
             <h1 className="app__title">{onTab ? me.name : current.label}</h1>
@@ -473,20 +494,18 @@ export default function ClientApp({ me, clientRow, preview }) {
               карточки клиента, и сторис оттуда читались бы как что-то,
               относящееся к этому клиенту. */}
           {t.id === 'overview' && own && ((me && me.unlinked) || pendingTrainerLink()) && <OverviewOffers />}
-          {t.id === 'overview' && personal && <Stories personal={personal} onOpen={openFromStory} />}
-          {/* Цель — сразу под историями: первое, что видно на «Обзоре» (FT-577).
-              Тренер в карточке клиента видит её внутри самого Overview */}
-          {/* Силовая с часов без занятия в приложении — «Записать подходы?»
-              (пункт 12 плана трёх разборов); только в своём кабинете */}
-          {t.id === 'overview' && own && <WatchSuggest trainer={!(me && me.unlinked)} onOpen={go} />}
-          {/* «Сегодня» — три числа с подписями (FT-646); только в своём кабинете */}
+          {/* Пока личные истории едут — ряд-заглушка той же высоты: истории
+              есть всегда (общие вшиты), и вставленный позже ряд толкал вниз
+              главную карточку (аудит 24.10.2026) */}
+          {t.id === 'overview' && (personal ? <Stories personal={personal} onOpen={openFromStory} /> : <StoriesWait />)}
+          {/* «Сегодня» — три числа с подписями (FT-646); только в своём
+              кабинете. Пока едет — свой скелетон (TodayStrip) */}
           {t.id === 'overview' && own && <TodayStrip onOpen={go} />}
-          {t.id === 'overview' && fs && (fs.regime || fs.notify) && (
-            <FirstRegime regime={fs.regime} notify={fs.notify}
-              onSeen={() => firstSteps.send('client.firstSteps.regimeSeen', {})}
-              onNotify={(result) => firstSteps.send('client.firstSteps.notify', { result })} />
-          )}
-          <t.Screen clientRow={clientRow} clientView={!!preview} />
+          {/* Силовая с часов и первый день в режиме бывают не всегда — они
+              встают под главной карточкой, а не над ней: появившись позже,
+              не сдвигают «Оплачено вперёд» (аудит 24.10.2026) */}
+          <t.Screen clientRow={clientRow} clientView={!!preview}
+            {...(t.id === 'overview' ? { afterLead: overviewExtras } : {})} />
         </main>
       ))}
 
@@ -528,7 +547,7 @@ export default function ClientApp({ me, clientRow, preview }) {
           </Deferred>
         )}
 
-        {view === 'family' && <Family members={familyMembers} preview={!!preview} />}
+        {view === 'family' && <Family members={familyMembers} preview={!!preview} open={familyOpen} onOpen={setFamilyOpen} />}
 
         {view === 'guide' && <Help tours={tours} frames={guideFrames} onTour={setHelpTour} onGuide={setGuideAt} />}
 
@@ -547,25 +566,23 @@ export default function ClientApp({ me, clientRow, preview }) {
                 выдавалось бы за клиентское, поэтому только описание */}
             <Section title="Подключения">
               {preview
-                ? <PreviewOnly text="Здесь клиент видит, откуда приходят шаги и тренировки с часов и разрешены ли уведомления на его телефоне." />
+                ? <PreviewOnly text="Здесь клиент видит, откуда приходят шаги и тренировки с часов." />
                 : <Connections />}
             </Section>
-            <Section title="Напоминания">
+            {/* Всё про уведомления — одним разделом (аудит 24.10.2026; было в
+                трёх местах): разрешение телефона первой строкой «Напоминаний»,
+                сами напоминания, сигнал конца отдыха. Push с сервера — последним:
+                на паузе до РКН (PUSH_OFF), но флага на клиенте нет — блок
+                прячется только там, где устройство push не умеет */}
+            <Section title="Уведомления">
               {preview
-                ? <PreviewOnly text="Здесь клиент включает напоминания телефона: занятие по плану, взвешивание, замеры и еда." />
+                ? <PreviewOnly text="Здесь клиент разрешает уведомления на телефоне и включает напоминания: тренировка по плану, взвешивание, замеры и еда." />
                 : <Reminders />}
               <RestSignalSetting />
+              {/* В режиме просмотра push нет: кнопка подписала бы на
+                  уведомления клиента телефон тренера */}
+              {!preview && pushSupported() && <PushSetting clientRow={clientRow} legend="Уведомления с сервера" />}
             </Section>
-            {/* Без «Конца отдыха» раздел может оказаться пустым — тогда его нет */}
-            {(preview || pushSupported()) && (
-              <Section title="Уведомления">
-                {/* В режиме просмотра — без кнопки: она подписала бы на
-                    уведомления клиента телефон тренера */}
-                {preview
-                  ? <PreviewOnly text="Здесь клиент включает уведомления: напоминания о взвешивании, замерах и конце отдыха." />
-                  : <PushSetting clientRow={clientRow} />}
-              </Section>
-            )}
             <Section title="Поддержка">
               <Support disabled={!!preview} />
             </Section>
@@ -597,6 +614,19 @@ export default function ClientApp({ me, clientRow, preview }) {
       )}
 
       <TabBar tabs={TABS} active={view} onSelect={go} action={quickAction} />
+    </div>
+  );
+}
+
+/**
+ * Ряд историй, пока личные («Моя неделя», «Итоги месяца») едут: плитки той
+ * же высоты, что настоящие (92 px), — главная карточка «Обзора» не
+ * съезжает, когда ряд появится (аудит 24.10.2026)
+ */
+function StoriesWait() {
+  return (
+    <div className="stories stories--wait" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => <span key={i} className="skeleton stories__wait" />)}
     </div>
   );
 }

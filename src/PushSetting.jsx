@@ -19,7 +19,9 @@ import { isNativeApp, iosApp } from './native-bridge.js';
  * приложения, добавленного на домашний экран. Умолчать об этом значит
  * оставить человека с кнопкой, которая у него молча не работает.
  */
-export default function PushSetting({ clientRow }) {
+// legend — подпись блока. У клиента он стоит в разделе «Уведомления» под
+// напоминаниями телефона, и второе «Напоминания» путало (аудит 24.10.2026)
+export default function PushSetting({ clientRow, legend = 'Напоминания' }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
@@ -71,7 +73,7 @@ export default function PushSetting({ clientRow }) {
   return (
     <div className="survey__group panel panel--pad">
       <div className="survey__legend">
-        Напоминания
+        {legend}
         <span className="survey__legend-note">
           взвешивание раз в неделю, замеры раз в месяц и конец отдыха на тренировке
         </span>

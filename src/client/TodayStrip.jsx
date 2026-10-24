@@ -21,6 +21,9 @@ const thousandsQty = (v) => (v >= 1000 ? <Qty value={formatNumber(Math.round(v /
 export default function TodayStrip({ onOpen }) {
   const awards = useData('client.awards', {}, []);
   const rights = useRights();
+  // Пока цифры едут — заглушка той же высоты: ряд стоит над главной
+  // карточкой «Обзора», и вставленный позже толкал её вниз (аудит 24.10.2026)
+  if (!awards.data && awards.loading) return <StripWait />;
   // Дневник — в «Плюсе»: без него запрос дневника не делаем вовсе
   return hasPlus(rights)
     ? <WithDiary awards={awards.data} onOpen={onOpen} />
@@ -32,6 +35,17 @@ function WithDiary({ awards, onOpen }) {
   const day = today();
   const diary = useData('diary.get', { day }, [day]);
   return <Strip awards={awards} day={diary.data} onOpen={onOpen} />;
+}
+
+function StripWait() {
+  return (
+    <section className="today-strip" aria-hidden="true">
+      <div className="skeleton today-strip__wait-title" />
+      <div className="today-strip__row">
+        {[0, 1, 2].map((i) => <div key={i} className="skeleton today-strip__wait" />)}
+      </div>
+    </section>
+  );
 }
 
 function Strip({ awards, day, onOpen }) {

@@ -16,7 +16,7 @@ import Wishes from './Wishes.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta, Qty,
-  formatNumber, formatMoney, formatDate, formatTime, formatWhen, relativeDays, daysSince, plural,
+  formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
@@ -32,6 +32,7 @@ import SwipeRow from '../SwipeRow.jsx';
 import { copyPlanBlocks, workoutRenameParams } from '../plan-block-actions.js';
 import { uid } from '../workout-model.js';
 import { trainerOverview } from './trainer-overview.js';
+import { SCHEDULE_UNKNOWN } from './schedule-text.js';
 import { GoalBanner } from './focus.jsx';
 import { onlineDaysLeft, onlineDay } from '../online.js';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
@@ -115,17 +116,19 @@ function PackageEnding({ state, payer, trainer }) {
           <div className="small">
             {state.out ? (
               <>
-                <strong>Оплаченные занятия закончились.</strong>{' '}
+                <strong>Оплаченные тренировки закончились.</strong>{' '}
                 {trainer
-                  ? 'Следующее пройдёт в долг — напомните клиенту об оплате.'
-                  : 'Следующее пройдёт в долг — напишите тренеру об оплате.'}
+                  ? 'Следующая пройдёт в долг — напомните клиенту об оплате.'
+                  : 'Следующая пройдёт в долг — напишите тренеру об оплате.'}
               </>
             ) : (
               <>
                 <strong>
+                  {/* «Тренировки», как в главной карточке «Оплачено вперёд»
+                      и у плательщика выше (аудит 24.10.2026) */}
                   {state.left === 1
-                    ? 'Осталось одно оплаченное занятие.'
-                    : 'Осталось ' + state.left + ' ' + plural(state.left, 'занятие', 'занятия', 'занятий') + '.'}
+                    ? 'Осталась одна оплаченная тренировка.'
+                    : 'Осталось ' + state.left + ' ' + plural(state.left, 'тренировка', 'тренировки', 'тренировок') + '.'}
                 </strong>{' '}
                 {trainer
                   ? 'Это примерно на неделю — самое время напомнить о продлении.'
@@ -142,7 +145,10 @@ function PackageEnding({ state, payer, trainer }) {
 /** Как часто открытый «Обзор» клиента сверяет баланс и занятия с сервером */
 const LIVE_MS = 15000;
 
-export function Overview({ clientRow, clientView = false, trainerClient, trainerClients }) {
+// afterLead — блоки, которые бывают не всегда (тренировка с часов, первый
+// день в режиме, ClientApp.jsx): под главной карточкой, чтобы, появившись
+// позже, не сдвигать её (аудит 24.10.2026)
+export function Overview({ clientRow, clientView = false, trainerClient, trainerClients, afterLead = null }) {
   // У клиента — живой: тренер провёл оплату, баланс меняется без «потянуть»
   // (у тренера карточка перечитывается сама после его записи — onMutated)
   const { loading, data: loaded, error, reload } = useData(
@@ -167,10 +173,11 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           </p>
           <p className="small muted">
             Когда тренер привяжет вас — по ID из меню «Мой тренер» или своей ссылкой, —
-            здесь появятся занятия с ним, расписание и оплата.
+            здесь появятся тренировки с ним, расписание и оплата.
           </p>
         </Panel>
       </Section>
+      {afterLead}
       </>
     );
   }
@@ -244,9 +251,12 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
             // Сравниваем с true, а не с false: поля может не быть вовсе —
             // например, API отвечает кодом, который про расписание ещё не
             // знает. Отсутствие ответа — это «не знаем», а не «занятий нет».
+            //
+            // Одна формулировка на «не знаем» во всём приложении — та же в
+            // «Напоминаниях» (Settings.jsx, PlanNext; аудит 24.10.2026)
             value: data.nextTrainingDate
               ? formatWhen(data.nextTrainingDate)
-              : data.scheduleKnown !== true ? 'нет данных' : 'не назначена',
+              : data.scheduleKnown !== true ? SCHEDULE_UNKNOWN : 'не назначена',
           },
           { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
         ]}
@@ -258,6 +268,8 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           человек читает как «ещё есть» и узнаёт о конце в тот день, когда
           пришёл заниматься. */}
       <PackageEnding state={data.packageEnding} payer={data.payer} trainer={!!clientRow && !clientView} />
+
+      {afterLead}
 
       {!online && sinceTraining !== null && sinceTraining > 14 && (
         <Section>
@@ -275,7 +287,10 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
         </Section>
       )}
 
-      <Section title="Занятия">
+      {/* «Следующей тренировки» здесь нет: она первым фактом главной
+          карточки, второй раз другим форматом только путала (аудит
+          24.10.2026). Клиенту — «тренировки», не «занятия» */}
+      <Section title="Тренировки">
         <Panel>
           <Rows>
             <Row label="Программа месяца">
@@ -284,16 +299,6 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
             <Row label="Последний замер">
               <StatusBadge value={data.lastMeasureStatus} fallback="не было" />
             </Row>
-            {/* Онлайн (FT-530): занятий с тренером нет — и ждать нечего */}
-            {!online && (
-              <Row label="Следующая тренировка">
-                {data.nextTrainingDate
-                  ? formatDate(data.nextTrainingDate) + ', ' + formatTime(data.nextTrainingDate)
-                  : data.scheduleKnown !== true
-                    ? 'расписание временно недоступно'
-                    : 'не назначена'}
-              </Row>
-            )}
             {data.lastTrainingDate && (
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>
             )}
@@ -313,7 +318,7 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           <Panel pad>
             <div className="small">
               По балансу числится долг {formatMoney(Math.abs(data.balance))}.
-              Если оплата уже прошла — напишите тренеру, он отметит её в таблице.
+              Если оплата уже прошла — напишите тренеру, он её отметит.
             </div>
           </Panel>
         </Section>
@@ -519,15 +524,15 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     <Section>
       <Panel pad>
         <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
-          {running.status === 'active' ? 'Идёт занятие' : 'Занятие на паузе'}
+          {running.status === 'active' ? 'Идёт тренировка' : 'Тренировка на паузе'}
           {' «' + running.title + '»'}
           {running.done ? ' · ' + running.done + ' ' + plural(running.done, 'подход', 'подхода', 'подходов') : ''}.
-          {' '}Новое можно начать, когда это завершено или отменено.
+          {' '}Новую можно начать, когда эта завершена или отменена.
         </p>
         {/* Номер идущего — не «какое-нибудь»: иначе открывался черновик
             последнего завершённого (02.10.2026) */}
         <button className="button button--primary button--block" onClick={() => openWorkout({ sessionId: running.id })}>
-          Вернуться к занятию
+          Вернуться к тренировке
         </button>
       </Panel>
     </Section>
@@ -738,7 +743,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           первое, что человек должен узнать на этом экране. */}
       {journalOffline && (
         <p className="small muted plan__offline" role="status">
-          Нет связи. Программа и занятия — сохранённые на телефоне{savedAt ? ', обновлены ' + formatDate(new Date(savedAt).toISOString()) : ''}.
+          Нет связи. Программа и тренировки — сохранённые на телефоне{savedAt ? ', обновлены ' + formatDate(new Date(savedAt).toISOString()) : ''}.
           {' '}Тренировку можно провести: результат сохранится здесь и уйдёт на сервер, когда появится связь.
         </p>
       )}
@@ -856,14 +861,20 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <Empty
           icon={IconPlan}
           title="Программы пока нет"
+          // Без «листов»: про Google-таблицы человеку знать незачем (аудит 24.10.2026)
           text={data.note || (data.month
-            ? `Лист «${data.month}» ещё не заполнен. Тренер создаёт программу в начале месяца.`
-            : 'Тренер ещё не создал ни одного листа с программой.')}
+            ? `Программа «${data.month}» ещё не готова. Тренер составляет её в начале месяца.`
+            : 'Тренер ещё не составил программу.')}
         />
       )}
 
+      {/* Подразделы месяца — «где я», а не фильтр: утопленная дорожка
+          (variant="nav", как в «Питании»). Синей заливкой остаётся один ряд —
+          месяцы над ним (DESIGN-APP §6, §10; аудит 24.10.2026) */}
       {(shownBlocks.length > 0 || doneSessions.length > 0) && (
         <Chips
+          variant="nav"
+          label="Тренировки месяца"
           items={[
             { value: 'queue', label: 'Очередь · ' + queueBlocks.length },
             { value: 'done', label: 'Выполненные · ' + doneSessions.length },
@@ -1042,7 +1053,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                   <span>
                     {formatDate(past[0].updatedAt)}
                     {past[0].done ? ' · ' + past[0].done + ' ' + plural(past[0].done, 'подход', 'подхода', 'подходов') : ''}
-                    {past.length > 1 ? ' · всего занятий: ' + past.length : ''}
+                    {past.length > 1 ? ' · всего раз: ' + past.length : ''}
                   </span>
                 </div>
                 {!familyRow && <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>}
@@ -1333,8 +1344,8 @@ function DoneSession({ session: s, canOpen, onRename, onOpen }) {
  * только что ушло. Обычное занятие с сервера — без пометки.
  */
 function SyncMark({ session: s }) {
-  if (s.local === 'conflict') return <span className="plan__sync plan__sync--problem">Не отправлено: занятие изменили на другом устройстве. Откройте, чтобы выбрать версию.</span>;
-  if (s.local === 'error') return <span className="plan__sync plan__sync--problem">Не отправлено: {s.localError || 'сервер не принял занятие'}. Откройте, чтобы исправить.</span>;
+  if (s.local === 'conflict') return <span className="plan__sync plan__sync--problem">Не отправлено: тренировку изменили на другом устройстве. Откройте, чтобы выбрать версию.</span>;
+  if (s.local === 'error') return <span className="plan__sync plan__sync--problem">Не отправлено: {s.localError || 'сервер не принял тренировку'}. Откройте, чтобы исправить.</span>;
   if (s.local) return <span className="plan__sync">Сохранено на телефоне · отправится, когда появится связь</span>;
   if (justSynced(s.id)) return <span className="plan__sync plan__sync--done">Синхронизировано</span>;
   return null;
@@ -1520,7 +1531,7 @@ function MonthVisibility({ month, hidden, clientRow, onChanged }) {
       </button>
       {failure && (
         <Note tone="critical" icon={IconAlert}>
-          {failure.message || 'Не получилось изменить видимость листа'}
+          {failure.message || 'Не получилось изменить видимость месяца'}
         </Note>
       )}
     </div>
@@ -1796,30 +1807,29 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
 
   const hasDeltas = series.some((s) => Object.keys(s.deltas).length > 0);
 
+  // Период изменений: «за всё время» или «с прошлого замера». Меняет
+  // таблицу изменений и «Изменение» в карточке веса; стоит дорожкой в шапке
+  // таблицы, а не синим рядом над карточкой — на экране было три
+  // переключателя подряд (аудит 24.10.2026). График от него не зависит
+  const periodChoice = series.some((s) => s.rows.length > 1) && (
+    <Segmented
+      track
+      label="Изменения за период"
+      items={[{ value: 'all', label: 'За всё время' }, { value: 'last', label: 'С прошлого замера' }]}
+      value={period}
+      onChange={setPeriod}
+    />
+  );
+
   return (
     <>
       {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
       {addMeasure}
 
-      {/* Цели, серии и награды — сразу под записью замера: ответ на
-          «иду ли я по плану» нужен раньше динамики (FT-490) */}
-      {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
-
-      {/* Итоги недели и месяца — под целями: цели отвечают «иду ли я по
-          плану», итоги — «что я сделал» (FT-493) */}
-      {!familyRow && <Summary clientRow={clientRow} />}
-
-      {/* Период изменений — над итогом, который он меняет, и над таблицей */}
-      {hasRows && series.some((s) => s.rows.length > 1) && (
-        <div className="progress__period">
-          <Chips
-            items={[{ value: 'all', label: 'За всё время' }, { value: 'last', label: 'С прошлого замера' }]}
-            value={period}
-            onChange={setPeriod}
-          />
-        </div>
-      )}
-
+      {/* Карточка веса — сразу под записью замера, выше целей и итогов:
+          «сколько я вешу» — первый вопрос экрана, и под годом точек целей
+          её было не найти (аудит 24.10.2026). Цели и итоги — следом (FT-490,
+          FT-493): цели — «иду ли я по плану», итоги — «что я сделал» */}
       {hasRows ? (
         <Lead
           label={activeField}
@@ -1844,6 +1854,9 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         />
       )}
 
+      {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
+      {!familyRow && <Summary clientRow={clientRow} />}
+
       {/* Выбор показателя — прямо над графиком, который он переключает:
           сверху, над итогом, он читался как отдельный фильтр экрана */}
       {available.length > 1 && (
@@ -1863,6 +1876,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {hasDeltas && (
         <Section title="Изменения по замерам" note={period === 'last' ? 'от прошлого замера к последнему' : 'от первого к последнему'}>
           <Panel pad>
+            {periodChoice}
             {series.map((s, i) => (
               <div key={i} style={{ marginBottom: series.length > 1 && i < series.length - 1 ? 20 : 0 }}>
                 {s.label && (
@@ -2356,7 +2370,8 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
       <Empty
         icon={IconNutrition}
         title="Анкета недоступна"
-        text={'Сервер не прислал варианты для формы.\n\nОбновите приложение или проверьте развёртывание Apps Script.'}
+        text="Не удалось загрузить анкету — потяните экран вниз, чтобы обновить. Не помогло — обновите приложение."
+        action={<button className="button" onClick={reload}>Обновить</button>}
       />
     );
   }
@@ -2396,7 +2411,7 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
         <h3 style={{ margin: '0 0 6px', fontSize: 'var(--text-md)', fontWeight: 640 }}>Норма ещё не посчитана</h3>
         <p className="small muted" style={{ marginTop: 0, marginBottom: 12 }}>
           {byTrainer
-            ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и ляжет в таблицу так же, как если бы он сделал это сам.'
+            ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и сохранится так же, как если бы он сделал это сам.'
             : 'Семь ответов о себе — и вы увидите суточную норму калорий и БЖУ. Дневник работает и без неё.'}
         </p>
         <button className="button button--primary" onClick={() => setDiaryTab('settings')}>Заполнить анкету</button>
@@ -2575,7 +2590,7 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
         <Section>
           <Note tone="info" icon={IconNutrition}>
             {byTrainer
-              ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и ляжет в таблицу так же, как если бы он сделал это сам.'
+              ? 'Клиент ещё не заполнил анкету. Её можно заполнить за него — норма посчитается и сохранится так же, как если бы он сделал это сам.'
               : 'Семь ответов о себе — и вы увидите суточную норму калорий и БЖУ.' + (self ? '' : ' Тренер получит результат сразу.')}
           </Note>
         </Section>

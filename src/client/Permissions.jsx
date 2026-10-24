@@ -141,7 +141,7 @@ export default function Permissions({ need, onDone }) {
     </div>
     <footer className="onboarding__footer">
       {lines
-        ? <button type="button" className="button button--primary button--block" onClick={onDone}>Перейти к занятиям</button>
+        ? <button type="button" className="button button--primary button--block" onClick={onDone}>Перейти к тренировкам</button>
         : <button type="button" className="button button--primary button--block" disabled={busy} onClick={run}>{busy ? 'Спрашиваем…' : 'Продолжить'}</button>}
     </footer>
   </main>;

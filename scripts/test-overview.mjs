@@ -138,7 +138,7 @@ test('FT-568: старый обзор использует баланс, зан�
   act(() => tree.update(React.createElement(Overview, { clientRow: 3,
     trainerClient: { ...client, balance: 2250, trainings: 6 } })));
   assert.match(screen(tree), /1 тренировка/);
-  assert.match(screen(tree), /Осталось одно оплаченное занятие/);
+  assert.match(screen(tree), /Осталась одна оплаченная тренировка/);
   act(() => tree.unmount());
 });
 
@@ -180,18 +180,18 @@ test('за неделю до конца появляется предупреж�
 
   const text = screen(tree);
 
-  assert.match(text, /Осталось 2 занятия/);
+  assert.match(text, /Осталось 2 тренировки/);
   assert.match(text, /продлите пакет/i);
 });
 
-test('одно занятие называется одним, а не «1 занятие»', () => {
+test('одна тренировка называется одной, а не «1 тренировка»', () => {
   const tree = draw(overview({
     balance: 2000,
     trainingsLeft: 1,
     packageEnding: { known: true, left: 1, perWeek: 2, soon: true, out: false },
   }));
 
-  assert.match(screen(tree), /Осталось одно оплаченное занятие/);
+  assert.match(screen(tree), /Осталась одна оплаченная тренировка/);
 });
 
 test('кончившийся пакет говорит о долге', () => {
@@ -203,7 +203,7 @@ test('кончившийся пакет говорит о долге', () => {
 
   const text = screen(tree);
 
-  assert.match(text, /Оплаченные занятия закончились/);
+  assert.match(text, /Оплаченные тренировки закончились/);
   assert.match(text, /в долг/);
 });
 

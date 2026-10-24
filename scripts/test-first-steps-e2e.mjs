@@ -64,7 +64,7 @@ test('тур проходит все разделы и меню, последн�
     await card.waitFor();
     await page.getByRole('button', { name: 'Далее' }).click();
   }
-  const last = page.getByRole('dialog', { name: 'Начните первое занятие' });
+  const last = page.getByRole('dialog', { name: 'Начните первую тренировку' });
   await last.waitFor();
   await page.waitForTimeout(500);
   await page.screenshot({ path: join(SHOTS, 'tour-action-390.png') });

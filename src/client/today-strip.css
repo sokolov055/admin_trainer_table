@@ -25,3 +25,7 @@
   .today-strip__tile strong { font-size: var(--text-lg); }
 }
 @media (prefers-reduced-motion: reduce) { .today-strip__tile { transition: none; } .today-strip__tile:active { transform: none; } }
+/* Заглушка на время загрузки (аудит 24.10.2026): заголовок 17 px и плитки
+   высотой настоящих (число + подпись в две строки) — карточка ниже не прыгает */
+.today-strip__wait-title { width: 96px; height: 22px; margin: 0 0 var(--space-2); border-radius: var(--radius-sm); }
+.today-strip__wait { height: 86px; margin: 0; border-radius: var(--radius-lg); }

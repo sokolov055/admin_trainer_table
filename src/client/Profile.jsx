@@ -5,6 +5,7 @@ import { IconAlert, IconCheck } from '../icons.jsx';
 import PhoneSetting from './PhoneSetting.jsx';
 import DataExport from './DataExport.jsx';
 import GoalChoice from './GoalChoice.jsx';
+import './profile.css';
 
 /**
  * Мои данные.
@@ -70,16 +71,16 @@ export default function Profile({ clientRow }) {
     }
   };
 
-  if (state.loading) return <Loading rows={3} />;
-  if (state.error) return <ErrorState error={state.error} onRetry={load} />;
+  // Цель и график из анкеты — только у самого клиента (FT-582). Стоит до
+  // проверки загрузки: свой запрос идёт рядом с анкетой, а не после неё, и
+  // блок не перемонтируется (аудит 24.10.2026)
+  const goal = !clientRow && <GoalChoice />;
+  if (state.loading) return <>{goal}<Loading rows={3} /></>;
+  if (state.error) return <>{goal}<ErrorState error={state.error} onRetry={load} /></>;
 
   return (
     <>
-    {/* Номер для входа — только у самого клиента: тренер в карточке его не
-        подключает, вход подтверждает звонком владелец номера */}
-    {/* Цель и график из анкеты — тоже только у самого клиента (FT-582) */}
-    {!clientRow && <GoalChoice />}
-    {!clientRow && <PhoneSetting />}
+    {goal}
     <Panel pad>
       <div className="survey">
         <div className="survey__group">
@@ -148,6 +149,11 @@ export default function Profile({ clientRow }) {
         <button className="button" onClick={load} disabled={busy}>Отменить правки</button>
       </div>
     </Panel>
+    {/* Номер для входа — только у самого клиента: тренер в карточке его не
+        подключает, вход подтверждает звонком владелец номера. Под анкетой,
+        а не над ней: блок есть не всегда (только с ключом SMS.ru) и,
+        появившись позже, сдвигал форму (аудит 24.10.2026) */}
+    {!clientRow && <PhoneSetting />}
     {/* Копия своих данных (ст. 14 152-ФЗ) — тоже только у самого клиента */}
     {!clientRow && <DataExport />}
     </>

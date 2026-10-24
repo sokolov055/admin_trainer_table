@@ -57,12 +57,15 @@
 /* Четыре приёма — строки одной карточки, а не четыре карточки на рисунке:
    пустой приём — одна строка «Завтрак · 0 ккал · +», записи — под ней */
 .diary-meal + .diary-meal { border-top: 1px solid var(--border); }
-.diary-meal-head { display: flex; align-items: center; gap: var(--space-3); min-height: 60px; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
+/* Справа — те же 16 px, что слева: «+» не жмётся к краю карточки (аудит 24.10.2026) */
+.diary-meal-head { display: flex; align-items: center; gap: var(--space-3); min-height: 60px; padding: var(--space-2) var(--space-4); }
 .diary-meal-head h3 { font-size: var(--text-base); font-weight: 600; margin: 0; }
-/* «+» приёма — главная кнопка экрана (22.10.2026, у клиента «Добавить еду»
-   внизу убрана): залитый акцентом круг 40 px с тенью, касание 48 px за счёт
-   невидимого поля. Мягкая подложка 34 px тонула в тёмных темах */
-.diary-meal-add { flex: none; position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 999px; background: var(--accent-fill); color: var(--accent-text); cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, .2), 0 3px 8px -2px rgba(0, 0, 0, .28); -webkit-tap-highlight-color: transparent; transition: transform var(--dur-press) var(--ease-out), filter var(--dur-press) var(--ease-out); }
+/* «+» приёма (22.10.2026, у клиента «Добавить еду» внизу убрана): круг
+   40 px, касание 48 px за счёт невидимого поля. Тихий — --accent-wash и
+   --accent-ink (FT-645), а не четыре залитых синих круга с тенью подряд,
+   споривших с «+» таб-бара (аудит 24.10.2026). Чтобы не тонуть в тёмных
+   темах, как прежняя подложка 34 px, — крупнее и с кромкой цвета акцента */
+.diary-meal-add { flex: none; position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 999px; background: var(--accent-wash); color: var(--accent-ink); cursor: pointer; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent); -webkit-tap-highlight-color: transparent; transition: transform var(--dur-press) var(--ease-out), filter var(--dur-press) var(--ease-out); }
 .diary-meal-add::after { content: ''; position: absolute; inset: -4px; border-radius: inherit; }
 .diary-meal-add svg { stroke-width: 2.4; }
 .diary-meal-add:active { transform: scale(.92); filter: brightness(.94); }
