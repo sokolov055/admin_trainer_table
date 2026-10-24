@@ -19,6 +19,9 @@ import {
   PLATFORM_NAMES, flagStatus, growthPoints, monthName, needsConfirm, percent, perClientNote, sourceTotals,
 } from './admin-model.js';
 
+// Подразделы и их группы — в admin-model.js, чтобы их проверял тест
+export { ADMIN_PANES, ADMIN_GROUPS, adminGroupOf, adminPanesOf } from './admin-model.js';
+
 /**
  * «Управление» — панель владельца сервиса (FT-562): аналитика по всему
  * приложению, тренеры, тарифы, флаги и логи в одном пункте меню.
@@ -33,24 +36,6 @@ import {
  * Аналитика — одни числа: имён и адресов в ней нет (docs/legal/
  * 2026-10-17-admin-panel.md в основном репозитории).
  */
-
-export const ADMIN_PANES = [
-  { value: 'stats', label: 'Аналитика' },
-  { value: 'trainers', label: 'Тренеры' },
-  { value: 'tariffs', label: 'Тарифы' },
-  { value: 'games', label: 'Игры' },
-  { value: 'flags', label: 'Флаги' },
-  // «Что нового» и «Инструкция» у всех пользователей — без сборки (FT-615)
-  { value: 'stories', label: 'Истории' },
-  // Темы оформления файлом — загрузить, закрыть (22.10.2026)
-  { value: 'look', label: 'Вид' },
-  // Последние версии iPhone: «Вышла новая версия» в старых (22.10.2026)
-  { value: 'versions', label: 'Версии' },
-  // Журнал действий: платежи, пересчёты, переносы, переключения флагов
-  { value: 'logs', label: 'Логи' },
-  // Справочные разделы базы файлом — переслать разработчику (18.10.2026)
-  { value: 'export', label: 'Выгрузка' },
-];
 
 export default function Admin({ pane }) {
   if (pane === 'trainers') return <Trainers />;
@@ -243,11 +228,11 @@ function Tariffs() {
     <>
       {!data.on && (
         <Note tone="info">
-          Тарифы выключены: у всех открыто всё, ступени только считаются. Включить — на вкладке «Флаги».
+          Тарифы выключены: у всех открыто всё, ступени только считаются. Включить — «Система» → «Флаги».
         </Note>
       )}
 
-      <Section title="Ступени тренера" note="Цена месяца по числу активных клиентов. Названия — в коде, здесь границы и цены">
+      <Section title="Ступени тренера" note="Цена месяца по числу активных клиентов. Названия ступеней постоянные, меняются границы и цены">
         <div className="admin-list">
           {form.tiers.map((t, i) => {
             // Цена на клиента — по тому, что сейчас в полях: видно сразу, как
@@ -278,7 +263,7 @@ function Tariffs() {
         {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
         {saved && <Note tone="good">Сохранено. Новые цены действуют сразу.</Note>}
         <button type="button" className="button button--primary admin-save" disabled={busy} onClick={save}>
-          {busy ? 'Сохраняю…' : 'Сохранить цены'}
+          {busy ? 'Сохраняем…' : 'Сохранить цены'}
         </button>
       </Section>
 
@@ -293,7 +278,7 @@ function Tariffs() {
         {!data.trainers.some((t) => !t.owner) && (
           <Note tone="info">
             Других работающих тренеров нет. Ступень выдаётся работающему тренеру: отключённому — сначала
-            «Вернуть доступ» на вкладке «Тренеры», новые появятся после одобрения заявки. У владельца ступени нет — у вас всё без предела.
+            «Вернуть доступ» в подразделе «Тренеры», новые появятся после одобрения заявки. У владельца ступени нет — у вас всё без предела.
           </Note>
         )}
       </Section>
@@ -440,7 +425,7 @@ function Flags() {
   return (
     <>
       <Note tone="info">
-        Переключение действует сразу, без перезапуска сервера, и сохраняется. Основа — значение в .env; «Как в .env» возвращает его.
+        Переключение действует сразу, без перезапуска сервера, и сохраняется. Основа — значение, заданное на сервере; кнопка «Как задано на сервере» возвращает его.
       </Note>
       {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
 
@@ -466,7 +451,7 @@ function Flags() {
                 {pending !== undefined && (
                   <Confirm
                     text={f.caution}
-                    action={pending === null ? 'Вернуть как в .env' : pending ? 'Включить' : 'Выключить'}
+                    action={pending === null ? 'Вернуть как задано на сервере' : pending ? 'Включить' : 'Выключить'}
                     busy={busy}
                     onConfirm={() => change(f, pending)}
                     onCancel={() => setAsking(null)}
@@ -474,7 +459,7 @@ function Flags() {
                 )}
                 {f.overridden && pending === undefined && (
                   <div className="trainer-row__actions">
-                    <button type="button" className="button" disabled={busy} onClick={() => change(f, null)}>Как в .env</button>
+                    <button type="button" className="button" disabled={busy} onClick={() => change(f, null)}>Как задано на сервере</button>
                   </div>
                 )}
               </Panel>
@@ -587,7 +572,7 @@ function Export() {
             </React.Fragment>
           ))}
           {failure && <Note tone="critical">{failure.message}</Note>}
-          <button type="button" className="button button--primary" disabled={busy || !chosen.length} onClick={build}>{busy ? 'Собираю…' : 'Выгрузить'}</button>
+          <button type="button" className="button button--primary" disabled={busy || !chosen.length} onClick={build}>{busy ? 'Собираем…' : 'Выгрузить'}</button>
           {ready && <>
             <p className="small">{ready.name} · {formatNumber(Math.max(1, Math.round(ready.size / 1024)))} КБ</p>
             {canShare && <button type="button" className="button button--primary" onClick={share}>Поделиться файлом</button>}

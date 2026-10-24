@@ -170,7 +170,7 @@ const SCENARIOS = [
     S.click('Ещё'), S.wait(400), S.shot('04-client-diary-more', true),
     S.click('Прогресс'), S.wait(800), S.shot('05-client-progress', true),
     S.click('Тренировки'), S.wait(800), S.shot('06-client-plan', true),
-    S.menu('Управление'), S.wait(800), S.click('Тарифы'), S.wait(600), S.shot('07-tariffs', true),
+    S.menu('Управление'), S.wait(800), S.click('Тренеры и тарифы'), S.wait(400), S.click('Тарифы'), S.wait(600), S.shot('07-tariffs', true),
   ] },
 ];
 

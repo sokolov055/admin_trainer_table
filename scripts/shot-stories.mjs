@@ -32,6 +32,8 @@ for (const scheme of ['light', 'dark']) {
   await page.goto(origin + '/?mockRole=trainer');
   await page.getByRole('button', { name: /меню/i }).first().click({ timeout: 10000 });
   await page.getByRole('button', { name: /Управление/ }).first().click({ timeout: 10000 });
+  // С 24.10.2026 подразделы — по группам: «Контент» → «Истории»
+  await page.getByText('Контент', { exact: true }).first().click({ timeout: 10000 });
   await page.getByText('Истории', { exact: true }).first().click({ timeout: 10000 });
   await page.locator('.admin-stories__thumb').first().waitFor({ timeout: 10000 });
   await page.waitForTimeout(600);

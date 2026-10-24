@@ -62,7 +62,7 @@ const output = await build({
         if (args.path === 'ui') return {
           loader: 'jsx',
           contents: `import React from 'react';
-            export const BackButton=()=>null; export const SubNav=({children})=>children; export const Chips=()=>null; export const Empty=()=>null; export const ErrorState=()=>null; export const Loading=()=>null; export const Search=()=>null;
+            export const BackButton=()=>null; export const SubNav=({children})=>children; export const Chips=()=>null; export const Segmented=()=>null; export const Empty=()=>null; export const ErrorState=()=>null; export const Loading=()=>null; export const Search=()=>null;
             export const Drawer=({children})=><div>{children}</div>; export const Section=({children})=><section>{children}</section>; export const Panel=({children})=><div>{children}</div>;`,
         };
         if (args.path === 'icons') return {
@@ -74,7 +74,7 @@ const output = await build({
         };
         if (args.path === 'my-games') return { loader: 'jsx', contents: 'export default () => null;' };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
-        if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }];` };
+        if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }]; export const ADMIN_GROUPS = [{ value: 'analytics', label: 'Stats', panes: ['stats'] }]; export const adminGroupOf = () => ADMIN_GROUPS[0]; export const adminPanesOf = () => ADMIN_PANES;` };
         if (args.path === 'metrics') return { loader: 'jsx', contents: `export const Finance=()=>null; export const Clients=()=>null; export const Processes=()=>null;` };
         if (args.path === 'dashboard') return { loader: 'jsx', contents: `export const Dashboard=()=>null;` };
         if (args.path === 'schedule') return { loader: 'jsx', contents: `export default () => null;` };

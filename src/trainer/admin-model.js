@@ -4,6 +4,52 @@
  * (server/src/lib/owner-stats.js); здесь только то, как их показать.
  */
 
+/**
+ * Подразделы «Управления». Порядок — как в группах ниже: по нему же
+ * подраздел въезжает слева или справа (useViewMotion в TrainerApp.jsx).
+ */
+export const ADMIN_PANES = [
+  { value: 'stats', label: 'Аналитика' },
+  { value: 'trainers', label: 'Тренеры' },
+  { value: 'tariffs', label: 'Тарифы' },
+  { value: 'games', label: 'Игры' },
+  // «Что нового» и «Инструкция» у всех пользователей — без сборки (FT-615)
+  { value: 'stories', label: 'Истории' },
+  // Темы оформления файлом — загрузить, закрыть (22.10.2026)
+  { value: 'look', label: 'Вид' },
+  { value: 'flags', label: 'Флаги' },
+  // Последние версии iPhone: «Вышла новая версия» в старых (22.10.2026)
+  { value: 'versions', label: 'Версии' },
+  // Журнал действий: платежи, пересчёты, переносы, переключения флагов
+  { value: 'logs', label: 'Логи' },
+  // Справочные разделы базы файлом — переслать разработчику (18.10.2026)
+  { value: 'export', label: 'Выгрузка' },
+];
+
+/**
+ * Десять подразделов в одной дорожке не помещались и листались за край —
+ * теперь четыре группы в шапке, а подразделы группы — переключателем над
+ * экраном (аудит 24.10.2026). У «Аналитики» подраздел один, переключателя нет.
+ */
+export const ADMIN_GROUPS = [
+  { value: 'analytics', label: 'Аналитика', panes: ['stats'] },
+  { value: 'people', label: 'Тренеры и тарифы', panes: ['trainers', 'tariffs'] },
+  { value: 'content', label: 'Контент', panes: ['games', 'stories', 'look'] },
+  { value: 'system', label: 'Система', panes: ['flags', 'versions', 'logs', 'export'] },
+];
+
+/** Группа подраздела; неизвестный — первая группа */
+export function adminGroupOf(pane) {
+  return ADMIN_GROUPS.find((g) => g.panes.includes(pane)) || ADMIN_GROUPS[0];
+}
+
+/** Подразделы группы с подписями — для переключателя над экраном */
+export function adminPanesOf(group) {
+  const g = typeof group === 'string' ? ADMIN_GROUPS.find((x) => x.value === group) : group;
+  if (!g) return [];
+  return g.panes.map((v) => ADMIN_PANES.find((p) => p.value === v)).filter(Boolean);
+}
+
 /** Откуда пришёл клиент — подписи в порядке показа */
 export const SOURCES = [
   ['trainer', 'Завёл тренер'],
@@ -58,23 +104,24 @@ export function monthName(key) {
 /**
  * Нужно ли переспросить перед переключением флага: в «опасную» сторону
  * (riskyTo с сервера) — да, с напоминанием, почему он стоит как стоит.
- * Вернуть как в .env — тоже переспросить, если это меняет значение.
+ * Вернуть как задано на сервере — тоже переспросить, если это меняет значение.
  */
 export function needsConfirm(flag, next) {
   if (next === null) return flag.envValue !== flag.value;
   return next === flag.riskyTo && next !== flag.value;
 }
 
-/** Строка состояния флага под названием */
+/** Строка состояния флага под названием. «.env» владельцу ничего не говорит —
+ *  «задано на сервере» (аудит 24.10.2026) */
 export function flagStatus(flag) {
   const now = flag.value ? 'Включено' : 'Выключено';
-  if (!flag.overridden) return `${now} · как в .env`;
+  if (!flag.overridden) return `${now} · как задано на сервере`;
   const env = flag.envValue ? 'вкл' : 'выкл';
   const when = flag.setAt ? new Date(flag.setAt) : null;
   const at = when && !Number.isNaN(when.getTime())
     ? ` ${pad(when.getDate())}.${pad(when.getMonth() + 1)} ${pad(when.getHours())}:${pad(when.getMinutes())}`
     : '';
-  return `${now} из панели${at} · в .env — ${env}`;
+  return `${now} из панели${at} · на сервере — ${env}`;
 }
 
 /** Платформы в порядке показа */

@@ -40,15 +40,15 @@ test('переспрашиваем только при переключении 
   const push = flag({ key: 'pushOff', value: true, envValue: true, riskyTo: false });
   assert.equal(needsConfirm(push, false), true, 'снять паузу push — переспросить');
   assert.equal(needsConfirm(push, true), false);
-  // «Как в .env» — переспросить, только если значение поменяется
+  // «Как задано на сервере» — переспросить, только если значение поменяется
   assert.equal(needsConfirm(flag({ value: true, overridden: true }), null), true);
   assert.equal(needsConfirm(flag({ value: false, overridden: true }), null), false);
 });
 
 test('состояние флага говорит, откуда значение', () => {
-  assert.equal(flagStatus(flag()), 'Выключено · как в .env');
+  assert.equal(flagStatus(flag()), 'Выключено · как задано на сервере');
   const s = flagStatus(flag({ value: true, overridden: true, setAt: '2026-10-17T09:05:00' }));
-  assert.match(s, /^Включено из панели 17\.10 09:05 · в \.env — выкл$/);
+  assert.match(s, /^Включено из панели 17\.10 09:05 · на сервере — выкл$/);
 });
 
 test('цена ступени на клиента: цена ÷ граница до рубля; у бесплатной и последней — нет', () => {
@@ -103,4 +103,17 @@ test('«Версии»: форма и обратно — номер сборки
   assert.equal(form.appStore.build, '22');
   form.testflight.build = ' 26 ';
   assert.deepEqual(versionsPayload(form).testflight, { version: '1.6', build: 26, url: 'itms-beta://x' });
+});
+
+test('подразделы «Управления» по группам: каждый ровно в одной, порядок групп = порядок подразделов (аудит 24.10.2026)', async () => {
+  const { ADMIN_PANES, ADMIN_GROUPS, adminGroupOf, adminPanesOf } = await import('../src/trainer/admin-model.js');
+  assert.deepEqual(ADMIN_GROUPS.map((g) => g.label), ['Аналитика', 'Тренеры и тарифы', 'Контент', 'Система']);
+  // Ничего не потеряно и не задвоено: группы подряд дают все подразделы в их порядке
+  assert.deepEqual(ADMIN_GROUPS.flatMap((g) => g.panes), ADMIN_PANES.map((p) => p.value));
+  assert.equal(new Set(ADMIN_PANES.map((p) => p.value)).size, 10);
+  assert.equal(adminGroupOf('logs').value, 'system');
+  assert.equal(adminGroupOf('look').value, 'content');
+  assert.equal(adminGroupOf('нет такого').value, 'analytics');
+  assert.deepEqual(adminPanesOf('people').map((p) => p.label), ['Тренеры', 'Тарифы']);
+  assert.deepEqual(adminPanesOf('system').map((p) => p.label), ['Флаги', 'Версии', 'Логи', 'Выгрузка']);
 });

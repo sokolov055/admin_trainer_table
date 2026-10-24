@@ -12,7 +12,7 @@ import { Payments } from './Payments.jsx';
 import { Stories } from '../stories.jsx';
 import { TelegramTransferCard } from '../AuthTransfer.jsx';
 import { APP_VERSION } from '../version.js';
-import { BackButton, Chips, Drawer, Empty, ErrorState, Loading, Search, Section, SubNav } from '../ui.jsx';
+import { BackButton, Chips, Drawer, Empty, ErrorState, Loading, Search, Section, Segmented, SubNav } from '../ui.jsx';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
@@ -29,7 +29,7 @@ import { WorkoutJournal } from '../client/screens.jsx';
 import { Deferred, lazyPage } from '../lazy.js';
 import Library, { LIBRARY_PANES } from './Library.jsx';
 import Schedule from './Schedule.jsx';
-import Admin, { ADMIN_PANES } from './Admin.jsx';
+import Admin, { ADMIN_PANES, ADMIN_GROUPS, adminGroupOf, adminPanesOf } from './Admin.jsx';
 import TrainerProfile from './TrainerProfile.jsx';
 import Appearance from '../Appearance.jsx';
 import { screensNote } from '../native-bridge.js';
@@ -121,7 +121,9 @@ const CLIENT_PANES = [
  */
 const DASH_PANES = [
   { value: 'overview', label: 'Обзор' },
-  { value: 'finance', label: 'Финансы' },
+  // «Деньги», как и сторона внутри обзора и заголовок вкладки: одно слово
+  // на одно и то же (аудит 24.10.2026)
+  { value: 'finance', label: 'Деньги' },
   { value: 'clients', label: 'Клиенты' },
   { value: 'processes', label: 'Процессы' },
 ];
@@ -161,6 +163,17 @@ export default function TrainerApp({ me }) {
   const [dashPane, setDashPane] = useState(DASH[0].value);
   const [libPane, setLibPane] = useState('program');
   const [adminPane, setAdminPane] = useState(ADMIN_PANES[0].value);
+  // «Управление» двумя уровнями (аудит 24.10.2026): группа в шапке,
+  // подраздел — переключателем над экраном. Вернулись в группу — на тот
+  // подраздел, где были, а не на первый
+  const adminGroup = adminGroupOf(adminPane);
+  const adminLast = useRef({});
+  adminLast.current[adminGroup.value] = adminPane;
+  const pickAdminGroup = (value) => {
+    const g = ADMIN_GROUPS.find((x) => x.value === value) || ADMIN_GROUPS[0];
+    setAdminPane(adminLast.current[g.value] || g.panes[0]);
+    haptic();
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   // «+» в шапке «Клиентов»: меню из двух пунктов и что из него открыто
   // ('add' | 'link') — вместо двух кнопок во всю ширину над списком
@@ -220,7 +233,11 @@ export default function TrainerApp({ me }) {
   useViewMotion(clientPane, { direction: byOrder(CLIENT_PANES.map((p) => p.value)), target: paneTarget });
   useViewMotion(dashPane, { direction: byOrder(DASH.map((p) => p.value)), target: paneTarget });
   useViewMotion(libPane, { direction: byOrder(LIBRARY_PANES.map((p) => p.value)), target: paneTarget });
-  useViewMotion(adminPane, { direction: byOrder(ADMIN_PANES.map((p) => p.value)), target: paneTarget });
+  // Едет экран подраздела, а не переключатель над ним
+  useViewMotion(adminPane, {
+    direction: byOrder(ADMIN_PANES.map((p) => p.value)),
+    target: () => { const m = visibleMain(); return m && (m.querySelector('[data-admin-pane]') || m.firstElementChild); },
+  });
   const [scheduleRevision, setScheduleRevision] = useState(0);
   const scheduleRequest = useRef(null);
 
@@ -378,7 +395,7 @@ export default function TrainerApp({ me }) {
         )}
         {view === 'admin' && (
           <SubNav>
-            <Chips items={ADMIN_PANES} value={adminPane} onChange={switchPane(setAdminPane)} variant="nav" />
+            <Chips items={ADMIN_GROUPS} value={adminGroup.value} onChange={pickAdminGroup} variant="nav" label="Группы управления" />
           </SubNav>
         )}
       </header>
@@ -469,7 +486,16 @@ export default function TrainerApp({ me }) {
         {view === 'journal' && <JournalScreen owner={owner} />}
         {view === 'expenses' && <Expenses />}
         {view === 'profile' && <TrainerProfile />}
-        {view === 'admin' && owner && <div key={adminPane}><Admin pane={adminPane} /></div>}
+        {view === 'admin' && owner && (
+          <>
+            {adminGroup.panes.length > 1 && (
+              <div className="admin-panes">
+                <Segmented track label={adminGroup.label} items={adminPanesOf(adminGroup)} value={adminPane} onChange={switchPane(setAdminPane)} />
+              </div>
+            )}
+            <div key={adminPane} data-admin-pane=""><Admin pane={adminPane} /></div>
+          </>
+        )}
         {view === 'appearance' && <Appearance />}
         {view === 'settings' && <Settings owner={owner} />}
         {view === 'client-preview' && <ClientPreviewPicker onSelect={(client) => { captureScreen('client-preview'); setPreviewClient(client); }} />}
