@@ -82,7 +82,7 @@ vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0]
   createRequire(import.meta.url), module, module.exports,
 );
 
-const { Finance, Clients, Processes, Expenses, Dashboard, resetPeriod } = module.exports;
+const { Finance, Clients, Processes, Expenses, Dashboard, resetPeriod, useLeaveGuard } = module.exports;
 
 /* ==========================================================================
  * Инструменты
@@ -571,6 +571,36 @@ test('у каждого числового Field явная цифровая к�
     }
   }
   assert.deepEqual(missing, []);
+});
+
+/**
+ * Правка шаблона или события с несохранённым (аудит 24.10.2026): «назад»
+ * не закрывает молча, а спрашивает на месте; без изменений — закрывает сразу.
+ */
+test('выход из правки с несохранённым спрашивает «Выйти без сохранения?»', () => {
+  let closed = 0;
+  let guard = null;
+  function Probe({ dirty }) {
+    guard = useLeaveGuard(dirty, () => { closed += 1; });
+    return React.createElement('div', null, guard.confirm);
+  }
+  let tree;
+  act(() => { tree = renderer.create(React.createElement(Probe, { dirty: false })); });
+  act(() => { guard.leave(); });
+  assert.equal(closed, 1, 'без изменений — сразу');
+
+  act(() => { tree.update(React.createElement(Probe, { dirty: true })); });
+  act(() => { guard.leave(); });
+  assert.equal(closed, 1, 'с изменениями не закрылось');
+  assert.match(screenText(tree), /Выйти без сохранения\?/);
+
+  act(() => { button(tree, 'Остаться').props.onClick(); });
+  assert.doesNotMatch(screenText(tree), /Выйти без сохранения/);
+  assert.equal(closed, 1);
+
+  act(() => { guard.leave(); });
+  act(() => { button(tree, 'Выйти').props.onClick(); });
+  assert.equal(closed, 2, '«Выйти» закрывает');
 });
 
 /* ==========================================================================
