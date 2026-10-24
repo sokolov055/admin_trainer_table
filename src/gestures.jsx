@@ -288,7 +288,7 @@ export function spring({ from, to, velocity = 0, damping = 1, response = 0.34, o
   };
 }
 
-function reducedMotion() {
+export function reducedMotion() {
   try {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch (_) {
@@ -606,7 +606,7 @@ function buildPager(target, side, at, host) {
  * Слой жестов
  * ========================================================================== */
 
-const LOCK = 10;            // px до выбора направления
+export const LOCK = 10;     // px до выбора направления (и для листа в ui.jsx)
 const PULL_TRIGGER = 72;    // px видимого хода, после которых отпускание обновляет
 const PULL_REST = 56;       // где индикатор ждёт, пока идёт обновление
 const PULL_MAX = 140;       // дальше резина почти не пускает

@@ -20,6 +20,7 @@
  * sessionStorage.
  */
 import { forcedScheme } from './palettes.js';
+import { plugin } from './native-bridge.js';
 
 const STORAGE_KEY = 'tg_init_params_v1';
 
@@ -224,11 +225,36 @@ function isDarkColor(hex) {
 }
 
 /** Тактильный отклик — мелочь, но приложение перестаёт ощущаться
- *  веб-страницей внутри мессенджера. Без SDK просто не срабатывает. */
+ *  веб-страницей. Сначала приложение iOS/Android (плагин Haptics оболочки
+ *  mobile/, @capacitor/haptics), иначе Telegram, иначе ничего.
+ *
+ *  type: light / medium / heavy — удар; success / warning / error — итог
+ *  действия (у iPhone свой узор на каждый); selection — щелчок выбора.
+ *  На Android отклик может молчать: системная «вибрация при касании»
+ *  выключена — это нормально, ошибок тут не ждём и не показываем. */
+const IMPACT = { light: 'LIGHT', medium: 'MEDIUM', heavy: 'HEAVY', soft: 'LIGHT', rigid: 'HEAVY' };
+const NOTICE = { success: 'SUCCESS', warning: 'WARNING', error: 'ERROR' };
+
 export function haptic(type = 'light') {
+  const native = plugin('Haptics');
+  if (native) {
+    try {
+      const done = NOTICE[type] ? native.notification({ type: NOTICE[type] })
+        : type === 'selection' ? native.selectionChanged()
+        : native.impact({ style: IMPACT[type] || 'LIGHT' });
+      if (done && done.catch) done.catch(() => {});
+    } catch (_) {}
+    return;
+  }
   const app = tg();
   try {
-    if (app && app.HapticFeedback) app.HapticFeedback.impactOccurred(type);
+    const feedback = app && app.HapticFeedback;
+    if (!feedback) return;
+    // У Telegram удар и итог — разные вызовы: impactOccurred('success')
+    // он молча пропускал
+    if (NOTICE[type]) feedback.notificationOccurred(type);
+    else if (type === 'selection') feedback.selectionChanged();
+    else feedback.impactOccurred(IMPACT[type] ? type : 'light');
   } catch (_) {}
 }
 

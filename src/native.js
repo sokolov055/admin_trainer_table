@@ -13,6 +13,7 @@
  *   - строка состояния телефона — цвета фона приложения и в тёмной теме;
  *   - вышла новая версия самой оболочки — внизу «Обновить» (checkUpdate);
  *     на iPhone — со ссылкой на App Store или TestFlight (app-update.js).
+ *   - системный размер шрифта телефона (text-zoom.js), 0.9–1.3.
  */
 import { goBack } from './gestures.jsx';
 import { isNativeApp, plugin, iosApp } from './native-bridge.js';
@@ -26,6 +27,7 @@ import { settleLive } from './live-settle.js';
 import { linkWidgets, reloadWidgets } from './native-widget.js';
 import { loadApiConfig, currentApiUrl } from './apiConfig.js';
 import { noteAppUse } from './native-review.js';
+import { applyTextZoom } from './text-zoom.js';
 
 export { isNativeApp };
 
@@ -34,6 +36,8 @@ export function startNative() {
   document.documentElement.classList.add('is-native');
   // Первый запуск — от него отсчёт «не просить оценку в первые 3 дня»
   noteAppUse();
+  // Размер текста из настроек телефона — до первых экранов, чтобы не прыгал
+  applyTextZoom();
 
   const app = plugin('App');
   if (app && app.addListener) {
@@ -50,6 +54,8 @@ export function startNative() {
     if (app.getInfo) app.getInfo().then((info) => { noteAppBuild(info); checkUpdate(info); }).catch(() => {});
     // Вернулись в приложение — шаги за это время могли прибавиться
     app.addListener('resume', () => {
+      // Размер текста могли поменять в настройках, пока приложение было свёрнуто
+      applyTextZoom();
       syncSteps().catch(() => {}).then(() => reportDevice());
       // Сон, пульс и вес (FT-708) — после тренировок: Health Connect не любит залп запросов
       syncWorkouts().catch(() => {}).then(() => syncHealthDaily()).catch(() => {});

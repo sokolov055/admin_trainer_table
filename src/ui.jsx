@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefresh, IconSearch, IconBack, IconClose } from './icons.jsx';
-import { useBackGesture } from './gestures.jsx';
-import { environmentInfo } from './telegram.js';
+import { useBackGesture, spring, rubberband, reducedMotion, LOCK } from './gestures.jsx';
+import { environmentInfo, haptic } from './telegram.js';
+import { sheetArmed, sheetRelease, releaseVelocity, canDragFrom } from './sheet-drag.js';
 import { hasToken, describeDevice } from './session.js';
 import { logout } from './api.js';
 import { stopBackgroundSync } from './native-sync.js';
@@ -961,6 +962,13 @@ const SHEET_LEAVE = 220;
  * `closeRef.current()` — тот же уход, что у крестика, а `onLeaving` —
  * в первый кадр ухода, чтобы кнопка начала обратное движение вместе с
  * листом, а не после него.
+ *
+ * Смахнуть вниз (24.10.2026, как лист iOS): за ручку и заголовок — всегда,
+ * за тело — когда оно прокручено в самый верх и палец пошёл вниз. Лист идёт
+ * за пальцем 1:1, фон светлеет вместе с ним; решение на отпускании —
+ * sheet-drag.js (четверть высоты или взмах), уход и возврат — пружиной
+ * gestures.jsx. С набранной формой (`dirty`) лист тянется туго и всегда
+ * возвращается: как и касание мимо, смахивание ввод не стирает.
  */
 export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = false, locked = false, focus, className, closeRef, onLeaving, children }) {
   const [leaving, setLeaving] = useState(false);
@@ -968,26 +976,159 @@ export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = f
   const panel = useRef(null);
   const opener = useRef(typeof document !== 'undefined' ? document.activeElement : null);
   const titleId = useRef('sheet-title-' + Math.random().toString(36).slice(2, 8));
+  const scrim = useRef(null);
   const live = useRef({ leaving: false, covered: 0, locked, onClose });
   live.current.covered = covered;
   live.current.locked = locked;
+  live.current.dirty = dirty;
   live.current.onClose = onClose;
   live.current.onLeaving = onLeaving;
   if (closeRef) closeRef.current = () => close(live.current.onClose);
   const parent = useContext(SheetContext);
 
-  // locked — форма отправляется: лист не закрыть, пока не пришёл ответ
-  const close = (cb) => {
+  // locked — форма отправляется: лист не закрыть, пока не пришёл ответ.
+  // fling — уход уже ведёт смахивание: оно само досматривает движение вниз
+  // и зовёт done, CSS-уход (.is-leaving) тогда не нужен
+  const close = (cb, fling = null) => {
     if (live.current.leaving || live.current.locked) return;
     live.current.leaving = true;
+    live.current.flung = !!fling;
     setLeaving(true);
     if (live.current.onLeaving) live.current.onLeaving();
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    setTimeout(() => {
+    const done = () => {
       if (cb) cb();
       try { opener.current?.focus?.({ preventScroll: true }); } catch (_) {}
-    }, reduce ? 0 : SHEET_LEAVE);
+    };
+    if (fling) { fling(done); return; }
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(done, reduce ? 0 : SHEET_LEAVE);
   };
+
+  // Лист уже тянули — на нём свои стили (animation: none, сдвиг). Уход
+  // крестиком, фоном или «назад» снимает их, чтобы сыграл CSS-уход
+  useLayoutEffect(() => {
+    if (!leaving || live.current.flung) return;
+    for (const el of [panel.current, scrim.current]) {
+      if (el) { el.style.animation = ''; el.style.transform = ''; el.style.opacity = ''; }
+    }
+  }, [leaving]);
+
+  // Смахнуть вниз. Слушатели на самом листе и заранее: iPhone даёт отменить
+  // прокрутку только тому touchmove, который был в момент касания. Кадры —
+  // прямой записью стилей, как в gestures.jsx, без состояния React
+  useEffect(() => {
+    const p = panel.current;
+    const s = scrim.current;
+    if (!p) return undefined;
+    let g = null;
+    let anim = null;
+
+    const draw = (y, h) => {
+      p.style.transform = y ? `translate3d(0, ${y}px, 0)` : '';
+      if (s) s.style.opacity = String(Math.max(0, Math.min(1, 1 - Math.max(0, y) / (h || 1))));
+    };
+    // Входная анимация с fill both держала бы transform сама и спорила бы
+    // с пальцем; снятая один раз, она уже не проигрывается заново
+    const hold = () => {
+      p.style.animation = 'none';
+      if (s) s.style.animation = 'none';
+    };
+
+    const onStart = (e) => {
+      g = null;
+      if (e.touches.length !== 1 || live.current.leaving || live.current.locked || live.current.covered) return;
+      if (!canDragFrom(e.target, p)) return;
+      const t = e.touches[0];
+      // Перехват возврата на лету: с текущего места, без рывка
+      let from = 0;
+      if (anim) { from = anim.stop(); anim = null; }
+      g = {
+        x0: t.clientX,
+        y0: t.clientY,
+        from,
+        y: from,
+        h: p.offsetHeight,
+        mode: from ? 'drag' : null,
+        history: [{ y: t.clientY, t: performance.now() }],
+        armed: false,
+      };
+    };
+
+    const onMove = (e) => {
+      if (!g) return;
+      const t = e.touches[0];
+      const dx = t.clientX - g.x0;
+      const dy = t.clientY - g.y0;
+      g.history.push({ y: t.clientY, t: performance.now() });
+      if (g.history.length > 6) g.history.shift();
+
+      if (!g.mode) {
+        // Тело наверху и палец пошёл вниз — родной отскок гасим сразу,
+        // иначе он успеет дёрнуть содержимое до выбора жеста
+        if (dy > 0 && dy >= Math.abs(dx) && e.cancelable) e.preventDefault();
+        if (Math.abs(dx) < LOCK && Math.abs(dy) < LOCK) return;
+        // Вверх или вбок — это прокрутка и свои жесты содержимого
+        if (!(dy > 0 && dy > Math.abs(dx))) { g = null; return; }
+        g.mode = 'drag';
+        // Лист трогается в точке выбора, а не прыгает сразу на LOCK px
+        g.y0 = t.clientY;
+        hold();
+      }
+
+      if (e.cancelable) e.preventDefault();
+      const raw = g.from + (t.clientY - g.y0);
+      const dirty = live.current.dirty;
+      // Вниз — 1:1 (с формой — туго), вверх — резина: выше своего места листу некуда
+      const y = raw >= 0 ? (dirty ? rubberband(raw, g.h) : raw) : -rubberband(-raw, 40);
+      g.y = y;
+      draw(y, g.h);
+      const armed = !dirty && sheetArmed(y, g.h);
+      if (armed && !g.armed) haptic('light');
+      g.armed = armed;
+    };
+
+    const onEnd = () => {
+      const cur = g;
+      g = null;
+      if (!cur || cur.mode !== 'drag') return;
+      const v = releaseVelocity(cur.history);
+      const { y, h } = cur;
+      const verdict = sheetRelease({ offset: y, height: h, velocity: v, dirty: live.current.dirty || live.current.locked });
+      const reduce = reducedMotion();
+      if (verdict === 'close') {
+        close(live.current.onClose, (done) => {
+          // Без движения — просто закрыть
+          if (reduce) { done(); return; }
+          // Досмотреть уход вниз с той же скоростью, что у пальца (px/с),
+          // и чуть дальше края — чтобы тень не осталась полоской
+          anim = spring({
+            from: y, to: h + 24, velocity: Math.max(0, v * 1000), response: 0.3,
+            onFrame: (x) => draw(x, h),
+            onDone: () => { anim = null; done(); },
+          });
+        });
+        return;
+      }
+      if (reduce) { draw(0, h); return; }
+      anim = spring({
+        from: y, to: 0, velocity: v * 1000,
+        onFrame: (x) => draw(x, h),
+        onDone: () => { anim = null; draw(0, h); },
+      });
+    };
+
+    p.addEventListener('touchstart', onStart, { passive: true });
+    p.addEventListener('touchmove', onMove, { passive: false });
+    p.addEventListener('touchend', onEnd);
+    p.addEventListener('touchcancel', onEnd);
+    return () => {
+      if (anim) anim.stop();
+      p.removeEventListener('touchstart', onStart);
+      p.removeEventListener('touchmove', onMove);
+      p.removeEventListener('touchend', onEnd);
+      p.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
 
   useBackGesture(() => close(live.current.onClose), true, null, { swipe: false });
 
@@ -1027,7 +1168,7 @@ export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = f
       {/* data-no-gestures: барабан и списки внутри крутят вниз — это не «потяни, чтобы обновить» */}
       <div className={'sheet' + (leaving ? ' is-leaving' : '') + (covered ? ' is-covered' : '') + (className ? ' ' + className : '')}
         data-no-gestures="" inert={hidden ? '' : undefined} aria-hidden={hidden ? 'true' : undefined}>
-        <div className="sheet__scrim" onClick={() => { if (!dirty) close(live.current.onClose); }} />
+        <div ref={scrim} className="sheet__scrim" onClick={() => { if (!dirty) close(live.current.onClose); }} />
         <section ref={panel} className="sheet__panel" role="dialog" aria-modal="true" aria-labelledby={titleId.current} tabIndex={-1}>
           <span className="sheet__grip" aria-hidden="true" />
           <header className="sheet__head">
