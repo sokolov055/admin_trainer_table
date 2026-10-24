@@ -24,6 +24,8 @@ captureTrainerLink();
 // Ответ на действие — ошибка, итог — на экран, а не за его краем (FT-595)
 installActionReveal();
 
+// Приложение запустилось — повтор при несработавшей загрузке (index.html) снова разрешён
+try { sessionStorage.removeItem('boot-retry'); } catch (_) { /* приватный режим */ }
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

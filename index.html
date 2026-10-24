@@ -2,6 +2,24 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
+    <!-- Код страницы не загрузился (24.10.2026): сервис-воркер отдал прежнюю
+         страницу, а её index-<хеш>.js на сервере уже нет — приложение висело
+         на «Загружаем кабинет…». Один раз за сеанс: забыть сохранённую копию
+         и открыть заново. Без сети не трогаем — копия нужна для работы без
+         интернета. Старый JS: бандла здесь ещё нет -->
+    <script>
+      window.addEventListener('error', function (e) {
+        var el = e.target;
+        if (!el || el.tagName !== 'SCRIPT' || !/\/assets\/[^\/]+\.js/.test(el.src || '')) return;
+        if (navigator.onLine === false) return;
+        try { if (sessionStorage.getItem('boot-retry')) return; sessionStorage.setItem('boot-retry', '1'); } catch (_) { return; }
+        var go = function () { var u = new URL(location.href); u.searchParams.set('r', String(Date.now())); location.replace(u.href); };
+        var jobs = [];
+        try { if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); })); } catch (_) {}
+        try { if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })); } catch (_) {}
+        Promise.all(jobs).then(go, go);
+      }, true);
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
     <meta name="color-scheme" content="light dark" />
     <title>Личный кабинет</title>
