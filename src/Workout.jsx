@@ -117,6 +117,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const conflictRef = useRef(null);
   // Просили сохранить, пока шло прежнее сохранение (см. save)
   const saveAgain = useRef(false);
+  // Какой отдых уже отправлен вне очереди (rushRest): «занятие:до»
+  const rushed = useRef('');
   // Чего не хватает, чтобы отметить круг суперсета: { key: 'группа:круг', text }
   const [roundLack, setRoundLack] = useState(null);
   // Переименование касанием по названию (02.10.2026): id упражнения
@@ -339,6 +341,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       }
     }
     saving.current = true; if (mounted.current) setBusy(true);
+    // Ушёл снимок старее черновика (повтор потерянного) — новое досылаем
+    // сразу после ответа, а не обычной задержкой: телефон к тому времени уже
+    // в кармане, и страница её не дождётся (24.10.2026)
+    let resend = false;
     // Повторяем ровно тот снимок, чей ответ потерялся. Новые нажатия
     // остаются в черновике и отправятся уже следующей версией.
     if (!r.pending) {
@@ -383,6 +389,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         // или месяца меняет их, пока здесь дописывают занятие
         sourceBlock: result.session.sourceBlock, sourceBlockId: result.session.sourceBlockId, month: result.session.month,
       }, revision: result.session.revision, serverTitle: result.session.title, pending: null, dirty: !unchanged });
+      resend = !unchanged && mounted.current;
       if (mounted.current) { setMessage(''); list().catch(() => {}); }
     } catch (e) {
       // Явный отказ валидации позволяет исправить снимок. При потере
@@ -391,7 +398,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       if (mounted.current) setMessage('Не сохранено в облаке: ' + e.message + ' Черновик остаётся на устройстве.');
     } finally {
       saving.current = false; if (mounted.current) setBusy(false);
-      if (saveAgain.current) { saveAgain.current = false; save(); }
+      if (saveAgain.current || resend) { saveAgain.current = false; save(); }
     }
   };
 
@@ -488,15 +495,20 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const online = () => { setMessage(''); save(); };
     const unload = e => { if (state.current?.dirty) { e.preventDefault(); e.returnValue = ''; } };
     // Свернули приложение или заблокировали экран — несохранённое уходит
-    // сразу: на iPhone у страницы после этого мгновения, не секунды
-    const hide = () => (document.hidden ? save() : applyPendingRest());
+    // сразу: на iPhone у страницы после этого мгновения, не секунды. Ждёт
+    // ответа прежнее сохранение — идущий отдых уходит вне очереди (rushRest)
+    const leave = () => {
+      if (saving.current || state.current?.pending) rushRest();
+      save();
+    };
+    const hide = () => (document.hidden ? leave() : applyPendingRest());
     window.addEventListener('online', online);
     window.addEventListener('beforeunload', unload);
     document.addEventListener('visibilitychange', hide);
-    window.addEventListener('pagehide', save);
+    window.addEventListener('pagehide', leave);
     return () => {
       clearInterval(interval); window.removeEventListener('online', online); window.removeEventListener('beforeunload', unload);
-      document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', save);
+      document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', leave);
     };
   }, []);
 
@@ -654,13 +666,40 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     change(v => ({ ...v, restUntil: until, restLocal: '' }));
     const cur = state.current && state.current.session;
     setRestHere({ until, total: Math.max(1000, until - Date.now()), next: cur ? nextInfo(cur, focusOf(cur, lastMarked.current)) : null, sessionId: cur ? cur.id : '' });
+    // До save: он сам ставит «идёт сохранение»
+    const behind = saving.current || !!(state.current && state.current.pending);
     save();
+    if (behind) rushRest();
     // Что дальше — в уведомление о конце отдыха и в шторку (Android)
     scheduleRestEnd(until, nextText(state.current && state.current.session, lastMarked.current)).then((ok) => {
       if (!ok || state.current?.session.restUntil !== until) return;
       change(v => (v.restUntil === until ? { ...v, restLocal: localRestPlatform() } : v));
       save();
     });
+  };
+
+  /**
+   * Отдых — на сервер сразу, не дожидаясь ответа на прежнее сохранение
+   * (24.10.2026). Подход отметили, отдых пошёл, телефон тут же в карман:
+   * снимок с отдыхом ждал ответа на предыдущий, iPhone замораживал
+   * страницу — и отдых дошёл до сервера через три минуты уже закончившимся
+   * (часы показали «Отдых окончен» с первой секунды). Здесь — одно нажатие
+   * «отдых до» тем же путём, что у часов (workout.watch): сервер кладёт
+   * его в последнюю версию занятия, повтор безопасен — более ранний отдых
+   * он не примет. Запрос уходит из страницы мгновенно; дальше его везёт
+   * сетевой процесс телефона, даже если страницу заморозили. Полный
+   * снимок следом уходит обычным сохранением, сервер сведёт его по
+   * версиям (workout-merge.js)
+   */
+  const rushRest = () => {
+    const r = state.current;
+    const s = r && r.session;
+    if (!s || !r.revision || s.status !== 'active' || !(s.restUntil > Date.now())) return;
+    const mark = s.id + ':' + s.restUntil;
+    if (rushed.current === mark) return;
+    rushed.current = mark;
+    apiMutate('workout.watch', { ...params, sessionId: s.id, actions: [{ kind: 'rest', sessionId: s.id, restUntil: s.restUntil }] })
+      .catch(() => { if (rushed.current === mark) rushed.current = ''; });
   };
 
   const updateExercise = (index, fn) => change(s => ({ ...s, exercises: s.exercises.map((e, i) => i === index ? fn(e) : e) }));

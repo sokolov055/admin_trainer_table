@@ -145,6 +145,41 @@ test('отмена доступна во время сохранения и от
   assert.ok(JSON.stringify(tree.toJSON()).includes('Отменена'));
 });
 
+test('24.10.2026: отдых уходит на сервер сразу, даже если прежнее сохранение ещё не ответило', async () => {
+  data.clear(); await mount(); await saveNow();
+  const calls = [];
+  const api = globalThis.__workoutApi;
+  globalThis.__workoutApi = async (action, params) => { calls.push({ action, params }); return api(action, params); };
+  let release;
+  let pending;
+  try {
+    const weight = tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || ''));
+    await act(async () => weight.props.onChange({ target: { value: '42' } }));
+    // Сохранение веса ушло и висит — телефон на плохой связи
+    holdSave = new Promise(resolve => { release = resolve; });
+    await act(async () => { pending = hideOnce(); await delay(); });
+    const before = Date.now();
+    const done = tree.root.findAllByType('button').find(n => text(n) === 'Норм');
+    await act(async () => { done.props.onClick(); await delay(); });
+    const rush = calls.filter(c => c.action === 'workout.watch');
+    assert.equal(rush.length, 1, 'отдых — отдельным нажатием, не дожидаясь ответа');
+    const [a] = rush[0].params.actions;
+    assert.equal(a.kind, 'rest');
+    assert.equal(a.sessionId, rush[0].params.sessionId);
+    assert.ok(a.restUntil > before, 'отдых в будущем');
+    // Свернули ещё раз — тот же отдых второй раз не шлём
+    await act(async () => { await hideOnce(); await delay(); });
+    assert.equal(calls.filter(c => c.action === 'workout.watch').length, 1);
+  } finally {
+    globalThis.__workoutApi = api;
+    await act(async () => { release(); await pending; await delay(); await delay(); });
+  }
+  // Полный снимок с отметкой и отдыхом всё равно сохранился следом
+  const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
+  assert.equal(saved.exercises[0].sets[0].state, 'done');
+  assert.ok(saved.restUntil > 0);
+});
+
 test('интерфейс: запись подхода, пауза, продолжение, завершение и история', async () => {
   data.clear(); await mount();
   await saveNow();
