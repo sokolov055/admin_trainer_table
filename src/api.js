@@ -593,6 +593,11 @@ async function postJson(url, payload, timeoutMs) {
 }
 
 async function getJson(url, payload, timeoutMs = 0) {
+  // Ключ входа — заголовком, не в адресе (24.10.2026): адрес целиком
+  // попадает в журналы nginx, и ключ лежал там открытым текстом. Сервер
+  // берёт его из Authorization так же, как из тела POST
+  const { token, ...rest } = payload;
+  payload = rest;
   const qs = Object.keys(payload)
     .filter((k) => payload[k] !== undefined && payload[k] !== null)
     .map((k) => {
@@ -605,7 +610,12 @@ async function getJson(url, payload, timeoutMs = 0) {
   const controller = timeoutMs && typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
-    const resp = await fetch(url + '?' + qs, { method: 'GET', redirect: 'follow', ...(controller ? { signal: controller.signal } : {}) });
+    const resp = await fetch(url + '?' + qs, {
+      method: 'GET',
+      redirect: 'follow',
+      ...(token ? { headers: { Authorization: 'Bearer ' + token } } : {}),
+      ...(controller ? { signal: controller.signal } : {}),
+    });
     return await resp.json();
   } finally {
     if (timer) clearTimeout(timer);

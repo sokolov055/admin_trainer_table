@@ -10,9 +10,10 @@
 # (server/deploy/web-receive.sh в основном репозитории): ни входа в
 # консоль, ни других команд.
 #
-# Адрес Apps Script лежит в секрете VITE_API_URL (Settings → Secrets and
-# variables → Actions). В репозитории его нет: он попадает только в готовую
-# сборку, а сам репозиторий публичный.
+# Адрес API по умолчанию лежит в секрете VITE_API_URL (Settings → Secrets and
+# variables → Actions): с 24.10.2026 — https://api.fitness100.ru (раньше был
+# Apps Script). Основной адрес приложение берёт из public/config.json, этот —
+# только если config.json не загрузился.
 name: Deploy
 
 on:
