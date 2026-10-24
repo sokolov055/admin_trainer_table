@@ -15,3 +15,37 @@
 
 /* Ошибка «Оплат» — под кнопкой, которая её вызвала (Payments.jsx) */
 .pay-note { margin-top: var(--space-2); }
+
+/* Шапка тренера: «+» рядом с меню (TrainerApp.jsx). У .icon-button отрицательный
+   отступ справа — для крайней кнопки; у «+» он съел бы зазор до меню */
+.app__actions { display: flex; align-items: center; flex: none; }
+.header-add { position: relative; }
+.header-add > .icon-button { margin-right: 0; color: var(--accent); }
+.header-add__scrim { position: fixed; inset: 0; z-index: 49; }
+.header-add__menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 248px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  transform-origin: top right;
+}
+.header-add__item {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 44px; padding: 10px 12px;
+  border: 0; border-radius: var(--radius-sm); background: none; color: var(--text);
+  font: inherit; font-size: var(--text-base); text-align: left; cursor: pointer;
+}
+.header-add__item svg { flex: none; color: var(--accent); }
+.header-add__item:active { background: var(--surface-active); }
+@media (prefers-reduced-motion: no-preference) {
+  .header-add__menu { animation: header-add-pop var(--dur) var(--ease-ios) backwards; }
+}
+@keyframes header-add-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } }
+
+/* «Сегодня» над списком клиентов — плотнее Lead: три числа одной строкой
+   (screens.jsx, TrainerDay) */
+.trainer-day { padding: var(--space-4); }
+.trainer-day .lead__label { margin-bottom: var(--space-1); }
+.trainer-day__value { font-size: var(--text-xl); }
+.trainer-day .lead__hint { margin-top: var(--space-1); }
+.trainer-day__facts {
+  margin: var(--space-3) 0 0; padding-top: var(--space-2); border-top: 1px solid var(--border);
+  font-size: var(--text-sm); line-height: 1.4; color: var(--text-muted);
+}

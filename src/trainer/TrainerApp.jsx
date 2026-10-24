@@ -23,7 +23,7 @@ import { useViewMotion, byOrder } from '../viewMotion.js';
 import NavTabs from '../NavTabs.jsx';
 import {
   IconUsers, IconChart, IconSliders, IconMenu, IconClose, IconPhone, IconSearch, IconMoney,
-  IconPlan, IconCalendar, IconKey, IconProgress, IconEye, IconPalette,
+  IconPlan, IconCalendar, IconKey, IconProgress, IconEye, IconPalette, IconPlus, IconUserPlus, IconLink,
 } from '../icons.jsx';
 import { WorkoutJournal } from '../client/screens.jsx';
 import { Deferred, lazyPage } from '../lazy.js';
@@ -162,6 +162,11 @@ export default function TrainerApp({ me }) {
   const [libPane, setLibPane] = useState('program');
   const [adminPane, setAdminPane] = useState(ADMIN_PANES[0].value);
   const [menuOpen, setMenuOpen] = useState(false);
+  // «+» в шапке «Клиентов»: меню из двух пунктов и что из него открыто
+  // ('add' | 'link') — вместо двух кнопок во всю ширину над списком
+  // (аудит 24.10.2026)
+  const [addMenu, setAddMenu] = useState(false);
+  const [adding, setAdding] = useState(null);
   const [openClient, setOpenClient] = useState(null);
   // С какого раздела открыть карточку: из расписания — сразу «Тренировки»
   const [openView, setOpenView] = useState('overview');
@@ -184,6 +189,7 @@ export default function TrainerApp({ me }) {
   // глазами клиента ведёт себя как само клиентское приложение: там
   // смахивание листает разделы, а выход — кнопкой «К тренеру».
   useBackGesture(() => setView(lastTab), inMenu && !openClient && !previewClient);
+  useBackGesture(() => setAddMenu(false), addMenu && !openClient && !previewClient);
 
   // Листать «Клиенты» и «Сводку» пальцем — пока открыт раздел, а не
   // карточка или экран меню. Функция перехода объявлена ниже ранних
@@ -309,15 +315,46 @@ export default function TrainerApp({ me }) {
             <h1 className="app__title">{current.label}</h1>
             <p className="app__subtitle">Панель тренера · {me.name}</p>
           </div>
-          <button
-            className="icon-button"
-            onClick={() => { setMenuOpen(true); haptic(); }}
-            aria-label="Меню"
-            aria-expanded={menuOpen}
-            aria-haspopup="dialog"
-          >
-            <IconMenu size={22} />
-          </button>
+          <div className="app__actions">
+            {view === 'clients' && clientPane === 'active' && (
+              <div className="header-add">
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Новый клиент"
+                  aria-haspopup="menu"
+                  aria-expanded={addMenu}
+                  onClick={() => { setAddMenu((m) => !m); haptic(); }}
+                >
+                  <IconPlus size={24} />
+                </button>
+                {addMenu && (
+                  <>
+                    <div className="header-add__scrim" onClick={() => setAddMenu(false)} aria-hidden="true" />
+                    <div className="header-add__menu" role="menu" aria-label="Новый клиент">
+                      <button type="button" role="menuitem" className="header-add__item"
+                        onClick={() => { setAddMenu(false); setAdding('add'); haptic(); }}>
+                        <IconUserPlus size={18} />Добавить клиента
+                      </button>
+                      <button type="button" role="menuitem" className="header-add__item"
+                        onClick={() => { setAddMenu(false); setAdding('link'); haptic(); }}>
+                        <IconLink size={18} />Привязать по ID или ссылке
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            <button
+              className="icon-button"
+              onClick={() => { setMenuOpen(true); haptic(); }}
+              aria-label="Меню"
+              aria-expanded={menuOpen}
+              aria-haspopup="dialog"
+            >
+              <IconMenu size={22} />
+            </button>
+          </div>
         </div>
 
         {/* Переключатель подразделов живёт в шапке, а не в теле экрана:
@@ -370,6 +407,8 @@ export default function TrainerApp({ me }) {
                 onOpenClient={(client) => openCard(client)}
                 onRefresh={runScheduleRefresh}
                 refreshRevision={scheduleRevision}
+                adding={adding}
+                onAdding={setAdding}
               />
             )}
             {clientPane === 'lost' && <Lost />}
@@ -580,9 +619,17 @@ function ClientPicker({ title, note, action, Icon = null, first = null, onSelect
   return (
     <Section title={title} note={note}>
       <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
-      {clients.length === 0 && (
-        <Empty icon={IconSearch} title="Клиент не найден" text="Проверьте имя или очистите поиск." />
-      )}
+      {/* Пусто по разным причинам — разными словами (аудит 24.10.2026) */}
+      {clients.length === 0 && (query
+        ? (
+          <Empty
+            icon={IconSearch}
+            title="Ничего не нашлось"
+            text={'Клиента «' + query.trim() + '» нет в списке.'}
+            action={<button type="button" className="button" onClick={() => setQuery('')}>Сбросить</button>}
+          />
+        )
+        : <Empty icon={IconUsers} title="Клиентов пока нет" text="Добавьте клиента кнопкой «+» в разделе «Клиенты»." />)}
       {clients.map((client) => (
         <button
           className="item client-preview-picker__item"

@@ -219,7 +219,17 @@ function Templates({ kind, owner }) {
       {list.loading && <Loading lead={false} rows={3} />}
       {list.error && <ErrorState error={list.error} onRetry={list.reload} />}
 
-      {!list.loading && !list.error && shown.length === 0 && (
+      {/* Поиск или фильтр без совпадений — не «шаблонов пока нет»: они
+          есть, просто не под этот запрос (аудит 24.10.2026) */}
+      {!list.loading && !list.error && shown.length === 0 && all.length > 0 && (
+        <Empty
+          icon={IconSearch}
+          title="Ничего не нашлось"
+          text={q ? 'По запросу «' + q + '»' + (goal ? ' с целью «' + goal + '»' : '') + ' шаблонов нет.' : 'С целью «' + goal + '» шаблонов нет.'}
+          action={<button type="button" className="button" onClick={() => { setQ(''); setGoal(''); }}>Сбросить</button>}
+        />
+      )}
+      {!list.loading && !list.error && all.length === 0 && (
         <Empty
           icon={scope === 'mine' ? IconPlan : IconSearch}
           title={scope === 'mine' ? `Своих шаблонов ${noun} пока нет` : 'Общих шаблонов пока нет'}

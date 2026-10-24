@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiPrimary } from '../api.js';
 import { shareText } from '../access.js';
-import { Panel } from '../ui.jsx';
+import { Panel, Note } from '../ui.jsx';
 import { IconLink, IconCopy, IconCheck, IconRefresh, IconSend, IconHelp } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { trainerLinkUrl } from '../trainer-link.js';
@@ -16,10 +16,12 @@ import { trainerLinkUrl } from '../trainer-link.js';
  * работал бы как ключ от чужих данных.
  *
  * Живёт рядом с «Добавить клиента»: это то же действие — появился новый
- * человек, — только карточку он завёл себе сам.
+ * человек, — только карточку он завёл себе сам. С 24.10.2026 оба — пунктами
+ * «+» в шапке: с onClose панель открыта сразу, «Свернуть» закрывает её.
  */
-export default function LinkClient({ onLinked }) {
-  const [open, setOpen] = useState(false);
+export default function LinkClient({ onLinked, onClose = null }) {
+  const [open, setOpen] = useState(!!onClose);
+  const panel = useRef(null);
   const [publicId, setPublicId] = useState('');
   const [link, setLink] = useState(null);
   const [busy, setBusy] = useState('');
@@ -45,6 +47,14 @@ export default function LinkClient({ onLinked }) {
     haptic();
     if (!link) loadLink();
   };
+
+  // Открыли из шапки — ссылка нужна сразу, и панель должна быть на виду
+  useEffect(() => {
+    if (!onClose) return;
+    if (!link) loadLink();
+    const el = panel.current;
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  }, []);
 
   const send = (event) => {
     event.preventDefault();
@@ -82,7 +92,7 @@ export default function LinkClient({ onLinked }) {
 
   return (
     <Panel pad className="link-client">
-      <form className="link-client" onSubmit={send}>
+      <form className="link-client" onSubmit={send} ref={panel}>
         <label className="field">
           <span className="field__label">ID клиента</span>
           <input
@@ -125,13 +135,14 @@ export default function LinkClient({ onLinked }) {
       )}
 
       {note && <p className="small" role="status">{note}</p>}
-      {problem && <p className="small muted" role="alert">{problem}</p>}
+      {/* Ошибка — красной плашкой, а не серым текстом (аудит 24.10.2026) */}
+      {problem && <Note tone="critical">{problem}</Note>}
 
       <div className="add-client__actions">
         <button type="button" className="button button--ghost" onClick={() => loadLink(true)} disabled={!!busy}>
           {busy === 'renew' ? 'Выпускаю…' : 'Выпустить новую ссылку'}
         </button>
-        <button type="button" className="button button--ghost" onClick={() => setOpen(false)} disabled={!!busy}>
+        <button type="button" className="button button--ghost" onClick={() => (onClose ? onClose() : setOpen(false))} disabled={!!busy}>
           Свернуть
         </button>
       </div>
@@ -270,7 +281,8 @@ export function LinkExisting({ client }) {
         </form>
       )}
       {note && <p className="small" role="status">{note}</p>}
-      {problem && <p className="small muted" role="alert">{problem}</p>}
+      {/* Ошибка — красной плашкой, а не серым текстом (аудит 24.10.2026) */}
+      {problem && <Note tone="critical">{problem}</Note>}
     </div>
   );
 }

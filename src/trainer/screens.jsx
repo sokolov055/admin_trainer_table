@@ -6,7 +6,7 @@ import { createClient } from '../access.js';
 import { ClientInviteLink } from './InviteLink.jsx';
 import LinkClient, { LinkExisting } from './LinkClient.jsx';
 import {
-  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
+  Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
   SignOut, DataTable, Field, Note, BackButton, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
@@ -22,7 +22,9 @@ import { SOURCES } from './Metrics.jsx';
  * Клиенты
  * ================================================================== */
 
-export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
+// adding — что открыто из «+» в шапке (TrainerApp): 'add' — новый клиент,
+// 'link' — привязать по ID или ссылке; onAdding(null) — закрыть
+export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = null, onAdding = () => {} }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, [refreshRevision]);
   // Сначала — ближайшие: заходят сюда чаще всего за тем, кто сегодня
   const [filter, setFilter] = useState('next');
@@ -122,18 +124,21 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
           вниз, — и строка с кнопкой «Обновить» больше не нужна: список
           сразу открывается из зеркала, свежие числа тихо заменяют его. */}
       <Section>
-        {/* Заведение клиента — первое действие тренера с новым человеком,
-            поэтому живёт над списком, а не в меню: искать его не должно
-            приходиться. Открывается по нажатию, чтобы форма не занимала
-            место в те дни, когда никого не заводят. */}
-        <AddClient
-          onCreated={(client) => {
-            setPendingRow(client.row);
-            reload();
-          }}
-        />
+        {/* Новый клиент и привязка — одной кнопкой «+» в шапке (аудит
+            24.10.2026): две кнопки во всю ширину стояли между «Сегодня» и
+            списком, а нужны не каждый день. Форма — здесь, над списком */}
+        {adding === 'add' && (
+          <AddClient
+            onClose={() => onAdding(null)}
+            onCreated={(client) => {
+              onAdding(null);
+              setPendingRow(client.row);
+              reload();
+            }}
+          />
+        )}
         {/* Клиент, зарегистрировавшийся сам: по его ID или своей ссылкой */}
-        <LinkClient />
+        {adding === 'link' && <LinkClient onClose={() => onAdding(null)} />}
 
         <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
         <Chips items={filters} value={filter} onChange={setFilter} />
@@ -142,8 +147,37 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision }) {
           <AddSplit onCreated={(client) => { setPendingRow(client.row); reload(); }} />
         )}
 
+        {/* Пустой список — под свой случай, с действием (аудит 24.10.2026):
+            одно «Никого не нашлось» встречало и в пустой день, и нового
+            тренера без клиентов */}
         {shown.length === 0 && (
-          <Empty icon={IconSearch} title="Никого не нашлось" text="Попробуйте другой фильтр или запрос." />
+          !clients.length && filter !== 'tests' ? (
+            <Empty
+              icon={IconUserPlus}
+              title="Добавьте первого клиента"
+              text="В карточке — программа, оплаты и приглашение в приложение."
+              action={<button type="button" className="button button--primary" onClick={() => onAdding('add')}>Добавить клиента</button>}
+            />
+          ) : query ? (
+            <Empty
+              icon={IconSearch}
+              title="Ничего не нашлось"
+              text={'По запросу «' + query + '»' + (filter === 'all' ? '' : ' в этом фильтре') + ' никого нет.'}
+              action={<button type="button" className="button" onClick={() => setQuery('')}>Сбросить</button>}
+            />
+          ) : filter === 'next' ? (
+            <Empty
+              icon={IconUsers}
+              title="Сегодня занятий нет"
+              action={<button type="button" className="button" onClick={() => setFilter('all')}>Все клиенты</button>}
+            />
+          ) : (
+            <Empty
+              icon={IconUsers}
+              title="В этом фильтре никого"
+              action={<button type="button" className="button" onClick={() => setFilter('all')}>Все клиенты</button>}
+            />
+          )
         )}
 
         {groupSplits(shown).map((g) => (g.split ? (
@@ -253,7 +287,8 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
                     клиента: ни ссылки, ни Telegram у человека нет, и в
                     кабинет он войти не может. */}
                 {!c.chatId && !c.invited && !c.joined && <Badge kind="warn">не приглашён</Badge>}
-                {!c.hasLink && <Badge>без таблицы</Badge>}
+                {/* «без таблицы» снят (аудит 24.10.2026): сервер таблиц больше
+                    не заводит, и значок горел у каждого нового клиента */}
               </div>
             </button>
           );
@@ -266,10 +301,12 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
  * числа про людей: сколько тренировок за месяц, кто требует внимания и
  * кто ещё не приглашён в приложение.
  *
- * Занятия на сегодня считает сервер по календарю. Запасной путь через
- * Apps Script их не знает — тогда крупной цифрой встаёт число клиентов,
- * у которых ближайшее занятие сегодня: это то же самое, только без уже
- * прошедших.
+ * Занятия на сегодня считает сервер по календарю. Нет его ответа — крупной
+ * цифрой встаёт число клиентов, у которых ближайшее занятие сегодня: это
+ * то же самое, только без уже прошедших.
+ *
+ * Три числа — одной строкой под главным (аудит 24.10.2026): карточкой с
+ * тремя колонками «Сегодня» занимало полэкрана до списка.
  */
 function TrainerDay({ summary, clients, attention }) {
   const day = summary.today;
@@ -301,38 +338,35 @@ function TrainerDay({ summary, clients, attention }) {
 
   const uninvited = clients.filter((c) => !c.chatId && !c.invited && !c.joined).length;
 
+  const facts = [
+    summary.totalTrainings + ' ' + plural(summary.totalTrainings, 'тренировка', 'тренировки', 'тренировок') + ' за месяц',
+    attention ? 'внимания требуют ' + attention + ' из ' + summary.count : 'внимания никто не требует',
+    uninvited ? 'не приглашены ' + uninvited : 'приглашены все',
+  ];
+
   return (
-    <Lead
-      label={'Сегодня · ' + todayLabel}
-      value={total
-        ? total + ' ' + plural(total, 'занятие', 'занятия', 'занятий')
-        : 'Занятий нет'}
-      hint={hint}
-      facts={[
-        {
-          label: 'За месяц',
-          value: summary.totalTrainings + ' ' + plural(summary.totalTrainings, 'тренировка', 'тренировки', 'тренировок'),
-        },
-        { label: 'Требуют внимания', value: attention ? attention + ' из ' + summary.count : 'нет' },
-        { label: 'Не приглашены', value: uninvited || 'все' },
-      ]}
-    />
+    <section className="lead enter trainer-day">
+      <div className="lead__label">{'Сегодня · ' + todayLabel}</div>
+      <div className="lead__value trainer-day__value">
+        {total ? total + ' ' + plural(total, 'занятие', 'занятия', 'занятий') : 'Занятий нет'}
+      </div>
+      <div className="lead__hint">{hint}</div>
+      <p className="trainer-day__facts">{facts.join(' · ')}</p>
+    </section>
   );
 }
 
 /**
  * Заведение клиента.
  *
- * Спрашиваем только ФИО. Цена, пакет и расписание появятся в таблице
+ * Спрашиваем только ФИО. Цена, пакет и расписание появятся в карточке
  * своим чередом, а сейчас нужно другое: чтобы у человека как можно
  * быстрее был кабинет и ссылка в него. Всё остальное — потом.
  *
- * Строка создаётся в Google Таблице: она остаётся источником истины, и
- * ключ клиента выдаёт она же. Поэтому кнопка думает несколько секунд —
- * это поход в таблицу, а не задумчивость приложения.
+ * Открывается из «+» в шапке (TrainerApp), закрывается «Отменой» —
+ * onClose.
  */
-function AddClient({ onCreated }) {
-  const [open, setOpen] = useState(false);
+function AddClient({ onCreated, onClose }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -348,7 +382,6 @@ function AddClient({ onCreated }) {
       const created = await createClient(value);
       haptic('success');
       setName('');
-      setOpen(false);
       onCreated(created);
     } catch (err) {
       setError(err);
@@ -356,15 +389,6 @@ function AddClient({ onCreated }) {
       setBusy(false);
     }
   };
-
-  if (!open) {
-    return (
-      <button className="button button--primary button--block add-client__open" onClick={() => { setOpen(true); haptic(); }}>
-        <IconUserPlus size={17} />
-        Добавить клиента
-      </button>
-    );
-  }
 
   return (
     <Panel pad className="add-client">
@@ -392,12 +416,12 @@ function AddClient({ onCreated }) {
         <div className="add-client__actions">
           <button className="button button--primary" disabled={busy || !name.trim()}>
             {busy ? <IconRefresh size={16} /> : <IconUserPlus size={16} />}
-            {busy ? 'Завожу в таблице…' : 'Создать карточку'}
+            {busy ? 'Создаю…' : 'Создать карточку'}
           </button>
           <button
             className="button button--ghost"
             type="button"
-            onClick={() => { setOpen(false); setError(null); }}
+            onClick={() => { setError(null); onClose(); }}
             disabled={busy}
           >
             Отмена
@@ -925,7 +949,7 @@ function CloseAccess({ client }) {
                 <span>
                   Старый вход через бота перестанет работать. Дальше клиент
                   заходит по ссылке, как все новые.
-                  {!client.clientKey && ' Сначала создайте ключ приглашения в таблице.'}
+                  {!client.clientKey && ' У этой карточки нет ключа приглашения — отвязать пока нельзя.'}
                 </span>
               </span>
             </label>
