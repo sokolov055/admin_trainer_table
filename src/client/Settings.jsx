@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Panel, Segmented, Field, formatNumber, formatWhen } from '../ui.jsx';
+import { Panel, Segmented, Field, Switch, formatNumber, formatWhen } from '../ui.jsx';
 import { IconCopy, IconCheck, IconExternal } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
@@ -159,17 +159,6 @@ export function Connections() {
 /* ==========================================================================
  * Напоминания
  * ========================================================================== */
-
-/** Переключатель: чекбокс с ролью switch, цель касания — весь квадрат 44 px */
-function Switch({ checked, onChange, label, disabled }) {
-  return (
-    <label className="switch">
-      <input type="checkbox" role="switch" checked={checked} disabled={disabled} aria-label={label}
-        onChange={(e) => onChange(e.target.checked)} />
-      <span className="switch__track" aria-hidden="true" />
-    </label>
-  );
-}
 
 const WEEK = [1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: WEEKDAYS_SHORT[d] }));
 

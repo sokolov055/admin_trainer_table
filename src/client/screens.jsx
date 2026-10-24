@@ -14,7 +14,7 @@ import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
 import {
-  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, StatusBadge,
+  Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta, Qty,
   formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
@@ -1131,7 +1131,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <div className="plan__block-actions" role="toolbar" aria-label="Действия с выбранными тренировками">
           <span>Выбрано: {selectedBlocks.size}</span>
           <button type="button" className="button" onClick={() => copyBlocks([...selectedBlocks])}><IconCopy size={16} />Копировать</button>
-          <button type="button" className="button button--danger" disabled={shownBlocks.length - selectedBlocks.size < 1} onClick={() => removeBlocks([...selectedBlocks])}><IconTrash size={16} />Удалить</button>
+          {/* Удаление обратимо («Вернуть» ниже) — мягкая опасная .button.danger;
+              класса button--danger в стилях не было (аудит 24.10.2026) */}
+          <button type="button" className="button danger" disabled={shownBlocks.length - selectedBlocks.size < 1} onClick={() => removeBlocks([...selectedBlocks])}><IconTrash size={16} />Удалить</button>
         </div>
       )}
 
@@ -2171,7 +2173,7 @@ function MeasureForm({ fields, series, clientRow, reveal = null, onSaved, onCanc
         <button className="button button--primary" onClick={submit} disabled={busy}>
           {busy ? 'Записываю…' : 'Записать'}
         </button>
-        <button className="button" onClick={onCancel} disabled={busy}>Отмена</button>
+        <button className="button button--ghost" onClick={onCancel} disabled={busy}>Отмена</button>
       </div>
     </Panel>
     </div>

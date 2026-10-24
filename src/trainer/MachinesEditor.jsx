@@ -4,7 +4,7 @@ import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
 import { shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
-import { Segmented, Note, Search } from '../ui.jsx';
+import { Confirm, Segmented, Note, Search } from '../ui.jsx';
 import { IconAlert, IconClose } from '../icons.jsx';
 import { useReveal } from '../reveal.js';
 
@@ -119,6 +119,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const [saved, setSaved] = useState({ exerciseId: exercise ? exercise.id : 0, uid: machine ? machine.uid : '' });
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
+  const [asking, setAsking] = useState(false); // «Убрать / Удалить» — вопрос на месте
 
   const kept = had.filter((u) => !dropped.includes(u));
   const total = kept.length + added.length;
@@ -166,11 +167,13 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   };
 
   const word = kind === 'equipment' ? 'оборудование' : 'тренажёр';
+  // Карточка с фото и настройкой пропадает насовсем — вопрос на месте,
+  // красная кнопка и «Отмена», а не системное окно window.confirm (аудит 24.10.2026)
+  const question = exercise
+    ? `Убрать «${name || (machine && machine.name)}» из упражнения?`
+    : `Удалить «${name || (machine && machine.name)}» из каталога и всех упражнений?`;
   const remove = async () => {
-    const question = exercise
-      ? `Убрать «${name || machine.name}» из упражнения?`
-      : `Удалить «${name || machine.name}» из каталога и всех упражнений?`;
-    if (!saved.uid || !window.confirm(question)) return;
+    if (!saved.uid) return;
     setBusy(true);
     try {
       const r = await apiMutate(exercise ? 'library.exercise.machine.delete' : 'library.machine.delete', {
@@ -181,6 +184,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     } catch (err) {
       setFailure(err);
       setBusy(false);
+      setAsking(false);
     }
   };
 
@@ -253,11 +257,21 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       </label>
       <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Инструкция оборудования проверена</label>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      <div className="library__actions">
-        <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
-        <button type="button" className="button button--ghost" disabled={busy} onClick={() => onDone(null)}>Отмена</button>
-        {saved.uid && canDelete && <button type="button" className="button button--ghost danger" disabled={busy} onClick={remove}>{exercise ? 'Убрать ' + word : 'Удалить из каталога'}</button>}
-      </div>
+      {asking ? (
+        <Confirm
+          text={question}
+          action={exercise ? 'Убрать' : 'Удалить'}
+          busy={busy}
+          onConfirm={remove}
+          onCancel={() => setAsking(false)}
+        />
+      ) : (
+        <div className="library__actions">
+          <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+          <button type="button" className="button button--ghost" disabled={busy} onClick={() => onDone(null)}>Отмена</button>
+          {saved.uid && canDelete && <button type="button" className="button button--ghost danger" disabled={busy} onClick={() => setAsking(true)}>{exercise ? 'Убрать ' + word : 'Удалить из каталога'}</button>}
+        </div>
+      )}
     </div>
   );
 }

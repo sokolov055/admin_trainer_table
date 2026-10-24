@@ -1995,51 +1995,8 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: var(--shadow-sm);
 }
 
-/* ==========================================================================
-   Значки состояния
-   Цвет здесь — второй канал. Первый всегда текст: в чёрно-белом виде и при
-   дальтонизме значок обязан сообщать то же самое.
-   ========================================================================== */
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 9px 2px 7px;
-  border-radius: 999px;
-  font-size: var(--text-xs);
-  font-weight: 620;
-  border: 1px solid var(--border);
-  background: var(--surface-sunken);
-  white-space: nowrap;
-  color: var(--text-secondary);
-}
-
-.badge__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-  flex: 0 0 auto;
-}
-
-.badge--good {
-  color: var(--good-text);
-  background: var(--good-fill);
-  border-color: var(--good-line);
-}
-
-.badge--warn {
-  color: var(--warning-text);
-  background: var(--warning-fill);
-  border-color: var(--warning-line);
-}
-
-.badge--bad {
-  color: var(--critical-text);
-  background: var(--critical-fill);
-  border-color: var(--critical-line);
-}
+/* Значки состояния .badge убраны (аудит 24.10.2026): метка в приложении
+   одна — .tag (ui.jsx, Tag) с тонами good / warn / bad. */
 
 /* ==========================================================================
    Таблицы
@@ -6107,6 +6064,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   color: var(--text);
   box-shadow: var(--shadow-sm);
 }
+/* Дорожка, которую Segmented ставит сам (2–3 варианта): отступ задаёт место */
+.chips.chips--track.chips--track-tight { margin-bottom: 0; }
 
 /* Сколько найдено — слева; действия третьего плана — справа синим текстом */
 .library__count {
@@ -6175,6 +6134,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 }
 .tag--good { background: var(--good-fill); color: var(--good-text); }
 .tag--warn { background: var(--warning-fill); color: var(--warning-text); }
+.tag--bad { background: var(--critical-fill); color: var(--critical-text); }
 .item__top > .tag { align-self: center; }
 .item__meta > .tag { align-self: center; }
 /* Текст и метки в одной строке: между метками ближе, чем до текста */

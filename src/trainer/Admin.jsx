@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { apiMutate, apiOnce } from '../api.js';
 import { useData } from '../useData.js';
 import {
-  DataTable, Empty, ErrorState, Field, Lead, Loading, Note, Panel, Row, Rows, Section, Segmented, Tag,
+  Confirm, DataTable, Empty, ErrorState, Field, Lead, Loading, Note, Panel, Row, Rows, Section, Segmented, Switch, Tag,
   formatDate, formatMoney, formatNumber, formatWhen, plural,
 } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
@@ -353,11 +353,12 @@ function TrainerTier({ trainer, tiers, titles, onDone }) {
             <Field label="По какой день" hint="Пусто — без срока" type="date" value={until} onChange={setUntil} disabled={busy} />
           )}
           {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
+          {/* Главная первой, «Отмена» без рамки сразу за ней — как везде (аудит 24.10.2026) */}
           <div className="trainer-row__actions">
-            <button type="button" className="button" disabled={busy} onClick={() => setOpen(false)}>Отмена</button>
             <button type="button" className="button button--primary" disabled={busy} onClick={give}>
               {tier === 'start' ? 'Вернуть на «Старт»' : 'Выдать'}
             </button>
+            <button type="button" className="button button--ghost" disabled={busy} onClick={() => setOpen(false)}>Отмена</button>
           </div>
         </div>
       )}
@@ -421,7 +422,8 @@ function Flags() {
 
   const change = async (flag, next) => {
     const key = flag.key + ':' + String(next);
-    if (needsConfirm(flag, next) && asking !== key) { setAsking(key); haptic(); return; }
+    // Вопрос встаёт на место (Confirm) и сам даёт отклик
+    if (needsConfirm(flag, next) && asking !== key) { setAsking(key); return; }
     setBusy(true); setProblem(null);
     try {
       const r = await apiMutate('owner.flag.set', next === null ? { key: flag.key, reset: true } : { key: flag.key, value: next });
@@ -448,32 +450,33 @@ function Flags() {
             const next = !f.value;
             const confirmKey = f.key + ':' + String(next);
             const resetKey = f.key + ':null';
+            const pending = asking === confirmKey ? next : asking === resetKey ? null : undefined;
+            // Флаг действует сразу — переключатель iOS вместо кнопки и метки
+            // «вкл/выкл» (аудит 24.10.2026). Рискованное направление
+            // спрашивает на месте: красная кнопка и «Отмена»
             return (
               <Panel pad key={f.key} className="admin-flag">
-                <div className="admin-flag__head">
-                  <div className="trainer-row__copy">
+                <Switch checked={f.value} disabled={busy || pending !== undefined} onChange={(v) => change(f, v)}>
+                  <span className="trainer-row__copy">
                     <strong>{f.title}</strong>
                     <span>{f.env} · {flagStatus(f)}</span>
-                  </div>
-                  <Tag tone={f.value === f.riskyTo ? 'warn' : undefined}>{f.value ? 'вкл' : 'выкл'}</Tag>
-                </div>
+                  </span>
+                </Switch>
                 <p className="admin-flag__text">{f.value ? f.on : f.off}</p>
-                {(asking === confirmKey || asking === resetKey) && <Note tone="critical">{f.caution}</Note>}
-                <div className="trainer-row__actions">
-                  {f.overridden && (
-                    <button type="button" className={'button' + (asking === resetKey ? ' button--critical' : '')} disabled={busy} onClick={() => change(f, null)}>
-                      {asking === resetKey ? 'Точно вернуть?' : 'Как в .env'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={'button' + (asking === confirmKey ? ' button--critical' : ' button--primary')}
-                    disabled={busy}
-                    onClick={() => change(f, next)}
-                  >
-                    {asking === confirmKey ? `Точно ${next ? 'включить' : 'выключить'}?` : (next ? 'Включить' : 'Выключить')}
-                  </button>
-                </div>
+                {pending !== undefined && (
+                  <Confirm
+                    text={f.caution}
+                    action={pending === null ? 'Вернуть как в .env' : pending ? 'Включить' : 'Выключить'}
+                    busy={busy}
+                    onConfirm={() => change(f, pending)}
+                    onCancel={() => setAsking(null)}
+                  />
+                )}
+                {f.overridden && pending === undefined && (
+                  <div className="trainer-row__actions">
+                    <button type="button" className="button" disabled={busy} onClick={() => change(f, null)}>Как в .env</button>
+                  </div>
+                )}
               </Panel>
             );
           })}

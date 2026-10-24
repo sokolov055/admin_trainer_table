@@ -1644,7 +1644,8 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
               <button className="button button--critical" disabled={busy || !who} onClick={remove}>
                 {busy ? 'Отменяю…' : who === 'error' ? 'Удалить запись' : charged ? 'Отменить и списать' : 'Отменить занятие'}
               </button>
-              <button className="button" disabled={busy} onClick={() => setStep(null)}>Назад</button>
+              {/* «Отмена» без рамки сразу за главной — одно правило на всё приложение (аудит 24.10.2026) */}
+              <button className="button button--ghost" disabled={busy} onClick={() => setStep(null)}>Отмена</button>
             </div>
           ) : (
             <div className="library__actions">
@@ -1655,7 +1656,7 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
               >
                 {busy ? 'Сохраняю…' : event.id ? (moved && step !== 'move' ? 'Перенести…' : 'Сохранить') : 'Добавить'}
               </button>
-              <button className="button" disabled={busy} onClick={onCancel}>Отмена</button>
+              <button className="button button--ghost" disabled={busy} onClick={onCancel}>Отмена</button>
             </div>
           )}
 

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
-import { ErrorState, Loading, Note, Panel, Row, Rows, Section, Tag, formatWhen } from '../ui.jsx';
+import { Confirm, ErrorState, Loading, Note, Panel, Row, Rows, Section, Tag, formatWhen } from '../ui.jsx';
 import { haptic, refreshTheme } from '../telegram.js';
 import { PALETTES, getPaletteId, paletteFromTheme, setPaletteId, setRemoteThemes } from '../palettes.js';
 import { readThemeFile, themeRows } from './admin-model.js';
@@ -118,10 +118,10 @@ export default function AdminLook() {
               <ThemePreview theme={draft} />
               {replacing && <Note tone="info">Тема «{replacing.name}» уже загружена — файл заменит её и закроет до вашего «Открыть для всех».</Note>}
               <div className="trainer-row__actions">
-                <button type="button" className="button" disabled={busy} onClick={() => setDraft(null)}>Отмена</button>
                 <button type="button" className="button button--primary" disabled={busy} onClick={upload}>
                   {replacing ? 'Заменить' : 'Загрузить'}
                 </button>
+                <button type="button" className="button button--ghost" disabled={busy} onClick={() => setDraft(null)}>Отмена</button>
               </div>
             </>
           )}
@@ -147,16 +147,21 @@ export default function AdminLook() {
                   </div>
                   <Tag tone={r.closed ? 'warn' : 'good'}>{r.closed ? 'закрыта' : 'у всех'}</Tag>
                 </div>
-                {asking === removeKey && <Note tone="critical">Тема пропадёт совсем. Вернуть — только загрузив файл снова.</Note>}
-                <div className="trainer-row__actions">
+                {/* Удаление необратимо — вопрос на месте: красная «Удалить» и
+                    «Отмена», а не смена текста кнопки на «Точно удалить?» (аудит 24.10.2026) */}
+                {asking === removeKey && (
+                  <Confirm
+                    text="Тема пропадёт совсем. Вернуть — только загрузив файл снова."
+                    action="Удалить"
+                    busy={busy}
+                    onConfirm={() => run('owner.themes.remove', { id: r.id })}
+                    onCancel={() => setAsking(null)}
+                  />
+                )}
+                {asking !== removeKey && <div className="trainer-row__actions">
                   {!r.builtIn && (
-                    <button
-                      type="button"
-                      className={'button' + (asking === removeKey ? ' button--critical' : '')}
-                      disabled={busy}
-                      onClick={() => (asking === removeKey ? run('owner.themes.remove', { id: r.id }) : (setAsking(removeKey), haptic()))}
-                    >
-                      {asking === removeKey ? 'Точно удалить?' : 'Удалить'}
+                    <button type="button" className="button button--ghost danger" disabled={busy} onClick={() => setAsking(removeKey)}>
+                      Удалить
                     </button>
                   )}
                   {!mine && (
@@ -170,7 +175,7 @@ export default function AdminLook() {
                   >
                     {r.closed ? 'Открыть для всех' : 'Закрыть'}
                   </button>
-                </div>
+                </div>}
               </Panel>
             );
           })}

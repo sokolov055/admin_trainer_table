@@ -36,6 +36,7 @@ const stubs = {
   ui: `import React from 'react';
     export const Panel = ({ children }) => <div className="panel">{children}</div>;
     export const Segmented = ({ label }) => <div data-segmented={label} />;
+    export const Switch = ({ checked, onChange, label, disabled }) => <input type="checkbox" role="switch" checked={checked} disabled={disabled} aria-label={label} onChange={(e) => onChange(e.target.checked)} />;
     export const Field = ({ label, value }) => <label>{label}<input value={value} readOnly /></label>;
     export const formatNumber = (n) => String(n);
     export const formatWhen = (iso) => 'когда ' + iso;`,

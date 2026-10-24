@@ -6,10 +6,11 @@ import { createClient } from '../access.js';
 import { ClientInviteLink } from './InviteLink.jsx';
 import LinkClient, { LinkExisting } from './LinkClient.jsx';
 import {
-  Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
-  SignOut, DataTable, Field, Note, BackButton, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
+  Section, Panel, Rows, Row, Loading, ErrorState, Empty, Tag, Chips, Search,
+  SignOut, DataTable, Field, Note, BackButton, Confirm, Switch, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
+import { usePendingDelete } from '../pendingDelete.jsx';
 import { useBackGesture, usePullRefresh, captureScreen } from '../gestures.jsx';
 import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconKey, IconAlert, IconCheck, IconChevron, IconSliders, IconExit } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
@@ -260,7 +261,7 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
               <div className="item__meta">
                 {c.online ? (
                   onlineLeft !== null && onlineLeft < 0
-                    ? <Badge kind="warn">онлайн · {onlineLabel(c.onlineUntil)}</Badge>
+                    ? <Tag tone="warn">онлайн · {onlineLabel(c.onlineUntil)}</Tag>
                     : <span>онлайн · {onlineLabel(c.onlineUntil)}</span>
                 ) : (
                   <>
@@ -277,16 +278,16 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
                     поэтому обычной строкой. Значком он спорил бы за
                     внимание с «не был N дней», а это разные новости. */}
                 {c.nextTrainingDate && <span>дальше {formatWhen(c.nextTrainingDate)}</span>}
-                {noData && <Badge>нет данных</Badge>}
+                {noData && <Tag>нет данных</Tag>}
                 {isStale && (
-                  <Badge kind="warn">
+                  <Tag tone="warn">
                     не был {days} {plural(days, 'день', 'дня', 'дней')}
-                  </Badge>
+                  </Tag>
                 )}
                 {/* Не приглашён — это задача тренера, а не свойство
                     клиента: ни ссылки, ни Telegram у человека нет, и в
                     кабинет он войти не может. */}
-                {!c.chatId && !c.invited && !c.joined && <Badge kind="warn">не приглашён</Badge>}
+                {!c.chatId && !c.invited && !c.joined && <Tag tone="warn">не приглашён</Tag>}
                 {/* «без таблицы» снят (аудит 24.10.2026): сервер таблиц больше
                     не заводит, и значок горел у каждого нового клиента */}
               </div>
@@ -500,7 +501,7 @@ function AddSplit({ onCreated }) {
           <button className="button button--primary" disabled={busy || members.length < 2}>
             {busy ? 'Завожу…' : 'Создать сплит'}
           </button>
-          <button type="button" className="button" disabled={busy} onClick={() => { setOpen(false); setError(null); }}>Отмена</button>
+          <button type="button" className="button button--ghost" disabled={busy} onClick={() => { setOpen(false); setError(null); }}>Отмена</button>
         </div>
       </form>
     </Panel>
@@ -568,10 +569,15 @@ function ClientSplit({ client }) {
             {busy ? 'Сохраняю…' : 'Сохранить состав'}
           </button>
         )}
+        {/* «Отмена» — сразу за главной: у новой пары закрывает форму, у
+            сохранённой возвращает прежний состав. «Не сплит» стояла на её
+            месте, а делала другое — разбирала пару; теперь это отдельное
+            действие «Убрать сплит» (аудит 24.10.2026) */}
+        {(saved.length === 0 || changed) && (
+          <button className="button button--ghost" disabled={busy} onClick={() => setDraft(saved.length ? saved : null)}>Отмена</button>
+        )}
         {draft.length < 4 && <button className="button button--ghost" disabled={busy} onClick={() => setDraft((p) => [...p, ''])}>Ещё участник</button>}
-        {saved.length > 0
-          ? <button className="button button--ghost" disabled={busy} onClick={() => save([])}>Не сплит</button>
-          : <button className="button button--ghost" disabled={busy} onClick={() => setDraft(null)}>Отмена</button>}
+        {saved.length > 0 && <button className="button button--ghost danger" disabled={busy} onClick={() => save([])}>Убрать сплит</button>}
       </div>
       {saved.length > 1 && !changed && <SeparateSplit client={client} members={saved} />}
       {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
@@ -613,10 +619,14 @@ function SeparateSplit({ client, members }) {
         Отдельные карточки: у каждого свои обзор, прогресс, питание и вход. Программа, журнал и деньги — общие у пары.
       </p>
       {ask ? (
-        <div className="library__actions">
-          <button className="button button--primary" disabled={busy} onClick={run}>{busy ? 'Разделяю…' : 'Да, разделить'}</button>
-          <button className="button" disabled={busy} onClick={() => setAsk(false)}>Отмена</button>
-        </div>
+        <Confirm
+          text="Собрать пару обратно будет нельзя."
+          action="Разделить"
+          busy={busy}
+          busyText="Разделяю…"
+          onConfirm={run}
+          onCancel={() => setAsk(false)}
+        />
       ) : (
         <button className="button button--ghost" onClick={() => setAsk(true)}>Разделить на карточки</button>
       )}
@@ -722,18 +732,14 @@ function ClientFamily({ client }) {
 
   return (
     <div className="client-family">
-      <label className="access-reset__option">
-        <input type="checkbox" checked={family.enabled} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
-        <span>
-          <strong>Семья</strong>
-          <span>
-            {family.enabled
-              ? 'Включено: тренировки и показатели видны всем включённым в семье. Деньги и питание скрыты.'
-              : 'Включите, чтобы семья видела тренировки и показатели друг друга. Деньги и питание не показываются.'}
-            {' '}В семье: {others}.
-          </span>
-        </span>
-      </label>
+      {/* Действует сразу — переключатель, а не галочка (аудит 24.10.2026) */}
+      <Switch checked={family.enabled} disabled={busy} onChange={toggle}>Семья</Switch>
+      <div className="small muted">
+        {family.enabled
+          ? 'Включено: тренировки и показатели видны всем включённым в семье. Деньги и питание скрыты.'
+          : 'Включите, чтобы семья видела тренировки и показатели друг друга. Деньги и питание не показываются.'}
+        {' '}В семье: {others}.
+      </div>
       {error && <div className="access-reset__error" role="alert">Не получилось: {error.message || 'сервер не ответил'}</div>}
     </div>
   );
@@ -775,7 +781,7 @@ export function ClientManage({ client }) {
           id={'manage-access-' + client.row}
           Icon={IconKey}
           title="Доступ в приложение"
-          status={invited ? 'ссылка, привязка, выход со всех устройств' : <Badge kind="warn">не приглашён</Badge>}
+          status={invited ? 'ссылка, привязка, выход со всех устройств' : <Tag tone="warn">не приглашён</Tag>}
           open={open === 'access'}
           onToggle={() => toggle('access')}
         >
@@ -960,7 +966,7 @@ function CloseAccess({ client }) {
               onClick={() => setAccess((s) => ({ ...s, confirming: false, unlinkTelegram: false, error: null }))}
               disabled={access.busy}
             >
-              Не надо
+              Отмена
             </button>
           </div>
         </div>
@@ -1115,10 +1121,8 @@ function OnlineFlag({ client }) {
 
   return (
     <div className="client-online">
-      <label className="library__check">
-        <input type="checkbox" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
-        <span>Онлайн-ведение</span>
-      </label>
+      {/* Сохраняется сразу — переключатель iOS, а не галочка формы (аудит 24.10.2026) */}
+      <Switch checked={on} disabled={busy} onChange={toggle}>Онлайн-ведение</Switch>
       <div className="small muted">
         Сам строит график, оплачен месяц ведения. В списке — фильтр «Онлайн».
       </div>
@@ -1165,10 +1169,7 @@ function TestFlag({ client }) {
 
   return (
     <div className="client-test">
-      <label className="library__check">
-        <input type="checkbox" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
-        <span>Тестовый клиент</span>
-      </label>
+      <Switch checked={on} disabled={busy} onChange={toggle}>Тестовый клиент</Switch>
       <div className="small muted">Уходит из списка и статистики; найти — фильтр «Тестовые».</div>
       {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
     </div>
@@ -1178,48 +1179,38 @@ function TestFlag({ client }) {
 /**
  * «В архив» — клиент уходит из списка, история занятий и оплат остаётся
  * (выручка прошлых месяцев не меняется). Удаление карточки это бы сломало,
- * поэтому кнопки «удалить» нет. Второе нажатие — подтверждение.
+ * поэтому кнопки «удалить» нет.
+ *
+ * Архив обратим, поэтому без вопроса: уходит сразу, внизу «Клиент в
+ * архиве · Вернуть», на сервер — через несколько секунд, если не вернули
+ * (pendingDelete.jsx; правило DESIGN-APP.md §6, аудит 24.10.2026). Раньше
+ * спрашивало «Да, в архив» синей кнопкой, как у обычного действия.
  */
 function ArchiveButton({ client }) {
-  const [ask, setAsk] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [failure, setFailure] = useState('');
-
-  const run = async () => {
-    setBusy(true);
-    setFailure('');
-    try {
-      await apiMutate('trainer.client.update', { clientRow: client.row, archived: true });
-      setDone(true);
-    } catch (error) {
-      setFailure(error.message || 'Не получилось');
-    } finally {
-      setBusy(false);
-      setAsk(false);
-    }
-  };
+  const del = usePendingDelete(() => apiMutate('trainer.client.update', { clientRow: client.row, archived: true }), {
+    onDone: () => { setDone(true); haptic('success'); },
+    onError: (error) => setFailure(error.message || 'Не получилось'),
+  });
 
   if (done) return <Note tone="good" icon={IconCheck}>В архиве — из списка клиентов уберётся после обновления.</Note>;
 
+  const leaving = del.hidden(client.row);
   return (
     <div className="client-archive">
       <strong className="manage__label">Архив</strong>
       <p className="manage__hint">
         Клиент уйдёт из списка, история занятий и оплат останется. Вернуть — «Клиенты» → «Ушедшие».
       </p>
-      {ask ? (
-        <div className="client-edit__actions" style={{ marginTop: 12 }}>
-          <button className="button button--primary" onClick={run} disabled={busy}>{busy ? 'Убираю…' : 'Да, в архив'}</button>
-          <button className="button" onClick={() => setAsk(false)} disabled={busy}>Отмена</button>
-        </div>
-      ) : (
-        <button className="button button--ghost access-reset__trigger" onClick={() => setAsk(true)}>
+      {!leaving && (
+        <button className="button button--ghost access-reset__trigger" onClick={() => { setFailure(''); del.remove(client.row, client, 'Клиент в архиве'); }}>
           <IconDeparted size={16} />
           В архив
         </button>
       )}
       {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
+      {del.bar}
     </div>
   );
 }
@@ -1353,19 +1344,19 @@ export function Lost() {
             <span>
               {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')}
             </span>
-            {c.auto && <Badge>больше 35 дней без занятий</Badge>}
+            {c.auto && <Tag>больше 35 дней без занятий</Tag>}
             {/* Оплачено вперёд — сколько занятий: клиент вернётся, и их надо
                 отработать; долг — суммой (решение владельца 01.10.2026) */}
             {/* За него платит тот, кто по-прежнему ходит: деньги у плательщика */}
-            {c.payer && <Badge>платит {c.payer}</Badge>}
+            {c.payer && <Tag>платит {c.payer}</Tag>}
             {!c.payer && c.balance > 0 && (
-              <Badge kind="warn">
+              <Tag tone="warn">
                 {c.price > 0
                   ? 'оплачено ' + Math.floor(c.balance / c.price) + ' ' + plural(Math.floor(c.balance / c.price), 'занятие', 'занятия', 'занятий') + ' · ' + formatMoney(c.balance)
                   : 'оплачено ' + formatMoney(c.balance)}
-              </Badge>
+              </Tag>
             )}
-            {!c.payer && c.balance < 0 && <Badge kind="bad">долг {formatMoney(-c.balance)}</Badge>}
+            {!c.payer && c.balance < 0 && <Tag tone="bad">долг {formatMoney(-c.balance)}</Tag>}
           </div>
           {c.restorable && <RestoreClient row={c.row} onDone={reload} />}
         </div>
@@ -1418,7 +1409,7 @@ export function Logs() {
           <div className="item item--static" key={i}>
             <div className="item__top">
               <span className="item__name">{e.action}</span>
-              <Badge kind={kind}>{label}</Badge>
+              <Tag tone={kind}>{label}</Tag>
             </div>
             <div className="item__meta">
               <span>{e.at}</span>

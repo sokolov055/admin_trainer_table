@@ -103,63 +103,10 @@
 
 .conn-caption--bad { color: var(--critical-text); }
 
-/* --- переключатель ---
-   Квадрат 52×44 — цель касания; дорожка 50×30 по центру. Чекбокс
-   прозрачный поверх всего: читалка экрана и клавиатура работают с ним */
-.switch {
-  position: relative;
-  flex-shrink: 0;
-  width: 52px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.switch input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 1;
-}
-
-.switch input:disabled { cursor: not-allowed; }
-
-.switch__track {
-  position: relative;
-  width: 50px;
-  height: 30px;
-  border-radius: 15px;
-  background: var(--border-strong);
-  transition: background-color var(--dur-fast) var(--ease-out);
-}
-
-.switch__track::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  transition: transform var(--dur) var(--ease-out);
-}
-
-.switch input:checked + .switch__track { background: var(--accent-solid); }
-.switch input:checked + .switch__track::after { transform: translateX(20px); }
-.switch input:focus-visible + .switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
-.switch input:disabled + .switch__track { opacity: 0.45; }
+/* Переключатель .switch — общий, в elements.css (ui.jsx, Switch; аудит 24.10.2026) */
 
 @media (prefers-reduced-motion: reduce) {
-  .conn-row__main--button,
-  .switch__track,
-  .switch__track::after { transition: none; }
+  .conn-row__main--button { transition: none; }
 }
 
 /* --- строки-кнопки «Поддержки» --- */

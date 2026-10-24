@@ -12,7 +12,7 @@ import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
 import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
 import {
-  Section, Panel, Loading, ErrorState, Empty, Badge, Tag, Chips, Search, Segmented, Field, Note, plural,
+  Section, Panel, Loading, ErrorState, Empty, Tag, Chips, Search, Segmented, Field, Note, plural,
   BackButton, useLeaveGuard,
 } from '../ui.jsx';
 import { IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconClose } from '../icons.jsx';
@@ -175,7 +175,7 @@ function Templates({ kind, owner }) {
         onEdit={(t) => setEditing(t)}
         onAssign={(t) => setAssigning(t)}
         onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
-        onDeleted={() => { setOpen(null); list.reload(); }}
+        onDeleted={(t) => { setOpen(null); remove(t); }}
         onSavedWorkout={() => list.reload()}
       />
     );
@@ -369,12 +369,10 @@ function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSav
               onCopied(copy);
             })}>Скопировать к себе</button>
           )}
+          {/* Как из списка: удаляется сразу, в списке — «Шаблон удалён ·
+              Вернуть», без системного окна window.confirm (аудит 24.10.2026) */}
           {t.mine && (
-            <button className="button button--ghost danger" disabled={busy} onClick={() => act(async () => {
-              if (!window.confirm(`Удалить шаблон «${t.title}»? Программ клиентов это не коснётся.`)) return;
-              await apiMutate('library.template.delete', { id: t.id });
-              onDeleted();
-            })}>Удалить</button>
+            <button className="button button--ghost danger" disabled={busy} onClick={() => onDeleted(t)}>Удалить</button>
           )}
         </div>
         {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
@@ -718,7 +716,7 @@ export function TemplateApply({ clientRow, month, onApplied, onCancel }) {
         <button className="item" key={t.id} onClick={() => { setPicked(t); haptic(); }}>
           <div className="item__top">
             <span className="item__name">{t.title}</span>
-            {t.goal && <Badge>{t.goal}</Badge>}
+            {t.goal && <Tag>{t.goal}</Tag>}
           </div>
           <div className="item__meta">
             <span>{t.exercises} {plural(t.exercises, 'упражнение', 'упражнения', 'упражнений')}</span>
@@ -769,7 +767,7 @@ export function SaveAsTemplate({ clientRow, month, onDone, onCancel }) {
         {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
         <div className="library__actions">
           <button className="button button--primary" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить шаблон'}</button>
-          <button className="button" disabled={busy} onClick={onCancel}>Отмена</button>
+          <button className="button button--ghost" disabled={busy} onClick={onCancel}>Отмена</button>
         </div>
       </div>
     </Panel>
@@ -848,7 +846,6 @@ function Exercises() {
         muscles={data.muscles}
         onBack={back}
         onOpen={(id) => { setTrail([...trail, open]); setOpen(id); window.scrollTo?.(0, 0); }}
-        onDeleted={() => { setOpen(null); reload(); }}
         onRemove={() => { remove(current); setOpen(null); }}
       />
     );
@@ -1224,8 +1221,9 @@ function SimilarGroup({ group }) {
             в программах клиентов и шаблонах; свои копии удалятся, общие скроются у вас.
           </p>
           <div className="library__similar-actions">
-            <button className="button" disabled={busy} onClick={() => setConfirming(false)}>Отмена</button>
-            <button className="button button--primary" disabled={busy} onClick={merge}>{busy ? 'Объединяем…' : 'Объединить'}</button>
+            {/* Необратимо — красная главная первой, «Отмена» без рамки за ней (аудит 24.10.2026) */}
+            <button className="button button--critical" disabled={busy} onClick={merge}>{busy ? 'Объединяем…' : 'Объединить'}</button>
+            <button className="button button--ghost" disabled={busy} onClick={() => setConfirming(false)}>Отмена</button>
           </div>
         </div>
       ) : (
@@ -1288,7 +1286,7 @@ function HiddenExercises({ onBack }) {
  * своей версией (сервер копирует тренажёры, замены, настройку и видео);
  * подготовку общего владелец правит прямо в базе.
  */
-function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBack, onDeleted, onRemove, onOpen }) {
+function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBack, onRemove, onOpen }) {
   const e = exercise;
   const [edit, setEdit] = useState('');
   const [draft, setDraft] = useState({});
@@ -1337,7 +1335,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       <div className="library__actions">
         <button className="button button--primary" disabled={busy || !ok} onClick={() => save(patch, upload)}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
-        <button className="button" disabled={busy} onClick={close}>Отмена</button>
+        <button className="button button--ghost" disabled={busy} onClick={close}>Отмена</button>
       </div>
     </>
   );
@@ -1419,7 +1417,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
 
         {/* Подготовка — только без тренажёра: с ним клиент видит настройку тренажёра */}
         {!e.machines?.length && row('setup', 'Подготовка к упражнению',
-          e.setup ? <>{!e.setupOk && <Badge kind="warn">черновик — клиенты не видят</Badge>}<SetupText text={e.setup} /></> : null,
+          e.setup ? <>{!e.setupOk && <Tag tone="warn">черновик — клиенты не видят</Tag>}<SetupText text={e.setup} /></> : null,
           () => ({ setup: e.setup || '', setupOk: !!e.setupOk }), () => <>
             <textarea className="field__input library__textarea" aria-label="Подготовка к упражнению" value={draft.setup} maxLength={1500} rows={5}
               onChange={(ev) => set({ setup: ev.target.value, setupOk: false })}
@@ -1459,16 +1457,10 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
 
         {!edit && failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
         <div className="library__actions">
+          {/* Как в правке списка: сразу, внизу «Упражнение удалено · Вернуть»,
+              без системного окна window.confirm (аудит 24.10.2026) */}
           {e.mine && (
-            <button className="button button--ghost danger" onClick={async () => {
-              if (!window.confirm(`Удалить «${e.name}»? В программах клиентов оно останется.`)) return;
-              try {
-                await apiMutate('library.exercise.delete', { id: e.id });
-                onDeleted();
-              } catch (err) {
-                setFailure(err);
-              }
-            }}>Удалить</button>
+            <button className="button button--ghost danger" onClick={onRemove}>Удалить</button>
           )}
           {e.common && (
             <button className="button button--ghost danger" onClick={onRemove}>Убрать у себя</button>

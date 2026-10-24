@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
-import { Section, Panel, Badge, formatNumber, formatTime } from '../ui.jsx';
+import { Section, Panel, Tag, formatNumber, formatTime } from '../ui.jsx';
 import { isNativeApp } from '../native-bridge.js';
 import WatchHelp from './WatchHelp.jsx';
 import { HealthSheet } from './HealthConnect.jsx';
@@ -186,7 +186,7 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
               <div className="small muted">{facts(w)}</div>
               {w.session && (
                 <div className="hw__merged">
-                  <Badge kind="good">{'Совмещено с «' + w.session.title + '»'}</Badge>
+                  <Tag tone="good">{'Совмещено с «' + w.session.title + '»'}</Tag>
                   <span className="small">{' всего ' + w.session.minutes + ' мин'}</span>
                   {w.session.notes && w.session.notes.length > 0 && (
                     <div className="small muted">{w.session.notes.join('; ')}</div>

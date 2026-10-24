@@ -1,0 +1,100 @@
+/* Общие элементы ui.jsx, единые правила дизайн-аудита 24.10.2026
+   (DESIGN-APP.md §6). Отдельным файлом, чтобы не переставлять блоки
+   styles.css. Значения — токены. */
+
+/* --- Подтверждение необратимого на месте (ui.jsx, Confirm) ---
+   Вопрос и кнопки в одной плашке там, где нажали: красная «Удалить» и сразу
+   за ней «Отмена» без рамки. Узко — кнопки уходят под вопрос. */
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  background: var(--critical-fill);
+  border: 1px solid var(--critical-line);
+  border-radius: var(--radius-lg);
+  scroll-margin: var(--space-6) 0;
+}
+.confirm__text {
+  flex: 1 1 14em;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--critical-text);
+}
+.confirm__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); flex: none; }
+.confirm__actions .button { margin: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .confirm { animation: confirm-in var(--dur) var(--ease-out) backwards; }
+}
+@keyframes confirm-in { from { opacity: 0; transform: translateY(-4px); } }
+
+/* --- Переключатель iOS (ui.jsx, Switch) ---
+   Дорожка 51×31 и бегунок 27 — размеры UISwitch; цель касания 51×44.
+   Чекбокс прозрачный поверх всего: читалка экрана и клавиатура работают
+   с ним. Бегунок белый в обеих темах, как в iOS. */
+.switch {
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switch input:disabled { cursor: not-allowed; }
+.switch__track {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color var(--dur) var(--ease-out);
+}
+.switch__track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16);
+  transition: transform var(--dur) var(--ease-ios);
+}
+.switch input:checked + .switch__track { background: var(--accent-fill); }
+.switch input:checked + .switch__track::after { transform: translateX(20px); }
+.switch input:focus-visible + .switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch input:disabled + .switch__track { opacity: 0.45; }
+.switch input:active:not(:disabled) + .switch__track::after { width: 31px; }
+.switch input:checked:active:not(:disabled) + .switch__track::after { transform: translateX(16px); }
+
+/* Строка с подписью: текст слева, переключатель справа, нажимается вся */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  cursor: pointer;
+}
+.switch-row__label { flex: 1 1 auto; min-width: 0; font-size: var(--text-base); font-weight: 600; }
+.switch-row--disabled { cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  .switch__track,
+  .switch__track::after { transition: none; }
+}

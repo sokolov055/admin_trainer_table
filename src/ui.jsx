@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import './elements.css';
 import { IconAlert, IconCheck, IconKey, IconEmpty, IconDelta, IconExit, IconRefresh, IconSearch, IconBack, IconClose } from './icons.jsx';
 import { useBackGesture, spring, rubberband, reducedMotion, LOCK } from './gestures.jsx';
 import { environmentInfo, haptic } from './telegram.js';
@@ -286,6 +287,74 @@ export function useLeaveGuard(dirty, close) {
   return { leave, asking, confirm };
 }
 
+/**
+ * Подтверждение необратимого — на месте действия, а не окном (DESIGN-APP.md
+ * §6, «Удаление и подтверждения»): вопрос, красная кнопка действия и сразу
+ * за ней «Отмена». Обратимое не спрашивают — делают сразу и показывают
+ * «… · Вернуть» (pendingDelete.jsx). Раньше в одних местах кнопка меняла
+ * текст на «Точно удалить?», в других вылезало системное окно
+ * window.confirm, а «Отмена» была то обычной кнопкой, то «Не надо»
+ * (аудит 24.10.2026).
+ *
+ *   {asking && <Confirm text="Тема пропадёт совсем." action="Удалить"
+ *     busy={busy} onConfirm={remove} onCancel={() => setAsking(false)} />}
+ */
+export function Confirm({ text, action, busy = false, busyText, onConfirm, onCancel }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Кнопка внизу длинной карточки — вопрос должен оказаться на экране
+    if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    haptic('warning');
+  }, []);
+  return (
+    <div className="confirm" role="alertdialog" aria-label={typeof text === 'string' ? text : action} ref={ref}>
+      {text && <span className="confirm__text">{text}</span>}
+      <div className="confirm__actions">
+        <button type="button" className="button button--critical" disabled={busy} onClick={onConfirm}>
+          {busy && busyText ? busyText : action}
+        </button>
+        <button type="button" className="button button--ghost" disabled={busy} onClick={onCancel}>Отмена</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Переключатель iOS (51×31) для настройки, которая действует сразу, без
+ * «Сохранить»: «Онлайн-ведение», «Тестовый клиент», флаги сервера,
+ * напоминания. Галочка остаётся в формах с кнопкой «Сохранить» — там
+ * выбор ещё не применён (аудит 24.10.2026).
+ *
+ * Сам элемент — чекбокс с ролью switch поверх дорожки: читалка экрана и
+ * клавиатура работают с ним как с настоящим; цель касания — 51×44.
+ * С подписью (children) переключатель стоит справа от неё, вся строка
+ * нажимается, как ячейка «Настроек» iPhone; без неё нужен label для
+ * читалки экрана.
+ */
+export function Switch({ checked, onChange, label, disabled = false, children }) {
+  const input = (
+    <input
+      type="checkbox"
+      role="switch"
+      checked={!!checked}
+      aria-checked={!!checked}
+      disabled={disabled}
+      aria-label={children ? undefined : label}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+  );
+  const track = <span className="switch__track" aria-hidden="true" />;
+  if (!children) return <label className="switch">{input}{track}</label>;
+  return (
+    <label className={'switch-row' + (disabled ? ' switch-row--disabled' : '')}>
+      <span className="switch-row__label">{children}</span>
+      <span className="switch">{input}{track}</span>
+    </label>
+  );
+}
+
 export function Section({ title, note, children, action }) {
   return (
     <section className="section enter">
@@ -324,21 +393,15 @@ export function Row({ label, children }) {
  * Значки и дельты
  * ========================================================================== */
 
-export function Badge({ kind, children }) {
-  const cls = kind ? ' badge--' + kind : '';
-  return (
-    <span className={'badge' + cls}>
-      {kind && <span className="badge__dot" />}
-      {children}
-    </span>
-  );
-}
-
 /**
  * Метка в строке списка: тихая плашка без рамки, 12 px. Свойства записи
  * («анимация», «настройка», «2 тренажёра») — не статусы, и рамка с жирным
  * кеглем делала их громче названия. Цвет — только у того, что требует
- * внимания (good / warn).
+ * внимания (good / warn / bad). Цвет — второй канал, первый всегда текст.
+ *
+ * Метка в приложении одна: рядом жил Badge — с рамкой, точкой и своим
+ * кеглем, — и одно и то же «не приглашён» в двух экранах выглядело по-разному
+ * (аудит 24.10.2026).
  */
 export function Tag({ tone, children }) {
   return <span className={'tag' + (tone ? ' tag--' + tone : '')}>{children}</span>;
@@ -353,9 +416,9 @@ export function StatusBadge({ value, fallback = '—' }) {
   const s = String(value || '').trim();
   if (!s) return <span className="muted">{fallback}</span>;
 
-  if (s.indexOf('✅') === 0) return <Badge kind="good">{s.replace('✅', '').trim()}</Badge>;
-  if (s.indexOf('❌') === 0) return <Badge kind="bad">{s.replace('❌', '').trim()}</Badge>;
-  if (s.indexOf('⚠️') === 0) return <Badge kind="warn">{s.replace('⚠️', '').trim()}</Badge>;
+  if (s.indexOf('✅') === 0) return <Tag tone="good">{s.replace('✅', '').trim()}</Tag>;
+  if (s.indexOf('❌') === 0) return <Tag tone="bad">{s.replace('❌', '').trim()}</Tag>;
+  if (s.indexOf('⚠️') === 0) return <Tag tone="warn">{s.replace('⚠️', '').trim()}</Tag>;
 
   // Сплит-пара: «Имя: ✅ дата | Имя: ❌ дата» — показываем целиком
   return <span className="small">{s}</span>;
@@ -481,15 +544,23 @@ export function Chips({ items, value, onChange, variant, className, label }) {
 }
 
 /**
- * Выбор одного значения из нескольких — внешне тот же ряд, что и фильтры,
- * но это не вкладки: здесь не переключают вид, а меняют настройку. Поэтому
- * роль другая (radiogroup), и с клавиатуры он ведёт себя как переключатель.
+ * Выбор одного значения из нескольких. Это не вкладки: здесь не
+ * переключают вид, а меняют настройку. Поэтому роль radiogroup, и с
+ * клавиатуры он ведёт себя как переключатель.
+ *
+ * Два-три варианта в ряд — всегда сегменты в утопленной дорожке, как
+ * UISegmentedControl в iOS (аудит 24.10.2026): «Тема», «Конец отдыха» и
+ * «Мои / Общие» были тремя разными видами одного и того же выбора, а
+ * залитые синим чипы читались фильтром. Больше вариантов или перенос
+ * строк (wrap) — прежний ряд чипов: в дорожке они не поместятся.
+ *
+ * track — дорожка с отступом снизу: «чьи / какие» над списком (раздел
+ * «Шаблоны»). Без него дорожка ставится сама и отступа не добавляет.
  */
 export function Segmented({ items, value, onChange, label, disabled, wrap, track }) {
-  // track — равные доли в утопленной дорожке: «чьи / какие» над списком,
-  // чтобы не спорить с синими фильтрами ниже (раздел «Шаблоны»)
+  const auto = !track && !wrap && items.length >= 2 && items.length <= 3;
   return (
-    <div className={'chips chips--flush' + (wrap ? ' chips--wrap' : '') + (track ? ' chips--track' : '')} role="radiogroup" aria-label={label}>
+    <div className={'chips chips--flush' + (wrap ? ' chips--wrap' : '') + (track || auto ? ' chips--track' : '') + (auto ? ' chips--track-tight' : '')} role="radiogroup" aria-label={label}>
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const text = typeof item === 'string' ? item : item.label;

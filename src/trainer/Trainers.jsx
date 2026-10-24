@@ -5,6 +5,7 @@ import { useData } from '../useData.js';
 import { Empty, ErrorState, Loading, Note, Panel, Section, Tag, relativeDays } from '../ui.jsx';
 import { IconKey } from '../icons.jsx';
 import { haptic } from '../telegram.js';
+import { usePendingDelete } from '../pendingDelete.jsx';
 import { OwnerTrainer, Reports, STAGE, TestEditor } from './OwnerTrainer.jsx';
 
 /**
@@ -37,16 +38,22 @@ const ACTIONS = {
   rejected: [['approve', 'Всё-таки одобрить', false]],
 };
 
-/** Отключение — с подтверждением: тренер тут же теряет кабинет */
-const CONFIRM = new Set(['block']);
+/** Отключение обратимо («Вернуть доступ»), поэтому без вопроса «Точно
+ *  отключить?»: внизу «Тренер отключён · Вернуть», на сервер — через
+ *  несколько секунд, если не вернули (pendingDelete.jsx; DESIGN-APP.md §6,
+ *  аудит 24.10.2026). Пока не ушло — кабинет у тренера работает. */
+const DEFERRED = new Set(['block']);
 
 export default function Trainers() {
   const { data, loading, error, reload } = useData('owner.trainers', {}, []);
   const reports = useData('owner.reports', {}, []);
   const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState('');
   const [problem, setProblem] = useState(null);
   const [open, setOpen] = useState(null);
+  const later = usePendingDelete((p) => apiMutate('owner.trainer.decide', { id: p.id, decision: p.decision }), {
+    onDone: () => { haptic('success'); reload(); },
+    onError: setProblem,
+  });
 
   const back = () => { setOpen(null); reload(); reports.reload(); window.scrollTo(0, 0); };
   if (open === 'test') return <TestEditor onBack={back} />;
@@ -65,14 +72,16 @@ export default function Trainers() {
   const openReports = (reports.data && reports.data.reports) || [];
 
   const decide = async (trainer, decision) => {
-    const key = trainer.id + ':' + decision;
-    if (CONFIRM.has(decision) && confirm !== key) { setConfirm(key); haptic(); return; }
+    if (DEFERRED.has(decision)) {
+      setProblem(null);
+      later.remove(trainer.id, { id: trainer.id, decision }, 'Тренер отключён');
+      return;
+    }
     setBusy(true);
     setProblem(null);
     try {
       await apiMutate('owner.trainer.decide', { id: trainer.id, decision });
       haptic('success');
-      setConfirm('');
       reload();
     } catch (err) {
       setProblem(err);
@@ -112,20 +121,17 @@ export default function Trainers() {
         </span>
       </div>
       <div className="trainer-row__actions">
-        {!trainer.owner && (ACTIONS[trainer.status] || []).map(([decision, label, primary]) => {
-          const asking = confirm === trainer.id + ':' + decision;
-          return (
-            <button
-              key={decision}
-              type="button"
-              className={'button' + (primary ? ' button--primary' : '') + (asking ? ' button--critical' : '')}
-              disabled={busy}
-              onClick={() => decide(trainer, decision)}
-            >
-              {asking ? 'Точно ' + label.toLowerCase() + '?' : label}
-            </button>
-          );
-        })}
+        {!trainer.owner && !later.hidden(trainer.id) && (ACTIONS[trainer.status] || []).map(([decision, label, primary]) => (
+          <button
+            key={decision}
+            type="button"
+            className={'button' + (primary ? ' button--primary' : '')}
+            disabled={busy}
+            onClick={() => decide(trainer, decision)}
+          >
+            {label}
+          </button>
+        ))}
         <button
           type="button"
           className={'button' + (trainer.status === 'pending' && WAITING.has(trainer.stage) ? ' button--primary' : '')}
@@ -140,6 +146,7 @@ export default function Trainers() {
   return (
     <>
       {problem && <Note tone="critical">Не получилось: {problem.message || 'нет связи'}</Note>}
+      {later.bar}
 
       {openReports.length > 0 && (
         <Section title="Жалобы на профили" note="Три жалобы от разных людей скрывают профиль сами — до вашего решения">

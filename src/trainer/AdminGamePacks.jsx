@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
-import { ErrorState, Loading, Note, Panel, Row, Rows, Section, Tag, formatWhen } from '../ui.jsx';
+import { Confirm, ErrorState, Loading, Note, Panel, Row, Rows, Section, Tag, formatWhen } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { isTried, setGamePacks, setTried } from '../game-packs-store.js';
 import { readPackFile } from './admin-model.js';
@@ -111,8 +111,8 @@ export default function AdminGamePacks() {
               )}
               {replacing && <Note tone="info">Набор «{replacing.name}» уже загружен — файл заменит его и закроет до вашего «Открыть для всех».</Note>}
               <div className="trainer-row__actions">
-                <button type="button" className="button" disabled={busy} onClick={() => setDraft(null)}>Отмена</button>
                 <button type="button" className="button button--primary" disabled={busy} onClick={upload}>{replacing ? 'Заменить' : 'Загрузить'}</button>
+                <button type="button" className="button button--ghost" disabled={busy} onClick={() => setDraft(null)}>Отмена</button>
               </div>
             </>
           )}
@@ -132,15 +132,19 @@ export default function AdminGamePacks() {
                     </div>
                     <Tag tone={p.closed ? 'warn' : 'good'}>{p.closed ? 'закрыт' : 'у всех'}</Tag>
                   </div>
-                  {asking === removeKey && <Note tone="critical">Набор пропадёт совсем. Вернуть — только загрузив файл снова.</Note>}
-                  <div className="trainer-row__actions">
-                    <button
-                      type="button"
-                      className={'button' + (asking === removeKey ? ' button--critical' : '')}
-                      disabled={busy}
-                      onClick={() => (asking === removeKey ? run('owner.gamepacks.remove', { id: p.id }) : (setAsking(removeKey), haptic()))}
-                    >
-                      {asking === removeKey ? 'Точно удалить?' : 'Удалить'}
+                  {/* Необратимо — вопрос на месте: красная «Удалить» и «Отмена» (аудит 24.10.2026) */}
+                  {asking === removeKey && (
+                    <Confirm
+                      text="Набор пропадёт совсем. Вернуть — только загрузив файл снова."
+                      action="Удалить"
+                      busy={busy}
+                      onConfirm={() => run('owner.gamepacks.remove', { id: p.id })}
+                      onCancel={() => setAsking('')}
+                    />
+                  )}
+                  {asking !== removeKey && <div className="trainer-row__actions">
+                    <button type="button" className="button button--ghost danger" disabled={busy} onClick={() => setAsking(removeKey)}>
+                      Удалить
                     </button>
                     {p.closed && (
                       <button type="button" className="button" disabled={busy} onClick={() => tryOn(p.id, !tried)}>
@@ -155,7 +159,7 @@ export default function AdminGamePacks() {
                     >
                       {p.closed ? 'Открыть для всех' : 'Закрыть'}
                     </button>
-                  </div>
+                  </div>}
                 </Panel>
               );
             })}

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
 import {
-  Lead, Section, Panel, Loading, ErrorState, Empty, Badge, Note,
+  Lead, Section, Panel, Loading, ErrorState, Empty, Tag, Note,
   formatMoney, formatNumber, formatDate, plural,
 } from '../ui.jsx';
 import { IconMoney, IconClose } from '../icons.jsx';
@@ -259,7 +259,7 @@ function PaymentRow({ payment, busy, onCancel, error = null }) {
       <div className="item__meta">
         {payment.product && <span>Онлайн-ведение «{payment.product}»</span>}
         {payment.id && <span>№{payment.id}</span>}
-        {!payment.cancellable && <Badge>до нумерации</Badge>}
+        {!payment.cancellable && <Tag>до нумерации</Tag>}
       </div>
 
       {payment.cancellable && !confirming && (
@@ -281,16 +281,18 @@ function PaymentRow({ payment, busy, onCancel, error = null }) {
               ? 'Срок ведения вернётся к прежнему, если его с тех пор не продлевали.'
               : 'Касса и баланс клиента вернутся к прежним значениям.'}
           </div>
+          {/* Отменённый платёж обратно не вернуть — только внести заново:
+              красная кнопка и сразу за ней «Отмена», как везде (аудит 24.10.2026) */}
           <div className="pay-confirm__actions">
             <button
-              className="button"
+              className="button button--critical"
               onClick={() => { setConfirming(false); onCancel(payment.id); }}
               disabled={busy}
             >
               {busy ? 'Отменяем…' : 'Да, отменить'}
             </button>
             <button className="button button--ghost" onClick={() => setConfirming(false)} disabled={busy}>
-              Не надо
+              Отмена
             </button>
           </div>
         </div>
@@ -536,7 +538,7 @@ function OnlineProducts({ products, reload }) {
               >
                 {busy ? 'Сохраняем…' : 'Сохранить'}
               </button>
-              <button className="button button--ghost" type="button" disabled={busy} onClick={() => setEditing(null)}>Не надо</button>
+              <button className="button button--ghost" type="button" disabled={busy} onClick={() => setEditing(null)}>Отмена</button>
             </div>
           </form>
         </Panel>
