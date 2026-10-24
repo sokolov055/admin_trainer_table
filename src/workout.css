@@ -40,6 +40,7 @@
    упражнений, а время и счётчик нужны ему постоянно. Уехавший вверх таймер
    заставляет возвращаться наверх после каждого подхода. */
 .workout__header {
+  --wk-glass: color-mix(in srgb, var(--bg) 69%, transparent);
   position: sticky;
   /* Под строкой состояния: в приложении с иконки страница рисуется и под
      часами, и прилипшая к самому верху шапка ушла бы под них. --inset-top —
@@ -59,42 +60,30 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: color-mix(in srgb, var(--bg) 69%, transparent);
+  background: var(--wk-glass);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   backdrop-filter: blur(18px) saturate(160%);
   pointer-events: none;
 }
-/* Над шапкой до края экрана — сплошной фон (::after): в верхней точке
-   между часами и шапкой нет щели с рисунком темы. У прилипшей шапки
-   (data-stuck ставит Workout.jsx) над ней только часы — туда продолжается
-   стекло, и содержимое идёт под него, а сплошной фон уходит выше. Стекло —
-   ровно на высоту выреза: на слое в высоту экрана Chrome размытие не
-   рисует. Только когда шапка первая: над ней бывают ошибка сохранения и
-   окно конфликта — их не закрываем */
-.workout__header:first-child::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: 100vh;
-  z-index: -1;
-  background: var(--bg);
-  pointer-events: none;
-}
-.workout__header:first-child[data-stuck]::before {
-  top: calc(-1 * max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)));
-}
-.workout__header:first-child[data-stuck]::after {
-  bottom: calc(100% + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)));
-}
+/* Стекло продолжается вверх до края экрана (владелец, 24.10.2026): в
+   верхней точке полоса над шапкой одного цвета с ней (сплошной --bg был
+   темнее стекла), у прилипшей — под стекло уходит содержимое под часами.
+   Одним слоем с шапкой, без шва. Высота — ровно до края (--wk-above ставит
+   Workout.jsx при прокрутке): слой, который заходит за край экрана, Chrome
+   не размывает. Шапку приложения под ним прячем (visibility, место
+   остаётся) — иначе её текст размазался бы пятном; она и раньше была под
+   сплошным фоном. «Меню» — с экрана программы, куда ведёт «назад». Только
+   когда шапка первая: над ней бывают ошибка сохранения и окно конфликта —
+   их не закрываем */
+.workout__header:first-child::before { top: calc(-1 * var(--wk-above, 0px)); }
+.app:has(.workout__header:first-child) > .app__header { visibility: hidden; }
 /* Без размытия полупрозрачный фон только мешал бы читать — тогда сплошной */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .workout__header::before { background: var(--bg); }
+  .workout__header { --wk-glass: var(--bg); }
 }
 @media (prefers-reduced-transparency: reduce) {
+  .workout__header { --wk-glass: var(--bg); }
   .workout__header::before {
-    background: var(--bg);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }

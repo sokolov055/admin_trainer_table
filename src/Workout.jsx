@@ -1819,25 +1819,25 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   }, [setups, editable, s ? s.exercises.map((e) => e.id + '|' + (e.exerciseId || '') + '|' + ((e.machine && e.machine.uid) || '')).join() : '']);
 
   /**
-   * Шапка прилипла к верху — data-stuck (24.10.2026). Матовое стекло шапки
-   * продолжается вверх под часы только у прилипшей: в верхней точке над ней
-   * шапка приложения, и стекло размазало бы её в пятно — там сплошной фон
-   * (workout.css)
+   * Сколько от шапки до края экрана — --wk-above (24.10.2026): стекло шапки
+   * продолжается вверх ровно на столько (workout.css). Слой «с запасом» за
+   * край экрана Chrome не размывает
    */
   const hasSession = !!s;
   useEffect(() => {
     if (!hasSession || typeof window === 'undefined' || typeof window.addEventListener !== 'function'
-      || typeof document === 'undefined' || !document.querySelector || typeof getComputedStyle !== 'function') return undefined;
+      || typeof document === 'undefined' || !document.querySelector) return undefined;
     const head = document.querySelector('.workout__header');
-    if (!head || !head.getBoundingClientRect || !head.toggleAttribute) return undefined;
+    if (!head || !head.getBoundingClientRect || !head.style) return undefined;
+    let last = -1;
     const check = () => {
-      const stuck = window.scrollY > 0
-        && head.getBoundingClientRect().top <= (parseFloat(getComputedStyle(head).top) || 0) + 1;
-      if (stuck !== head.hasAttribute('data-stuck')) head.toggleAttribute('data-stuck', stuck);
+      const above = Math.max(0, Math.round(head.getBoundingClientRect().top));
+      if (above !== last) { last = above; head.style.setProperty('--wk-above', above + 'px'); }
     };
     check();
     window.addEventListener('scroll', check, { passive: true });
-    return () => window.removeEventListener('scroll', check);
+    window.addEventListener('resize', check);
+    return () => { window.removeEventListener('scroll', check); window.removeEventListener('resize', check); };
   }, [hasSession]);
 
   /**

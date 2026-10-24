@@ -425,7 +425,7 @@ body:has(#root .workout__header, #root .cal-screen)::before {
   mask-image: none;
 }
 /* У тренировки под часами — то же матовое стекло, что у шапки (оно само
-   продолжается до края, workout.css): сплошной слой поверх лёг бы швом */
+   продолжается до края, workout.css): слой поверх лёг бы швом */
 body:has(#root .workout__header:first-child)::before { display: none; }
 body::before {
   --fade: min(var(--top-fade), calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) * 100));

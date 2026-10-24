@@ -1756,7 +1756,10 @@ test('отдых, свёрнутый у тренера, доживает до к
     // Кнопка остаётся вторым способом свернуть таймер.
     await phone.locator('.rest-pill').click();
     await phone.getByRole('button', { name: 'Свернуть таймер' }).click({ timeout: 5000 });
-    // Из «Моих тренировок» — в другой раздел бокового меню: экран тренировки закрывается
+    // Из «Моих тренировок» — в другой раздел бокового меню: экран тренировки закрывается.
+    // Шапка приложения с «Меню» на экране занятия под стеклом его шапки (24.10.2026) —
+    // сначала «назад» к программе
+    await phone.getByRole('button', { name: /^Назад/ }).first().click();
     await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Журнал тренировок/ }).click();
     await phone.locator('.rest-pill').waitFor({ timeout: 5000 });
