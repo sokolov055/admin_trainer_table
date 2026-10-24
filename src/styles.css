@@ -456,14 +456,17 @@ body {
    видно. Цифры часов читаются за счёт затемнения. Только когда есть
    вырез (в браузере на компьютере отступ ноль — и слоя нет). Экранам,
    где шапка липнет прямо под часы (тренировка, расписание), хвост вниз
-   не нужен: он лёг бы на её верх. */
+   не нужен: он лёг бы на её верх. Только видимые: посещённые разделы
+   остаются в странице спрятанными (hidden у main или у .app под карточкой),
+   и без :not([hidden] *) сплошной слой вставал под часы на всех экранах
+   после захода в расписание или тренировку (владелец, 24.10.2026) */
 body { --top-fade: 36px; }
-body:has(#root .workout__header, #root .cal-screen) { --top-fade: 0px; }
+body:has(#root .workout__header:not([hidden] *), #root .cal-screen:not([hidden] *)) { --top-fade: 0px; }
 /* У них шапка липнет прямо под часы и сплошная (--bg) — слой тоже
    сплошной, того же цвета: уехавшее вверх содержимое не просвечивает над
    шапкой. Щель над шапкой тренировки в верхней точке закрывает сама шапка
    (её фон продолжается вверх до края, workout.css; владелец, 24.10.2026). */
-body:has(#root .workout__header, #root .cal-screen)::before {
+body:has(#root .workout__header:not([hidden] *), #root .cal-screen:not([hidden] *))::before {
   background: var(--bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -472,7 +475,7 @@ body:has(#root .workout__header, #root .cal-screen)::before {
 }
 /* У тренировки под часами — то же матовое стекло, что у шапки (оно само
    продолжается до края, workout.css): слой поверх лёг бы швом */
-body:has(#root .workout__header:first-child)::before { display: none; }
+body:has(#root .workout__header:first-child:not([hidden] *))::before { display: none; }
 body::before {
   --fade: min(var(--top-fade), calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) * 100));
   content: '';

@@ -22,8 +22,14 @@ const CONFIG_TIMEOUT_MS = 3000;
 let resolved = null;
 let loading = null;
 
-/** Адрес из сборки — запасной вариант, если config.json недоступен */
-const BUILT_IN = import.meta.env?.VITE_API_URL || '';
+/** Адрес из сборки — запасной вариант, если config.json недоступен.
+ *  Секрет VITE_API_URL до сих пор указывает на Apps Script, выведенный
+ *  27.09.2026: когда config.json не успевал за 3 с (через VPN), запросы
+ *  уходили в скрипт, и он отвечал «откройте через Telegram-бот» (владелец,
+ *  24.10.2026). Скрипт больше не адрес API — вместо него свой сервер */
+const SERVER = 'https://api.fitness100.ru';
+const RAW_BUILT_IN = import.meta.env?.VITE_API_URL || '';
+const BUILT_IN = /script\.google(usercontent)?\.com/.test(RAW_BUILT_IN) ? SERVER : RAW_BUILT_IN;
 
 export function currentApiUrl() {
   return resolved?.apiUrl || BUILT_IN;

@@ -76,7 +76,9 @@
    когда шапка первая: над ней бывают ошибка сохранения и окно конфликта —
    их не закрываем */
 .workout__header:first-child::before { top: calc(-1 * var(--wk-above, 0px)); }
-.app:has(.workout__header:first-child) > .app__header { visibility: hidden; }
+/* Только видимое занятие: спрятанное в посещённом разделе не прячет шапку
+   приложения на других экранах */
+.app:has(.workout__header:first-child:not([hidden] *)) > .app__header { visibility: hidden; }
 /* Без размытия полупрозрачный фон только мешал бы читать — тогда сплошной */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .workout__header { --wk-glass: var(--bg); }
@@ -910,11 +912,11 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* По .workout--session, а не по шапке занятия (аудит 24.10.2026): класс
    стоит с первого кадра экрана, а шапка появляется, когда занятие
    загрузилось, — и шапка приложения ужималась уже на глазах, сдвигая экран */
-.app:has(.workout--session) > .app__header > .app__back,
-.app:has(.workout--session) > .app__header .app__subtitle,
-.app:has(.workout--session) .card-bar { display: none; }
-.app:has(.workout--session) > .app__header { padding-top: var(--space-3); padding-bottom: 0; }
-.app:has(.workout--session) > .app__header .app__title { font-size: var(--text-md); }
+.app:has(.workout--session:not([hidden] *)) > .app__header > .app__back,
+.app:has(.workout--session:not([hidden] *)) > .app__header .app__subtitle,
+.app:has(.workout--session:not([hidden] *)) .card-bar { display: none; }
+.app:has(.workout--session:not([hidden] *)) > .app__header { padding-top: var(--space-3); padding-bottom: 0; }
+.app:has(.workout--session:not([hidden] *)) > .app__header .app__title { font-size: var(--text-md); }
 /* Название и «месяц · статус» одной строкой; h2 — только название (тесты и читалка) */
 .workout__title-row { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
 .workout__title-row h2 { flex: 0 1 auto; min-width: 0; }
