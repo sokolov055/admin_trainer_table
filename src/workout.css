@@ -479,10 +479,12 @@
 .workout__ex-count { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .workout__exercise--done .workout__ex-count { background: var(--good-fill); color: var(--good-text); }
 
-/* Текущее упражнение — обведено акцентом; законченное — приглушено */
+/* Текущее упражнение — обведено акцентом; законченное — приглушено цветом:
+   утопленная подложка, зелёная рамка, название вторичным текстом. Прозрачность
+   (.72) роняла контраст всего текста карточки ниже 4,5:1 (аудит 24.10.2026) */
 .workout__exercise--current { border: 2px solid var(--accent); padding: calc(var(--space-4) - 1px); box-shadow: 0 6px 20px -12px var(--accent); }
-.workout__exercise--done { opacity: 0.72; }
-.workout__exercise--done:focus-within { opacity: 1; }
+.workout__exercise--done { --swipe-bg: var(--surface-sunken); background: var(--surface-sunken); border-color: var(--good-line); }
+.workout__exercise--done .workout__ex-head h3 { color: var(--text-secondary); }
 
 /* Текущий подход — подложка акцента, крупные цифры; «готово» залито */
 .workout__set--current { background: var(--accent-wash); border-top-color: transparent; }
@@ -490,12 +492,12 @@
 .workout__set-row input { font-size: var(--text-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
 .workout__set--current input { border-color: var(--accent); background: var(--surface); }
 
-.workout__set--skipped .workout__set-row input { text-decoration: line-through; opacity: 0.5; }
+.workout__set--skipped .workout__set-row input { text-decoration: line-through; color: var(--text-muted); }
 .workout__skipped { margin: 2px 0 4px 52px; font-size: var(--text-sm); color: var(--text-muted); }
 
 /* Номер подхода — он же вход в настройки: тихая цель вместо строки под каждым */
 .workout__set-num { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 44px; min-height: 44px; padding: 0 4px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; }
-.workout__set-num svg { color: var(--text-muted); opacity: 0.7; }
+.workout__set-num svg { color: var(--text-muted); }
 .workout__set-num[aria-expanded='true'] { background: var(--bg); }
 .workout__set-num:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .workout__set--done .workout__set-num { color: var(--good-text); font-weight: 640; }
@@ -509,7 +511,7 @@
 .workout__note { margin-top: var(--space-1); }
 .workout__note textarea { width: 100%; margin-top: 4px; }
 @media (prefers-reduced-motion: no-preference) {
-  .workout__exercise { transition: opacity var(--dur-fast, 160ms) var(--ease-out, ease-out), border-color var(--dur-fast, 160ms) var(--ease-out, ease-out); }
+  .workout__exercise { transition: background-color var(--dur-fast, 160ms) var(--ease-out, ease-out), border-color var(--dur-fast, 160ms) var(--ease-out, ease-out); }
 }
 
 .workout__ex-num { min-width: 0; margin-right: 2px; }
@@ -526,7 +528,7 @@
 /* Выбор упражнений: кружок у названия, выбранное — с акцентом */
 .workout__ex-head--pick { cursor: pointer; align-items: center; }
 .workout__pick { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--border-strong); color: var(--accent-text); transition: background-color 160ms ease, border-color 160ms ease; }
-.workout__pick.is-on { background: var(--accent); border-color: var(--accent); }
+.workout__pick.is-on { background: var(--accent-fill); border-color: var(--accent-fill); }
 .workout__exercise--picked { border-color: var(--accent); }
 .workout__pick-bar, .workout__undo {
   position: sticky; bottom: var(--float-bottom); z-index: 4;
@@ -581,14 +583,15 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
    оранжевого: белый текст на них — не ниже 4,5:1 (craft-floor). Тихие —
    ближайший подход не текущего упражнения: обводкой, а не полупрозрачностью,
    чтобы текст оставался читаемым */
-.workout__effort { --easy: #1a7f37; --hard: #b35600; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: var(--space-2) 0 var(--space-1); }
-.workout__effort-btn { --c: var(--accent); --on: var(--accent-text); min-height: 48px; border: 0; border-radius: var(--radius-sm, 10px); background: var(--c); color: var(--on); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 140ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), background-color 160ms var(--ease-out, ease); }
+.workout__effort { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: var(--space-2) 0 var(--space-1); }
+.workout__effort-btn { --c: var(--effort-ok); --on: #fff; min-height: 48px; border: 0; border-radius: var(--radius-sm, 10px); background: var(--c); color: var(--on); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 140ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), background-color 160ms var(--ease-out, ease); }
 .workout__effort-btn:active { transform: scale(0.97); }
 .workout__effort-btn:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
-/* «Норм» залит акцентом — и текст его (тёмный у палитр тёмной темы,
-   palettes.js); «легко» и «тяжело» — белым по своим заливкам */
-.workout__effort-btn--easy { --c: var(--easy); --on: #fff; }
-.workout__effort-btn--hard { --c: var(--hard); --on: #fff; }
+/* Все три — постоянными цветами вне палитры (--effort-*, styles.css), белым
+   текстом: «Норм» акцентом темы был в «Хэллоуине» оранжевым, как «Тяжело»,
+   в «Авокадо» — зелёным, как «Легко» (аудит 24.10.2026) */
+.workout__effort-btn--easy { --c: var(--effort-easy); }
+.workout__effort-btn--hard { --c: var(--effort-hard); }
 /* Разминка (FT-620): одна кнопка «Готово» на всю ширину, спокойнее рабочих */
 .workout__effort-btn--warmup { grid-column: 1 / -1; background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--c); }
 .workout__effort--quiet .workout__effort-btn { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--c); }
@@ -598,9 +601,9 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__effort-fix-title { margin: 0 0 var(--space-1); font-size: 13px; color: var(--text-muted); }
 .workout__effort-hint { margin: 0 0 var(--space-2); font-size: 13px; line-height: 1.35; color: var(--text-muted); }
 .workout__effort-next { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-muted); }
-.workout__effort-dot { --c: var(--accent); width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px; background: var(--c); }
-.workout__effort-dot--easy { --c: #1a7f37; }
-.workout__effort-dot--hard { --c: #b35600; }
+.workout__effort-dot { --c: var(--effort-ok); width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px; background: var(--c); }
+.workout__effort-dot--easy { --c: var(--effort-easy); }
+.workout__effort-dot--hard { --c: var(--effort-hard); }
 .workout__member-done { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin: var(--space-1) 0 var(--space-2); padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font: inherit; font-size: 13px; cursor: pointer; }
 .workout__member-done:active { transform: scale(0.97); }
 .workout__cardio-done { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--good-text); }
@@ -685,7 +688,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__toolbar--head { flex-wrap: nowrap; align-items: stretch; margin: var(--space-2) 0 0; }
 .workout__toolbar--head .button, .workout__toolbar--head label { height: 40px; min-height: 0; box-sizing: border-box; border-radius: 10px; font-size: var(--text-sm); }
 .workout__toolbar--head .button { padding: 0 var(--space-3); border: 1px solid var(--border); background: var(--surface-sunken); color: var(--text); flex: none; }
-.workout__toolbar--head .button.is-on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.workout__toolbar--head .button.is-on { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-text); }
 .workout__toolbar--head label { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; padding: 0 var(--space-2) 0 var(--space-3); border: 1px solid var(--border); background: var(--surface-sunken); color: var(--text-secondary); }
 .workout__toolbar--head select { height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); font-size: 16px; font-weight: 600; }
 .workout__title-tap { all: unset; cursor: text; -webkit-tap-highlight-color: transparent; }
@@ -831,7 +834,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__toolbar--head .button, .workout__toolbar--head label, .workout__head-actions .button { height: 44px; }
 .workout__bar { margin-top: var(--space-2); }
 /* «Выбрать» включён — контур акцентом, а не вторая залитая кнопка рядом с «Завершить» */
-.workout__toolbar--head .button.is-on { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+.workout__toolbar--head .button.is-on { background: var(--accent-wash); border-color: var(--accent); color: var(--accent-ink); }
 /* Панель выбора: счётчик уступает место кнопкам, «Удалить» не уезжает одна на вторую строку */
 .workout__pick-bar { flex-wrap: nowrap; }
 .workout__pick-bar .button { padding: 0 10px; font-size: var(--text-sm); margin: 0; }

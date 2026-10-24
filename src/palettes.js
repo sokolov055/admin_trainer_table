@@ -193,6 +193,9 @@ export function paletteTokens(palette, scheme) {
     '--surface-sunken': c.sunken,
     '--accent': c.accent,
     '--accent-solid': c.accent,
+    // Заливка под текстом кнопки: у палитры тот же акцент — он уже доведён
+    // до 4,6:1 с onButton (у стандартной в тёмной свой, styles.css)
+    '--accent-fill': c.accent,
     '--accent-text': c.onButton,
     // Подложка выделения — третьим цветом, надпись на ней — акцентом
     '--accent-wash': fillWash,

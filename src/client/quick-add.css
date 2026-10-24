@@ -15,7 +15,7 @@
   padding: 10px 16px 10px 14px;
   border: 0;
   border-radius: 16px;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
   font: inherit;
   text-align: left;

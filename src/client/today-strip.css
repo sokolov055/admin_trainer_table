@@ -13,7 +13,9 @@
 /* Число в ряду — xl (FT-665); «тыс.» — серой единицей через Qty. Три плитки
    на 360 px дают по 69 px внутри: «8,4 тыс.» 22-м кеглем с единицей 13 входит */
 .today-strip__tile strong { font-size: var(--text-xl); font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.today-strip__tile span { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.3; }
+/* Подпись — только прямой потомок: «.today-strip__tile span» задевал и
+   <span class="qty"> внутри числа, и «5,3 тыс.» сжималось до 13 px (аудит 24.10.2026) */
+.today-strip__tile > span { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.3; }
 .today-strip__tile.is-done { border-color: var(--good-line); background: var(--good-fill); }
 .today-strip__tile.is-done strong { color: var(--good-text); }
 .today-strip__tile:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 2px; }

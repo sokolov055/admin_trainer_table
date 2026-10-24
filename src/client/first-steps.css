@@ -28,7 +28,7 @@
 }
 .first-regime__day.is-today .first-regime__dot { border-color: var(--accent); }
 .first-regime__day.is-today { color: var(--text); font-weight: 600; }
-.first-regime__day.is-on .first-regime__dot { background: var(--accent-solid); border-color: var(--accent-solid); animation: first-regime-pop 320ms var(--ease-out) both; }
+.first-regime__day.is-on .first-regime__dot { background: var(--accent-fill); border-color: var(--accent-fill); animation: first-regime-pop 320ms var(--ease-out) both; }
 .first-regime__notify { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
 .first-regime__notify h3 { margin: 0 0 6px; font-size: var(--text-base); }
 .first-regime__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

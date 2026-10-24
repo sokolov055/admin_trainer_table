@@ -36,7 +36,7 @@
   border-radius: 18px;
   background: var(--accent-wash);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .signin__mark svg { width: 24px; height: 24px; }
 
@@ -151,15 +151,15 @@
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
 }
 .is-current .signin__dot {
-  border-color: var(--accent-solid);
-  background: var(--accent-solid);
+  border-color: var(--accent-fill);
+  background: var(--accent-fill);
   color: var(--accent-text);
   box-shadow: 0 0 0 4px var(--accent-wash);
 }
 .is-done .signin__dot {
   border-color: transparent;
   background: var(--accent-wash);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .signin__label {
@@ -367,7 +367,7 @@
   padding: 0 16px;
   border-radius: 999px;
   background: var(--accent-wash);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 14px;
   font-weight: 650;
   cursor: pointer;
