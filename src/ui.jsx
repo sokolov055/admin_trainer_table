@@ -229,7 +229,9 @@ export function BackButton({ label = 'Назад', onClick }) {
   const aria = label === 'Назад' || /^К /.test(label) ? undefined : 'Назад: ' + label;
   return (
     <button type="button" className="button button--ghost app__back" aria-label={aria} onClick={onClick}>
-      <IconBack size={16} />
+      {/* Стрелка как у системного «назад» iOS: крупнее текста и жирнее
+          остальных иконок — 16 px тонкой линией терялась (владелец, 24.10.2026) */}
+      <IconBack size={22} strokeWidth={2.4} />
       {label}
     </button>
   );

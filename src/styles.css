@@ -6167,8 +6167,10 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Один вид у всех «назад» (FT-567, этап 3): синий текст со стрелкой от левого
    края, как в «Библиотеке» (.library__back), а не серая кнопка — раньше
    карточка, экраны меню и «Библиотека» показывали «назад» по-разному */
-.app__back { min-height: 40px; gap: 4px; margin: 0 0 var(--space-2); padding: 0; border: 0; background: none; color: var(--accent); font-size: 14px; font-weight: 600; }
-.app__back svg { margin-left: -4px; }
+/* Размер — как у системного «назад» iOS (17 px, владелец 24.10.2026): 14 px
+   рядом с заголовком и кнопкой «Завершить» выглядели сноской */
+.app__back { min-height: 44px; gap: 0; margin: 0 0 var(--space-2); padding: 0 var(--space-2) 0 0; border: 0; background: none; color: var(--accent); font-size: var(--text-md); font-weight: 500; letter-spacing: -0.01em; }
+.app__back svg { margin-left: -7px; }
 .app__back:active { transform: none; opacity: 0.55; }
 
 /* Ряд подразделов: край, за которым есть ещё разделы, затухает (FT-567) */

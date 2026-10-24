@@ -2020,7 +2020,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {/* Название — касанием: переименовывает только тренер (07.10.2026), сервер это же проверяет */}
         {renamingTitle && clientRow && !clientView
           ? <input className="workout__title-input" aria-label="Название занятия" autoFocus value={s.title} maxLength={160} onChange={e => change(v => ({ ...v, title: e.target.value }))} onBlur={() => setRenamingTitle(false)} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingTitle(false); }} />
-          : <div className="workout__title-row"><h2>{editable && clientRow && !clientView ? <button type="button" className="workout__title-tap" onClick={() => setRenamingTitle(true)}>{s.title}</button> : s.title}</h2><p className="workout__title-meta">{s.month || 'Свободная тренировка'} · {labels[s.status]}</p></div>}
+          : <div className="workout__title-row"><h2>{editable && clientRow && !clientView ? <button type="button" className="workout__title-tap" onClick={() => setRenamingTitle(true)}>{s.title}</button> : s.title}</h2>{/* Месяц и «Идёт» убраны (владелец, 24.10.2026): идёт занятие и так
+              видно, пауза — по кнопке «Продолжить». Остаётся только итог
+              закрытого занятия */}{(s.status === 'completed' || s.status === 'cancelled') && <p className="workout__title-meta">{labels[s.status]}</p>}</div>}
         {editable && confirm && <div className="workout__confirm" role="alertdialog" aria-label={confirm === 'complete' ? 'Завершить тренировку' : 'Отменить занятие'}>
           <p>{confirmText}</p>
           <div className="workout__confirm-actions">
