@@ -14,9 +14,18 @@
  * ==========================================================================
  */
 
+/* Запас под нижнее меню (padding-bottom .app__body) — внутри занятия
+   (владелец, 24.10.2026): липкая шапка держится только в пределах своего
+   блока, и в самом низу страницы блок уезжал вверх вместе с ней — шапка
+   «слетала». Отрицательный нижний отступ тянет блок на запас родителя,
+   высота страницы та же */
 .workout {
-  padding-bottom: var(--space-6);
+  --wk-tail: calc(96px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--space-6) + var(--wk-tail));
+  margin-bottom: calc(-1 * var(--wk-tail));
 }
+/* Карточка клиента у тренера — свой запас снизу (.app__body--plain) */
+.app__body--plain .workout { --wk-tail: var(--space-6); }
 
 .workout h2 {
   font-size: var(--text-xl);
