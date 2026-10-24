@@ -104,7 +104,7 @@ export default function ExercisePicker({ value, exerciseId, exercises, disabled,
         <span className="picker__state">
           нет в базе ·{' '}
           <button type="button" className="picker__add" disabled={adding || disabled} onClick={add}>
-            {adding ? 'добавляю…' : 'добавить в базу'}
+            {adding ? 'добавляем…' : 'добавить в базу'}
           </button>
         </span>
       )}

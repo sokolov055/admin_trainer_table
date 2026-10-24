@@ -259,7 +259,7 @@ function PaymentRow({ payment, busy, onCancel, error = null }) {
       <div className="item__meta">
         {payment.product && <span>Онлайн-ведение «{payment.product}»</span>}
         {payment.id && <span>№{payment.id}</span>}
-        {!payment.cancellable && <Tag>до нумерации</Tag>}
+        {!payment.cancellable && <Tag>старая запись, без отмены</Tag>}
       </div>
 
       {payment.cancellable && !confirming && (

@@ -49,3 +49,18 @@
   margin: var(--space-3) 0 0; padding-top: var(--space-2); border-top: 1px solid var(--border);
   font-size: var(--text-sm); line-height: 1.4; color: var(--text-muted);
 }
+
+/* Обзор сводки: изменение под цифрой, а не рядом — с «₽ к сентябрю» оно
+   длиннее самой цифры и в строку не помещается (Dashboard.jsx, SideRow;
+   аудит 24.10.2026) */
+.side .metric { flex-direction: column; align-items: flex-end; gap: 2px; }
+.side .delta { font-size: var(--text-sm); font-weight: 560; white-space: nowrap; }
+
+/* Заглушка одной строки поля (44 px — высота поля и кнопки): ссылка для
+   привязки, контакты в карточке клиента (аудит 24.10.2026) */
+.skeleton--line { height: 44px; }
+.client-contacts .skeleton--line { flex: 0 1 240px; margin: 0; }
+
+/* «Управление»: подразделы группы над экраном (TrainerApp.jsx, аудит
+   24.10.2026) */
+.admin-panes { margin-bottom: var(--space-4); }

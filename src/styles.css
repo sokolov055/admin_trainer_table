@@ -89,6 +89,10 @@
   /* --- линии --- */
   --border: rgba(26, 24, 21, 0.10);
   --border-strong: rgba(26, 24, 21, 0.18);
+  /* Рамка поля ввода: белое поле на белой карточке видно только по ней,
+     поэтому ≥ 3:1 к --surface (WCAG 1.4.11); --border давал 1,23:1
+     (аудит 24.10.2026). Прозрачная — следует за поверхностью палитры */
+  --field-line: rgba(26, 24, 21, 0.48);
   --grid: #e6e3da;
   --axis: #c6c2b6;
 
@@ -261,6 +265,7 @@
 
   --border: rgba(255, 255, 255, 0.11);
   --border-strong: rgba(255, 255, 255, 0.2);
+  --field-line: rgba(255, 255, 255, 0.36);
   --grid: #302d33;
   --axis: #403c44;
 
@@ -335,6 +340,7 @@
 
     --border: rgba(255, 255, 255, 0.11);
     --border-strong: rgba(255, 255, 255, 0.2);
+    --field-line: rgba(255, 255, 255, 0.36);
     --grid: #302d33;
     --axis: #403c44;
 
@@ -3038,16 +3044,19 @@ code {
   font-variant-numeric: tabular-nums;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-line);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
-  transition: border-color var(--dur-fast) var(--ease-out);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 
+/* Фокус — рамка и мягкое кольцо: одна смена цвета рамки в 1 px на
+   солнце не видна (аудит 24.10.2026) */
 .field__input:focus,
 .pay-field__input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
 .field__input:disabled,
@@ -3196,7 +3205,9 @@ code {
 
 .field--bad .field__input { border-color: var(--critical); }
 
-.field--bad .field__input:focus { border-color: var(--critical); }
+/* Поле с ошибкой в фокусе раньше ничем не отличалось от поля без фокуса —
+   кольцо того же красного тона (аудит 24.10.2026) */
+.field--bad .field__input:focus { border-color: var(--critical); box-shadow: 0 0 0 3px var(--critical-line); }
 
 /* Возраст, вес и рост — три коротких числа, и стоять им в столбик незачем:
    в ряд они читаются как одна мысль «вот я», а форма становится короче на
@@ -4623,22 +4634,12 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-agenda__empty { margin: 9px 0; color: var(--text-muted); font-size: var(--text-sm); }
 .cal-agenda__more { width: 100%; margin-top: var(--space-3); }
 
-/* «Чей перенос» — лист снизу после переноса занятия */
-.cal-sheet { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; justify-content: center; }
-.cal-sheet__scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .38); animation: cal-fade 200ms ease; }
-.cal-sheet__panel {
-  position: relative; width: min(100%, 520px); display: grid; gap: var(--space-3);
-  padding: var(--space-5) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
-  background: var(--surface); border-radius: 20px 20px 0 0; box-shadow: var(--shadow-lg);
-}
-.cal-sheet__title { font-size: var(--text-lg); }
-.cal-sheet__text { margin: 0; line-height: 1.5; }
+/* «Чей перенос» — содержимое общего листа Sheet (Schedule.jsx, MoveAsk;
+   свой лист без ручки заменён 24.10.2026) */
+.cal-sheet__text { margin: 0 0 var(--space-4); line-height: 1.5; }
 .cal-sheet__options { display: grid; gap: var(--space-2); }
 .cal-sheet__options .button { width: 100%; margin: 0; justify-content: center; }
-@keyframes cal-fade { from { opacity: 0; } }
-@keyframes cal-sheet { from { transform: translateY(100%); } }
 @media (prefers-reduced-motion: reduce) {
-  .cal-sheet__scrim { animation: none; }
   .cal-event--ghost { transform: none; }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -4681,10 +4682,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   .cal-viewpick__menu--leaving { animation: cal-pop-out 140ms var(--ease-out) forwards; pointer-events: none; }
   .cal-draft { animation: cal-pop 220ms var(--ease-ios) backwards; }
 
-  .cal-sheet__panel { animation: cal-sheet 420ms var(--ease-ios) backwards; }
-  .cal-sheet--leaving { pointer-events: none; }
-  .cal-sheet--leaving .cal-sheet__panel { animation: cal-sheet-out 260ms var(--ease-ios) forwards; }
-  .cal-sheet--leaving .cal-sheet__scrim { animation: cal-fade-out 260ms ease forwards; }
   .undo-bar--leaving { animation: undo-out 200ms var(--ease-out) forwards; pointer-events: none; }
 }
 .cal-grid__ghosts { position: absolute; top: 0; bottom: 0; left: 44px; right: 0; z-index: 9; overflow: hidden; pointer-events: none; }
@@ -4699,8 +4696,6 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 @keyframes cal-mini-next { from { opacity: 0; transform: translateX(36px); } }
 @keyframes cal-mini-prev { from { opacity: 0; transform: translateX(-36px); } }
 @keyframes cal-pop-out { to { opacity: 0; transform: scale(0.96) translateY(-4px); } }
-@keyframes cal-sheet-out { to { transform: translateY(100%); } }
-@keyframes cal-fade-out { to { opacity: 0; } }
 @keyframes undo-out { to { opacity: 0; transform: translate(-50%, 10px); } }
 .schedule__unknown { color: var(--critical-text, var(--text-muted)); }
 .schedule__when { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
@@ -4786,7 +4781,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cardio-plan { display: grid; gap: var(--space-3); }
 .cardio-plan .chips { margin-bottom: 0; }
 .cardio-plan__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-2); }
-.cardio-plan__grid label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); min-width: 0; }
+.cardio-plan__grid label { display: grid; gap: 4px; font-size: var(--text-sm); color: var(--text-muted); min-width: 0; }
 .cardio-plan__grid input, .cardio-plan__rounds input { text-align: center; font-variant-numeric: tabular-nums; }
 .cardio-plan__rounds { display: grid; grid-template-columns: auto 88px; align-items: center; gap: var(--space-2); justify-content: start; }
 .cardio-plan__phase { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: 14px; }
@@ -5038,7 +5033,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Отросток от скобки к колонке кругов — на середине линии */
 .plan-inline__bracket::after { content: ''; position: absolute; right: -10px; top: 50%; width: 10px; height: var(--bracket); margin-top: calc(var(--bracket) / -2); background: var(--accent); }
 .plan-inline__rounds-col { align-self: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) 0 var(--space-1) 14px; }
-.plan-inline__rounds-title { font-size: var(--text-xs); font-weight: 650; letter-spacing: 0.02em; color: var(--text-muted); }
+.plan-inline__rounds-title { font-size: var(--text-sm); font-weight: 650; letter-spacing: 0.02em; color: var(--text-muted); }
 .plan-inline__rounds-list { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 1), auto); justify-content: center; gap: 10px; padding-top: 4px; }
 .plan-inline__rounds-col[data-cols='1'] { --cols: 1; }
 .plan-inline__rounds-col[data-cols='2'] { --cols: 2; }
@@ -5080,8 +5075,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__fields { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-4); }
 .plan-inline__field--reps .field__input { width: calc(3ch + 28px); padding-left: 10px; padding-right: 10px; text-align: center; }
 .plan-inline__field--weight .field__input { width: calc(5ch + 28px); padding-left: 10px; padding-right: 10px; text-align: center; }
-.plan-inline__field { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
-.plan-inline__sets-head { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-muted); }
+.plan-inline__field { display: grid; gap: 4px; font-size: var(--text-sm); color: var(--text-muted); }
+.plan-inline__sets-head { display: flex; justify-content: space-between; font-size: var(--text-sm); color: var(--text-muted); }
 .plan-inline__sets { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 6px; }
 .plan-inline__set-wrap { position: relative; display: inline-flex; }
 /* Крестик удаления — значок в углу подхода; касание шире самого значка */

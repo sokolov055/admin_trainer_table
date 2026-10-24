@@ -186,7 +186,7 @@ test('расписание: экран, виды, листание и перен
     const lb = await lesson.boundingBox();
     const lessonLabel = await lesson.getAttribute('aria-label');
     await touch.drag({ x: lb.x + lb.width / 2, y: lb.y + 6 }, { x: lb.x + lb.width / 2, y: lb.y + 6 + hour / 2 }, { hold: 450, steps: 6 });
-    const sheet = page.getByRole('dialog', { name: 'Перенос занятия' });
+    const sheet = page.getByRole('dialog', { name: 'Перенести занятие?' });
     await sheet.waitFor();
     await page.screenshot({ path: join(REVIEW, 'schedule-ask.png') });
     await sheet.getByRole('button', { name: 'Не переносить' }).click();

@@ -413,7 +413,7 @@ function AddClient({ onCreated, onClose }) {
         <div className="add-client__actions">
           <button className="button button--primary" disabled={busy || !name.trim()}>
             {busy ? <IconRefresh size={16} /> : <IconUserPlus size={16} />}
-            {busy ? 'Создаю…' : 'Создать карточку'}
+            {busy ? 'Создаём…' : 'Создать карточку'}
           </button>
           <button
             className="button button--ghost"
@@ -499,7 +499,7 @@ function AddSplit({ onCreated }) {
         {error && <div className="access-reset__error" role="alert">{error.message || 'Не получилось'}</div>}
         <div className="library__actions">
           <button className="button button--primary" disabled={busy || members.length < 2}>
-            {busy ? 'Завожу…' : 'Создать сплит'}
+            {busy ? 'Заводим…' : 'Создать сплит'}
           </button>
           <button type="button" className="button button--ghost" disabled={busy} onClick={() => { setOpen(false); setError(null); }}>Отмена</button>
         </div>
@@ -566,7 +566,7 @@ function ClientSplit({ client }) {
       <div className="library__actions">
         {changed && (
           <button className="button button--primary" disabled={busy || clean.length < 2} onClick={() => save(clean)}>
-            {busy ? 'Сохраняю…' : 'Сохранить состав'}
+            {busy ? 'Сохраняем…' : 'Сохранить состав'}
           </button>
         )}
         {/* «Отмена» — сразу за главной: у новой пары закрывает форму, у
@@ -623,7 +623,7 @@ function SeparateSplit({ client, members }) {
           text="Собрать пару обратно будет нельзя."
           action="Разделить"
           busy={busy}
-          busyText="Разделяю…"
+          busyText="Разделяем…"
           onConfirm={run}
           onCancel={() => setAsk(false)}
         />
@@ -815,9 +815,11 @@ export function ClientManage({ client }) {
 
           <div className="manage__part">
             <ArchiveButton client={client} />
+            {/* Номер и ключ карточки нужны только при обращении в поддержку —
+                так и подписано, без «строки» из времён таблицы (аудит 24.10.2026) */}
             <p className="manage__tech">
-              {client.clientKey && <>Ключ <code>{client.clientKey}</code> · </>}
-              строка {client.row}
+              Для поддержки: карточка № {client.row}
+              {client.clientKey && <> · ключ <code>{client.clientKey}</code></>}
             </p>
           </div>
         </ManageGroup>
@@ -830,11 +832,11 @@ export function ClientManage({ client }) {
 function cardSummary(client) {
   const marks = [
     client.online && 'онлайн-ведение',
-    (client.splitOf || (client.members && client.members.length > 1)) && 'сплит',
+    (client.splitOf || (client.members && client.members.length > 1)) && 'вдвоём (сплит)',
     client.payer && 'платит ' + client.payer,
     client.test && 'тестовый',
   ].filter(Boolean);
-  return marks.length ? marks.join(' · ') : 'имя, цена, пакет, откуда пришёл, онлайн, сплит, архив';
+  return marks.length ? marks.join(' · ') : 'имя, цена, пакет, откуда пришёл, онлайн-ведение, занятия вдвоём, архив';
 }
 
 /**
@@ -959,7 +961,7 @@ function CloseAccess({ client }) {
 
           <div className="access-reset__actions">
             <button className="button button--critical" onClick={run} disabled={access.busy}>
-              {access.busy ? 'Закрываю…' : 'Да, закрыть входы'}
+              {access.busy ? 'Закрываем…' : 'Да, закрыть входы'}
             </button>
             <button
               className="button button--ghost"
@@ -1068,7 +1070,7 @@ function ClientEdit({ client }) {
 
       <div className="client-edit__actions">
         <button className="button button--primary" onClick={save} disabled={busy || !dirty}>
-          {busy ? 'Сохраняю…' : 'Сохранить'}
+          {busy ? 'Сохраняем…' : 'Сохранить'}
         </button>
         {dirty && (
           <button className="button" onClick={() => { setForm(initial); setFailure(null); }} disabled={busy}>
@@ -1265,7 +1267,15 @@ function ClientContacts({ clientRow }) {
     return () => { alive = false; };
   }, [clientRow]);
 
-  if (state.loading) return null;
+  // Пока контакты едут — заглушка их высоты: раньше блок появлялся позже
+  // и сдвигал «Доступ» и «Изменить карточку» под пальцем (аудит 24.10.2026)
+  if (state.loading) {
+    return (
+      <div className="client-contacts" aria-busy="true" aria-label="Контакты загружаются">
+        <div className="skeleton skeleton--line" />
+      </div>
+    );
+  }
 
   const p = state.profile || {};
 
@@ -1309,7 +1319,7 @@ function RestoreClient({ row, onDone }) {
   };
   return (
     <div style={{ marginTop: 8 }}>
-      <button className="button button--ghost" disabled={busy} onClick={run}>{busy ? 'Возвращаю…' : 'Вернуть в клиенты'}</button>
+      <button className="button button--ghost" disabled={busy} onClick={run}>{busy ? 'Возвращаем…' : 'Вернуть в клиенты'}</button>
       {failure && <span className="small" role="alert"> {failure}</span>}
     </div>
   );

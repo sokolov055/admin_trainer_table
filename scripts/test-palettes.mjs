@@ -371,3 +371,28 @@ test('палитры: заливка кнопки = акцент палитры,
     }
   }
 });
+
+/*
+ * Рамка поля ввода (аудит 24.10.2026): белое поле на белой карточке видно
+ * только по рамке — она держит ≥ 3:1 к поверхности (WCAG 1.4.11) и в
+ * стандартной теме, и поверх карточки и фона каждой палитры.
+ */
+test('рамка поля ввода — не ниже 3:1 к карточке и фону во всех палитрах', () => {
+  for (const [scheme, d] of [['light', ROOT], ['dark', DARK_ATTR]]) {
+    const raw = d['--field-line'] ?? ROOT['--field-line'];
+    const r = raw && raw.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/);
+    assert.ok(r, scheme + ': --field-line — rgba');
+    const ink = '#' + [r[1], r[2], r[3]].map((x) => Number(x).toString(16).padStart(2, '0')).join('');
+    const grounds = [['стандартная', colorOf(d, '--surface'), colorOf(d, '--bg')]]
+      .concat(PALETTES.filter((p) => p[scheme]).map((p) => {
+        const c = paletteColors(p, scheme);
+        return [p.id, c.surface, c.bg];
+      }));
+    for (const [id, ...under] of grounds) {
+      for (const g of under) {
+        const c = contrast(over(ink, Number(r[4]), g), g);
+        assert.ok(c >= 3, `${id}/${scheme}: рамка поля на ${g} — ${c.toFixed(2)}`);
+      }
+    }
+  }
+});

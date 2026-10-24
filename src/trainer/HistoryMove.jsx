@@ -62,7 +62,7 @@ export default function HistoryMove({ clientRow, from, to, onClose, onMoved, aft
     <p className="small muted">Тогда его веса, «Было» и рекорды перейдут на «{to.name}». У других клиентов ничего не поменяется.</p>
     {error && <p className="small danger">{error}</p>}
     <div className="history-move__actions">
-      <button type="button" className="button" disabled={busy} onClick={move}>{busy ? 'Переношу…' : 'Да, перенести силовые'}</button>
+      <button type="button" className="button" disabled={busy} onClick={move}>{busy ? 'Переносим…' : 'Да, перенести силовые'}</button>
       <button type="button" className="button button--ghost" disabled={busy} onClick={onClose}>Нет, это другое</button>
     </div>
   </div>;
@@ -114,7 +114,9 @@ export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '
   return <div className="history-move" ref={ref}>
     <p className="history-move__text">Что из журнала — это «{to.name}»?</p>
     {error && <p className="small danger">{error}</p>}
-    {!list && !error && <p className="small muted">Загружаю журнал…</p>}
+    {/* Заглушка строк журнала, а не «Загружаю…» (аудит 24.10.2026). Класс
+        общего Loading из ui.jsx — сам ui.jsx сюда не тянем: он тянет полсайта */}
+    {!list && !error && <div aria-busy="true"><div className="skeleton skeleton--row" /><div className="skeleton skeleton--row" /></div>}
     {list && list.length > 8 && <input className="field__input" type="search" placeholder="Найти по названию" aria-label="Найти упражнение в журнале"
       value={query} onChange={(e) => setQuery(e.target.value)} />}
     {list && !items.length && <p className="small muted">{words ? 'Ничего не нашлось.' : 'В журнале других упражнений нет.'}</p>}

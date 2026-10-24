@@ -107,7 +107,7 @@ export default function LinkClient({ onLinked, onClose = null }) {
         </label>
         <button className="button button--primary" disabled={!!busy || !publicId.trim()}>
           {busy === 'id' ? <IconRefresh size={16} /> : <IconSend size={16} />}
-          {busy === 'id' ? 'Отправляю…' : 'Отправить запрос'}
+          {busy === 'id' ? 'Отправляем…' : 'Отправить запрос'}
         </button>
       </form>
 
@@ -121,7 +121,11 @@ export default function LinkClient({ onLinked, onClose = null }) {
               {copied ? 'Скопирована' : 'Скопировать'}
             </button>
           </div>
-        ) : <span className="small muted">{busy === 'link' ? 'Загружаю…' : ''}</span>}
+        ) : busy === 'link'
+          // Место ссылки — заглушкой её высоты, а не словом «Загружаю…»:
+          // строка не прыгает, когда ссылка приходит (аудит 24.10.2026)
+          ? <div className="skeleton skeleton--line" aria-busy="true" aria-label="Ссылка загружается" />
+          : null}
         <span className="field__hint">
           Одна на всех ваших клиентов. Открыв её, человек войдёт или зарегистрируется
           и подтвердит привязку.
@@ -140,7 +144,7 @@ export default function LinkClient({ onLinked, onClose = null }) {
 
       <div className="add-client__actions">
         <button type="button" className="button button--ghost" onClick={() => loadLink(true)} disabled={!!busy}>
-          {busy === 'renew' ? 'Выпускаю…' : 'Выпустить новую ссылку'}
+          {busy === 'renew' ? 'Выпускаем…' : 'Выпустить новую ссылку'}
         </button>
         <button type="button" className="button button--ghost" onClick={() => (onClose ? onClose() : setOpen(false))} disabled={!!busy}>
           Свернуть
@@ -272,7 +276,7 @@ export function LinkExisting({ client }) {
           </label>
           <div className="add-client__actions">
             <button className="button button--primary" disabled={busy || !publicId.trim()}>
-              {busy ? 'Отправляю…' : 'Отправить запрос'}
+              {busy ? 'Отправляем…' : 'Отправить запрос'}
             </button>
             <button type="button" className="button button--ghost" onClick={() => setOpen(false)} disabled={busy}>
               Отмена

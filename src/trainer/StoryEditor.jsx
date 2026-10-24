@@ -532,7 +532,7 @@ export default function StoryEditor({ topics, topic: startTopic = 0, frame: star
     input.onchange = async () => {
       const file = input.files && input.files[0];
       if (!file) return;
-      say('Загружаю картинку…');
+      say('Загружаем картинку…');
       try {
         const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
         const blob = await shrinkPhoto(file, max, type);
@@ -872,7 +872,7 @@ export default function StoryEditor({ topics, topic: startTopic = 0, frame: star
         </div>
         <button type="button" className="se-play" onClick={openPreview} aria-label="Посмотреть, как увидит клиент" title="Посмотреть">{I.play}</button>
         <button type="button" className="se-save" onClick={save} disabled={saving || !dirty}>
-          {saving ? 'Сохраняю…' : dirty ? <>Сохранить<span className="dot" aria-label="есть несохранённое" /></> : 'Сохранено'}
+          {saving ? 'Сохраняем…' : dirty ? <>Сохранить<span className="dot" aria-label="есть несохранённое" /></> : 'Сохранено'}
         </button>
       </div>
 

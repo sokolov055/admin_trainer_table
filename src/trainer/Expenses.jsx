@@ -183,7 +183,7 @@ function AddExpense({ month, categories, onAdded }) {
 
         <div className="survey__actions">
           <button className="button button--primary" onClick={save} disabled={busy || !ready}>
-            {busy ? 'Сохраняю…' : 'Записать'}
+            {busy ? 'Сохраняем…' : 'Записать'}
           </button>
         </div>
       </Panel>

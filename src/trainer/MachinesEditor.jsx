@@ -4,7 +4,7 @@ import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
 import { shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
-import { Confirm, Segmented, Note, Search } from '../ui.jsx';
+import { Confirm, Loading, Segmented, Note, Search } from '../ui.jsx';
 import { IconAlert, IconClose } from '../icons.jsx';
 import { useReveal } from '../reveal.js';
 
@@ -196,7 +196,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         <Segmented label="Что это" items={MACHINE_KIND_ITEMS} value={kind} onChange={setKind} />
       </div>
       <label className="field">
-        <span className="field__label">Клиентское название</span>
+        <span className="field__label">Название для клиента</span>
         <input className="field__input" value={name} maxLength={80} autoFocus={!machine}
           onChange={(ev) => setName(ev.target.value)} placeholder={kind === 'equipment' ? 'Гантели, фитбол, степ-платформа…' : 'Hammer у окна, Technogym…'} />
       </label>
@@ -253,7 +253,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         <textarea className="field__input library__textarea" value={setup} maxLength={1500} rows={4}
           onChange={(ev) => { setSetup(ev.target.value); setSetupOk(false); }}
           placeholder={kind === 'equipment' ? 'Где лежит, что взять для разминки…' : 'Спинка — рычаг справа под сиденьем.\nВалик — кнопка слева, тянуть на себя.'} />
-        <span className="field__hint">Без цифр: настройка у каждого клиента своя — её записывают в занятии. Шаг — строка.</span>
+        <span className="field__hint">Без цифр: настройка у каждого клиента своя — её записывают в занятии. Каждый шаг — с новой строки.</span>
       </label>
       <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Инструкция оборудования проверена</label>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
@@ -267,7 +267,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         />
       ) : (
         <div className="library__actions">
-          <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+          <button type="button" className="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button>
           <button type="button" className="button button--ghost" disabled={busy} onClick={() => onDone(null)}>Отмена</button>
           {saved.uid && canDelete && <button type="button" className="button button--ghost danger" disabled={busy} onClick={() => setAsking(true)}>{exercise ? 'Убрать ' + word : 'Удалить из каталога'}</button>}
         </div>
@@ -307,9 +307,9 @@ function MachinePicker({ exercise, attached, onDone }) {
         <span className="field__label">Найти в каталоге</span>
         <input className="field__input" value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Гантели, скамья, гриф…" />
       </label>
-      {loading && <p className="small muted">Загружаю каталог…</p>}
+      {loading && <Loading lead={false} rows={3} />}
       {error && <Note tone="critical" icon={IconAlert}>{error.message}<button type="button" className="button button--ghost" onClick={reload}>Повторить</button></Note>}
-      {!loading && !error && !list.length && <p className="small muted">Подходящих объектов нет. Создайте новый рядом.</p>}
+      {!loading && !error && !list.length && <p className="small muted">Ничего не нашлось. Создайте новый рядом.</p>}
       {list.slice(0, 50).map((m) => (
         <button type="button" key={m.uid} className="item" disabled={!!busy} onClick={() => attach(m)}>
           <span className="item__name">{m.name}</span>
@@ -407,7 +407,7 @@ export function AlternativesEditor({ exercise, owner, all, onChanged, onOpen = n
 export function ExerciseMachines({ exerciseId, name, onChanged }) {
   const { data, error, reload } = useData('library.exercises', {}, []);
   if (error) return <Note tone="critical" icon={IconAlert}>{error.message}</Note>;
-  if (!data) return <p className="small muted">Загружаю тренажёры…</p>;
+  if (!data) return <Loading lead={false} rows={1} />;
   const all = data.exercises || [];
   const key = normName(name);
   const e = (exerciseId && all.find((x) => x.id === Number(exerciseId)))

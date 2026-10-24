@@ -267,7 +267,7 @@ function DishEditor({ dish, foods, onCancel, onSaved }) {
           {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
 
           <div className="library__actions">
-            <button className="button button--primary" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+            <button className="button button--primary" disabled={busy} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button>
             <button className="button" disabled={busy} onClick={onCancel}>Отмена</button>
           </div>
           <p className="small muted" style={{ margin: 0 }}>Новое блюдо сохраняется черновиком — опубликуете, когда будет готово.</p>

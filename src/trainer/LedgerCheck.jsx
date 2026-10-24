@@ -69,10 +69,10 @@ export default function LedgerCheck() {
           </p>
           <div className="add-client__actions">
             <button className="button" disabled={!!busy} onClick={() => settle(r.row, 'sheet')}>
-              {busy === r.row + 'sheet' ? 'Сохраняю…' : 'Верна таблица'}
+              {busy === r.row + 'sheet' ? 'Сохраняем…' : 'Верна таблица'}
             </button>
             <button className="button button--ghost" disabled={!!busy} onClick={() => settle(r.row, 'server')}>
-              {busy === r.row + 'server' ? 'Сохраняю…' : 'Верен сервер'}
+              {busy === r.row + 'server' ? 'Сохраняем…' : 'Верен сервер'}
             </button>
           </div>
         </Panel>

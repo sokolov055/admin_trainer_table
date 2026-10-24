@@ -43,7 +43,7 @@ const output = await build({ entryPoints: ['src/trainer/MachinesEditor.jsx'], bu
     b.onLoad({ filter: /\/useData\.js$/, namespace: 'stub' }, () => ({ contents: 'export const useData=(...a)=>globalThis.__data(...a);' }));
     b.onLoad({ filter: /\/library\.js$/, namespace: 'stub' }, () => ({ contents: 'export const shrinkPhoto=async(x)=>x; export const uploadMachinePhoto=async()=>{}; export const mediaUrl=(x)=>x;' }));
     b.onLoad({ filter: /\/ui\.jsx$/, namespace: 'stub' }, () => ({ loader: 'js', contents: `import React from 'react';
-export const Segmented=()=>null; export const Confirm=()=>null; export const Note=({children})=>React.createElement('div',null,children);
+export const Segmented=()=>null; export const Confirm=()=>null; export const Loading=()=>null; export const Note=({children})=>React.createElement('div',null,children);
 export const Search=({value,onChange,placeholder})=>React.createElement('input',{value,placeholder,onChange:(e)=>onChange(e.target.value)});` }));
   } }] });
 const mod = { exports: {} };

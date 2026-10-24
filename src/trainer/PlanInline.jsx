@@ -16,6 +16,7 @@ import { patchPlanExercise } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 import MuscleEdit from '../muscles/MuscleEdit.jsx';
 import RestChips from '../RestChips.jsx';
+import { Loading, plural } from '../ui.jsx';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -425,7 +426,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     return { ex, track, tech, work, strength, pills, setTech, kindOf, choose, removeAt, removePicked, removable };
   };
 
-  /** Повторы и вес — узкие поля по ширине цифр */
+  /** Повторы и вес — узкие поля по ширине цифр. Подписи — словами целиком:
+   *  «Повт. / сторона» и «Кг / сторона» в зале расшифровывали (аудит 24.10.2026) */
   const fieldOf = (i, key, label, placeholder, mode = 'text') => (
     <label className={'plan-inline__field plan-inline__field--' + key}>
       <span>{label}</span>
@@ -438,8 +440,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const one = planOneSide(ex);
     return (
       <>
-        {fieldOf(i, 'reps', track.kind === 'timed' ? 'Время, с' : track.unilateral ? 'Повт. / сторона' : 'Повторы', track.kind === 'timed' ? '60' : '12')}
-        {!split && fieldOf(i, 'weight', track.kind === 'strength' ? (one ? 'Кг / сторона' : 'Вес, кг') : 'Доп. вес', track.kind === 'strength' ? '—' : 'свой', 'decimal')}
+        {fieldOf(i, 'reps', track.kind === 'timed' ? 'Время, с' : track.unilateral ? 'Повторы на сторону' : 'Повторы', track.kind === 'timed' ? '60' : '12')}
+        {!split && fieldOf(i, 'weight', track.kind === 'strength' ? (one ? 'Вес на сторону, кг' : 'Вес, кг') : 'Доп. вес', track.kind === 'strength' ? '—' : 'свой', 'decimal')}
         {/* Вес на одну сторону — начальная отметка подходов занятия (07.10.2026) */}
         {!split && track.kind === 'strength' && (
           <button
@@ -480,7 +482,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
               <RestChips value={tech.rest} onChange={(rest) => setRest(i, rest)} />
               <div className="plan-inline__sets-head">
                 <span>{inGroup ? 'Круги' : 'Подходы'}</span>
-                <span className="muted">{tech.warmup ? tech.warmup + ' разм. + ' : ''}{work} раб.</span>
+                <span className="muted">{tech.warmup ? tech.warmup + ' ' + plural(tech.warmup, 'разминочный', 'разминочных', 'разминочных') + ' + ' : ''}{work} {plural(work, 'рабочий', 'рабочих', 'рабочих')}</span>
               </div>
               {/* Разминочный — вверху, рядом с началом списка; «в конец» — внизу
                   (владелец, 07.10.2026) */}
@@ -705,7 +707,7 @@ export function AddBlock({ onAdd, busy }) {
   const list = templates.data ? templates.data.templates : [];
   return (
     <div className="plan-inline__add-menu" ref={ref}>
-      {templates.loading && <p className="small muted">Загружаю шаблоны…</p>}
+      {templates.loading && <Loading lead={false} rows={3} />}
       {!templates.loading && !list.length && <p className="small muted">Шаблонов тренировок нет — их заводят в разделе «Библиотека».</p>}
       {list.map((t) => (
         <button type="button" key={t.id} className="item" disabled={!!loading} onClick={async () => {

@@ -6,7 +6,7 @@ import { useData } from '../useData.js';
 import { apiMutate, apiStale, onMutated } from '../api.js';
 import { reloadWidgets } from '../native-widget.js';
 import { haptic } from '../telegram.js';
-import { Panel, Note, Field, Options, ErrorState, BackButton, useLeaveGuard } from '../ui.jsx';
+import { Panel, Note, Field, Options, ErrorState, BackButton, Sheet, useLeaveGuard } from '../ui.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { IconAlert, IconBack, IconCheck, IconChevron, IconCopy, IconMenu, IconPlus } from '../icons.jsx';
 import {
@@ -131,7 +131,6 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   const pager = useRef(null);
   const [menuShown, menuLeaving] = useLeaving(menu, 160);
   const [pickerShown, pickerLeaving] = useLeaving(picker, 300);
-  const [askShown, askLeaving] = useLeaving(ask, 260);
   const [undoShown, undoLeaving] = useLeaving(undo, 200);
   useReturnScroll(!!editing);
   // Запись открыта поверх сетки: смахнуть вправо, Back Android и браузера —
@@ -455,7 +454,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
           экран, а кнопка всегда под пальцем над нижним меню */}
       <button type="button" className="cal-fab" aria-label="Добавить событие" onClick={() => create()}><IconPlus size={24} /></button>
 
-      {askShown && <MoveAsk ask={askShown} leaving={askLeaving} onAnswer={answer} />}
+      {ask && <MoveAsk ask={ask} onAnswer={answer} />}
       {del.bar}
       {undoShown && typeof document !== 'undefined' && createPortal(
         <div className={'undo-bar' + (undoLeaving ? ' undo-bar--leaving' : '')} role="status">
@@ -476,29 +475,35 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
 /**
  * Чей перенос. Сервер без ответа занятие не перенесёт: в статистику идут
  * переносы клиента и тренера отдельно, а исправление ошибки — никуда.
+ *
+ * Общий лист приложения (Sheet) — с ручкой, смахиванием и крестиком, как
+ * все остальные; три ответа одинаковые: синим «Попросил клиент» подталкивал
+ * к одному ответу, а статистике нужен честный (аудит 24.10.2026). Ответ
+ * уходит, когда лист доехал вниз; крестик, смахивание, «назад» и касание
+ * мимо — то же, что «Не переносить».
  */
-function MoveAsk({ ask, leaving, onAnswer }) {
+function MoveAsk({ ask, onAnswer }) {
   const { event, next } = ask;
   const from = new Date(event.startsAt);
-  useBackGesture(() => onAnswer(null), !leaving);
-  return createPortal(
-    <div className={'cal-sheet' + (leaving ? ' cal-sheet--leaving' : '')} role="dialog" aria-modal="true" aria-label="Перенос занятия">
-      <div className="cal-sheet__scrim" onClick={() => onAnswer(null)} aria-hidden="true" />
-      <div className="cal-sheet__panel">
-        <strong className="cal-sheet__title">Перенести занятие?</strong>
-        <p className="cal-sheet__text">
-          {labelOf(event)}<br />
-          <span className="muted">{whenShort(from)}</span> → <b>{whenShort(next)}</b>
-        </p>
-        <div className="cal-sheet__options">
-          <button type="button" className="button button--primary" onClick={() => onAnswer('client')}>Попросил клиент</button>
-          <button type="button" className="button" onClick={() => onAnswer('trainer')}>По моей инициативе</button>
-          <button type="button" className="button" onClick={() => onAnswer('fix')}>Исправление — неверно записал</button>
-          <button type="button" className="button button--ghost" onClick={() => onAnswer(null)}>Не переносить</button>
-        </div>
+  const closeRef = useRef(null);
+  const chosen = useRef(null);
+  const pick = (change) => {
+    chosen.current = change;
+    if (closeRef.current) closeRef.current();
+  };
+  return (
+    <Sheet title="Перенести занятие?" closeRef={closeRef} onClose={() => onAnswer(chosen.current)}>
+      <p className="cal-sheet__text">
+        {labelOf(event)}<br />
+        <span className="muted">{whenShort(from)}</span> → <b>{whenShort(next)}</b>
+      </p>
+      <div className="cal-sheet__options">
+        <button type="button" className="button" onClick={() => pick('client')}>Попросил клиент</button>
+        <button type="button" className="button" onClick={() => pick('trainer')}>По моей инициативе</button>
+        <button type="button" className="button" onClick={() => pick('fix')}>Исправление — неверно записал</button>
+        <button type="button" className="button button--ghost" onClick={() => pick(null)}>Не переносить</button>
       </div>
-    </div>,
-    document.body,
+    </Sheet>
   );
 }
 
@@ -1426,7 +1431,7 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
             <div className="cal-agenda__items">
               {!ofDay.length && (
                 <p className="cal-agenda__empty">
-                  {loading ? 'Загружаю…' : empty ? 'Занятий нет до ' + addDays(start, days - 1).getDate() + ' ' + MONTHS[addDays(start, days - 1).getMonth()] : today ? 'Сегодня занятий нет' : 'Занятий нет'}
+                  {loading ? 'Загружаем…' : empty ? 'Занятий нет до ' + addDays(start, days - 1).getDate() + ' ' + MONTHS[addDays(start, days - 1).getMonth()] : today ? 'Сегодня занятий нет' : 'Занятий нет'}
                 </p>
               )}
               {ofDay.map((e) => (
@@ -1642,7 +1647,7 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
           {step === 'cancel' ? (
             <div className="library__actions">
               <button className="button button--critical" disabled={busy || !who} onClick={remove}>
-                {busy ? 'Отменяю…' : who === 'error' ? 'Удалить запись' : charged ? 'Отменить и списать' : 'Отменить занятие'}
+                {busy ? 'Отменяем…' : who === 'error' ? 'Удалить запись' : charged ? 'Отменить и списать' : 'Отменить занятие'}
               </button>
               {/* «Отмена» без рамки сразу за главной — одно правило на всё приложение (аудит 24.10.2026) */}
               <button className="button button--ghost" disabled={busy} onClick={() => setStep(null)}>Отмена</button>
@@ -1654,7 +1659,7 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
                 disabled={busy || (personal ? !title.trim() : !clientRow) || !date || !time || (step === 'move' && !change)}
                 onClick={() => (moved && !personal && step !== 'move' ? setStep('move') : save())}
               >
-                {busy ? 'Сохраняю…' : event.id ? (moved && step !== 'move' ? 'Перенести…' : 'Сохранить') : 'Добавить'}
+                {busy ? 'Сохраняем…' : event.id ? (moved && step !== 'move' ? 'Перенести…' : 'Сохранить') : 'Добавить'}
               </button>
               <button className="button button--ghost" disabled={busy} onClick={onCancel}>Отмена</button>
             </div>

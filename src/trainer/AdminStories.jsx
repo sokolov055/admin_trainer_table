@@ -158,7 +158,7 @@ export default function AdminStories() {
           {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
           {saved && !dirty && <Note tone="good">Сохранено. Люди увидят новые истории при следующем открытии приложения.</Note>}
           <button type="button" className="button button--primary" disabled={busy || !dirty || issues.length > 0} onClick={save}>
-            {busy ? 'Сохраняю…' : dirty ? 'Сохранить для всех' : 'Изменений нет'}
+            {busy ? 'Сохраняем…' : dirty ? 'Сохранить для всех' : 'Изменений нет'}
           </button>
           {dirty && (
             <button type="button" className="button" disabled={busy} onClick={() => edit(base)}>

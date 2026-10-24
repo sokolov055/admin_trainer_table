@@ -231,7 +231,7 @@ export default function PlanEditor({
       {typeof document !== 'undefined' && onScreen && createPortal(
         <div className="plan-edit__float" role="toolbar" aria-label="Правка шаблона">
           <button className="button button--primary" disabled={busy} onClick={save}>
-            {busy ? 'Сохраняю…' : submitLabel}
+            {busy ? 'Сохраняем…' : submitLabel}
           </button>
           {!single && draft.length > 1 && (
             <button className="button" disabled={busy} onClick={toggleOrdering}>{ordering ? 'Развернуть' : 'Свернуть'}</button>

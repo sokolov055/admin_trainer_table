@@ -622,7 +622,7 @@ export function AssignForm({ template, clientRow, defaultMonth, onDone }) {
       </p>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       <button className="button button--primary button--block" disabled={busy || !month.trim()} onClick={apply}>
-        {busy ? 'Назначаю…' : 'Назначить'}
+        {busy ? 'Назначаем…' : 'Назначить'}
       </button>
     </div>
   );
@@ -766,7 +766,7 @@ export function SaveAsTemplate({ clientRow, month, onDone, onCancel }) {
         </label>
         {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
         <div className="library__actions">
-          <button className="button button--primary" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить шаблон'}</button>
+          <button className="button button--primary" disabled={busy} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить шаблон'}</button>
           <button className="button button--ghost" disabled={busy} onClick={onCancel}>Отмена</button>
         </div>
       </div>
@@ -1334,7 +1334,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
     <>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       <div className="library__actions">
-        <button className="button button--primary" disabled={busy || !ok} onClick={() => save(patch, upload)}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+        <button className="button button--primary" disabled={busy || !ok} onClick={() => save(patch, upload)}>{busy ? 'Сохраняем…' : 'Сохранить'}</button>
         <button className="button button--ghost" disabled={busy} onClick={close}>Отмена</button>
       </div>
     </>
@@ -1386,7 +1386,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
             {progress !== null && (
               <div className="library__progress" role="progressbar" aria-valuenow={Math.round(progress * 100)}>
                 <span style={{ transform: `scaleX(${progress})` }} />
-                <em>Загружаю видео… {Math.round(progress * 100)}%</em>
+                <em>Загружаем видео… {Math.round(progress * 100)}%</em>
               </div>
             )}
             {/* Пустая ссылка не стирает загруженный файл и анимацию */}
@@ -1422,13 +1422,13 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
             <textarea className="field__input library__textarea" aria-label="Подготовка к упражнению" value={draft.setup} maxLength={1500} rows={5}
               onChange={(ev) => set({ setup: ev.target.value, setupOk: false })}
               placeholder={'Сиденье — рукояти на уровне груди.\nСпинка — лопатки прижаты.\nОшибка: локти выше плеч.'} />
-            <span className="field__hint">Шаг — строка. Клиент видит её, пока к упражнению не привязан тренажёр.</span>
+            <span className="field__hint">Каждый шаг — с новой строки. Клиент видит подготовку, пока к упражнению не привязан тренажёр.</span>
             <label className="library__check"><input type="checkbox" checked={draft.setupOk} disabled={!draft.setup.trim()} onChange={(ev) => set({ setupOk: ev.target.checked })} />Проверено — показывать клиентам</label>
             {actions({ setupOnly: true, setup: draft.setup, setupOk: draft.setupOk })}
           </>)}
 
         {row('notes', 'Техника выполнения', e.notes ? <span className="card-field__text">{e.notes}</span> : null, () => ({ notes: e.notes || '' }), () => <>
-          <textarea className="field__input library__textarea" aria-label="Техника выполнения" value={draft.notes} maxLength={2000} rows={6} onChange={(ev) => set({ notes: ev.target.value })} placeholder="Шаг — строка: исходное положение, движение, дыхание" />
+          <textarea className="field__input library__textarea" aria-label="Техника выполнения" value={draft.notes} maxLength={2000} rows={6} onChange={(ev) => set({ notes: ev.target.value })} placeholder="Каждый шаг — с новой строки: исходное положение, движение, дыхание" />
           {actions({ notes: draft.notes })}
         </>)}
 
@@ -1503,7 +1503,7 @@ function NewExercise({ muscles, onSaved, onCancel }) {
           </div>
           <p className="small muted">Технику, видео, тренажёры и замены добавите в карточке — касанием по полю.</p>
           {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-          <button className="button button--primary" disabled={busy || name.trim().length < 2} onClick={create}>{busy ? 'Создаю…' : 'Создать'}</button>
+          <button className="button button--primary" disabled={busy || name.trim().length < 2} onClick={create}>{busy ? 'Создаём…' : 'Создать'}</button>
         </div>
       </Panel>
     </>

@@ -67,6 +67,7 @@ Capacitor WebView на iPhone/Android). Лендинг описан в `DESIGN.m
 | `--effort-easy` / `-ok` / `-hard` | `#1a7f37` / `#2672cd` / `#b35600` | `-ok` `#2a74cf` | оценка подхода «Легко/Норм/Тяжело» и точка у номера; вне палитры, белый текст ≥4,5:1 |
 | `--overtime` | `#a85a00` | `#ff9f0a` | кольцо перебора отдыха |
 | `--border` / `--border-strong` | 10% / 18% тёмного | 11% / 20% белого | рамки / рамка при наведении, полоса прокрутки |
+| `--field-line` | 48% тёмного | 36% белого | рамка поля ввода (≥ 3:1 к карточке) |
 | `--scrim` | `rgba(26,24,21,.42)` | `rgba(0,0,0,.58)` | затемнение под листом и меню |
 | `--tabbar-edge` | белый 80% | белый 7% | светлая кромка сверху у таб-бара |
 | `--story-bg` / `--story-fg` | `#17161a` / `#f2f0ea` | то же | истории, тёмные в обеих темах |
@@ -267,8 +268,11 @@ Capacitor WebView на iPhone/Android). Лендинг описан в `DESIGN.m
 - `.field` > `.field__label` (13, muted, отступ 5) + `.field__input` +
   `.field__hint` / `.field__error` (одно место — поле не прыгает).
 - `.field__input`: 17 px 600 tabular, `padding: 10px 12px`, `--radius-sm`,
-  фокус — рамка `--accent` без outline; ошибка — `.field--bad` (рамка
-  `--critical`). Высота ≈ 45 px.
+  рамка в покое `--field-line` (≥ 3:1 к `--surface` во всех палитрах —
+  проверка в `test-palettes.mjs`), фокус — рамка `--accent` и кольцо
+  `0 0 0 3px var(--accent-wash)` без outline; ошибка — `.field--bad` (рамка
+  `--critical`, в фокусе кольцо `--critical-line`). Высота ≈ 45 px
+  (аудит 24.10.2026).
 - Поиск `.search__input`: 44 px, иконка слева 38 px отступа.
 - Короткие числа в ряд — `.field-row` (3 колонки).
 - В листе поля 16 px (`.sheet__body input`) — иначе iOS приближает страницу.
