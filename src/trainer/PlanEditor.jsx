@@ -35,11 +35,17 @@ import { copyPlanBlocks } from '../plan-block-actions.js';
  */
 export default function PlanEditor({
   blocks, onSaved, onSubmit, single = false, submitLabel = 'Сохранить шаблон',
-  workoutTemplates = null,
+  workoutTemplates = null, onDirty = null,
 }) {
   const [draft, setDraft] = useState(() => (blocks.length
     ? blocks.map((b) => ({ id: b.id || '', title: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blankExercise(), ...e })) }))
     : [{ title: 'Тренировка № 1', exercises: [blankExercise()] }]));
+  // Изменилось ли что-то против открытого — экрану шаблона, чтобы спросить
+  // перед выходом (аудит 24.10.2026). Сравнение снимком: правка и откат
+  // той же правки — снова «ничего не менялось»
+  const [initialDraft] = useState(() => JSON.stringify(draft));
+  const draftDirty = JSON.stringify(draft) !== initialDraft;
+  useEffect(() => { if (onDirty) onDirty(draftDirty); }, [draftDirty]);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
   const [ordering, setOrdering] = useState(false);

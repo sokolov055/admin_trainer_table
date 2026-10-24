@@ -34,6 +34,7 @@ import TrainerProfile from './TrainerProfile.jsx';
 import Appearance from '../Appearance.jsx';
 import { screensNote } from '../native-bridge.js';
 import { useSelfCard, selfPick } from './selfCard.js';
+import './trainer.css';
 
 // Игры тяжёлые (картинки, звук) — грузятся, только когда открыли вкладку
 const MyGames = lazyPage(() => import('./MyGames.jsx'));

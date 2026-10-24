@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
 import {
-  Lead, Section, Panel, Loading, ErrorState, Empty, Badge,
+  Lead, Section, Panel, Loading, ErrorState, Empty, Badge, Note,
   formatMoney, formatNumber, formatDate, plural,
 } from '../ui.jsx';
-import { IconMoney, IconCheck, IconClose, IconAlert } from '../icons.jsx';
+import { IconMoney, IconClose } from '../icons.jsx';
+import { usePendingDelete } from '../pendingDelete.jsx';
 import { onlineDaysLeft, onlineDay, addOnlineMonths } from '../online.js';
 
 /**
@@ -15,8 +17,8 @@ import { onlineDaysLeft, onlineDay, addOnlineMonths } from '../online.js';
  *
  * — сумма показывается крупно до нажатия, чтобы ошибку заметили заранее,
  *   а не в кассе за месяц;
- * — кнопка блокируется на время операции: Apps Script отвечает секунды,
- *   и без этого второе нажатие провело бы второй платёж;
+ * — кнопка блокируется на время операции: без этого второе нажатие
+ *   провело бы второй платёж;
  * — отмена спрашивает подтверждение прямо в строке платежа. Не окном:
  *   окно закрывают не глядя, а здесь видно, какой именно платёж уходит;
  * — после операции данные перечитываются с сервера, а не правятся на
@@ -76,8 +78,20 @@ export function Payments({ client }) {
   const [count, setCount] = useState(String(client.count || ''));
 
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
+  // Ошибка — у того, что её вызвало: 'pay', 'online' или номер платежа.
+  // Раньше и ошибка, и «Платёж отменён» вставали между формой и историей,
+  // далеко от нажатой кнопки (аудит 24.10.2026)
+  const [error, setError] = useState(null); // { at, error }
   const [done, setDone] = useState(null);
+  const failed = (at) => (error && error.at === at ? error.error : null);
+
+  // Итог операции — плашкой над нижним меню, где её видно с любого места
+  // экрана; сама уходит через несколько секунд
+  useEffect(() => {
+    if (!done) return undefined;
+    const t = setTimeout(() => setDone(null), 6000);
+    return () => clearTimeout(t);
+  }, [done]);
 
   const history = useData('payment.list', { clientRow: client.row }, [client.row]);
 
@@ -99,7 +113,7 @@ export function Payments({ client }) {
       setDone({ kind: 'paid', amount: res.amount, id: res.paymentId });
       history.reload();
     } catch (err) {
-      setError(err);
+      setError({ at: 'pay', error: err });
     } finally {
       setBusy(false);
     }
@@ -115,7 +129,7 @@ export function Payments({ client }) {
       setDone({ kind: 'cancelled', amount: res.amount, id: paymentId });
       history.reload();
     } catch (err) {
-      setError(err);
+      setError({ at: paymentId, error: err });
     } finally {
       setBusy(false);
     }
@@ -129,10 +143,11 @@ export function Payments({ client }) {
         <OnlinePay
           client={client}
           busy={busy}
+          error={failed('online')}
           onStart={() => { setBusy(true); setError(null); setDone(null); }}
           onEnd={(res, err) => {
             setBusy(false);
-            if (err) setError(err);
+            if (err) setError({ at: 'online', error: err });
             if (res) { setDone({ kind: 'paid', amount: res.amount, id: res.paymentId, until: res.until }); history.reload(); }
           }}
         />
@@ -184,45 +199,27 @@ export function Payments({ client }) {
           >
             {busy ? 'Проводим…' : 'Провести оплату'}
           </button>
+          {failed('pay') && <div className="pay-note"><Note tone="critical">Не провелось: {failed('pay').message}</Note></div>}
 
           <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
-            Изменится касса месяца, баланс клиента и журнал платежей — как при
-            галочке «Оплата» в таблице.
+            Изменится касса месяца, баланс клиента и журнал платежей.
           </p>
         </Panel>
       </Section>
       )}
 
       {/* ---------- результат ---------- */}
-      {done && (
-        <Section>
-          <Panel pad>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ color: 'var(--good-text)', display: 'flex', flexShrink: 0, marginTop: 1 }}>
-                <IconCheck size={18} />
-              </span>
-              <div className="small">
-                {done.kind === 'paid'
-                  ? `Оплата ${formatMoney(done.amount)} проведена, платёж №${done.id}.`
-                    + (done.until ? ` Ведение оплачено по ${onlineDay(done.until)}.` : '')
-                  : `Платёж №${done.id} отменён, ${formatMoney(done.amount)} возвращены.`}
-              </div>
-            </div>
-          </Panel>
-        </Section>
-      )}
-
-      {error && (
-        <Section>
-          <Panel pad>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ color: 'var(--critical-text)', display: 'flex', flexShrink: 0, marginTop: 1 }}>
-                <IconAlert size={18} />
-              </span>
-              <div className="small">{error.message}</div>
-            </div>
-          </Panel>
-        </Section>
+      {done && typeof document !== 'undefined' && createPortal(
+        <div className="undo-bar" role="status">
+          <span>
+            {done.kind === 'paid'
+              ? `Оплата ${formatMoney(done.amount)} проведена, №${done.id}`
+                + (done.until ? ` · по ${onlineDay(done.until)}` : '')
+              : `Платёж №${done.id} отменён, ${formatMoney(done.amount)} возвращены`}
+          </span>
+          <button type="button" className="button button--ghost" onClick={() => setDone(null)}>Скрыть</button>
+        </div>,
+        document.body,
       )}
 
       {/* ---------- история ---------- */}
@@ -235,7 +232,7 @@ export function Payments({ client }) {
         )}
 
         {history.data && history.data.payments.map((p) => (
-          <PaymentRow key={p.id || p.date + p.amount} payment={p} busy={busy} onCancel={cancel} />
+          <PaymentRow key={p.id || p.date + p.amount} payment={p} busy={busy} onCancel={cancel} error={p.id ? failed(p.id) : null} />
         ))}
       </Section>
     </>
@@ -249,7 +246,7 @@ export function Payments({ client }) {
  * глядя, а тут перед глазами остаётся сумма и дата того платежа, который
  * сейчас исчезнет.
  */
-function PaymentRow({ payment, busy, onCancel }) {
+function PaymentRow({ payment, busy, onCancel, error = null }) {
   const [confirming, setConfirming] = useState(false);
 
   return (
@@ -298,6 +295,7 @@ function PaymentRow({ payment, busy, onCancel }) {
           </div>
         </div>
       )}
+      {error && <div className="pay-note"><Note tone="critical">Не отменилось: {error.message}</Note></div>}
     </div>
   );
 }
@@ -328,7 +326,7 @@ function OnlineLead({ client }) {
   );
 }
 
-function OnlinePay({ client, busy, onStart, onEnd }) {
+function OnlinePay({ client, busy, error = null, onStart, onEnd }) {
   const products = useData('online.products', {}, []);
   const list = (products.data && products.data.products) || [];
   const [picked, setPicked] = useState(null);
@@ -409,6 +407,7 @@ function OnlinePay({ client, busy, onStart, onEnd }) {
               >
                 {busy ? 'Проводим…' : 'Провести ' + (sum > 0 ? formatMoney(sum) : 'оплату')}
               </button>
+              {error && <div className="pay-note"><Note tone="critical">Не провелось: {error.message}</Note></div>}
 
               <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
                 Оплата попадёт в кассу и журнал платежей, в долг за тренировки не
@@ -431,6 +430,12 @@ function OnlineProducts({ products, reload }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const months = parseInt(form.months, 10) || 0;
+  // «Убрать» — сразу, с «Вернуть» внизу; на сервер — через несколько
+  // секунд, если не вернули (pendingDelete.jsx, аудит 24.10.2026)
+  const del = usePendingDelete((p) => apiMutate('online.product.archive', { id: p.id }), {
+    onDone: () => reload(),
+    onError: setError,
+  });
 
   const start = (p) => {
     setEditing(p ? p.id : 'new');
@@ -464,7 +469,7 @@ function OnlineProducts({ products, reload }) {
 
   return (
     <Section title="Продукты ведения" note="общие для всех ваших онлайн-клиентов">
-      {products.map((p) => (editing === p.id ? null : (
+      {products.filter((p) => !del.hidden(p.id)).map((p) => (editing === p.id ? null : (
         <div className="item item--static" key={p.id}>
           <div className="item__top">
             <span className="item__name">{p.name}</span>
@@ -477,7 +482,7 @@ function OnlineProducts({ products, reload }) {
           )}
           <div style={{ display: 'flex', gap: 4, marginTop: 6, marginLeft: -8 }}>
             <button className="button button--ghost" disabled={busy} onClick={() => start(p)}>Изменить</button>
-            <button className="button button--ghost" disabled={busy} onClick={() => run('online.product.archive', { id: p.id })}>Убрать</button>
+            <button className="button button--ghost" disabled={busy} onClick={() => { setError(null); del.remove(p.id, p, 'Продукт убран'); }}>Убрать</button>
           </div>
         </div>
       )))}
@@ -522,7 +527,7 @@ function OnlineProducts({ products, reload }) {
                 />
               </label>
             </div>
-            {error && <p className="small" style={{ color: 'var(--critical-text)' }}>{error.message}</p>}
+            {error && <div className="pay-note"><Note tone="critical">Не сохранилось: {error.message}</Note></div>}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button
                 className="button button--primary"
@@ -538,7 +543,8 @@ function OnlineProducts({ products, reload }) {
       ) : (
         <button className="button button--block" onClick={() => start(null)}>Добавить продукт</button>
       )}
-      {editing === null && error && <p className="small" style={{ color: 'var(--critical-text)' }}>{error.message}</p>}
+      {editing === null && error && <div className="pay-note"><Note tone="critical">Не получилось: {error.message}</Note></div>}
+      {del.bar}
     </Section>
   );
 }

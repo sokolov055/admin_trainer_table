@@ -238,6 +238,54 @@ export function BackButton({ label = 'Назад', onClick }) {
   );
 }
 
+/**
+ * «Выйти без сохранения?» — на месте, под стрелкой «назад», а не окном
+ * поверх. Ставит экран правки, у которого есть несохранённое: стрелка,
+ * «Отмена» и системный Back спрашивают здесь, смахивание от края в это
+ * время выключено (useBackGesture swipe:false), как у листа с набранной
+ * формой (аудит 24.10.2026). Выйти — красная, «Остаться» — спокойная.
+ */
+export function LeaveConfirm({ onLeave, onStay, text = 'Выйти без сохранения?' }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Back нажали внизу длинной формы — вопрос должен быть виден
+    if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    const stay = el.querySelector('.leave-confirm__stay');
+    if (stay) stay.focus({ preventScroll: true });
+  }, []);
+  return (
+    <div className="leave-confirm" role="alertdialog" aria-label={text} ref={ref} data-reveal="">
+      <span className="leave-confirm__text">{text}</span>
+      <div className="leave-confirm__actions">
+        <button type="button" className="button button--critical" onClick={onLeave}>Выйти</button>
+        <button type="button" className="button button--ghost leave-confirm__stay" onClick={onStay}>Остаться</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Экран правки с вопросом при выходе. dirty — есть несохранённое;
+ * close — закрыть без вопроса. Возвращает leave (стрелка, «Отмена»,
+ * системный Back), asking и confirm — элемент вопроса или null.
+ *
+ *   const guard = useLeaveGuard(dirty, close);
+ *   useBackGesture(guard.leave, open, null, { swipe: !dirty });
+ */
+export function useLeaveGuard(dirty, close) {
+  const [asking, setAsking] = useState(false);
+  useEffect(() => { if (!dirty) setAsking(false); }, [dirty]);
+  const leave = () => {
+    if (dirty) { setAsking(true); haptic('warning'); } else close();
+  };
+  const confirm = asking
+    ? <LeaveConfirm onLeave={() => { setAsking(false); close(); }} onStay={() => setAsking(false)} />
+    : null;
+  return { leave, asking, confirm };
+}
+
 export function Section({ title, note, children, action }) {
   return (
     <section className="section enter">

@@ -148,7 +148,30 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const rest = next.filter((e) => e.supersetGroup === g);
     if (rest.length < 2) rest.forEach((e) => { e.supersetGroup = ''; });
   });
-  const remove = (i) => { setOpen(null); set((next) => { next.splice(i, 1); }); };
+  // Удалённое упражнение можно вернуть, как целую тренировку (blockUndo в
+  // client/screens.jsx): правка уходит на сервер сама через 0,7 с, и
+  // смахнутое по ошибке терялось насовсем (аудит 24.10.2026). Пустую строку
+  // без названия не жалеем
+  const [gone, setGone] = useState(null); // { i, ex }
+  useEffect(() => {
+    if (!gone) return undefined;
+    const t = setTimeout(() => setGone(null), 8000);
+    return () => clearTimeout(t);
+  }, [gone]);
+  const remove = (i) => {
+    setOpen(null);
+    const ex = list[i];
+    setGone(ex && String(ex.name || '').trim() ? { i, ex: { ...ex } } : null);
+    set((next) => { next.splice(i, 1); });
+  };
+  const restore = () => {
+    if (!gone) return;
+    const next = latest.current.map((e) => ({ ...e }));
+    next.splice(Math.min(gone.i, next.length), 0, gone.ex);
+    setGone(null);
+    onChange(next);
+    haptic('light');
+  };
   /** Отдых после подхода (20.10.2026) — у упражнения; у суперсета один на круг: у всех его упражнений */
   const setRest = (i, rest) => set((next) => {
     const g = next[i].supersetGroup;
@@ -630,6 +653,12 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
           );
         })}
       </div>
+      {gone && (
+        <div className="plan__block-undo" role="status">
+          <span>Упражнение удалено</span>
+          <button type="button" className="button button--ghost" onClick={restore}>Вернуть</button>
+        </div>
+      )}
       {list.length > 1 && <p className="plan-inline__hint">Подержите упражнение, чтобы перетащить. Смахните влево — удалить.</p>}
       <div className="plan-inline__add">
         <button type="button" className="button" onClick={() => add(blankExercise)}><IconPlus size={16} />Упражнение</button>

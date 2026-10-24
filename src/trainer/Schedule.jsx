@@ -6,7 +6,8 @@ import { useData } from '../useData.js';
 import { apiMutate, apiStale, onMutated } from '../api.js';
 import { reloadWidgets } from '../native-widget.js';
 import { haptic } from '../telegram.js';
-import { Panel, Note, Field, Options, ErrorState } from '../ui.jsx';
+import { Panel, Note, Field, Options, ErrorState, BackButton, useLeaveGuard } from '../ui.jsx';
+import { usePendingDelete } from '../pendingDelete.jsx';
 import { IconAlert, IconBack, IconCheck, IconChevron, IconCopy, IconMenu, IconPlus } from '../icons.jsx';
 import {
   addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
@@ -134,8 +135,21 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   const [undoShown, undoLeaving] = useLeaving(undo, 200);
   useReturnScroll(!!editing);
   // Запись открыта поверх сетки: смахнуть вправо, Back Android и браузера —
-  // к расписанию, как кнопка «Расписание» над формой (FT-567)
-  useBackGesture(() => { setEditing(null); setPreset(null); }, !!editing);
+  // к расписанию, как кнопка «Расписание» над формой (FT-567). С изменённой
+  // формой смахивания нет, а выход спрашивает «Выйти без сохранения?» —
+  // раньше набранное пропадало от жеста от края (аудит 24.10.2026)
+  const [formDirty, setFormDirty] = useState(false);
+  const [delFailure, setDelFailure] = useState(null);
+  const closeForm = () => { setEditing(null); setPreset(null); setFormDirty(false); };
+  const formGuard = useLeaveGuard(formDirty, closeForm);
+  useBackGesture(formGuard.leave, !!editing, null, { swipe: !formDirty });
+
+  // Личное событие удаляется сразу, с «Вернуть» внизу (pendingDelete.jsx):
+  // раньше кнопка «Удалить событие» стирала его без пути назад (аудит 24.10.2026)
+  const del = usePendingDelete((e) => apiMutate('trainer.schedule.delete', { id: e.id, who: 'error', reason: '' }), {
+    onDone: () => { reloadWidgets(); setTick((t) => t + 1); },
+    onError: (err) => setDelFailure(err),
+  });
 
   const setView = (v) => {
     // Смена вида — с того же места: сегодня, если оно на экране, иначе
@@ -195,7 +209,12 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
 
   const clients = useData('trainer.clients', {}, []);
 
-  const events = useMemo(() => [...cache.values()].map((e) => (moves[e.id] ? { ...e, ...moves[e.id], moving: true } : e)), [cache, moves]);
+  // Удалённое с «Вернуть» прячется сразу; ключ строкой — чтобы список не
+  // пересобирался на каждой отрисовке
+  const hiddenKey = [...cache.keys()].filter((id) => del.hidden(id)).join(',');
+  const events = useMemo(() => [...cache.values()]
+    .filter((e) => !del.hidden(e.id))
+    .map((e) => (moves[e.id] ? { ...e, ...moves[e.id], moving: true } : e)), [cache, moves, hiddenKey]);
 
   // Смена экрана без анимации — её делает лента (палец, пружина)
   function shift(dir) { setAnchor((a) => shifted(view, a, dir)); setPicker(false); }
@@ -269,8 +288,11 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
         }}
         clients={(clients.data && clients.data.clients) || []}
         onOpenClient={onOpenClient}
-        onDone={() => { setEditing(null); setPreset(null); setTick((t) => t + 1); }}
-        onCancel={() => { setEditing(null); setPreset(null); }}
+        onDone={() => { closeForm(); setTick((t) => t + 1); }}
+        onCancel={formGuard.leave}
+        confirm={formGuard.confirm}
+        onDirty={setFormDirty}
+        onRemovePersonal={(e) => { closeForm(); setUndo(null); setDelFailure(null); haptic('success'); del.remove(e.id, e, 'Событие удалено'); }}
       />
       </div>
     );
@@ -325,6 +347,8 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   const drop = (event, next) => {
     if (next.getTime() === new Date(event.startsAt).getTime()) return;
     setUndo(null);
+    // Две плашки «Вернуть» друг на друге не помещаются: ждущее удаление — сразу
+    del.flush();
     if (event.personal) {
       const back = new Date(event.startsAt);
       commitMove(event, next).then((ok) => {
@@ -404,6 +428,11 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
           <Note tone="critical" icon={IconAlert}>Не удалось перенести: {failure.message || 'повторите ещё раз'}</Note>
         </div>
       )}
+      {delFailure && (
+        <div className="cal-note">
+          <Note tone="critical" icon={IconAlert}>Не удалось удалить событие: {delFailure.message || 'повторите ещё раз'}</Note>
+        </div>
+      )}
       {load.error && !events.length && (
         <div className="cal-note"><ErrorState error={load.error} onRetry={() => setTick((t) => t + 1)} /></div>
       )}
@@ -427,6 +456,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
       <button type="button" className="cal-fab" aria-label="Добавить событие" onClick={() => create()}><IconPlus size={24} /></button>
 
       {askShown && <MoveAsk ask={askShown} leaving={askLeaving} onAnswer={answer} />}
+      {del.bar}
       {undoShown && typeof document !== 'undefined' && createPortal(
         <div className={'undo-bar' + (undoLeaving ? ' undo-bar--leaving' : '')} role="status">
           <span>{undoShown.text}</span>
@@ -1420,7 +1450,7 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
 }
 
 /** Создать, перенести или удалить занятие либо личное событие */
-function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenClient }) {
+function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenClient, confirm = null, onDirty, onRemovePersonal }) {
   // Новое — на время, куда нажали в сетке (или 10:00 опорного дня)
   const base = (preset && preset.date) || startOfDay(new Date());
   const presetMinutes = preset && Number.isFinite(preset.minutes) ? preset.minutes : 10 * 60;
@@ -1443,6 +1473,11 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
   const [who, setWho] = useState('');
   const [charge, setCharge] = useState(null); // null — по умолчанию (поздняя → да)
   const [reason, setReason] = useState('');
+  // Есть ли что терять при выходе — против значений, с которыми открыли
+  const snapshot = JSON.stringify([clientRow, kind, title, date, time, minutes, change, who, charge, reason]);
+  const [initial] = useState(snapshot);
+  const dirty = !event.cancelledCharged && snapshot !== initial;
+  useEffect(() => { if (onDirty) onDirty(dirty); }, [dirty]);
 
   const active = clients.filter((c) => !c.archived).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   const startsAt = new Date(`${date}T${time}`);
@@ -1484,7 +1519,7 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
   if (event.cancelledCharged) {
     return (
       <>
-        <button className="button button--ghost library__back" onClick={onCancel}><IconBack size={16} />Расписание</button>
+        <BackButton label="Расписание" onClick={onCancel} />
         <Panel pad>
           <div className="library__form">
             <strong>{event.clientName || event.title}</strong>
@@ -1500,7 +1535,8 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
 
   return (
     <>
-      <button className="button button--ghost library__back" onClick={onCancel}><IconBack size={16} />Расписание</button>
+      <BackButton label="Расписание" onClick={onCancel} />
+      {confirm}
       <Panel pad>
         <div className="library__form">
           <strong>{event.id ? (personal ? 'Личное событие' : 'Занятие') : event.copyOf ? 'Копия события' : 'Новое событие'}</strong>
@@ -1628,7 +1664,7 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
               <button className="button button--ghost" disabled={busy} onClick={() => onCopy && onCopy(event)}>
                 <IconCopy size={16} />Копировать
               </button>
-              <button className="button button--ghost" disabled={busy} onClick={() => personal ? remove() : setStep('cancel')}>
+              <button className="button button--ghost" disabled={busy} onClick={() => (personal && onRemovePersonal ? onRemovePersonal(event) : personal ? remove() : setStep('cancel'))}>
                 {personal ? 'Удалить событие' : 'Отменить занятие'}
               </button>
             </div>

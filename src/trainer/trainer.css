@@ -1,0 +1,17 @@
+/* Экраны тренера: правки дизайн-аудита 24.10.2026. Отдельным файлом, чтобы
+   не переставлять общие блоки styles.css. Значения — токены DESIGN-APP.md. */
+
+/* «Выйти без сохранения?» на месте (ui.jsx, LeaveConfirm) */
+.leave-confirm {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  scroll-margin: var(--space-6) 0;
+}
+.leave-confirm__text { flex: 1 1 12em; min-width: 0; font-size: var(--text-base); font-weight: 600; }
+.leave-confirm__actions { display: flex; gap: var(--space-2); flex: none; }
+.leave-confirm__actions .button { margin: 0; }
+
+/* Ошибка «Оплат» — под кнопкой, которая её вызвала (Payments.jsx) */
+.pay-note { margin-top: var(--space-2); }

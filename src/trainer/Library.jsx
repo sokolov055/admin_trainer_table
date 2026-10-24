@@ -13,8 +13,9 @@ import FoodCatalog from './FoodCatalog.jsx';
 import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
 import {
   Section, Panel, Loading, ErrorState, Empty, Badge, Tag, Chips, Search, Segmented, Field, Note, plural,
+  BackButton, useLeaveGuard,
 } from '../ui.jsx';
-import { IconBack, IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconClose } from '../icons.jsx';
+import { IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconClose } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
@@ -135,8 +136,15 @@ function Templates({ kind, owner }) {
   });
   const remove = (t) => { setFailure(null); del.remove(t.id, t, 'Шаблон удалён'); };
 
+  // Правка шаблона с несохранённым: смахнуть от края нельзя, стрелка и
+  // системный Back спрашивают «Выйти без сохранения?» — раньше правка
+  // пропадала от случайного жеста (аудит 24.10.2026)
+  const [editorDirty, setEditorDirty] = useState(false);
+  const closeEditor = () => { setEditing(null); setEditorDirty(false); };
+  const editorGuard = useLeaveGuard(editorDirty, closeEditor);
+
   // Вложенные экраны закрываются смахиванием вправо, как всё остальное
-  useBackGesture(() => setEditing(null), !!editing);
+  useBackGesture(editorGuard.leave, !!editing, null, { swipe: !editorDirty });
   useBackGesture(() => setAssigning(null), !editing && !!assigning);
   useBackGesture(() => setOpen(null), !editing && !assigning && !!open);
   // Из карточки шаблона — обратно на то же место списка
@@ -147,8 +155,10 @@ function Templates({ kind, owner }) {
       <TemplateEditor
         kind={kind}
         template={editing.new ? null : editing}
-        onCancel={() => setEditing(null)}
-        onSaved={(saved) => { setEditing(null); setOpen(saved.id); setScope('mine'); list.reload(); }}
+        onCancel={editorGuard.leave}
+        confirm={editorGuard.confirm}
+        onDirty={setEditorDirty}
+        onSaved={(saved) => { closeEditor(); setOpen(saved.id); setScope('mine'); list.reload(); }}
       />
     );
   }
@@ -278,13 +288,10 @@ function Row({ pruning, canRemove = true, onOpen, onRemove, removeLabel, removeT
   );
 }
 
+// Тот же «назад», что у остальных экранов (ui.jsx, 17 px): 14-й кегль
+// здесь выглядел сноской рядом с заголовком (аудит 24.10.2026)
 function Back({ onClick, children = 'Назад' }) {
-  return (
-    <button className="button button--ghost library__back" onClick={onClick}>
-      <IconBack size={16} />
-      {children}
-    </button>
-  );
+  return <BackButton label={children} onClick={onClick} />;
 }
 
 /** Упражнение одной строкой: «Жим гантелей лёжа — 3×12, 20 кг» */
@@ -397,7 +404,7 @@ function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSav
   );
 }
 
-function TemplateEditor({ kind, template, onSaved, onCancel }) {
+function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onDirty }) {
   const [title, setTitle] = useState(template ? template.title : '');
   const [goal, setGoal] = useState(template ? template.goal : '');
   const [level, setLevel] = useState(template ? template.level : '');
@@ -413,6 +420,13 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
   const blocks = template
     ? template.blocks
     : [{ title: kind === 'workout' ? 'Тренировка' : 'Тренировка № 1', exercises: [] }];
+
+  // Есть ли что терять при выходе: поля карточки против открытых значений
+  // и тренировки (PlanEditor сообщает сам)
+  const [blocksDirty, setBlocksDirty] = useState(false);
+  const [initial] = useState(() => JSON.stringify([title, goal, level, description, isPublic, place, days, minutes, forClients]));
+  const dirty = blocksDirty || JSON.stringify([title, goal, level, description, isPublic, place, days, minutes, forClients]) !== initial;
+  useEffect(() => { if (onDirty) onDirty(dirty); }, [dirty]);
 
   // Программа собирается и из шаблонов тренировок — копиями со ссылкой
   const workouts = useData('library.templates', { kind: 'workout' }, []);
@@ -453,6 +467,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
           («К шаблону», «Тренажёры»); «Отмена» была и здесь, и в плавающей
           панели редактора — дубль убран 20.10.2026 (QA C05b) */}
       <Back onClick={onCancel}>{template ? 'К шаблону' : 'К шаблонам'}</Back>
+      {confirm}
 
       <Panel pad>
         <div className="library__form">
@@ -524,6 +539,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
           submitLabel="Сохранить шаблон"
           workoutTemplates={workoutList}
           onSubmit={submit}
+          onDirty={setBlocksDirty}
           onSaved={(saved) => { haptic('success'); onSaved(saved); }}
         />
         {ask && (

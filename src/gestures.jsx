@@ -115,9 +115,14 @@ export function captureScreen(name) {
  */
 // swipe: false — только системный Back и Back браузера, без смахивания:
 // там, где вправо уже листает разделы (карточка клиента не на первом)
+// swipe читается в момент жеста, а не при регистрации: правка с
+// несохранённым выключает смахивание на лету, не меняя место экрана в
+// стопке «назад» (аудит 24.10.2026)
 export function useBackGesture(handler, enabled = true, snapshotName = null, { swipe = true } = {}) {
   const ref = useRef(handler);
   ref.current = handler;
+  const swipeRef = useRef(swipe);
+  swipeRef.current = swipe;
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -125,7 +130,7 @@ export function useBackGesture(handler, enabled = true, snapshotName = null, { s
     const named = snapshotName ? namedSnapshots.get(snapshotName) : null;
     const fresh = !named && pendingSnapshot && Date.now() - pendingSnapshot.at < SNAPSHOT_FRESH_MS;
     const entry = {
-      swipe,
+      get swipe() { return swipeRef.current; },
       run: () => ref.current && ref.current(),
       snapshot: named || (fresh ? pendingSnapshot : null),
     };
