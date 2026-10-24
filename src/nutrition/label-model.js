@@ -74,14 +74,38 @@ function variants(token) {
   return list;
 }
 
+// Плитки «число над подписью» — снимок экрана «Честного знака», таблица в строку:
+// «16,8 16,3 0,6 215,3\nбелки жиры углеводы ккал» → «белки 16,8\n…\n215,3 ккал».
+// Пара соседних строк: в одной только числа, в другой столько же слов, среди них БЖУ
+const NUM_ROW = /^\s*(?:\d+(?:[.,]\d+)?\s*(?:г|g|мг|ккал|kcal)?\.?\s+)*\d+(?:[.,]\d+)?\s*(?:г|g|мг|ккал|kcal)?\.?\s*$/i;
+const NUTRIENT = /^(?:[б6]ел(?:ки|ок)|жиры?|углеводы|ккал|proteins?|fat|carbs|carbohydrates?|kcal)$/i;
+function columns(text) {
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const words = lines[i].trim().split(/\s+/);
+    if (words.length < 2 || words.some(w => /\d/.test(w)) || !words.some(w => NUTRIENT.test(w))) continue;
+    for (const j of [i - 1, i + 1]) {
+      if (!NUM_ROW.test(lines[j] ?? '')) continue;
+      const nums = [...lines[j].matchAll(/(\d+(?:[.,]\d+)?)\s*((?:г|g|мг)(?![а-яa-z])\.?)?/gi)];
+      if (nums.length !== words.length) continue;
+      lines[i] = words.map((w, k) => /^(?:ккал|kcal)$/i.test(w)
+        ? `${nums[k][1]} ${w}` : `${w} ${nums[k][1]}${nums[k][2] ? ' ' + nums[k][2] : ''}`).join('\n');
+      lines[j] = '';
+      break;
+    }
+  }
+  return lines.join('\n');
+}
+
 function extract(text) {
   // «1OOг», «1О0 г»: буква «о» внутри числа — ноль (длина та же, позиции не сдвигаются)
-  const raw = String(text || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\S\n]/g, ' ').replace(/[\doо]*\d[\doо]*/g, m => m.replace(/[oо]/g, '0'));
+  const raw = columns(String(text || '')).toLowerCase().replace(/ё/g, 'е').replace(/[^\S\n]/g, ' ').replace(/[\doо]*\d[\doо]*/g, m => m.replace(/[oо]/g, '0'));
   const t = cyr(raw);
   const grams = both(GRAM_BASIS, t, raw), ml = both(ML_BASIS, t, raw), portion = both(PORTION, t, raw);
   const basis = portion ? 'portion' : grams && ml ? 'mixed' : grams ? '100g' : ml ? '100ml' : 'unknown';
-  // Состав выше таблицы тоже говорит «белок», «жир»: начинаем с «Пищевая ценность», если она прочитана
-  const start = Math.max(0, t.search(/пищев|nutrition/));
+  // Состав выше таблицы тоже говорит «белок», «жир»: начинаем с «Пищевая ценность», если она прочитана.
+  // «Пищевые волокна» — строка таблицы, а не её начало: на экране «Честного знака» она ниже белков
+  const start = Math.max(0, t.search(/пищев(?!ы[ех]\s*волок)|nutrition/));
   const stops = [...t.matchAll(STOP_RU), ...raw.matchAll(STOP_EN)].map(m => m.index).filter(i => i >= start).sort((a, b) => a - b);
   const values = {}, ambiguous = new Set();
   for (const [key, spec] of Object.entries(KEYS)) {
