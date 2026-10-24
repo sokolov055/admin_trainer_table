@@ -21,7 +21,7 @@
 .match-pause-icon { display: block; width: 13px; height: 18px; border-left: 4px solid currentColor; border-right: 4px solid currentColor; border-radius: 1px; }
 /* Колонка игры: верхняя строка, HUD, квест, поле на всё оставшееся место, лента и кнопки */
 .match-scene { position: relative; display: flex; flex-direction: column; gap: var(--mg-gap); width: 100%; max-width: 640px; height: 100%; margin: 0 auto;
-  padding: calc(10px + env(safe-area-inset-top)) max(var(--mg-gutter), env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(var(--mg-gutter), env(safe-area-inset-left)); }
+  padding: calc(10px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) max(var(--mg-gutter), max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) calc(10px + env(safe-area-inset-bottom)) max(var(--mg-gutter), max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); }
 .match-scene > * { flex: 0 0 auto; }
 .match-top { display: flex; align-items: center; gap: 8px; min-height: 46px; }
 .match-top__gap { flex: 1; }
@@ -47,12 +47,12 @@
 .match-quest { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 3px 10px; border: 1px solid #f7e5ae; border-radius: 12px; background: #fff9e9; box-shadow: 0 4px 10px #183f3630; }
 .match-quest .match-piece { width: 34px; }
 .match-quest > span:nth-child(2) { display: flex; flex: 1; min-width: 0; flex-direction: column; line-height: 1.15; }
-.match-quest small { color: #688176; font-size: 10px; font-weight: 750; }
+.match-quest small { color: #688176; font-size: 11px; font-weight: 750; }
 .match-quest strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .match-quest-progress { display: flex; flex-direction: column; align-items: flex-end; min-width: 67px; line-height: 1.12; }
 .match-quest-progress b { color: #a15722; font-size: 16px; font-variant-numeric: tabular-nums; }
 .match-quest-progress b i { font-style: normal; color: #796f58; font-size: 11px; }
-.match-quest-progress em { font-size: 9px; font-weight: 800; font-style: normal; color: #71572e; white-space: nowrap; }
+.match-quest-progress em { font-size: 11px; font-weight: 800; font-style: normal; color: #71572e; white-space: nowrap; }
 .match-quest.is-progressing { animation: match-quest-pop 390ms var(--mg-ease) both; }
 /* Поле — самый большой квадрат, который помещается в оставшееся место */
 .match-stage { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; margin-inline: calc(4px - var(--mg-gutter)); container-type: size; }
@@ -110,7 +110,7 @@
 .match-hint-mark { display: block; width: 20px; height: 20px; flex: 0 0 20px; }
 /* Панели — поверх всей сцены: на телефоне снизу, как лист, на широком экране по центру */
 .match-overlay { position: absolute; z-index: 20; inset: 0; display: flex; align-items: flex-end; justify-content: center; overflow-y: auto; overscroll-behavior: contain;
-  padding: calc(16px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #153e3480; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  padding: calc(16px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) max(12px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) calc(14px + env(safe-area-inset-bottom)) max(12px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); background: #153e3480; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
 .match-panel { position: relative; width: 100%; max-width: 420px; max-height: 100%; margin: auto auto 0; overflow-y: auto; scrollbar-color: #a4ba9f #fff9e9; padding: 25px 24px 17px; border-radius: 20px; background: var(--mg-paper); text-align: center; box-shadow: 0 16px 40px #0e2c3670; animation: match-panel-in 230ms var(--mg-ease) both; }
 .match-game .match-panel-close { position: absolute; right: 3px; top: 3px; width: 36px; height: 36px; min-height: 36px; z-index: 2; }
 .match-game .match-panel h3 { margin: 0 0 12px; color: var(--mg-ink); font-size: 28px; line-height: 1.12; font-weight: 850; letter-spacing: -.03em; }
@@ -187,7 +187,7 @@
 /* Низкий экран (320×568, телефон боком): плотнее, чтобы поле не стало крошечным */
 @media (max-height: 640px) {
   .match-game { --mg-gap: 5px; }
-  .match-scene { padding-top: calc(6px + env(safe-area-inset-top)); padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+  .match-scene { padding-top: calc(6px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
   .match-top, .match-rest { min-height: 44px; }
   .match-game .match-round { width: 44px; height: 44px; flex-basis: 44px; }
   .match-hud { padding-block: 5px 6px; }

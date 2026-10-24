@@ -14,7 +14,7 @@
 .scooter-game .game, .scooter-game .viewport { width: 100%; height: 100%; overflow: hidden; background: #354c49; }
 .scooter-game .viewport { position: relative; isolation: isolate; touch-action: none; }
 .scooter-game .scooter-tutorial { position: absolute; z-index: 35; inset: 0; display: flex; flex-direction: column; color: #fffdf2; background: #173c3452; }
-.scooter-game .tutorial-heading { padding: calc(28px + env(safe-area-inset-top)) 24px 14px; background: #173c34ed; }
+.scooter-game .tutorial-heading { padding: calc(28px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) 24px 14px; background: #173c34ed; }
 .scooter-game .tutorial-heading h2 { font-size: 30px; }
 .scooter-game .tutorial-heading p { margin: 0; min-height: 40px; }
 .scooter-game .tutorial-halves { display: flex; flex: 1; min-height: 150px; }
@@ -29,25 +29,25 @@
 .scooter-game .tutorial-footer { padding: 14px 24px calc(20px + env(safe-area-inset-bottom)); background: #173c34ed; }
 .scooter-game .tutorial-footer p { margin-bottom: 10px; font-size: 11px; }
 .scooter-game canvas { display: block; width: 100%; height: 100%; }
-.scooter-game .hud { position: absolute; z-index: 4; top: calc(12px + env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); display: flex; align-items: flex-start; gap: 12px; pointer-events: none; color: #fffdf2; text-shadow: 0 2px 6px #0b2924; }
-.scooter-game .viewport::before { content: ''; position: absolute; z-index: 3; inset: 0 0 auto; height: calc(112px + env(safe-area-inset-top)); background: linear-gradient(#173c34b8, #173c3400); pointer-events: none; }
+.scooter-game .hud { position: absolute; z-index: 4; top: calc(12px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); left: max(18px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); right: max(18px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))); display: flex; align-items: flex-start; gap: 12px; pointer-events: none; color: #fffdf2; text-shadow: 0 2px 6px #0b2924; }
+.scooter-game .viewport::before { content: ''; position: absolute; z-index: 3; inset: 0 0 auto; height: calc(112px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); background: linear-gradient(#173c34b8, #173c3400); pointer-events: none; }
 .scooter-game .distance-counter { display: flex; flex-direction: column; line-height: 1; }
 .scooter-game .distance-counter strong { font-size: clamp(28px, 7vw, 40px); letter-spacing: -.035em; font-weight: 850; font-variant-numeric: tabular-nums; }
 .scooter-game .distance-counter span { font-size: 11px; margin-top: 5px; font-weight: 700; }
-.scooter-game .ride-stats { display: flex; gap: 16px; padding-top: 3px; font-size: 10px; line-height: 1.25; }
+.scooter-game .ride-stats { display: flex; gap: 16px; padding-top: 3px; font-size: 11px; line-height: 1.25; }
 .scooter-game .ride-stats span { display: flex; flex-direction: column; }
 .scooter-game .ride-stats b { font-size: 20px; font-weight: 850; font-variant-numeric: tabular-nums; }
 .scooter-game .icon-button { margin-left: auto; flex: 0 0 46px; width: 46px; height: 46px; border: 0; border-radius: 15px; background: #fffdf2; color: #173c34; box-shadow: 0 5px 16px #102f2b38; pointer-events: auto; }
 .scooter-game .icon-button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-.scooter-game .combo { position: absolute; z-index: 4; top: calc(88px + env(safe-area-inset-top)); left: 18px; color: #d9ffae; font-size: 12px; font-weight: 850; text-shadow: 0 2px 5px #0b2924; }
-.scooter-game .crossing-warning { position: absolute; z-index: 4; top: calc(145px + env(safe-area-inset-top)); left: 16px; right: 16px; padding: 8px 10px; border-radius: 12px; background: #244d40; text-align: center; color: #fff9c5; font-size: 12px; font-weight: 800; }
+.scooter-game .combo { position: absolute; z-index: 4; top: calc(88px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); left: 18px; color: #d9ffae; font-size: 12px; font-weight: 850; text-shadow: 0 2px 5px #0b2924; }
+.scooter-game .crossing-warning { position: absolute; z-index: 4; top: calc(145px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); left: 16px; right: 16px; padding: 8px 10px; border-radius: 12px; background: #244d40; text-align: center; color: #fff9c5; font-size: 12px; font-weight: 800; }
 .scooter-game .toast[data-kind="bark"] span { background: #fff6d7; border-radius: 14px 14px 14px 3px; }
 .scooter-game .voice-choice { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; font-size: 13px; }
-.scooter-game .toast { position: absolute; z-index: 5; top: calc(112px + env(safe-area-inset-top)); left: 12px; right: 12px; margin: 0; text-align: center; opacity: 0; pointer-events: none; }
+.scooter-game .toast { position: absolute; z-index: 5; top: calc(112px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); left: 12px; right: 12px; margin: 0; text-align: center; opacity: 0; pointer-events: none; }
 .scooter-game .toast.visible { opacity: 1; }
 .scooter-game .toast span { display: inline-block; background: #dfffad; color: #173c34; padding: 9px 14px; border-radius: 12px; box-shadow: 0 5px 18px #0b292438; font-size: 12px; font-weight: 800; }
 .scooter-game .countdown { position: absolute; z-index: 8; inset: 0; display: grid; place-items: center; color: #fffdf2; font-size: 112px; font-weight: 850; text-shadow: 0 5px 24px #0b2924; pointer-events: none; }
-.scooter-game .overlay { position: absolute; z-index: 10; inset: 0; display: flex; align-items: flex-end; padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); background: #102f2b45; overflow-y: auto; }
+.scooter-game .overlay { position: absolute; z-index: 10; inset: 0; display: flex; align-items: flex-end; padding: max(16px, max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) max(18px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) max(24px, env(safe-area-inset-bottom)) max(18px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); background: #102f2b45; overflow-y: auto; }
 .scooter-game .overlay-body { width: min(100%, 470px); margin: auto auto 0; padding: 26px; border-radius: 24px; background: #fffdf2; box-shadow: 0 18px 50px #0b29244d; }
 .scooter-game h2 { margin: 0 0 12px; font-size: clamp(30px, 8vw, 44px); line-height: 1.03; font-weight: 850; letter-spacing: -.035em; text-wrap: balance; }
 .scooter-game p { font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
@@ -58,7 +58,7 @@
 .scooter-game .difficulty-picker { display: flex; gap: 5px; margin: 20px 0; }
 .scooter-game .difficulty-picker button { flex: 1; min-width: 0; min-height: 62px; padding: 9px 3px; border: 1px solid #c8d6c6; border-radius: 12px; color: #254f40; background: #f2f4e8; font-size: 11px; font-weight: 850; }
 .scooter-game .difficulty-picker button[aria-pressed="true"] { background: #244d40; border-color: #244d40; color: #f1f7df; }
-.scooter-game .difficulty-picker small { display: block; margin-top: 4px; font-size: 9px; font-weight: 600; }
+.scooter-game .difficulty-picker small { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; }
 .scooter-game .menu-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 12px; margin-top: 6px; }
 .scooter-game .menu-links button, .scooter-game .text-button { min-height: 44px; border: 0; background: transparent; color: #315c4c; font-size: 11px; font-weight: 750; padding: 8px 0; text-decoration: underline; text-underline-offset: 4px; }
 .scooter-game .rank-status { color: #315c4c; font-size: 12px; margin: 8px 0 0; overflow-wrap: anywhere; }
@@ -66,13 +66,13 @@
 .scooter-game .result-stats { display: flex; gap: 12px; margin: 18px 0; }
 .scooter-game .result-stats > div { flex: 1; min-width: 0; }
 .scooter-game .result-stats strong { display: block; font-size: 25px; font-weight: 850; font-variant-numeric: tabular-nums; }
-.scooter-game .result-stats span { display: block; font-size: 10px; color: #49665b; }
-.scooter-game .nitro-button { position: absolute; z-index: 5; right: max(18px, env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 10px 15px; border: 0; border-radius: 16px; background: #d3ff85; color: #173c34; box-shadow: 0 7px 22px #0b29244d; font-size: 12px; font-weight: 850; text-transform: uppercase; }
+.scooter-game .result-stats span { display: block; font-size: 11px; color: #49665b; }
+.scooter-game .nitro-button { position: absolute; z-index: 5; right: max(18px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 10px 15px; border: 0; border-radius: 16px; background: #d3ff85; color: #173c34; box-shadow: 0 7px 22px #0b29244d; font-size: 12px; font-weight: 850; text-transform: uppercase; }
 .scooter-game .nitro-button svg { width: 20px; height: 25px; fill: currentColor; }
 .scooter-game .nitro-button b { min-width: 22px; font-variant-numeric: tabular-nums; }
 .scooter-game .nitro-button.active { background: #b3ff6e; }
 .scooter-game .nitro-button.active:disabled { opacity: 1; }
-.scooter-game .settings-panel, .scooter-game .leaderboard-panel { position: absolute; z-index: 30; inset: 0; overflow-y: auto; padding: calc(26px + env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) calc(26px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #fffdf2; scrollbar-color: #799b83 #e9eee2; touch-action: pan-y; }
+.scooter-game .settings-panel, .scooter-game .leaderboard-panel { position: absolute; z-index: 30; inset: 0; overflow-y: auto; padding: calc(26px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) max(24px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) calc(26px + env(safe-area-inset-bottom)) max(24px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); background: #fffdf2; scrollbar-color: #799b83 #e9eee2; touch-action: pan-y; }
 .scooter-game .settings-panel { display: flex; flex-direction: column; justify-content: center; }
 .scooter-game .modes { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #e8eee2; margin: 12px 0; }
 .scooter-game .modes button { flex: 1; min-height: 44px; border: 0; border-radius: 9px; color: #315c4c; background: transparent; font-size: 12px; font-weight: 750; }
@@ -88,7 +88,7 @@
 .scooter-game .leaderboard-list li { display: flex; align-items: center; gap: 14px; min-height: 64px; border-bottom: 1px solid #d1ddcc; }
 .scooter-game .leaderboard-list li > b { width: 22px; }
 .scooter-game .leaderboard-list li > span { flex: 1; font-size: 13px; }
-.scooter-game .leaderboard-list small { display: block; font-size: 10px; color: #49665b; }
+.scooter-game .leaderboard-list small { display: block; font-size: 11px; color: #49665b; }
 .scooter-game .leaderboard-list strong { font-size: 15px; font-variant-numeric: tabular-nums; }
 .scooter-game .leaderboard-list .mine { color: #15522f; background: #e7f7d9; }
 /* Задание карьеры: режим задан заданием */

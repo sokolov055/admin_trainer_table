@@ -15,7 +15,7 @@
 .career button:disabled { opacity: .45; cursor: default; }
 .career button:focus-visible, .career input:focus-visible { outline: 3px solid #9fe1ff; outline-offset: 3px; }
 .game-shell--career { background: #102f2b; }
-.career-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); }
+.career-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(10px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) max(16px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) 8px max(16px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); }
 .career-icon { width: 46px; height: 46px; display: grid; place-items: center; border: 0; border-radius: 15px; background: var(--cr-paper); color: var(--cr-ink); box-shadow: 0 5px 16px #0b29244d; }
 .career-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 .career-wallet { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 6px 16px 6px 8px; border-radius: 15px; background: #0f2f29b3; box-shadow: inset 0 0 0 1px #fffdf224; }
@@ -23,7 +23,7 @@
 .career-coin { width: 28px; height: 28px; flex: 0 0 28px; }
 .career-coin circle { fill: var(--cr-gold); stroke: #b77a16; stroke-width: 1.5; }
 .career-coin path { fill: none; stroke: #6f4a0c; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.career-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 4px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); scrollbar-width: none; }
+.career-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 4px max(16px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) calc(24px + env(safe-area-inset-bottom)) max(16px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); scrollbar-width: none; }
 .career-hero { padding: 6px 2px 4px; }
 .career-step { display: inline-block; padding: 4px 10px; border-radius: 8px; background: var(--cr-lime); color: var(--cr-ink); font-size: 11px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
 .career h2 { margin: 12px 0 4px; font-size: clamp(30px, 8.5vw, 44px); line-height: 1.04; font-weight: 850; letter-spacing: -.035em; text-wrap: balance; }
@@ -64,7 +64,7 @@
 .career-restart button { min-height: 44px; margin: 3px; padding: 8px 14px; border: 1px solid #fffdf259; border-radius: 12px; background: transparent; color: var(--cr-paper); font-weight: 750; }
 .career-restart .career-text { border: 0; text-decoration: underline; text-underline-offset: 4px; color: #c5e7c4; }
 /* fixed: на широком экране затемнение — на весь экран, а не на колонку 640 px */
-.career-overlay { position: fixed; z-index: 20; inset: 0; display: flex; align-items: flex-end; padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: #0b2924a6; }
+.career-overlay { position: fixed; z-index: 20; inset: 0; display: flex; align-items: flex-end; padding: 16px max(16px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) calc(16px + env(safe-area-inset-bottom)) max(16px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); background: #0b2924a6; }
 .career-panel { position: relative; width: 100%; padding: 28px 24px 22px; border-radius: 26px; background: var(--cr-paper); color: var(--cr-ink); text-align: center; overflow: hidden; box-shadow: 0 18px 50px #0b29246b; animation: career-in 260ms var(--cr-ease) both; }
 .career-panel h2 { margin-top: 14px; }
 .career-panel p { margin: 0 0 14px; color: var(--cr-muted); font-size: 14px; line-height: 1.5; }

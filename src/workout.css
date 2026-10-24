@@ -487,7 +487,7 @@
 .workout__ex-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
 .workout__exercise > .workout__ex-head h3 { margin: 0; font-size: var(--text-xl); line-height: 1.2; font-weight: 720; letter-spacing: -0.01em; text-wrap: balance; }
 .workout__ex-num { display: inline-block; min-width: 1.4em; margin-right: 6px; color: var(--text-muted); font-weight: 600; font-variant-numeric: tabular-nums; }
-.workout__ex-count { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2, var(--bg)); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.workout__ex-count { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .workout__exercise--done .workout__ex-count { background: var(--good-fill); color: var(--good-text); }
 
 /* Текущее упражнение — обведено акцентом; законченное — приглушено */
@@ -507,7 +507,7 @@
 /* Номер подхода — он же вход в настройки: тихая цель вместо строки под каждым */
 .workout__set-num { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 44px; min-height: 44px; padding: 0 4px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; }
 .workout__set-num svg { color: var(--text-muted); opacity: 0.7; }
-.workout__set-num[aria-expanded='true'] { background: var(--surface-2, var(--bg)); }
+.workout__set-num[aria-expanded='true'] { background: var(--bg); }
 .workout__set-num:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .workout__set--done .workout__set-num { color: var(--good-text); font-weight: 640; }
 .workout__cardio-head .workout__set-num { justify-content: flex-start; padding: 0 6px 0 0; }
@@ -606,7 +606,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Поменять оценку отмеченного подхода: текущая залита, остальные — контуром */
 .workout__effort--quiet .workout__effort-btn--on { background: var(--c); color: var(--on); box-shadow: none; }
 .workout__effort-fix { margin-bottom: var(--space-2); }
-.workout__effort-fix-title { margin: 0 0 var(--space-1); font-size: 13px; color: var(--muted, #6b6b6b); }
+.workout__effort-fix-title { margin: 0 0 var(--space-1); font-size: 13px; color: var(--text-muted); }
 .workout__effort-hint { margin: 0 0 var(--space-2); font-size: 13px; line-height: 1.35; color: var(--text-muted); }
 .workout__effort-next { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-muted); }
 .workout__effort-dot { --c: var(--accent); width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px; background: var(--c); }
@@ -835,7 +835,11 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__metrics { margin-top: var(--space-2); gap: var(--space-3); }
 .workout__metrics strong { font-size: var(--text-lg); }
 .workout__toolbar--head { margin-top: var(--space-2); }
-.workout__toolbar--head .button, .workout__toolbar--head label, .workout__head-actions .button { height: 36px; }
+/* Кнопки шапки — 44 по высоте, как велит iOS (владелец, 24.10.2026): 36 в
+   зале, на ходу и в перчатках — промах. Шапка от этого выросла на 4 px, а не
+   на 12: «Назад» и «Завершить» поднялись в верхний отступ (над шапкой тот же
+   фон, края не видно), третья строка придвинулась к названию */
+.workout__toolbar--head .button, .workout__toolbar--head label, .workout__head-actions .button { height: 44px; }
 .workout__bar { margin-top: var(--space-2); }
 /* «Выбрать» включён — контур акцентом, а не вторая залитая кнопка рядом с «Завершить» */
 .workout__toolbar--head .button.is-on { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
@@ -851,21 +855,21 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* «Назад» слева, «Завершить» справа — одной строкой; название с месяцем и
    статусом — второй; время, подходы, отдых, пауза и ⋯ — третьей. Было пять
    строк и 230 px: в зале треть экрана уходила на шапку */
-.workout__head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.workout__head-row .app__back { margin: 0; }
-.workout__finish-btn { height: 36px; min-height: 0; padding: 0 var(--space-3); border-radius: 10px; font-size: var(--text-sm); }
+.workout__head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: calc(var(--space-1) * -1); }
+.workout__head-row .app__back { margin: 0; min-height: 44px; }
+.workout__finish-btn { height: 44px; min-height: 0; padding: 0 var(--space-3); border-radius: 10px; font-size: var(--text-sm); }
 .workout__header h2 { margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workout__title-meta { font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); letter-spacing: 0; }
-.workout__line { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); min-width: 0; }
+.workout__line { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); min-width: 0; }
 .workout__line .workout__metrics { display: inline-flex; align-items: baseline; gap: 4px; margin: 0 auto 0 0; flex: 0 1 auto; min-width: 0; white-space: nowrap; font-size: var(--text-base); color: var(--text-secondary); }
 .workout__line .workout__metrics strong { display: inline; margin: 0; font-size: var(--text-lg); }
 .workout__line .workout__metrics b { font-weight: 600; color: var(--text); }
-.workout__rest-pick { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 4px 0 10px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--text-sm); white-space: nowrap; }
-.workout__rest-pick select { height: 100%; min-height: 0; margin: 0; padding: 0 2px; border: 0; background: transparent; color: var(--text); font-size: 15px; font-weight: 600; }
-.workout__pause { height: 36px; min-height: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); font-size: var(--text-sm); }
-.workout__line .workout__pick-toggle { height: 36px; min-height: 0; padding: 0 10px; border-radius: 10px; font-size: var(--text-sm); }
+.workout__rest-pick { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 4px 0 10px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--text-sm); white-space: nowrap; }
+.workout__rest-pick select { height: 100%; min-height: 0; margin: 0; padding: 0 2px; border: 0; background: transparent; color: var(--text); font-size: 16px; font-weight: 600; }
+.workout__pause { height: 44px; min-height: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); font-size: var(--text-sm); }
+.workout__line .workout__pick-toggle { height: 44px; min-height: 0; padding: 0 10px; border-radius: 10px; font-size: var(--text-sm); }
 .workout__more { position: relative; flex: none; }
-.workout__more-btn { width: 36px; height: 36px; margin: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); }
+.workout__more-btn { width: 40px; height: 44px; margin: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); }
 .workout__more-scrim { position: fixed; inset: 0; z-index: 49; }
 .workout__menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 200px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); transform-origin: top right; animation: rest-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 .workout__menu-item { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; font-size: var(--text-base); text-align: left; cursor: pointer; }
@@ -898,3 +902,14 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Подписи шапки — 13 (FT-665): «месяц · статус» стоит в строке названия,
    а отдых — в поле фиксированной высоты, поэтому шапка не растёт (166 px, 20.10) */
 .workout__title-meta { font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+
+/* Зона касания 44 без перемены вида (DESIGN-APP.md): «Готово» панели правки,
+   «снять оценку» участника и «на сторону» под подходом стоят в плотных
+   строках — растить их значит растягивать каждый подход. Накладка как у
+   .chip::after. У «на сторону» она вытянута вниз, в собственный нижний отступ
+   подхода, чтобы не перекрывать поля веса над ней */
+.workout__panel-actions .button, .workout__member-done, .workout__side { position: relative; }
+.workout__panel-actions .button::after, .workout__member-done::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: max(44px, 100%); transform: translateY(-50%);
+}
+.workout__side::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -12px; }

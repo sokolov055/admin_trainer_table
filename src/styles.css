@@ -428,13 +428,13 @@ body:has(#root .workout__header, #root .cal-screen)::before {
    продолжается до края, workout.css): сплошной слой поверх лёг бы швом */
 body:has(#root .workout__header:first-child)::before { display: none; }
 body::before {
-  --fade: min(var(--top-fade), calc(env(safe-area-inset-top, 0px) * 100));
+  --fade: min(var(--top-fade), calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) * 100));
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: calc(env(safe-area-inset-top) + var(--fade));
+  height: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + var(--fade));
   background: linear-gradient(
     color-mix(in srgb, var(--bg) 60%, transparent),
     color-mix(in srgb, var(--bg) 15%, transparent) 55%,
@@ -518,6 +518,13 @@ body:has(#root .client-preview)::before { display: none; }
 /* Поля ввода по умолчанию берут шрифт браузера, а не страницы: цифры в
    поле веса и рядом с ним были бы разными (FT-665) */
 button, input, select, textarea { font-family: inherit; }
+
+/* Поле мельче 16 px iOS приближает при фокусе, и страницу потом возят
+   пальцами обратно. Сейчас это держит только maximum-scale=1 в index.html,
+   а он мешает доступности. Поэтому 16 — пол для любого поля: здесь по
+   умолчанию (без классов браузер даёт ~13), в классах — не меньше.
+   Нулевая специфичность: классы, где поле крупнее, перекрывают. */
+:where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), textarea, select) { font-size: 16px; }
 
 #root { min-height: 100vh; }
 
@@ -718,8 +725,8 @@ button, input, select, textarea { font-family: inherit; }
 .tabbar {
   --tab-inset: 5px;
   position: fixed;
-  left: max(var(--space-3), env(safe-area-inset-left));
-  right: max(var(--space-3), env(safe-area-inset-right));
+  left: max(var(--space-3), max(env(safe-area-inset-left, 0px), var(--inset-left, 0px)));
+  right: max(var(--space-3), max(env(safe-area-inset-right, 0px), var(--inset-right, 0px)));
   bottom: max(10px, calc(env(safe-area-inset-bottom) - 8px));
   z-index: 20;
   max-width: 520px;
@@ -841,18 +848,18 @@ button, input, select, textarea { font-family: inherit; }
 @media (display-mode: standalone) {
   /* Полоса «Вы смотрите как клиент» — первая на экране: она и уходит под
      часы, а шапка под ней отступа на строку состояния уже не делает */
-  .client-preview { padding-top: calc(10px + env(safe-area-inset-top)); }
+  .client-preview { padding-top: calc(10px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); }
   .client-preview + .app__header { padding-top: var(--space-5); }
 
   .app__header {
-    padding-top: calc(var(--space-5) + env(safe-area-inset-top));
-    padding-left: calc(var(--space-4) + env(safe-area-inset-left));
-    padding-right: calc(var(--space-4) + env(safe-area-inset-right));
+    padding-top: calc(var(--space-5) + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)));
+    padding-left: calc(var(--space-4) + max(env(safe-area-inset-left, 0px), var(--inset-left, 0px)));
+    padding-right: calc(var(--space-4) + max(env(safe-area-inset-right, 0px), var(--inset-right, 0px)));
   }
 
   .app__body {
-    padding-left: calc(var(--space-4) + env(safe-area-inset-left));
-    padding-right: calc(var(--space-4) + env(safe-area-inset-right));
+    padding-left: calc(var(--space-4) + max(env(safe-area-inset-left, 0px), var(--inset-left, 0px)));
+    padding-right: calc(var(--space-4) + max(env(safe-area-inset-right, 0px), var(--inset-right, 0px)));
   }
 
 }
@@ -862,7 +869,11 @@ button, input, select, textarea { font-family: inherit; }
    экране», поэтому медиазапрос выше не срабатывает — и шапка уходила под
    строку состояния. Отступ — больший из двух: env() браузера и переменной,
    которую передаёт Capacitor (на WebView старше 140-й версии env() — ноль,
-   хотя страница уже под строкой состояния). */
+   хотя страница уже под строкой состояния).
+   Поэтому отступ под вырез везде пишется парой
+   max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)), а не голым
+   env(): вне приложения --inset-* не объявлены и срабатывает 0px.
+   --inset-bottom не объявлен, поэтому снизу пока голый env(). */
 :root.is-native {
   --inset-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
   --inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
@@ -917,7 +928,7 @@ button, input, select, textarea { font-family: inherit; }
   background: var(--surface);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
-  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-3)
+  padding: calc(var(--space-4) + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) var(--space-3)
            calc(var(--space-4) + env(safe-area-inset-bottom));
   overflow-y: auto;
   /* Прокрутка не уходит на страницу под панелью */
@@ -1182,7 +1193,7 @@ button, input, select, textarea { font-family: inherit; }
   z-index: 70;
   display: flex;
   flex-direction: column;
-  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4)
+  padding: calc(var(--space-4) + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) var(--space-4)
            calc(var(--space-5) + env(safe-area-inset-bottom));
   background: var(--story-bg);
   color: var(--story-fg);
@@ -1392,7 +1403,7 @@ button, input, select, textarea { font-family: inherit; }
   content: '';
   position: absolute;
   inset: 0 0 auto;
-  height: calc(120px + env(safe-area-inset-top));
+  height: calc(120px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)));
   z-index: 1;
   background: linear-gradient(rgba(0, 0, 0, 0.38), transparent);
   pointer-events: none;
@@ -1779,7 +1790,8 @@ button, input, select, textarea { font-family: inherit; }
 .search__input {
   width: 100%;
   font-family: inherit;
-  font-size: var(--text-base);
+  /* 16, а не --text-base: иначе iOS приближает страницу при фокусе */
+  font-size: 16px;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2420,10 +2432,10 @@ th.sticky, td.sticky {
   /* Безопасные зоны здесь безусловны: экран входа — единственное, что
      нарисовано на весь экран, и в режиме с рабочего стола прижимается
      и к часам сверху, и к полосе «домой» снизу. */
-  padding: calc(var(--space-6) + env(safe-area-inset-top))
-           calc(var(--space-4) + env(safe-area-inset-right))
+  padding: calc(var(--space-6) + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)))
+           calc(var(--space-4) + max(env(safe-area-inset-right, 0px), var(--inset-right, 0px)))
            calc(var(--space-6) + env(safe-area-inset-bottom))
-           calc(var(--space-4) + env(safe-area-inset-left));
+           calc(var(--space-4) + max(env(safe-area-inset-left, 0px), var(--inset-left, 0px)));
 }
 
 .login__inner {
@@ -2725,8 +2737,8 @@ th.sticky, td.sticky {
 .install-hint {
   position: fixed;
   z-index: 80;
-  left: max(var(--space-3), env(safe-area-inset-left));
-  right: max(var(--space-3), env(safe-area-inset-right));
+  left: max(var(--space-3), max(env(safe-area-inset-left, 0px), var(--inset-left, 0px)));
+  right: max(var(--space-3), max(env(safe-area-inset-right, 0px), var(--inset-right, 0px)));
   bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
   max-width: 440px;
   margin: 0 auto;
@@ -3379,7 +3391,7 @@ code {
 .access-link {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 
 .access-link--quiet {
@@ -3844,7 +3856,7 @@ code {
    наезжают на гриф, пока тянут; их положение пишет gestures.jsx. */
 .pull {
   position: fixed;
-  top: env(safe-area-inset-top);
+  top: max(env(safe-area-inset-top, 0px), var(--inset-top, 0px));
   left: 50%;
   /* Выше подложки под часами (body::before, 25): под ней верх гантели
      прятался, пока страницу тянут */
@@ -3950,7 +3962,7 @@ code {
 /* Раздел, где ещё не были: заготовка с названием вместо шапки и серые
    карточки — сразу видно, куда листаешь, а настоящий встанет после жеста */
 .swipeback__blank {
-  padding: calc(env(safe-area-inset-top) + var(--space-5)) var(--space-4) 0;
+  padding: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + var(--space-5)) var(--space-4) 0;
 }
 
 .swipeback__blank-title {
@@ -4105,7 +4117,7 @@ html.live-region body { background: transparent; }
    становилось шире экрана, и длинное название уводило форму вбок. */
 .library__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 .library__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-.library__textarea { min-height: 96px; resize: vertical; font: inherit; line-height: 1.45; }
+.library__textarea { min-height: 96px; resize: vertical; font: inherit; font-size: max(16px, 1em); line-height: 1.45; }
 
 .library__check { display: flex; gap: var(--space-2); align-items: flex-start; font-size: var(--text-sm); cursor: pointer; }
 .library__check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex: 0 0 auto; }
@@ -4195,7 +4207,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
    списке (20.10.2026): во всю ширину с подписями сверху они отодвигали
    упражнения за сгиб экрана */
 .library__selects { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 5fr); gap: var(--space-2); margin: var(--space-3) 0; }
-.library__selects .field__input { min-width: 0; padding: 10px 8px; font-size: var(--text-sm); text-overflow: ellipsis; }
+.library__selects .field__input { min-width: 0; padding: 10px 8px; font-size: 16px; text-overflow: ellipsis; }
 .library__count { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .library__row { display: flex; align-items: center; gap: var(--space-2); }
 .library__row-body { flex: 1; min-width: 0; }
@@ -4509,7 +4521,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-grid__scroll > .cal-grid__row { background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px var(--hour, 48px)); }
 .cal-grid__hours { position: relative; }
 .cal-grid__hours span {
-  position: absolute; right: 6px; transform: translateY(-50%); font-size: 10.5px;
+  position: absolute; right: 6px; transform: translateY(-50%); font-size: 11px;
   color: var(--text-muted); font-variant-numeric: tabular-nums; background: var(--surface); padding: 0 2px;
 }
 .cal-grid__col { position: relative; border-left: 1px solid var(--border); cursor: pointer; }
@@ -4527,7 +4539,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-event__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-event__time { opacity: .85; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
 .cal-event__time--strong { opacity: 1; font-weight: 700; }
-.cal-grid--7 .cal-event { padding: 2px; font-size: 10.5px; }
+.cal-grid--7 .cal-event { padding: 2px; font-size: 11px; }
 /* Прошло — чуть тише; личное событие — рамкой без заливки; отменено со
    списанием — серым и зачёркнуто: по нему считаются деньги */
 .cal-event--done { opacity: .72; }
@@ -4572,8 +4584,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums;
 }
 .cal-month__cell--today .cal-month__date { background: var(--accent-solid); color: var(--accent-text); }
-.cal-event--chip { position: static; display: block; flex: none; padding: 1px 3px; border-radius: 4px; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: none; }
-.cal-month__more { flex: none; font-size: 10px; color: var(--text-muted); padding-left: 3px; }
+.cal-event--chip { position: static; display: block; flex: none; padding: 1px 3px; border-radius: 4px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: none; }
+.cal-month__more { flex: none; font-size: 11px; color: var(--text-muted); padding-left: 3px; }
 .cal-month__ghost {
   position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; max-width: 160px; padding: 5px 9px; font-size: var(--text-xs);
   box-shadow: 0 12px 28px rgba(0, 0, 0, .3);
@@ -4647,14 +4659,14 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   .cal-mini__grid--prev { animation: cal-mini-prev 300ms var(--ease-ios) backwards; }
 
   .cal-viewpick__menu { animation: cal-pop 220ms var(--ease-ios) backwards; }
-  .cal-viewpick__menu--leaving { animation: cal-pop-out 140ms ease-in forwards; pointer-events: none; }
+  .cal-viewpick__menu--leaving { animation: cal-pop-out 140ms var(--ease-out) forwards; pointer-events: none; }
   .cal-draft { animation: cal-pop 220ms var(--ease-ios) backwards; }
 
   .cal-sheet__panel { animation: cal-sheet 420ms var(--ease-ios) backwards; }
   .cal-sheet--leaving { pointer-events: none; }
   .cal-sheet--leaving .cal-sheet__panel { animation: cal-sheet-out 260ms var(--ease-ios) forwards; }
   .cal-sheet--leaving .cal-sheet__scrim { animation: cal-fade-out 260ms ease forwards; }
-  .undo-bar--leaving { animation: undo-out 200ms ease-in forwards; pointer-events: none; }
+  .undo-bar--leaving { animation: undo-out 200ms var(--ease-out) forwards; pointer-events: none; }
 }
 .cal-grid__ghosts { position: absolute; top: 0; bottom: 0; left: 44px; right: 0; z-index: 9; overflow: hidden; pointer-events: none; }
 .cal-event--settle { transform: none; box-shadow: 0 0 0 1px var(--surface); opacity: 0; }
@@ -4677,7 +4689,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 /* Подсказки упражнений из базы в редакторе программы */
 .picker { position: relative; display: grid; gap: 4px; }
-.picker__input { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 72px); }
+.picker__input { scroll-margin-top: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + 72px); }
 .picker__list {
   margin: 0; padding: 4px; list-style: none;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
@@ -4769,7 +4781,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
    и «кто отменил»; отменённое со списанием — приглушено и зачёркнуто */
 .schedule__when { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .schedule__when input { min-width: 0; width: 100%; -webkit-appearance: none; appearance: none; }
-.schedule__ask { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md, 12px); background: var(--surface-2, var(--surface)); border: 1px solid var(--border); }
+.schedule__ask { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
 .schedule__cancelled .item__name { text-decoration: line-through; color: var(--text-muted); }
 .schedule-stats__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-2); }
 .schedule-stats__num { font-size: var(--text-xl, 24px); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -4961,7 +4973,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Поле и текст — одной высоты: отступы и рамка поля скомпенсированы
    внешними (4+1 по вертикали, 8+1 по горизонтали), иначе после «ОК» всё
    ниже подпрыгивает (FT-469) */
-.plan__title-input { font: inherit; line-height: inherit; box-sizing: border-box; display: block; width: calc(100% + 18px); padding: 4px 8px; margin: -5px -9px; }
+.plan__title-input { font: inherit; font-size: max(16px, 1em); line-height: inherit; box-sizing: border-box; display: block; width: calc(100% + 18px); padding: 4px 8px; margin: -5px -9px; }
 .section__head > div:has(.plan__title-input) { flex: 1; min-width: 0; }
 .plan__title-error { display: block; color: var(--warning-text); font-weight: 400; margin-top: 4px; }
 
@@ -5145,7 +5157,10 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .machines { display: grid; gap: var(--space-1); }
 .machines__item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
 .machines__item summary { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: 600; cursor: pointer; min-height: 32px; }
-.machines__item[open] summary { margin-bottom: var(--space-2); }
+/* Зона касания 44 при прежнем виде карточки: строка растёт на 12 px, а
+   отрицательные поля съедают их из внутреннего отступа карточки */
+.machines__item summary { min-height: 44px; margin: -6px 0; }
+.machines__item[open] summary { margin-bottom: calc(var(--space-2) - 6px); }
 .machines__thumb { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; flex: none; }
 .machine { display: grid; gap: var(--space-2); }
 .machine__photo { all: unset; display: block; cursor: zoom-in; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-sunken); -webkit-tap-highlight-color: transparent; }
@@ -5618,7 +5633,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .wishes { display: grid; gap: var(--space-4); }
 .wishes__form { display: grid; gap: var(--space-2); }
 .wishes__form .button { justify-self: start; }
-.wishes__input { min-height: 84px; resize: vertical; font: inherit; line-height: 1.45; }
+.wishes__input { min-height: 84px; resize: vertical; font: inherit; font-size: max(16px, 1em); line-height: 1.45; }
 .wishes__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .wish { display: grid; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--border); }
 .wishes__list .wish:first-child { border-top: 0; padding-top: 0; }
@@ -6299,9 +6314,9 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Замена упражнения: название ведёт к её карточке, крестик убирает */
 .alt-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .alt-chip { display: inline-flex; align-items: stretch; max-width: 100%; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); overflow: hidden; }
-.alt-chip__name { border: 0; background: none; font: inherit; font-size: var(--text-sm); font-weight: 600; color: var(--accent); text-align: left; padding: 8px 4px 8px 14px; min-width: 0; min-height: 40px; display: flex; align-items: center; cursor: pointer; }
+.alt-chip__name { border: 0; background: none; font: inherit; font-size: var(--text-sm); font-weight: 600; color: var(--accent); text-align: left; padding: 8px 4px 8px 14px; min-width: 0; min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 span.alt-chip__name { color: var(--text-secondary); cursor: default; }
-.alt-chip__x { border: 0; border-left: 1px solid var(--border); background: none; color: var(--text-muted); font-size: 18px; line-height: 1; width: 40px; flex: none; cursor: pointer; }
+.alt-chip__x { border: 0; border-left: 1px solid var(--border); background: none; color: var(--text-muted); font-size: 18px; line-height: 1; width: 44px; flex: none; cursor: pointer; }
 .alt-chip__name:focus-visible, .alt-chip__x:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Ролик с манекеном: квадрат 540×540 на белом фоне, крутится сам */
@@ -6315,7 +6330,7 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .admin-stories__topic { display: grid; gap: var(--space-3); }
 .admin-stories__fields { display: grid; gap: var(--space-3); }
 .admin-stories__frames { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-.admin-stories__frame { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.admin-stories__frame { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
 .admin-stories__frame--hidden .admin-stories__frame-copy strong { color: var(--text-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .admin-stories__frame-head { display: flex; align-items: center; gap: var(--space-1); padding-right: var(--space-1); }
 .admin-stories__frame-title {
@@ -6332,7 +6347,7 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .admin-stories__frame-copy span { font-size: var(--text-sm); color: var(--text-muted); }
 .admin-stories__move { display: flex; flex: none; }
 .admin-stories__move .icon-button[disabled] { opacity: 0.3; }
-.admin-stories__frame-body { display: grid; gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.admin-stories__frame-body { display: grid; gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); border-top: 1px solid var(--border); padding-top: var(--space-3); }
 .admin-stories__ios { justify-self: start; }
 .admin-stories__picker { display: grid; gap: var(--space-2); }
 .admin-stories__arts {
@@ -6342,7 +6357,7 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .admin-stories__arts::-webkit-scrollbar { display: none; }
 .admin-stories__art {
   display: grid; place-items: center; height: 72px; padding: var(--space-1);
-  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-sunken, var(--fill));
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken);
   color: var(--text); cursor: pointer; text-align: center;
 }
 .admin-stories__art .story-art { max-height: 60px; }
@@ -6350,7 +6365,7 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .admin-stories__tints { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .admin-stories__tint { width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
 .admin-stories__tint.is-on { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface) inset; }
-.admin-stories__topic-actions { border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.admin-stories__topic-actions { border-top: 1px solid var(--border); padding-top: var(--space-3); }
 .admin-stories__add-topic { width: 100%; margin: var(--space-2) 0 var(--space-4); }
 .admin-stories__save { display: grid; gap: var(--space-2); }
 .admin-stories__issue { display: block; }
@@ -6363,7 +6378,7 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .admin-stories__thumbs { display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; padding: 4px 2px 6px; }
 .admin-stories__thumbs::-webkit-scrollbar { display: none; }
 .admin-stories__thumb { position: relative; flex: 0 0 auto; width: 72px; padding: 0; border: 0; border-radius: 10px; background: none; cursor: pointer; }
-.admin-stories__thumb .sc { width: 100%; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.admin-stories__thumb .sc { width: 100%; border-radius: 10px; box-shadow: 0 0 0 1px var(--border); }
 .admin-stories__thumb--hidden .sc { opacity: 0.4; }
 .admin-stories__thumb-note { position: absolute; left: 4px; right: 4px; bottom: 4px; padding: 2px 4px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 9.5px; font-weight: 700; line-height: 1.2; text-align: center; }
 .admin-stories__thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -6384,11 +6399,11 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
   background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); outline: none;
   animation: sheet-up 360ms var(--ease-ios) both;
 }
-.sheet.is-leaving .sheet__scrim { animation: sheet-fade-out 220ms ease-in both; }
-.sheet.is-leaving .sheet__panel { animation: sheet-down 220ms ease-in both; }
+.sheet.is-leaving .sheet__scrim { animation: sheet-fade-out 220ms var(--ease-out) both; }
+.sheet.is-leaving .sheet__panel { animation: sheet-down 220ms var(--ease-out) both; }
 .sheet__grip { flex: none; display: block; width: 36px; height: 5px; margin: 0 auto 4px; border-radius: 3px; background: var(--border-strong); }
 .sheet__head { flex: none; position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 40px; }
-.sheet__head h2 { margin: 0; font-size: 17px; font-weight: 720; text-align: center; overflow-wrap: anywhere; }
+.sheet__head h2 { margin: 0; font-size: var(--text-md); font-weight: 720; text-align: center; overflow-wrap: anywhere; }
 .sheet__close { position: absolute; right: -4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; }
 .sheet__close::before { content: ''; position: absolute; width: 36px; height: 36px; border-radius: 50%; background: var(--surface-sunken); z-index: -1; }
 .sheet__close:active { transform: translateY(-50%) scale(0.92); }
@@ -6433,3 +6448,55 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 
 /* Вид упражнения в карточке библиотеки: подпись уже у поля карточки */
 .exercise-kind--bare .exercise-kind__label { display: none; }
+
+/* ==========================================================================
+ * Зона касания 44 px без перемены вида (DESIGN-APP.md, «Зона касания»).
+ * Эти кнопки нарочно ниже 44: строки плотные, и растить их — съесть экран.
+ * Невидимая накладка по высоте, как у .chip::after: палец попадает, вид
+ * прежний. Своего ::after ни у одной из них нет. alt-chip (overflow:
+ * hidden режет накладку) и тренажёр в упражнении доведены до 44 по-настоящему.
+ * ========================================================================== */
+.button--small,
+.app__back,
+.client-preview__actions .button,
+.invite-row__actions .button,
+.trainer-row__actions .button,
+.bars__toggle,
+.plan-inline__round-add,
+.library__link,
+.library__back,
+.library__extras > .button--ghost,
+.library__machine-actions > .button--ghost,
+.library__save-block,
+.plan__visibility .button,
+.plan-inline__panel-actions .button,
+.plan-inline__round-done,
+.plan-inline__set-add .button,
+.plan-inline__group-actions .button,
+.plan-inline__set-kind .button { position: relative; }
+.button--small::after,
+.app__back::after,
+.client-preview__actions .button::after,
+.invite-row__actions .button::after,
+.trainer-row__actions .button::after,
+.bars__toggle::after,
+.plan-inline__round-add::after,
+.library__link::after,
+.library__back::after,
+.library__extras > .button--ghost::after,
+.library__machine-actions > .button--ghost::after,
+.library__save-block::after,
+.plan__visibility .button::after,
+.plan-inline__panel-actions .button::after,
+.plan-inline__round-done::after,
+.plan-inline__set-add .button::after,
+.plan-inline__group-actions .button::after,
+.plan-inline__set-kind .button::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: max(44px, 100%);
+  transform: translateY(-50%);
+}

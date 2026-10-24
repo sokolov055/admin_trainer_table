@@ -162,8 +162,8 @@
    четыре подписи помещаются целиком и с «+» посередине */
 @media (max-width: 359px) {
   .tabbar.tabbar--action {
-    left: max(8px, env(safe-area-inset-left));
-    right: max(8px, env(safe-area-inset-right));
+    left: max(8px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px)));
+    right: max(8px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px)));
   }
   .tabbar--action .tabbar__item { padding-left: 2px; padding-right: 2px; }
   .tabbar__action { width: 56px; }

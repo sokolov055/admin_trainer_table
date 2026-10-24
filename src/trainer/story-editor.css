@@ -23,8 +23,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: calc(10px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
-           calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  padding: calc(10px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) max(16px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px)))
+           calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px)));
   background: var(--se-ink);
   color: var(--se-fg);
   font-family: var(--se-ui);
@@ -306,7 +306,7 @@
 .pv-link { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 999px; background: #fff; color: #1d5fae !important; font-size: 11.5px; }
 .se-tile .pv-link svg { width: 12px; height: 12px; }
 .pv-step { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #f5c65c; color: #141216 !important; }
-.pv-badge { padding: 5px 8px; border-radius: 7px; background: #f5c65c; color: #141216 !important; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.pv-badge { padding: 5px 8px; border-radius: 7px; background: #f5c65c; color: #141216 !important; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 .se-emojis { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
 .se-emojis button { border: 0; background: none; font-size: 26px; padding: 6px 0; border-radius: 10px; cursor: pointer; }
 .se-arts { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
@@ -358,7 +358,7 @@
 .se-toast {
   position: absolute;
   left: 50%;
-  top: calc(18px + env(safe-area-inset-top, 0px));
+  top: calc(18px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)));
   z-index: 40;
   max-width: min(92vw, 420px);
   padding: 11px 16px;

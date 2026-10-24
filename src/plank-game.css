@@ -5,7 +5,7 @@
   --pg-green: #216549; --pg-line: #d2ddd1; --pg-orange: #ffb750; --pg-red: #b64827;
   --pg-ease: cubic-bezier(.23, 1, .32, 1);
   --pg-display: Manrope, var(--font, system-ui), sans-serif;
-  --pg-top: env(safe-area-inset-top, 0px);
+  --pg-top: max(env(safe-area-inset-top, 0px), var(--inset-top, 0px));
   position: relative; display: flex; flex-direction: column;
   width: 100%; height: 100%; min-height: 0; max-width: 640px; margin: 0 auto;
   overflow: hidden; color: var(--pg-ink); background: var(--pg-cream);
@@ -22,7 +22,7 @@
 /* Сцена: зал на всю верхнюю часть, тянется за счёт листа */
 .plank-game__scene { position: relative; flex: 1 1 0; min-height: 190px; display: flex; flex-direction: column; overflow: hidden; touch-action: none; background: #c6dfcb url('./assets/plank-gym.png') 38% 62% / cover no-repeat; }
 .plank-game__scene::before { content: ''; position: absolute; z-index: 1; inset: 0 0 auto; height: calc(118px + var(--pg-top)); background: linear-gradient(#173c34d9, #173c3400); pointer-events: none; }
-.plank-game__hud { position: absolute; z-index: 4; top: calc(12px + var(--pg-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); display: flex; align-items: center; gap: 8px; }
+.plank-game__hud { position: absolute; z-index: 4; top: calc(12px + var(--pg-top)); left: max(16px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); right: max(16px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))); display: flex; align-items: center; gap: 8px; }
 .plank-game__icon-button { flex: 0 0 46px; width: 46px; height: 46px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 15px; background: var(--pg-cream); color: var(--pg-ink); box-shadow: 0 5px 16px #102f2b38; }
 .plank-game__icon-button svg { width: 24px; height: 24px; stroke-width: 2.2; }
 .plank-game__score { flex: 1; min-width: 0; display: flex; flex-direction: column; padding-left: 4px; line-height: 1; color: var(--pg-cream); text-shadow: 0 2px 6px #0b2924; }
@@ -33,7 +33,7 @@
 .plank-game__status { position: relative; flex: none; width: 100%; min-height: 60px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; }
 .plank-game__rest { position: absolute; left: 2px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 7px; padding: 7px 11px 7px 9px; border-radius: 14px; background: var(--pg-cream); color: var(--pg-ink); box-shadow: 0 5px 16px #102f2b30; font-variant-numeric: tabular-nums; }
 .plank-game__rest svg { flex: none; color: var(--pg-green); }
-.plank-game__rest span { display: flex; flex-direction: column; font-size: 10px; font-weight: 700; line-height: 1.15; color: var(--pg-muted); }
+.plank-game__rest span { display: flex; flex-direction: column; font-size: 11px; font-weight: 700; line-height: 1.15; color: var(--pg-muted); }
 .plank-game__rest strong { color: var(--pg-ink); font-size: 16px; font-weight: 850; white-space: nowrap; }
 .plank-game__timer { position: relative; width: 60px; height: 60px; display: grid; place-items: center; border-radius: 50%; background: var(--pg-cream); box-shadow: 0 6px 18px #102f2b40; color: var(--pg-ink); }
 .plank-game__timer svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 5; stroke-linecap: round; }
@@ -61,20 +61,20 @@
 .plank-game__sweat path { fill: #279eb0; opacity: 0; animation: plank-sweat 1100ms linear infinite; }
 .plank-game__sweat g:nth-child(2) path { animation-delay: 300ms; }
 .plank-game__sweat g:nth-child(3) path { animation-delay: 650ms; }
-.plank-game__reward { position: absolute; z-index: 4; top: calc(78px + var(--pg-top)); right: max(16px, env(safe-area-inset-right)); color: #163c2e; background: #ffe7a8; border-radius: 14px; padding: 7px 14px; box-shadow: 0 6px 18px #0b292438; font-family: var(--pg-display); font-size: 28px; font-weight: 850; text-align: center; animation: plank-reward 260ms var(--pg-ease) both; }
+.plank-game__reward { position: absolute; z-index: 4; top: calc(78px + var(--pg-top)); right: max(16px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))); color: #163c2e; background: #ffe7a8; border-radius: 14px; padding: 7px 14px; box-shadow: 0 6px 18px #0b292438; font-family: var(--pg-display); font-size: 28px; font-weight: 850; text-align: center; animation: plank-reward 260ms var(--pg-ease) both; }
 .plank-game__reward span { display: block; font-size: 12px; }
 .plank-game__confetti { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
 .plank-game__confetti i { position: absolute; top: 0; width: 7px; height: 13px; background: var(--pg-orange); animation: plank-confetti 1300ms ease-out both; }
 .plank-game__confetti i:nth-child(even) { background: var(--pg-green); }
 
 /* Лист снизу: ход партии; на низком экране прокручивается только он */
-.plank-game__sheet { position: relative; z-index: 5; flex: none; max-height: calc(100% - 166px); margin-top: -24px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 22px max(20px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border-radius: 24px 24px 0 0; background: var(--pg-cream); box-shadow: 0 -10px 30px #0b292430; scrollbar-width: thin; scrollbar-color: #9db5a3 transparent; }
+.plank-game__sheet { position: relative; z-index: 5; flex: none; max-height: calc(100% - 166px); margin-top: -24px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 22px max(20px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) calc(18px + env(safe-area-inset-bottom)) max(20px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); border-radius: 24px 24px 0 0; background: var(--pg-cream); box-shadow: 0 -10px 30px #0b292430; scrollbar-width: thin; scrollbar-color: #9db5a3 transparent; }
 .plank-game__sheet-body { animation: plank-sheet-in 220ms var(--pg-ease) both; }
 .plank-game .plank-game__title { margin: 0 0 8px; font-family: var(--pg-display); font-size: clamp(30px, 8vw, 44px); font-weight: 850; line-height: 1.03; letter-spacing: -.035em; text-wrap: balance; }
 .plank-game .plank-game__rules { margin: 0 0 16px; color: var(--pg-muted); font-size: 14px; line-height: 1.45; }
 .plank-game__choices { display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; margin-bottom: 16px; }
 .plank-game__choices label { display: grid; gap: 6px; min-width: 0; color: var(--pg-muted); font-size: 12px; font-weight: 750; }
-.plank-game__choices select { width: 100%; min-width: 0; min-height: 48px; padding: 8px 30px 8px 12px; border: 1px solid var(--pg-line); border-radius: 14px; color: var(--pg-ink); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23173c31' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 10px center / 16px no-repeat; font-size: 15px; font-weight: 700; text-overflow: ellipsis; -webkit-appearance: none; appearance: none; }
+.plank-game__choices select { width: 100%; min-width: 0; min-height: 48px; padding: 8px 30px 8px 12px; border: 1px solid var(--pg-line); border-radius: 14px; color: var(--pg-ink); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23173c31' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 10px center / 16px no-repeat; font-size: 16px; font-weight: 700; text-overflow: ellipsis; -webkit-appearance: none; appearance: none; }
 .plank-game__primary { width: 100%; min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 16px; border: 0; border-radius: 16px; color: #fff; background: var(--pg-green); box-shadow: 0 6px 14px #173c3126; font-size: 16px; font-weight: 800; }
 .plank-game__secondary { width: 100%; min-height: 50px; padding: 12px 15px; border: 0; border-radius: 14px; color: #214a3b; background: #e8eee2; font-size: 15px; font-weight: 800; }
 .plank-game .plank-game__note { margin: 12px 0 0; color: var(--pg-muted); font-size: 12px; line-height: 1.5; }
@@ -110,7 +110,7 @@
 .plank-game__error { margin: 12px 0 0; color: #8b321c; font-size: 14px; line-height: 1.4; }
 
 /* Меню — панель поверх игры, как настройки самоката */
-.plank-game__menu { position: absolute; z-index: 30; inset: 0; display: flex; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: calc(24px + var(--pg-top)) max(24px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: var(--pg-cream); animation: plank-sheet-in 220ms var(--pg-ease) both; }
+.plank-game__menu { position: absolute; z-index: 30; inset: 0; display: flex; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: calc(24px + var(--pg-top)) max(24px, max(env(safe-area-inset-right, 0px), var(--inset-right, 0px))) calc(24px + env(safe-area-inset-bottom)) max(24px, max(env(safe-area-inset-left, 0px), var(--inset-left, 0px))); background: var(--pg-cream); animation: plank-sheet-in 220ms var(--pg-ease) both; }
 .plank-game__menu-body { width: min(100%, 460px); margin: auto; display: grid; gap: 12px; }
 .plank-game__menu-body > .plank-game__title { margin-bottom: 4px; }
 .plank-game__menu-group h3 { margin: 0 0 4px; font-size: 17px; }
@@ -168,7 +168,7 @@
   .plank-game__hud { gap: 6px; }
   .plank-game__answers button { font-size: 15px; }
   .plank-game__choices { grid-template-columns: 1.4fr 1fr; gap: 8px; }
-  .plank-game__choices select { padding-left: 10px; padding-right: 26px; background-position: right 8px center; font-size: 14px; }
+  .plank-game__choices select { padding-left: 10px; padding-right: 26px; background-position: right 8px center; }
   .plank-game__primary { gap: 8px; padding-inline: 12px; font-size: 15px; }
 }
 @media (min-width: 700px) {

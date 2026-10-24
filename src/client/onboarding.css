@@ -6,7 +6,7 @@
  * быстрее; при уменьшении движения — только смена прозрачности.
  * ========================================================================== */
 
-.onboarding { max-width: 560px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); min-height: 100dvh; display: flex; flex-direction: column; gap: 20px; }
+.onboarding { max-width: 560px; margin: 0 auto; padding: max(16px, max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))) 20px max(20px, env(safe-area-inset-bottom)); min-height: 100dvh; display: flex; flex-direction: column; gap: 20px; }
 .onboarding__top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .onboarding__top .button { min-height: 44px; }
 .onboarding__progress-text { margin: 0; color: var(--text-secondary); font-size: 14px; }
@@ -296,7 +296,7 @@
 .onboarding-admin__row { padding: 16px 0; border-top: 1px solid var(--border); }
 .onboarding-admin__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
 .onboarding-admin__fields label { display: grid; gap: 6px; font-size: 14px; }
-.onboarding-admin__fields select { width: 100%; min-height: 44px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px; font: inherit; }
+.onboarding-admin__fields select { width: 100%; min-height: 44px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px; font: inherit; font-size: 16px; }
 
 @media (max-width: 360px) {
   .onboarding { padding-left: 16px; padding-right: 16px; }
