@@ -7,7 +7,7 @@ import {
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { IconCheck, IconPhone, IconMoney, IconRuler, IconPlan, IconChevron } from '../icons.jsx';
-import { monthLabel, format } from './Metrics.jsx';
+import { monthLabel, format, deltaUnit, shiftMonth, toMonthWord } from './Metrics.jsx';
 
 /**
  * Обзор — первая вкладка сводки. То, ради чего в неё заглядывают:
@@ -140,7 +140,7 @@ function GoalsSheet({ targets, onClose, onSaved }) {
  * цели. Строка — кнопка на вкладку стороны. Полоса есть только у цифры с
  * целью: без цели мерить нечем, и пустая полоса читалась бы как ноль.
  */
-function SideRow({ goal, value, was, target, onGo }) {
+function SideRow({ goal, value, was, target, against, onGo }) {
   const unit = goal.unit;
   const known = value !== null && value !== undefined;
   const aim = goal.aim || 1;
@@ -167,7 +167,9 @@ function SideRow({ goal, value, was, target, onGo }) {
           <span className="metric">
             <span className="metric__value">{format(value, unit)}</span>
             {was !== null && was !== undefined && was !== value && (
-              <Delta value={value - was} suffix={unit === '%' ? '%' : ''} aim={aim} />
+              // С единицей и с чем сравнили: красное «↓ 21 850» без «₽» и
+              // месяца было непонятно, что упало и к чему (аудит 24.10.2026)
+              <Delta value={value - was} suffix={deltaUnit(unit) + (against ? ' ' + against : '')} aim={aim} />
             )}
           </span>
         ) : <span className="muted small">пока нет</span>}
@@ -287,6 +289,9 @@ export function Dashboard({ onGo, onOpenClient }) {
   const yearBar = progress(year.revenue, yearTarget);
   const yearDone = reached(year.revenue, yearTarget);
 
+  // С каким месяцем сравнивают стороны — подпись к стрелке у цифры
+  const against = toMonthWord(data.previousMonth || shiftMonth(data.month, -1));
+
   const signals = SIGNALS.map((s) => ({ ...s, list: (data.signals && data.signals[s.id]) || [] })).filter((s) => s.list.length);
   const quiet = !signals.length;
 
@@ -305,8 +310,8 @@ export function Dashboard({ onGo, onOpenClient }) {
       />
 
       <Section
-        title="Пять сторон"
-        note="ключевая цифра каждой — к цели и к прошлому месяцу"
+        title="Главные цифры месяца"
+        note="каждая — к цели и к прошлому месяцу"
         action={(
           <button type="button" className="button button--ghost button--small" onClick={() => { setEditing(true); haptic(); }}>
             Цели
@@ -322,6 +327,7 @@ export function Dashboard({ onGo, onOpenClient }) {
                 value={values[g.group][g.id]}
                 was={befores[g.group][g.id]}
                 target={goals[g.id]}
+                against={against}
                 onGo={onGo}
               />
             ))}

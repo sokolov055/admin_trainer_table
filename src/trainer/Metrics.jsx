@@ -48,6 +48,12 @@ function monthTo(month) {
   return MONTHS_TO[m - 1] + ' ' + year;
 }
 
+/** «к сентябрю» — без года: на обзоре сравнивают с соседним месяцем */
+export function toMonthWord(month) {
+  const m = Number(String(month || '').slice(5, 7));
+  return MONTHS_TO[m - 1] ? 'к ' + MONTHS_TO[m - 1] : '';
+}
+
 export function monthLabel(month) {
   const [year, m] = String(month || '').split('-').map(Number);
   if (!year || !m || !MONTHS[m - 1]) return String(month || '');
@@ -339,7 +345,7 @@ function Metric({ id, spec, now, before, picked, onPick, label }) {
             {comparable && (
               <Delta
                 value={value - was}
-                suffix={spec.unit === '%' ? '%' : ''}
+                suffix={deltaUnit(spec.unit)}
                 digits={spec.digits}
                 aim={spec.aim === undefined ? 1 : spec.aim}
               />
@@ -371,12 +377,23 @@ function Metric({ id, spec, now, before, picked, onPick, label }) {
  * там, где доля ровная, и не округляет 8,9 до 9. Лишняя цифра после
  * запятой в доле — это шум, который читается как точность, которой нет.
  */
+// Единица — через неразрывный пробел: «3 500 ₽» в узкой строке цели
+// переносилось, и «₽» оставался один на следующей строке (аудит 24.10.2026)
+const NBSP = ' ';
+
 export function format(value, unit, digits) {
-  if (unit === '₽') return formatMoney(value);
+  if (unit === '₽') return formatMoney(value).replace(/ ₽$/, NBSP + '₽');
   if (unit === '%') return formatNumber(value, digits) + '%';
-  if (unit === 'мес.') return formatNumber(value, digits) + ' мес.';
-  if (unit === 'ч') return formatNumber(value, digits) + ' ч';
+  if (unit === 'мес.') return formatNumber(value, digits) + NBSP + 'мес.';
+  if (unit === 'ч') return formatNumber(value, digits) + NBSP + 'ч';
   return formatNumber(value, digits);
+}
+
+/** Единица после изменения: «↓ 21 850» без «₽» читалось как что угодно */
+export function deltaUnit(unit) {
+  if (unit === '%') return '%';
+  if (unit === '₽' || unit === 'ч' || unit === 'мес.') return NBSP + unit;
+  return '';
 }
 
 function signed(value, period) {
