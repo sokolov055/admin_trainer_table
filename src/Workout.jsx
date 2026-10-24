@@ -1819,6 +1819,28 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   }, [setups, editable, s ? s.exercises.map((e) => e.id + '|' + (e.exerciseId || '') + '|' + ((e.machine && e.machine.uid) || '')).join() : '']);
 
   /**
+   * Шапка прилипла к верху — data-stuck (24.10.2026). Матовое стекло шапки
+   * продолжается вверх под часы только у прилипшей: в верхней точке над ней
+   * шапка приложения, и стекло размазало бы её в пятно — там сплошной фон
+   * (workout.css)
+   */
+  const hasSession = !!s;
+  useEffect(() => {
+    if (!hasSession || typeof window === 'undefined' || typeof window.addEventListener !== 'function'
+      || typeof document === 'undefined' || !document.querySelector || typeof getComputedStyle !== 'function') return undefined;
+    const head = document.querySelector('.workout__header');
+    if (!head || !head.getBoundingClientRect || !head.toggleAttribute) return undefined;
+    const check = () => {
+      const stuck = window.scrollY > 0
+        && head.getBoundingClientRect().top <= (parseFloat(getComputedStyle(head).top) || 0) + 1;
+      if (stuck !== head.hasAttribute('data-stuck')) head.toggleAttribute('data-stuck', stuck);
+    };
+    check();
+    window.addEventListener('scroll', check, { passive: true });
+    return () => window.removeEventListener('scroll', check);
+  }, [hasSession]);
+
+  /**
    * Под названием упражнения из базы (07.10.2026): на каком тренажёре
    * (FT-478) — вес у каждого свой, — как его настроить, и чем заменить, если
    * он занят (FT-479). Замена — пока подходы не отмечены: отмеченное при
