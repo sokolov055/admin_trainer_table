@@ -13,6 +13,7 @@ import { alarmRings, alarmClosed } from './native-rest.js';
 import { ringOnce, stopVibration } from './rest-alarm.js';
 import { isNativeApp } from './native-bridge.js';
 import { IconDelta, IconChevron } from './icons.jsx';
+import { useBackGesture } from './gestures.jsx';
 import { IconPlankGame, IconScooterGame, IconMatchGame, IconBliniGame } from './game-icons.jsx';
 import { enterFullscreen } from './game-feel.js';
 import './rest.css';
@@ -51,6 +52,18 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const stopRef = useRef(onStop);
   const swipe = useRef(null);
   stopRef.current = onStop;
+  // Системный «Назад» (Android, Back браузера) сворачивает отдых, а не
+  // закрывает тренировку под ним (аудит 24.10.2026); в игре — закрывает
+  // игру, после конца отдыха — «Закрыть». Без смахивания (swipe: false):
+  // вправо оно уводило из занятия, а вниз экран сворачивает сам
+  useBackGesture(() => {
+    if (!over && allowGame && gameUntil === until) setGameUntil(0);
+    else if (!over && onCollapse) onCollapse();
+    else onStop();
+  }, true, null, { swipe: false });
+  // data-no-gestures на экране (аудит 24.10.2026): жесты приложения
+  // (gestures.jsx) его не трогают — смахивание вправо уводило из занятия,
+  // а под ним стартовало «потяни, чтобы обновить». Свой жест — ниже
   const touchStart = (event) => {
     const touch = event.touches && event.touches[0];
     if (!touch || over || !onCollapse || (event.target.closest && event.target.closest('button'))) {
@@ -98,7 +111,7 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const R = 120;
   const C = 2 * Math.PI * R;
   if (!over && allowGame && gameUntil === until) return (
-    <div className={'rest-screen rest-screen--game' + (gameKind === 'scooter' ? ' rest-screen--scooter' : gameKind === 'match' ? ' rest-screen--match' : gameKind === 'blini' ? ' rest-screen--blini' : '')} role="dialog" aria-modal="true" aria-label="Игра во время отдыха">
+    <div className={'rest-screen rest-screen--game' + (gameKind === 'scooter' ? ' rest-screen--scooter' : gameKind === 'match' ? ' rest-screen--match' : gameKind === 'blini' ? ' rest-screen--blini' : '')} role="dialog" aria-modal="true" aria-label="Игра во время отдыха" data-no-gestures="">
       {gameKind === 'blini'
         ? <BliniGame restLeft={left} restUntil={until} onClose={() => setGameUntil(0)} />
         : gameKind === 'match'
@@ -110,6 +123,7 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   );
   return (
     <div className={'rest-screen' + (over ? ' rest-screen--over' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}
+      data-no-gestures=""
       onTouchStart={touchStart} onTouchEnd={touchEnd} onTouchCancel={() => { swipe.current = null; }}>
       <div className="rest-screen__label">{over ? 'Отдых окончен' : 'Отдых'}</div>
       <div className="rest-screen__dial">
