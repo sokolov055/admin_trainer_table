@@ -22,6 +22,10 @@ import { syncWorkouts, workoutsOn, workoutsAvailable, openHealthSettings, onIpho
  * тренировках». Android — с APK versionCode 4.
  */
 const DAYS = 30;
+// Короче — запустили и сразу закрыли, такие записи не показываем (24.10.2026)
+const SHORT = 5 * 60;
+// Свёрнутый список — последние три, совмещённые с занятием видны всегда
+const FIRST = 3;
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 
 const TYPES = {
@@ -74,6 +78,7 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
   const [message, setMessage] = useState('');
   // «Подключить тренировки» — общий экран «Здоровье» (FT-708): одно окно на всё
   const [sheet, setSheet] = useState(false);
+  const [all, setAll] = useState(false);
 
   useEffect(() => {
     const again = () => reload();
@@ -83,7 +88,7 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
 
   // Дополнение к прогрессу: старый сервер или нет связи — блока просто нет
   if (loading || error || !data) return null;
-  const list = data.workouts || [];
+  const list = (data.workouts || []).filter((w) => w.session || w.duration >= SHORT);
 
   const connect = async () => {
     if (!on) { setSheet(true); return; }
@@ -170,14 +175,18 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
   }
 
   const merged = list.filter((w) => w.session).length;
+  const minutes = Math.round(list.reduce((sum, w) => sum + (w.duration || 0), 0) / 60);
+  const total = minutes >= 60 ? Math.floor(minutes / 60) + ' ч' + (minutes % 60 ? ' ' + (minutes % 60) + ' мин' : '') : minutes + ' мин';
+  const shown = all ? list : list.filter((w, i) => i < FIRST || w.session);
+  const rest = list.length - shown.length;
   return (
     <Section
       title="Тренировки с часов"
-      note={'за месяц: ' + list.length + (merged ? ', совмещено с приложением — ' + merged : '')}
+      note={'за месяц: ' + list.length + ', ' + total + (merged ? ', совмещено с приложением — ' + merged : '')}
     >
       <Panel>
         <ul className="hw">
-          {list.map((w) => (
+          {shown.map((w) => (
             <li key={w.id} className="hw__item">
               <div className="hw__head">
                 <span className="hw__title">{workoutLabel(w.type)}</span>
@@ -196,6 +205,11 @@ export default function HealthWorkouts({ clientRow, self = false, preview = fals
             </li>
           ))}
         </ul>
+        {(rest > 0 || all) && list.length > FIRST && (
+          <button className="hw__more" onClick={() => setAll((v) => !v)} aria-expanded={all}>
+            {all ? 'Свернуть' : 'Показать все (' + list.length + ')'}
+          </button>
+        )}
         {phone && (
           <div className="hw__foot">
             <button className="button" onClick={connect} disabled={busy}>{busy ? 'Проверяем…' : 'Обновить'}</button>

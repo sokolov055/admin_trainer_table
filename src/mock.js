@@ -2139,7 +2139,7 @@ const MOCK = {
     mockGoal = { week, steps, setBy: params.clientRow ? 'trainer' : 'client', updatedAt: new Date().toISOString() };
     return mockAwards(params);
   },
-  // Тренировки с часов в «Моих тренировках»: одна совмещена с занятием
+  // Тренировки с часов в «Моих тренировках»: одна совмещена с занятием, две короткие скрыты
   'health.workouts.list': () => {
     const at = (dAgo, h, m) => { const d = new Date(); d.setDate(d.getDate() - dAgo); d.setHours(h, m, 0, 0); return d.toISOString(); };
     return {
@@ -2148,6 +2148,11 @@ const MOCK = {
           session: { id: 's1', title: 'Верх', minutes: 75, notes: ['часы включили на 7 мин позже'] } },
         { id: 'hw2', type: 'running', startedAt: at(3, 8, 5), endedAt: at(3, 8, 41), duration: 2160, kcal: 356, distance: 5230, source: 'Apple Watch', hrAvg: 149, hrMax: 176 },
         { id: 'hw3', type: 'walking', startedAt: at(5, 18, 30), endedAt: at(5, 19, 25), duration: 3300, kcal: 190, distance: 4800, source: 'iPhone' },
+        // Запустили и сразу закрыли — в списке их нет; пять настоящих — свёрнуты до трёх
+        { id: 'hw4', type: 'traditionalStrengthTraining', startedAt: at(6, 19, 3), endedAt: at(6, 19, 3), duration: 12, kcal: 0, distance: null, source: 'Fit Track' },
+        { id: 'hw5', type: 'traditionalStrengthTraining', startedAt: at(8, 9, 28), endedAt: at(8, 9, 30), duration: 130, kcal: 6, distance: null, source: 'Fit Track' },
+        { id: 'hw6', type: 'traditionalStrengthTraining', startedAt: at(8, 17, 5), endedAt: at(8, 18, 1), duration: 3360, kcal: 235, distance: null, source: 'Fit Track' },
+        { id: 'hw7', type: 'yoga', startedAt: at(10, 8, 0), endedAt: at(10, 8, 40), duration: 2400, kcal: 120, distance: null, source: 'Apple Watch' },
       ],
     };
   },

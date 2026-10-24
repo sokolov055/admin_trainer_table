@@ -5013,6 +5013,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .hw__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
 .hw__title { font-weight: 600; }
 .hw__merged { margin-top: var(--space-1); }
+.hw__more { display: block; width: 100%; min-height: 44px; padding: var(--space-3) var(--space-4); border: 0; border-top: 1px solid var(--border); background: none; color: var(--accent); font: inherit; font-weight: 600; text-align: center; cursor: pointer; }
 .hw__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); }
 
 /* Вход в Android-приложении по вставленной ссылке (PasteLink.jsx) */
