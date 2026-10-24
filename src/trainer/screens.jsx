@@ -7,11 +7,11 @@ import { ClientInviteLink } from './InviteLink.jsx';
 import LinkClient, { LinkExisting } from './LinkClient.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, Badge, Chips, Search,
-  SignOut, DataTable, Field, Note, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
+  SignOut, DataTable, Field, Note, BackButton, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { useBackGesture, usePullRefresh, captureScreen } from '../gestures.jsx';
-import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconBack, IconKey, IconAlert, IconCheck, IconChevron, IconSliders, IconExit } from '../icons.jsx';
+import { IconUsers, IconUserPlus, IconSearch, IconDeparted, IconLog, IconSheet, IconRefresh, IconKey, IconAlert, IconCheck, IconChevron, IconSliders, IconExit } from '../icons.jsx';
 import PushSetting from '../PushSetting.jsx';
 import PrivacyLink from '../PrivacyLink.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
@@ -1453,10 +1453,7 @@ function SheetView({ name, onBack }) {
 
   return (
     <>
-      <button className="button button--ghost" style={{ marginBottom: 12 }} onClick={onBack}>
-        <IconBack size={16} />
-        К списку листов
-      </button>
+      <BackButton label="К списку листов" onClick={onBack} />
 
       {loading && <Loading lead={false} rows={4} />}
       {error && <ErrorState error={error} onRetry={reload} />}

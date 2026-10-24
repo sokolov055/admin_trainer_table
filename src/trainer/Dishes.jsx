@@ -5,8 +5,9 @@ import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import {
   Panel, Chips, Segmented, Loading, ErrorState, Empty, Note, Field, Tag, Search, formatNumber, plural,
+  BackButton,
 } from '../ui.jsx';
-import { IconAlert, IconBack, IconNutrition } from '../icons.jsx';
+import { IconAlert, IconNutrition } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { EGG_SIZES, pieceLabel, mlLabel } from '../nutrition/pieces.js';
 import { carbLevel, carbTag } from '../nutrition/carbs.js';
@@ -135,7 +136,7 @@ function DishView({ dish, onBack, onEdit, onChanged }) {
 
   return (
     <>
-      <button className="button button--ghost library__back" onClick={onBack}><IconBack size={16} />Блюда</button>
+      <BackButton label="Блюда" onClick={onBack} />
       <Panel pad>
         <h2 className="library__title">{dish.name}</h2>
         <div className="item__meta library__meta">
@@ -224,7 +225,9 @@ function DishEditor({ dish, foods, onCancel, onSaved }) {
 
   return (
     <>
-      <button className="button button--ghost library__back" onClick={onCancel}><IconBack size={16} />Отмена</button>
+      {/* Сверху — куда ведёт стрелка, как у шаблонов; «Отмена» — обычной
+          кнопкой рядом с «Сохранить», а не стрелкой (аудит 24.10.2026) */}
+      <BackButton label={dish ? 'К блюду' : 'Блюда'} onClick={onCancel} />
       <Panel pad>
         <div className="library__form">
           <Field label="Название" inputMode="text" value={name} onChange={setName} placeholder="Гречка с курицей" />

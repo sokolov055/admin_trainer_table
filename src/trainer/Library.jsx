@@ -1490,7 +1490,8 @@ function NewExercise({ muscles, onSaved, onCancel }) {
   };
   return (
     <>
-      <Back onClick={onCancel}>Отмена</Back>
+      {/* Стрелка говорит, куда ведёт, а не «Отмена» (аудит 24.10.2026) */}
+      <Back onClick={onCancel}>Упражнения</Back>
       <Panel pad>
         <div className="library__form">
           <Field label="Название" inputMode="text" value={name} onChange={setName} placeholder="Жим гантелей лёжа" />
