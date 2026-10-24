@@ -94,6 +94,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // окончен» всплывает в любом разделе только у того, кто его запустил
   // «Свернуть таймер»: until свёрнутого отдыха — плашка вместо экрана
   const [collapsedUntil, setCollapsedUntil] = useState(0);
+  // Отдых, который шёл, пока экран был открыт (24.10.2026): только у него
+  // показываем «Отдых окончен». Отдых с часов, закончившийся, пока телефон
+  // лежал, при входе в занятие всплывал «Отдых окончен» от старого таймера
+  const restSeen = useRef(0);
   // Пока экран отдыха развёрнут — страница под ним не листается
   const lockScroll = useRef(false);
   // Разъединили или соединили суперсет — подходы перелетают на новые места
@@ -2029,7 +2033,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Без настоящей страницы (проверки компонента) — рисуем на месте
   const dom = typeof document !== 'undefined' && !!document.body && document.body.nodeType === 1;
   const onScreen = !dom || !!(fieldsRef.current && fieldsRef.current.offsetParent);
-  const restShown = restOn && (onScreen || startedHere);
+  if (restOn && !restOver && onScreen) restSeen.current = s.restUntil;
+  const restShown = restOn && (startedHere || (onScreen && (!restOver || restSeen.current === s.restUntil)));
   const restFolded = restShown && !restOver && collapsedUntil === s.restUntil;
   lockScroll.current = restShown && !restFolded;
   const stopRest = () => change(v => ({ ...v, restUntil: 0 }));

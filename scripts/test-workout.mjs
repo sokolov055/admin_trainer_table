@@ -208,6 +208,32 @@ test('отдых с Live Activity ждёт загрузки занятия, со
     if (tree) { tree.unmount(); tree = null; }
   }
 });
+/**
+ * Отдых с часов закончился, пока телефон лежал (владелец, 24.10.2026): при
+ * входе в занятие «Отдых окончен» от старого таймера не всплывает; идущий —
+ * виден как раньше
+ */
+test('прошедший отдых с часов при входе в занятие не показываем, идущий — показываем', async () => {
+  data.clear(); await mount(); await saveNow();
+  const initial = JSON.parse(data.get('workout_demo_server:3'))[0];
+  const rest = () => tree.root.findAll(n => n.props && n.props.role === 'dialog' && /^rest-screen/.test(n.props.className || ''));
+  for (const [until, shown] of [[Date.now() - 60000, 0], [Date.now() + 120000, 1]]) {
+    if (tree) { tree.unmount(); tree = null; }
+    for (const key of [...data.keys()]) if (key.startsWith('workout_draft_v1:')) data.delete(key);
+    nativeEnabled = true;
+    nativeActions = [{ kind: 'rest', sessionId: initial.id, restUntil: until }];
+    try {
+      await mount(false);
+      await act(async () => { await wake(); await delay(); await delay(); await delay(); });
+      assert.equal(rest().length, shown, shown ? 'идущий отдых с часов виден' : 'прошедший — без «Отдых окончен»');
+    } finally {
+      nativeEnabled = false;
+      nativeActions = [];
+      nativeTakeCalls.length = 0;
+    }
+  }
+  if (tree) { tree.unmount(); tree = null; }
+});
 test('«Завершить» по ошибке: «Продолжить» возвращает занятие с неотмеченного подхода (09.10.2026)', async () => {
   data.clear(); await mount();
   await saveNow();
