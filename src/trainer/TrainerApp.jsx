@@ -312,8 +312,9 @@ export default function TrainerApp({ me }) {
         {inMenu && <BackButton label={(TABS.find((t) => t.id === lastTab) || TABS[0]).label} onClick={() => go(lastTab)} />}
         <div className="app__bar">
           <div className="app__headline">
+            {/* Без подписи «Панель тренера · Имя»: она повторялась под каждой
+                вкладкой и ничего не сообщала (аудит 24.10.2026) */}
             <h1 className="app__title">{current.label}</h1>
-            <p className="app__subtitle">Панель тренера · {me.name}</p>
           </div>
           <div className="app__actions">
             {view === 'clients' && clientPane === 'active' && (
@@ -666,7 +667,6 @@ function ClientDetail({ client: opened, initialView = 'overview', backLabel = '�
   const fresh = ((list.data && list.data.clients) || []).find((c) => c.row === opened.row);
   const client = fresh ? { ...opened, ...fresh } : opened;
   const [view, setView] = useState(() => (CLIENT_VIEWS.some((v) => v.value === initialView) ? initialView : 'overview'));
-  const current = CLIENT_VIEWS.find((v) => v.value === view) || CLIENT_VIEWS[0];
   const ids = CLIENT_VIEWS.map((v) => v.value);
 
   // Разделы карточки — такая же лента, как нижнее меню: смахивание вбок
@@ -714,8 +714,9 @@ function ClientDetail({ client: opened, initialView = 'overview', backLabel = '�
         <BackButton label={backLabel} onClick={onBack} />
         <div className="app__bar">
           <div className="app__headline">
+            {/* Раздел видно по выделенной вкладке бара — подпись «Карточка
+                клиента · Обзор» его только повторяла (аудит 24.10.2026) */}
             <h1 className="app__title">{client.name}</h1>
-            <p className="app__subtitle">Карточка клиента · {current.label}</p>
           </div>
           {/* «Глазами клиента» — значок рядом с именем (FT-613): шапка общая
               у всех разделов, и вход в просмотр не пропадает при переходе */}

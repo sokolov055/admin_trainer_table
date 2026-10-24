@@ -986,7 +986,7 @@ test('глазами клиента — из карточки, и обратно
 
     await phone.getByRole('tab', { name: /^Все · / }).click({ timeout: 10000 });
     await phone.locator('#root main:not([hidden]) .item').first().click();
-    await phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 10000 });
+    await phone.locator('#root .card-bar [role=tab][aria-selected=true]', { hasText: 'Обзор' }).waitFor({ timeout: 10000 });
     await phone.getByRole('button', { name: 'Глазами клиента' }).click();
     await phone.getByText('Вы смотрите как клиент').waitFor({ timeout: 10000 });
     assert.equal(await phone.getByRole('button', { name: 'Сменить' }).count(), 0, 'из карточки менять некого');
@@ -995,13 +995,13 @@ test('глазами клиента — из карточки, и обратно
     await swipe(phone, { x: 60, y: 420 }, { x: 330, y: 430 });
     await phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 4000 });
     await assert.doesNotReject(
-      phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 5000 }),
+      phone.locator('#root .card-bar [role=tab][aria-selected=true]', { hasText: 'Обзор' }).waitFor({ timeout: 5000 }),
       'вернулись в карточку клиента',
     );
 
     await phone.getByRole('button', { name: 'Глазами клиента' }).click();
     await phone.getByRole('button', { name: 'К карточке' }).click();
-    await phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 5000 });
+    await phone.locator('#root .card-bar [role=tab][aria-selected=true]', { hasText: 'Обзор' }).waitFor({ timeout: 5000 });
   } finally {
     await context.close();
   }
@@ -1022,7 +1022,8 @@ test('FT-567: видимый «назад» и Back браузера на экр
   const phone = await context.newPage();
   phone.on('pageerror', (error) => consoleErrors.push(String(error)));
   const title = () => phone.locator('#root .app__title').first().textContent();
-  const subtitle = () => phone.locator('#root .app__subtitle').first().textContent();
+  // Раздел карточки — выделенная вкладка бара (подписи под именем нет, аудит 24.10.2026)
+  const subtitle = () => phone.locator('#root .card-bar [role=tab][aria-selected=true]').first().textContent();
   const menu = async (item) => {
     await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: item }).click();
@@ -1119,7 +1120,7 @@ test('FT-567: видимый «назад» и Back браузера на экр
     assert.ok(lesson, 'на экране есть занятие Анны');
     await lesson.click();
     await phone.getByRole('button', { name: 'Программа клиента' }).click();
-    await phone.locator('#root .app__subtitle', { hasText: 'Карточка клиента · Тренировки' }).waitFor({ timeout: 10000 });
+    await phone.locator('#root .card-bar [role=tab][aria-selected=true]', { hasText: 'Тренировки' }).waitFor({ timeout: 10000 });
     assert.equal(await phone.locator('#root .app__title').first().textContent(), 'Анна Морозова');
     await phone.getByRole('button', { name: 'К занятию' }).waitFor({ timeout: 3000 });
     // Back браузера с не первого раздела карточки — к тому, откуда пришли
@@ -1334,7 +1335,8 @@ test('разделы карточки клиента листаются смах
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
   const phone = await context.newPage();
   phone.on('pageerror', (error) => consoleErrors.push(String(error)));
-  const subtitle = () => phone.locator('#root .app__subtitle').first().textContent();
+  // Раздел карточки — выделенная вкладка бара (подписи под именем нет, аудит 24.10.2026)
+  const subtitle = () => phone.locator('#root .card-bar [role=tab][aria-selected=true]').first().textContent();
   const settled = () => phone.waitForFunction(() => !document.querySelector('.swipeback'), null, { timeout: 4000 });
 
   try {
@@ -1346,16 +1348,16 @@ test('разделы карточки клиента листаются смах
     // быть: берём клиента из «Все»
     await phone.getByRole('tab', { name: /^Все · / }).click({ timeout: 10000 });
     await phone.locator('#root main:not([hidden]) .item').first().click({ timeout: 10000 });
-    await phone.getByText('Карточка клиента · Обзор').waitFor({ timeout: 10000 });
+    await phone.locator('#root .card-bar [role=tab][aria-selected=true]', { hasText: 'Обзор' }).waitFor({ timeout: 10000 });
     await phone.waitForTimeout(400);
 
     await swipe(phone, { x: 330, y: 600 }, { x: 60, y: 610 });
     await settled();
-    assert.equal(await subtitle(), 'Карточка клиента · Оплаты', 'влево — следующий раздел');
+    assert.equal((await subtitle()).trim(), 'Оплаты', 'влево — следующий раздел');
 
     await swipe(phone, { x: 60, y: 600 }, { x: 330, y: 610 });
     await settled();
-    assert.equal(await subtitle(), 'Карточка клиента · Обзор', 'вправо — предыдущий');
+    assert.equal((await subtitle()).trim(), 'Обзор', 'вправо — предыдущий');
 
     await swipe(phone, { x: 60, y: 600 }, { x: 330, y: 610 });
     await settled();
