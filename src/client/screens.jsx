@@ -355,13 +355,13 @@ function changeLine(counts, kind) {
   if (!all) return 'не было';
   const t = counts.total;
   const detail = kind === 'cancel'
-    ? ['клиент ' + t.cancelClient, 'тренер ' + t.cancelTrainer, t.cancelLate ? 'поздних ' + t.cancelLate : '', t.cancelCharged ? 'списано ' + t.cancelCharged : '']
-    : ['клиент ' + t.moveClient, 'тренер ' + t.moveTrainer];
+    ? ['отменил клиент — ' + t.cancelClient, 'тренер — ' + t.cancelTrainer, t.cancelLate ? 'поздних — ' + t.cancelLate : '', t.cancelCharged ? 'списано — ' + t.cancelCharged : '']
+    : ['перенёс клиент — ' + t.moveClient, 'тренер — ' + t.moveTrainer];
   // Число этого месяца — главное; разбивка за всё время — мелко под ним
   return (
     <span className="changes">
       <strong>{part(counts.month)} в этом месяце</strong>
-      <span className="changes__detail">всего {all}: {detail.filter(Boolean).join(', ')}</span>
+      <span className="changes__detail">за всё время {all}: {detail.filter(Boolean).join(', ')}</span>
     </span>
   );
 }
