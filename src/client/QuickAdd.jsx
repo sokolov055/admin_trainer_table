@@ -21,12 +21,12 @@ import './quick-add.css';
  * Только действия, которые в приложении уже есть. Плитка не открывает
  * свою форму, а переключает вкладку и просит её открыть свою
  * (quick-actions.js): форма одна, и правится в одном месте. Еда и вода —
- * с «Плюсом», «Тренеру» — когда тренер есть: пожелание тренеру внизу
+ * с «Плюсом», «Написать тренеру» — когда тренер есть: пожелание тренеру внизу
  * «Тренировок» (Wishes.jsx) — единственный способ написать ему из
  * приложения.
  *
  * Тренер «глазами клиента» видит тот же набор, что клиент, но еда, вода и
- * «Тренеру» там не нажимаются: дневник в просмотре только для чтения, а
+ * «Написать тренеру» там не нажимаются: дневник в просмотре только для чтения, а
  * пожелание тренер написал бы сам себе. Раньше их просто не было, и лист
  * на «Питании» выглядел так, будто про еду в нём забыли.
  *
@@ -60,7 +60,7 @@ export default function QuickAdd({ me, clientRow, preview, tab, onClose, onPick,
     ...(food ? [{ kind: 'water', tab: 'nutrition', label: 'Вода', hint: '+250 мл', name: 'Вода, плюс 250 мл', Icon: IconDrop, off: !own }] : []),
     actions.weight,
     { kind: 'measure', tab: 'progress', label: 'Замеры', Icon: IconRuler },
-    ...(coach ? [{ kind: 'wish', tab: 'plan', label: 'Тренеру', name: 'Написать тренеру', Icon: IconSend, off: !own }] : []),
+    ...(coach ? [{ kind: 'wish', tab: 'plan', label: 'Написать тренеру', Icon: IconSend, off: !own }] : []),
   ].map((t) => (t.kind === mainKind ? actions.workout : t));
   const locked = tiles.some((t) => t.off);
   // Занятию нужен payload (что начать), остальным — нет
@@ -76,7 +76,9 @@ export default function QuickAdd({ me, clientRow, preview, tab, onClose, onPick,
         </span>
       </button>
 
-      <div className="quick-tiles">
+      {/* Число колонок — по числу плиток (quick-add.css): все плитки одной
+          ширины, без растянутых половинок в последнем ряду (аудит 24.10.2026) */}
+      <div className="quick-tiles" data-count={tiles.length}>
         {tiles.map((t, i) => (
           <button key={t.kind} type="button" className="quick-tile" style={{ '--i': i + 1 }}
             aria-label={t.name} disabled={t.off} onClick={() => pick(t)}>

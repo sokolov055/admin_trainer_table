@@ -1,0 +1,3 @@
+/* Лист «Дата замера» (MeasureMove.jsx, аудит 24.10.2026) */
+.measure-move__lead { margin: 0 0 var(--space-3); line-height: 1.45; }
+.measure-move__lead + .field { margin-bottom: var(--space-4); }

@@ -1,22 +1,26 @@
 /* Карта мышц (FT-491). Основная — акцентом, синергисты — им же бледнее
    (сплошным цветом, а не прозрачностью: фигура лежит и на карточке, и на фоне),
-   остальное тело — тёплым серым фона приложения. */
+   остальное тело — тёплым серым фона приложения.
+   Синергисты — смесью основного цвета с поверхностью, а не своим синим: в
+   «Хэллоуине» и других палитрах основная оранжевая, а синергисты оставались
+   тёмно-синими #2e5687 и почти не читались (аудит 24.10.2026). В тёмной
+   теме доля цвета больше: смесь с тёмной поверхностью иначе тонет в теле. */
 :root {
   --muscle-idle: #dcd7cc;
   --muscle-inert: #e9e5dc;
   --muscle-primary: var(--accent-solid);
-  --muscle-secondary: #a9c6ea;
+  --muscle-secondary: color-mix(in srgb, var(--accent-solid) 45%, var(--surface));
 }
 :root[data-theme='dark'] {
   --muscle-idle: #403c45;
   --muscle-inert: #312e35;
-  --muscle-secondary: #2e5687;
+  --muscle-secondary: color-mix(in srgb, var(--accent-solid) 55%, var(--surface));
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     --muscle-idle: #403c45;
     --muscle-inert: #312e35;
-    --muscle-secondary: #2e5687;
+    --muscle-secondary: color-mix(in srgb, var(--accent-solid) 55%, var(--surface));
   }
 }
 

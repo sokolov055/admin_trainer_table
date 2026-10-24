@@ -20,15 +20,12 @@
 .onboarding__footer { padding-top: 12px; }
 .onboarding__footer .button { min-height: 52px; }
 
+/* Цвета БЖУ — общие токены --macro-* (styles.css), а не свои: в дневнике и
+   «Ладони» белки, жиры и углеводы того же цвета (аудит 24.10.2026) */
 .ob {
-  --ob-protein: #cf6340;
-  --ob-fat: #d99a22;
-  --ob-carbs: #3a7fd0;
   gap: 0;
   padding-bottom: 0;
 }
-:root[data-theme='dark'] .ob, .theme-dark .ob { --ob-protein: #e8845f; --ob-fat: #eab54a; --ob-carbs: #6aa6ec; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .ob { --ob-protein: #e8845f; --ob-fat: #eab54a; --ob-carbs: #6aa6ec; } }
 
 /* ---------- Верх: разделы и «Позже» ---------- */
 .ob__top { display: flex; align-items: center; gap: 12px; min-height: 48px; }
@@ -152,18 +149,18 @@
 .ob-gauge svg { display: block; width: 100%; overflow: visible; }
 .ob-gauge__track { fill: none; stroke: var(--surface-sunken); stroke-width: 18; stroke-linecap: round; }
 .ob-gauge__seg { fill: none; stroke-width: 18; }
-.ob-gauge__seg--protein { stroke: var(--ob-protein); }
-.ob-gauge__seg--fat { stroke: var(--ob-fat); }
-.ob-gauge__seg--carbs { stroke: var(--ob-carbs); }
+.ob-gauge__seg--protein { stroke: var(--macro-protein); }
+.ob-gauge__seg--fat { stroke: var(--macro-fat); }
+.ob-gauge__seg--carbs { stroke: var(--macro-carbs); }
 .ob-gauge__value { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; display: grid; justify-items: center; }
 .ob-gauge__value .ob-big__num { font-size: clamp(48px, 15vw, 60px); }
 .ob-gauge__unit { margin-top: 4px; color: var(--text-secondary); font-size: 14px; font-weight: 650; }
 .ob-macros { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .ob-macro { display: grid; gap: 2px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); animation: ob-rise 420ms var(--ease-out) both; animation-delay: calc(500ms + var(--i, 0) * 70ms); }
 .ob-macro__dot { width: 10px; height: 10px; border-radius: 50%; margin-bottom: 6px; }
-.ob-macro--protein .ob-macro__dot { background: var(--ob-protein); }
-.ob-macro--fat .ob-macro__dot { background: var(--ob-fat); }
-.ob-macro--carbs .ob-macro__dot { background: var(--ob-carbs); }
+.ob-macro--protein .ob-macro__dot { background: var(--macro-protein); }
+.ob-macro--fat .ob-macro__dot { background: var(--macro-fat); }
+.ob-macro--carbs .ob-macro__dot { background: var(--macro-carbs); }
 .ob-macro__label { color: var(--text-secondary); font-size: 13px; font-weight: 600; }
 .ob-macro__value { font-size: 21px; font-weight: 780; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .ob-macro__share { justify-self: start; margin-top: 4px; padding: 2px 8px; border-radius: 99px; background: var(--surface-sunken); color: var(--text-secondary); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }

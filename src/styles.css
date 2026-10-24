@@ -130,6 +130,12 @@
   --palm-carbs: #b7791f;
   --palm-fat: #2672cd;
   --palm-veg: #1a7f3c;
+  /* Белки, жиры, углеводы — одни тона на всех экранах: анкета, дневник,
+     «Ладонь» (аудит 24.10.2026; раньше у анкеты были свои, жиры 2,4:1).
+     Берутся у «Ладони», поэтому тёмные значения приходят оттуда же */
+  --macro-protein: var(--palm-protein);
+  --macro-carbs: var(--palm-carbs);
+  --macro-fat: var(--palm-fat);
 
   /* --- смысловые тона ---
      Зелёный за деньги и «всё в порядке», красный за долг — то, как это
@@ -1139,6 +1145,9 @@ button, input, select, textarea { font-family: inherit; }
   overflow-x: auto;
   scrollbar-width: none;
   scroll-snap-type: x proximity;
+  /* Без него привязка прижимала первую плитку к краю ленты, за поле экрана, —
+     она стояла обрезанной слева (аудит 24.10.2026) */
+  scroll-padding-inline: var(--space-4);
 }
 
 .stories::-webkit-scrollbar { display: none; }

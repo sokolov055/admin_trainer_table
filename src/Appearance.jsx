@@ -32,10 +32,12 @@ export default function Appearance() {
   return (
     <>
       <LookPreview />
-      <Section title="Тема">
+      {/* «Тема» звучала как «Хэллоуин», а он лежал ниже, в «Персональных
+          цветах» (аудит 24.10.2026): заголовки — по тому, что выбирают */}
+      <Section title="Светлая или тёмная">
         <ThemeSetting bare forced={forcedScheme(palette)} forcedBy={paletteById(palette).name} />
       </Section>
-      <Section title="Персональные цвета" note="Кнопки, вкладки, выделение и фон. Запоминается на этом устройстве.">
+      <Section title="Цвета и темы" note="Кнопки, вкладки, выделение и фон. Запоминается на этом устройстве.">
         <PalettePicker current={palette} onPick={pick} />
       </Section>
     </>
@@ -87,7 +89,7 @@ function PalettePicker({ current, onPick }) {
 
   return (
     <Panel pad>
-      <div className="palettes" role="radiogroup" aria-label="Персональные цвета">
+      <div className="palettes" role="radiogroup" aria-label="Цвета и темы">
         {listPalettes().map((p) => {
           const on = p.id === current;
           const [a, b, c] = p.swatch;

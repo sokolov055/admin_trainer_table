@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Panel, Segmented, Field, Switch, formatNumber, formatWhen } from '../ui.jsx';
-import { IconCopy, IconCheck, IconExternal } from '../icons.jsx';
+import { IconCopy, IconCheck, IconExternal, IconMail, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
 import { isNativeApp, plugin, screensNote } from '../native-bridge.js';
@@ -15,7 +15,7 @@ import { ensureBackgroundSync } from '../native-sync.js';
 import { notifyPermission, askNotifyPermission } from '../native-rest.js';
 import { openPhoneSettings, canRateInStore, openStorePage, deviceInfo } from '../native-review.js';
 import { readReminders, saveReminders, syncReminders, remindersAvailable } from '../native-reminders.js';
-import { WEEKDAYS_SHORT, reminderNote, validTime } from '../reminders-model.js';
+import { WEEKDAYS, WEEKDAYS_SHORT, normalizeReminders, shortTime, reminderNote, validTime } from '../reminders-model.js';
 import { SCHEDULE_UNKNOWN } from './schedule-text.js';
 import './settings.css';
 
@@ -185,6 +185,25 @@ function PlanNext() {
 
 const capital = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
+/**
+ * Строка напоминания, которое можно настроить: время — справа у шеврона,
+ * как значение в настройках iOS, день — подписью под названием. Так видно,
+ * что строка нажимается и что под ней меняется (аудит 24.10.2026: раньше
+ * это объясняла подпись «Время можно менять касанием по строке»).
+ */
+function reminderParts(kind, raw) {
+  const s = normalizeReminders(raw);
+  if (kind === 'weigh') return { when: WEEKDAYS[s.weigh.day], time: shortTime(s.weigh.time) };
+  if (kind === 'measure') return { when: 'Раз в две недели, ' + WEEKDAYS[s.measure.day].toLowerCase(), time: shortTime(s.measure.time) };
+  if (kind === 'food') {
+    const [a, b] = s.food.times;
+    return a === b
+      ? { when: 'Раз в день', time: shortTime(a) }
+      : { when: 'Два раза в день', time: shortTime(a) + ', ' + shortTime(b) };
+  }
+  return { when: reminderNote(kind, s), time: '' };
+}
+
 /** Состояние разрешения словами — первая строка «Напоминаний» */
 const NOTIFY_NOTE = {
   granted: 'Разрешены',
@@ -277,16 +296,21 @@ export function Reminders() {
         {KINDS.map(({ id, title }) => {
           const editable = can && id !== 'plan';
           const expanded = editable && open === id;
+          const parts = editable ? reminderParts(id, s) : null;
           const note = <>
             <span className="conn-row__title">{title}</span>
-            <span className="conn-row__note">{reminderNote(id, s)}</span>
+            <span className="conn-row__note">{parts ? parts.when : reminderNote(id, s)}</span>
             {can && id === 'plan' && s.plan.on && <PlanNext />}
           </>;
           return <React.Fragment key={id}>
             <div className="conn-row">
               {editable
                 ? <button type="button" className="conn-row__main conn-row__main--button" aria-expanded={expanded}
-                  aria-controls={'reminder-' + id} onClick={() => { setOpen(expanded ? '' : id); haptic(); }}>{note}</button>
+                  aria-controls={'reminder-' + id} onClick={() => { setOpen(expanded ? '' : id); haptic(); }}>
+                  <span className="conn-row__text">{note}</span>
+                  <span className="conn-row__value">{parts.time}</span>
+                  <IconChevron size={16} className={'conn-row__chevron' + (expanded ? ' is-open' : '')} />
+                </button>
                 : <div className="conn-row__main">{note}</div>}
               <Switch label={title} checked={s[id].on} disabled={!can || busy} onChange={(on) => toggle(id, on)} />
             </div>
@@ -302,7 +326,7 @@ export function Reminders() {
       )}
       <p className="conn-caption">
         {can
-          ? 'Напоминания ставит сам телефон, без нашего сервера: расписание хранится только на нём. Время можно менять касанием по строке.'
+          ? 'Напоминания ставит сам телефон, без нашего сервера: расписание хранится только на нём.'
           : 'Напоминания работают в приложении для iPhone и Android.'}
       </p>
     </>
@@ -312,6 +336,15 @@ export function Reminders() {
 /* ==========================================================================
  * Поддержка: оценить и скопировать данные
  * ========================================================================== */
+
+/** Адрес поддержки — тот же, что на экране входа (LoginScreen.jsx) */
+export const SUPPORT_EMAIL = 'sokolovk055@yandex.ru';
+
+/** Письмо в поддержку: адрес, тема и данные уже в нём — человек дописывает вопрос */
+export function supportMailto(text) {
+  const body = '\n\n' + (text || 'Fit Track — данные для поддержки\nВерсия: ' + APP_VERSION);
+  return 'mailto:' + SUPPORT_EMAIL + '?subject=' + encodeURIComponent('Fit Track: вопрос') + '&body=' + encodeURIComponent(body);
+}
 
 /** Текст для письма в поддержку — только то, что человек сам решит отправить */
 async function supportText() {
@@ -357,6 +390,20 @@ export function Support({ disabled = false }) {
   return (
     <>
       <Panel>
+        {/* Письмо сразу с адресом и данными (аудит 24.10.2026): раньше была
+            только «Скопировать — вставьте в письмо поддержке», а адреса на
+            экране не было — тупик */}
+        {disabled ? (
+          <button type="button" className="conn-link" disabled>
+            <span>Написать в поддержку</span>
+            <IconMail size={18} />
+          </button>
+        ) : (
+          <a className="conn-link" href={supportMailto(text)} onClick={() => haptic()}>
+            <span>Написать в поддержку</span>
+            <IconMail size={18} />
+          </a>
+        )}
         {rate && (
           <button type="button" className="conn-link" onClick={() => { haptic(); openStorePage().catch(() => {}); }}>
             <span>Оценить Fit Track</span>
@@ -370,10 +417,10 @@ export function Support({ disabled = false }) {
       </Panel>
       <p className={'conn-caption' + (failed ? ' conn-caption--bad' : '')} role="status">
         {disabled
-          ? 'Здесь клиент копирует версию приложения, модель телефона и свой ID для письма в поддержку. В режиме просмотра это не нажимается.'
-          : failed ? 'Не получилось скопировать — телефон не дал доступ к буферу обмена.'
-            : copied ? 'Скопировано: версия, устройство и ID — вставьте в письмо поддержке.'
-              : 'Версия приложения, модель телефона и ваш ID — в буфер обмена, чтобы вставить в письмо.'}
+          ? 'Здесь клиент пишет в поддержку: версия приложения, модель телефона и его ID подставляются в письмо сами. В режиме просмотра это не нажимается.'
+          : failed ? 'Не получилось скопировать — телефон не дал доступ к буферу обмена. Адрес поддержки: ' + SUPPORT_EMAIL + '.'
+            : copied ? 'Скопировано: версия, устройство и ID. Адрес поддержки: ' + SUPPORT_EMAIL + '.'
+              : 'Версия приложения, модель телефона и ваш ID подставятся в письмо сами. Адрес поддержки: ' + SUPPORT_EMAIL + '.'}
       </p>
     </>
   );

@@ -48,20 +48,21 @@
 }
 
 /* Плитки: по три в ряд и на 320 px (≈ 86 px шириной); крупный шрифт
-   переносит подпись, а не режет её. Сетка — в шесть долей, плитка
-   занимает две: неполный последний ряд растягивается на всю ширину,
-   а не оставляет дыру справа (пять плиток — три и две по половине) */
+   переносит подпись, а не режет её. Все плитки одной ширины (аудит
+   24.10.2026): раньше неполный ряд растягивался — пять плиток стояли как
+   три и две широкие, и широкие читались как важнее. Теперь колонок столько,
+   чтобы ряды выходили ровными: две и три плитки — в один ряд, четыре —
+   два на два, пять — три и две той же ширины */
 .quick-tiles {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding-bottom: 4px;
 }
 
-.quick-tiles > .quick-tile { grid-column: span 2; }
-.quick-tiles > .quick-tile:nth-child(3n + 1):nth-last-child(2),
-.quick-tiles > .quick-tile:nth-child(3n + 2):last-child { grid-column: span 3; }
-.quick-tiles > .quick-tile:nth-child(3n + 1):last-child { grid-column: span 6; }
+.quick-tiles[data-count='1'] { grid-template-columns: minmax(0, 1fr); }
+.quick-tiles[data-count='2'],
+.quick-tiles[data-count='4'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .quick-tile {
   display: flex;
@@ -73,7 +74,10 @@
   padding: 10px 6px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: var(--surface-sunken);
+  /* Чуть светлее листа в тёмной теме и чуть темнее в светлой: утопленная
+     --surface-sunken в тёмной была темнее листа — плитки читались дырами
+     (аудит 24.10.2026) */
+  background: color-mix(in srgb, var(--text) 7%, var(--surface));
   color: var(--text);
   font: inherit;
   font-size: var(--text-sm);

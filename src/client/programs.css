@@ -147,3 +147,11 @@
   .pcard { transition: none; }
   .pcard:active { transform: none; }
 }
+
+/* Две кнопки пустого состояния — рядом, переносом на узком экране (аудит 24.10.2026) */
+.programs__empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}

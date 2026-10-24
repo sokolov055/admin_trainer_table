@@ -18,8 +18,11 @@
 .diary-tabs button { white-space: nowrap; }
 .diary-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
 /* Переключатель дня — плашка, как вкладки над ним: на рисунке темы стрелки
-   и «Сегодня» без подложки терялись (владелец, 22.10.2026) */
-.diary-date { display: flex; gap: var(--space-1); align-items: center; padding: 3px; border: 1px solid var(--diary-edge); border-radius: 999px; background: var(--surface); box-shadow: var(--diary-lift); }
+   и «Сегодня» без подложки терялись (владелец, 22.10.2026). На всю ширину
+   и без тени (аудит 24.10.2026): капсула с тенью на полэкрана висела над
+   карточками как всплывающая кнопка, а это строка «какой день» */
+.diary-date { flex: 1 1 100%; display: flex; gap: var(--space-1); align-items: center; justify-content: space-between; padding: 3px; border: 1px solid var(--diary-edge); border-radius: 999px; background: var(--surface); }
+.diary-date .diary-date__pick { flex: 1; }
 .diary-date .icon-button { border-radius: 999px; color: var(--accent); }
 .diary-date__pick { border-radius: 999px; }
 /* День словами («Сегодня», «20 октября, вт»); настоящее поле даты лежит
@@ -45,6 +48,11 @@
 .diary-macros strong { display: block; font-size: var(--text-base); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .diary-track { height: 6px; background: var(--diary-track); border-radius: 4px; margin-top: var(--space-2); overflow: hidden; }
 .diary-track > span { display: block; height: 100%; background: var(--accent-solid); border-radius: 4px; transition: width 480ms var(--ease-ios); }
+/* Полоски БЖУ — общими цветами БЖУ, как в анкете и «Ладони», а не акцентом
+   палитры (аудит 24.10.2026). Кольцо калорий остаётся акцентом */
+.diary-track--protein > span { background: var(--macro-protein); }
+.diary-track--fat > span { background: var(--macro-fat); }
+.diary-track--carbs > span { background: var(--macro-carbs); }
 /* «Осталось …» и «Что влезет» — шапка правой колонки; подбор блюд — подвал
    карточки под чертой, кнопка во всю ширину */
 .diary-summary__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }

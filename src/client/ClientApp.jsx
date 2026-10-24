@@ -7,7 +7,7 @@ import { useBackGesture, useTabGesture, rememberTab, captureScreen } from '../ge
 import TabBar from '../TabBar.jsx';
 import { useKeptTabs } from '../keptTabs.js';
 import { useViewMotion } from '../viewMotion.js';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink, IconGuide, IconPalette } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconBack, IconUser, IconUsers, IconMenu, IconClose, IconSliders, IconPhone, IconLink, IconGuide, IconPalette } from '../icons.jsx';
 import { canOpenInApp } from '../open-in-app.js';
 import { showAppHint } from '../AppHint.jsx';
 import { BackButton, Drawer, Section, SignOut, Loading } from '../ui.jsx';
@@ -51,6 +51,7 @@ import { useCareer } from '../CareerSession.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import { requestQuick } from '../quick-actions.js';
 import './overview.css';
+import './client-menu.css';
 
 /**
  * Панель клиента.
@@ -85,17 +86,21 @@ const TABS = [
  * зашедший включить уведомления не должен листать свой рост и телефон.
  */
 const MENU = [
-  // Игры — общий список с «Моими тренировками» владельца (game-icons.jsx)
-  ...GAME_ITEMS.map((g) => ({ ...g, game: true })),
   // Журнала тренировок у клиента в меню нет (решение владельца 01.10.2026):
   // всё проведённое, со свободными тренировками и повторами, — во вкладке
   // «Тренировки» → «Выполненные», свободная тренировка — кнопкой там же.
   // У тренера журнал клиентов в меню остался
-  { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта, здоровье', Icon: IconUsers },
+  { id: 'profile', label: 'Мои данные', note: 'Рост, телефон, почта, здоровье', Icon: IconUser },
   // Тема и персональные цвета — свой пункт (21.10.2026), а не строка настроек
-  { id: 'appearance', label: 'Оформление', note: 'Тема и персональные цвета', Icon: IconPalette },
+  { id: 'appearance', label: 'Оформление', note: 'Светлая или тёмная, цвета и темы', Icon: IconPalette },
   { id: 'settings', label: 'Настройки', note: 'Уведомления, подключения, поддержка', Icon: IconSliders },
 ];
+
+// Игры — общий список с «Моими тренировками» владельца (game-icons.jsx).
+// Отдельной группой с заголовком в конце меню (аудит 24.10.2026): пять
+// пунктов с картинками 64 px стояли между «Семьёй» и «Моими данными», и
+// «Настройки» с «Моим тренером» уходили за край панели
+const GAMES = GAME_ITEMS.map((g) => ({ ...g, game: true }));
 
 // Семья — в меню, только если тренер открыл её этому человеку и в ней
 // есть кого показать. Пустой пункт «Семья» у одиночки только сбивал бы.
@@ -231,8 +236,9 @@ export default function ClientApp({ me, clientRow, preview }) {
   const guide = { id: 'guide', label: 'Как пользоваться', note: tours.length ? 'Короткие туры и инструкция' : guideNote(storyTopics), Icon: IconGuide };
   // Согласие по новым правилам ещё не подтверждено — сначала оно
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
-  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU.filter(m => !['career', 'plank-game', 'scooter-game', 'match-game', 'blini-game'].includes(m.id) || plankEnabled), ...(tours.length || hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
-  const VIEWS = TABS.concat(menu);
+  const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...(tours.length || hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
+  const games = plankEnabled ? GAMES : [];
+  const VIEWS = TABS.concat(menu, games);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
   // смахнуть вправо — вернуться на ту вкладку, где был человек
@@ -372,6 +378,26 @@ export default function ClientApp({ me, clientRow, preview }) {
     </>
   );
 
+  // Пункт бокового меню; игры — с картинкой (game-icons.jsx), остальные — значком
+  const menuItem = (m) => {
+    const Icon = m.Icon;
+    const active = m.id === view;
+    return (
+      <button
+        key={m.id}
+        className={'menu__item' + (m.game ? ' menu__item--game' : '') + (active ? ' menu__item--active' : '')}
+        onClick={() => (m.action ? (setMenuOpen(false), m.action()) : go(m.id))}
+        aria-current={active ? 'page' : undefined}
+      >
+        <span className="menu__icon"><Icon size={m.game ? 44 : 20} /></span>
+        <span className="menu__text">
+          <span className="menu__label">{m.label}</span>
+          <span className="menu__note">{m.note}</span>
+        </span>
+      </button>
+    );
+  };
+
   return (
     <div className="app">
       {preview && (
@@ -431,26 +457,17 @@ export default function ClientApp({ me, clientRow, preview }) {
           </button>
         </div>
 
-        <div className="menu__list">
-          {menu.map((m) => {
-            const Icon = m.Icon;
-            const active = m.id === view;
-            return (
-              <button
-                key={m.id}
-                className={'menu__item' + (m.game ? ' menu__item--game' : '') + (active ? ' menu__item--active' : '')}
-                onClick={() => (m.action ? (setMenuOpen(false), m.action()) : go(m.id))}
-                aria-current={active ? 'page' : undefined}
-              >
-                <span className="menu__icon"><Icon size={m.game ? 64 : 20} /></span>
-                <span className="menu__text">
-                  <span className="menu__label">{m.label}</span>
-                  <span className="menu__note">{m.note}</span>
-                </span>
-              </button>
-            );
-          })}
+        {/* Колонка значков одной ширины у всех пунктов (client-menu.css):
+            текст не прыгает между строками со значком и с картинкой игры */}
+        <div className="menu__list client-menu">
+          {menu.map(menuItem)}
         </div>
+        {games.length > 0 && (
+          <div className="client-menu__group" role="group" aria-labelledby="client-menu-games">
+            <h2 className="client-menu__title" id="client-menu-games">Игры</h2>
+            <div className="menu__list client-menu">{games.map(menuItem)}</div>
+          </div>
+        )}
 
         <p className="menu__version">Версия {APP_VERSION}{screensNote()}</p>
       </Drawer>
@@ -505,7 +522,7 @@ export default function ClientApp({ me, clientRow, preview }) {
               встают под главной карточкой, а не над ней: появившись позже,
               не сдвигают «Оплачено вперёд» (аудит 24.10.2026) */}
           <t.Screen clientRow={clientRow} clientView={!!preview}
-            {...(t.id === 'overview' ? { afterLead: overviewExtras } : {})} />
+            {...(t.id === 'overview' ? { afterLead: overviewExtras, onTrainer: menu.some((m) => m.id === 'trainer') ? () => go('trainer') : null } : {})} />
         </main>
       ))}
 

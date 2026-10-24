@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, apiMutate } from '../api.js';
+import { api, apiMutate, apiPrimary } from '../api.js';
 import { Field, Segmented, Note, Loading, ErrorState, Panel } from '../ui.jsx';
 import { IconAlert, IconCheck } from '../icons.jsx';
 import PhoneSetting from './PhoneSetting.jsx';
@@ -31,14 +31,24 @@ export default function Profile({ clientRow }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
   const [saved, setSaved] = useState(false);
+  // Номер для входа (account.phone.get) — только у самого клиента
+  const [phoneLogin, setPhoneLogin] = useState(null);
+  const loadPhoneLogin = () => (clientRow ? Promise.resolve(null) : apiPrimary('account.phone.get', {}).catch(() => null));
 
   const load = () => {
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    // Через api(): без связи — последние сохранённые данные, а не ошибка
-    api('profile.get', params, { fresh: true })
-      .then((r) => {
+    // Через api(): без связи — последние сохранённые данные, а не ошибка.
+    // Номер для входа читаем рядом и показываем вместе с анкетой: под полем
+    // «Телефон» он, появившись позже, сдвигал бы форму (аудит 24.10.2026).
+    // Но анкету не держим дольше 1,5 с: без связи запрос номера ждал бы
+    // своего таймаута, а сохранённая анкета уже есть — номер догонит
+    const phone = loadPhoneLogin();
+    const phoneSoon = Promise.race([phone, new Promise((r) => setTimeout(() => r(undefined), 1500))]);
+    Promise.all([api('profile.get', params, { fresh: true }), phoneSoon])
+      .then(([r, ph]) => {
         setForm({ ...EMPTY, ...(r.profile || {}) });
+        if (ph === undefined) phone.then(setPhoneLogin); else setPhoneLogin(ph);
         setState({ loading: false, error: null, age: r.age });
       })
       .catch((error) => setState({ loading: false, error, age: null }));
@@ -128,6 +138,14 @@ export default function Profile({ clientRow }) {
               disabled={busy}
             />
           </div>
+          {/* Вход по этому номеру — под тем же полем, а не отдельным блоком
+              со вторым полем «Телефон» ниже анкеты (аудит 24.10.2026). Только
+              у самого клиента: тренер в карточке номер для входа не подключает,
+              вход подтверждает звонком владелец номера */}
+          {!clientRow && (
+            <PhoneSetting state={phoneLogin} phone={form.phone} disabled={busy}
+              onChange={() => loadPhoneLogin().then(setPhoneLogin)} />
+          )}
         </div>
 
         <div className="survey__group">
@@ -149,11 +167,6 @@ export default function Profile({ clientRow }) {
         <button className="button" onClick={load} disabled={busy}>Отменить правки</button>
       </div>
     </Panel>
-    {/* Номер для входа — только у самого клиента: тренер в карточке его не
-        подключает, вход подтверждает звонком владелец номера. Под анкетой,
-        а не над ней: блок есть не всегда (только с ключом SMS.ru) и,
-        появившись позже, сдвигал форму (аудит 24.10.2026) */}
-    {!clientRow && <PhoneSetting />}
     {/* Копия своих данных (ст. 14 152-ФЗ) — тоже только у самого клиента */}
     {!clientRow && <DataExport />}
     </>

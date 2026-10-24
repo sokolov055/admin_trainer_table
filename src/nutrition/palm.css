@@ -34,9 +34,9 @@
 .palm-ring strong { font-size: var(--text-md); font-weight: 650; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .palm-ring small { font-size: var(--text-sm); color: var(--text-secondary); }
 /* Цвета колец — токены styles.css (светлые и тёмные значения там же) */
-.palm-ring--protein { --palm-color: var(--palm-protein); }
-.palm-ring--carbs { --palm-color: var(--palm-carbs); }
-.palm-ring--fat { --palm-color: var(--palm-fat); }
+.palm-ring--protein { --palm-color: var(--macro-protein); }
+.palm-ring--carbs { --palm-color: var(--macro-carbs); }
+.palm-ring--fat { --palm-color: var(--macro-fat); }
 .palm-ring--veg { --palm-color: var(--palm-veg); }
 .palm-ring.is-done .palm-ring__circle { color: var(--good-text); }
 .palm-summary > p { margin: var(--space-3) 0 0; }

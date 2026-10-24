@@ -424,14 +424,16 @@ function BmrStep({ answers, first, head }) {
   const bmr = bmrOf(answers) || 0;
   const k = useReveal(1000, String(bmr));
   return <>
-    {head('О вас', first ? `Отлично, ${first}! Базовый обмен рассчитан` : 'Базовый обмен рассчитан')}
+    {/* «Базовый обмен» — термин диетологов; заголовок говорит, что это
+        значит (аудит 24.10.2026), а термин остаётся в пояснении ниже */}
+    {head('О вас', first ? `Отлично, ${first}! Столько вы тратите в покое` : 'Столько вы тратите в покое')}
     <div className="ob-hero ob-hero--rest" aria-hidden="true"><RestArt /></div>
     <p className="ob-big" aria-label={formatNumber(bmr) + ' килокалорий'}>
       <span className="ob-big__num">{formatNumber(Math.round(bmr * k))}</span><span className="ob-big__unit">ккал</span>
     </p>
     <div className="ob-meter" aria-hidden="true"><span style={{ transform: `scaleX(${0.65 * k})` }} /></div>
     <p className="ob__lead ob__lead--small">
-      Столько тело тратит в полном покое — на сердце, дыхание и мозг. Это 60–70 % всех трат за день, остальное
+      Столько тело тратит в полном покое — на сердце, дыхание и мозг (базовый обмен). Это 60–70 % всех трат за день, остальное
       добавят движение и тренировки. Формула Миффлина — Сан-Жеора по вашим данным: {formatNumber(answers.height)} см,{' '}
       {formatNumber(answers.weight)} кг, {years(ageOf(answers))}.
     </p>

@@ -40,7 +40,7 @@ const stubs = {
     export const Field = ({ label, value }) => <label>{label}<input value={value} readOnly /></label>;
     export const formatNumber = (n) => String(n);
     export const formatWhen = (iso) => 'когда ' + iso;`,
-  icons: `import React from 'react'; const I = () => <i />; export const IconCopy = I, IconCheck = I, IconExternal = I;`,
+  icons: `import React from 'react'; const I = () => <i />; export const IconCopy = I, IconCheck = I, IconExternal = I, IconMail = I, IconChevron = I;`,
   telegram: 'export const haptic = () => {};',
   useData: 'export const useData = () => ({ data: globalThis.__settings.overview, loading: false, error: null, reload() {} });',
   steps: `export const stepsAvailability = async () => ({ available: false, reason: 'app' });
@@ -76,6 +76,8 @@ const { Reminders, Support } = bundled.exports;
 
 const textOf = (node) => (typeof node === 'string' ? node : Array.isArray(node) ? node.map(textOf).join(' ') : ((node && node.children) || []).map(textOf).join(' '));
 const screen = (tree) => textOf(tree.toJSON()).replace(/\s+/g, ' ').trim();
+// Кнопка «Скопировать данные для поддержки» — по подписи: перед ней может стоять «Написать в поддержку»
+const copyButton = (tree) => tree.root.findAll((n) => n.type === 'button' && /Скопировать данные/.test(textOf(n.children))).at(0);
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 async function draw(Component, props = {}) {
   let tree;
@@ -103,7 +105,7 @@ test('«Скопировать данные для поддержки»: тек�
   __settings.copies = [];
   const tree = await draw(Support);
   assert.doesNotMatch(screen(tree), /Оценить Fit Track/, 'в браузере магазина нет');
-  const button = tree.root.findAll((n) => n.type === 'button')[0];
+  const button = copyButton(tree);
   assert.equal(button.props.disabled, false);
   let pending;
   act(() => { pending = button.props.onClick(); });
@@ -124,7 +126,7 @@ test('буфер не дали — говорим об этом; без ID (не
   __settings.copyFails = true;
   __settings.publicId = '';
   const tree = await draw(Support);
-  await act(async () => { await tree.root.findAll((n) => n.type === 'button')[0].props.onClick(); });
+  await act(async () => { await copyButton(tree).props.onClick(); });
   assert.match(screen(tree), /Не получилось скопировать — телефон не дал доступ к буферу обмена\./);
   assert.doesNotMatch(__settings.copies[0], /ID:/);
   __settings.copyFails = false;
@@ -135,9 +137,23 @@ test('буфер не дали — говорим об этом; без ID (не
 test('«глазами клиента» (disabled): кнопка не нажимается, подпись объясняет, данные не собираются', async () => {
   __settings.copies = [];
   const tree = await draw(Support, { disabled: true });
-  const button = tree.root.findAll((n) => n.type === 'button')[0];
-  assert.equal(button.props.disabled, true);
+  const buttons = tree.root.findAll((n) => n.type === 'button');
+  assert.ok(buttons.length >= 2 && buttons.every((b) => b.props.disabled === true), 'и «Написать», и «Скопировать» не нажимаются');
+  assert.equal(tree.root.findAll((n) => n.type === 'a').length, 0, 'письмо не открывается');
   assert.match(screen(tree), /В режиме просмотра это не нажимается\./);
   assert.equal(__settings.copies.length, 0);
+  await act(async () => tree.unmount());
+});
+
+test('«Написать в поддержку» — письмо с адресом поддержки и данными внутри (аудит 24.10.2026)', async () => {
+  const tree = await draw(Support);
+  const link = tree.root.findAll((n) => n.type === 'a').find((n) => /Написать в поддержку/.test(textOf(n.children)));
+  assert.ok(link, 'строка-ссылка есть');
+  const href = link.props.href;
+  assert.match(href, /^mailto:sokolovk055@yandex\.ru\?subject=/);
+  const body = decodeURIComponent(href.split('&body=')[1]);
+  assert.match(body, /Fit Track — данные для поддержки/);
+  assert.match(body, /ID: FT-ABC123/);
+  assert.match(screen(tree), /Адрес поддержки: sokolovk055@yandex\.ru/);
   await act(async () => tree.unmount());
 });

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
+import { requestQuick } from '../quick-actions.js';
 import { Section, Loading, ErrorState, Empty, Note, Sheet, plural } from '../ui.jsx';
 import { IconBack, IconCheck, IconAlert, IconClose, IconSearch } from '../icons.jsx';
 import { tidyTitle } from './Onboarding.jsx';
@@ -168,6 +169,18 @@ export function ProgramsShowcase({ clientRow = 0, clientView = false, onClose })
   const shown = applyFilters(programs, filters);
   const groups = groupByGoal(shown);
   const trainer = list.data && list.data.trainer;
+  // Пожелание тренеру — кнопкой, а не словами «внизу „Тренировок“» (аудит
+  // 24.10.2026): закрыть витрину и подвести экран к полю пожелания (тот же
+  // запрос, что у «Написать тренеру» в «+»). Кадр ждём, чтобы поле уже было
+  // на странице — иначе запрос снимется впустую. «Глазами клиента» поля нет
+  const toWish = clientView ? null : () => {
+    haptic();
+    onClose();
+    requestAnimationFrame(() => requestQuick('wish'));
+  };
+  const wishButton = (label) => (toWish
+    ? <button type="button" className="button" onClick={toWish}>{label}</button>
+    : null);
 
   return (
     <>
@@ -205,14 +218,18 @@ export function ProgramsShowcase({ clientRow = 0, clientView = false, onClose })
       {list.loading && <Loading lead={false} rows={3} />}
       {list.error && <ErrorState error={list.error} onRetry={list.reload} />}
       {list.data && !programs.length && (
-        <Empty title="Программ пока нет" text="Тренер ещё не показал клиентам ни одной программы. Пожелание ему можно написать внизу «Тренировок»." />
+        <Empty title="Программ пока нет" text="Тренер ещё не показал клиентам ни одной программы — напишите ему, какая нужна."
+          action={wishButton('Написать пожелание тренеру')} />
       )}
       {programs.length > 0 && !shown.length && (
         <Empty
           icon={IconSearch}
           title="Под эти условия программ нет"
-          text="Снимите один из фильтров — или напишите тренеру пожелание внизу «Тренировок»."
-          action={<button type="button" className="button" onClick={() => setFilters({})}>Сбросить фильтры</button>}
+          text="Снимите один из фильтров — или напишите тренеру, какая программа нужна."
+          action={<div className="programs__empty-actions">
+            <button type="button" className="button" onClick={() => setFilters({})}>Сбросить фильтры</button>
+            {wishButton('Написать тренеру')}
+          </div>}
         />
       )}
 

@@ -100,7 +100,7 @@ test('лист: сверху занятие по программе, ниже �
   const s = await sheet();
   assert.match(s.main, /^Начать тренировку/);
   assert.match(s.main, /Ноги и ягодицы · следующая по плану$/);
-  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Написать тренеру']);
   assert.deepEqual(s.off, []);
   assert.equal(s.tiles.includes('Самочувствие'), false, 'чего нет в приложении — нет и в листе');
 
@@ -117,13 +117,13 @@ test('на «Прогрессе» главное — вес, занятие вс
   setRights(null);
   let s = await sheet({ tab: 'progress' });
   assert.match(s.main, /^Записать вес/);
-  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Тренировка', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Тренировка', 'Замеры', 'Написать тренеру']);
   assert.deepEqual(await s.press(0), ['progress', 'weight']);
   assert.deepEqual(await s.press(3), ['plan', 'workout', { title: 'Ноги и ягодицы' }]);
   await s.close();
   setRights({ plus: false });
   s = await sheet({ tab: 'progress' });
-  assert.deepEqual(s.tiles, ['Тренировка', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Тренировка', 'Замеры', 'Написать тренеру']);
   await s.close();
   setRights(null);
 });
@@ -132,7 +132,7 @@ test('на «Питании» главное — еда, занятие вста
   setRights(null);
   let s = await sheet({ tab: 'nutrition' });
   assert.match(s.main, /^Добавить еду/);
-  assert.deepEqual(s.tiles, ['Тренировка', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Тренировка', 'Вода', 'Вес', 'Замеры', 'Написать тренеру']);
   assert.deepEqual(await s.press(0), ['nutrition', 'food']);
   assert.deepEqual(await s.press(1), ['plan', 'workout', { title: 'Ноги и ягодицы' }]);
   await s.close();
@@ -147,15 +147,15 @@ test('на «Питании» главное — еда, занятие вста
   setRights({ plus: false });
   s = await sheet({ tab: 'nutrition' });
   assert.match(s.main, /^Начать тренировку/);
-  assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Написать тренеру']);
   await s.close();
   setRights(null);
 });
 
-test('без «Плюса» нет еды и воды, без тренера — плитки «Тренеру»', async () => {
+test('без «Плюса» нет еды и воды, без тренера — плитки «Написать тренеру»', async () => {
   setRights({ plus: false });
   let s = await sheet();
-  assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Вес', 'Замеры', 'Написать тренеру']);
   await s.close();
 
   setRights(null);
@@ -164,12 +164,12 @@ test('без «Плюса» нет еды и воды, без тренера —
   await s.close();
 });
 
-test('тренер «глазами клиента»: набор как у клиента, но еда, вода и «Тренеру» не нажимаются', async () => {
+test('тренер «глазами клиента»: набор как у клиента, но еда, вода и «Написать тренеру» не нажимаются', async () => {
   setRights(null);
   const s = await sheet({ clientRow: 7, preview: true, tab: 'nutrition' });
   assert.match(s.main, /^Начать тренировку/, 'дневник в просмотре только для чтения — главной еда не становится');
-  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Тренеру']);
-  assert.deepEqual(s.off, ['Еда', 'Вода', 'Тренеру']);
+  assert.deepEqual(s.tiles, ['Еда', 'Вода', 'Вес', 'Замеры', 'Написать тренеру']);
+  assert.deepEqual(s.off, ['Еда', 'Вода', 'Написать тренеру']);
   await s.close();
 
   // Тренер в карточке клиента (не «глазами клиента») — без дневника и пожелания

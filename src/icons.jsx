@@ -104,6 +104,15 @@ export const IconNutrition = (p) => (
   </Icon>
 );
 
+// Один человек — «Мои данные» в меню клиента: с двумя силуэтами (IconUsers)
+// пункт было не отличить от «Семьи» (аудит 24.10.2026)
+export const IconUser = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="8" r="3.75" />
+    <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" />
+  </Icon>
+);
+
 /* ---------- Навигация тренера ---------- */
 
 export const IconUserPlus = (p) => (

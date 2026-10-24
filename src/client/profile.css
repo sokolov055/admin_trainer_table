@@ -5,5 +5,20 @@
    всё равно не стоит на месте пустоты */
 .goal-choice__wait { height: 104px; margin: 0 0 var(--space-3); }
 
-/* «Вход по телефону» переехал под анкету: отступ сверху, как у копии данных */
-.panel + .phone-setting { margin-top: var(--space-3); }
+/* Вход по номеру — под полем «Телефон», а не вторым блоком со своим полем
+   (аудит 24.10.2026). Состояние — подписью поля, кнопки — мелкие: главная
+   кнопка анкеты — «Сохранить» */
+.survey .phone-setting { margin: var(--space-2) 0 0; gap: var(--space-2); }
+.phone-setting__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.phone-setting__status--good { color: var(--good-text); font-weight: 600; }
+.phone-setting__status svg { flex: 0 0 auto; }
+.phone-setting__confirm { display: grid; gap: var(--space-2); }
+.phone-setting .login__email { gap: var(--space-2); margin-top: 0; justify-items: start; }

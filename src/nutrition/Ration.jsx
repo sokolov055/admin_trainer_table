@@ -482,7 +482,8 @@ function Deck({ cards, liked, onLike, onSkip, onEnough, onRestart }) {
             {liked.length >= 2
               ? 'Отмечено ' + liked.length + ' ' + plural(liked.length, 'блюдо', 'блюда', 'блюд')
                 + ' — этого хватит, чтобы собрать день.'
-              : 'Ничего не отмечено. Начните колоду заново или добавьте продуктов '
+              // Без «колоды» — слово из макета, человеку оно ничего не говорит (аудит 24.10.2026)
+              : 'Ничего не отмечено. Покажите блюда заново или добавьте продуктов '
                 + 'в холодильник — блюд станет больше.'}
           </p>
           <div className="ration__actions">
@@ -1057,7 +1058,7 @@ export default function Ration({ targets: calculatedTargets, onClose, trial = fa
             <h3 style={{ marginTop: 0 }}>Дня пока не выходит</h3>
             <p className="small muted">
               Чтобы собрать день, нужны блюда хотя бы на два разных приёма пищи —
-              например, завтрак и ужин. Вернитесь к колоде и отметьте ещё.
+              например, завтрак и ужин. Вернитесь к блюдам и отметьте ещё.
             </p>
             <button className="button button--primary" onClick={() => setStep('swipe')}>
               К блюдам

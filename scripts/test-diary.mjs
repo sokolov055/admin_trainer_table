@@ -243,7 +243,7 @@ test('тренер в карточке клиента: видит «пример
   assert.match(text, /70 из 500 ккал/, 'норма завтрака — 25 % от 2000');
   assert.match(text, /Клиент ещё не завершил этот день/);
   let buttons = buttonsText(tree);
-  assert.doesNotMatch(buttons.join(' | '), /Завершить день|Дописать|Режим|Добавить еду|Отметить порции|Повторить еду|\+ 250 мл/);
+  assert.doesNotMatch(buttons.join(' | '), /Завершить день|Дописать|Как считать|Добавить еду|Отметить порции|Повторить еду|\+ 250 мл/);
   assert.ok(buttons.includes('Назначить цель') && buttons.includes('Сохранить комментарий'), 'тренер назначает цель и пишет комментарий');
   assert.equal(tree.root.findAllByProps({ 'aria-label': 'Добавить в завтрак' }).length, 0);
   assert.equal(tree.root.findByProps({ 'aria-label': 'Изменить: Йогурт' }).props.disabled, true, 'записи клиента тренер не правит');

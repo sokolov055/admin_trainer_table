@@ -49,7 +49,7 @@ test('анкета 2.0: согласие, данные барабанами, о�
   await sheetDone(page).click(); await page.getByRole('dialog').waitFor({ state: 'detached' });
   assert.match(await page.locator('.ob-tile').first().textContent(), /1 февраля \d{4}/);
   await next(page).click();
-  await page.getByRole('heading', { name: /Базовый обмен рассчитан/ }).waitFor();
+  await page.getByRole('heading', { name: /Столько вы тратите в покое/ }).waitFor();
   await next(page).click();
   await radio(page, 'Подвижный').click();
   await radio(page, 'Похудеть').click();

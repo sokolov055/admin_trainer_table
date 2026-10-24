@@ -13,6 +13,7 @@ import HealthDaily, { SpentKcal } from './HealthDaily.jsx';
 import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
+import MeasureMove from './MeasureMove.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, StatusBadge,
   Chips, Segmented, Options, Field, Note, Delta, Qty,
@@ -148,7 +149,8 @@ const LIVE_MS = 15000;
 // afterLead — блоки, которые бывают не всегда (тренировка с часов, первый
 // день в режиме, ClientApp.jsx): под главной карточкой, чтобы, появившись
 // позже, не сдвигать её (аудит 24.10.2026)
-export function Overview({ clientRow, clientView = false, trainerClient, trainerClients, afterLead = null }) {
+// onTrainer — открыть «Мой тренер» (ID для привязки) из пустого «Обзора»
+export function Overview({ clientRow, clientView = false, trainerClient, trainerClients, afterLead = null, onTrainer = null }) {
   // У клиента — живой: тренер провёл оплату, баланс меняется без «потянуть»
   // (у тренера карточка перечитывается сама после его записи — onMutated)
   const { loading, data: loaded, error, reload } = useData(
@@ -172,9 +174,15 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
             шаги и награды — в «Прогрессе».
           </p>
           <p className="small muted">
-            Когда тренер привяжет вас — по ID из меню «Мой тренер» или своей ссылкой, —
+            Когда тренер привяжет вас — по вашему ID или своей ссылкой, —
             здесь появятся тренировки с ним, расписание и оплата.
           </p>
+          {/* Кнопка к ID, а не «из меню „Мой тренер“» словами (аудит 24.10.2026) */}
+          {onTrainer && (
+            <div className="state__action">
+              <button type="button" className="button" onClick={onTrainer}>Мой ID для тренера</button>
+            </div>
+          )}
         </Panel>
       </Section>
       {afterLead}
@@ -1648,6 +1656,8 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   // после записи закрывается сама и просит перечитать замеры.
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(null);
+  // Перенос замера на другую дату — лист (MeasureMove): { from, sheetName }
+  const [moving, setMoving] = useState(null);
 
   // «Вес» и «Замеры» из «+» нижнего меню (quick-actions.js): открыть форму
   // и подвести к ней экран. Каждый запрос — новый объект: форма могла быть
@@ -1953,19 +1963,11 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         ? series.map((s, i) => (
             <Section key={i} title={s.label ? 'Замеры: ' + s.label : 'Замеры'}>
               <Panel pad>
-                <MeasureTable rows={s.rows} fields={fields} onMove={familyRow ? null : async (from) => {
-                  // Ошиблись датой (годом) — перенести замер целиком
-                  const typed = window.prompt('Правильная дата замера (ДД.ММ.ГГГГ):', formatDate(from));
-                  const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(typed || '').trim());
-                  if (!typed) return;
-                  if (!m) { window.alert('Дата — в виде ДД.ММ.ГГГГ, например 09.10.2026.'); return; }
-                  const to = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
-                  try {
-                    await apiMutate('measure.move', { ...(clientRow ? { clientRow } : {}), sheetName: measureSeries[i] && measureSeries[i].sheetName, from: String(from).slice(0, 10), to });
-                    reload();
-                  } catch (error) {
-                    window.alert(error.message);
-                  }
+                {/* Ошиблись датой (годом) — перенести замер целиком: лист с
+                    выбором даты вместо window.prompt (аудит 24.10.2026) */}
+                <MeasureTable rows={s.rows} fields={fields} onMove={familyRow ? null : (from) => {
+                  haptic();
+                  setMoving({ from, sheetName: (measureSeries[i] && measureSeries[i].sheetName) || '' });
                 }} />
               </Panel>
             </Section>
@@ -1973,16 +1975,25 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         : (
           <Section title="Замеры">
             <Panel pad>
+              {/* Кнопка — здесь же, а не ссылка на «кнопку вверху» (аудит
+                  24.10.2026); форма откроется наверху и экран подъедет к ней */}
               <Empty
                 icon={IconRuler}
-                text={(measurements && measurements.note)
-                  || (familyRow
-                    ? 'Замеров пока нет.'
-                    : 'Замеров пока нет. Запишите первый — кнопка «Записать замер» вверху.')}
+                text={(measurements && measurements.note) || 'Замеров пока нет.'}
+                action={!familyRow && !adding ? (
+                  <button className="button" onClick={() => { haptic(); openForm('measure')(); }}>
+                    Записать первый замер
+                  </button>
+                ) : null}
               />
             </Panel>
           </Section>
         )}
+
+      {moving && (
+        <MeasureMove from={moving.from} sheetName={moving.sheetName} clientRow={clientRow}
+          onClose={() => setMoving(null)} onMoved={reload} />
+      )}
 
       {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
       {!familyRow && <HealthDaily clientRow={clientRow} />}

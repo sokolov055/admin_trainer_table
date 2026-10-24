@@ -40,13 +40,17 @@ function formatPhone(raw) {
 
 const digits = (s) => String(s || '').replace(/\D/g, '');
 
-export default function PhoneLogin({ mode = 'login', options = { call: true, sms: false }, onAttached }) {
+// fixedPhone — номер уже вписан в поле «Телефон» «Моих данных»: своего поля
+// здесь нет, только кнопка подтверждения (аудит 24.10.2026 — номер
+// спрашивали дважды)
+export default function PhoneLogin({ mode = 'login', options = { call: true, sms: false }, onAttached, fixedPhone }) {
   const login = mode === 'login';
   const call = (action, params) => (login ? apiPublic : apiPrimary)(
     login ? 'auth.phone.' + action : 'account.phone.' + action, params,
   );
 
-  const [phone, setPhone] = useState('');
+  const [typed, setPhone] = useState('');
+  const phone = fixedPhone != null ? formatPhone(fixedPhone) : typed;
   const [step, setStep] = useState('phone'); // phone → verify → name
   const [check, setCheck] = useState(null);   // { key, method, callPhone, callPhonePretty }
   const [code, setCode] = useState('');
@@ -198,7 +202,7 @@ export default function PhoneLogin({ mode = 'login', options = { call: true, sms
         {problem && <p className="login__problem" role="alert">{problem}</p>}
 
         {phase !== 'success' && (
-          <button type="button" className="button button--ghost" onClick={reset}>Другой номер</button>
+          <button type="button" className="button button--ghost" onClick={reset}>{fixedPhone == null ? 'Другой номер' : 'Отмена'}</button>
         )}
       </div>
     );
@@ -207,7 +211,7 @@ export default function PhoneLogin({ mode = 'login', options = { call: true, sms
   const ready = digits(phone).length === 11;
   return (
     <form className="login__email" onSubmit={(e) => { e.preventDefault(); if (ready && !busy) start('call'); }}>
-      <label className="field">
+      {fixedPhone == null && <label className="field">
         <span className="field__label">Телефон</span>
         <input
           className="field__input"
@@ -222,9 +226,10 @@ export default function PhoneLogin({ mode = 'login', options = { call: true, sms
         />
         {/* В «Моих данных» то же сказано под заголовком блока */}
         {login && <span className="field__hint">Пароль не нужен: подтвердите номер звонком. Кабинета нет — заведём.</span>}
-      </label>
+      </label>}
       {problem && <p className="login__problem" role="alert">{problem}</p>}
-      <button className="button button--primary button--block" disabled={busy || !ready}>
+      {/* Под полем анкеты — не главная кнопка: главная там «Сохранить» */}
+      <button className={fixedPhone == null ? 'button button--primary button--block' : 'button button--small'} disabled={busy || !ready}>
         {busy ? 'Минуту…' : 'Подтвердить звонком'}
       </button>
       {options.sms && (

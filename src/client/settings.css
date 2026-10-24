@@ -43,6 +43,40 @@
   transition: background-color var(--dur-press) var(--ease-out);
 }
 
+/* Внутри — текст, время и шеврон в ряд, как строка-значение в настройках
+   iOS: время справа, «›» говорит, что строка нажимается; раскрыта — шеврон
+   смотрит вниз (аудит 24.10.2026) */
+.conn-row__main--button {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.conn-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conn-row__value {
+  flex-shrink: 0;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.conn-row__chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transform: rotate(-90deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.conn-row__chevron.is-open { transform: rotate(0deg); }
+
 /* Нажатие — подсветка строки, как у .conn-link и строк «Как пользоваться» */
 .conn-row__main--button:active { background: var(--surface-active); }
 .conn-row__main--button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -106,7 +140,8 @@
 /* Переключатель .switch — общий, в elements.css (ui.jsx, Switch; аудит 24.10.2026) */
 
 @media (prefers-reduced-motion: reduce) {
-  .conn-row__main--button { transition: none; }
+  .conn-row__main--button,
+  .conn-row__chevron { transition: none; }
 }
 
 /* --- строки-кнопки «Поддержки» --- */
@@ -130,6 +165,9 @@
   transition: background-color var(--dur-fast) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 }
+
+/* «Написать в поддержку» — ссылка mailto: в виде той же строки */
+a.conn-link { text-decoration: none; }
 
 .conn-link:last-child { border-bottom: 0; }
 .conn-link svg { flex-shrink: 0; color: var(--text-muted); }
