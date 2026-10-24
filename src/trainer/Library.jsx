@@ -478,6 +478,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel }) {
           {kind === 'program' && (
             <Field
               label="Минут на тренировку"
+              inputMode="numeric"
               value={minutes}
               onChange={(v) => setMinutes(v.replace(/\D/g, '').slice(0, 3))}
               placeholder={template && template.minutesAuto ? '≈ ' + template.minutes + ' — по упражнениям' : 'Посчитаем по упражнениям'}

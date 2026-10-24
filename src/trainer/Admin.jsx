@@ -258,8 +258,8 @@ function Tariffs() {
               <Panel pad key={t.key} className="admin-tier">
                 <strong>{t.title}</strong>
                 <div className="admin-tier__fields">
-                  <Field label="Клиентов до" value={t.upTo} onChange={(v) => setTier(i, 'upTo', v)} disabled={busy} />
-                  <Field label="Цена, ₽ в месяц" value={t.price} onChange={(v) => setTier(i, 'price', v)} disabled={busy} />
+                  <Field label="Клиентов до" inputMode="numeric" value={t.upTo} onChange={(v) => setTier(i, 'upTo', v)} disabled={busy} />
+                  <Field label="Цена, ₽ в месяц" inputMode="decimal" value={t.price} onChange={(v) => setTier(i, 'price', v)} disabled={busy} />
                 </div>
                 {per && <p className="small muted" style={{ margin: 0 }}>{per}</p>}
               </Panel>
@@ -271,7 +271,7 @@ function Tariffs() {
       <Section title="Остальное">
         <Panel pad className="admin-tier__fields">
           {NUMBERS.map(([k, label]) => (
-            <Field key={k} label={label} value={form[k]} disabled={busy}
+            <Field key={k} label={label} inputMode={/₽|%/.test(label) ? 'decimal' : 'numeric'} value={form[k]} disabled={busy}
               onChange={(v) => { setSaved(false); setForm((f) => ({ ...f, [k]: v })); }} />
           ))}
         </Panel>

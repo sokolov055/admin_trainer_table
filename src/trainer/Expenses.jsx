@@ -132,7 +132,6 @@ function AddExpense({ month, categories, onAdded }) {
           <Field
             label="Статья"
             placeholder="Аренда зала"
-            // Поле по умолчанию цифровое (Field), а статья — слова
             inputMode="text"
             value={category}
             onChange={(value) => { setCategory(value); setSaved(false); }}

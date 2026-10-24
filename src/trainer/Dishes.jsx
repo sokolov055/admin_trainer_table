@@ -233,8 +233,8 @@ function DishEditor({ dish, foods, onCancel, onSaved }) {
             <Chips items={MEALS.map((m) => ({ value: m, label: m }))} value={meal} onChange={setMeal} />
           </div>
           <div className="field-row">
-            <Field label="Порций" value={portions} onChange={setPortions} />
-            <Field label="Минут на готовку" value={minutes} onChange={setMinutes} />
+            <Field label="Порций" inputMode="numeric" value={portions} onChange={setPortions} />
+            <Field label="Минут на готовку" inputMode="numeric" value={minutes} onChange={setMinutes} />
           </div>
           <label className="library__check">
             <input type="checkbox" checked={budget} onChange={(e) => setBudget(e.target.checked)} />

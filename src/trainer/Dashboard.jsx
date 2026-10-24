@@ -117,6 +117,7 @@ function GoalsSheet({ targets, onClose, onSaved }) {
           <Field
             key={g.id}
             label={g.label + (g.unit === '%' ? ', %' : g.unit === '₽' ? ', ₽' : '')}
+            inputMode="decimal"
             hint={g.hint}
             value={values[g.id]}
             onChange={(v) => setValues((prev) => ({ ...prev, [g.id]: v }))}

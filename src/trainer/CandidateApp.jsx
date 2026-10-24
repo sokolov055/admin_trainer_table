@@ -163,6 +163,7 @@ function Anketa({ data, onChange }) {
             <Field label="Где работаете сейчас" inputMode="text" value={priv.workplace} onChange={setP('workplace')} disabled={!!busy} />
             <Field
               label="Сколько клиентов ведёте сейчас"
+              inputMode="numeric"
               value={priv.clientsNow === null || priv.clientsNow === undefined ? '' : String(priv.clientsNow)}
               onChange={(v) => setP('clientsNow')(v.replace(/\D/g, '') === '' ? null : Number(v.replace(/\D/g, '')))}
               disabled={!!busy}

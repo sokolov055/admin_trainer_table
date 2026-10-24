@@ -515,10 +515,15 @@ export function Options({ items, value, onChange, label, disabled }) {
  *
  * Ошибка живёт под полем, а не в общем списке сверху: чинить надо здесь,
  * и читать про это надо здесь же.
+ *
+ * Клавиатура по умолчанию — обычная: цифровая на имени участника или
+ * названии не даёт набрать ни буквы. Числовые поля просят её сами —
+ * inputMode="decimal" (вес, деньги) или "numeric" (штуки, минуты)
+ * (аудит 24.10.2026).
  */
 export function Field({
   label, hint, value, onChange, onFocus, error, disabled,
-  inputMode = 'numeric', placeholder, inputRef, type = 'text', list,
+  inputMode = 'text', placeholder, inputRef, type = 'text', list,
 }) {
   return (
     <label className={'field' + (error ? ' field--bad' : '')}>

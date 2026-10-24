@@ -539,6 +539,40 @@ test('в расходе цифровая клавиатура только у с
   assert.equal(modes['Заметка'], 'text');
 });
 
+/**
+ * С 24.10.2026 общее поле по умолчанию буквенное (аудит: имя участника
+ * сплита набиралось на цифрах). Обратная ошибка хуже: вес или цена на
+ * буквенной клавиатуре. Каждое поле из ui.jsx с числом в подписи обязано
+ * просить цифры само.
+ */
+test('у каждого числового Field явная цифровая клавиатура', async () => {
+  const { readFile, readdir } = await import('node:fs/promises');
+  const path = await import('node:path');
+  const files = [];
+  const walk = async (dir) => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (/\.jsx$/.test(entry.name)) files.push(full);
+    }
+  };
+  await walk('src');
+  const numeric = /кг|, см|₽|%|лет|дней|минут|порций|клиентов|сборка|сумма|цена|часов|возраст|рост/i;
+  const missing = [];
+  for (const file of files) {
+    const text = await readFile(file, 'utf8');
+    // Своё поле у питания (FoodField / diary-ui) — там клавиатура задаётся иначе
+    if (!/import\s*\{[^}]*\bField\b[^}]*\}\s*from\s*'\.\.?\/(\.\.\/)?ui\.jsx'/.test(text)) continue;
+    for (const match of text.matchAll(/<Field\b([\s\S]*?)\/>/g)) {
+      const props = match[1];
+      if (/\btype="(date|time)"/.test(props)) continue;
+      const label = (props.match(/label=("[^"]*"|\{[^\n]*\})/) || [])[1] || '';
+      if (numeric.test(label) && !/inputMode=/.test(props)) missing.push(file + ': ' + label);
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
 /* ==========================================================================
  * График сводки
  * ========================================================================== */

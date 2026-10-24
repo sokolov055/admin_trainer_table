@@ -2841,6 +2841,7 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
           <div className="field-row">
             <Field
               label="Возраст, лет"
+              inputMode="numeric"
               placeholder="лет"
               value={form.age}
               onChange={(v) => set('age', v)}
@@ -2861,6 +2862,7 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
             <Field
               label="Рост, см"
               placeholder="см"
+              inputMode="decimal"
               value={form.height}
               onChange={(v) => set('height', v)}
               error={errors.height}

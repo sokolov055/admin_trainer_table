@@ -126,6 +126,7 @@ export function ProfileFields({ value, onChange, dicts = {}, disabled }) {
       <Field label="Залы" hint="Где проводите тренировки — название и район" inputMode="text" value={value.gyms} onChange={set('gyms')} disabled={disabled} />
       <Field
         label="Опыт, лет"
+        inputMode="numeric"
         value={value.experience === null || value.experience === undefined ? '' : String(value.experience)}
         onChange={(v) => set('experience')(digits(v))}
         disabled={disabled}
@@ -136,6 +137,7 @@ export function ProfileFields({ value, onChange, dicts = {}, disabled }) {
       </div>
       <Field
         label="Цена занятия от, ₽"
+        inputMode="numeric"
         hint="Необязательно"
         value={value.priceFrom === null || value.priceFrom === undefined ? '' : String(value.priceFrom)}
         onChange={(v) => set('priceFrom')(digits(v))}

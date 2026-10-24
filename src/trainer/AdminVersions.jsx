@@ -75,7 +75,7 @@ export default function AdminVersions() {
           </div>
           <div className="admin-version__fields">
             <Field label="Версия" inputMode="decimal" value={form.appStore.version} onChange={set('appStore', 'version')} disabled={busy} />
-            <Field label="Сборка" value={form.appStore.build} onChange={set('appStore', 'build')} disabled={busy} />
+            <Field label="Сборка" inputMode="numeric" value={form.appStore.build} onChange={set('appStore', 'build')} disabled={busy} />
             <Field label="Ссылка" inputMode="url" value={form.appStore.url} onChange={set('appStore', 'url')} disabled={busy} />
           </div>
         </Panel>
@@ -92,7 +92,7 @@ export default function AdminVersions() {
           </div>
           <div className="admin-version__fields">
             <Field label="Версия" inputMode="decimal" value={form.testflight.version} onChange={set('testflight', 'version')} disabled={busy} />
-            <Field label="Сборка" value={form.testflight.build} onChange={set('testflight', 'build')} disabled={busy} />
+            <Field label="Сборка" inputMode="numeric" value={form.testflight.build} onChange={set('testflight', 'build')} disabled={busy} />
             <Field label="Ссылка" inputMode="url" value={form.testflight.url} onChange={set('testflight', 'url')} disabled={busy} />
           </div>
         </Panel>
