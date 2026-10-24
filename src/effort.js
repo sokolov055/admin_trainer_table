@@ -348,6 +348,13 @@ export function rateSet(ex, si, effort) {
     } else if (effort === 'ok') {
       if (scaled !== null && scaled > cur) { to = lift(scaled); dir = 1; suggest = 'over'; }
       else if (short && before.some((x) => num(x.reps) > 0 && num(x.reps) < plan.lo)) { to = cap(cur - step); dir = -1; suggest = 'again'; }
+      // «Норм», а следующий подход легче (владелец, 24.10.2026: пирамида
+      // прошлого раза 30–40–35, на 40 «Норм» — дальше снова 35): этот вес по
+      // силам — следующий подход не легче. Только ближайший: дальше могут
+      // стоять облегчённые нарочно
+      else if (nextAt.length && m.load(ex.sets[nextAt[0]]) < cur) {
+        to = (w, i) => (i === nextAt[0] && w < cur ? cur : null); dir = 1; suggest = 'kept';
+      }
     }
   } else if (set.kind !== 'warmup' && isEffort(effort) && !assist && bodyweight(ex, set)) {
     key = 'reps';
@@ -415,7 +422,7 @@ export function rerate(ex, si, effort) {
 
 const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело', held: 'было тяжело',
   first: 'тяжело уже на первом', over: 'повторов больше плана', again: 'снова не добил', more: 'было легко', fewer: 'не добил повторы',
-  tired: 'после другого на эти мышцы' };
+  tired: 'после другого на эти мышцы', kept: 'на прошлом «Норм»' };
 
 /**
  * Подпись подобранного веса: «+2,5 кг · было легко»; у помощи — «−5 кг
