@@ -1,4 +1,5 @@
 import React from 'react';
+import { IconCheck, IconClose } from '../icons.jsx';
 
 /**
  * «Как снять» — до камеры, а не после неудачного снимка (план трёх
@@ -77,11 +78,11 @@ export default function ScanGuide({ mode }) {
       <div className="scan-guide__pair">
         <figure className="scan-guide__case scan-guide__case--good">
           <Art />
-          <figcaption><span aria-hidden="true">✓</span> Так</figcaption>
+          <figcaption><IconCheck size={14} className="scan-guide__mark" /> Так</figcaption>
         </figure>
         <figure className="scan-guide__case scan-guide__case--bad">
           <Art bad />
-          <figcaption><span aria-hidden="true">✕</span> Не так: под углом, обрезано, блик</figcaption>
+          <figcaption><IconClose size={14} className="scan-guide__mark" /> Не так: под углом, обрезано, блик</figcaption>
         </figure>
       </div>
       <ol className="scan-guide__tips">

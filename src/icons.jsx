@@ -7,14 +7,26 @@ import React from 'react';
  * чужую цветовую гамму и ломают вертикальный ритм строки — это чужая
  * графика внутри интерфейса, а не его часть.
  *
- * Все иконки построены на одной сетке 24×24, обводкой одной толщины,
- * с currentColor. Значит они наследуют цвет текста, масштабируются
- * размером шрифта и везде выглядят как один комплект.
+ * Все иконки построены на одной сетке 24×24, с currentColor. Значит они
+ * наследуют цвет текста, масштабируются размером шрифта и везде выглядят
+ * как один комплект.
+ *
+ * Размеры — шкала 14 / 16 / 20 / 24 (в строке текста 14–16, в кнопке 20,
+ * в таб-баре и плитках 22–24). Толщина — по размеру: до 16 px включительно
+ * обводка 2 (1,75 на мелкой иконке выходила меньше пикселя и бледнела),
+ * крупнее — 1,75. Явный strokeWidth сильнее. Своих наборов svg в экранах не
+ * заводить — иконку добавить сюда (аудит 24.10.2026).
  */
 
 const STROKE = 1.75;
+const STROKE_SMALL = 2;
 
-function Icon({ children, size = 22, ...rest }) {
+/** Толщина обводки по размеру иконки — и для своих svg на той же сетке */
+export function iconStroke(size) {
+  return Number(size) <= 16 ? STROKE_SMALL : STROKE;
+}
+
+function Icon({ children, size = 22, strokeWidth, ...rest }) {
   return (
     <svg
       width={size}
@@ -22,7 +34,7 @@ function Icon({ children, size = 22, ...rest }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={STROKE}
+      strokeWidth={strokeWidth ?? iconStroke(size)}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -264,6 +276,14 @@ export const IconEmpty = (p) => (
   <Icon {...p}>
     <path d="M3.5 13.5h4l1.5 3h6l1.5-3h4" />
     <path d="M3.5 13.5 6 6.5a1.5 1.5 0 0 1 1.4-1h9.2a1.5 1.5 0 0 1 1.4 1l2.5 7v4a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3.5 17.5Z" />
+  </Icon>
+);
+
+/** Часы — раздел «Часы» в турах (Help.jsx), тренировки с часов (WatchSuggest.jsx) */
+export const IconWatch = (p) => (
+  <Icon {...p}>
+    <rect x="7" y="6" width="10" height="12" rx="3" />
+    <path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3M12 10v2l1.5 1" />
   </Icon>
 );
 

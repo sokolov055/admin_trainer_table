@@ -7,7 +7,10 @@ import React from 'react';
  * счёт шёл без разрыва: регистрация — первый раздел.
  */
 
-const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+// Сетка 20×20 на 20 px: обводка 1,5 = 1,75 на сетке 24, как у icons.jsx;
+// галочка пройденного — заметнее, 1,8 (было 2 и 2,4 — толще всех иконок
+// приложения; аудит 24.10.2026)
+const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' };
 const GLYPH = {
   account: <><circle cx="10" cy="7" r="3.2" {...P} /><path d="M4 17c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" {...P} /></>,
   body: <><circle cx="10" cy="4.5" r="2" {...P} /><path d="M10 7.5v6M6 9.5h8M8 18l2-4.5 2 4.5" {...P} /></>,
@@ -15,7 +18,7 @@ const GLYPH = {
   goal: <><circle cx="10" cy="10" r="7" {...P} /><circle cx="10" cy="10" r="3.5" {...P} /><circle cx="10" cy="10" r=".6" fill="currentColor" stroke="currentColor" /></>,
   training: <><path d="M3 10h14" {...P} /><path d="M5 6.5v7M15 6.5v7M2.5 8.5v3M17.5 8.5v3" {...P} /></>,
   plan: <><path d="M5 3.5h10v13H5z" {...P} /><path d="M7.5 8l1.5 1.5L12.5 6M7.5 13h5" {...P} /></>,
-  check: <path d="M5 10.5l3.2 3L15 6.5" {...P} strokeWidth="2.4" />,
+  check: <path d="M5 10.5l3.2 3L15 6.5" {...P} strokeWidth="1.8" />,
 };
 
 export default function StageBar({ stages, current, label }) {

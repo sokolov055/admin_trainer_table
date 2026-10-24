@@ -18,13 +18,15 @@ import { useDiaryResource, useOperation, Field, ErrorNote, n, macroLine } from '
 // своим поиском и вкладкой, назад возвращает к нему.
 // Плитки способов на экране «Добавить еду» (п. 9 плана, как у «Худеем вместе»):
 // все пути ввода видны сразу, сканер больше не спрятан в отдельный режим
+// Обводка — как у icons.jsx на 22 px: 1,75 на сетке 24 (у «Ладони» сетка 32 —
+// 2,33), аудит 24.10.2026
 const WAYS = [
-  { id: 'label', title: 'Фото этикетки', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" /><path d="M8 9h8M8 12h8M8 15h5" /></svg> },
-  { id: 'barcode', title: 'Штрихкод', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M18 6v12M20 6v12" /></svg> },
-  { id: 'custom', title: 'Свой продукт', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg> },
-  { id: 'recipe', title: 'Своё блюдо', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15h16M6 15a6 6 0 0 1 12 0M12 7V5M9 19h6" /></svg> },
-  { id: 'quick', title: 'Только калории', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z" /></svg> },
-  { id: 'palm', title: 'Ладонью', icon: <svg viewBox="0 0 32 32" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 29h12a5 5 0 0 0 5-5V13a2 2 0 0 0-4 0v5M22 13V7a2 2 0 0 0-4 0v10M18 7V5a2 2 0 0 0-4 0v12M14 7a2 2 0 0 0-4 0v12l-2.2-2.6a2 2 0 0 0-3.1 2.5L9 29" /></svg> },
+  { id: 'label', title: 'Фото этикетки', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" /><path d="M8 9h8M8 12h8M8 15h5" /></svg> },
+  { id: 'barcode', title: 'Штрихкод', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M18 6v12M20 6v12" /></svg> },
+  { id: 'custom', title: 'Свой продукт', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg> },
+  { id: 'recipe', title: 'Своё блюдо', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15h16M6 15a6 6 0 0 1 12 0M12 7V5M9 19h6" /></svg> },
+  { id: 'quick', title: 'Только калории', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z" /></svg> },
+  { id: 'palm', title: 'Ладонью', icon: <svg viewBox="0 0 32 32" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.33" strokeLinecap="round" strokeLinejoin="round"><path d="M9 29h12a5 5 0 0 0 5-5V13a2 2 0 0 0-4 0v5M22 13V7a2 2 0 0 0-4 0v10M18 7V5a2 2 0 0 0-4 0v12M14 7a2 2 0 0 0-4 0v12l-2.2-2.6a2 2 0 0 0-3.1 2.5L9 29" /></svg> },
 ];
 
 export function ProductPicker({ meal, onPick, onClose, onQuick, onPalm, onRecipe, mealLine, ingredientsOnly = false }) {

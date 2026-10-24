@@ -53,8 +53,9 @@ function replaceFrame(doc, ti, fi, frame) {
   return doc.map((t, i) => (i !== ti ? t : { ...t, frames: t.frames.map((f, j) => (j === fi ? frame : f)) }));
 }
 
+// Обводка — как у icons.jsx для 18–22 px (кнопки редактора), 1,75; аудит 24.10.2026
 const Svg = ({ children, ...p }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>{children}</svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>{children}</svg>
 );
 const I = {
   undo: <Svg><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></Svg>,

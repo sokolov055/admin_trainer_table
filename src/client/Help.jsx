@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Section, Panel } from '../ui.jsx';
-import { IconHome, IconPlan, IconProgress, IconNutrition, IconGuide, IconChevron } from '../icons.jsx';
+import { IconHome, IconPlan, IconProgress, IconNutrition, IconGuide, IconChevron, IconWatch } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { passedTours } from './tour-model.js';
 import './help.css';
@@ -14,15 +14,6 @@ import './help.css';
  * «Пройден» — отметка на этом устройстве (tour-model.js): тур дошли до
  * «Готово». Прервали — остаётся «новое».
  */
-
-// Часы — своим значком на сетке 24×24, как в icons.jsx
-const IconWatch = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}
-    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-    <rect x="6" y="6" width="12" height="12" rx="3.5" />
-    <path d="M9 6l.6-3h4.8l.6 3M9 18l.6 3h4.8l.6-3M12 9.5V12l1.5 1.5" />
-  </svg>
-);
 
 const ICONS = { overview: IconHome, workout: IconPlan, progress: IconProgress, nutrition: IconNutrition, watch: IconWatch };
 

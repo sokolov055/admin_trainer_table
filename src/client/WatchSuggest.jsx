@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useData } from '../useData.js';
+import { IconWatch } from '../icons.jsx';
 import { formatNumber, formatTime } from '../ui.jsx';
 import { requestQuick } from '../quick-actions.js';
 import './watch-suggest.css';
@@ -44,17 +45,6 @@ function length(seconds) {
   return Math.floor(m / 60) + ' ч' + (m % 60 ? ' ' + (m % 60) + ' мин' : '');
 }
 
-/** Часы — та же сетка 24×24 и обводка, что у иконок icons.jsx */
-function IconWatch() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-      <rect x="7" y="6" width="10" height="12" rx="3" />
-      <path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3M12 10v2l1.5 1" />
-    </svg>
-  );
-}
-
 // trainer — у клиента есть тренер: ему и пишем, что тренер увидит
 export default function WatchSuggest({ trainer = true, onOpen }) {
   const { data, stale } = useData('health.workouts.suggest', {}, []);
@@ -81,7 +71,7 @@ export default function WatchSuggest({ trainer = true, onOpen }) {
   return (
     <section className="watch-suggest" aria-label="Тренировка с часов">
       <div className="watch-suggest__head">
-        <span className="watch-suggest__icon"><IconWatch /></span>
+        <span className="watch-suggest__icon"><IconWatch size={24} /></span>
         <div className="watch-suggest__what">
           <p className="watch-suggest__eyebrow">С часов · сегодня · в приложении не отмечено</p>
           <p className="watch-suggest__title">

@@ -22,6 +22,9 @@
 .scan-guide__case--good { border-color: var(--good-line); background: var(--good-fill); }
 .scan-guide__case--bad { border-color: var(--critical-line); background: var(--critical-fill); }
 .scan-guide__case figcaption { margin-top: 6px; font-size: var(--text-sm); font-weight: 600; line-height: 1.3; }
+/* ✓ / ✕ — иконками набора, а не символами шрифта (аудит 24.10.2026); правило
+   выше растягивает svg картинки на ширину — значку свой размер */
+.scan-guide__case .scan-guide__mark { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; }
 .scan-guide__case--good figcaption { color: var(--good-text); }
 .scan-guide__case--bad figcaption { color: var(--critical-text); }
 .scan-guide__paper { fill: var(--surface); stroke: var(--border-strong); }
