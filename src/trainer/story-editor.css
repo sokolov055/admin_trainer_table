@@ -16,10 +16,10 @@
   --se-danger: #ff5a4e;
   --se-glass: rgba(18, 17, 22, 0.42);
   --se-ui: 'Manrope', var(--font, system-ui), -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --se-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --se-ease: var(--ease-out);
   position: fixed;
   inset: 0;
-  z-index: 65;
+  z-index: var(--z-overlay);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -42,7 +42,7 @@
 .se-cv--empty { background: var(--se-raise); }
 .se-cv .sc-ly { cursor: grab; touch-action: none; }
 .se-cv .sc-ly:active { cursor: grabbing; }
-.se-cv .sc-ly.is-doomed { opacity: 0.55; scale: 0.55; transition: scale 0.15s var(--se-ease), opacity 0.15s var(--se-ease); }
+.se-cv .sc-ly.is-doomed { opacity: 0.55; scale: 0.55; transition: scale var(--dur-fast) var(--se-ease), opacity var(--dur-fast) var(--se-ease); }
 .se-hint {
   position: absolute;
   left: 50%;
@@ -62,7 +62,7 @@
 .se-ed .sc-tx.is-empty { display: inline-block; min-width: 0.4em; }
 
 /* ---------- Инструменты поверх кадра ---------- */
-.se-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 10; transition: opacity 0.18s var(--se-ease); }
+.se-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 10; transition: opacity var(--dur-fast) var(--se-ease); }
 .se-chrome > * { pointer-events: auto; }
 .se-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: center; gap: 6px; }
 .se-sp { flex: 1; }
@@ -86,7 +86,7 @@
   white-space: nowrap;
   color: rgba(255, 255, 255, 0.72);
   cursor: pointer;
-  transition: background 0.15s var(--se-ease), color 0.15s var(--se-ease);
+  transition: background var(--dur-fast) var(--se-ease), color var(--dur-fast) var(--se-ease);
 }
 .se-topics button[aria-pressed='true'] { background: #fff; color: #141216; }
 .se-tools { position: absolute; top: 60px; right: 10px; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
@@ -100,10 +100,10 @@
   background: var(--se-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  transition: transform 0.12s var(--se-ease);
+  transition: transform var(--dur-press) var(--se-ease);
 }
 .se-rb:active .ic { transform: scale(0.94); }
-.se-rb:disabled { opacity: 0.35; cursor: default; }
+.se-rb:disabled { opacity: var(--disabled-opacity); cursor: default; }
 .se-rb svg { width: 21px; height: 21px; }
 .se-rb .aa { font: 800 16px/1 var(--se-ui); letter-spacing: -0.03em; }
 .se-rb .lbl {
@@ -114,7 +114,7 @@
   overflow: hidden;
   white-space: nowrap;
   opacity: 0;
-  transition: max-width 0.35s var(--se-ease), opacity 0.25s var(--se-ease);
+  transition: max-width 0.35s var(--se-ease), opacity var(--dur) var(--se-ease);
 }
 .se-wrap.labels .se-rb .lbl { max-width: 120px; opacity: 1; }
 .se-flag {
@@ -170,7 +170,7 @@
   opacity: 0;
   transform: translateY(12px) scale(0.9);
   pointer-events: none;
-  transition: opacity 0.16s var(--se-ease), transform 0.2s var(--se-ease), background 0.15s var(--se-ease);
+  transition: opacity var(--dur-fast) var(--se-ease), transform var(--dur) var(--se-ease), background var(--dur-fast) var(--se-ease);
 }
 .se-trash svg { width: 22px; height: 22px; }
 .se.is-dragging .se-trash { opacity: 1; transform: none; }
@@ -216,7 +216,7 @@
 .se-sizer .knob { position: absolute; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); }
 
 /* ---------- Лента кадров ---------- */
-.se-bar { display: flex; align-items: center; gap: 10px; transition: opacity 0.18s var(--se-ease); }
+.se-bar { display: flex; align-items: center; gap: 10px; transition: opacity var(--dur-fast) var(--se-ease); }
 .se-strip { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 6px 4px; }
 .se-strip::-webkit-scrollbar { display: none; }
 .se-th, .se-th-add {
@@ -258,8 +258,9 @@
 .se-save .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f5c65c; margin-left: 6px; vertical-align: 1px; }
 
 /* ---------- Листы ---------- */
-.se-sheet-host { position: absolute; inset: 0; z-index: 30; }
-.se-sheet-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); opacity: 0; transition: opacity 0.2s var(--se-ease); }
+/* Слои ниже — внутри контекста .se: лист и тост над рамкой правки (12) */
+.se-sheet-host { position: absolute; inset: 0; z-index: 15; }
+.se-sheet-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); opacity: 0; transition: opacity var(--dur) var(--se-ease); }
 .se-sheet {
   position: absolute;
   left: 0;
@@ -275,7 +276,7 @@
   background: var(--se-chrome);
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
   transform: translateY(100%);
-  transition: transform 0.32s var(--se-ease);
+  transition: transform var(--dur-nav) var(--se-ease);
 }
 .se-sheet-host.on .se-sheet-back { opacity: 1; }
 .se-sheet-host.on .se-sheet { transform: none; }
@@ -311,29 +312,29 @@
 .se-emojis button { border: 0; background: none; font-size: 26px; padding: 6px 0; border-radius: 10px; cursor: pointer; }
 .se-arts { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
 .se-arts::-webkit-scrollbar { display: none; }
-.se-arts button { flex: 0 0 auto; width: 104px; padding: 8px; border: 0; border-radius: 12px; background: var(--se-raise); cursor: pointer; color: #f2f0ea; }
+.se-arts button { flex: 0 0 auto; width: 104px; padding: 8px; border: 0; border-radius: var(--radius); background: var(--se-raise); cursor: pointer; color: #f2f0ea; }
 .se-arts .story-art { max-height: 60px; }
 .se-list { display: grid; gap: 6px; }
-.se-list button { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; padding: 13px 14px; border-radius: 12px; background: var(--se-raise); cursor: pointer; text-align: left; font-weight: 600; }
+.se-list button { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; padding: 13px 14px; border-radius: var(--radius); background: var(--se-raise); cursor: pointer; text-align: left; font-weight: 600; }
 .se-list button span { color: var(--se-mute); font-weight: 500; }
 .se-dots { display: flex; flex-wrap: wrap; gap: 10px; }
 .se-dots button { width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
 .se-dots button[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--se-chrome), 0 0 0 4px #fff; }
-.se-seg { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--se-raise); }
+.se-seg { display: flex; gap: 4px; padding: 3px; border-radius: var(--radius); background: var(--se-raise); }
 .se-seg button { flex: 1; border: 0; background: none; padding: 9px 6px; border-radius: 9px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--se-mute) !important; }
 .se-seg button[aria-pressed='true'] { background: var(--se-raise-2); color: var(--se-fg) !important; }
 .se-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.se-btn { border: 0; cursor: pointer; padding: 11px 15px; border-radius: 12px; background: var(--se-raise); font-weight: 700; }
+.se-btn { border: 0; cursor: pointer; padding: 11px 15px; border-radius: var(--radius); background: var(--se-raise); font-weight: 700; }
 .se-btn.danger { color: #ff8a80 !important; }
 .se-btn.danger.sure { background: var(--se-danger); color: #fff !important; }
 .se-field { display: grid; gap: 6px; margin-bottom: 12px; }
 .se-field > span { font-size: 13px; font-weight: 600; color: var(--se-mute); }
 .se-field input[type='text'] { width: 100%; padding: 11px 12px; border-radius: 11px; border: 1px solid var(--se-line); background: var(--se-raise); color: var(--se-fg); font: inherit; font-size: 16px; }
-.se-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--se-raise); font-weight: 600; cursor: pointer; }
+.se-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--se-raise); font-weight: 600; cursor: pointer; }
 .se-switch input { width: 20px; height: 20px; accent-color: var(--se-accent); }
 .se-range { width: 100%; accent-color: #fff; }
-.se-rule { margin-top: 4px; padding: 11px 13px; border-radius: 12px; background: rgba(245, 198, 92, 0.12); color: #f5d68f; line-height: 1.45; font-size: 13px; }
-.se-old { display: grid; gap: 4px; margin-top: 14px; padding: 11px 13px; border-radius: 12px; background: var(--se-raise); font-size: 12.5px; line-height: 1.4; color: var(--se-mute); }
+.se-rule { margin-top: 4px; padding: 11px 13px; border-radius: var(--radius); background: rgba(245, 198, 92, 0.12); color: #f5d68f; line-height: 1.45; font-size: 13px; }
+.se-old { display: grid; gap: 4px; margin-top: 14px; padding: 11px 13px; border-radius: var(--radius); background: var(--se-raise); font-size: 12.5px; line-height: 1.4; color: var(--se-mute); }
 .se-old strong { color: var(--se-fg); font-weight: 700; }
 .se-old span:last-child:not(:first-child) { white-space: pre-line; }
 .se-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; counter-reset: s; }
@@ -359,7 +360,7 @@
   position: absolute;
   left: 50%;
   top: calc(18px + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)));
-  z-index: 40;
+  z-index: 16;
   max-width: min(92vw, 420px);
   padding: 11px 16px;
   border-radius: 14px;
@@ -373,7 +374,7 @@
   transform: translate(-50%, -16px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s var(--se-ease), transform 0.25s var(--se-ease);
+  transition: opacity var(--dur) var(--se-ease), transform var(--dur) var(--se-ease);
 }
 .se-toast.on { opacity: 1; transform: translate(-50%, 0); }
 

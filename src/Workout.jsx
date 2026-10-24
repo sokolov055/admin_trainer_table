@@ -9,7 +9,7 @@ import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, withoutSet, cloneSet, editSetField } from './workout-model.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore } from './icons.jsx';
-import { useBackGesture, useTabLock } from './gestures.jsx';
+import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete, UndoBar, UNDO_MS } from './pendingDelete.jsx';
@@ -1160,7 +1160,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const afterLast = () => {
     setConfirm('complete');
     haptic('medium');
-    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { /* старый браузер */ }
+    try { window.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' }); } catch (_) { /* старый браузер */ }
   };
   const finishAs = (kind) => {
     if (kind === 'complete') {
@@ -1197,7 +1197,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     haptic('medium');
     setTimeout(() => {
       const row = document.querySelector && (document.querySelector('.workout__set--current') || document.querySelector('.workout__exercise--current'));
-      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
     }, 80);
   };
 
@@ -1815,7 +1815,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     setPicking(true);
     (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 0))(() => {
       const first = document.querySelector && document.querySelector('.workout__exercise');
-      if (first && first.scrollIntoView) first.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      if (first && first.scrollIntoView) first.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
     });
   };
   // Щипок: свели пальцы — выбор упражнений (удалить, суперсет), развели — обычный вид

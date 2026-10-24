@@ -14,7 +14,7 @@
   margin: 4px 0 12px;
   padding: 10px 16px 10px 14px;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--accent-fill);
   color: var(--accent-text);
   font: inherit;
@@ -73,7 +73,7 @@
   min-height: 84px;
   padding: 10px 6px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   /* Чуть светлее листа в тёмной теме и чуть темнее в светлой: утопленная
      --surface-sunken в тёмной была темнее листа — плитки читались дырами
      (аудит 24.10.2026) */
@@ -106,7 +106,7 @@
 }
 
 /* «Глазами клиента»: плитка видна, как у клиента, но не нажимается */
-.quick-tile:disabled { opacity: 0.45; cursor: default; }
+.quick-tile:disabled { opacity: var(--disabled-opacity); cursor: default; }
 .quick-tile:disabled:active { transform: none; }
 
 .quick-note {
@@ -133,7 +133,7 @@
 .sheet--quick .quick-main,
 .sheet--quick .quick-tile {
   transform-origin: 50% 100%;
-  animation: quick-in 300ms var(--ease-out) backwards;
+  animation: quick-in var(--dur-nav) var(--ease-out) backwards;
   animation-delay: calc(90ms + var(--i, 0) * 30ms);
 }
 

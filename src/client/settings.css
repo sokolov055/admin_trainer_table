@@ -173,7 +173,7 @@ a.conn-link { text-decoration: none; }
 .conn-link svg { flex-shrink: 0; color: var(--text-muted); }
 .conn-link:active { background: var(--surface-active); }
 .conn-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.conn-link:disabled { opacity: 0.45; cursor: not-allowed; background: none; }
+.conn-link:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; background: none; }
 
 @media (hover: hover) and (pointer: fine) {
   .conn-link:not(:disabled):hover { background: var(--surface-hover); }

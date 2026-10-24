@@ -1,6 +1,6 @@
 /* Экран отдыха и свёрнутая плашка (RestScreen.jsx) — и в тренировке, и
    в любом разделе (RestLayer.jsx) */
-.rest-screen { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); background: var(--bg, #111); color: var(--text); animation: rest-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.rest-screen { position: fixed; inset: 0; z-index: var(--z-rest); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); background: var(--bg, #111); color: var(--text); animation: rest-in var(--dur) var(--ease-out) both; }
 @keyframes rest-in { from { opacity: 0; transform: scale(0.98); } }
 .rest-screen__label { margin: 0; font-size: 22px; font-weight: 700; color: var(--accent); }
 .rest-screen--over .rest-screen__label { color: var(--warning-text); }
@@ -11,7 +11,7 @@
 /* Перебор — токеном --overtime: #f08c00 давал на светлом фоне 2,4:1 (аудит 24.10.2026) */
 .rest-screen--over .rest-screen__bar { stroke: var(--overtime); transition: none; }
 .rest-screen__time { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: min(20vw, 88px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-.rest-screen__next { width: min(100%, 420px); padding: 16px; border-radius: var(--radius, 16px); background: var(--surface); text-align: center; }
+.rest-screen__next { width: min(100%, 420px); padding: 16px; border-radius: var(--radius); background: var(--surface); text-align: center; }
 .rest-screen__next-name { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.25; text-wrap: balance; }
 .rest-screen__next-part { margin: 2px 0 0; font-size: 14px; color: var(--text-muted); }
 .rest-screen__next-load { margin: 10px 0 0; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
@@ -32,11 +32,11 @@
 @media (prefers-reduced-motion: reduce) { .rest-screen { animation: none; } .rest-screen__bar { transition: none; } }
 /* Уход — той же дорогой, что приход: прозрачность и масштаб к 0,98, 220 мс
    (аудит 24.10.2026: экран пропадал рывком). Без анимации — сразу (RestScreen.jsx) */
-.rest-screen--leaving { animation: rest-out 220ms cubic-bezier(0.23, 1, 0.32, 1) forwards; pointer-events: none; }
+.rest-screen--leaving { animation: rest-out var(--dur) var(--ease-out) forwards; pointer-events: none; }
 @keyframes rest-out { to { opacity: 0; transform: scale(0.98); } }
 @media (prefers-reduced-motion: reduce) { .rest-screen--leaving { animation: none; } }
 /* Экран отдыха — поверх всего (портал в body): под ним ничего не листается */
-.rest-screen { touch-action: none; overscroll-behavior: contain; z-index: 90; }
+.rest-screen { touch-action: none; overscroll-behavior: contain; z-index: var(--z-rest); }
 /* Вниз — свернуть, как шторку. Горизонтальный и короткий жесты не мешают
    кнопкам и не срабатывают случайно. */
 .rest-screen:not(.rest-screen--over) { cursor: ns-resize; }
@@ -48,7 +48,7 @@
 .rest-screen__next-part { font-size: 15px; color: var(--text-secondary); }
 .rest-screen__next-load { font-size: 34px; color: var(--text); }
 .rest-screen__round { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; text-align: left; }
-.rest-screen__round li { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-sunken); }
+.rest-screen__round li { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-sunken); }
 .rest-screen__round li.is-done { opacity: 0.5; }
 .rest-screen__round-name { font-size: 17px; font-weight: 650; line-height: 1.25; }
 .rest-screen__round-load { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -62,13 +62,13 @@
   .rest-screen__next-load { font-size: 28px; margin-top: 6px; }
 }
 /* Свёрнутый отдых — плашка над нижним меню, в любом разделе */
-.rest-pill { position: fixed; left: 50%; bottom: var(--float-bottom); z-index: 40; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); cursor: pointer; animation: rest-pill-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.rest-pill { position: fixed; left: 50%; bottom: var(--float-bottom); z-index: var(--z-float); transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; box-shadow: var(--shadow-float); cursor: pointer; animation: rest-pill-in var(--dur) var(--ease-out) both; }
 .rest-pill strong { font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--accent); }
 .rest-pill__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .rest-pill__up { transform: rotate(180deg); color: var(--text-secondary); }
 .rest-pill:active { transform: translateX(-50%) scale(0.97); }
 @keyframes rest-pill-in { from { opacity: 0; transform: translate(-50%, 12px); } }
-@media (prefers-reduced-motion: reduce) { .rest-pill { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rest-pill { animation: none; } .rest-pill:active { transform: translateX(-50%); } }
 
 /* Вне экрана тренировки — без «+30 с»: одна кнопка во всю ширину */
 .rest-screen__actions--one { grid-template-columns: 1fr; }

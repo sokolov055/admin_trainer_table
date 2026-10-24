@@ -3,7 +3,7 @@
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start;
   margin: 0 0 16px; padding: 14px 16px; border-radius: var(--radius-lg);
   background: var(--accent-2-wash); color: var(--text);
-  animation: goal-banner-in 320ms var(--ease-out) both;
+  animation: goal-banner-in var(--dur-nav) var(--ease-out) both;
 }
 .goal-banner__art { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--surface); }
 .goal-banner__body { min-width: 0; }
@@ -11,9 +11,9 @@
 .goal-banner__title { margin: 2px 0 4px; font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; }
 .goal-banner__text { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.45; text-wrap: pretty; }
 .goal-banner__facts { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 10px 0 0; padding: 0; }
-.goal-banner__facts li { padding: 4px 10px; border-radius: 99px; background: var(--surface); font-size: var(--text-sm); font-weight: 600; }
+.goal-banner__facts li { padding: 4px 10px; border-radius: 999px; background: var(--surface); font-size: var(--text-sm); font-weight: 600; }
 .goal-banner--plan, .goal-banner--progress, .goal-banner--nutrition { grid-template-columns: auto minmax(0, 1fr); padding: 12px 14px; }
-.goal-banner--plan .goal-banner__art, .goal-banner--progress .goal-banner__art, .goal-banner--nutrition .goal-banner__art { width: 44px; height: 44px; border-radius: 12px; }
+.goal-banner--plan .goal-banner__art, .goal-banner--progress .goal-banner__art, .goal-banner--nutrition .goal-banner__art { width: 44px; height: 44px; border-radius: var(--radius); }
 .goal-banner--plan .goal-banner__art svg, .goal-banner--progress .goal-banner__art svg, .goal-banner--nutrition .goal-banner__art svg { width: 32px; height: 32px; }
 .goal-banner--plan .goal-banner__title, .goal-banner--progress .goal-banner__title, .goal-banner--nutrition .goal-banner__title { font-size: var(--text-base); }
 @keyframes goal-banner-in { from { opacity: 0; transform: translateY(6px); } }

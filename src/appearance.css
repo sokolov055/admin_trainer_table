@@ -31,14 +31,14 @@
 .look-preview__body { display: grid; gap: 3px; min-width: 0; }
 .look-preview__eyebrow {
   justify-self: start;
-  padding: 2px 8px; border-radius: 99px;
+  padding: 2px 8px; border-radius: 999px;
   background: var(--accent-2-wash); color: var(--accent-2-ink);
   font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
 }
 .look-preview__title { font-size: var(--text-base); font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .look-preview__chips { display: flex; gap: 6px; }
 .look-preview__chip {
-  padding: 3px 10px; border-radius: 99px;
+  padding: 3px 10px; border-radius: 999px;
   border: 1px solid var(--border); color: var(--text-secondary);
   font-size: var(--text-sm); font-weight: 600;
 }

@@ -21,9 +21,9 @@
 .app__actions { display: flex; align-items: center; flex: none; }
 .header-add { position: relative; }
 .header-add > .icon-button { margin-right: 0; color: var(--accent); }
-.header-add__scrim { position: fixed; inset: 0; z-index: 49; }
+.header-add__scrim { position: fixed; inset: 0; z-index: calc(var(--z-menu) - 1); }
 .header-add__menu {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 248px; padding: 6px;
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-menu); min-width: 248px; padding: 6px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   transform-origin: top right;
 }

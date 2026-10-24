@@ -13,7 +13,7 @@
 .help-row--plain { min-height: 48px; }
 .help-row__icon {
   flex: none; display: grid; place-items: center; width: 36px; height: 36px;
-  border-radius: 10px; background: var(--accent-wash); color: var(--accent-ink);
+  border-radius: var(--radius); background: var(--accent-wash); color: var(--accent-ink);
 }
 .help-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .help-row__text strong { font-size: var(--text-base); font-weight: 600; line-height: 1.3; }

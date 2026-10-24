@@ -47,11 +47,11 @@
 .palm-group__head strong { display: block; font-size: var(--text-base); }
 .palm-group__head small { display: block; font-size: var(--text-sm); color: var(--text-secondary); }
 .palm-group__hands { display: flex; align-items: center; gap: 4px; margin-top: var(--space-2); flex-wrap: wrap; }
-.palm-hand { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: var(--surface-sunken); color: var(--text-muted); cursor: pointer; transition: transform var(--dur-press) var(--ease-out), color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.palm-hand { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--radius); background: var(--surface-sunken); color: var(--text-muted); cursor: pointer; transition: transform var(--dur-press) var(--ease-out), color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
 .palm-hand:active { transform: scale(0.9); }
 .palm-hand.is-on { color: var(--accent-ink); background: var(--accent-wash); }
 .palm-hand.is-half { color: var(--accent-ink); background: linear-gradient(90deg, var(--accent-wash) 50%, var(--surface-sunken) 50%); }
-.palm-half { min-width: 44px; height: 44px; padding: 0 10px; border: 1px dashed var(--border-strong); border-radius: 12px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; transition: transform var(--dur-press) var(--ease-out); }
+.palm-half { min-width: 44px; height: 44px; padding: 0 10px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; transition: transform var(--dur-press) var(--ease-out); }
 .palm-half:active { transform: scale(0.94); }
 .palm-group__count { margin: 6px 0 0; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .palm-sheet__footer { display: flex; flex-wrap: wrap; gap: var(--space-2); }

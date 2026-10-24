@@ -1,10 +1,10 @@
 /* Тур по разделам (Tour.jsx, FT-577) */
-.tour { position: fixed; inset: 0; z-index: 70; pointer-events: none; animation: tour-in 240ms var(--ease-out) both; }
+.tour { position: fixed; inset: 0; z-index: var(--z-tour); pointer-events: none; animation: tour-in var(--dur) var(--ease-out) both; }
 .tour__block { position: fixed; pointer-events: auto; }
 .tour__hole {
-  position: fixed; border-radius: 16px; pointer-events: none;
+  position: fixed; border-radius: var(--radius-lg); pointer-events: none;
   box-shadow: 0 0 0 3px var(--accent-solid), 0 0 0 200vmax rgba(12, 11, 9, 0.62);
-  transition: top 420ms var(--ease-ios), left 420ms var(--ease-ios), width 420ms var(--ease-ios), height 420ms var(--ease-ios), box-shadow 240ms var(--ease-out);
+  transition: top var(--dur-enter) var(--ease-ios), left var(--dur-enter) var(--ease-ios), width var(--dur-enter) var(--ease-ios), height var(--dur-enter) var(--ease-ios), box-shadow var(--dur) var(--ease-out);
 }
 .tour__hole.is-empty { box-shadow: 0 0 0 0 transparent, 0 0 0 200vmax rgba(12, 11, 9, 0.62); }
 .tour--live .tour__hole { box-shadow: 0 0 0 3px var(--accent-solid), 0 0 0 8px var(--accent-wash), 0 0 0 200vmax rgba(12, 11, 9, 0.62); animation: tour-pulse 1600ms var(--ease-in-out) 400ms infinite; }
@@ -13,18 +13,18 @@
   position: fixed; left: 16px; right: 16px; max-width: 400px; margin: 0 auto; box-sizing: border-box;
   padding: 18px 18px 14px; border-radius: 22px; background: var(--surface); color: var(--text);
   box-shadow: var(--shadow-lg); pointer-events: auto; font-family: 'Manrope', var(--font);
-  transition: top 420ms var(--ease-ios), bottom 420ms var(--ease-ios);
+  transition: top var(--dur-enter) var(--ease-ios), bottom var(--dur-enter) var(--ease-ios);
 }
-.tour__tail { position: absolute; width: 16px; height: 16px; background: var(--surface); transform: rotate(45deg); border-radius: 3px; transition: left 420ms var(--ease-ios); }
+.tour__tail { position: absolute; width: 16px; height: 16px; background: var(--surface); transform: rotate(45deg); border-radius: 3px; transition: left var(--dur-enter) var(--ease-ios); }
 .tour__card.is-above .tour__tail { bottom: -6px; }
 .tour__card.is-below .tour__tail { top: -6px; }
-.tour__content { animation: tour-step 300ms var(--ease-out) both; }
+.tour__content { animation: tour-step var(--dur-nav) var(--ease-out) both; }
 .tour__count { margin: 0 0 6px; color: var(--accent-solid); font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .tour__card h2 { margin: 0 0 6px; font-size: 20px; font-weight: 780; letter-spacing: -0.025em; line-height: 1.2; }
 .tour__card h2:focus { outline: none; }
 .tour__card p#tour-text { margin: 0; color: var(--text-secondary); font-size: 15px; line-height: 1.5; }
 .tour__actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
-.tour__skip { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 6px; margin-left: -6px; color: var(--text-secondary); font-size: 15px; font-weight: 650; cursor: pointer; border-radius: 10px; }
+.tour__skip { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 6px; margin-left: -6px; color: var(--text-secondary); font-size: 15px; font-weight: 650; cursor: pointer; border-radius: var(--radius-sm); }
 .tour__skip:focus-visible { outline: 2px solid var(--accent); }
 .tour__next { min-height: 46px; padding: 0 22px; margin-left: auto; border-radius: 14px; font-family: inherit; font-size: 16px; font-weight: 720; }
 

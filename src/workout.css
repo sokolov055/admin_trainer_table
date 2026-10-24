@@ -356,7 +356,7 @@
   white-space: normal;
 }
 
-.workout button:disabled { opacity: .5; cursor: default; }
+.workout button:disabled { opacity: var(--disabled-opacity); cursor: default; }
 
 .workout button:focus-visible {
   outline: 2px solid var(--accent);
@@ -413,7 +413,7 @@
   content: counter(member, upper-alpha);
   content: counter(member, upper-alpha) / '';
   display: inline-grid; place-items: center; vertical-align: middle;
-  width: 22px; height: 22px; margin-right: 8px; border-radius: 6px;
+  width: 22px; height: 22px; margin-right: 8px; border-radius: var(--radius-xs);
   background: var(--accent-wash); color: var(--accent-ink, var(--accent));
   font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
 }
@@ -555,7 +555,7 @@
 
 /* Выбор упражнений: кружок у названия, выбранное — с акцентом */
 .workout__ex-head--pick { cursor: pointer; align-items: center; }
-.workout__pick { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--border-strong); color: var(--accent-text); transition: background-color 160ms ease, border-color 160ms ease; }
+.workout__pick { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--border-strong); color: var(--accent-text); transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease; }
 .workout__pick.is-on { background: var(--accent-fill); border-color: var(--accent-fill); }
 .workout__exercise--picked { border-color: var(--accent); }
 .workout__pick-bar {
@@ -564,7 +564,7 @@
   display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
   margin: var(--space-3) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-dock);
 }
 .workout__pick-bar .button { gap: 6px; }
 .workout__pick-count { flex: 1; min-width: 8ch; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -582,7 +582,7 @@
 
 /* Название упражнения — касанием переименовать (02.10.2026): выглядит как текст */
 .workout__name-tap { all: unset; cursor: text; -webkit-tap-highlight-color: transparent; }
-.workout__name-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.workout__name-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 /* Правка касанием (FT-513): по названию — название и вид, по единицам или
    плану — подходы, вес, время, у кардио — цели и интервалы. Панель под
    строкой, как в программе (plan-inline__panel) */
@@ -590,7 +590,7 @@
 .workout__panel .workout__field, .workout__panel .workout__track, .workout__panel > p { margin: 0; }
 .workout__panel .chips { flex-wrap: wrap; overflow: visible; margin-bottom: 0; }
 .workout__panel-actions { display: flex; justify-content: flex-end; }
-.workout__panel-actions .button { min-height: 34px; padding: 0 14px; font-size: var(--text-sm); border-radius: 10px; }
+.workout__panel-actions .button { min-height: 34px; padding: 0 14px; font-size: var(--text-sm); border-radius: var(--radius-sm); }
 .workout__tune-count { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-secondary); }
 .workout__tune-count span { flex: 1; }
 .workout__tune-count .button { min-width: 40px; min-height: 36px; padding: 0; font-size: var(--text-lg, 18px); }
@@ -599,21 +599,21 @@
 .workout__tune-fields label { display: grid; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); min-width: 0; }
 .workout__tune-fields input { text-align: center; font-variant-numeric: tabular-nums; }
 
-.workout__target-tap:focus-visible, button.workout__round-units:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.workout__target-tap:focus-visible, button.workout__round-units:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 button.workout__round-units { all: unset; white-space: pre-wrap; font-weight: 400; color: var(--text-muted); font-size: var(--text-xs); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 
 /* Перестановка удержанием: соседи расступаются, взятая строка — над ними */
 .workout__round > [data-member].workout__exercise--lifted { --swipe-bg: var(--surface); background: var(--surface); }
-.workout__fields [data-unit], .workout__round > [data-member] { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
-.workout__exercise--lifted { position: relative; z-index: 3; transition: none !important; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); }
+.workout__fields [data-unit], .workout__round > [data-member] { transition: transform var(--dur) var(--ease-out); }
+.workout__exercise--lifted { position: relative; z-index: 3; transition: none !important; box-shadow: var(--shadow-lift); }
 
 /* Оценка подхода (03.10.2026). Заливки темнее фирменных зелёного и
    оранжевого: белый текст на них — не ниже 4,5:1 (craft-floor). Тихие —
    ближайший подход не текущего упражнения: обводкой, а не полупрозрачностью,
    чтобы текст оставался читаемым */
 .workout__effort { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: var(--space-2) 0 var(--space-1); }
-.workout__effort-btn { --c: var(--effort-ok); --on: #fff; min-height: 48px; border: 0; border-radius: var(--radius-sm, 10px); background: var(--c); color: var(--on); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 140ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), background-color 160ms var(--ease-out, ease); }
+.workout__effort-btn { --c: var(--effort-ok); --on: #fff; min-height: 48px; border: 0; border-radius: var(--radius-sm); background: var(--c); color: var(--on); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out, ease); }
 .workout__effort-btn:active { transform: scale(0.97); }
 .workout__effort-btn:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
 /* Все три — постоянными цветами вне палитры (--effort-*, styles.css), белым
@@ -664,7 +664,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Завершить и отменить — в шапке, справа от времени и подходов */
 .workout__head-actions { display: flex; gap: var(--space-2); margin-left: auto; align-self: center; }
 .workout__head-actions .button { min-height: 40px; padding: 0 var(--space-3); font-size: var(--text-sm); }
-.workout__confirm { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); animation: rest-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.workout__confirm { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); animation: rest-in var(--dur-fast) var(--ease-out) both; }
 .workout__confirm p { margin: 0 0 var(--space-3); color: var(--text); font-size: var(--text-sm); }
 .workout__confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .workout__confirm-actions .button { min-height: 44px; }
@@ -691,9 +691,9 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Замена упражнения (16.10.2026): кнопка, под ней — список строками во всю
    ширину, чтобы попасть пальцем в зале */
 .workout__alts-toggle { all: unset; cursor: pointer; color: var(--accent); font-size: 14px; font-weight: 600; padding: 6px 0; -webkit-tap-highlight-color: transparent; }
-.workout__alts-toggle:focus-visible, .workout__alts-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.workout__alts-toggle:focus-visible, .workout__alts-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 .workout__alts-list { display: grid; gap: var(--space-1); margin-top: var(--space-1); }
-.workout__alts-item { all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); font-size: 15px; font-weight: 600; -webkit-tap-highlight-color: transparent; }
+.workout__alts-item { all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-sunken); color: var(--text); font-size: 15px; font-weight: 600; -webkit-tap-highlight-color: transparent; }
 .workout__alts-item:active { background: var(--surface); }
 /* Сплит-пара (FT-488): строка на человека — имя, его тренажёр, его настройка */
 .workout__member { display: grid; gap: 2px; margin: var(--space-1) 0; }
@@ -702,7 +702,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__note { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; margin: var(--space-1) 0; }
 .workout__note-edit, .workout__note-add { all: unset; cursor: pointer; color: var(--accent); font-size: var(--text-sm); font-weight: 600; padding: 6px 0; -webkit-tap-highlight-color: transparent; }
 .workout__note-add { display: block; margin: var(--space-1) 0; }
-.workout__note-edit:focus-visible, .workout__note-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.workout__note-edit:focus-visible, .workout__note-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 .workout__note-form { display: grid; gap: var(--space-2); margin: var(--space-1) 0; }
 .workout__note-actions { display: flex; gap: var(--space-2); }
 
@@ -710,16 +710,16 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
    временем, в шапке, что едет за прокруткой. Три кнопки одной высоты с
    рамкой — «Выбрать» читается как кнопка, а не как подпись */
 .workout__toolbar--head { flex-wrap: nowrap; align-items: stretch; margin: var(--space-2) 0 0; }
-.workout__toolbar--head .button, .workout__toolbar--head label { height: 40px; min-height: 0; box-sizing: border-box; border-radius: 10px; font-size: var(--text-sm); }
+.workout__toolbar--head .button, .workout__toolbar--head label { height: 40px; min-height: 0; box-sizing: border-box; border-radius: var(--radius-sm); font-size: var(--text-sm); }
 .workout__toolbar--head .button { padding: 0 var(--space-3); border: 1px solid var(--border); background: var(--surface-sunken); color: var(--text); flex: none; }
 .workout__toolbar--head .button.is-on { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-text); }
 .workout__toolbar--head label { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; padding: 0 var(--space-2) 0 var(--space-3); border: 1px solid var(--border); background: var(--surface-sunken); color: var(--text-secondary); }
 .workout__toolbar--head select { height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); font-size: 16px; font-weight: 600; }
 .workout__title-tap { all: unset; cursor: text; -webkit-tap-highlight-color: transparent; }
-.workout__title-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.workout__title-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 .workout__title-input { width: 100%; box-sizing: border-box; font-size: var(--text-md); font-weight: 640; }
 /* Завершить и Отменить — той же высоты и скругления, что кнопки строки ниже */
-.workout__head-actions .button { height: 40px; min-height: 0; box-sizing: border-box; border-radius: 10px; }
+.workout__head-actions .button { height: 40px; min-height: 0; box-sizing: border-box; border-radius: var(--radius-sm); }
 /* Интервалы отрезка (FT-513): круги и каждый интервал строкой — название
    слева, его цели справа сеткой. Те же поля, что у отрезка, той же высоты */
 .intervals-row { display: grid; gap: var(--space-2); }
@@ -732,7 +732,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Единицы у названия — касанием настройки упражнения (вместо крупного «4 × 12») */
 .workout__units-tap { all: unset; display: inline-flex; align-items: center; gap: 6px; margin-top: var(--space-1); color: var(--text-muted); font-size: var(--text-sm); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .workout__units-tap[aria-expanded="true"] { color: var(--accent); }
-.workout__units-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.workout__units-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 /* Инструкция упражнения на виду; фото и регулировки конкретного тренажёра —
    в собственной раскрывашке (FT-570). */
 .workout__about { display: grid; gap: var(--space-3); margin: var(--space-2) 0 var(--space-3); }
@@ -758,7 +758,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .guide__muscles-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .guide__figure { display: flex; justify-content: center; padding: var(--space-2) 0; }
 .guide__link { border: 0; background: none; padding: 6px 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.guide__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.guide__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 
 /* ---------------------------------------------------------------------------
    Карточка упражнения — единая система (владелец, 09.10.2026, дизайн-проход).
@@ -799,7 +799,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .intervals-row__name { font-size: 14px; font-weight: 650; }
 
 /* Главное действие — скругление и высота как у полей */
-.workout__effort-btn { min-height: var(--field-h, 52px); border-radius: var(--field-r, 12px); font-size: 17px; letter-spacing: -0.005em; }
+.workout__effort-btn { min-height: var(--field-h, 52px); border-radius: var(--field-r, var(--radius)); font-size: 17px; letter-spacing: -0.005em; }
 .workout__effort-hint { margin-top: var(--space-1); font-size: var(--text-sm); }
 
 /* Второй план — кнопка с рамкой, как «Пауза» и «Выбрать» в шапке */
@@ -808,7 +808,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
   min-height: 44px;
   margin-top: var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--field-r, 12px);
+  border-radius: var(--field-r, var(--radius));
   background: var(--surface-sunken);
   color: var(--text);
   font-size: 15px;
@@ -818,7 +818,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
   min-height: 36px;
   padding: 0 var(--space-3);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface-sunken);
   color: var(--text);
   font-size: 14px;
@@ -873,26 +873,26 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
    строк и 230 px: в зале треть экрана уходила на шапку */
 .workout__head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: calc(var(--space-1) * -1); }
 .workout__head-row .app__back { margin: 0; min-height: 44px; }
-.workout__finish-btn { height: 44px; min-height: 0; padding: 0 var(--space-3); border-radius: 10px; font-size: var(--text-sm); }
+.workout__finish-btn { height: 44px; min-height: 0; padding: 0 var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-sm); }
 .workout__header h2 { margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workout__title-meta { font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); letter-spacing: 0; }
 .workout__line { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); min-width: 0; }
 .workout__line .workout__metrics { display: inline-flex; align-items: baseline; gap: 4px; margin: 0 auto 0 0; flex: 0 1 auto; min-width: 0; white-space: nowrap; font-size: var(--text-base); color: var(--text-secondary); }
 .workout__line .workout__metrics strong { display: inline; margin: 0; font-size: var(--text-lg); }
 .workout__line .workout__metrics b { font-weight: 600; color: var(--text); }
-.workout__rest-pick { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 4px 0 10px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--text-sm); white-space: nowrap; }
+.workout__rest-pick { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 4px 0 10px; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--text-sm); white-space: nowrap; }
 .workout__rest-pick select { height: 100%; min-height: 0; margin: 0; padding: 0 2px; border: 0; background: transparent; color: var(--text); font-size: 16px; font-weight: 600; }
-.workout__pause { height: 44px; min-height: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); font-size: var(--text-sm); }
-.workout__line .workout__pick-toggle { height: 44px; min-height: 0; padding: 0 10px; border-radius: 10px; font-size: var(--text-sm); }
+.workout__pause { height: 44px; min-height: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text); font-size: var(--text-sm); }
+.workout__line .workout__pick-toggle { height: 44px; min-height: 0; padding: 0 10px; border-radius: var(--radius-sm); font-size: var(--text-sm); }
 .workout__more { position: relative; flex: none; }
-.workout__more-btn { width: 44px; height: 44px; margin: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); }
-.workout__more-scrim { position: fixed; inset: 0; z-index: 49; }
-.workout__menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 200px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); transform-origin: top right; animation: rest-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.workout__more-btn { width: 44px; height: 44px; margin: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text); }
+.workout__more-scrim { position: fixed; inset: 0; z-index: calc(var(--z-menu) - 1); }
+.workout__menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-menu); min-width: 200px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); transform-origin: top right; animation: rest-in var(--dur-fast) var(--ease-out) both; }
 .workout__menu-item { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; font-size: var(--text-base); text-align: left; cursor: pointer; }
 .workout__menu-item:active { background: var(--surface-active); }
 .workout__menu-item--critical { color: var(--critical-text, #b42318); }
 /* Уходит той же дорогой, что пришло, — чуть быстрее (аудит 24.10.2026) */
-.workout__menu--leaving { animation: workout-menu-out 140ms cubic-bezier(0.23, 1, 0.32, 1) forwards; pointer-events: none; }
+.workout__menu--leaving { animation: workout-menu-out var(--dur-fast) var(--ease-out) forwards; pointer-events: none; }
 @keyframes workout-menu-out { to { opacity: 0; transform: scale(0.98); } }
 @media (prefers-reduced-motion: reduce) { .workout__menu, .workout__menu--leaving { animation: none; } }
 
@@ -920,8 +920,17 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* «Настройки круга» — раскрывашка, а не серая строка: шеврон показывает,
    что под ней что-то есть (QA 20.10.2026) */
 .workout__round-options > summary { display: inline-flex; align-items: center; gap: 4px; }
-.workout__round-options > summary svg { transition: transform 160ms ease; }
+.workout__round-options > summary svg { transition: transform var(--dur-fast) ease; }
 .workout__round-options[open] > summary svg { transform: rotate(180deg); }
+
+/* «Уменьшить движение»: уходит перемещение — сжатие при нажатии, плавный
+   сдвиг соседей при перестановке и плавный поворот шеврона (он
+   переворачивается сразу); остаются цвет и проявление (аудит 24.10.2026) */
+@media (prefers-reduced-motion: reduce) {
+  .workout__effort-btn:active, .workout__member-done:active { transform: none; }
+  .workout__fields [data-unit], .workout__round > [data-member] { transition: none; }
+  .workout__round-options > summary svg { transition: none; }
+}
 
 /* Подписи разбора упражнения — как остальные подписи приложения, без капса:
    это было единственное место с ним (QA 20.10.2026) */
@@ -963,7 +972,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
    та сдвигала всё занятие и отнимала у шапки :first-child (стекло до края).
    Портал в body — вне .workout */
 .workout__alerts {
-  position: fixed; left: 50%; z-index: 45;
+  position: fixed; left: 50%; z-index: var(--z-toast);
   width: min(calc(100% - 2 * var(--space-4)), 560px); transform: translateX(-50%);
   display: grid; gap: var(--space-2);
 }
@@ -976,7 +985,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
   background: var(--warning-fill); color: var(--warning-text);
   border: 1px solid var(--warning-line); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  animation: workout-alert-in 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  animation: workout-alert-in var(--dur) var(--ease-out);
 }
 .workout__alert > p { flex: 1 1 14ch; min-width: 0; margin: 0; font-size: var(--text-sm); font-weight: 600; line-height: 1.35; }
 .workout__alert .button { flex: none; margin: 0; }

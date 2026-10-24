@@ -243,7 +243,7 @@ button.diary-food-main:active { background: var(--surface-active); }
 .diary-meal-norm.is-over small { color: var(--warning-text); }
 .meal-shares__row { display: grid; grid-template-columns: minmax(0, 1fr) 44px 64px 44px 76px; align-items: center; gap: var(--space-2); min-height: 52px; border-bottom: 1px solid var(--border); }
 .meal-shares__name { font-weight: 600; }
-.meal-shares__step { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: var(--text-title); cursor: pointer; transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-press) var(--ease-out); }
+.meal-shares__step { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; font-size: var(--text-title); cursor: pointer; transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-press) var(--ease-out); }
 .meal-shares__step:active { background: var(--surface-active); transform: scale(0.94); }
 @media (prefers-reduced-motion: reduce) { .meal-shares__step { transition: none; } .meal-shares__step:active { transform: none; } }
 .meal-shares__pct { text-align: center; font-size: var(--text-md); font-variant-numeric: tabular-nums; }

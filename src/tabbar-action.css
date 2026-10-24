@@ -92,7 +92,7 @@
    а не начинает заново */
 .tabbar__action-glyph {
   display: flex;
-  transition: transform 420ms var(--ease-ios);
+  transition: transform var(--dur-enter) var(--ease-ios);
   transition: transform 500ms linear(0, 0.092, 0.283, 0.487, 0.664, 0.8, 0.895, 0.955, 0.99, 1.007, 1.014, 1.015, 1.013, 1.01, 1.007, 1.004, 1);
 }
 .tabbar__action[aria-expanded="true"] .tabbar__action-glyph { transform: rotate(45deg); }
@@ -133,7 +133,7 @@
 /* Лист открыт — меню над его затемнением: крестик там же, где был плюс,
    и лист закрывается тем местом, откуда появился (макет Plus; apple-design,
    «Spatial consistency»). Лист в body на z-index 110 (styles.css) */
-.tabbar.tabbar--raised { z-index: 120; }
+.tabbar.tabbar--raised { z-index: var(--z-sheet-tabbar); }
 .tabbar--raised .tabbar__action-disc { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.18); }
 
 /* Подсказка новичку (TabBar.jsx, usePlusHint): два кольца расходятся от
