@@ -1521,7 +1521,8 @@ test('оборудование создаётся без упражнения и
       return row && row.getAttribute('aria-pressed') === 'true';
     });
 
-    await phone.getByRole('button', { name: 'Тренажёры', exact: true }).click();
+    // «Назад» к списку — общий BackButton (аудит 24.10.2026): для диктора «Назад: Тренажёры»
+    await phone.getByRole('button', { name: 'Назад: Тренажёры', exact: true }).click();
     const linked = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Разборные гантели' });
     await assert.doesNotReject(linked.getByText(/Жим гантелей лёжа/).waitFor({ timeout: 3000 }));
     await assert.doesNotReject(linked.getByText(/Приседания со штангой/).waitFor({ timeout: 3000 }));
