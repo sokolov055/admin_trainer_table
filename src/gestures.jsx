@@ -721,6 +721,10 @@ export function Gestures() {
     let pagerX = 0;             // сдвиг ленты разделов, со знаком
     let scene = null;           // сцена «назад», пока жест идёт
     let refreshing = false;
+    // Страница едет на место после обновления (24.10.2026): касание этот
+    // ход не перехватывает — оборванная пружина не доходила до onDone,
+    // refreshing оставался true, и страница висела сдвинутой со штангой
+    let returning = false;
     let settle = null;          // пружина, что возвращает страницу после прерванного «потянуть»
 
     /* ---------------- отрисовка ---------------- */
@@ -878,7 +882,7 @@ export function Gestures() {
       }
 
       // Перехват на лету: берём текущее положение, а не цель пружины
-      if (anim) { anim.stop(); anim = null; }
+      if (anim && !returning) { anim.stop(); anim = null; }
       if (settle) { settle.stop(); settle = null; }
 
       const t = e.touches[0];
@@ -1030,11 +1034,12 @@ export function Gestures() {
           const wait = Math.max(0, MIN_SPIN_MS - (performance.now() - started));
           setTimeout(() => {
             if (anim) anim.stop();
+            returning = true;
             anim = spring({
               from: pullY,
               to: 0,
               onFrame: (y) => drawPull(y, y > 8),
-              onDone: () => { anim = null; refreshing = false; drawPull(0); },
+              onDone: () => { anim = null; returning = false; refreshing = false; drawPull(0); },
             });
           }, wait);
         });
