@@ -70,10 +70,10 @@ const SCENARIOS = [
     S.click('Добавить в обед'), S.fill('Поиск продуктов и блюд', 'овс'), S.wait(700), S.shot('01-search'),
     S.eval(async page => { await page.getByRole('dialog').locator('button').filter({ hasText: /овс/i }).first().click(); }), S.wait(400), S.shot('02-entry-form'),
     S.dialog(/^Записать/), S.wait(700),
-    S.click('Добавить в обед'), S.dialog('Только калории'), S.wait(400), S.shot('03-quick'),
+    S.click('Добавить в обед'), S.dialog('Ещё способы'), S.dialog('Только калории'), S.wait(400), S.shot('03-quick'),
     S.fill('Калории, ккал', '650'), S.fill('Что это было', 'Бизнес-ланч'), S.shot('04-quick-filled'),
     S.dialog(/^Добавить \d/), S.wait(700), S.shot('05-quick-saved', true),
-    S.click('Добавить в обед'), S.dialog('Фото этикетки'), S.wait(400), S.shot('06-scan-guide'),
+    S.click('Добавить в обед'), S.dialog('Ещё способы'), S.dialog('Фото этикетки'), S.wait(400), S.shot('06-scan-guide'),
     S.close(), S.wait(300),
     S.click(/250 мл/), S.wait(500), S.shot('07-water', true),
     S.click('Завершить день'), S.wait(400), S.shot('08-finish-sheet'),
@@ -86,7 +86,7 @@ const SCENARIOS = [
     S.click('Ещё'), S.click('Норма по приёмам'), S.wait(400), S.shot('01-shares'),
     S.click('Больше: Ужин'), S.click('Меньше: Завтрак'), S.shot('02-shares-changed'),
     S.dialog('Сохранить'), S.wait(700), S.click('Дневник'), S.wait(400), S.shot('03-meals', true),
-    S.click('Добавить в обед'), S.dialog('Только калории'), S.fill('Калории, ккал', '900'), S.dialog(/^Добавить \d/), S.wait(700), S.shot('04-over', true),
+    S.click('Добавить в обед'), S.dialog('Ещё способы'), S.dialog('Только калории'), S.fill('Калории, ккал', '900'), S.dialog(/^Добавить \d/), S.wait(700), S.shot('04-over', true),
   ] },
   // 4. Рецепты под остаток и из холодильника
   { id: 'n4-recipes', query: '', steps: [

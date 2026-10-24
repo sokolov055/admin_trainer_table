@@ -34,6 +34,9 @@ test('FT-736: фото тарелки → проверка граммов → з
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   await page.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Ещё способы' }).click();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(shots, 'ft736-picker.png') });
   await page.getByRole('dialog').getByRole('button', { name: 'Фото блюда', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: /Еда по фото/ });
   await sheet.getByText('Положите рядом вилку или ложку').waitFor();
