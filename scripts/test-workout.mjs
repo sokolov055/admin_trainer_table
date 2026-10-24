@@ -73,7 +73,7 @@ const output = await build({ entryPoints: ['src/Workout.jsx'], bundle: true, wri
   loader: { '.png': 'dataurl' },
   plugins: [{ name: 'test-api', setup(b) {
     b.onResolve({ filter: /\/(api|telegram|session)\.js$/ }, args => ({ path: args.path, namespace: 'test' }));
-    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiWait=(...a)=>globalThis.__workoutWait?globalThis.__workoutWait(...a):new Promise(()=>{}); export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const apiFresh=async(...a)=>({data:await globalThis.__workoutApi(...a),offline:false,at:0}); export const apiStoredAt=()=>0; export const apiStale=()=>({data:{exercises:[]},stale:false,promise:Promise.resolve({exercises:[]})}); export const onMutated=()=>()=>{}; export const getInitData=()=>""; export const getToken=()=>"demo"; export const haptic=()=>{}; export const apiPrimary=apiPublic; export const logout=()=>{}; export const environmentInfo=()=>({}); export const hasToken=()=>true; export const describeDevice=()=>"";' }));
+    b.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const apiWait=(...a)=>globalThis.__workoutWait?globalThis.__workoutWait(...a):new Promise(()=>{}); export const apiPublic=(...a)=>globalThis.__workoutApi(...a); export const apiMutate=apiPublic; export const apiFresh=async(...a)=>({data:await globalThis.__workoutApi(...a),offline:false,at:0}); export const apiStoredAt=()=>0; export const apiStale=(a,p)=>a==="exercise.setup"?({data:globalThis.__workoutStale?globalThis.__workoutStale(a,p):null,stale:false,promise:globalThis.__workoutApi(a,p)}):({data:{exercises:[]},stale:false,promise:Promise.resolve({exercises:[]})}); export const onMutated=()=>()=>{}; export const getInitData=()=>""; export const getToken=()=>"demo"; export const haptic=(...a)=>{ if (globalThis.__haptic) globalThis.__haptic(...a); }; export const apiPrimary=apiPublic; export const logout=()=>{}; export const environmentInfo=()=>({}); export const hasToken=()=>true; export const describeDevice=()=>"";' }));
     b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
   } }] });
 const module = { exports: {} };
@@ -408,8 +408,17 @@ test('суперсет из программы виден в занятии', as
     // Отдых пошёл после последнего упражнения — закрыть его, чтобы не мешал
     const stop = local.root.findAllByType('button').find(b => text(b) === 'Закончить отдых');
     if (stop) await act(async () => { stop.props.onClick(); await delay(); });
-    await press('Круг 1 выполнен');
-    assert.equal(round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length, 0, 'второе нажатие снимает отметку');
+    // «Круг 1 выполнен» — статус, не кнопка (аудит 24.10.2026): случайное
+    // касание больше не снимает отметки. Снять — в «Настройках круга», с «Вернуть»
+    assert.ok(round1().findAll(n => n.type === 'p' && n.props.role === 'status' && text(n) === 'Круг 1 выполнен').length === 1, 'круг отмечен — строкой-статусом');
+    assert.equal(round1().findAll(n => n.type === 'button' && text(n) === 'Круг 1 выполнен').length, 0, 'это не кнопка');
+    const isDone = () => round1().findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done')).length;
+    await press('Снять отметку круга');
+    assert.equal(isDone(), 0, 'отметки круга сняты из настроек круга');
+    await press('Вернуть');
+    assert.equal(isDone(), 2, '«Вернуть» возвращает отметки круга');
+    await press('Снять отметку круга');
+    assert.equal(isDone(), 0);
 
     // Разъединили — два отдельных упражнения, подходов у каждого столько,
     // сколько было кругов
@@ -495,6 +504,9 @@ test('отмеченный подход запускает отдых, если 
   await act(async () => { await check.props.onClick(); await delay(); });
 
   assert.equal(rest().length, 1, 'отдых пошёл сам, без похода в шапку');
+  // Жесты приложения экран отдыха не трогают: вправо уводило из занятия,
+  // вниз — «потяни, чтобы обновить» под ним (аудит 24.10.2026)
+  assert.equal(rest()[0].props['data-no-gestures'], '');
   const target = { closest: () => null };
   await act(async () => {
     rest()[0].props.onTouchStart({ touches: [{ clientX: 190, clientY: 180 }], target });
@@ -1225,7 +1237,7 @@ test('цель кардио, поправленная в сделанном кр
     const round1 = () => local.root.findAllByProps({ className: 'workout__round' })[0];
     await press(round1().findAll(n => n.type === 'button' && text(n) === 'Норм')[0]);
     await press(round1().findAll(n => n.type === 'button' && text(n) === 'Норм')[0]);
-    assert.ok(local.root.findAllByType('button').some(b => text(b) === 'Круг 1 выполнен'));
+    assert.ok(local.root.findAll(n => n.type === 'p' && text(n) === 'Круг 1 выполнен').length);
     // Во втором круге отрезок ещё пуст; цель 150 м из настроек второго круга
     await press(local.root.findAllByType('button').filter(b => b.props['aria-label'] === 'Аэробайк: настройки')[1]);
     await act(async () => { input('Цель: Расстояние, м').props.onChange({ target: { value: '150' } }); await delay(); });
@@ -1454,4 +1466,101 @@ test('время занятия с сервера досчитывается о�
   assert.equal(serverTick({ status: 'active', updatedAt: at(24 * 60) }, now), now - 3 * 3600000);
   assert.equal(serverTick({ status: 'active', updatedAt: at(-2) }, now), now);
   assert.equal(serverTick({ status: 'active' }, now), now);
+});
+
+/**
+ * Аудит 24.10.2026, «прыжки»: после показа занятия ничего не вставляется в
+ * поток над шапкой. Проверка подхода — под самим подходом; ошибки связи —
+ * плашкой, которая не пропадает от касания и одна несёт «Повторить».
+ */
+test('аудит 24.10.2026: «Введите вес» — под подходом, ошибка связи — плашкой с «Повторить», шапка первая', async () => {
+  data.clear();
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: { title: 'Без веса', exercises: [{ name: 'Жим', sets: 2, reps: '8', weight: '' }] }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const screen = local.root.find(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout'));
+    assert.ok(screen.props.className.includes('workout--session'), 'класс занятия — с первого кадра (шапка приложения не ужимается позже)');
+    assert.equal(screen.children[0].type, 'header', 'шапка занятия — первая');
+    assert.equal(local.root.findAll(n => n.props && n.props.role === 'status' && /Открываем журнал/.test(text(n))).length, 0, 'строки загрузки под шапкой нет');
+    const pick = () => local.root.findAllByType('button').find(b => text(b) === 'Норм');
+    await act(async () => { pick().props.onClick(); await delay(); });
+    const lack = local.root.findAll(n => n.type === 'p' && n.props.className === 'workout__round-lack');
+    assert.equal(lack.length, 1);
+    assert.equal(lack[0].props.role, 'alert');
+    assert.match(text(lack[0]), /Введите вес/);
+    assert.equal(local.root.findAll(n => String(n.props.className || '').includes('workout__alert')).length, 0, 'это не плашка ошибки');
+    assert.equal(screen.children[0].type, 'header', 'и шапка по-прежнему первая');
+    const weight = () => local.root.findAllByType('input').find(n => /Жим, подход 1, вес/.test(n.props['aria-label'] || ''));
+    await act(async () => { weight().props.onChange({ target: { value: '50' } }); await delay(); });
+    assert.equal(local.root.findAll(n => n.type === 'p' && n.props.className === 'workout__round-lack').length, 0, 'вписали — подсказка ушла');
+
+    // Нет связи при сохранении — плашка с «Повторить»; следующее касание её не снимает
+    offline = true;
+    await act(async () => { await hideOnce(); await delay(); });
+    const alert = () => local.root.findAll(n => n.type === 'div' && n.props.role === 'alert' && String(n.props.className || '').includes('workout__alert'));
+    assert.equal(alert().length, 1);
+    assert.match(text(alert()[0]), /Не сохранено в облаке/);
+    assert.ok(alert()[0].findAll(n => n.type === 'button' && text(n) === 'Повторить').length === 1);
+    await act(async () => { weight().props.onChange({ target: { value: '52' } }); await delay(); });
+    assert.equal(alert().length, 1, 'плашка стоит, пока не сохранится');
+    assert.equal(screen.children[0].type, 'header');
+    offline = false;
+    await act(async () => { alert()[0].findAll(n => n.type === 'button' && text(n) === 'Повторить')[0].props.onClick(); await delay(); });
+    assert.equal(alert().length, 0, 'сохранилось — плашки нет');
+    // «Повторить» досылает тот же снимок (50), вписанное после — следующим сохранением
+    await saveNow();
+    assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].exercises[0].sets[0].weight, '52');
+  } finally {
+    offline = false;
+    if (local) local.unmount();
+  }
+});
+
+test('аудит 24.10.2026: место под настройки упражнения занято заранее, тренажёр подставляется без вибрации', async () => {
+  data.clear();
+  const bar = { uid: 'bar1', name: 'Гриф', kind: 'equipment' };
+  const info = { setups: { 77: {
+    name: 'Жим лёжа', setup: '', notes: '', machines: [bar], primaryEquipmentUid: 'bar1', alternatives: [], noteKey: 'e:жим лёжа',
+    muscles: { primary: [], secondary: [] }, media: null,
+  } }, notes: {} };
+  const buzz = [];
+  globalThis.__haptic = (...a) => buzz.push(a);
+  let release;
+  exerciseSetupResponse = new Promise(resolve => { release = resolve; });
+  const block = { title: 'Грудь', exercises: [{ name: 'Жим лёжа', exerciseId: 77, sets: '3', reps: '10', weight: '' }, { name: 'Своё', sets: '2', reps: '10', weight: '5' }] };
+  let local;
+  try {
+    await act(async () => { local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Октябрь 2026' }, onClose() {} })); await delay(); });
+    const waits = () => local.root.findAll(n => n.type === 'div' && String(n.props.className || '').includes('workout__extras-wait'));
+    assert.equal(waits().length, 1, 'скелетон — только у упражнения из базы, пока настройки в пути');
+    await act(async () => { release(info); await delay(); });
+    assert.equal(waits().length, 0, 'приехали — на месте скелетона настройки');
+    assert.ok(local.root.findAll(n => n.type === 'details' && n.props.className === 'workout__setup workout__about').length === 1);
+    assert.ok(local.root.findAll(n => n.type === 'p' && /Здесь ещё не делали/.test(text(n))).length === 1, 'подсказка про вес на месте');
+    assert.equal(buzz.length, 0, 'тренажёр подставлен сам — телефон не вибрирует');
+    // Подсказка не пропадает на первой цифре — только после отметки подхода
+    const weight = () => local.root.findAllByType('input').find(n => /Жим лёжа, подход 1, вес/.test(n.props['aria-label'] || ''));
+    await act(async () => { weight().props.onChange({ target: { value: '6' } }); await delay(); });
+    assert.ok(local.root.findAll(n => n.type === 'p' && /Здесь ещё не делали/.test(text(n))).length === 1, 'вписали цифру — подсказка стоит');
+    await act(async () => { weight().props.onChange({ target: { value: '60' } }); await delay(); });
+    await act(async () => { local.root.findAllByType('button').find(b => text(b) === 'Норм').props.onClick(); await delay(); });
+    assert.equal(local.root.findAll(n => n.type === 'p' && /Здесь ещё не делали/.test(text(n))).length, 0, 'отметили подход — подсказка ушла');
+    local.unmount(); local = null;
+
+    // Сохранённые настройки (offline-prefetch, прошлое открытие) — сразу, без скелетона
+    data.clear();
+    globalThis.__workoutStale = (action) => (action === 'exercise.setup' ? info : null);
+    exerciseSetupResponse = new Promise(() => {});
+    await act(async () => { local = renderer.create(React.createElement(Workout, { launch: { block, month: 'Октябрь 2026' }, onClose() {} })); await delay(); });
+    assert.equal(waits().length, 0, 'из запаса — без скелетона');
+    assert.ok(local.root.findAll(n => n.type === 'details' && n.props.className === 'workout__setup workout__about').length === 1);
+  } finally {
+    globalThis.__haptic = null;
+    globalThis.__workoutStale = null;
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
 });

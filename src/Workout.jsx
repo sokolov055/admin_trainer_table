@@ -1,8 +1,8 @@
 import { primaryEquipment } from './equipment-guidance.js';
 import WorkoutGuidance from './WorkoutGuidance.jsx';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync, createPortal } from 'react-dom';
-import { apiFresh, apiPublic, apiMutate, apiWait } from './api.js';
+import { apiStale, apiPublic, apiMutate, apiWait } from './api.js';
 import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWorkout, settleClosed } from './workout-outbox.js';
 import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
@@ -53,7 +53,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [ready, setReady] = useState(false);
   const [trackNote, setTrackNote] = useState(null); // { ei, text, error } — вид упражнения ушёл в базу или нет
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  // Ошибка связи или сохранения: { text, retry } — закреплённой плашкой у
+  // низа экрана, а не строкой над шапкой (аудит 24.10.2026): та вставала в
+  // поток, сдвигала всё занятие вниз и пропадала на следующем касании. held —
+  // после сбоя автосохранение ждёт следующей правки; плашка при этом стоит,
+  // пока не сохранится, не нажмут «Повторить» или крестик
+  const [message, setMessageState] = useState(null);
+  const [held, setHeld] = useState(false);
+  const setMessage = (text, retry = true) => { setMessageState(text ? { text, retry } : null); setHeld(!!text); };
+  // Чего не хватает, чтобы отметить подход: { key: 'упражнение:подход', text } —
+  // под строкой подхода, как у круга суперсета (roundLack), а не плашкой
+  // над шапкой (аудит 24.10.2026)
+  const [lack, setLack] = useState(null);
   const [storageError, setStorageError] = useState(false);
   const [conflict, setConflict] = useState(null);
   const [confirm, setConfirm] = useState('');
@@ -300,9 +311,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const settled = next && Array.isArray(next.exercises) ? settleOrder(next.exercises) : null;
     const session = settled && settled !== next.exercises ? { ...next, exercises: settled } : next;
     store({ ...r, session, tick: Date.now(), dirty: true, edit: (r.edit || 0) + 1 });
-    setMessage('');
-    // Вписали недостающее — подсказка под кнопкой круга больше не нужна
+    // Правка — повод снова попробовать сохранить. Плашку не снимаем: она
+    // уйдёт, когда сохранение пройдёт (аудит 24.10.2026)
+    setHeld(false);
+    // Вписали недостающее — подсказка под подходом и под кругом больше не нужна
     setRoundLack(null);
+    setLack(null);
   };
 
   const save = async () => {
@@ -316,7 +330,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (!r.pending) {
       const issue = resultIssue(r.session);
       if (issue) {
-        if (mounted.current) setMessage('Не сохранено: ' + issue + ' Исправьте результат подхода. Черновик остаётся на устройстве.');
+        if (mounted.current) setMessage('Не сохранено: ' + issue + ' Исправьте результат подхода. Черновик остаётся на устройстве.', false);
         return;
       }
     }
@@ -460,10 +474,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   }, [record]);
 
   useEffect(() => {
-    if (!ready || !record?.dirty || busy || message || conflict) return;
+    if (!ready || !record?.dirty || busy || held || conflict) return;
     const timer = setTimeout(save, 1800);
     return () => clearTimeout(timer);
-  }, [record, ready, busy, message, conflict]);
+  }, [record, ready, busy, held, conflict]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -661,6 +675,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     ? { ...x, sets: x.sets.map((set, i) => (i === si ? withIntervals(set, setIntervals(set, x), trackOf(x)) : set)) }
     : x);
   const lackOf = (ex, si) => missing(pinIntervals(ex, si).sets[si], trackOf(ex));
+  /**
+   * Чего не хватает для отметки — под подходом, и курсор сразу в пустое
+   * поле (аудит 24.10.2026): плашка над шапкой сдвигала занятие и была не
+   * видна за клавиатурой. fields — поля строки, set — сам подход
+   */
+  const askFor = (key, text, fields, set) => {
+    setLack({ key, text });
+    const want = /вес/.test(text) ? ['weight', 'assist'] : /время/.test(text) ? ['time'] : /повтор/.test(text) ? ['reps'] : [];
+    const field = fields.find(f => want.includes(f.key)) || fields.find(f => !String(set[f.key] || '').trim()) || fields[0];
+    if (!field || typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+    const input = document.querySelector('[data-field="' + String(key + ':' + field.key).replace(/["\\]/g, '\\$&') + '"]');
+    if (input && input.focus) input.focus();
+  };
   // Номер последней замены: ответ истории применяется только к ней (выбрали
   // A, потом B, потом снова A — ответ на первое A пришёл бы в уже новое A)
   const replaceSeq = useRef(0);
@@ -698,7 +725,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const chooseMachine = async (ei, machine) => {
     const current = state.current && state.current.session.exercises[ei];
     if (!current) return;
-    haptic();
+    // Без вибрации (аудит 24.10.2026): тренажёр подставляет сам экран, когда
+    // приехали настройки (autoMachine), — телефон дёргался без касания
     const uidOf = (m) => (m ? m.uid : '');
     updateExercise(ei, (ex) => withMachine(ex, machine));
     try {
@@ -762,7 +790,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const useRemote = () => {
     // Перед разрешением конфликта сохраняем локальную копию отдельно.
     try { localStorage.setItem(key.current + ':backup:' + Date.now(), JSON.stringify(state.current)); }
-    catch (_) { setMessage('Скачайте черновик перед загрузкой другой версии.'); return; }
+    catch (_) { setMessage('Скачайте черновик перед загрузкой другой версии.', false); return; }
     const remote = conflict.session;
     conflictRef.current = null; setConflict(null);
     store({ session: remote, revision: remote.revision, serverTitle: remote.title, dirty: false, tick: serverTick(remote) });
@@ -817,7 +845,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                     : <IconSliders size={12} aria-hidden="true" />}
                 </button>}
               {fields.map(f => (
-                <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
+                <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
               ))}
             </div>
             {/* Под строкой, под колонкой веса — одной строкой: вес на одну
@@ -846,8 +874,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 отдых. Снять отметку — номер подхода → «Снять отметку» */}
             {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
               // Разминку можно и без веса: свой вес, без нагрузки (FT-620)
-              const lack = missing(set, track, { requireWeight: set.kind !== 'warmup' });
-              if (lack) { setMessage(lack); return; }
+              const why = missing(set, track, { requireWeight: set.kind !== 'warmup' });
+              if (why) { askFor(key, why, fields, set); return; }
               // Один расчёт на свежем снимке — и в занятие, и для отдыха:
               // change зовёт transform сразу (20.10.2026, аудит)
               let rated = null;
@@ -860,6 +888,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               // куда прибавить (effort.js, capped)
               if (restAfter) startRest(restFor(effort, restBase(ex), !!(rated && rated.capped)));
             }, current, set.kind === 'warmup')}
+            {/* Под кнопками оценки, а не над ними: нажатая кнопка не уезжает
+                из-под пальца (аудит 24.10.2026) */}
+            {!inRound && lack && lack.key === key && <p className="workout__round-lack" role="alert">{lack.text}</p>}
             {set.state === 'pending' && set.suggest && (() => {
               // Только у ближайшего: сразу за отмеченным подходом того же человека
               const prev = ex.sets.slice(0, si).filter(x => (x.who || '') === (set.who || '')).pop();
@@ -947,18 +978,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           onChange={iv => updateSet(ei, si, x => withIntervals(x, iv, track))} />
         : <div className="workout__cardio-grid">
           {fields.map(f => (
-            <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
+            <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
           ))}
         </div>}
       {/* Как у силовых: отрезок отмечается оценкой, она же запускает отдых */}
       {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
-        const lack = lackOf(ex, si);
-        if (lack) { setMessage(lack); return; }
+        const why = lackOf(ex, si);
+        if (why) { askFor(key, why, isFunctional(ex) ? [] : fields, set); return; }
         lastMarked.current = ex.id;
         updateExercise(ei, x => { const y = pinIntervals(x, si); return { ...y, sets: y.sets.map((s, i) => (i === si ? { ...s, state: 'done', effort } : s)) }; });
         if (allDone()) { afterLast(); return; }
         if (restAfter) startRest(restFor(effort, restBase(ex)));
       }, current)}
+      {!inRound && lack && lack.key === key && <p className="workout__round-lack" role="alert">{lack.text}</p>}
       {!inRound && openSet === key && <div className="workout__set-options">
         {editable && set.state === 'done' && effortFix(set.effort, (effort) => { setOpenSet(''); updateSet(ei, si, x => ({ ...x, effort })); })}
         <div className="workout__toolbar">
@@ -986,7 +1018,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       const issue = resultIssue(state.current.session);
       if (issue) {
         setConfirm('');
-        setMessage('Не удалось завершить: ' + issue + ' Исправьте результат подхода и завершите тренировку снова.');
+        setMessage('Не удалось завершить: ' + issue + ' Исправьте результат подхода и завершите тренировку снова.', false);
         return;
       }
     }
@@ -1146,10 +1178,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
 
   /**
-   * Круг суперсета сделан — кнопка «Круг N выполнен», касание снимает
-   * отметки со всего круга. Отмечают круг оценками у каждого упражнения
-   * (memberEffort); чего не хватает — пишем под кругом с названием
-   * упражнения: подсказка вверху экрана не видна за клавиатурой.
+   * Круг суперсета сделан — строка «Круг N выполнен». Статус, а не кнопка
+   * (аудит 24.10.2026): большая зелёная кнопка снимала отметки всего круга
+   * одним случайным касанием, без «Вернуть». Снять — в «Настройках круга».
+   * Отмечают круг оценками у каждого упражнения (memberEffort); чего не
+   * хватает — пишем под кругом с названием упражнения: подсказка вверху
+   * экрана не видна за клавиатурой.
    */
   const roundCheck = (members, r) => {
     const group = members[0].ex.supersetGroup;
@@ -1157,15 +1191,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     if (!inRound.length) return null;
     const done = inRound.every(({ ex }) => ex.sets[r].state === 'done');
     const key = group + ':' + r;
-    const toggle = () => {
-      setRoundLack(null);
-      change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] && e.sets[r].state === 'done'
-        ? unrateAt(e, r) : e)) }));
-    };
     return <>
-      {done && <button type="button" className="button button--block workout__round-check workout__round-check--done" aria-pressed onClick={toggle}>
-        <IconCheck size={18} />{`Круг ${r + 1} выполнен`}
-      </button>}
+      {done && <p className="workout__round-check workout__round-check--done" role="status">
+        <IconCheck size={18} aria-hidden="true" />{`Круг ${r + 1} выполнен`}
+      </p>}
       {roundLack && roundLack.key === key && <p className="workout__round-lack" role="alert">{roundLack.text}</p>}
     </>;
   };
@@ -1183,6 +1212,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const rounds = Math.max(...members.map(({ ex }) => ex.sets.length));
     const all = fn => change(v => ({ ...v, exercises: v.exercises.map(e => (e.supersetGroup === group && e.sets[r] ? fn(e) : e)) }));
     const setAll = patch => all(e => ({ ...e, sets: e.sets.map((x, i) => (i === r ? { ...x, ...patch } : x)) }));
+    // Снять отметки круга — отсюда и с «Вернуть» (аудит 24.10.2026): раньше
+    // это делало касание по зелёной строке «Круг N выполнен»
+    const live = inRound.filter(({ ex }) => ex.sets[r].state !== 'skipped');
+    const done = live.length > 0 && live.every(({ ex }) => ex.sets[r].state === 'done');
+    const unmark = () => {
+      setUndo(s.exercises, 'Отметка круга снята');
+      all(e => (e.sets[r].state === 'done' ? unrateAt(e, r) : e));
+    };
     return <details className="workout__set-options workout__round-options">
       <summary>{skipped ? 'Круг пропущен · изменить' : 'Настройки круга'}<IconChevron size={14} aria-hidden="true" /></summary>
       {inRound.map(({ ex, ei }) => (
@@ -1196,7 +1233,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       ))}
       <div className="workout__toolbar">
         <label>Круг<select value={kind} onChange={e => setAll({ kind: e.target.value })}><option value="work">Рабочий</option><option value="warmup">Разминка</option></select></label>
-        <button className="button" onClick={() => setAll({ state: skipped ? 'pending' : 'skipped' })}>{skipped ? 'Вернуть круг' : 'Пропустить круг'}</button>
+        {editable && done
+          ? <button className="button" onClick={unmark}>Снять отметку круга</button>
+          : <button className="button" onClick={() => setAll({ state: skipped ? 'pending' : 'skipped' })}>{skipped ? 'Вернуть круг' : 'Пропустить круг'}</button>}
         <button className="button" disabled={rounds === 1} onClick={() => { setUndo(s.exercises); all(e => (e.sets.length > 1 ? { ...e, sets: e.sets.filter((_, i) => i !== r) } : e)); }}>Удалить круг</button>
       </div>
     </details>;
@@ -1289,7 +1328,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {members.map(({ ex }) => <LastRunHint key={'last' + ex.id} last={ex.lastRun} name={ex.name} tired={ex.tired} sets={ex.sets} />)}
       {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
       {members.map(({ ex }) => ex.exerciseId && setups[ex.exerciseId]
-        ? <WorkoutGuidance key={'about' + ex.id} info={setups[ex.exerciseId]} trainer={!asClient} title={ex.name} /> : null)}
+        ? <WorkoutGuidance key={'about' + ex.id} info={setups[ex.exerciseId]} trainer={!asClient} title={ex.name} />
+        : setupWait(ex) ? <div key={'about' + ex.id} className="workout__extras-wait workout__extras-wait--one" aria-hidden="true"><span className="skeleton" /></div> : null)}
       {Array.from({ length: rounds }, (_, r) => (
         <div className="workout__round" key={r}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
@@ -1723,32 +1763,49 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // У сплит-пары (FT-488) — у каждого своя: { кто: { цель: настройка } }.
   // Участнику в его кабинете сервер отдаёт только его
   const [notesBy, setNotesBy] = useState({});
-  useEffect(() => {
+  // Для какого набора id настройки уже пришли (или не пришли совсем): пока
+  // нет — у упражнений из базы держим место скелетоном, а не вставляем
+  // «Тренажёр и технику» и «Свою настройку» под пальцем (аудит 24.10.2026)
+  const [setupsFor, setSetupsFor] = useState('');
+  // До первой отрисовки (layout): сохранённые настройки встают вместе с
+  // занятием, а не кадром позже на месте скелетона
+  useLayoutEffect(() => {
     if (!setupIds) return undefined;
     let alive = true;
     // Без связи — сохранённые (offline-prefetch.js запасает их по программе)
     // Поверх — настройки, записанные без связи и ещё не отправленные
     // (FT-566, этап 2): на экране они такие же, как принятые сервером
-    Promise.all([apiFresh('exercise.setup', { ...params, ids: setupIds }), localWrites(clientRow, 'note').catch(() => [])])
-      .then(([{ data: r }, pending]) => {
-        if (!alive || !r || !r.setups) return;
-        const own = { ...(r.notes || {}) };
-        const by = { ...(r.notesBy || {}) };
-        pending.forEach(({ params: p }) => {
-          const text = String(p.text || '').trim();
-          const note = text ? { text, by: asClient ? 'client' : 'trainer', local: true } : null;
-          if (p.member) {
-            const next = { ...(by[p.member] || {}) };
-            if (note) next[p.target] = note; else delete next[p.target];
-            by[p.member] = next;
-          } else if (note) own[p.target] = note;
-          else delete own[p.target];
-        });
-        setSetups(r.setups); setNotes(own); setNotesBy(by);
-      })
-      .catch(() => {});
+    const apply = ([r, pending]) => {
+      if (!alive) return;
+      setSetupsFor(setupIds);
+      if (!r || !r.setups) return;
+      const own = { ...(r.notes || {}) };
+      const by = { ...(r.notesBy || {}) };
+      pending.forEach(({ params: p }) => {
+        const text = String(p.text || '').trim();
+        const note = text ? { text, by: asClient ? 'client' : 'trainer', local: true } : null;
+        if (p.member) {
+          const next = { ...(by[p.member] || {}) };
+          if (note) next[p.target] = note; else delete next[p.target];
+          by[p.member] = next;
+        } else if (note) own[p.target] = note;
+        else delete own[p.target];
+      });
+      setSetups(r.setups); setNotes(own); setNotesBy(by);
+    };
+    // Сохранённые на телефоне (offline-prefetch.js или прошлое открытие) —
+    // сразу: занятие встаёт целиком, свежие приходят поверх на то же место
+    // (аудит 24.10.2026). Свежие — запросом мимо памяти страницы: без связи
+    // api.js отдаёт сохранённое
+    const { data: cached, promise } = apiStale('exercise.setup', { ...params, ids: setupIds });
+    if (cached && cached.setups) apply([cached, []]);
+    Promise.all([promise, localWrites(clientRow, 'note').catch(() => [])])
+      .then(apply)
+      .catch(() => { if (alive) setSetupsFor(setupIds); });
     return () => { alive = false; };
   }, [setupIds, setupsTick]);
+  /** Упражнение из базы, а его настройки ещё в пути — держим им место */
+  const setupWait = (ex) => !!ex.exerciseId && !setups[ex.exerciseId] && setupsFor !== setupIds;
 
   // Куда смотреть: первое упражнение с неотмеченным подходом и этот
   // подход. Оно обведено, подход подсвечен, его «готово» — залито; всё
@@ -1908,8 +1965,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {/* Тренажёр закрепил тренер (16.10.2026) — клиент его не выбирает */}
       {machines.length > 0 && !split && (
         <div className="workout__machines">
+          {/* Подсказка стоит до первой отметки, а не до первой цифры (аудит
+              24.10.2026): пропадая на вводе веса, она утаскивала строки
+              подходов из-под пальца. Вес, пришедший с программой, — не
+              «впишите», поэтому без вписанного здесь (own) смотрим на поля */}
           {primary && editable && !ex.prevWeight && !ex.lastRun && trackOf(ex).kind === 'strength'
-            && ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim()) && (
+            && !ex.sets.some((x) => x.state === 'done')
+            && (ex.sets.some((x) => x.own) || ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim())) && (
             <p className="small muted">{otherMachineText(ex.otherRun) || 'Здесь ещё не делали — впишите вес, дальше он запомнится.'}</p>
           )}
         </div>
@@ -1987,21 +2049,38 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const confirmText = confirm === 'complete'
     ? (stats && !stats.pending ? 'Все подходы сделаны. Завершить тренировку?' : `Выполнено ${setsWord(stats ? stats.done : 0)}. ${stats && stats.pending === 1 ? 'Оставшийся будет отмечен пропущенным' : 'Оставшиеся ' + (stats ? stats.pending : 0) + ' будут отмечены пропущенными'}.`)
     : 'Занятие останется в журнале с отметкой «Отменена».';
-  return <div className="workout">
+  // Ошибки и конфликт версий — закреплённой плашкой у низа экрана, поверх
+  // занятия, как «Удалено · Вернуть» (аудит 24.10.2026). В потоке над шапкой
+  // они сдвигали всё занятие вниз, пропадали на следующем касании и отнимали
+  // у шапки :first-child — стекло до края и спрятанную шапку приложения
+  // (workout.css). Теперь шапка занятия на странице всегда первая.
+  // «Повторить» — только у ошибок связи и сохранения
+  const retry = () => { setMessage(''); if (record?.dirty) save(); else list().catch(e => setMessage(e.message)); };
+  const alerts = (storageError || message || conflict) && (dom ? (node) => createPortal(node, document.body) : (node) => node)(
+    // Всегда на виду — подводить к ним экран незачем (data-reveal="off"), а
+    // их высоту reveal.js учитывает, как у панелей внизу (data-reveal-bottom)
+    <div className={'workout__alerts' + (restFolded || undo || picking ? ' workout__alerts--lift' : '')} data-reveal="off" data-reveal-bottom="">
+      {conflict && <div role="alert" className="workout__alert workout__alert--conflict">
+        <h3>{conflict.activeConflict ? 'Уже есть текущее занятие' : 'Занятие изменено на другом устройстве'}</h3>
+        <p>Ваш черновик сохранён отдельно. Скачайте его, затем откройте актуальную версию и перенесите нужные изменения.</p>
+        <div className="workout__alert-actions">
+          <button className="button" onClick={exportDraft}>Скачать мой черновик</button>
+          <button className="button" onClick={useRemote}>Открыть актуальное занятие</button>
+        </div>
+      </div>}
+      {storageError && <div role="alert" className="workout__alert"><p>Устройство не сохранило черновик. Не закрывайте экран до сохранения в облаке.</p></div>}
+      {message && <div role="alert" className="workout__alert">
+        <p>{message.text}</p>
+        {message.retry && <button type="button" className="button" disabled={busy} onClick={retry}>Повторить</button>}
+        <button type="button" className="icon-button workout__alert-close" aria-label="Скрыть сообщение" onClick={() => setMessageState(null)}><IconClose size={18} /></button>
+      </div>}
+    </div>);
+  return <div className={'workout' + (s || launch ? ' workout--session' : '')}>
     {/* В списке журнала — кнопка, куда вернёт: к программе или к списку клиентов */}
     {!s && <BackButton label={backLabel} onClick={close} />}
-    {/* Занятие уже на экране (снимок из черновика) — строка загрузки под его
-        шапкой, а не над ней: иначе шапка прыгала вверх, когда журнал
-        догружался (владелец, 24.10.2026) */}
+    {/* Занятие уже на экране (снимок из черновика) — строки загрузки нет
+        вовсе: она исчезала и двигала упражнения (аудит 24.10.2026) */}
     {!ready && !s && <p role="status">Открываем журнал тренировок…</p>}
-    {storageError && <p role="alert" className="workout__error">Устройство не сохранило черновик. Не закрывайте экран до сохранения в облаке.</p>}
-    {message && <div role="alert" className="workout__error" data-reveal="off"><p>{message}</p><button className="button" disabled={busy} onClick={() => { setMessage(''); record?.dirty ? save() : list().catch(e => setMessage(e.message)); }}>Повторить</button></div>}
-    {conflict && <div role="alert" className="workout__error" data-reveal="off">
-      <h3>{conflict.activeConflict ? 'Уже есть текущее занятие' : 'Занятие изменено на другом устройстве'}</h3>
-      <p>Ваш черновик сохранён отдельно. Скачайте его, затем откройте актуальную версию и перенесите нужные изменения.</p>
-      <button className="button" onClick={exportDraft}>Скачать мой черновик</button>
-      <button className="button" onClick={useRemote}>Открыть актуальное занятие</button>
-    </div>}
     {s && <>
       <header className="workout__header">
         {/* Видимый выход из занятия (FT-567; 09.10 был только жест): занятие
@@ -2037,8 +2116,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <div className="workout__line">
           <span className="workout__metrics" aria-label={`Время ${clock(elapsed)}, подходы ${stats.done} из ${stats.total}`}><strong>{clock(elapsed)}</strong><span aria-hidden="true"> · </span><b>{stats.done} / {stats.total}</b></span>
           {editable && !confirm && <>
-            <label className="workout__rest-pick">Отдых <select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
-            <button type="button" className="button button--ghost workout__pause" onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</button>
+            {/* Слово «Отдых» на узком экране уходит (workout.css), у списка
+                остаётся подпись для чтения вслух (аудит 24.10.2026) */}
+            <label className="workout__rest-pick"><span className="workout__rest-word">Отдых</span><select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
+            {/* Ширина постоянная — под «Продолжить» (workout.css): «Пауза ↔
+                Продолжить» больше не двигает соседей (аудит 24.10.2026).
+                aria-label — чтобы скрытое «Продолжить» не читалось вслух */}
+            <button type="button" className="button button--ghost workout__pause" aria-label={s.status === 'active' ? 'Пауза' : 'Продолжить'} onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}><span>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</span></button>
             {picking
               ? <button type="button" className="button workout__pick-toggle is-on" aria-pressed onClick={endPick}>Готово</button>
               : <div className="workout__more">
@@ -2070,7 +2154,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             менялась на каждую правку, и экран прыгал. Не сохранилось —
             сообщение об ошибке вверху */}
       </header>
-      {!ready && <p role="status">Открываем журнал тренировок…</p>}
+      {/* «Открываем журнал…» под шапкой убрано (аудит 24.10.2026): занятие
+          уже на экране из черновика, а строка исчезала через секунды и
+          поднимала все упражнения. Журнал догружается молча */}
       <fieldset disabled={!editable || !!conflict} className="workout__fields" ref={fieldsRef}>
         {/* Полоса отдыха прижата к низу экрана, а не стоит в шапке: между
             подходами человек листает список упражнений вниз, и таймер,
@@ -2119,7 +2205,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {!compact && renaming === ex.id && nameEditor(ex, ei, ex.id)}
           {!compact && <>
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
-          {ex.exerciseId && setups[ex.exerciseId] && extrasView(ex, ei, setups[ex.exerciseId])}
+          {ex.exerciseId && setups[ex.exerciseId] ? extrasView(ex, ei, setups[ex.exerciseId]) : setupWait(ex) && <div className="workout__extras-wait" aria-hidden="true"><span className="skeleton" /><span className="skeleton" /></div>}
           {/* «4 × 12» крупно убрано (владелец, 09.10.2026): подходы и повторы
               и так видны в строках. Единицы — касанием: подходы, вес, время,
               у кардио — цели и интервалы, как в круге суперсета */}
@@ -2202,6 +2288,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       </SwipeRow>)}
       {erase.bar}
     </>}
+    {/* Портал в body; без страницы (проверки) — в конце экрана, не над шапкой */}
+    {alerts}
   </div>;
 }
 

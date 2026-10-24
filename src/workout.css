@@ -311,6 +311,8 @@
 
 .workout__finish h3 { margin-bottom: var(--space-1); }
 
+/* Ошибки экрана — плашкой у низа (.workout__alert ниже); .workout__error
+   остался для старой разметки */
 .workout__error {
   background: var(--warning-fill);
   border: 1px solid var(--warning-line);
@@ -413,8 +415,10 @@
 /* В круге галочка одна на круг — строка упражнения только из полей */
 .workout__set-row--round { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); }
 .workout__set-row--round > span:first-child { display: none; }
-.workout__round-check { margin-top: var(--space-2); gap: 8px; }
-.button.workout__round-check--done, .button.workout__round-check--done:hover { background: var(--good-fill); color: var(--good-text); border-color: var(--good-line); }
+/* «Круг N выполнен» — строка-статус, не кнопка (аудит 24.10.2026): зелёная
+   кнопка во всю ширину снимала отметки круга одним случайным касанием.
+   Снять — «Настройки круга» → «Снять отметку круга», с «Вернуть» */
+.workout__round-check { display: flex; align-items: center; gap: 6px; min-height: 36px; margin: var(--space-2) 0 0; color: var(--good-text); font-size: var(--text-sm); font-weight: 600; }
 .workout__round-lack { margin: 6px 0 0; font-size: var(--text-sm); color: var(--critical-text, #b42318); }
 
 /* «Соединить в суперсет» — в промежутке между карточками, негромко:
@@ -861,13 +865,34 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__pause { height: 44px; min-height: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); font-size: var(--text-sm); }
 .workout__line .workout__pick-toggle { height: 44px; min-height: 0; padding: 0 10px; border-radius: 10px; font-size: var(--text-sm); }
 .workout__more { position: relative; flex: none; }
-.workout__more-btn { width: 40px; height: 44px; margin: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); }
+.workout__more-btn { width: 44px; height: 44px; margin: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); }
 .workout__more-scrim { position: fixed; inset: 0; z-index: 49; }
 .workout__menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 200px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); transform-origin: top right; animation: rest-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 .workout__menu-item { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; font-size: var(--text-base); text-align: left; cursor: pointer; }
 .workout__menu-item:active { background: var(--surface-active); }
 .workout__menu-item--critical { color: var(--critical-text, #b42318); }
 @media (prefers-reduced-motion: reduce) { .workout__menu { animation: none; } }
+
+/* Строка шапки на 360 px (аудит 24.10.2026): «0:00 · 0 / 15» уходили на две
+   строки — у общего .workout__metrics перенос, а сжимать его было можно.
+   Теперь время и подходы не сжимаются и не переносятся, уступает выбор
+   отдыха; «Пауза» — шириной под «Продолжить»: скрытое второе слово стоит в
+   той же клетке сетки, и смена подписи не двигает соседей */
+.workout__line .workout__metrics { flex: none; flex-wrap: nowrap; }
+.workout__rest-pick { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.workout__rest-pick select { min-width: 0; }
+.workout__line .workout__pause { display: inline-grid; flex: none; justify-items: center; }
+.workout__pause > span, .workout__pause::after { grid-area: 1 / 1; }
+.workout__pause::after { content: 'Продолжить'; visibility: hidden; }
+/* Порог 413, а не 374: по расчёту строка «0:00 · 0 / 15», «Отдых 1:30»,
+   «Продолжить» и ⋯ занимает ~370 px — на 375–402 px (большинство iPhone)
+   слово уже не влезало бы, и выбор отдыха обрезался */
+@media (max-width: 413px) {
+  .workout__line { gap: 6px; }
+  /* Слово «Отдых» уходит, у списка остаётся aria-label «Таймер отдыха» */
+  .workout__rest-word { display: none; }
+  .workout__rest-pick { padding-left: 6px; }
+}
 
 /* «Настройки круга» — раскрывашка, а не серая строка: шеврон показывает,
    что под ней что-то есть (QA 20.10.2026) */
@@ -882,11 +907,14 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 /* Карточка клиента над занятием — до одной строки с именем: вкладки и
    «К списку» во время тренировки не нужны, у занятия свой «назад» и своя
    шапка (QA 20.10.2026). Браузер без :has оставит как было */
-.app:has(.workout__header) > .app__header > .app__back,
-.app:has(.workout__header) > .app__header .app__subtitle,
-.app:has(.workout__header) .card-bar { display: none; }
-.app:has(.workout__header) > .app__header { padding-top: var(--space-3); padding-bottom: 0; }
-.app:has(.workout__header) > .app__header .app__title { font-size: var(--text-md); }
+/* По .workout--session, а не по шапке занятия (аудит 24.10.2026): класс
+   стоит с первого кадра экрана, а шапка появляется, когда занятие
+   загрузилось, — и шапка приложения ужималась уже на глазах, сдвигая экран */
+.app:has(.workout--session) > .app__header > .app__back,
+.app:has(.workout--session) > .app__header .app__subtitle,
+.app:has(.workout--session) .card-bar { display: none; }
+.app:has(.workout--session) > .app__header { padding-top: var(--space-3); padding-bottom: 0; }
+.app:has(.workout--session) > .app__header .app__title { font-size: var(--text-md); }
 /* Название и «месяц · статус» одной строкой; h2 — только название (тесты и читалка) */
 .workout__title-row { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
 .workout__title-row h2 { flex: 0 1 auto; min-width: 0; }
@@ -905,3 +933,39 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
   content: ''; position: absolute; left: 0; right: 0; top: 50%; height: max(44px, 100%); transform: translateY(-50%);
 }
 .workout__side::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -12px; }
+
+/* ---- Аудит 24.10.2026: ничего не вставлять в поток после показа -------- */
+/* Ошибки связи и сохранения, конфликт версий — закреплённой плашкой у низа
+   экрана, как «Удалено · Вернуть» (.undo-bar), а не строкой над шапкой:
+   та сдвигала всё занятие и отнимала у шапки :first-child (стекло до края).
+   Портал в body — вне .workout */
+.workout__alerts {
+  position: fixed; left: 50%; bottom: var(--float-bottom); z-index: 45;
+  width: min(calc(100% - 2 * var(--space-4)), 560px); transform: translateX(-50%);
+  display: grid; gap: var(--space-2);
+}
+/* Свёрнутый отдых, «Вернуть» и панель выбора стоят там же — плашка над ними */
+.workout__alerts--lift { bottom: calc(var(--float-bottom) + 60px); }
+.workout__alert {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  background: var(--warning-fill); color: var(--warning-text);
+  border: 1px solid var(--warning-line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: workout-alert-in 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.workout__alert > p { flex: 1 1 14ch; min-width: 0; margin: 0; font-size: var(--text-sm); font-weight: 600; line-height: 1.35; }
+.workout__alert .button { flex: none; margin: 0; }
+.workout__alert-close { color: inherit; }
+.workout__alert--conflict { display: grid; gap: var(--space-2); padding: var(--space-4); }
+.workout__alert--conflict h3 { margin: 0; font-size: var(--text-md); font-weight: 640; }
+.workout__alert-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+@keyframes workout-alert-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .workout__alert { animation: none; } }
+
+/* Место под «Тренажёр и технику» и «Свою настройку», пока настройки
+   упражнения в пути: высота — как у них (summary 40 + строка 28 и их
+   отступы), чтобы приехавшие не сдвигали подходы под пальцем */
+.workout__extras-wait { display: grid; gap: var(--space-2); margin: var(--space-2) 0 var(--space-3); }
+.workout__extras-wait .skeleton { display: block; width: 62%; height: 40px; margin: 0; border-radius: var(--radius-sm); }
+.workout__extras-wait .skeleton + .skeleton { width: 38%; height: 28px; }
