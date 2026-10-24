@@ -32,3 +32,15 @@
 .scan-guide__line { fill: var(--text-muted); opacity: 0.55; }
 .scan-guide__tips { margin: 12px 0 0; padding-left: 1.3em; font-size: var(--text-sm); line-height: 1.45; }
 .scan-guide__tips li + li { margin-top: 4px; }
+
+/* Еда по фото (FT-736): список распознанного с правкой граммов */
+.plate-photo__preview { max-height: 240px; }
+.plate-photo__list { list-style: none; margin: 16px 0 0; padding: 0; }
+.plate-photo__row { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: start; gap: 8px 12px; padding-block: 12px; border-bottom: 1px solid var(--border); }
+.plate-photo__row:last-child { border-bottom: 0; }
+.plate-photo__main { display: grid; gap: 2px; min-width: 0; }
+.plate-photo__main small { color: var(--text-secondary); }
+.plate-photo__options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.plate-photo__grams { display: grid; justify-items: end; gap: 4px; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.plate-photo__grams .field__input { width: 84px; text-align: right; }
+.plate-photo__row .icon-button { width: 44px; height: 44px; }

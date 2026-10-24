@@ -21,6 +21,8 @@ import { useDiaryResource, useOperation, Field, ErrorNote, n, macroLine } from '
 // Обводка — как у icons.jsx на 22 px: 1,75 на сетке 24 (у «Ладони» сетка 32 —
 // 2,33), аудит 24.10.2026
 const WAYS = [
+  // Еда по фото (FT-736) — первой: самый быстрый способ, пока видна только пробе
+  { id: 'photo', title: 'Фото блюда', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg> },
   { id: 'label', title: 'Фото этикетки', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" /><path d="M8 9h8M8 12h8M8 15h5" /></svg> },
   { id: 'barcode', title: 'Штрихкод', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M18 6v12M20 6v12" /></svg> },
   { id: 'custom', title: 'Свой продукт', icon: <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg> },
@@ -29,12 +31,12 @@ const WAYS = [
   { id: 'palm', title: 'Ладонью', icon: <svg viewBox="0 0 32 32" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.33" strokeLinecap="round" strokeLinejoin="round"><path d="M9 29h12a5 5 0 0 0 5-5V13a2 2 0 0 0-4 0v5M22 13V7a2 2 0 0 0-4 0v10M18 7V5a2 2 0 0 0-4 0v12M14 7a2 2 0 0 0-4 0v12l-2.2-2.6a2 2 0 0 0-3.1 2.5L9 29" /></svg> },
 ];
 
-export function ProductPicker({ meal, onPick, onClose, onQuick, onPalm, onRecipe, mealLine, ingredientsOnly = false }) {
+export function ProductPicker({ meal, onPick, onClose, onQuick, onPalm, onRecipe, onPhoto, mealLine, ingredientsOnly = false }) {
   const [scope, setScope] = useState('recent'), [query, setQuery] = useState(''), [q, setQ] = useState(''), [version, setVersion] = useState(0);
   const [error, setError] = useState(null), [busy, setBusy] = useState(''), [custom, setCustom] = useState(false), [scan, setScan] = useState('');
   const op = useOperation();
-  const way = id => { haptic(); if (id === 'label' || id === 'barcode') setScan(s => s === id ? '' : id); else if (id === 'custom') setCustom(true); else if (id === 'quick') onQuick?.(); else if (id === 'palm') onPalm?.(); else if (id === 'recipe') onRecipe?.(); };
-  const ways = ingredientsOnly ? WAYS.filter(w => ['label', 'barcode', 'custom'].includes(w.id)) : WAYS.filter(w => (w.id !== 'quick' || onQuick) && (w.id !== 'palm' || onPalm) && (w.id !== 'recipe' || onRecipe));
+  const way = id => { haptic(); if (id === 'label' || id === 'barcode') setScan(s => s === id ? '' : id); else if (id === 'custom') setCustom(true); else if (id === 'quick') onQuick?.(); else if (id === 'palm') onPalm?.(); else if (id === 'recipe') onRecipe?.(); else if (id === 'photo') onPhoto?.(); };
+  const ways = ingredientsOnly ? WAYS.filter(w => ['label', 'barcode', 'custom'].includes(w.id)) : WAYS.filter(w => (w.id !== 'photo' || onPhoto) && (w.id !== 'quick' || onQuick) && (w.id !== 'palm' || onPalm) && (w.id !== 'recipe' || onRecipe));
   useEffect(() => { const t = setTimeout(() => setQ(query), 200); return () => clearTimeout(t); }, [query]);
   const resource = useDiaryResource('diary.catalog', { q, scope, refresh: version });
   const products = resource.data?.products || [];

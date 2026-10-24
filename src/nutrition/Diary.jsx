@@ -17,6 +17,7 @@ import { useDiaryResource, useOperation, Field, ErrorNote, n, macroLine, amountL
 import { ProductFacts } from './ProductFacts.jsx';
 import { QuickEntry } from './QuickEntry.jsx';
 import { ProductPicker } from './ProductPicker.jsx';
+import { PlatePhoto } from './PlatePhoto.jsx';
 import { MealShares, MealNormLine } from './MealShares.jsx';
 import { Recipes } from './Recipes.jsx';
 import { SnackIdeas, FreeMarks } from './DiaryExtras.jsx';
@@ -194,7 +195,8 @@ export default function NutritionDiary({ clientRow, readOnly = false, self = fal
   const openEntry = entry => { if (readOnly || entry.pending) return; setModal({ type: 'entry', entry }); };
   const modalView = () => {
     if (!modal) return null;
-    if (modal.type === 'pick') return <ProductPicker key={catalogVersion} meal={modal.meal} mealLine={mealLine(modal.meal)} onClose={() => setModal(null)} onQuick={() => setModal({ type: 'quick', meal: modal.meal })} onPalm={() => setModal({ type: 'palm', meal: modal.meal })} onRecipe={() => setModal({ type: 'recipe' })} onPick={p => setModal({ type: 'entry', product: p, meal: modal.meal })} />;
+    if (modal.type === 'pick') return <ProductPicker key={catalogVersion} meal={modal.meal} mealLine={mealLine(modal.meal)} onClose={() => setModal(null)} onQuick={() => setModal({ type: 'quick', meal: modal.meal })} onPalm={() => setModal({ type: 'palm', meal: modal.meal })} onRecipe={() => setModal({ type: 'recipe' })} onPhoto={resource.data?.photo ? () => setModal({ type: 'photo', meal: modal.meal }) : undefined} onPick={p => setModal({ type: 'entry', product: p, meal: modal.meal })} />;
+    if (modal.type === 'photo') return <PlatePhoto day={day} meal={modal.meal} onClose={() => setModal({ type: 'pick', meal: modal.meal })} onSaved={refresh} />;
     if (modal.type === 'shares') return <MealShares meals={settings.meals} dayKcal={Number(target.kcal || 0)} onClose={() => setModal(null)} onSave={async meals => { await op('diary.settings.save', { meals }); setModal(null); resource.reload(); say(meals ? 'Норма по приёмам сохранена.' : 'Доли по приёмам убраны.'); }} />;
     if (modal.type === 'palm') return <PalmSheet day={day} meal={modal.meal} onClose={() => setModal(null)} onSaved={refresh} onGrams={() => setModal({ type: 'pick', meal: modal.meal })} />;
     if (modal.type === 'snacks') return <SnackIdeas remaining={remaining} onClose={() => setModal(null)} onPick={(product, amount) => setModal({ type: 'entry', product, amount, meal: 'snack' })} />;

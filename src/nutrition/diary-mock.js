@@ -26,7 +26,17 @@ export function diaryMock(action, p = {}) {
   const day = p.day || today();
   if (p.requestId && s.operations[p.requestId]) return copy(s.operations[p.requestId]);
   let result;
-  if (action === 'diary.get') result = present(day);
+  // Демо видит «Фото блюда» (FT-736); ответ модели — заготовленный
+  if (action === 'diary.get') result = { ...present(day), photo: true };
+  else if (action === 'diary.photo') {
+    if (!/^data:image\/jpeg;base64,/.test(String(p.image || ''))) fail(400, 'Не удалось прочитать фото. Сделайте снимок ещё раз.');
+    const grecha = catalog().find(f => f.kind === 'food' && /греч/i.test(f.name)) || null;
+    result = { id: 1, ms: 1400, utensil: false, angle: 'angled', shared: false, deep: false, note: '', items: [
+      { name: 'Гречка варёная', search: 'гречка варёная', grams: 180, per100: { kcal: 110, protein: 4, fat: 1, carbs: 21 }, confidence: 0.9, match: grecha, options: grecha ? [grecha] : [] },
+      { name: 'Котлета куриная', search: 'котлета куриная', grams: 120, per100: { kcal: 190, protein: 18, fat: 11, carbs: 6 }, confidence: 0.8, match: null, options: [] },
+      { name: 'Огурец свежий', search: 'огурец', grams: 60, per100: { kcal: 15, protein: 1, fat: 0, carbs: 3 }, confidence: 0.9, match: null, options: [] },
+    ] };
+  } else if (action === 'diary.photo.confirm') result = { ok: true };
   else if (action === 'diary.settings.save') {
     const old = s.settings || { mode: 'count', meals: null };
     if (p.meals && Object.values(p.meals).reduce((a, b) => a + Number(b), 0) !== 100) fail(400, 'Доли приёмов в сумме должны давать 100 %.');

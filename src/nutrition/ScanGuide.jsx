@@ -19,7 +19,14 @@ const TIPS = {
     'Держите ровно, на расстоянии ладони — не вплотную',
     'Не читается — впишите цифры вручную ниже',
   ],
+  // Еда по фото (FT-736): мерка — вилка рядом, как у «Худеем вместе»
+  plate: [
+    'Почти сверху: вся тарелка и всё, что съедите, целиком в кадре',
+    'Положите рядом вилку или ложку — по ней считается размер порции',
+    'После снимка проверьте блюда и граммы: вес — оценка',
+  ],
 };
+const BAD = { label: 'Не так: под углом, обрезано, блик', barcode: 'Не так: под углом, обрезано, блик', plate: 'Не так: сбоку, обрезано, без вилки' };
 
 // Блик и обрезка — только у примера «не так»; id у каждого рисунка свой
 function BadDefs({ id }) {
@@ -71,8 +78,36 @@ function Barcode({ bad }) {
   );
 }
 
+// Тарелка сверху с вилкой рядом против тарелки сбоку, обрезанной кадром
+function Plate({ bad }) {
+  return (
+    <svg viewBox="0 0 120 84" aria-hidden="true" focusable="false">
+      {bad && <BadDefs id="scan-plate" />}
+      {bad ? (
+        <g clipPath="url(#scan-plate-crop)">
+          <ellipse cx="66" cy="54" rx="48" ry="15" className="scan-guide__paper" />
+          <ellipse cx="66" cy="52" rx="34" ry="9" className="scan-guide__line" />
+          <ellipse cx="56" cy="47" rx="14" ry="6" className="scan-guide__ink" />
+          <ellipse cx="80" cy="48" rx="10" ry="5" className="scan-guide__line" />
+        </g>
+      ) : (
+        <g>
+          <circle cx="50" cy="42" r="32" className="scan-guide__paper" />
+          <circle cx="50" cy="42" r="24" fill="none" className="scan-guide__paper" />
+          <circle cx="42" cy="36" r="10" className="scan-guide__ink" />
+          <circle cx="58" cy="48" r="9" className="scan-guide__line" />
+          <circle cx="57" cy="31" r="5" className="scan-guide__line" />
+          <rect x="98" y="34" width="4" height="40" rx="2" className="scan-guide__ink" />
+          <rect x="93" y="26" width="14" height="10" rx="3" className="scan-guide__ink" />
+          {[93, 97, 101, 105].map((x) => <rect key={x} x={x} y="12" width="2" height="16" rx="1" className="scan-guide__ink" />)}
+        </g>
+      )}
+    </svg>
+  );
+}
+
 export default function ScanGuide({ mode }) {
-  const Art = mode === 'barcode' ? Barcode : Label;
+  const Art = mode === 'barcode' ? Barcode : mode === 'plate' ? Plate : Label;
   return (
     <div className="scan-guide">
       <div className="scan-guide__pair">
@@ -82,7 +117,7 @@ export default function ScanGuide({ mode }) {
         </figure>
         <figure className="scan-guide__case scan-guide__case--bad">
           <Art bad />
-          <figcaption><IconClose size={14} className="scan-guide__mark" /> Не так: под углом, обрезано, блик</figcaption>
+          <figcaption><IconClose size={14} className="scan-guide__mark" /> {BAD[mode]}</figcaption>
         </figure>
       </div>
       <ol className="scan-guide__tips">
