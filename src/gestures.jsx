@@ -77,7 +77,14 @@ function snapshotOf(app) {
   const node = app.cloneNode(false);
   [...app.children].forEach((el) => {
     if (el.hidden || el.matches('.drawer')) return;
+    // Прокрутка внутри раздела (сетка часов в расписании) в копию не
+    // попадает: копия въезжала с 01:00 и прыгала на место, когда вставал
+    // настоящий раздел (владелец, 24.10.2026). Помечаем, где что
+    // прокручено, — scene() вернёт это, когда копия ляжет в документ
+    const scrolled = [...el.querySelectorAll('*')].filter((s) => s.scrollTop || s.scrollLeft);
+    scrolled.forEach((s) => s.setAttribute('data-snap-scroll', s.scrollLeft + ',' + s.scrollTop));
     const copy = el.cloneNode(true);
+    scrolled.forEach((s) => s.removeAttribute('data-snap-scroll'));
     // Во время жеста у частей страницы стоит сдвиг — копии он не нужен.
     // И свой рисунок темы (.live-art) тоже: копия ляжет в сцену, у которой
     // он уже есть, и полупрозрачный рисунок лёг бы дважды — раздел ехал
@@ -94,6 +101,15 @@ function snapshotOf(app) {
     scrollY: window.scrollY || document.documentElement.scrollTop || 0,
     at: Date.now(),
   };
+}
+
+/** Копия уже в документе — прокрутить её части туда, где они были у снимка */
+function restoreScroll(root) {
+  root.querySelectorAll('[data-snap-scroll]').forEach((el) => {
+    const [left, top] = el.getAttribute('data-snap-scroll').split(',').map(Number);
+    el.scrollLeft = left;
+    el.scrollTop = top;
+  });
 }
 
 /**
@@ -382,6 +398,7 @@ function buildScene(direction, snapshot) {
 
   scene.append(under, edge);
   document.body.appendChild(scene);
+  restoreScroll(scene);
   goLive();
 
   return { direction, scene, under, shade, edge };
@@ -611,6 +628,7 @@ function buildPager(target, side, at, host) {
   }
 
   document.body.appendChild(scene);
+  restoreScroll(scene);
   keepChrome = !region;
   goLive(region);
 
