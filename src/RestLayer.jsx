@@ -51,7 +51,7 @@ export default function RestLayer({ allowGame = false }) {
   }
   return createPortal(
     <RestScreen
-      allowGame={allowGame}
+      allowGame={allowGame && rest.games !== false}
       until={rest.until}
       total={rest.total || 90000}
       now={now}

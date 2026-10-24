@@ -766,7 +766,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const cur = state.current && state.current.session;
     // Длина — от начала отдыха, а не от этой минуты: после «+30 с» кольцо
     // прыгало снова полным (аудит 24.10.2026)
-    setRestHere({ until, total: Math.max(1000, until - start), next: cur ? nextInfo(cur, focusOf(cur, lastMarked.current)) : null, sessionId: cur ? cur.id : '' });
+    // games — как на экране отдыха в занятии (allowGame): тренер ведёт
+    // клиента — игр нет и в свёрнутом отдыхе вне занятия (24.10.2026)
+    setRestHere({ until, total: Math.max(1000, until - start), next: cur ? nextInfo(cur, focusOf(cur, lastMarked.current)) : null, sessionId: cur ? cur.id : '', games: asClient });
     // До save: он сам ставит «идёт сохранение»
     const behind = saving.current || !!(state.current && state.current.pending);
     save();
