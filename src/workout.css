@@ -273,7 +273,8 @@
 .workout__set-row,
 .workout__set-head {
   display: grid;
-  grid-template-columns: 44px repeat(var(--cols, 2), minmax(0, 1fr));
+  /* 58, а не 44: под номером подхода — слово «Разминка» или оценка (аудит 24.10.2026) */
+  grid-template-columns: 58px repeat(var(--cols, 2), minmax(0, 1fr));
   align-items: center;
   gap: var(--space-2);
 }
@@ -456,7 +457,7 @@
   border: 0; background: none; color: var(--text-muted); cursor: pointer;
 }
 .workout__drop-add {
-  display: block; margin: 6px 0 0 52px; padding: 6px 0; border: 0; background: none;
+  display: block; margin: 6px 0 0 66px; padding: 6px 0; border: 0; background: none;
   color: var(--accent); font: inherit; font-size: var(--text-sm); cursor: pointer;
 }
 
@@ -493,6 +494,8 @@
 .workout__ex-num { display: inline-block; min-width: 1.4em; margin-right: 6px; color: var(--text-muted); font-weight: 600; font-variant-numeric: tabular-nums; }
 .workout__ex-count { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .workout__exercise--done .workout__ex-count { background: var(--good-fill); color: var(--good-text); }
+/* Закрыто, но не всё сделано (есть пропущенные) — без зелени и галочки */
+.workout__exercise--done .workout__ex-count--partial { background: var(--bg); color: var(--text-secondary); }
 
 /* Текущее упражнение — обведено акцентом; законченное — приглушено цветом:
    утопленная подложка, зелёная рамка, название вторичным текстом. Прозрачность
@@ -508,7 +511,10 @@
 .workout__set--current input { border-color: var(--accent); background: var(--surface); }
 
 .workout__set--skipped .workout__set-row input { text-decoration: line-through; color: var(--text-muted); }
-.workout__skipped { margin: 2px 0 4px 52px; font-size: var(--text-sm); color: var(--text-muted); }
+.workout__skipped { margin: 2px 0 4px 66px; font-size: var(--text-sm); color: var(--text-muted); }
+/* Пропущенный отрезок кардио — зачёркнут, как подход: иначе не отличить от ждущего (аудит 24.10.2026) */
+.workout__set--skipped .workout__cardio-grid input { text-decoration: line-through; color: var(--text-muted); }
+.workout__set--cardio .workout__skipped { margin-left: 0; }
 
 /* Номер подхода — он же вход в настройки: тихая цель вместо строки под каждым */
 .workout__set-num { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 44px; min-height: 44px; padding: 0 4px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -517,6 +523,13 @@
 .workout__set-num:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .workout__set--done .workout__set-num { color: var(--good-text); font-weight: 640; }
 .workout__cardio-head .workout__set-num { justify-content: flex-start; padding: 0 6px 0 0; }
+/* Номер и под ним состояние словом — «Разминка» или оценка сделанного
+   («Легко / Норм / Тяжело»): цвет строки — второй канал, слово — первый,
+   дальтоник их различает (аудит 24.10.2026) */
+.workout__set-row .workout__set-num { flex-direction: column; gap: 0; padding: 0 2px; line-height: 1.15; }
+.workout__set-label { display: inline-flex; align-items: center; gap: 3px; }
+.workout__set-sub { font-size: var(--text-xs); font-weight: 600; white-space: nowrap; color: var(--text-muted); }
+.workout__set--done .workout__set-sub { color: var(--good-text); }
 .workout__set-options { padding: 0 0 var(--space-2); }
 
 /* Тише: «Добавить подход» — не главное действие; заметка свёрнута */
@@ -545,15 +558,16 @@
 .workout__pick { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--border-strong); color: var(--accent-text); transition: background-color 160ms ease, border-color 160ms ease; }
 .workout__pick.is-on { background: var(--accent-fill); border-color: var(--accent-fill); }
 .workout__exercise--picked { border-color: var(--accent); }
-.workout__pick-bar, .workout__undo {
-  position: sticky; bottom: var(--float-bottom); z-index: 4;
+.workout__pick-bar {
+  /* Над свёрнутым отдыхом, а не под ним (стопка — styles.css, --float-rest) */
+  position: sticky; bottom: calc(var(--float-bottom) + var(--float-rest, 0px)); z-index: 4;
   display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
   margin: var(--space-3) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
   box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.35);
 }
 .workout__pick-bar .button { gap: 6px; }
-.workout__pick-count, .workout__undo > span { flex: 1; min-width: 8ch; font-weight: 600; font-variant-numeric: tabular-nums; }
+.workout__pick-count { flex: 1; min-width: 8ch; font-weight: 600; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .swipe__trash, .workout__pick { transition: none; } }
 
 /* Между карточками — «+ Упражнение» и «Соединить в суперсет» рядом */
@@ -616,9 +630,6 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__effort-fix-title { margin: 0 0 var(--space-1); font-size: 13px; color: var(--text-muted); }
 .workout__effort-hint { margin: 0 0 var(--space-2); font-size: 13px; line-height: 1.35; color: var(--text-muted); }
 .workout__effort-next { margin: 0 0 var(--space-2); font-size: 13px; color: var(--text-muted); }
-.workout__effort-dot { --c: var(--effort-ok); width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px; background: var(--c); }
-.workout__effort-dot--easy { --c: var(--effort-easy); }
-.workout__effort-dot--hard { --c: var(--effort-hard); }
 .workout__member-done { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin: var(--space-1) 0 var(--space-2); padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font: inherit; font-size: 13px; cursor: pointer; }
 .workout__member-done:active { transform: scale(0.97); }
 .workout__cardio-done { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--good-text); }
@@ -667,8 +678,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__set-meta .workout__was { margin: 0; padding: 0; }
 
 /* Оценка у сделанного упражнения в круге суперсета */
-.workout__round-effort { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); }
-.workout__round-effort .workout__effort-dot { margin-left: 0; }
+.workout__round-effort { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; font-size: var(--text-xs); font-weight: 600; color: var(--good-text); }
 
 /* Вес на одну сторону — у каждого силового подхода, под строкой (07.10.2026) */
 .workout__side { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; margin: 0; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
@@ -685,7 +695,6 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__alts-list { display: grid; gap: var(--space-1); margin-top: var(--space-1); }
 .workout__alts-item { all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: 10px; background: var(--surface-sunken); color: var(--text); font-size: 15px; font-weight: 600; -webkit-tap-highlight-color: transparent; }
 .workout__alts-item:active { background: var(--surface); }
-.workout__alts-later { margin: var(--space-1) 0; }
 /* Сплит-пара (FT-488): строка на человека — имя, его тренажёр, его настройка */
 .workout__member { display: grid; gap: 2px; margin: var(--space-1) 0; }
 .workout__member-name { font-size: var(--text-sm); font-weight: 600; }
@@ -882,7 +891,10 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__menu-item { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; font-size: var(--text-base); text-align: left; cursor: pointer; }
 .workout__menu-item:active { background: var(--surface-active); }
 .workout__menu-item--critical { color: var(--critical-text, #b42318); }
-@media (prefers-reduced-motion: reduce) { .workout__menu { animation: none; } }
+/* Уходит той же дорогой, что пришло, — чуть быстрее (аудит 24.10.2026) */
+.workout__menu--leaving { animation: workout-menu-out 140ms cubic-bezier(0.23, 1, 0.32, 1) forwards; pointer-events: none; }
+@keyframes workout-menu-out { to { opacity: 0; transform: scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .workout__menu, .workout__menu--leaving { animation: none; } }
 
 /* Строка шапки на 360 px (аудит 24.10.2026): «0:00 · 0 / 15» уходили на две
    строки — у общего .workout__metrics перенос, а сжимать его было можно.
@@ -951,12 +963,13 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
    та сдвигала всё занятие и отнимала у шапки :first-child (стекло до края).
    Портал в body — вне .workout */
 .workout__alerts {
-  position: fixed; left: 50%; bottom: var(--float-bottom); z-index: 45;
+  position: fixed; left: 50%; z-index: 45;
   width: min(calc(100% - 2 * var(--space-4)), 560px); transform: translateX(-50%);
   display: grid; gap: var(--space-2);
 }
-/* Свёрнутый отдых, «Вернуть» и панель выбора стоят там же — плашка над ними */
-.workout__alerts--lift { bottom: calc(var(--float-bottom) + 60px); }
+/* Свёрнутый отдых, панель выбора и «Вернуть» стоят там же — плашка над
+   теми из них, что видны (стопка — styles.css, аудит 24.10.2026) */
+.workout__alerts { bottom: calc(var(--float-bottom) + var(--float-rest, 0px) + var(--float-pick, 0px) + var(--float-undo, 0px)); }
 .workout__alert {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);

@@ -21,7 +21,10 @@ import { haptic } from './telegram.js';
  *   del.remove(x.id, x, 'Расход удалён')
  *   {del.bar}
  */
-const WAIT_MS = 5000;
+// Сколько держится «Удалено · Вернуть» — одно время на всё приложение, и в
+// занятии тоже (аудит 24.10.2026: там было 8 с, в списках 5)
+export const UNDO_MS = 5000;
+const WAIT_MS = UNDO_MS;
 
 export function usePendingDelete(commit, { onDone, onError } = {}) {
   const [pending, setPending] = useState(null);
@@ -73,15 +76,25 @@ export function usePendingDelete(commit, { onDone, onError } = {}) {
 
   const hidden = (id) => gone.has(id) || (pending !== null && pending.id === id);
 
-  const bar = pending && typeof document !== 'undefined'
-    ? createPortal(
-      <div className="undo-bar" role="status">
-        <span>{pending.text}</span>
-        <button type="button" className="button button--ghost" onClick={undo}>Вернуть</button>
-      </div>,
-      document.body,
-    )
-    : null;
+  const bar = pending ? <UndoBar text={pending.text} onUndo={undo} /> : null;
 
   return { remove, hidden, bar, flush };
+}
+
+/**
+ * Сама плашка «Удалено · Вернуть» — закреплена над нижним меню (портал в
+ * body, .undo-bar). Её же показывает экран занятия (Workout.jsx): там своё
+ * «вернуть» без сервера, но плашка та же — одна на приложение (аудит
+ * 24.10.2026: в занятии была вторая, в потоке и с другим временем). Без
+ * настоящей страницы (проверки компонента) — на месте
+ */
+export function UndoBar({ text, onUndo }) {
+  const node = (
+    <div className="undo-bar" role="status">
+      <span>{text}</span>
+      <button type="button" className="button button--ghost" onClick={onUndo}>Вернуть</button>
+    </div>
+  );
+  const dom = typeof document !== 'undefined' && !!document.body && document.body.nodeType === 1;
+  return dom ? createPortal(node, document.body) : node;
 }

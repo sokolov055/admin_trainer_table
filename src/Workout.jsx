@@ -12,7 +12,7 @@ import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, I
 import { useBackGesture, useTabLock } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
 import SwipeRow from './SwipeRow.jsx';
-import { usePendingDelete } from './pendingDelete.jsx';
+import { usePendingDelete, UndoBar, UNDO_MS } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, planSet, cardioFrom, cardioGoal, intervalsTotals, isFunctional, setIntervals } from './exercise-track.js';
@@ -20,6 +20,72 @@ import { METRICS, trackOf, rowFields as trackFields, missing, metricField, setti
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
 const rowFields = (track) => trackFields({ ...track, perSide: false });
+
+/**
+ * «Вернуть» в занятии (аудит 24.10.2026) — только удалённое и на прежнее
+ * место, в занятие, каким оно стало: подходы, отмеченные за эти секунды,
+ * остаются. Раньше «Вернуть» подставлял снимок всего занятия до удаления, и
+ * сделанное после удаления пропадало. Упражнения уже нет — возвращать некуда
+ */
+// Подход si упражнения id. withoutSet сдвигал у следующих неотмеченных
+// «было» (тот же подход в прошлый раз) — им возвращаем прежнее
+function putSetBack(exercises, id, si, before) {
+  return exercises.map((e) => {
+    if (e.id !== id || !before[si]) return e;
+    const at = Math.min(si, e.sets.length);
+    const sets = [...e.sets.slice(0, at), before[si], ...e.sets.slice(at)];
+    return { ...e, sets: sets.map((x, i) => {
+      const b = before[i];
+      if (i <= at || !b || x.state !== 'pending' || b.state !== 'pending' || x.was === b.was) return x;
+      const { was, ...rest } = x;
+      return b.was === undefined ? rest : { ...rest, was: b.was };
+    }) };
+  });
+}
+// Упражнения ids — каждое сразу за тем, что стояло перед ним до удаления
+function putExercisesBack(exercises, snapshot, ids) {
+  const out = exercises.filter((e) => !ids.has(e.id));
+  snapshot.forEach((e, i) => {
+    if (!ids.has(e.id)) return;
+    let at = 0;
+    for (let j = i - 1; j >= 0; j -= 1) {
+      const k = out.findIndex((x) => x.id === snapshot[j].id);
+      if (k !== -1) { at = k + 1; break; }
+    }
+    out.splice(at, 0, e);
+  });
+  return out;
+}
+// Отметки круга: before — id → { r, ex } до «Снять отметку круга». Подход
+// круга — как был, и веса следующих, которые сдвинула его оценка, а
+// unrateAt вернул (если их с тех пор не правили руками)
+function putMarksBack(exercises, before) {
+  return exercises.map((e) => {
+    const b = before.get(e.id);
+    const was = b && b.ex.sets[b.r];
+    if (!was || !e.sets[b.r] || e.sets[b.r].state !== 'pending') return e;
+    const moved = was.moved || [];
+    return { ...e, sets: e.sets.map((x, i) => {
+      if (i === b.r) return was;
+      const mv = moved.find((m) => m.i === i);
+      const old = b.ex.sets[i];
+      if (!mv || !old || x.state !== 'pending' || x.own || String(x[mv.key] ?? '') !== String(mv.from ?? '')) return x;
+      const { suggest, ...rest } = x;
+      return { ...rest, [mv.key]: old[mv.key], ...(old.suggest ? { suggest: old.suggest } : {}) };
+    }) };
+  });
+}
+
+// Дробные (вес, расстояние, скорость) — с запятой, как везде в приложении
+// (аудит 24.10.2026: в полях стояло «72.5»). Принимаем и точку, и запятую,
+// храним с точкой — как вес из программы и подобранный оценкой
+// (MachinesEditor делает так же)
+const shown = (f, v) => (f.mode === 'decimal' ? String(v || '').replace('.', ',') : (v || ''));
+const typed = (f, v) => (f.mode === 'decimal' ? String(v).replace(',', '.') : v);
+// Слово оценки у сделанного подхода — то же, что на кнопке («Легко», «Норм»,
+// «Тяжело»): цветная точка одна не годилась — «Легко» и «Тяжело» при
+// дальтонизме одного цвета (аудит 24.10.2026)
+const effortLabel = (effort) => (EFFORTS.find((e) => e.key === effort) || {}).label || 'Сделан';
 import CardioPlan, { CardioKind, IntervalsRow } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
@@ -32,7 +98,7 @@ import { HistoryPick } from './trainer/HistoryMove.jsx';
 
 import { useData } from './useData.js';
 import { MachineNote } from './media.jsx';
-import { EFFORT_WORD, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, otherMachineText, wasSet, repsGoalText, repsLeftText, isAssisted, settleOrder } from './effort.js';
+import { EFFORTS, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, otherMachineText, wasSet, repsGoalText, repsLeftText, isAssisted, settleOrder } from './effort.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
@@ -70,19 +136,50 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [confirm, setConfirm] = useState('');
   // Меню ⋯ в шапке: «Выбрать упражнения», «Отменить занятие» (QA 20.10.2026)
   const [moreOpen, setMoreOpen] = useState(false);
+  // Закрывается той же анимацией, что открывается, и по Escape (аудит
+  // 24.10.2026: пропадало мгновенно). Без анимации (reduced-motion,
+  // проверки компонента) — сразу
+  const [moreLeaving, setMoreLeaving] = useState(false);
+  const moreTimer = useRef(0);
+  const moreBtn = useRef(null);
+  const closeMore = () => {
+    clearTimeout(moreTimer.current);
+    const calm = typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (calm) { setMoreOpen(false); setMoreLeaving(false); return; }
+    setMoreLeaving(true);
+    moreTimer.current = setTimeout(() => { setMoreOpen(false); setMoreLeaving(false); }, 140);
+  };
+  useEffect(() => () => clearTimeout(moreTimer.current), []);
+  useEffect(() => {
+    if (!moreOpen || moreLeaving || typeof document === 'undefined' || typeof document.addEventListener !== 'function') return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      closeMore();
+      if (moreBtn.current && moreBtn.current.focus) moreBtn.current.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [moreOpen, moreLeaving]);
 
-  // id занятия, которое сейчас подтверждают к удалению. Отдельным
-  // состоянием, а не флагом «показать диалог»: подтверждение обязано быть
-  // привязано к конкретной строке, иначе список перерисуется и человек
-  // подтвердит удаление не того занятия.
+  // «Удалено · Вернуть»: { text, restore } — restore кладёт удалённое
+  // обратно в текущее занятие (putSetBack и соседи выше). Плашка — общая
+  // .undo-bar над нижним меню и время то же, что в списках (UNDO_MS):
+  // своя плашка в потоке держалась 8 с и откатывала всё занятие (аудит 24.10.2026)
   const [undo, setUndoState] = useState(null);
-  const [undoText, setUndoText] = useState('');
-  const setUndo = (value, text = 'Удалено') => { setUndoState(value); setUndoText(value ? text : ''); };
+  const setUndo = (text, restore) => setUndoState({ text, restore });
   useEffect(() => {
     if (!undo) return undefined;
-    const t = setTimeout(() => setUndo(null), 8000);
+    const t = setTimeout(() => setUndoState(null), UNDO_MS);
     return () => clearTimeout(t);
   }, [undo]);
+  const takeBack = () => {
+    if (!undo) return;
+    const { restore } = undo;
+    setUndoState(null);
+    haptic('light');
+    change(v => ({ ...v, exercises: restore(v.exercises) }));
+  };
   // Выбор нескольких упражнений: удалить, дублировать, соединить в суперсет
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState(() => new Set());
@@ -665,7 +762,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     setCollapsedUntil(0);
     change(v => ({ ...v, restUntil: until, restLocal: '' }));
     const cur = state.current && state.current.session;
-    setRestHere({ until, total: Math.max(1000, until - Date.now()), next: cur ? nextInfo(cur, focusOf(cur, lastMarked.current)) : null, sessionId: cur ? cur.id : '' });
+    // Длина — от начала отдыха, а не от этой минуты: после «+30 с» кольцо
+    // прыгало снова полным (аудит 24.10.2026)
+    setRestHere({ until, total: Math.max(1000, until - start), next: cur ? nextInfo(cur, focusOf(cur, lastMarked.current)) : null, sessionId: cur ? cur.id : '' });
     // До save: он сам ставит «идёт сохранение»
     const behind = saving.current || !!(state.current && state.current.pending);
     save();
@@ -812,8 +911,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   };
   const close = () => { if (state.current?.dirty) save(); onClose(); };
 
-  // Смахнуть вправо — то же, что «Назад»: с сохранением незаписанного
-  useBackGesture(close);
+  // Смахнуть вправо — то же, что «Назад»: с сохранением незаписанного.
+  // Только от левого края (аудит 24.10.2026): с середины экрана палец,
+  // поправлявший вес или листавший подходы, уводил из занятия
+  useBackGesture(close, true, null, { edgeOnly: true });
   // Идущая тренировка — не раздел: смахнуть влево в «Прогресс» посреди
   // подхода нельзя, выход только «назад» (смахнуть вправо)
   useTabLock(true);
@@ -875,20 +976,21 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // (QA 20.10.2026) читались как шум
     const firstOwn = ex.sets.findIndex(x => (x.who || '') === (set.who || ''));
     const sideHere = track.kind === 'strength' && (si === firstOwn || setOneSide(set, track) !== setOneSide(ex.sets[firstOwn], track));
-    const removeSet = () => { setUndo(s.exercises, 'Подход удалён'); setOpenSet(''); updateExercise(ei, ex => withoutSet(ex, si)); };
+    const removeSet = () => { const before = ex.sets; setUndo('Подход удалён', v => putSetBack(v, ex.id, si, before)); setOpenSet(''); updateExercise(ei, ex => withoutSet(ex, si)); };
+    // Под номером — состояние словом: «Разминка» (было «1 · Р»), у сделанного
+    // — оценка, как на кнопке; цвет строки — второй канал (аудит 24.10.2026)
+    const sub = set.kind === 'warmup' ? 'Разминка' : set.state === 'done' ? effortLabel(set.effort) : '';
     return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
             <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '') + (inRound ? ' workout__set-row--round' : '')} style={{ '--cols': fields.length }}>
               {inRound
                 ? <span>{label}</span>
                 : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, подход ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
-                  <span>{label}{set.kind === 'warmup' ? ' · Р' : ''}</span>
-                  {set.state === 'done' && set.effort
-                    ? <span className={'workout__effort-dot workout__effort-dot--' + set.effort} title={EFFORT_WORD[set.effort]} aria-label={EFFORT_WORD[set.effort]} />
-                    : <IconSliders size={12} aria-hidden="true" />}
+                  <span className="workout__set-label">{label}{set.state === 'done' ? <IconCheck size={12} aria-hidden="true" /> : <IconSliders size={12} aria-hidden="true" />}</span>
+                  {sub && <span className="workout__set-sub">{sub}</span>}
                 </button>}
               {fields.map(f => (
-                <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} value={set[f.key] || ''} maxLength={f.max} onChange={e => edit(f.key, e.target.value)} />
+                <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} value={shown(f, set[f.key])} maxLength={f.max} onChange={e => edit(f.key, typed(f, e.target.value))} />
               ))}
             </div>
             {/* Под строкой, под колонкой веса — одной строкой: вес на одну
@@ -906,7 +1008,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                     return { ...x, sets: x.sets.map((s, k) => (k === si || (si === first && (s.who || '') === who) ? { ...s, side } : s)) };
                   });
                 }} />
-                на сторону
+                Вес на одну сторону
               </label>}
               {was && <span className="workout__was">было {was.assist !== undefined ? 'помощь ' + was.assist : was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
             </div>}
@@ -945,18 +1047,19 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 они на виду, а не в настройках */}
             {drops.map((d, di) => (
               <div className="workout__set-row workout__drop" key={'d' + di} style={{ '--cols': 2 }}>
-                <span>сброс</span>
-                <input aria-label={`${ex.name}, подход ${si + 1}, сброс ${di + 1}, вес`} inputMode="decimal" placeholder="кг" maxLength={12} value={d.weight} onChange={e => editDrop(di, 'weight', e.target.value)} />
-                <input aria-label={`${ex.name}, подход ${si + 1}, сброс ${di + 1}, повторы`} inputMode="numeric" placeholder="повт." maxLength={6} value={d.reps} onChange={e => editDrop(di, 'reps', e.target.value)} />
-                <button type="button" className="workout__drop-remove" aria-label={`Убрать сброс ${di + 1}`} onClick={() => updateSet(ei, si, s => ({ ...s, drops: s.drops.filter((_, i) => i !== di) }))}><IconClose size={16} /></button>
+                {/* «Дроп» — как кнопка «Дропсет», которая его добавила; «сброс» читался загадкой (аудит 24.10.2026) */}
+                <span>Дроп {di + 1}</span>
+                <input aria-label={`${ex.name}, подход ${si + 1}, дроп ${di + 1}, вес`} inputMode="decimal" placeholder="кг" maxLength={12} value={String(d.weight || '').replace('.', ',')} onChange={e => editDrop(di, 'weight', e.target.value.replace(',', '.'))} />
+                <input aria-label={`${ex.name}, подход ${si + 1}, дроп ${di + 1}, повторы`} inputMode="numeric" placeholder="повт." maxLength={6} value={d.reps} onChange={e => editDrop(di, 'reps', e.target.value)} />
+                <button type="button" className="workout__drop-remove" aria-label={`Убрать дроп ${di + 1}`} onClick={() => updateSet(ei, si, s => ({ ...s, drops: s.drops.filter((_, i) => i !== di) }))}><IconClose size={16} /></button>
               </div>
             ))}
             {drops.length > 0 && drops.length < 5 && (
-              <button type="button" className="workout__drop-add" onClick={() => updateSet(ei, si, s => ({ ...s, drops: [...s.drops, { weight: '', reps: '' }] }))}>Ещё сброс</button>
+              <button type="button" className="workout__drop-add" onClick={() => updateSet(ei, si, s => ({ ...s, drops: [...s.drops, { weight: '', reps: '' }] }))}>Ещё дроп</button>
             )}
             {track.unilateral && set.left !== undefined && (
               <div className="workout__set-row workout__drop" style={{ '--cols': 2 }}>
-                <span>Л / П</span>
+                <span>Стороны</span>
                 <input aria-label={`${ex.name}, подход ${si + 1}, повторы левой`} inputMode="numeric" placeholder="левая" maxLength={6} value={set.left} onChange={e => side('left', e.target.value)} />
                 <input aria-label={`${ex.name}, подход ${si + 1}, повторы правой`} inputMode="numeric" placeholder="правая" maxLength={6} value={set.right || ''} onChange={e => side('right', e.target.value)} />
                 <button type="button" className="workout__drop-remove" aria-label="Стороны поровну" onClick={() => updateSet(ei, si, ({ left, right, ...s }) => s)}><IconClose size={16} /></button>
@@ -1003,8 +1106,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const edit = (key, value) => updateSet(ei, si, s => ({ ...s, [key]: value }));
     const key = ex.id + ':' + si;
     const current = focus.ex === ex.id && focus.set === si;
-    const removeSet = () => { setUndo(s.exercises, 'Отрезок удалён'); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
-    return <SwipeRow className={'workout__set workout__set--cardio' + (set.state === 'done' ? ' workout__set--done' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
+    const removeSet = () => { const before = ex.sets; setUndo('Отрезок удалён', v => putSetBack(v, ex.id, si, before)); setOpenSet(''); updateExercise(ei, ex => ({ ...ex, sets: ex.sets.filter((_, i) => i !== si) })); };
+    return <SwipeRow className={'workout__set workout__set--cardio' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить отрезок ${si + 1}`} onDelete={removeSet}>
       <div className="workout__cardio-head">
         {inRound
@@ -1012,7 +1115,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, отрезок ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
             <span>{/^\d+$/.test(label) ? 'Отрезок ' + label : label}{set.kind === 'warmup' ? ' · разминка' : ''}</span><IconSliders size={12} aria-hidden="true" />
           </button>}
-        {!inRound && set.state === 'done' && <span className="workout__cardio-done"><IconCheck size={16} /> сделан</span>}
+        {/* Сделан — с оценкой, как силовой подход (аудит 24.10.2026) */}
+        {!inRound && set.state === 'done' && <span className="workout__cardio-done"><IconCheck size={16} aria-hidden="true" />{effortLabel(set.effort)}</span>}
       </div>
       {/* Функциональное — не время и скорость, а круги и каждый интервал со
           своими целями (владелец, 09.10.2026): в каждом круге суперсета свои */}
@@ -1021,7 +1125,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           onChange={iv => updateSet(ei, si, x => withIntervals(x, iv, track))} />
         : <div className="workout__cardio-grid">
           {fields.map(f => (
-            <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={set[f.key] || ''} onChange={e => edit(f.key, e.target.value)} /></label>
+            <label key={f.key}><span>{f.head}</span><input aria-label={`${ex.name}, отрезок ${si + 1}, ${f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={shown(f, set[f.key])} onChange={e => edit(f.key, typed(f, e.target.value))} /></label>
           ))}
         </div>}
       {/* Как у силовых: отрезок отмечается оценкой, она же запускает отдых */}
@@ -1034,6 +1138,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         if (restAfter) startRest(restFor(effort, restBase(ex)));
       }, current)}
       {!inRound && lack && lack.key === key && <p className="workout__round-lack" role="alert">{lack.text}</p>}
+      {/* Пропущенный — как у силовых: зачёркнут и подписан, иначе не отличить от ждущего */}
+      {set.state === 'skipped' && !inRound && openSet !== key && <p className="workout__skipped">Пропущен — нажмите номер, чтобы вернуть</p>}
       {!inRound && openSet === key && <div className="workout__set-options">
         {editable && set.state === 'done' && effortFix(set.effort, (effort) => { setOpenSet(''); updateSet(ei, si, x => ({ ...x, effort })); })}
         <div className="workout__toolbar">
@@ -1156,7 +1262,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, drops: [{ weight: '', reps: '' }] }))}>Дропсет</button>
       )}
       {track.unilateral && set.left === undefined && (
-        <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, left: s.reps || '', right: s.reps || '' }))}>Л и П отдельно</button>
+        <button className="button" onClick={() => updateSet(ei, si, s => ({ ...s, left: s.reps || '', right: s.reps || '' }))}>Левая и правая отдельно</button>
       )}
     </>;
   };
@@ -1177,10 +1283,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const live = members.filter(({ ex: e }) => e.sets[r] && e.sets[r].state !== 'skipped');
     if (set.state === 'done') {
       if (live.every(({ ex: e }) => e.sets[r].state === 'done')) return null;
-      return <button type="button" className="workout__member-done" onClick={() => updateExercise(ei, x => unrateAt(x, r))}>
-        <span className={'workout__effort-dot workout__effort-dot--' + (set.effort || 'ok')} aria-hidden="true" />
-        {(set.effort ? EFFORT_WORD[set.effort] : 'сделано')} · снять
-      </button>;
+      // Оценка уже стоит у названия (workout__round-effort) — здесь только
+      // действие, без второго «Легко» (аудит 24.10.2026)
+      return <button type="button" className="workout__member-done" aria-label={ex.name + ': снять отметку'} onClick={() => updateExercise(ei, x => unrateAt(x, r))}>Снять отметку</button>;
     }
     if (set.state !== 'pending') return null;
     // Только в ближайшем незаконченном круге
@@ -1260,7 +1365,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const live = inRound.filter(({ ex }) => ex.sets[r].state !== 'skipped');
     const done = live.length > 0 && live.every(({ ex }) => ex.sets[r].state === 'done');
     const unmark = () => {
-      setUndo(s.exercises, 'Отметка круга снята');
+      const before = new Map(live.filter(({ ex }) => ex.sets[r].state === 'done').map(({ ex }) => [ex.id, { r, ex }]));
+      setUndo('Отметка круга снята', v => putMarksBack(v, before));
       all(e => (e.sets[r].state === 'done' ? unrateAt(e, r) : e));
     };
     return <details className="workout__set-options workout__round-options">
@@ -1279,7 +1385,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {editable && done
           ? <button className="button" onClick={unmark}>Снять отметку круга</button>
           : <button className="button" onClick={() => setAll({ state: skipped ? 'pending' : 'skipped' })}>{skipped ? 'Вернуть круг' : 'Пропустить круг'}</button>}
-        <button className="button" disabled={rounds === 1} onClick={() => { setUndo(s.exercises); all(e => (e.sets.length > 1 ? { ...e, sets: e.sets.filter((_, i) => i !== r) } : e)); }}>Удалить круг</button>
+        <button className="button" disabled={rounds === 1} onClick={() => {
+          const gone = inRound.filter(({ ex }) => ex.sets.length > 1).map(({ ex }) => [ex.id, ex.sets]);
+          setUndo('Круг удалён', v => gone.reduce((acc, [id, sets]) => putSetBack(acc, id, r, sets), v));
+          all(e => (e.sets.length > 1 ? { ...e, sets: e.sets.filter((_, i) => i !== r) } : e));
+        }}>Удалить круг</button>
       </div>
     </details>;
   };
@@ -1386,9 +1496,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   {asClient ? ex.name : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>}
                   {/* Единицы — касанием: вес, повторы, время, у кардио — интервалы (FT-513) */}
                   {!asClient && <button type="button" className="workout__round-units" aria-expanded={tuning === ex.id + ':' + r} aria-label={ex.name + ': настройки'} onClick={() => startTune(ex.id + ':' + r)}> · {isFunctional(ex) ? 'интервалы' : rowFields(trackOf(ex)).map(f => f.unit).join(' · ')}</button>}
-                  {/* Сделано — с оценкой, как у обычных подходов (03.10.2026) */}
-                  {ex.sets[r].state === 'done' && ex.sets[r].effort && <span className={'workout__round-effort workout__round-effort--' + ex.sets[r].effort}>
-                    <span className={'workout__effort-dot workout__effort-dot--' + ex.sets[r].effort} aria-hidden="true" />{EFFORT_WORD[ex.sets[r].effort]}
+                  {/* Сделано — галочка и слово оценки, как у обычных подходов
+                      (03.10.2026; словом, а не точкой — аудит 24.10.2026) */}
+                  {ex.sets[r].state === 'done' && <span className={'workout__round-effort workout__round-effort--' + (ex.sets[r].effort || 'ok')}>
+                    <IconCheck size={14} aria-hidden="true" />{effortLabel(ex.sets[r].effort)}
                   </span>}
                 </div>}
               {tuning === ex.id + ':' + r && tuneEditor(ex, ei, ex.id + ':' + r, true)}
@@ -1502,7 +1613,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     });
     const last = ex.sets[ex.sets.length - 1];
     const addSet = () => updateExercise(ei, withSet);
-    const dropSet = () => { setUndo(s.exercises, 'Подход удалён'); updateExercise(ei, x => ({ ...x, sets: x.sets.slice(0, -1) })); };
+    const dropSet = () => { const before = ex.sets; setUndo('Подход удалён', v => putSetBack(v, ex.id, before.length - 1, before)); updateExercise(ei, x => ({ ...x, sets: x.sets.slice(0, -1) })); };
     return <div className="workout__panel" key={'tune-' + id}>
       {!inRound && <div className="workout__tune-count">
         <span>Подходов</span>
@@ -1512,7 +1623,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       </div>}
       {open.length > 0 && <div className="workout__tune-fields">
         {rowFields(track).map(f => (
-          <label key={f.key}><span>{f.head}</span><input className="field__input" aria-label={ex.name + ': ' + f.head.toLowerCase() + ', всем подходам'} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={sample[f.key] || ''} onChange={e => editAll(f.key, e.target.value)} /></label>
+          <label key={f.key}><span>{f.head}</span><input className="field__input" aria-label={ex.name + ': ' + f.head.toLowerCase() + ', всем подходам'} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={shown(f, sample[f.key])} onChange={e => editAll(f.key, typed(f, e.target.value))} /></label>
         ))}
       </div>}
       {open.length > 0 && <p className="small muted">{open.length === ex.sets.length ? 'Меняется во всех подходах.' : 'Меняется в неотмеченных подходах.'}</p>}
@@ -1731,7 +1842,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const cards = units(snapshot).filter(u => u.items.every(e => ids.has(e.id)))
       .map(u => fieldsRef.current && fieldsRef.current.querySelector(`[data-unit="${u.key}"]`)).filter(Boolean);
     vanish(cards, () => {
-      setUndo(snapshot, ids.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + ids.size);
+      setUndo(ids.size === 1 ? 'Упражнение удалено' : 'Удалено упражнений: ' + ids.size, v => putExercisesBack(v, snapshot, ids));
       change(v => ({ ...v, exercises: v.exercises.filter(e => !ids.has(e.id)) }));
     }, leavingBars(cards));
   };
@@ -2043,9 +2154,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
           after="Веса и настройка — уже в этом занятии." />
       )}
-      {alts.length > 0 && editable && (started
-        ? <p className="small muted workout__alts-later">Заменить упражнение можно до первого подхода.</p>
-        : <div className="workout__alts">
+      {/* После первого подхода замены нет — и постоянной строки об этом тоже
+          (аудит 24.10.2026): она стояла под каждым начатым упражнением */}
+      {alts.length > 0 && editable && !started && (
+        <div className="workout__alts">
           <button type="button" className="workout__alts-toggle" aria-expanded={swapping === ex.id}
             onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
             {swapping === ex.id ? 'Не заменять' : 'Заменить упражнение'}
@@ -2057,7 +2169,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 onClick={() => { haptic(); setSwapping(null); replaceExercise(ei, { name: a.name, exerciseId: a.id }); }}>{a.name}</button>
             ))}
           </div>}
-        </div>)}
+        </div>
+      )}
     </>;
   };
 
@@ -2082,7 +2195,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     : <RestScreen
       allowGame={asClient && plankEnabled}
       until={s.restUntil}
-      total={startedHere ? here.total : (s.restSeconds || 90) * 1000}
+      total={startedHere ? here.total : s.restUntil - restStartOf(s.restUntil)}
       now={now}
       next={nextInfo(s, focus)}
       onMore={extendRest}
@@ -2103,7 +2216,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const alerts = (storageError || message || conflict) && (dom ? (node) => createPortal(node, document.body) : (node) => node)(
     // Всегда на виду — подводить к ним экран незачем (data-reveal="off"), а
     // их высоту reveal.js учитывает, как у панелей внизу (data-reveal-bottom)
-    <div className={'workout__alerts' + (restFolded || undo || picking ? ' workout__alerts--lift' : '')} data-reveal="off" data-reveal-bottom="">
+    <div className="workout__alerts" data-reveal="off" data-reveal-bottom="">
       {conflict && <div role="alert" className="workout__alert workout__alert--conflict">
         <h3>{conflict.activeConflict ? 'Уже есть текущее занятие' : 'Занятие изменено на другом устройстве'}</h3>
         <p>Ваш черновик сохранён отдельно. Скачайте его, затем откройте актуальную версию и перенесите нужные изменения.</p>
@@ -2150,8 +2263,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <p>{confirmText}</p>
           <div className="workout__confirm-actions">
             {/* Отмена меняет черновик сразу; save отправит её после текущего запроса. */}
-            <button type="button" className={'button ' + (confirm === 'complete' ? 'button--primary' : 'button--critical')} disabled={!!conflict || (confirm === 'complete' && (busy || !stats.done))} onClick={() => finishAs(confirm)}>{confirm === 'complete' ? 'Завершить' : 'Отменить'}</button>
-            <button type="button" className="button button--ghost" onClick={() => setConfirm('')}>{confirm === 'complete' && !stats.pending ? 'Ещё не всё' : 'Продолжить'}</button>
+            <button type="button" className={'button ' + (confirm === 'complete' ? 'button--primary' : 'button--critical')} disabled={!!conflict || (confirm === 'complete' && (busy || !stats.done))} onClick={() => finishAs(confirm)}>{confirm === 'complete' ? 'Завершить' : 'Отменить занятие'}</button>
+            {/* «Отменить / Продолжить» читалось двояко — что отменить? (аудит 24.10.2026) */}
+            <button type="button" className="button button--ghost" onClick={() => setConfirm('')}>{confirm === 'complete' ? (stats.pending ? 'Продолжить' : 'Ещё не всё') : 'Не отменять'}</button>
           </div>
         </div>}
         {/* Пауза и отдых — в шапке, что едет за прокруткой (владелец, 09.10.2026).
@@ -2170,12 +2284,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             {picking
               ? <button type="button" className="button workout__pick-toggle is-on" aria-pressed onClick={endPick}>Готово</button>
               : <div className="workout__more">
-                <button type="button" className="icon-button workout__more-btn" aria-label="Ещё" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => { setMoreOpen(o => !o); haptic(); }}><IconMore size={22} /></button>
+                <button type="button" ref={moreBtn} className="icon-button workout__more-btn" aria-label="Ещё" aria-haspopup="menu" aria-expanded={moreOpen && !moreLeaving} onClick={() => { if (moreOpen && !moreLeaving) closeMore(); else { clearTimeout(moreTimer.current); setMoreLeaving(false); setMoreOpen(true); } haptic(); }}><IconMore size={22} /></button>
                 {moreOpen && <>
-                  <div className="workout__more-scrim" onClick={() => setMoreOpen(false)} aria-hidden="true" />
-                  <div className="workout__menu" role="menu" aria-label="Ещё">
-                    {!asClient && <button type="button" role="menuitem" className="workout__menu-item" onClick={() => { setMoreOpen(false); pickFromButton(); }}>Выбрать упражнения</button>}
-                    <button type="button" role="menuitem" className="workout__menu-item workout__menu-item--critical" onClick={() => { setMoreOpen(false); setConfirm('cancel'); }}>Отменить занятие</button>
+                  <div className="workout__more-scrim" onClick={closeMore} aria-hidden="true" />
+                  <div className={'workout__menu' + (moreLeaving ? ' workout__menu--leaving' : '')} role="menu" aria-label="Ещё">
+                    {!asClient && <button type="button" role="menuitem" className="workout__menu-item" onClick={() => { closeMore(); pickFromButton(); }}>Выбрать упражнения</button>}
+                    <button type="button" role="menuitem" className="workout__menu-item workout__menu-item--critical" onClick={() => { closeMore(); setConfirm('cancel'); }}>Отменить занятие</button>
                   </div>
                 </>}
               </div>}
@@ -2228,12 +2342,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             }
             return <React.Fragment key={'g' + group}>{joinBefore(ei)}{supersetBlock(members)}</React.Fragment>;
           }
-          const doneSets = ex.sets.filter(x => x.state !== 'pending').length;
-          const finished = doneSets === ex.sets.length;
+          // Счётчик — только сделанные; пропущенные не дают «✓ 3/3» (аудит
+          // 24.10.2026). Карточка приглушается, когда ждать больше нечего
+          const doneSets = ex.sets.filter(x => x.state === 'done').length;
+          const finished = ex.sets.every(x => x.state !== 'pending');
+          const allMade = doneSets === ex.sets.length;
           const compact = picking || !!reorder;
           return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable || asClient} label={`Удалить упражнение «${ex.name}»`}
-            onDelete={() => { setUndo(s.exercises, 'Упражнение удалено'); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
+            onDelete={() => { const snapshot = s.exercises; setUndo('Упражнение удалено', v => putExercisesBack(v, snapshot, new Set([ex.id]))); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}
             <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {compact
@@ -2241,7 +2358,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               // Название — касанием: из базы или новое прямо здесь
               : asClient ? (ex.name || 'Новое упражнение')
                 : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id)}>{ex.name || 'Новое упражнение'}</button>}</h3>
-            <span className="workout__ex-count" aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{finished ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
+            <span className={'workout__ex-count' + (finished && !allMade ? ' workout__ex-count--partial' : '')} aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{allMade ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
           </div>
           </SwipeRow>
           {/* Режим выбора — свёрнутый: одна строка на упражнение, чтобы
@@ -2292,12 +2409,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           </>}
         </section></React.Fragment>;
         })}
-        {undo && (
-          <div className="workout__undo" role="status">
-            <span>{undoText}</span>
-            <button type="button" className="button button--ghost" onClick={() => { change(s => ({ ...s, exercises: undo })); setUndo(null); }}>Вернуть</button>
-          </div>
-        )}
+        {/* Та же плашка, что в списках (pendingDelete.jsx): закреплена над
+            нижним меню, а не в конце упражнений */}
+        {undo && editable && <UndoBar text={undo.text} onUndo={takeBack} />}
         {picking && (
           <div className="workout__pick-bar" role="toolbar" aria-label="Действия с выбранными упражнениями">
             <span className="workout__pick-count">{picked.size ? 'Выбрано ' + pickedUnits() : 'Отметьте упражнения'}</span>

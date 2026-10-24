@@ -52,14 +52,31 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const stopRef = useRef(onStop);
   const swipe = useRef(null);
   stopRef.current = onStop;
+  // Уход экрана — анимацией 220 мс, как приход (аудит 24.10.2026: пропадал
+  // рывком): «Закончить отдых», «Закрыть», «Свернуть», смахивание вниз и
+  // «Назад» сначала гасят экран, потом зовут своё. Без анимации
+  // (reduced-motion, проверки компонента) — сразу
+  const [leaving, setLeaving] = useState(false);
+  const leavingRef = useRef(false);
+  const leaveTimer = useRef(0);
+  useEffect(() => () => clearTimeout(leaveTimer.current), []);
+  const leave = (fn) => () => {
+    if (!fn || leavingRef.current) return;
+    const calm = typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (calm) { fn(); return; }
+    leavingRef.current = true;
+    setLeaving(true);
+    leaveTimer.current = setTimeout(() => { leavingRef.current = false; fn(); setLeaving(false); }, 220);
+  };
   // Системный «Назад» (Android, Back браузера) сворачивает отдых, а не
   // закрывает тренировку под ним (аудит 24.10.2026); в игре — закрывает
   // игру, после конца отдыха — «Закрыть». Без смахивания (swipe: false):
   // вправо оно уводило из занятия, а вниз экран сворачивает сам
   useBackGesture(() => {
     if (!over && allowGame && gameUntil === until) setGameUntil(0);
-    else if (!over && onCollapse) onCollapse();
-    else onStop();
+    else if (!over && onCollapse) leave(onCollapse)();
+    else leave(onStop)();
   }, true, null, { swipe: false });
   // data-no-gestures на экране (аудит 24.10.2026): жесты приложения
   // (gestures.jsx) его не трогают — смахивание вправо уводило из занятия,
@@ -79,7 +96,7 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
     if (!start || !touch || over || !onCollapse) return;
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
-    if (dy >= 64 && dy > Math.abs(dx) * 1.25) onCollapse();
+    if (dy >= 64 && dy > Math.abs(dx) * 1.25) leave(onCollapse)();
   };
   // Будильник iPhone закрыли крестиком вне приложения — закрыть и этот
   // экран, второй раз «Закрыть» нажимать не нужно (03.10.2026)
@@ -122,7 +139,7 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
     </div>
   );
   return (
-    <div className={'rest-screen' + (over ? ' rest-screen--over' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}
+    <div className={'rest-screen' + (over ? ' rest-screen--over' : '') + (leaving ? ' rest-screen--leaving' : '')} role="dialog" aria-modal="true" aria-label={over ? 'Отдых окончен' : 'Отдых'}
       data-no-gestures=""
       onTouchStart={touchStart} onTouchEnd={touchEnd} onTouchCancel={() => { swipe.current = null; }}>
       <div className="rest-screen__label">{over ? 'Отдых окончен' : 'Отдых'}</div>
@@ -173,16 +190,16 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
       </>}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>
         {over
-          ? <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закрыть</button>
+          ? <button type="button" className="button button--primary rest-screen__main" onClick={leave(onStop)}>Закрыть</button>
           : <>
             {/* Вне экрана тренировки занятия под рукой нет — без «+30 с» */}
             {onMore && <button type="button" className="button rest-screen__more" onClick={onMore}>+30 с</button>}
-            <button type="button" className="button button--primary rest-screen__main" onClick={onStop}>Закончить отдых</button>
+            <button type="button" className="button button--primary rest-screen__main" onClick={leave(onStop)}>Закончить отдых</button>
           </>}
       </div>
       {/* Свернуть — таймер уходит в плашку внизу, приложение свободно:
           другие разделы, прокрутка (владелец, 03.10.2026) */}
-      {!over && onCollapse && <button type="button" className="rest-screen__fold" onClick={onCollapse}>
+      {!over && onCollapse && <button type="button" className="rest-screen__fold" onClick={leave(onCollapse)}>
         <IconChevron size={18} aria-hidden="true" />Свернуть таймер
       </button>}
     </div>

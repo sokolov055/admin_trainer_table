@@ -510,7 +510,7 @@ test('в активной тренировке один раздел: настр
 
   await page.getByRole('button', { name: 'Ещё', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Отменить занятие' }).click();
-  await page.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();
+  await page.locator('.workout__confirm').getByRole('button', { name: 'Отменить занятие', exact: true }).click();
   await swipe(page, { x: 4, y: 420 }, { x: 340, y: 420 });
 });
 
@@ -965,7 +965,7 @@ test('игра на отдыхе у тестового клиента глаза
     await phone.getByRole('button', { name: 'Закончить отдых', exact: true }).click();
     await phone.getByRole('button', { name: 'Ещё', exact: true }).click();
     await phone.getByRole('menuitem', { name: 'Отменить занятие' }).click();
-    await phone.locator('.workout__confirm').getByRole('button', { name: 'Отменить', exact: true }).click();
+    await phone.locator('.workout__confirm').getByRole('button', { name: 'Отменить занятие', exact: true }).click();
     await phone.locator('.workout__header').getByText(/Отменена/).waitFor();
   } finally { await context.close(); }
 });

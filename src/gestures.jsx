@@ -118,11 +118,17 @@ export function captureScreen(name) {
 // swipe читается в момент жеста, а не при регистрации: правка с
 // несохранённым выключает смахивание на лету, не меняя место экрана в
 // стопке «назад» (аудит 24.10.2026)
-export function useBackGesture(handler, enabled = true, snapshotName = null, { swipe = true } = {}) {
+// edgeOnly — смахнуть только от левого края (касание началось не дальше
+// BACK_EDGE от него), как системный жест iOS: на экране тренировки палец
+// посреди подхода, поправлявший вес, уводил из занятия (аудит 24.10.2026).
+// Без него — с любого места экрана, как было
+export function useBackGesture(handler, enabled = true, snapshotName = null, { swipe = true, edgeOnly = false } = {}) {
   const ref = useRef(handler);
   ref.current = handler;
   const swipeRef = useRef(swipe);
   swipeRef.current = swipe;
+  const edgeRef = useRef(edgeOnly);
+  edgeRef.current = edgeOnly;
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -131,6 +137,7 @@ export function useBackGesture(handler, enabled = true, snapshotName = null, { s
     const fresh = !named && pendingSnapshot && Date.now() - pendingSnapshot.at < SNAPSHOT_FRESH_MS;
     const entry = {
       get swipe() { return swipeRef.current; },
+      get edgeOnly() { return edgeRef.current; },
       run: () => ref.current && ref.current(),
       snapshot: named || (fresh ? pendingSnapshot : null),
     };
@@ -617,6 +624,7 @@ const PULL_REST = 56;       // где индикатор ждёт, пока ид
 const PULL_MAX = 140;       // дальше резина почти не пускает
 const BACK_COMMIT = 0.14;    // доля ширины, после которой «назад» и листание без скорости
 const BACK_FLICK = 220;     // px/с — взмах, который решает сам по себе
+const BACK_EDGE = 24;       // px от левого края — где начинается «назад» у экранов с edgeOnly
 const PARALLAX = 0.3;       // насколько предыдущий экран сдвинут влево в начале
 const DRAWER_COMMIT = 0.14;  // доля ширины меню, вытянутая пальцем, чтобы оно осталось открытым
 const MIN_SPIN_MS = 500;    // короче индикатор не крутится: иначе мелькнёт
@@ -892,7 +900,8 @@ export function Gestures() {
         y0: t.clientY,
         mode: null,
         atTop: (window.scrollY || document.documentElement.scrollTop) <= 0,
-        canBack: backStack.length > 0 && backStack[backStack.length - 1].swipe !== false && free,
+        canBack: backStack.length > 0 && backStack[backStack.length - 1].swipe !== false && free
+          && (!backStack[backStack.length - 1].edgeOnly || t.clientX <= BACK_EDGE),
         // Строка со смахиванием влево (удалить подход) забирает себе
         // движение влево; «назад» вправо с неё по-прежнему работает
         canTabs: !!tabHost && free && tabLocks === 0 && !(e.target.closest && e.target.closest('[data-swipe-left]')),

@@ -4887,6 +4887,14 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
    где меню нет или оно спрятано — у края экрана, с учётом выреза */
 :root { --float-bottom: calc(76px + var(--space-3) + env(safe-area-inset-bottom, 0px)); }
 :root:has(.tabbar--hidden), :root:not(:has(.tabbar)) { --float-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+/* Стопка плавающих плашек (аудит 24.10.2026): внизу свёрнутый отдых
+   (.rest-pill 48 + 8), над ним панель выбора упражнений, над ней «Вернуть»
+   (62 + 8), выше всех — плашка ошибок занятия. Каждая поднимается на высоту
+   видимых под ней, а не ложится поверх. Отдых у «брови» iPhone — сверху */
+:root { --float-rest: 0px; --float-pick: 0px; --float-undo: 0px; }
+:root:has(.rest-pill:not(.rest-pill--island)) { --float-rest: 56px; }
+:root:has(.workout__pick-bar) { --float-pick: 70px; }
+:root:has(.undo-bar) { --float-undo: 70px; }
 
 /* Ручка перестановки: палец на ней не листает страницу, а тащит строку */
 .block-order__handle { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -8px -8px -8px 0; touch-action: none; cursor: grab; }
@@ -4919,7 +4927,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 /* Панель «Удалено · Вернуть» (pendingDelete.jsx) — над нижним меню */
 .undo-bar {
-  position: fixed; left: 50%; bottom: var(--float-bottom); z-index: 45;
+  position: fixed; left: 50%; bottom: calc(var(--float-bottom) + var(--float-rest) + var(--float-pick)); z-index: 45;
   width: min(calc(100% - 2 * var(--space-4)), 560px); transform: translateX(-50%);
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);

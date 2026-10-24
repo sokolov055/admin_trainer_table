@@ -132,7 +132,9 @@ test('отмена доступна во время сохранения и от
   try {
     await openMore();
     await click('Отменить занятие');
-    await click('Отменить');
+    // Кнопка подтверждения — «Отменить занятие», рядом «Не отменять» (аудит 24.10.2026)
+    assert.ok(button('Не отменять'));
+    await click('Отменить занятие');
     assert.ok(tree.root.findAllByType('p').some(n => text(n).includes('Отменена')));
   } finally {
     await act(async () => { release(); await pending; await delay(); });
@@ -192,7 +194,8 @@ test('интерфейс: запись подхода, пауза, продол�
   await click('Завершить'); await click('Завершить');
   const saved = JSON.parse(data.get('workout_demo_server:3'))[0];
   assert.equal(saved.status, 'completed');
-  assert.equal(saved.exercises[0].sets[0].weight, '45,5');
+  // Ввели с запятой — хранится с точкой, показывается с запятой (аудит 24.10.2026)
+  assert.equal(saved.exercises[0].sets[0].weight, '45.5');
   assert.equal(saved.exercises[0].sets[1].state, 'skipped');
   // Главная кнопка после завершения — назад, к программе (QA 20.10.2026)
   await click('К программе');
@@ -345,7 +348,7 @@ test('черновик восстанавливается после отклю�
   await act(async () => weight.props.onChange({ target: { value: '77.5' } }));
   await act(async () => tree.unmount());
   await mount(false);
-  assert.equal(tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || '')).props.value, '77.5');
+  assert.equal(tree.root.findAllByType('input').find(n => /подход 1, вес/.test(n.props['aria-label'] || '')).props.value, '77,5', 'в поле — с запятой');
   offline = false; await saveNow();
   assert.equal(JSON.parse(data.get('workout_demo_server:3'))[0].exercises[0].sets[0].weight, '77.5');
   await act(async () => tree.unmount()); tree = null;
@@ -1141,8 +1144,17 @@ test('корзина подхода удаляет с «Вернуть»; выб
     await press(/^Удалить подход 2$/);
     assert.equal(sets(), 5);
     assert.ok(local.root.findAllByType('span').some(x => text(x) === 'Подход удалён'));
+    // Пока висит «Вернуть», отметили подход — «Вернуть» кладёт на место
+    // только удалённый, отметка остаётся (аудит 24.10.2026: раньше
+    // возвращался снимок всего занятия, и отметка пропадала)
+    await press('Норм');
+    const stop = local.root.findAllByType('button').find(x => text(x) === 'Закончить отдых');
+    if (stop) await act(async () => { stop.props.onClick(); await delay(); });
     await press('Вернуть');
     assert.equal(sets(), 6, 'вернулся');
+    const done = () => local.root.findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set--done'));
+    assert.equal(done().length, 1, 'подход, отмеченный после удаления, остался отмеченным');
+    assert.ok(!local.root.findAllByType('span').some(x => text(x) === 'Подход удалён'), 'плашка ушла');
 
     await openMore(local.root);
     await press('Выбрать упражнения');
@@ -1347,7 +1359,7 @@ test('клиент не меняет ни названия, ни состава 
     await act(async () => { buttons().find(b => text(b) === 'Добавить разминочный подход').props.onClick(); await delay(); });
     assert.equal(weight(2).props.value, '50');
     assert.equal(weight(3).props.value, '100');
-    assert.equal(local.root.findAll(n => n.type === 'span' && /· Р$/.test(text(n))).length, 2, 'оба помечены «Р»');
+    assert.equal(local.root.findAll(n => n.type === 'span' && n.props.className === 'workout__set-sub' && text(n) === 'Разминка').length, 2, 'оба помечены «Разминка» (было «1 · Р»)');
   } finally {
     if (local) local.unmount();
   }
@@ -1418,13 +1430,13 @@ test('19.10.2026: нажали «Легко» вместо «Норм» — оц
   await mount();
   const weightOf = n => tree.root.findAll(x => x.type === 'input' && typeof x.props['aria-label'] === 'string'
     && x.props['aria-label'].includes(`подход ${n}, вес в кг`))[0].props.value;
-  const dots = () => tree.root.findAll(x => x.props && typeof x.props.className === 'string' && /workout__effort-dot--/.test(x.props.className) && x.type === 'span');
+  // Оценка сделанного — словом под номером подхода, не цветной точкой (аудит 24.10.2026)
+  const marks = () => tree.root.findAll(x => x.type === 'span' && x.props && x.props.className === 'workout__set-sub').map(text);
 
   await click('Легко');
   assert.equal(weightOf(1), '40');
   assert.equal(weightOf(2), '50', '«Легко» прибавило вес следующему подходу (шаг приседа — 10)');
-  assert.equal(dots().length, 1);
-  assert.ok(/--easy/.test(dots()[0].props.className));
+  assert.deepEqual(marks(), ['Легко']);
 
   // Номер подхода → «Как прошло?»
   const num = () => tree.root.findAll(x => x.type === 'button' && /подход 1: настройки/.test(x.props['aria-label'] || ''))[0];
@@ -1437,7 +1449,7 @@ test('19.10.2026: нажали «Легко» вместо «Норм» — оц
   await act(async () => { await norm.props.onClick(); await delay(); });
 
   assert.equal(weightOf(2), '40', 'прибавка ушла вместе с прежней оценкой');
-  assert.ok(/--ok/.test(dots()[0].props.className), 'оценка стала «Норм»');
+  assert.deepEqual(marks(), ['Норм'], 'оценка стала «Норм»');
   assert.ok(!group(), 'панель закрылась');
 
   // Обратно «Легко» — прибавка снова есть; «Снять отметку» возвращает вес
@@ -1449,7 +1461,7 @@ test('19.10.2026: нажали «Легко» вместо «Норм» — оц
   const snap = tree.root.findAll(x => x.type === 'button' && text(x) === 'Снять отметку')[0];
   await act(async () => { await snap.props.onClick(); await delay(); });
   assert.equal(weightOf(2), '40');
-  assert.equal(dots().length, 0);
+  assert.deepEqual(marks(), []);
 });
 
 /**
