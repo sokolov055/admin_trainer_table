@@ -14,6 +14,7 @@ import Games from './Games.jsx';
 import AdminStories from './AdminStories.jsx';
 import AdminLook from './AdminLook.jsx';
 import AdminVersions from './AdminVersions.jsx';
+import AdminImport from './AdminImport.jsx';
 import { Logs } from './screens.jsx';
 import {
   PLATFORM_NAMES, flagStatus, growthPoints, monthName, needsConfirm, percent, perClientNote, sourceTotals,
@@ -44,6 +45,7 @@ export default function Admin({ pane }) {
   if (pane === 'flags') return <Flags />;
   if (pane === 'stories') return <AdminStories />;
   if (pane === 'look') return <AdminLook />;
+  if (pane === 'import') return <AdminImport />;
   if (pane === 'versions') return <AdminVersions />;
   if (pane === 'logs') return <Logs />;
   if (pane === 'export') return <Export />;

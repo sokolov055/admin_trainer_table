@@ -1446,6 +1446,20 @@ const MOCK = {
     return mockThemesState();
   },
   'app.gamepacks': () => ({ packs: mockPackDoc().map(({ at, by, closed, ...p }) => (closed ? { ...p, closed: true } : p)), trial: true }),
+  // Загрузка каталога таблицей (AdminImport.jsx): в демо — без записи
+  'owner.catalog.imports': () => ({ imports: [] }),
+  'owner.catalog.import': (p) => {
+    const results = [];
+    const totals = {};
+    for (const sheet of ['exercises', 'machines']) {
+      const rows = p[sheet] || [];
+      rows.forEach((r) => results.push({ sheet, line: r.line, name: r.name || '', action: r.id || r.uid ? 'update' : 'create', fields: r.id || r.uid ? ['техника'] : [] }));
+      const n = (a) => results.filter((r) => r.sheet === sheet && r.action === a).length;
+      totals[sheet] = { rows: rows.length, create: n('create'), update: n('update'), same: 0, errors: 0 };
+    }
+    return { applied: !!p.apply, id: p.apply ? 1 : null, totals, results };
+  },
+  'owner.catalog.import.undo': () => ({ restored: 0, kept: 0, imports: [] }),
   'owner.gamepacks': () => mockPacksState(),
   'owner.gamepacks.upload': (p) => {
     const { summary, preview, ...pack } = p.pack || {};

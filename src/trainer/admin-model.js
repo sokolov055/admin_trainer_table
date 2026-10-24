@@ -17,6 +17,8 @@ export const ADMIN_PANES = [
   { value: 'stories', label: 'Истории' },
   // Темы оформления файлом — загрузить, закрыть (22.10.2026)
   { value: 'look', label: 'Вид' },
+  // Упражнения и тренажёры таблицей — пачкой, с проверкой и отменой (24.10.2026)
+  { value: 'import', label: 'Загрузка' },
   { value: 'flags', label: 'Флаги' },
   // Последние версии iPhone: «Вышла новая версия» в старых (22.10.2026)
   { value: 'versions', label: 'Версии' },
@@ -34,7 +36,7 @@ export const ADMIN_PANES = [
 export const ADMIN_GROUPS = [
   { value: 'analytics', label: 'Аналитика', panes: ['stats'] },
   { value: 'people', label: 'Тренеры и тарифы', panes: ['trainers', 'tariffs'] },
-  { value: 'content', label: 'Контент', panes: ['games', 'stories', 'look'] },
+  { value: 'content', label: 'Контент', panes: ['games', 'stories', 'look', 'import'] },
   { value: 'system', label: 'Система', panes: ['flags', 'versions', 'logs', 'export'] },
 ];
 
