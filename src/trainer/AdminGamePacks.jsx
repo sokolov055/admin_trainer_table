@@ -85,7 +85,7 @@ export default function AdminGamePacks() {
 
   return (
     <>
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не получилось: {problem.message || 'нет связи'}</Note>}
       <Section title="Вопросы и уровни" note="Набор вопросов для «Тренера в планке» или уровней для «Блинов» — файлом от Claude, без новой сборки">
         <Panel pad className="admin-flag">
           <input ref={input} type="file" accept=".json,application/json" hidden onChange={pickFile} />

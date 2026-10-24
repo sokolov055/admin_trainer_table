@@ -407,11 +407,7 @@ function AddClient({ onCreated, onClose }) {
           />
         </label>
 
-        {error && (
-          <div className="access-reset__error" role="alert">
-            {error.message || 'Не получилось завести клиента'}
-          </div>
-        )}
+        {error && <Note tone="critical">Не получилось завести клиента: {error.message || 'нет связи'}</Note>}
 
         <div className="add-client__actions">
           <button className="button button--primary" disabled={busy || !name.trim()}>

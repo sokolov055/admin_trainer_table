@@ -275,7 +275,7 @@ function Tariffs() {
               onChange={(v) => { setSaved(false); setForm((f) => ({ ...f, [k]: v })); }} />
           ))}
         </Panel>
-        {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+        {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
         {saved && <Note tone="good">Сохранено. Новые цены действуют сразу.</Note>}
         <button type="button" className="button button--primary admin-save" disabled={busy} onClick={save}>
           {busy ? 'Сохраняю…' : 'Сохранить цены'}
@@ -352,7 +352,7 @@ function TrainerTier({ trainer, tiers, titles, onDone }) {
           {tier !== 'start' && (
             <Field label="По какой день" hint="Пусто — без срока" type="date" value={until} onChange={setUntil} disabled={busy} />
           )}
-          {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+          {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
           <div className="trainer-row__actions">
             <button type="button" className="button" disabled={busy} onClick={() => setOpen(false)}>Отмена</button>
             <button type="button" className="button button--primary" disabled={busy} onClick={give}>
@@ -389,7 +389,7 @@ function PlusByID() {
     <Panel pad className="admin-tier__fields">
       <Field label="ID клиента" inputMode="text" placeholder="FT-7K2QM4" value={publicId} onChange={setPublicId} disabled={busy} />
       <Field label="По какой день" hint="Пусто — без срока" type="date" value={until} onChange={setUntil} disabled={busy} />
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
       {done && (
         <Note tone="good">
           {done.name}: {done.plus ? `«Плюс» ${done.until ? 'до ' + formatDate(done.until) : 'без срока'}` : '«Плюс» снят'}
@@ -440,7 +440,7 @@ function Flags() {
       <Note tone="info">
         Переключение действует сразу, без перезапуска сервера, и сохраняется. Основа — значение в .env; «Как в .env» возвращает его.
       </Note>
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
 
       <Section title="Флаги сервера">
         <div className="admin-list">

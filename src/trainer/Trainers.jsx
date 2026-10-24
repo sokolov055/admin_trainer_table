@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 import { apiMutate } from '../api.js';
 import { useData } from '../useData.js';
-import { Empty, ErrorState, Loading, Panel, Section, Tag, relativeDays } from '../ui.jsx';
+import { Empty, ErrorState, Loading, Note, Panel, Section, Tag, relativeDays } from '../ui.jsx';
 import { IconKey } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { OwnerTrainer, Reports, STAGE, TestEditor } from './OwnerTrainer.jsx';
@@ -139,7 +139,7 @@ export default function Trainers() {
 
   return (
     <>
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не получилось: {problem.message || 'нет связи'}</Note>}
 
       {openReports.length > 0 && (
         <Section title="Жалобы на профили" note="Три жалобы от разных людей скрывают профиль сами — до вашего решения">

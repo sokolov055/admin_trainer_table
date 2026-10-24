@@ -99,7 +99,7 @@ export default function AdminLook() {
       <Note tone="info">
         Тему делает Claude по скиллу app-theme и присылает файлом. Сохраните его на телефон и загрузите здесь — тема придёт закрытой: людям её не видно. «Примерить у себя» — посмотреть на своём телефоне; понравилась — «Открыть для всех», без новой сборки. Не понравилась — скажите Claude, что переделать, и загрузите новый файл.
       </Note>
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не получилось: {problem.message || 'нет связи'}</Note>}
 
       <Section title="Новая тема">
         <Panel pad className="admin-flag">

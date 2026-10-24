@@ -63,7 +63,7 @@ export default function AdminVersions() {
       <Note tone="info">
         Старая версия на iPhone показывает «Вышла новая версия» со ссылкой: кто ставил из App Store — на App Store, из TestFlight — на TestFlight. App Store сервер проверяет сам раз в 3 часа, новую сборку TestFlight — показывает через 45 минут после загрузки.
       </Note>
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
 
       <Section title="App Store" note={lookup ? (lookup.ok ? `Apple ответила: ${lookup.version} · ${formatWhen(lookup.at)}` : `Apple не ответила (${lookup.error}) · ${formatWhen(lookup.at)}`) : 'Apple ещё не спрашивали'}>
         <Panel pad className="admin-version">

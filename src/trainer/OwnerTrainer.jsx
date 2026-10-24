@@ -105,7 +105,7 @@ export function OwnerTrainer({ id, onBack }) {
         </Panel>
       </Section>
 
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не получилось: {problem.message || 'нет связи'}</Note>}
 
       {(pending || app.anketaAt) && (
         <Section title="Анкета" note={app.anketaAt ? 'Прислана ' + new Date(app.anketaAt).toLocaleDateString('ru-RU') : 'Ещё не прислана — ниже черновик'}>
@@ -234,7 +234,7 @@ export function Reports({ reports, onChanged, withTrainer = false, onOpen }) {
   };
   return (
     <div className="trainer-list">
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не получилось: {problem.message || 'нет связи'}</Note>}
       {reports.map((r) => (
         <Panel pad className="trainer-row" key={r.id}>
           <div className="trainer-row__copy">

@@ -48,7 +48,7 @@ export default function Games() {
         Игры — «Тренер в планке», «На самокате до зала» (с рейтингом), «Три в ряд» и «Блины». Открытые здесь клиенты увидят их при
         следующем открытии приложения, обновлять приложение не нужно. Тестовым клиентам игры открыты всегда.
       </Note>
-      {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+      {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
       <AdminGamePacks />
       <Section title="Клиенты" note={'Игры открыты: ' + open}>
         <Search value={query} onChange={setQuery} placeholder="Имя клиента или тренера" />

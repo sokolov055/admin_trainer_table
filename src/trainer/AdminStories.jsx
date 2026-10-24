@@ -155,7 +155,7 @@ export default function AdminStories() {
               {issues.length > 5 && <span className="admin-stories__issue">и ещё {issues.length - 5}</span>}
             </Note>
           )}
-          {problem && <ErrorState error={problem} onRetry={() => setProblem(null)} />}
+          {problem && <Note tone="critical">Не сохранилось: {problem.message || 'нет связи'}</Note>}
           {saved && !dirty && <Note tone="good">Сохранено. Люди увидят новые истории при следующем открытии приложения.</Note>}
           <button type="button" className="button button--primary" disabled={busy || !dirty || issues.length > 0} onClick={save}>
             {busy ? 'Сохраняю…' : dirty ? 'Сохранить для всех' : 'Изменений нет'}
