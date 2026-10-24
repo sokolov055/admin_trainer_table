@@ -501,12 +501,19 @@ test('в активной тренировке один раздел: настр
   await squat.getByText('Крюки на 4-й, упоры на 2-й').waitFor({ timeout: 5000 });
   await chip.first().click();
   const about = page.locator('.guide-sheet');
-  await about.getByRole('heading', { name: 'Подготовка', exact: true }).waitFor({ timeout: 5000 });
+  // А3 (24.10.2026): в «Технике» — анимация, схема мышц и шаги; тренажёр и
+  // как его настроить — своей кнопкой «Тренажёр»
+  await about.locator('.guide__steps').waitFor({ timeout: 5000 });
+  assert.equal(await about.locator('.muscles__figure').count(), 1, 'схема мышц — сразу');
   assert.equal(await about.locator('.guide__avoid').count(), 1, 'ошибки — одним блоком');
   const text = await about.evaluate((d) => d.textContent);
-  assert.ok(text.indexOf('Подготовка') < text.indexOf('Движение'), 'сначала подготовка, потом движение');
-  assert.ok(text.indexOf('Движение') < text.indexOf('Чего избегать'), 'ошибки — после шагов');
-  assert.ok(text.indexOf('Чего избегать') < text.indexOf('Мышцы'), 'мышцы — в конце');
+  assert.ok(!text.includes('Подготовка') && !text.includes('Силовая рама'), 'тренажёра в технике нет');
+  await page.keyboard.press('Escape');
+  await about.waitFor({ state: 'detached', timeout: 5000 });
+  await squat.locator('.workout__machine-btn').click();
+  await about.getByRole('heading', { name: 'Как настроить', exact: true }).waitFor({ timeout: 5000 });
+  const machine = await about.evaluate((d) => d.textContent);
+  assert.ok(machine.includes('Силовая рама у окна') && machine.includes('Крюки на 4-й, упоры на 2-й'), 'тренажёр, фото и настройка клиента');
   await page.keyboard.press('Escape');
   await about.waitFor({ state: 'detached', timeout: 5000 });
   assert.equal(await squat.getByText('Крюки на 4-й, упоры на 2-й').isVisible(), true, 'своя настройка на виду');

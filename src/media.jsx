@@ -177,7 +177,10 @@ export function PersonalNote({ text, trainer = false, by = '', local = false, la
  * скамья): у каждого своя настройка. note.from — настройка показана со
  * старого ключа упражнения (сервер, withLegacyNotes): сохранение переносит её
  */
-export function MachineNote({ target, label = '', note, trainer, params, onSaved }) {
+// plaque — плашкой в шапке упражнения занятия (вариант А3, владелец,
+// 24.10.2026): подпись сверху, цифры или «+ Записать» снизу, касание —
+// правка; рядом стоит кнопка «Тренажёр» той же высоты
+export function MachineNote({ target, label = '', note, trainer, params, onSaved, plaque = false }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note ? note.text : '');
   const [busy, setBusy] = useState(false);
@@ -212,6 +215,19 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
     }
   };
 
+  if (!editing && plaque) {
+    // Тренажёров несколько — подпись короче: их имя («Стойка у зеркала»),
+    // чья настройка и кто записал — в листе «Тренажёр»
+    const whose = trainer ? 'Настройка клиента' : 'Моя настройка';
+    const head = (label || whose) + (note && note.local ? ' · не отправлена' : '');
+    return <button type="button" className={'workout__plaque' + (note ? '' : ' workout__plaque--empty')}
+      aria-label={whose + (label ? ' · ' + label : '') + (note ? ': ' + note.text + '. Изменить' : ': не записана. Записать')}
+      onClick={() => setEditing(true)}>
+      <span className="workout__plaque-head">{head}</span>
+      {/* «4-й» не рвётся на «4-» и «й»: дефис после цифры — неразрывный */}
+      <span className="workout__plaque-value">{note ? note.text.replace(/(\d)-(?=[а-яё])/gi, '$1‑') : label ? '+ Записать настройку' : '+ Записать'}</span>
+    </button>;
+  }
   if (!editing) {
     return note
       ? <div className="workout__note">

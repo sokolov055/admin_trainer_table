@@ -1006,21 +1006,39 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__extras-wait .skeleton { display: block; width: 62%; height: 40px; margin: 0; border-radius: var(--radius-sm); }
 .workout__extras-wait .skeleton + .skeleton { width: 38%; height: 28px; }
 
-/* ---- Шапка упражнения, вариант А2 (владелец, 24.10.2026) ---------------- */
-/* Было восемь строк ссылок над подходами. Теперь: тренажёр одной строкой,
-   настройка клиента — плашкой (записана или нет — на одном месте), ряд
-   кнопок «Техника · Заменить · Ещё», разминка — рядом с «Добавить подход» */
-.workout__machine-line { margin: 2px 0 var(--space-2); color: var(--text-secondary); font-size: var(--text-sm); }
-.workout__tools { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0 var(--space-1); }
-.workout__tools .workout__chip { all: unset; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); color: var(--text); font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* ---- Шапка упражнения, вариант А3 (владелец, 24.10.2026) ---------------- */
+/* Одна сетка в три колонки: настройка клиента — на две, «Тренажёр» — над
+   «Ещё»; ниже «Техника · Заменить · Ещё». Кнопки — как .button (DESIGN-APP:
+   --radius-sm, --text-sm 600, рамка --border), одной высоты 48 px — как у
+   двухстрочной плашки, иначе «Тренажёр» выше соседей. Меню «Ещё» — от
+   правого края сетки, не вылезает за экран */
+.workout__tools { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-2) 0 var(--space-1); }
+.workout__head-note { grid-column: span 2; min-width: 0; display: grid; }
+.workout__head-note--wide, .workout__head-note:has(.workout__note-form) { grid-column: 1 / -1; }
+.workout__tools .workout__chip { all: unset; display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 48px; padding: 0 6px; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; overflow: hidden; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .workout__tools .workout__chip[aria-expanded="true"] { border-color: var(--accent); }
 .workout__tools .workout__chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .workout__tools .workout__chip:active { background: var(--surface-active); }
 .workout__chip svg { flex: none; }
 .workout__chip-up { transform: rotate(180deg); }
-.workout__tools-more { position: relative; }
-.workout__menu--tools { left: 0; right: auto; min-width: 240px; transform-origin: top left; }
+.workout__tools-more { display: grid; min-width: 0; }
+.workout__menu--tools { right: 0; left: auto; min-width: 240px; max-width: 100%; transform-origin: top right; }
+/* «Тренажёр» — ровно как соседи: длинная настройка в две строки тянет
+   плашку, а не кнопку (дизайн-проверка 24.10.2026) */
+.workout__tools .workout__machine-btn { align-self: start; }
+/* Узкий экран (< 380 px): подписи важнее значков, иначе текст у рамки */
+@media (max-width: 379px) { .workout__tools .workout__chip svg:first-child { display: none; } }
 .workout__first-hint { margin: var(--space-1) 0 0; }
+/* Плашка настройки: подпись сверху, цифры снизу; не записана — пунктир */
+.workout__plaque { all: unset; display: grid; align-content: center; gap: 1px; min-width: 0; min-height: 48px; padding: 5px var(--space-3); box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.workout__plaque--empty { background: none; border: 1px dashed var(--border-strong); }
+.workout__plaque:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.workout__plaque:active { background: var(--surface-active); }
+.workout__plaque-head { color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.25; overflow-wrap: break-word; }
+.workout__plaque-value { color: var(--text); font-size: var(--text-base); font-weight: 600; line-height: 1.3; overflow-wrap: break-word; }
+.workout__plaque--empty .workout__plaque-value { color: var(--accent); }
+/* Лист «Техника»: схема мышц — сразу, крупно, под анимацией */
+.guide__muscles--top { border-top: 0; padding-top: 0; }
 /* Настройки нет — плашка с пунктиром на месте записанной */
 .workout__note-add { all: unset; display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 44px; margin: var(--space-1) 0; padding: var(--space-2) var(--space-3); box-sizing: border-box; border: 1px dashed var(--border-strong); border-radius: var(--radius); font-size: var(--text-sm); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .workout__note-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

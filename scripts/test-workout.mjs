@@ -835,27 +835,39 @@ test('FT-570, вариант А: шаги одной нумерацией, ош�
       await delay();
     });
 
-    // Вариант А2 (24.10.2026): «Техника» — кнопкой в ряду, текст — листом снизу
+    // Вариант А3 (24.10.2026): «Техника» — анимация, мышцы и техника листом;
+    // тренажёр и его настройка — своей кнопкой рядом с настройкой клиента
     const chip = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__about'));
     assert.equal(text(chip), 'Техника');
-    assert.equal(chip.props['aria-label'], 'Техника: Technogym · 2 шага · видео', 'закрыто: что внутри — для чтения вслух');
+    assert.equal(chip.props['aria-label'], 'Техника: 1 шаг · видео', 'закрыто: что внутри — для чтения вслух');
     assert.equal(local.root.findAll(n => n.props && n.props.className === 'guide-sheet').length, 0, 'лист закрыт — медиа не смонтированы');
-    assert.ok(local.root.findAll(n => n.type === 'p' && n.props.className === 'workout__machine-line' && text(n) === 'Technogym').length === 1, 'тренажёр — строкой под названием');
+    const machineBtn = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn'));
+    assert.equal(text(machineBtn), 'Тренажёр');
+    assert.equal(machineBtn.props['aria-label'], 'Тренажёр: Technogym');
     const weights = () => local.root.findAllByType('input').filter(n => /подход [123], вес в кг/.test(n.props['aria-label'] || ''));
     await act(async () => { weights()[0].props.onChange({ target: { value: '37' } }); await delay(); });
     const before = weights().map(n => n.props.value);
     await act(async () => { chip.props.onClick(); await delay(); });
     const about = local.root.find(n => n.type === 'div' && n.props.className === 'guide-sheet');
-    assert.equal(text(about.find(n => n.props.className === 'guide__machine-name')), 'Technogym');
-    assert.deepEqual(about.findAll(n => n.props.className === 'guide__h').map(text), ['Подготовка', 'Движение', 'Чего избегать', 'Мышцы']);
+    assert.equal(about.findAll(n => n.props.className === 'guide__machine-name').length, 0, 'тренажёра в технике нет');
+    assert.deepEqual(about.findAll(n => n.props.className === 'guide__h').map(text), ['Чего избегать']);
+    assert.equal(about.findAll(n => String(n.props.className || '').startsWith('muscles__figure')).length, 1, 'схема мышц — сразу, без кнопки');
     assert.equal(about.findAllByType('details').length, 0, 'мышцы — без вложенной раскрывашки');
     assert.ok(!text(about).includes('рукоятки на уровне плеч'), 'резервная инструкция не показана');
-    assert.equal(about.findAll(n => n.props.className === 'guide__steps').length, 2, 'подготовка и движение — одним видом');
-    assert.equal(about.findAll(n => n.props.className === 'guide__avoid').length, 1, 'ошибки настройки и техники — одним блоком');
-    assert.ok(text(about).includes('Не тяните рычаг под нагрузкой.'), 'ошибка тренажёра в общем блоке');
+    assert.ok(!text(about).includes('Рычаг'), 'подготовка тренажёра — в его листе');
+    assert.equal(about.findAll(n => n.props.className === 'guide__steps').length, 1);
     assert.equal(text(about).split('Не раскачивайтесь.').length - 1, 1, 'ошибка не дублируется');
-    assert.ok(about.findAllByType('img').length >= 3, 'фото и анимация доступны вместе с техникой');
+    assert.ok(about.findAllByType('img').length >= 2, 'анимация в технике');
     assert.deepEqual(weights().map(n => n.props.value), before, 'введённые веса сохраняются при открытии');
+
+    await act(async () => { machineBtn.props.onClick(); await delay(); });
+    const sheets = local.root.findAll(n => n.type === 'div' && n.props.className === 'guide-sheet');
+    // Лист «Тренажёр» — рядом со своей кнопкой, она в сетке раньше «Техники»
+    const machineSheet = sheets.find((n) => n !== about);
+    assert.deepEqual(machineSheet.findAll(n => n.props.className === 'guide__machine-name').map(text), ['Technogym']);
+    assert.deepEqual(machineSheet.findAll(n => n.props.className === 'guide__h').map(text), ['Как настроить', 'Чего избегать']);
+    assert.ok(text(machineSheet).includes('Не тяните рычаг под нагрузкой.'), 'ошибка тренажёра — в его листе');
+    assert.ok(machineSheet.findAllByType('img').length >= 1, 'фото тренажёра');
   } finally {
     exerciseSetupResponse = null;
     if (local) local.unmount();
@@ -919,14 +931,16 @@ test('тренажёры закрепил тренер: выбора нет, п�
     });
     assert.equal(local.root.findAll(n => n.props.role === 'radiogroup').length, 0, 'выбирать тренажёр нечего');
     assert.ok(calls.some(([a, q]) => a === 'workout.exercise.history' && q.machineUid === 'bar1'), 'первый подставлен сам — с весом на нём');
-    const chip = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__about'));
-    await act(async () => { chip.props.onClick(); await delay(); });
-    const about = local.root.find(n => n.type === 'div' && n.props.className === 'guide-sheet');
-    assert.ok(text(about).includes('Дополнительно: Скамья'));
-    assert.deepEqual(local.root.findAll(n => n.props.className === 'machine__note').map(text), ['Ваша настройка · ГрифХват 81']);
-    assert.ok(local.root.findAllByType('button').some(b => text(b) === 'Моя настройка не записана · СкамьяЗаписать'), 'у скамьи своя — плашкой «не записана»');
+    // Плашками в шапке (вариант А3): у каждого тренажёра своя
+    const plaques = () => local.root.findAll(n => n.type === 'button' && String(n.props.className || '').startsWith('workout__plaque'));
+    assert.deepEqual(plaques().map(text), ['ГрифХват 81', 'Скамья+ Записать настройку'], 'у скамьи своя — плашкой «+ Записать»');
+    const machineBtn = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn'));
+    await act(async () => { machineBtn.props.onClick(); await delay(); });
+    const sheet = local.root.find(n => n.type === 'div' && n.props.className === 'guide-sheet');
+    assert.deepEqual(sheet.findAll(n => n.props.className === 'guide__machine-name').map(text), ['Гриф', 'Скамья'], 'основной первым, скамья под ним');
+    assert.deepEqual(sheet.findAll(n => n.props.className === 'machine__note').map(text), ['Ваша настройкаХват 81'], 'настройка клиента — и в листе');
 
-    const edit = local.root.findAllByType('button').find(b => text(b) === 'Изменить');
+    const edit = plaques()[0];
     await act(async () => { edit.props.onClick(); await delay(); });
     await act(async () => { local.root.find(n => n.type === 'textarea' && /Спинка 3/.test(n.props.placeholder || '')).props.onChange({ target: { value: 'Хват 80' } }); await delay(); });
     await act(async () => { local.root.findAllByType('button').find(b => text(b) === 'Сохранить').props.onClick(); await delay(); });

@@ -1,5 +1,5 @@
 import { primaryEquipment } from './equipment-guidance.js';
-import WorkoutGuidance from './WorkoutGuidance.jsx';
+import WorkoutGuidance, { MachineGuide } from './WorkoutGuidance.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync, createPortal } from 'react-dom';
 import { apiStale, apiPublic, apiMutate, apiWait } from './api.js';
@@ -2121,26 +2121,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * регулировки не должны повторять инструкцию упражнения (FT-570).
    */
   const extrasView = (ex, ei, info) => {
-    const split = ex.sets.some((x) => x.who);
-    const primary = primaryEquipment(guideOf(ex, info));
-    return <>
-      {/* Шапка упражнения, вариант А2 (владелец, 24.10.2026): под названием —
-          тренажёр одной строкой, настройка клиента — плашкой (ради неё в зале
-          и смотрят), остальное — рядом кнопок (toolsRow) */}
-      {primary && !split && <p className="workout__machine-line">{primary.name}</p>}
-      {/* Своя настройка — у каждого клиента своя, на виду, а не в
-          раскрывашке: ради неё в зале и смотрят. У каждого тренажёра своя */}
-      {!split && noteTargetsOf(info).map(({ target, label }) => (
-        <MachineNote key={target} target={target} label={label} note={notes[target]} trainer={!asClient} params={params}
-          onSaved={(n) => setNotes((v) => {
-            const next = { ...v };
-            if (n) next[target] = n; else delete next[target];
-            if (v[target] && v[target].from) delete next[v[target].from];
-            return next;
-          })} />
-      ))}
-      {split && splitView(ex, ei, info)}
-    </>;
+    // Настройка и «Тренажёр» — в шапке упражнения (toolsRow, вариант А3)
+    return ex.sets.some((x) => x.who) ? splitView(ex, ei, info) : null;
   };
 
   /**
@@ -2189,8 +2171,26 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       && trackOf(ex).kind === 'strength' && !started
       && (ex.sets.some((x) => x.own) || ex.sets.every((x) => x.state !== 'pending' || !String(x.weight || '').trim()));
     if (!info && !more.length) return null;
+    // Шапка — одной сеткой в три колонки (вариант А3, владелец, 24.10.2026):
+    // настройка клиента на две, «Тренажёр» — над «Ещё», ниже «Техника ·
+    // Заменить · Ещё». Кнопки одной высоты и стоят ровно друг под другом
+    const targets = info && !split ? noteTargetsOf(info) : [];
+    const noteCell = ({ target, label }, i) => (
+      <div key={target} className={'workout__head-note' + (i === 0 && machines.length ? '' : ' workout__head-note--wide')}>
+        <MachineNote plaque target={target} label={label} note={notes[target]} trainer={!asClient} params={params}
+          onSaved={(n) => setNotes((v) => {
+            const next = { ...v };
+            if (n) next[target] = n; else delete next[target];
+            if (v[target] && v[target].from) delete next[v[target].from];
+            return next;
+          })} />
+      </div>
+    );
     return <>
       <div className="workout__tools">
+        {targets.slice(0, 1).map(noteCell)}
+        {machines.length > 0 && <MachineGuide info={guideOf(ex, info)} notes={split ? {} : notes} trainer={!asClient} />}
+        {targets.slice(1).map((t, i) => noteCell(t, i + 1))}
         {info && <WorkoutGuidance info={guideOf(ex, info)} trainer={!asClient} chip />}
         {canSwap && <button type="button" className="workout__chip workout__alts-toggle" aria-expanded={swapping === ex.id}
           onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
