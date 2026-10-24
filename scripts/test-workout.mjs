@@ -953,6 +953,34 @@ test('тренажёры закрепил тренер: выбора нет, п�
   }
 });
 
+// Рама или Смит — выбор, а не комплект (владелец, 24.10.2026): закреплена
+// рама — плашка и лист «Тренажёр» только у неё
+test('тренажёры на выбор: закреплённый — одной плашкой, чужой стойки нет', async () => {
+  data.clear();
+  const rack = { uid: 'rack1', name: 'Рама у окна', kind: 'machine' };
+  const smith = { uid: 'smith1', name: 'Стойка у зеркала', kind: 'machine' };
+  exerciseSetupResponse = { setups: { 79: {
+    name: 'Присед', setup: '', notes: '', machines: [rack, smith], alternatives: [], noteKey: 'e:присед',
+    muscles: { primary: [], secondary: [] }, media: null,
+  } }, notes: { 'm:rack1': { text: 'Крюки на 4-й', by: 'trainer' } } };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: {
+        title: 'Ноги', exercises: [{ name: 'Присед', exerciseId: 79, machine: { uid: 'rack1', name: 'Рама у окна' }, sets: '3', reps: '5', weight: '60' }],
+      }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const plaques = local.root.findAll(n => n.type === 'button' && String(n.props.className || '').startsWith('workout__plaque'));
+    assert.deepEqual(plaques.map(text), ['Моя настройкаКрюки на 4‑й']);
+    const machineBtn = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn'));
+    assert.equal(machineBtn.props['aria-label'], 'Тренажёр: Рама у окна');
+  } finally {
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
+});
+
 /**
  * Замена упражнения (владелец, 16.10.2026): кнопкой со списком, вес нового —
  * с прошлого раза; после первого подхода — пояснение, а не пропавшая кнопка.

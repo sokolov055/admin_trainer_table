@@ -2174,7 +2174,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // Шапка — одной сеткой в три колонки (вариант А3, владелец, 24.10.2026):
     // настройка клиента на две, «Тренажёр» — над «Ещё», ниже «Техника ·
     // Заменить · Ещё». Кнопки одной высоты и стоят ровно друг под другом
-    const targets = info && !split ? noteTargetsOf(info) : [];
+    // Тренажёры упражнения бывают и комплектом (гриф + скамья), и выбором
+    // (рама или Смит в разных залах). Закрепил тренер — только он и
+    // оборудование к нему, а не плашка «+ Записать» у чужой стойки
+    // (владелец, 24.10.2026)
+    const pin = ex.machine && ex.machine.uid && machines.some((m) => m.uid === ex.machine.uid) ? ex.machine.uid : '';
+    const used = pin ? machines.filter((m) => m.uid === pin || m.kind === 'equipment') : machines;
+    const usedInfo = info && used.length !== machines.length ? { ...info, machines: used } : info;
+    const targets = usedInfo && !split ? noteTargetsOf(usedInfo) : [];
     const noteCell = ({ target, label }, i) => (
       <div key={target} className={'workout__head-note' + (i === 0 && machines.length ? '' : ' workout__head-note--wide')}>
         <MachineNote plaque target={target} label={label} note={notes[target]} trainer={!asClient} params={params}
@@ -2189,7 +2196,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return <>
       <div className="workout__tools">
         {targets.slice(0, 1).map(noteCell)}
-        {machines.length > 0 && <MachineGuide info={guideOf(ex, info)} notes={split ? {} : notes} trainer={!asClient} />}
+        {machines.length > 0 && <MachineGuide info={guideOf(ex, usedInfo)} notes={split ? {} : notes} trainer={!asClient} />}
         {targets.slice(1).map((t, i) => noteCell(t, i + 1))}
         {info && <WorkoutGuidance info={guideOf(ex, info)} trainer={!asClient} chip />}
         {canSwap && <button type="button" className="workout__chip workout__alts-toggle" aria-expanded={swapping === ex.id}
