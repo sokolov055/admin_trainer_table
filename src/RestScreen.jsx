@@ -59,6 +59,10 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   const [leaving, setLeaving] = useState(false);
   const leavingRef = useRef(false);
   const leaveTimer = useRef(0);
+  // Отдых, у которого нажали «уйти»: за 220 мс анимации мог начаться
+  // новый (отметили следующий подход) — запоздалое «закончить» его не гасит
+  const untilRef = useRef(until);
+  untilRef.current = until;
   useEffect(() => () => clearTimeout(leaveTimer.current), []);
   const leave = (fn) => () => {
     if (!fn || leavingRef.current) return;
@@ -67,7 +71,8 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
     if (calm) { fn(); return; }
     leavingRef.current = true;
     setLeaving(true);
-    leaveTimer.current = setTimeout(() => { leavingRef.current = false; fn(); setLeaving(false); }, 220);
+    const at = untilRef.current;
+    leaveTimer.current = setTimeout(() => { leavingRef.current = false; if (untilRef.current === at) fn(); setLeaving(false); }, 220);
   };
   // Системный «Назад» (Android, Back браузера) сворачивает отдых, а не
   // закрывает тренировку под ним (аудит 24.10.2026); в игре — закрывает
