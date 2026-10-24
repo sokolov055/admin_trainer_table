@@ -8,13 +8,18 @@ import { useLayoutEffect, useRef } from 'react';
  * стороны, где он стоит в меню, на небольшое расстояние и проявляется
  * («общая ось»): видно, куда перешли, и глаз не теряет место.
  *
- * Анимация — Web Animations API, только transform и opacity: идёт на
- * видеокарте и не мешает загрузке данных. Своё состояние не нужно —
- * элемент тот же, что стоит на экране.
+ * Анимация — Web Animations API, только transform: идёт на видеокарте и
+ * не мешает загрузке данных. Своё состояние не нужно — элемент тот же,
+ * что стоит на экране.
+ *
+ * Без прозрачности (24.10.2026): раздел проявлялся из нуля, и на первых
+ * кадрах сквозь пустой экран проступал рисунок темы — призраки и тыквы
+ * «Хэллоуина» вылетали вперёд, экран моргал. Теперь раздел всегда
+ * непрозрачный и только доезжает на место.
  *
  * После жеста не играет: страница уже приехала за пальцем, и жест
  * отмечает это классом gesture-landing (gestures.jsx). Тем, кто просил
- * систему меньше двигать, — короткое проявление без сдвига.
+ * систему меньше двигать, — сразу на месте.
  */
 
 export const VIEW_MS = 340;
@@ -27,15 +32,12 @@ function reduced() {
 
 export function playViewIn(el, direction = 1) {
   if (!el || typeof el.animate !== 'function') return;
-  if (document.documentElement.classList.contains('gesture-landing')) return;
+  if (document.documentElement.classList.contains('gesture-landing') || reduced()) return;
 
-  const frames = reduced()
-    ? [{ opacity: 0 }, { opacity: 1 }]
-    : [
-      { opacity: 0, transform: `translate3d(${direction * SHIFT}px, 0, 0)` },
-      { opacity: 1, transform: 'translate3d(0, 0, 0)' },
-    ];
-  el.animate(frames, { duration: reduced() ? 160 : VIEW_MS, easing: EASE });
+  el.animate([
+    { transform: `translate3d(${direction * SHIFT}px, 0, 0)` },
+    { transform: 'translate3d(0, 0, 0)' },
+  ], { duration: VIEW_MS, easing: EASE });
 }
 
 /**

@@ -673,14 +673,11 @@ function useCalendarGestures(rootRef, api, handle) {
       go(dir);
     };
     // Прыжок на дату («Сегодня», выбор в календарике): новое уже на месте,
-    // лента въезжает с той стороны, откуда пришли, и проявляется
+    // лента въезжает с той стороны, откуда пришли. Без проявления: сквозь
+    // полупрозрачную ленту моргал рисунок темы
     const enter = (dir) => {
       stopAnim();
       if (!dir || reduceMotion()) { setX(0); return; }
-      const tracks = api.current.tracks().filter(Boolean);
-      tracks.forEach((el) => {
-        el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 320, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
-      });
       setX(dir * Math.min(120, api.current.width() * 0.3));
       go(0);
     };

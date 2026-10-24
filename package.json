@@ -18,6 +18,7 @@
     "test:e2e": "node --test scripts/test-e2e.mjs",
     "test:offline-e2e": "node --test scripts/test-offline-e2e.mjs",
     "test:schedule-e2e": "node --test scripts/test-schedule-e2e.mjs",
+    "test:transitions-e2e": "node --test scripts/test-transitions-e2e.mjs",
     "test:ration": "node --test scripts/test-ration.mjs scripts/test-carbs.mjs",
     "test:ration-access": "node --test scripts/test-ration-access.mjs",
     "test:auth": "node --test scripts/test-auth.mjs",

@@ -78,9 +78,15 @@ function snapshotOf(app) {
   [...app.children].forEach((el) => {
     if (el.hidden || el.matches('.drawer')) return;
     const copy = el.cloneNode(true);
-    // Во время жеста у частей страницы стоит сдвиг — копии он не нужен
+    // Во время жеста у частей страницы стоит сдвиг — копии он не нужен.
+    // И свой рисунок темы (.live-art) тоже: копия ляжет в сцену, у которой
+    // он уже есть, и полупрозрачный рисунок лёг бы дважды — раздел ехал
+    // заметно ярче и темнел, когда жест кончался (владелец, 24.10.2026)
     copy.style.transform = '';
     copy.style.opacity = '';
+    copy.classList.remove('live-art');
+    copy.style.removeProperty('--art-x');
+    copy.style.removeProperty('--art-y');
     node.appendChild(copy);
   });
   return {

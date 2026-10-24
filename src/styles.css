@@ -524,8 +524,12 @@ body:has(#root .workout__header:not([hidden] *), #root .cal-screen:not([hidden] 
 /* У них шапка липнет прямо под часы и сплошная (--bg) — слой тоже
    сплошной, того же цвета: уехавшее вверх содержимое не просвечивает над
    шапкой. Щель над шапкой тренировки в верхней точке закрывает сама шапка
-   (её фон продолжается вверх до края, workout.css; владелец, 24.10.2026). */
-body:has(#root .workout__header:not([hidden] *), #root .cal-screen:not([hidden] *))::before {
+   (её фон продолжается вверх до края, workout.css; владелец, 24.10.2026).
+   Пока разделы листают пальцем — затемнение, как у остальных: рядом едет
+   соседний раздел, и сплошная полоса над ним в конце жеста сменялась
+   затемнением рывком. Над расписанием затемнение и так сплошное — под ним
+   его же фон. */
+html:not(.live-moving):not(.live-region) body:has(#root .workout__header:not([hidden] *), #root .cal-screen:not([hidden] *))::before {
   background: var(--bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -2925,6 +2929,10 @@ th.sticky, td.sticky {
    Появление содержимого
    Единственный авторский момент в приложении: экран собирается снизу вверх
    короткой лесенкой. Дальше интерфейс молчит — человек в задаче, а не в кино.
+
+   Только сдвиг, без прозрачности (24.10.2026): блоки проявлялись из нуля, и
+   при смене подраздела экран на кадр-два пустел — сквозь него проступал
+   рисунок темы, всё моргало. Блок на месте с первого кадра и чуть доезжает.
    ========================================================================== */
 
 .enter {
@@ -2937,8 +2945,8 @@ th.sticky, td.sticky {
 .enter:nth-child(n + 5) { animation-delay: 150ms; }
 
 @keyframes enter-up {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(7px); }
+  to { transform: translateY(0); }
 }
 
 /**
@@ -2948,14 +2956,8 @@ th.sticky, td.sticky {
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
 
-  .enter {
-    animation: enter-fade var(--dur-fast) var(--ease-out) both;
-  }
-
-  @keyframes enter-fade {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
+  /* Проявление из прозрачности тоже мигало бы фоном — блоки сразу на месте */
+  .enter { animation: none; }
 
   .item:active, .button:active, .chip:active, .tabbar__item:active,
   .icon-button:active, .menu__item:active { transform: none; }
@@ -4726,7 +4728,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   .cal-month__ghost { animation: cal-chip-lift var(--dur) var(--ease-ios) backwards; }
   .cal-month__cell { transition: background-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease; }
 
-  /* Сменили вид — новый проявляется; открыли событие — форма въезжает справа */
+  /* Сменили вид — новый чуть подрастает; открыли событие — форма въезжает
+     справа. Без прозрачности: сквозь проявляющийся вид моргал рисунок темы */
   .cal-main > * { animation: cal-view-in var(--dur-nav) var(--ease-ios) backwards; }
   .cal-form { animation: cal-push var(--dur-enter) var(--ease-ios) backwards; }
 
@@ -4747,8 +4750,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .cal-mini-wrap { display: grid; grid-template-rows: 1fr; border-bottom: 1px solid var(--border); }
 @keyframes cal-lift { from { transform: none; box-shadow: 0 0 0 1px var(--surface); } }
 @keyframes cal-chip-lift { from { opacity: .4; scale: .9; } }
-@keyframes cal-view-in { from { opacity: 0; transform: scale(0.985); } }
-@keyframes cal-push { from { opacity: 0; transform: translateX(32px); } }
+@keyframes cal-view-in { from { transform: scale(0.985); } }
+@keyframes cal-push { from { transform: translateX(32px); } }
 @keyframes cal-expand { from { grid-template-rows: 0fr; opacity: 0; } }
 @keyframes cal-collapse { to { grid-template-rows: 0fr; opacity: 0; } }
 @keyframes cal-mini-next { from { opacity: 0; transform: translateX(36px); } }
