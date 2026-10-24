@@ -31,6 +31,8 @@ const output = await build({
   format: 'cjs',
   platform: 'node',
   external: ['react'],
+  // Стили компонентов (ui.jsx → elements.css) проверке не нужны
+  loader: { '.css': 'empty' },
   plugins: [{
     name: 'metrics-stubs',
     setup(bundle) {
