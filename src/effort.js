@@ -297,6 +297,8 @@ export function rateSet(ex, si, effort) {
   let to = null;
   let dir = 0;
   let suggest = '';
+  // Какие подходы правило может сдвинуть — обычно open
+  let touch = open;
   if (set.kind !== 'warmup' && isEffort(effort) && m.has(set)) {
     const cur = m.load(set);
     const step = assist ? assistStep(ex) : stepOf(ex, cur);
@@ -351,9 +353,15 @@ export function rateSet(ex, si, effort) {
       // «Норм», а следующий подход легче (владелец, 24.10.2026: пирамида
       // прошлого раза 30–40–35, на 40 «Норм» — дальше снова 35): этот вес по
       // силам — следующий подход не легче. Только ближайший: дальше могут
-      // стоять облегчённые нарочно
-      else if (nextAt.length && m.load(ex.sets[nextAt[0]]) < cur) {
-        to = (w, i) => (i === nextAt[0] && w < cur ? cur : null); dir = 1; suggest = 'kept';
+      // стоять облегчённые нарочно. Ближайший — даже вписанный руками
+      // (24.10.2026: вписал 15 во второй, «Норм» на первом 25 — правило
+      // перескакивало на третий, а второй оставался 15)
+      else {
+        const near = ex.sets.findIndex((x, i) => i > si && mine(x) && x.state === 'pending' && x.kind !== 'warmup');
+        if (near >= 0 && m.has(ex.sets[near]) && m.load(ex.sets[near]) < cur) {
+          to = (w, i) => (i === near && w < cur ? cur : null); dir = 1; suggest = 'kept';
+          touch = (x, i) => i === near;
+        }
       }
     }
   } else if (set.kind !== 'warmup' && isEffort(effort) && !assist && bodyweight(ex, set)) {
@@ -366,7 +374,7 @@ export function rateSet(ex, si, effort) {
   const moved = [];
   const sets = ex.sets.map((x, i) => {
     if (i === si) return { ...x, state: 'done', effort };
-    if (!to || !open(x, i)) return x;
+    if (!to || !touch(x, i)) return x;
     let value;
     if (key === 'reps') {
       const r = to(num(x.reps));
@@ -409,7 +417,8 @@ export function unrateAt(ex, si) {
   return { ...ex, sets: ex.sets.map((x, i) => {
     if (i === si) return unrate(x);
     const mv = moved.find((m) => m.i === i);
-    if (!mv || x.state !== 'pending' || x.own || String(x[mv.key] ?? '') !== mv.to) return x;
+    // Вписанный руками тоже: значение то, что поставила оценка, — после неё не трогали
+    if (!mv || x.state !== 'pending' || String(x[mv.key] ?? '') !== mv.to) return x;
     const { suggest, ...rest } = x;
     return { ...rest, [mv.key]: mv.from, ...(mv.suggest ? { suggest: mv.suggest } : {}) };
   }) };
