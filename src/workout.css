@@ -26,6 +26,13 @@
 }
 /* Карточка клиента у тренера — свой запас снизу (.app__body--plain) */
 .app__body--plain .workout { --wk-tail: var(--space-6); }
+/* Во время занятия нижнего меню нет (владелец, 24.10.2026): в зале
+   вкладки не нужны, а место внизу занимают отдых и плашки. Уходит, как на
+   экранах из бокового меню (.tabbar--hidden); запас снизу — без него */
+:root:has(.workout--live:not([hidden] *)) .tabbar { transform: translate3d(0, calc(100% + 32px), 0); opacity: 0; pointer-events: none; }
+:root:has(.workout--live:not([hidden] *)) { --float-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+.app__body:has(.workout--live:not([hidden] *)) { padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); }
+.workout--live { --wk-tail: calc(var(--space-6) + env(safe-area-inset-bottom)); }
 
 .workout h2 {
   font-size: var(--text-xl);

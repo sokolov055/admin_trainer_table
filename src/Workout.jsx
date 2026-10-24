@@ -728,6 +728,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // Где только что отметили подход: «Дальше» на экране отдыха и подсветка
   // держатся этого упражнения, пока в нём есть подходы (focusOf, QA 20.10.2026)
   const lastMarked = useRef('');
+  // Перерисовать, когда текущим стало другое упражнение (pickExercise)
+  const [, setFocusPick] = useState('');
   const restStartOf = (until) => {
     if (restStart.current.until === until && restStart.current.start) return restStart.current.start;
     return until - ((state.current && state.current.session.restSeconds) || 90) * 1000;
@@ -1017,7 +1019,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             {/* Галочки нет (03.10.2026): под ближайшим подходом упражнения —
                 «Легко / Норм / Тяжело», каждая отмечает подход и запускает
                 отдых. Снять отметку — номер подхода → «Снять отметку» */}
-            {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
+            {!inRound && editable && focus.ex === ex.id && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
               // Разминку можно и без веса: свой вес, без нагрузки (FT-620)
               const why = missing(set, track, { requireWeight: set.kind !== 'warmup' });
               if (why) { askFor(key, why, fields, set); return; }
@@ -1129,7 +1131,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           ))}
         </div>}
       {/* Как у силовых: отрезок отмечается оценкой, она же запускает отдых */}
-      {!inRound && editable && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
+      {!inRound && editable && focus.ex === ex.id && set.state === 'pending' && nextOf(ex, si) && effortChooser((effort) => {
         const why = lackOf(ex, si);
         if (why) { askFor(key, why, isFunctional(ex) ? [] : fields, set); return; }
         lastMarked.current = ex.id;
@@ -1288,7 +1290,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       return <button type="button" className="workout__member-done" aria-label={ex.name + ': снять отметку'} onClick={() => updateExercise(ei, x => unrateAt(x, r))}>Снять отметку</button>;
     }
     if (set.state !== 'pending') return null;
-    // Только в ближайшем незаконченном круге
+    // Только у текущего суперсета (24.10.2026) и в ближайшем незаконченном круге
+    if (!members.some(({ ex: e }) => e.id === focus.ex)) return null;
     const open = (i) => members.some(({ ex: e }) => e.sets[i] && e.sets[i].state === 'pending');
     if (Array.from({ length: r }, (_, i) => i).some(open)) return null;
     const waiting = live.filter(({ ex: e }) => e.sets[r].state === 'pending');
@@ -1469,7 +1472,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         : e)),
     }));
     const currentHere = members.some(({ ex }) => ex.id === focus.ex);
-    return <section className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-unit={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
+    return <section onFocus={pickExercise(members[0].ex.id)} className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-unit={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
       <div className="workout__rounds-head" onPointerDown={holdToMove('g' + group)}>
         <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
         {!asClient && <button className="button button--ghost" onClick={split}>Разъединить</button>}
@@ -1965,6 +1968,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   // подход. Оно обведено, подход подсвечен, его «готово» — залито; всё
   // остальное тише. Иначе в зале глаза разбегаются по одинаковым строкам.
   const focus = focusOf(s, lastMarked.current);
+  // «Легко / Норм / Тяжело» — только у текущего упражнения (владелец,
+  // 24.10.2026). Взялся за поле другого — текущим становится оно, и оценки
+  // переезжают к нему
+  const pickExercise = (id) => (e) => {
+    if (!editable || !e.target.matches || !e.target.matches('input') || lastMarked.current === id) return;
+    lastMarked.current = id;
+    setFocusPick(id);
+  };
   const stats = s ? summary(s) : null;
   const editable = s && ['active', 'paused'].includes(s.status);
   const elapsed = s ? s.elapsedMs + (s.status === 'active' ? Math.max(0, now - record.tick) : 0) : 0;
@@ -2232,7 +2243,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button type="button" className="icon-button workout__alert-close" aria-label="Скрыть сообщение" onClick={() => setMessageState(null)}><IconClose size={18} /></button>
       </div>}
     </div>);
-  return <div className={'workout' + (s || launch ? ' workout--session' : '')}>
+  return <div className={'workout' + (s || launch ? ' workout--session' : '') + (editable ? ' workout--live' : '')}>
     {/* В списке журнала — кнопка, куда вернёт: к программе или к списку клиентов */}
     {!s && <BackButton label={backLabel} onClick={close} />}
     {/* Занятие уже на экране (снимок из черновика) — строки загрузки нет
@@ -2348,7 +2359,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const finished = ex.sets.every(x => x.state !== 'pending');
           const allMade = doneSets === ex.sets.length;
           const compact = picking || !!reorder;
-          return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
+          return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section onFocus={pickExercise(ex.id)} className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable || asClient} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { const snapshot = s.exercises; setUndo('Упражнение удалено', v => putExercisesBack(v, snapshot, new Set([ex.id]))); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
