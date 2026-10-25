@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { apiMutate } from '../api.js';
-import { Note, Sheet } from '../ui.jsx';
+import { apiMutate, apiPublic } from '../api.js';
+import { Note, Sheet, plural } from '../ui.jsx';
 import { IconTrash } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { foodTitle, cap } from './FoodFields.jsx';
@@ -20,6 +20,11 @@ import './food-scan.css';
  * Фото уменьшается до 1024 px и перекодируется здесь же: метаданные (место,
  * телефон) отрезаются, на сервер уходит только картинка. Пока идёт проба,
  * плитку видят владелец и тестовые клиенты (сервер: diary.get → photo).
+ *
+ * Состав (FT-749): блюдо — заголовок с суммой, под ним продукты, из которых
+ * оно приготовлено. Название блюда и продуктов правится прямо в строке,
+ * продукт меняется на карточку справочника. Каждый продукт — своя запись
+ * дневника с пометкой блюда (dish): справочник точнее, «Повторить» работает.
  */
 const per = (v, g) => Math.round(Number(v || 0) * g) / 100;
 const one = v => String(Math.round(Number(v || 0) * 10) / 10).replace('.', ',');
@@ -29,31 +34,35 @@ const packName = pack => [cap(pack?.product), pack?.brand].filter(Boolean).join(
 // «на 39 % меньше» — насколько оценка на глаз разошлась с этикеткой
 const diffText = (ai, real) => { const d = Math.round((ai - real) / real * 100); return d === 0 ? 'совпало' : 'на ' + Math.abs(d) + ' % ' + (d < 0 ? 'меньше' : 'больше'); };
 
-// Строка списка: что записываем и сколько это калорий при этих граммах
+// Строка списка: что записываем и сколько это калорий при этих граммах.
+// Без КБЖУ (продукт, добавленный вручную, ещё не выбран) — 0 и не записывается
 function rowValues(it) {
   const g = decimal(it.grams), src = it.food || it.per100;
-  const grams = Number.isFinite(g) && g > 0 ? g : 0;
-  return { grams, kcal: per(src.kcal, grams), protein: per(src.protein, grams), fat: per(src.fat, grams), carbs: per(src.carbs, grams) };
+  const grams = Number.isFinite(g) && g > 0 && src ? g : 0;
+  return { grams, kcal: per(src?.kcal, grams), protein: per(src?.protein, grams), fat: per(src?.fat, grams), carbs: per(src?.carbs, grams) };
 }
+const productWord = k => plural(k, 'продукт', 'продукта', 'продуктов');
 
 // file — кадр AI-сканера (PlateScanner, FT-746): лист сразу его распознаёт, onRescan —
 // «Сканировать снова» обратно в видоискатель. Без file — запасной путь, когда
 // камеры в браузере нет (denied — не дали разрешение): «как снять» и снимок
 // preset — сканер уже спросил AI сам (FT-748): { image, data, label? , labelFailed? }
 export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied = false, onRescan, onClose, onSaved }) {
-  const [image, setImage] = useState(''), [result, setResult] = useState(null), [items, setItems] = useState([]);
+  // items — продукты подряд, dishes — блюда, к которым они относятся (it.dish — ключ блюда)
+  const [image, setImage] = useState(''), [result, setResult] = useState(null), [items, setItems] = useState([]), [dishes, setDishes] = useState([]);
   const [busy, setBusy] = useState(''), [error, setError] = useState(null), [meal, setMeal] = useState(initialMeal);
   // Упаковка (FT-748): labelValues — КБЖУ на 100 г с этикетки (с фото или отсканированные), scan — открыт сканер этикетки
   const [labelValues, setLabelValues] = useState(null), [scan, setScan] = useState(false);
   // «AI ошибся» (FT-748): комментарий уходит владельцу вместе с ответом модели — по нему правят подсказку и справочник
   const [wrong, setWrong] = useState(null);
-  const camera = useRef(null), gallery = useRef(null), sequence = useRef(0);
+  const camera = useRef(null), gallery = useRef(null), sequence = useRef(0), uid = useRef(0);
+  const key = () => 'k' + ++uid.current;
   useEffect(() => { if (preset?.data) show(preset.image, preset.data, preset.label); else if (file) void take(file); }, []);
 
   const take = async file => {
     if (!file) return;
     const ticket = ++sequence.current;
-    setError(null); setResult(null); setItems([]); setLabelValues(null); setScan(false); setBusy('Готовим фото…');
+    setError(null); setResult(null); setItems([]); setDishes([]); setLabelValues(null); setScan(false); setBusy('Готовим фото…');
     try {
       const src = await shrink(file);
       if (ticket !== sequence.current) return;
@@ -72,42 +81,57 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
     setImage(src); setResult(data);
     const pack = data.package, guess = data.items[0], grams = String(guess?.grams || pack?.net || 100);
     const values = read?.label || pack?.label;
-    if (pack?.match) setItems([{ ...(guess || {}), name: foodTitle(pack.match), from: 0, food: pack.match, options: pack.options || [], grams }]);
+    const single = row => { const d = key(); setDishes([{ key: d, name: row.name }]); setItems([{ ...row, key: key(), dish: d }]); };
+    if (pack?.match) single({ name: foodTitle(pack.match), from: 0, per100: guess?.per100 || null, food: pack.match, options: pack.options || [], grams });
     // Название, объём и цифры — с этикетки: лицевая сторона даёт только догадку («Сок» вместо «Напиток «Крюшон»»)
-    else if (pack && values) { const named = { product: read?.product || pack.product, brand: read?.brand || pack.brand }; setLabelValues({ ...values, basis: read?.basis || 'g', portion: read?.portion || null, net: read?.net || null, quote: read?.quote || '', labelId: read?.id || null, ...named }); setItems([{ name: packName(named), from: 0, per100: values, label: true, food: null, options: pack.options || [], grams: String(read?.portion?.grams || guess?.grams || pack.net || 100) }]); }
-    else setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, options: pack && i === 0 ? pack.options || [] : it.options, grams: String(it.grams) })));
+    else if (pack && values) { const named = { product: read?.product || pack.product, brand: read?.brand || pack.brand }; setLabelValues({ ...values, basis: read?.basis || 'g', portion: read?.portion || null, net: read?.net || null, quote: read?.quote || '', labelId: read?.id || null, ...named }); single({ name: packName(named), from: 0, per100: values, label: true, food: null, options: pack.options || [], grams: String(read?.portion?.grams || guess?.grams || pack.net || 100) }); }
+    else {
+      // Блюдо → его продукты; ответ старого сервера без состава — блюдо само себе продукт
+      const list = data.items.map((it, i) => ({ dish: { key: key(), name: it.name }, parts: (it.ingredients?.length ? it.ingredients : [it]).map(part => ({ name: part.name, per100: part.per100, food: part.match || null, options: pack && i === 0 ? pack.options || [] : part.options || [], grams: String(part.grams), from: i })) }));
+      setDishes(list.map(x => x.dish));
+      setItems(list.flatMap(x => x.parts.map(part => ({ ...part, key: key(), dish: x.dish.key }))));
+    }
   }
   const pack = result?.package || null, aiKcal = result?.items?.[0]?.per100?.kcal;
   const unit = labelValues?.basis === 'ml' ? 'мл' : 'г', net = labelValues?.net || null;
-  const patch = (i, next) => setItems(list => list.map((it, k) => k === i ? { ...it, ...next } : it));
-  const drop = i => setItems(list => list.filter((_, k) => k !== i));
+  // Правки — по ключу строки, а не по номеру: ответ поиска приходит позже и не должен попасть в соседнюю
+  const patch = (k, next) => setItems(list => list.map(it => it.key === k ? { ...it, ...next } : it));
+  const drop = k => setItems(list => list.filter(it => it.key !== k));
+  const rename = (k, name) => setDishes(list => list.map(d => d.key === k ? { ...d, name } : d));
+  const blank = (dish, from = null) => ({ key: key(), dish, from, name: '', query: '', grams: '', per100: null, food: null, options: [], manual: true });
+  const addTo = d => setItems(list => [...list, blank(d.key, list.find(it => it.dish === d.key)?.from ?? null)]);
+  const addDish = () => { const d = key(); setDishes(list => [...list, { key: d, name: '' }]); setItems(list => [...list, blank(d)]); };
   const kept = items.filter(it => rowValues(it).grams > 0);
   const total = kept.reduce((s, it) => s + rowValues(it).kcal, 0);
+  // Блюдо пишется пометкой, только когда в нём больше одного продукта: «Гречка» из одной гречки — просто гречка
+  const dishOf = it => { const d = dishes.find(x => x.key === it.dish); return d && kept.filter(x => x.dish === it.dish).length > 1 ? d.name.trim() || 'Блюдо' : ''; };
 
   const save = async () => {
     setBusy('Записываем…'); setError(null);
     let done = 0;
     try {
       for (const it of kept) {
-        const v = rowValues(it);
+        const v = rowValues(it), dish = dishOf(it);
         // С этикетки — карточкой в справочник (как «Продукт с этикетки»), чтобы в следующий раз нашлась сразу
         if (it.label && !it.food) {
           const r = await apiMutate('food.add', { name: cap(labelValues?.product || pack?.product || it.name), brand: labelValues?.brand || pack?.brand || '', barcode: '', preparation: 'as_sold', unit: unit === 'мл' ? 'ml' : 'g', kcal: it.per100.kcal, protein: it.per100.protein, fat: it.per100.fat, carbs: it.per100.carbs }).catch(() => null);
           if (r?.food) it.food = { ...r.food, kind: 'food', unit: r.food.unit || (unit === 'мл' ? 'ml' : 'g') };
         }
+        // Вписанные вручную калории без БЖУ — БЖУ «не знаю», а не 0
+        const macro = k => it.per100[k] == null ? null : Math.round(v[k]);
         const payload = it.food
-          ? { day, meal, amount: v.grams, product: { kind: 'food', id: it.food.id }, preview: it.food }
+          ? { day, meal, amount: v.grams, product: { kind: 'food', id: it.food.id }, preview: { ...it.food, ...(dish ? { dish } : {}) } }
           : (() => {
-            const product = { kind: 'quick', name: it.name + ', ~' + n(v.grams) + ' г', kcal: Math.max(1, Math.round(v.kcal)), protein: Math.round(v.protein), fat: Math.round(v.fat), carbs: Math.round(v.carbs) };
-            return { day, meal, amount: 1, product, preview: { ...product, id: 'pending', unit: 'portion', approx: true, source: 'Примерно · по фото' } };
+            const product = { kind: 'quick', name: (it.name.trim() || 'Продукт') + ', ~' + n(v.grams) + ' г', kcal: Math.max(1, Math.round(v.kcal)), protein: macro('protein'), fat: macro('fat'), carbs: macro('carbs') };
+            return { day, meal, amount: 1, product, preview: { ...product, id: 'pending', unit: 'portion', approx: true, source: 'Примерно · по фото', ...(dish ? { dish } : {}) } };
           })();
-        await apiMutate('diary.entry.save', { ...payload, requestId: requestId() });
+        await apiMutate('diary.entry.save', { ...payload, ...(dish ? { dish } : {}), requestId: requestId() });
         done++;
       }
       // Что записано на самом деле — для подсчёта точности; не мешает записи, если не дошло
-      apiMutate('diary.photo.confirm', { id: result.id, items: kept.map(it => ({ name: it.food ? foodTitle(it.food) : it.name, grams: rowValues(it).grams, from: it.from, food: it.food?.id ?? null })) }).catch(() => {});
+      apiMutate('diary.photo.confirm', { id: result.id, items: kept.map(it => ({ name: it.food ? foodTitle(it.food) : it.name, dish: dishOf(it), grams: rowValues(it).grams, from: it.from, food: it.food?.id ?? null })) }).catch(() => {});
       haptic('success');
-      onSaved('По фото записано: ' + n(total) + ' ккал, ' + kept.length + ' ' + (kept.length === 1 ? 'блюдо' : kept.length < 5 ? 'блюда' : 'блюд') + '.');
+      onSaved('По фото записано: ' + n(total) + ' ккал, ' + kept.length + ' ' + productWord(kept.length) + '.');
     } catch (e) {
       // Часть уже записана — убираем записанное из списка, чтобы повтор не задвоил
       if (done) setItems(list => list.filter(it => !kept.slice(0, done).includes(it)));
@@ -148,25 +172,23 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
       </div>}
       {items.length > 0 && <>
         <ul className="plate-photo__list" aria-label="Распознанные блюда">
-          {items.map((it, i) => {
-            const v = rowValues(it), others = (it.options || []).filter(o => o.id !== it.food?.id);
-            return <li key={it.from} className="plate-photo__row">
-              <div className="plate-photo__main">
-                <strong>{it.food ? foodTitle(it.food) : it.name}</strong>
-                <small>{it.food ? 'Из справочника · ' + n(it.food.kcal) + ' ккал / 100 г' : it.label ? 'С этикетки · ' + n(it.per100.kcal) + ' ккал · Б ' + one(it.per100.protein) + ' · Ж ' + one(it.per100.fat) + ' · У ' + one(it.per100.carbs) + ' на 100 ' + unit : 'Примерно, оценка по фото · ' + n(it.per100.kcal) + ' ккал / 100 г'}</small>
-                {(others.length > 0 || it.food) && <div className="plate-photo__options">
-                  {it.food && <button type="button" className="chip" onClick={() => patch(i, { food: null })}>Оценка по фото</button>}
-                  {others.map(o => <button type="button" className="chip" key={o.id} onClick={() => patch(i, { food: o })}>{foodTitle(o)}</button>)}
-                </div>}
+          {dishes.map(d => {
+            const list = items.filter(it => it.dish === d.key);
+            const row = it => <ProductRow key={it.key} it={it} unit={it.label ? unit : 'г'} onPatch={next => patch(it.key, next)} onDrop={() => drop(it.key)} />;
+            if (list.length === 0) return null;
+            if (list.length === 1) return row(list[0]);
+            return <li key={d.key} className="plate-dish">
+              <div className="plate-dish__head">
+                <input className="field__input plate-dish__name" aria-label="Название блюда" placeholder="Название блюда" maxLength={80} value={d.name} onChange={e => rename(d.key, e.target.value)} />
+                <span className="plate-dish__sum">{n(list.reduce((s, it) => s + rowValues(it).kcal, 0))} ккал</span>
+                <button type="button" className="icon-button" aria-label={'Убрать блюдо ' + d.name} onClick={() => setItems(all => all.filter(it => it.dish !== d.key))}><IconTrash size={18} /></button>
               </div>
-              <div className="plate-photo__grams">
-                <input className="field__input" inputMode="decimal" aria-label={'Граммы: ' + it.name} value={it.grams} onChange={e => patch(i, { grams: e.target.value })} />
-                <span>{it.label ? unit : 'г'} · {n(v.kcal)} ккал</span>
-              </div>
-              <button type="button" className="icon-button" aria-label={'Убрать ' + it.name} onClick={() => drop(i)}><IconTrash size={18} /></button>
+              <ul className="plate-dish__list" aria-label={'Из чего: ' + d.name}>{list.map(row)}</ul>
+              <button type="button" className="button button--ghost plate-dish__add" onClick={() => addTo(d)}>+ продукт</button>
             </li>;
           })}
         </ul>
+        {!pack && <button type="button" className="button button--ghost plate-dish__add" onClick={addDish}>+ Добавить продукт</button>}
         {/* Приём угадан по часам — поправить можно здесь же, до записи */}
         <div className="chips chips--wrap chips--flush plate-photo__meal" role="group" aria-label="Куда записать">{DIARY_MEALS.map(m => <button key={m.id} type="button" className={'chip' + (meal === m.id ? ' chip--active' : '')} aria-pressed={meal === m.id} onClick={() => setMeal(m.id)}>{m.label}</button>)}</div>
         <div className="diary-form-footer">
@@ -184,6 +206,44 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
       }} />}
     </div>
   </Sheet>;
+}
+
+/* Продукт блюда: название правится текстом и ищется в справочнике, выбранная
+   карточка даёт КБЖУ «Из справочника»; без неё — оценка модели «примерно»,
+   у добавленного вручную — калории на 100 г, если в справочнике нет */
+function ProductRow({ it, unit, onPatch, onDrop }) {
+  const v = rowValues(it), others = (it.options || []).filter(o => o.id !== it.food?.id);
+  const name = it.food ? foodTitle(it.food) : it.name;
+  useEffect(() => {
+    const q = String(it.query || '').trim();
+    if (q.length < 2) return undefined;
+    let alive = true;
+    // С паузой, а не на каждую букву; только граммовые карточки — лист считает на 100 г
+    const timer = setTimeout(() => apiPublic('food.search', { q, separateBrand: true })
+      .then(r => { if (alive) onPatch({ options: (r?.foods || []).filter(f => !f.unit || f.unit === 'g').slice(0, 4).map(f => ({ ...f, kind: 'food', unit: 'g' })) }); })
+      .catch(() => {}), 300);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [it.query]);
+  const source = it.food ? 'Из справочника · ' + n(it.food.kcal) + ' ккал / 100 г'
+    : it.label ? 'С этикетки · ' + n(it.per100.kcal) + ' ккал · Б ' + one(it.per100.protein) + ' · Ж ' + one(it.per100.fat) + ' · У ' + one(it.per100.carbs) + ' на 100 ' + unit
+      : it.manual ? (it.per100 ? 'Примерно · ' + n(it.per100.kcal) + ' ккал / 100 г' : 'Выберите из справочника или впишите калории')
+        : 'Примерно, оценка по фото · ' + n(it.per100.kcal) + ' ккал / 100 г';
+  return <li className="plate-photo__row">
+    <div className="plate-photo__main">
+      <input className="field__input plate-photo__name" aria-label="Продукт" placeholder="Продукт" maxLength={80} autoFocus={it.manual && !it.name} value={name} onChange={e => onPatch({ name: e.target.value, query: e.target.value, food: null })} />
+      <small>{source}</small>
+      {(others.length > 0 || (it.food && it.per100)) && <div className="plate-photo__options" role="group" aria-label={'Из справочника: ' + name}>
+        {it.food && it.per100 && <button type="button" className="chip" onClick={() => onPatch({ food: null })}>{it.manual ? 'Свои калории' : 'Оценка по фото'}</button>}
+        {others.map(o => <button type="button" className="chip" key={o.id} onClick={() => onPatch({ food: o, query: null })}>{foodTitle(o)}</button>)}
+      </div>}
+      {it.manual && !it.food && <label className="plate-photo__kcal"><input className="field__input" inputMode="decimal" aria-label={'Калории на 100 г: ' + (name || 'продукт')} placeholder="ккал" value={it.kcal100 || ''} onChange={e => { const k = decimal(e.target.value); onPatch({ kcal100: e.target.value, per100: Number.isFinite(k) && k > 0 ? { kcal: k, protein: null, fat: null, carbs: null } : null }); }} /><span>ккал на 100 г</span></label>}
+    </div>
+    <div className="plate-photo__grams">
+      <input className="field__input" inputMode="decimal" aria-label={'Граммы: ' + (name || 'продукт')} placeholder={unit} value={it.grams} onChange={e => onPatch({ grams: e.target.value })} />
+      <span>{unit} · {n(v.kcal)} ккал</span>
+    </div>
+    <button type="button" className="icon-button" aria-label={'Убрать ' + (name || 'продукт')} onClick={onDrop}><IconTrash size={18} /></button>
+  </li>;
 }
 
 const WRONG_REASONS = ['Не то блюдо', 'Не те граммы', 'Не те калории', 'Это напиток', 'Не тот продукт'];

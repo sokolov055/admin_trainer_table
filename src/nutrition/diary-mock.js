@@ -31,10 +31,20 @@ export function diaryMock(action, p = {}) {
   else if (action === 'diary.photo') {
     if (!/^data:image\/jpeg;base64,/.test(String(p.image || ''))) fail(400, 'Не удалось прочитать фото. Сделайте снимок ещё раз.');
     const grecha = catalog().find(f => f.kind === 'food' && /греч/i.test(f.name)) || null;
+    // Состав блюд (FT-749) — как на сервере: справочник ищется по каждому продукту
+    const part = (name, search, grams, per100, match = null) => ({ name, search, grams, per100, match, options: match ? [match] : [] });
+    const cucumber = part('Огурец свежий', 'огурец', 60, { kcal: 15, protein: 1, fat: 0, carbs: 3 });
     result = { id: 1, ms: 1400, utensil: false, angle: 'angled', shared: false, deep: false, note: '', items: [
-      { name: 'Гречка варёная', search: 'гречка варёная', grams: 180, per100: { kcal: 110, protein: 4, fat: 1, carbs: 21 }, confidence: 0.9, match: grecha, options: grecha ? [grecha] : [] },
-      { name: 'Котлета куриная', search: 'котлета куриная', grams: 120, per100: { kcal: 190, protein: 18, fat: 11, carbs: 6 }, confidence: 0.8, match: null, options: [] },
-      { name: 'Огурец свежий', search: 'огурец', grams: 60, per100: { kcal: 15, protein: 1, fat: 0, carbs: 3 }, confidence: 0.9, match: null, options: [] },
+      { name: 'Гречка с маслом', search: 'гречка варёная', grams: 180, per100: { kcal: 140, protein: 4, fat: 4, carbs: 21 }, confidence: 0.9, ingredients: [
+        part('Гречка варёная', 'гречка варёная', 170, { kcal: 110, protein: 4, fat: 1, carbs: 21 }, grecha),
+        part('Масло сливочное', 'масло сливочное', 10, { kcal: 748, protein: 0.5, fat: 82.5, carbs: 0.8 }),
+      ] },
+      { name: 'Котлета куриная', search: 'котлета куриная', grams: 120, per100: { kcal: 190, protein: 18, fat: 11, carbs: 6 }, confidence: 0.8, ingredients: [
+        part('Фарш куриный жареный', 'фарш куриный', 100, { kcal: 190, protein: 20, fat: 11, carbs: 0 }),
+        part('Хлеб белый', 'хлеб белый', 12, { kcal: 260, protein: 8, fat: 3, carbs: 50 }),
+        part('Масло растительное', 'масло растительное', 8, { kcal: 899, protein: 0, fat: 99.9, carbs: 0 }),
+      ] },
+      { ...cucumber, confidence: 0.9, ingredients: [cucumber] },
     ] };
   } else if (action === 'diary.photo.label') {
     // FT-748: ответ модели на кадр этикетки — заготовленный
@@ -55,7 +65,7 @@ export function diaryMock(action, p = {}) {
     if (old && old.revision !== p.revision) fail(409, 'Запись изменена на другом устройстве.');
     if (p.id && !old) fail(404, 'Запись не найдена.');
     if (old) { dayOf(old.day).entries = dayOf(old.day).entries.filter(e => e.id !== old.id); dayOf(old.day).complete = false; }
-    const e = { id: old?.id || p.requestId, day, meal: p.meal, amount: Number(p.amount), product: copy(old?.product || resolve(p.product)), revision: (old?.revision || 0) + 1, requestId: old?.requestId || p.requestId };
+    const e = { id: old?.id || p.requestId, day, meal: p.meal, amount: Number(p.amount), product: copy(old?.product || { ...resolve(p.product), ...(String(p.dish || '').trim() ? { dish: String(p.dish).trim().slice(0, 80) } : {}) }), revision: (old?.revision || 0) + 1, requestId: old?.requestId || p.requestId };
     dayOf(day).entries.push(e); dayOf(day).revision++; dayOf(day).complete = false; result = e;
   } else if (action === 'diary.entry.remove') {
     const d = Object.values(s.days).find(d => d.entries.some(e => e.id === p.id));

@@ -215,3 +215,78 @@ test('карточка «Рациона»: «Чем заменить» — то�
   assert.equal(tree.toJSON(), null);
   tree.unmount();
 });
+
+// Еда по фото (FT-749): блюдо — заголовок с суммой, под ним продукты; название и граммы
+// правятся в строке, продукт меняется на карточку справочника; каждый — своя запись с пометкой блюда
+const plateStubs = {
+  ...stubs,
+  icons: `import React from 'react';const I=()=> <i/>; export const IconTrash=I;`,
+  telegram: `export const haptic=()=>{};`,
+  ScanGuide: `export default ()=>null;`,
+  'plate-photo-io': `export const shrink=async()=>'';`,
+  PlateScanner: `export const PlateScanner=()=>null;`,
+};
+const plateBundle = await build({ stdin: { contents: "export { PlatePhoto } from './src/nutrition/PlatePhoto.jsx';", resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'cjs', platform: 'node', external: ['react'], logLevel: 'silent', plugins: [{ name: 'plate-stubs', setup(b) {
+  b.onResolve({ filter: /\/(api|ui|icons|offline-writes|telegram|ScanGuide|plate-photo-io|PlateScanner)\.(js|jsx)$/ }, a => ({ path: ({ 'offline-writes': 'offline' })[a.path.split('/').at(-1).split('.')[0]] || a.path.split('/').at(-1).split('.')[0], namespace: 'stub' }));
+  b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: plateStubs[a.path], loader: 'jsx' }));
+  b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
+} }] });
+const plateModule = { exports: {} };
+vm.runInThisContext('(function(require,module,exports){' + plateBundle.outputFiles[0].text + '\n})')(createRequire(import.meta.url), plateModule, plateModule.exports);
+const { PlatePhoto } = plateModule.exports;
+
+test('еда по фото (FT-749): блюдо разложено на продукты, правка названия и граммов, замена из справочника, запись по продуктам', async () => {
+  const image = 'data:image/jpeg;base64,AAAA';
+  const data = diaryMock('diary.photo', { clientRow: 78, image });
+  const butter = { id: 901, kind: 'food', name: 'Масло сливочное 82,5%', brand: '', kcal: 748, protein: 0.5, fat: 82.5, carbs: 0.8, unit: 'g' };
+  const searched = [], sent = [];
+  __x.read = async (a, p) => { searched.push([a, p]); return { foods: [butter, { id: 902, name: 'Масло в штуках', kcal: 700, unit: 'piece' }] }; };
+  __x.mutate = async (a, p) => { sent.push([a, p]); return { id: 1 }; };
+  let tree, saved = '';
+  await act(async () => { tree = renderer.create(React.createElement(PlatePhoto, { day: '2026-10-25', meal: 'lunch', preset: { image, data }, onClose() {}, onSaved: t => { saved = t; } })); });
+  const inputs = label => tree.root.findAll(n => n.type === 'input' && n.props['aria-label'] === label);
+  const dishNames = () => inputs('Название блюда').map(i => i.props.value);
+  assert.deepEqual(dishNames(), ['Гречка с маслом', 'Котлета куриная'], 'блюда из нескольких продуктов — заголовками');
+  assert.deepEqual(inputs('Продукт').map(i => i.props.value), ['Гречка варёная', 'Масло сливочное', 'Фарш куриный жареный', 'Хлеб белый', 'Масло растительное', 'Огурец свежий'], 'огурец — один продукт, без заголовка');
+  const out = () => text(tree);
+  assert.ok(out().includes('Примерно, оценка по фото'));
+  // 170 г гречки × 110 + 10 г масла × 748 = 187 + 74,8 ≈ 262 ккал
+  assert.ok(out().includes('262') && out().includes('ккал'), 'сумма блюда');
+
+  await act(async () => inputs('Название блюда')[1].props.onChange({ target: { value: 'Котлета из индейки' } }));
+  assert.equal(dishNames()[1], 'Котлета из индейки', 'название блюда правится в строке');
+  await act(async () => inputs('Граммы: Хлеб белый')[0].props.onChange({ target: { value: '0' } }));
+
+  // Название продукта правится — справочник ищется по нему, штучные карточки не предлагаются
+  await act(async () => inputs('Продукт')[1].props.onChange({ target: { value: 'масло сливочное' } }));
+  await act(() => new Promise(r => setTimeout(r, 350)));
+  assert.deepEqual(searched.at(-1), ['food.search', { q: 'масло сливочное', separateBrand: true }]);
+  assert.ok(!out().includes('Масло в штуках'));
+  await act(async () => button(tree, 'Масло сливочное 82,5%').props.onClick());
+  assert.equal(inputs('Продукт')[1].props.value, 'Масло сливочное 82,5%');
+  assert.ok(out().includes('Из справочника · 748 ккал / 100 г'));
+
+  // + продукт к блюду: без калорий не записывается, со своими — «примерно»
+  await act(async () => button(tree, '+ продукт').props.onClick());
+  const extra = inputs('Продукт').find(i => i.props.value === '');
+  assert.ok(extra, 'пустая строка нового продукта');
+  await act(async () => extra.props.onChange({ target: { value: 'Сыр' } }));
+  await act(async () => inputs('Граммы: Сыр')[0].props.onChange({ target: { value: '20' } }));
+  await act(async () => inputs('Калории на 100 г: Сыр')[0].props.onChange({ target: { value: '350' } }));
+  await act(() => new Promise(r => setTimeout(r, 350)));
+
+  const add = tree.root.findAll(n => n.type === 'button' && String([].concat(n.props.children).join('')).startsWith('Добавить '))[0];
+  await act(async () => add.props.onClick());
+  const entries = sent.filter(([a]) => a === 'diary.entry.save').map(([, p]) => p);
+  assert.equal(entries.length, 6, 'хлеб с 0 г не записан, остальные — каждый своей записью');
+  const butterEntry = entries.find(p => p.product.kind === 'food');
+  assert.deepEqual([butterEntry.product.id, butterEntry.amount, butterEntry.dish], [901, 10, 'Гречка с маслом']);
+  const cheese = entries.find(p => /^Сыр/.test(p.product.name));
+  assert.deepEqual([cheese.product.name, cheese.product.kcal, cheese.product.protein, cheese.dish], ['Сыр, ~20 г', 70, null, 'Гречка с маслом'], 'свои калории без БЖУ — БЖУ «не знаю»');
+  assert.equal(entries.find(p => /Фарш/.test(p.product.name)).dish, 'Котлета из индейки', 'в запись — исправленное название блюда');
+  assert.equal(entries.find(p => /Огурец/.test(p.product.name)).dish, undefined, 'один продукт — без пометки блюда');
+  const confirm = sent.find(([a]) => a === 'diary.photo.confirm')[1];
+  assert.equal(confirm.items.length, 6);
+  assert.match(saved, /6 продуктов/);
+  tree.unmount();
+});
