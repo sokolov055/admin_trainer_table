@@ -85,11 +85,69 @@ test('Android не из Google Play: окна нет — попытка не т�
   assert.equal(await review.maybeAskReview('workout', T0 + 6 * DAY), true, 'на следующий день — можно');
 });
 
+// Первый полный день (FT-751): любая тренировка + два приёма пищи в один день
+const H = 3600000;
+const DAY1 = T0 + 10 * H; // 13:00 по Москве первого дня
+test('полный день: тренировка и два приёма пищи — окно сразу, без «первых 3 дней»', async () => {
+  reset();
+  review.noteAppUse(DAY1);
+  const day = review.reviewDay(DAY1);
+  review.noteMeals(day, 1, DAY1);
+  review.noteWorkoutDone('a', DAY1 + H);
+  assert.equal(await review.askReviewAt('workout', DAY1 + H), false, 'один приём пищи — ещё не полный день, а тренировка первая');
+  review.noteMeals(day, 2, DAY1 + 2 * H);
+  assert.equal(await review.askReviewAt('meal', DAY1 + 2 * H), true, 'записали второй приём после тренировки');
+  assert.equal(fake.asked, 1);
+  // Повод — один раз: следующий полный день через 70 дней окна не даёт
+  const later = DAY1 + 70 * DAY;
+  review.noteWorkoutDone('b', later);
+  review.noteMeals(review.reviewDay(later), 3, later);
+  assert.equal(await review.askReviewAt('meal', later), false);
+  assert.equal(fake.asked, 1);
+});
+
+test('полный день на итоге тренировки; вчерашняя еда не считается', async () => {
+  reset();
+  review.noteAppUse(DAY1);
+  review.noteMeals(review.reviewDay(DAY1), 2, DAY1);
+  review.noteWorkoutDone('a', DAY1 + DAY);
+  assert.equal(await review.askReviewAt('workout', DAY1 + DAY), false, 'еда — вчера, тренировка — сегодня');
+  review.noteMeals(review.reviewDay(DAY1 + DAY), 2, DAY1 + DAY);
+  assert.equal(await review.askReviewAt('workout', DAY1 + DAY + H), true, 'еда записана заранее, тренировка завершена — на итоге');
+  assert.equal(review.noteMeals('2026-01-01', 5, DAY1 + DAY), undefined);
+  assert.equal(JSON.parse(store.get('fittrack_review_v1')).mealsDay, review.reviewDay(DAY1 + DAY), 'не сегодняшний день дневника не трогает счётчик');
+});
+
+test('с «Разбором дня» — окно только после его закрытия', async () => {
+  reset();
+  review.noteAppUse(DAY1);
+  review.noteDayReview();
+  review.noteMeals(review.reviewDay(DAY1), 2, DAY1);
+  review.noteWorkoutDone('a', DAY1 + H);
+  assert.equal(await review.askReviewAt('workout', DAY1 + H), false, 'на итоге тренировки — нет');
+  assert.equal(await review.askReviewAt('meal', DAY1 + H), false, 'после записи еды — нет');
+  assert.equal(await review.askReviewAt('day-review', DAY1 + 2 * H), true, 'закрыли разбор — окно');
+});
+
+test('полный день не обходит паузу 60 дней и предел 3 раза в год', () => {
+  const v = review.reviewVerdict;
+  const day = review.reviewDay(DAY1);
+  const full = { first: DAY1, workoutDay: day, mealsDay: day, meals: 2 };
+  assert.equal(v(full, 'day', DAY1), 'ask');
+  assert.equal(v({ ...full, asks: [DAY1 - 10 * DAY] }, 'day', DAY1), 'recent');
+  assert.equal(v({ ...full, meals: 1 }, 'day', DAY1), 'no-success');
+  assert.equal(v({ ...full, dayAsked: true }, 'day', DAY1), 'done');
+  assert.deepEqual(review.reviewReasons({}, 'workout'), ['day', 'workout']);
+  assert.deepEqual(review.reviewReasons({ dayReview: true }, 'workout'), ['workout']);
+});
+
 test('в браузере — ничего: ни счётчиков, ни окна, ни строки «Оценить»', async () => {
   reset();
   fake.native = false;
   review.noteAppUse(T0);
   review.noteWorkoutDone('a', T0);
+  review.noteMeals(review.reviewDay(T0), 3, T0);
+  review.noteDayReview();
   assert.equal(store.size, 0, 'на устройстве ничего не пишем');
   assert.equal(await review.maybeAskReview('record', T0 + 10 * DAY), false);
   assert.equal(fake.asked, 0);

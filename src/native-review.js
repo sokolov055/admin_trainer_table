@@ -9,6 +9,13 @@
  * Когда просим — только после успеха и редко:
  *   - успех — третья и каждая следующая тренировка, завершённая на этом
  *     телефоне (её видно ровно в момент завершения, без запросов к серверу);
+ *   - или первый полный день (FT-751, решения владельца 25.10.2026): в
+ *     один день завершена любая тренировка и записаны хотя бы два приёма
+ *     пищи. У кого есть «Разбор дня» — окно после его закрытия; у
+ *     остальных — как только день стал полным: записан второй приём пищи
+ *     после тренировки или завершена тренировка после еды («Завершить
+ *     день» нажимают редко — владелец 25.10.2026, на него не опираемся).
+ *     Этот повод — один раз и без правила первых 3 дней;
  *   - не в первые 3 дня с первого запуска приложения;
  *   - не чаще раза в 60 дней и не больше 3 раз за 365 дней;
  *   - после экрана итога, никогда посреди тренировки (Workout.jsx).
@@ -26,7 +33,10 @@ import { bridge, iosApp, isNativeApp, plugin } from './native-bridge.js';
 const KEY = 'fittrack_review_v1';
 const DAY = 86400000;
 
-export const REVIEW_RULES = { quietDays: 3, gapDays: 60, perYear: 3, workouts: 3 };
+export const REVIEW_RULES = { quietDays: 3, gapDays: 60, perYear: 3, workouts: 3, dayMeals: 2 };
+
+/** День по Москве — как у дневника питания (diary-model.js, today) */
+export const reviewDay = (now = Date.now()) => new Date(now + 3 * 3600000).toISOString().slice(0, 10);
 
 /** Страница в App Store сразу на отзыве; ID — mobile/APP_STORE.md, как APP_STORE_URL в access.js */
 const IOS_REVIEW_URL = 'https://apps.apple.com/app/id6816619723?action=write-review';
@@ -47,6 +57,13 @@ function read() {
     workouts: Number(s.workouts) || 0,
     counted: Array.isArray(s.counted) ? s.counted.filter(Boolean).map(String) : [],
     asks: Array.isArray(s.asks) ? s.asks.map(Number).filter(Number.isFinite) : [],
+    // Полный день (FT-751): когда была тренировка, сколько приёмов пищи
+    // записано сегодня, есть ли «Разбор дня», просили ли уже по этому поводу
+    workoutDay: typeof s.workoutDay === 'string' ? s.workoutDay : '',
+    mealsDay: typeof s.mealsDay === 'string' ? s.mealsDay : '',
+    meals: Number(s.meals) || 0,
+    dayReview: s.dayReview === true,
+    dayAsked: s.dayAsked === true,
   };
 }
 
@@ -76,7 +93,34 @@ export function noteWorkoutDone(id, now = Date.now()) {
     first: s.first || now,
     workouts: s.workouts + 1,
     counted: key ? [...s.counted, key].slice(-10) : s.counted,
+    workoutDay: reviewDay(now),
   });
+}
+
+/**
+ * Свой дневник питания показал день: сколько приёмов пищи (завтрак, обед,
+ * ужин, перекус) в нём есть записи. Считаем только сегодняшний
+ */
+export function noteMeals(day, count, now = Date.now()) {
+  if (!isNativeApp() || day !== reviewDay(now)) return;
+  const s = read();
+  const meals = Math.max(0, Number(count) || 0);
+  if (s.mealsDay === day && s.meals === meals) return;
+  write({ ...s, first: s.first || now, mealsDay: day, meals });
+}
+
+/** «Разбор дня» у человека есть — окно за полный день ждёт его закрытия */
+export function noteDayReview() {
+  if (!isNativeApp()) return;
+  const s = read();
+  if (!s.dayReview) write({ ...s, dayReview: true });
+}
+
+/** Сегодня полный день: тренировка и хотя бы два приёма пищи */
+export function fullDay(state, now = Date.now()) {
+  const s = state || {};
+  const day = reviewDay(now);
+  return s.workoutDay === day && s.mealsDay === day && (Number(s.meals) || 0) >= REVIEW_RULES.dayMeals;
 }
 
 /**
@@ -87,7 +131,11 @@ export function noteWorkoutDone(id, now = Date.now()) {
 export function reviewVerdict(state, reason, now = Date.now()) {
   const s = state || {};
   const first = Number(s.first) || 0;
-  if (!first || now - first < REVIEW_RULES.quietDays * DAY) return 'early';
+  if (reason === 'day') {
+    // Первый полный день — один раз и без «не в первые 3 дня»
+    if (s.dayAsked) return 'done';
+    if (!fullDay(s, now)) return 'no-success';
+  } else if (!first || now - first < REVIEW_RULES.quietDays * DAY) return 'early';
   if (reason === 'workout' && (Number(s.workouts) || 0) < REVIEW_RULES.workouts) return 'no-success';
   const asks = (s.asks || []).filter((t) => now - t < 365 * DAY);
   if (asks.length && now - Math.max(...asks) < REVIEW_RULES.gapDays * DAY) return 'recent';
@@ -110,8 +158,31 @@ export async function maybeAskReview(reason, now = Date.now()) {
     if (!res || !res.asked) return false;
   } catch (_) { return false; }
   const s = read();
-  write({ ...s, asks: [...s.asks.filter((t) => now - t < 365 * DAY), now] });
+  write({ ...s, asks: [...s.asks.filter((t) => now - t < 365 * DAY), now], dayAsked: s.dayAsked || reason === 'day' });
   return true;
+}
+
+/**
+ * Где сейчас успех и какой повод проверить (FT-751): 'workout' — итог
+ * тренировки, 'meal' — в своём дневнике записан ещё один приём пищи,
+ * 'day-finish' — «Завершить день», 'day-review' — закрыли «Разбор дня».
+ * Полный день у тех, у кого есть разбор, — только после него; у остальных —
+ * в момент, когда день стал полным. Не подошёл полный день — на итоге
+ * тренировки прежнее правило
+ */
+export function reviewReasons(state, moment) {
+  const s = state || {};
+  if (moment === 'day-review') return ['day'];
+  if (moment === 'meal' || moment === 'day-finish') return s.dayReview ? [] : ['day'];
+  if (moment === 'workout') return s.dayReview ? ['workout'] : ['day', 'workout'];
+  return [];
+}
+
+export async function askReviewAt(moment, now = Date.now()) {
+  if (!native()) return false;
+  const s = read();
+  const reason = reviewReasons(s, moment).find((r) => reviewVerdict(s, r, now) === 'ask');
+  return reason ? maybeAskReview(reason, now) : false;
 }
 
 /**

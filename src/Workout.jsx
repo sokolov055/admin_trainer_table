@@ -102,7 +102,7 @@ import { EFFORTS, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, ot
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
-import { maybeAskReview, noteWorkoutDone } from './native-review.js';
+import { askReviewAt, noteWorkoutDone } from './native-review.js';
 import { useReveal } from './reveal.js';
 import { setsWord, planText, supersetMark, focusOf, nextText, nextInfo, unitsOf as units } from './workout-view.js';
 import { EffortChooser, EffortFix } from './EffortButtons.jsx';
@@ -1990,7 +1990,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   useEffect(() => {
     if (!finishedId || finishedHere.current !== finishedId) return undefined;
     finishedHere.current = '';
-    const t = setTimeout(() => { maybeAskReview('workout').catch(() => {}); }, 1500);
+    // Полный день (тренировка + еда, FT-751) или третья тренировка
+    const t = setTimeout(() => { askReviewAt('workout').catch(() => {}); }, 1500);
     return () => clearTimeout(t);
   }, [finishedId]);
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { useData } from '../useData.js';
 import { Sheet, formatNumber } from '../ui.jsx';
+import { noteDayReview, askReviewAt } from '../native-review.js';
 import './day-review.css';
 
 /**
@@ -162,6 +163,13 @@ export default function DayCard({ clientRow, own = false, mine = false }) {
   const [open, setOpen] = useState(false);
   const data = res.data;
   const pop = useClosedPop(data, own);
+  // Разбор есть — просьба об оценке за полный день ждёт его закрытия (FT-751)
+  const enabled = !!data?.enabled;
+  useEffect(() => { if (own && enabled) noteDayReview(); }, [own, enabled]);
+  const close = () => {
+    setOpen(false);
+    if (own) setTimeout(() => { askReviewAt('day-review').catch(() => {}); }, 600);
+  };
 
   if (!data && res.loading) return own ? <DayCardWait /> : null;
   if (!data?.enabled || !data.rings?.length) return null;
@@ -199,7 +207,7 @@ export default function DayCard({ clientRow, own = false, mine = false }) {
           </button>
         )}
       </section>
-      {open && <DaySheet clientRow={clientRow} first={data} onClose={() => setOpen(false)} />}
+      {open && <DaySheet clientRow={clientRow} first={data} onClose={close} />}
     </>
   );
 }

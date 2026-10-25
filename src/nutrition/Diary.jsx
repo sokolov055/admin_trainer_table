@@ -25,6 +25,7 @@ import { SnackIdeas, FreeMarks } from './DiaryExtras.jsx';
 import { FinishSheet, DayFinish } from './DayFinish.jsx';
 import { CarbCycleField } from './CarbCycle.jsx';
 import { carbTargetLine } from './carbs.js';
+import { noteMeals, askReviewAt } from '../native-review.js';
 // Части дневника разнесены по модулям 21.10.2026; прежние экспорты этого файла
 // остаются доступными отсюда (scripts/test-diary.mjs, Ration.jsx)
 export { useDiaryResource } from './diary-ui.jsx';
@@ -175,6 +176,21 @@ export default function NutritionDiary({ clientRow, readOnly = false, self = fal
   const chooseDate = value => { if (value && /^20\d{2}-\d{2}-\d{2}$/.test(value)) { setDay(value); setModal(null); setMessage(null); setError(null); } };
   const shown = data.entries.filter(e => !del.hidden(e.id));
   const totals = shown.length === data.entries.length ? data.totals : totalEntries(shown);
+  // Первый полный день для просьбы об оценке (FT-751): сколько приёмов пищи
+  // сегодня записано в своём дневнике — счётчик на телефоне, не на сервере
+  const ownDiary = !readOnly && !preview && !clientRow;
+  const mealsToday = ownDiary && resource.data && day === today() && (data.day || day) === day ? new Set(shown.map(e => e.meal)).size : -1;
+  // Записали ещё приём — день мог стать полным: окно, когда лист уже закрыт
+  const mealsBefore = useRef(-1);
+  useEffect(() => {
+    if (mealsToday < 0) { mealsBefore.current = -1; return undefined; }
+    noteMeals(day, mealsToday);
+    const grew = mealsBefore.current >= 0 && mealsToday > mealsBefore.current;
+    mealsBefore.current = mealsToday;
+    if (!grew) return undefined;
+    const t = setTimeout(() => { askReviewAt('meal').catch(() => {}); }, 900);
+    return () => clearTimeout(t);
+  }, [day, mealsToday]);
   const target = resource.data ? data.targets || {} : fallbackTargets || {}, remaining = Number(target.kcal || 0) - totals.kcal;
   const recipeRows = (recipeResource.data?.products || []).filter(p => ['dish', 'recipe'].includes(p.kind));
   const approxKcal = totalEntries(shown.filter(e => e.product.approx)).kcal;
@@ -209,7 +225,7 @@ export default function NutritionDiary({ clientRow, readOnly = false, self = fal
     if (modal.type === 'snacks') return <SnackIdeas remaining={remaining} onClose={() => setModal(null)} onPick={(product, amount) => setModal({ type: 'entry', product, amount, meal: 'snack' })} />;
     if (modal.type === 'quick') return <QuickEntry day={day} meal={modal.meal} onClose={() => setModal(null)} onSaved={refresh} />;
     if (modal.type === 'entry') return <DiaryEntryForm {...modal} day={day} onClose={() => setModal(null)} onSaved={refresh} onRemove={removeEntry} />;
-    if (modal.type === 'finish') return <FinishSheet data={data} totals={totals} target={target} busy={busy} error={error} onClose={() => setModal(null)} onFinish={async () => { if (await updateDay({ complete: true }, 'День завершён.')) { haptic('success'); setModal(null); } }} />;
+    if (modal.type === 'finish') return <FinishSheet data={data} totals={totals} target={target} busy={busy} error={error} onClose={() => setModal(null)} onFinish={async () => { if (await updateDay({ complete: true }, 'День завершён.')) { haptic('success'); setModal(null); if (ownDiary) setTimeout(() => { askReviewAt('day-finish').catch(() => {}); }, 900); } }} />;
     if (modal.type === 'copy') return <CopyDialog day={day} onClose={() => setModal(null)} onSaved={refresh} />;
     if (modal.type === 'recipe') return <RecipeEditor recipe={modal.recipe} onClose={() => setModal(null)} onSaved={() => refresh('Рецепт сохранён.')} />;
     if (modal.type === 'goal') return <GoalEditor clientRow={clientRow} targets={data.carbDay?.base || target} carbDay={data.carbDay} onClose={() => setModal(null)} onSaved={() => refresh('Цель сохранена.')} />;
