@@ -15,7 +15,8 @@ const BARCODE_HINT = 'Наведите рамку на штрихкод с ци�
 // сканер сразу открывается в нём; compact — без своих кнопок запуска.
 // В приложении (FT-732) вместо выбора файла — своя камера телефона
 // (native-scan.js): открывается сразу, штрихкод находит сама, подсказка поверх
-export default function FoodScan({ onDraft, onFound, disabled = false, start = '', compact = false, onClose }) {
+// title — что сканируем, если уже известно (упаковка, которую узнал AI-сканер): подпись поверх камеры
+export default function FoodScan({ onDraft, onFound, disabled = false, start = '', compact = false, onClose, title = '' }) {
   const [mode, setMode] = useState(''), [image, setImage] = useState(null), [busy, setBusy] = useState(''), [error, setError] = useState('');
   const [code, setCode] = useState(''), [found, setFound] = useState(null), [searched, setSearched] = useState(false), [reads, setReads] = useState([]), [percent, setPercent] = useState(0);
   // undefined — ещё узнаём, null — камеры приложения нет (сайт, старая сборка)
@@ -132,7 +133,7 @@ export default function FoodScan({ onDraft, onFound, disabled = false, start = '
         native.plugin.hint({ text: live.hint, ready: live.ready }).catch(() => {});
         if (live.done) native.plugin.finish().catch(() => {});
       });
-      const result = await native.plugin.scan({ mode: m, title: m === 'barcode' ? 'Штрихкод продукта' : 'Этикетка продукта', hint: m === 'barcode' ? BARCODE_HINT : liveText ? LABEL_HINT : LABEL_HINT + ' и нажмите на круглую кнопку' });
+      const result = await native.plugin.scan({ mode: m, title: m === 'barcode' ? 'Штрихкод продукта' : title || 'Этикетка продукта', hint: m === 'barcode' ? BARCODE_HINT : liveText ? LABEL_HINT : LABEL_HINT + ' и нажмите на круглую кнопку' });
       if (ticket !== sequence.current) return;
       await takeResult(result, m, live);
     } catch (e) { console.error('Камера сканера', e); if (ticket === sequence.current) setError('Камера не открылась. Прикрепите фото или впишите цифры.'); }
@@ -160,7 +161,7 @@ export default function FoodScan({ onDraft, onFound, disabled = false, start = '
         : webCam
           ? <div className="diary-inline-actions"><button type="button" className="button button--primary" disabled={locked} onClick={() => setLive(mode)}>Включить камеру</button><button type="button" className="button" disabled={locked} onClick={() => gallery.current.click()}>Прикрепить фото</button></div>
           : <div className="diary-inline-actions"><button type="button" className="button" disabled={locked} onClick={() => camera.current.click()}>Сделать снимок</button><button type="button" className="button" disabled={locked} onClick={() => gallery.current.click()}>Прикрепить фото</button></div>}
-      {live && <PlateScanner mode={live} onShot={file => void liveShot(file)} onFallback={why => { setLive(''); if (why === 'denied') setError('Нет доступа к камере. Разрешите его в настройках браузера или прикрепите фото.'); }} onClose={() => setLive('')} />}
+      {live && <PlateScanner mode={live} note={live === 'label' ? title : ''} onShot={file => void liveShot(file)} onFallback={why => { setLive(''); if (why === 'denied') setError('Нет доступа к камере. Разрешите его в настройках браузера или прикрепите фото.'); }} onClose={() => setLive('')} />}
       <input ref={camera} className="food-scan-file" type="file" accept="image/*" capture="environment" aria-label="Снять фото продукта" onChange={e => { void loadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
       <input ref={gallery} className="food-scan-file" type="file" accept="image/*" aria-label="Выбрать фото продукта" onChange={e => { void loadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
       {image && <><img className="food-scan-preview" src={image} alt="Выбранная этикетка или штрихкод для проверки" /><div className="diary-inline-actions"><button className="button" type="button" disabled={locked} onClick={rotate}>Повернуть фото</button><button className="button button--primary" type="button" disabled={locked} onClick={() => void recognize()}>{mode === 'barcode' ? 'Прочитать штрихкод' : 'Прочитать этикетку'}</button></div></>}

@@ -71,6 +71,8 @@ export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRes
       if (pack?.match) setItems([{ ...(guess || {}), name: foodTitle(pack.match), from: 0, food: pack.match, options: pack.options || [], grams: String(guess?.grams || pack.net || 100) }]);
       else if (pack?.label) { setLabelValues(pack.label); setItems([{ name: packName(pack), from: 0, per100: pack.label, label: true, food: null, options: [], grams: String(guess?.grams || pack.net || 100) }]); }
       else setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, grams: String(it.grams) })));
+      // Упаковка без цифр — сразу камера на этикетку, без лишнего касания (владелец 25.10.2026: «один сканер на всё»)
+      if (pack && !pack.match && !pack.label) setScan(true);
       haptic('success');
     } catch (e) { if (ticket === sequence.current) setError(e); }
     finally { if (ticket === sequence.current) setBusy(''); }
@@ -142,7 +144,7 @@ export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRes
           : labelValues ? <small>{aiKcal ? 'AI на глаз давал ' + n(aiKcal) + ' ккал / 100 г, на этикетке ' + n(labelValues.kcal) + ' — ' + diffText(aiKcal, labelValues.kcal) + '.' : 'Цифры с этикетки — сверьте с упаковкой.'}</small>
           : <><small>У упаковки AI считает на глаз и может ошибиться в разы. Отсканируйте таблицу «Пищевая ценность» — калории будут точными.</small>
             {!scan && <button type="button" className="button button--primary" onClick={() => { haptic(); setScan(true); }}>Сканировать этикетку</button>}</>}
-        {scan && <FoodScan compact start="label" onClose={() => setScan(false)} onDraft={applyLabel} />}
+        {scan && <FoodScan compact start="label" title={packName(pack)} onClose={() => setScan(false)} onDraft={applyLabel} />}
         {items.length === 1 && (pack.net || labelValues || pack.match) && <div className="chips chips--wrap chips--flush" role="group" aria-label="Сколько съели">
           {[pack.net && ['Вся упаковка', pack.net], pack.net && ['Половина', Math.round(pack.net / 2)], ['100 г', 100], ['50 г', 50]].filter(Boolean).map(([t, g]) => <button key={t} type="button" className={'chip' + (String(g) === String(items[0].grams) ? ' chip--active' : '')} onClick={() => patch(0, { grams: String(g) })}>{t}{t.endsWith('г') ? '' : ' · ' + g + ' г'}</button>)}
         </div>}

@@ -26,7 +26,7 @@ const MODES = {
   label: { title: 'Этикетка', aria: 'Сканер этикетки', hints: { ...SCAN_HINTS, empty: LABEL_HINT, steady: 'Держите ровно — читаю', ready: 'Читаю этикетку…' } },
   barcode: { title: 'Штрихкод', aria: 'Сканер штрихкода', hints: { ...SCAN_HINTS, empty: 'Наведите рамку на штрихкод', steady: 'Держите ровно — читаю', ready: 'Читаю штрихкод…' } },
 };
-export function PlateScanner({ mode = 'plate', onShot, onFallback, onClose }) {
+export function PlateScanner({ mode = 'plate', note = '', onShot, onFallback, onClose }) {
   const look = MODES[mode] || MODES.plate;
   const video = useRef(null), stream = useRef(null), state = useRef({}), shot = useRef(false), gallery = useRef(null);
   const [phase, setPhase] = useState('start'), [progress, setProgress] = useState(0);
@@ -75,7 +75,7 @@ export function PlateScanner({ mode = 'plate', onShot, onFallback, onClose }) {
   return createPortal(<div className="plate-scan" role="dialog" aria-modal="true" aria-label={look.aria}>
     <video ref={video} className="plate-scan__video" muted playsInline autoPlay aria-hidden="true" />
     <div className="plate-scan__top">
-      <span className="plate-scan__badge">{look.ai && <><span className="ai-badge">AI</span> </>}{look.title}</span>
+      <span className="plate-scan__badge">{look.ai && <><span className="ai-badge">AI</span> </>}{note || look.title}</span>
       <button type="button" className="plate-scan__close" aria-label="Закрыть сканер" onClick={() => { stop(); onClose(); }}><IconClose size={22} /></button>
     </div>
     <div className={'plate-scan__frame is-' + phase + (mode === 'plate' ? '' : ' plate-scan__frame--wide')} style={{ '--scan-progress': progress }} aria-hidden="true"><i /><i /><i /><i /><span className="plate-scan__beam" /></div>
