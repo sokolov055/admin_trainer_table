@@ -27,8 +27,12 @@ export function diaryMock(action, p = {}) {
   if (p.requestId && s.operations[p.requestId]) return copy(s.operations[p.requestId]);
   let result;
   // Демо видит «Фото блюда» (FT-736); ответ модели — заготовленный
-  if (action === 'diary.get') result = { ...present(day), photo: true };
+  if (action === 'diary.get') result = { ...present(day), photo: true, photoConsent: !!s.photoConsent, photoConsentVersion: '2026-10-25' };
+  // Экран-разрешение сканера (FT-752) — как на сервере
+  else if (action === 'diary.photo.consent') { if (p.accept !== true) fail(400, 'Нужно отдельное согласие на распознавание фото.'); s.photoConsent = true; result = { consent: true }; }
+  else if (action === 'diary.photo.revoke') { s.photoConsent = false; result = { consent: false }; }
   else if (action === 'diary.photo') {
+    if (!s.photoConsent) fail(403, 'Сначала разрешите распознавание: откройте «Сканер еды · AI» и подтвердите согласие.');
     if (!/^data:image\/jpeg;base64,/.test(String(p.image || ''))) fail(400, 'Не удалось прочитать фото. Сделайте снимок ещё раз.');
     const grecha = catalog().find(f => f.kind === 'food' && /греч/i.test(f.name)) || null;
     // Состав блюд (FT-749) — как на сервере: справочник ищется по каждому продукту

@@ -14,6 +14,8 @@ export const CONSENT_URL = 'https://app.fitness100.ru/consent.html';
 export const TERMS_URL = 'https://app.fitness100.ru/terms.html';
 /** Отдельное согласие на данные о здоровье: сон, пульс, вес (FT-708) */
 export const HEALTH_CONSENT_URL = 'https://app.fitness100.ru/health-consent.html';
+/** Отдельное согласие на распознавание еды по фото — Yandex AI Studio (FT-752) */
+export const FOOD_PHOTO_CONSENT_URL = 'https://app.fitness100.ru/food-photo-consent.html';
 /** Поддержка — почта разработчика (App Store 1.5: способ связаться) */
 export const SUPPORT_URL = 'https://app.fitness100.ru/support.html';
 

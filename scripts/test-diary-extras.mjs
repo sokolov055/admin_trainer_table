@@ -237,6 +237,7 @@ const { PlatePhoto } = plateModule.exports;
 
 test('еда по фото (FT-749): блюдо разложено на продукты, правка названия и граммов, замена из справочника, запись по продуктам', async () => {
   const image = 'data:image/jpeg;base64,AAAA';
+  diaryMock('diary.photo.consent', { clientRow: 78, accept: true }); // FT-752: без согласия сканер отказывает
   const data = diaryMock('diary.photo', { clientRow: 78, image });
   const butter = { id: 901, kind: 'food', name: 'Масло сливочное 82,5%', brand: '', kcal: 748, protein: 0.5, fat: 82.5, carbs: 0.8, unit: 'g' };
   const searched = [], sent = [];
