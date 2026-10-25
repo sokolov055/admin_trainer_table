@@ -87,11 +87,9 @@ test('в приложении: первый кадр — знак в центр�
     assert.ok(Math.abs(first.box.bottom - first.box.top - 111.3) < 0.6, 'высота знака ' + (first.box.bottom - first.box.top));
     assert.ok(Math.abs((first.box.left + first.box.right) / 2 - 195) < 0.6, 'знак по центру по горизонтали');
     assert.ok(Math.abs((first.box.top + first.box.bottom) / 2 - 422) < 0.6, 'знак по центру по вертикали');
-    await page.evaluate(() => window.__flush());
-    await page.evaluate(() => window.__flush());
-    await page.evaluate(() => window.__flush());
-    // Опрос по таймеру: свои кадры здесь подменены
-    await page.waitForFunction(() => window.__hides.length === 1, null, { polling: 50 });
+    // Отпускаем кадры, пока нативную не снимут (кадр в кадре — второй
+    // встаёт в очередь только после первого). Опрос по таймеру: свои кадры здесь подменены
+    await page.waitForFunction(() => { window.__flush(); return window.__hides.length === 1; }, null, { polling: 50 });
     assert.deepEqual(await page.evaluate(() => window.__hides[0].o), { fadeOutDuration: 0 });
     await page.waitForFunction(() => document.getElementById('splash').classList.contains('splash--go'), null, { polling: 50 });
     // Анимация идёт сама — кадры больше не держим
