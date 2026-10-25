@@ -45,6 +45,8 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
   const [busy, setBusy] = useState(''), [error, setError] = useState(null), [meal, setMeal] = useState(initialMeal);
   // Упаковка (FT-748): labelValues — КБЖУ на 100 г с этикетки (с фото или отсканированные), scan — открыт сканер этикетки
   const [labelValues, setLabelValues] = useState(null), [scan, setScan] = useState(false);
+  // «AI ошибся» (FT-748): комментарий уходит владельцу вместе с ответом модели — по нему правят подсказку и справочник
+  const [wrong, setWrong] = useState(null);
   const camera = useRef(null), gallery = useRef(null), sequence = useRef(0);
   useEffect(() => { if (preset?.data) show(preset.image, preset.data, preset.label); else if (file) void take(file); }, []);
 
@@ -72,7 +74,7 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
     const values = read?.label || pack?.label;
     if (pack?.match) setItems([{ ...(guess || {}), name: foodTitle(pack.match), from: 0, food: pack.match, options: pack.options || [], grams }]);
     // Название, объём и цифры — с этикетки: лицевая сторона даёт только догадку («Сок» вместо «Напиток «Крюшон»»)
-    else if (pack && values) { const named = { product: read?.product || pack.product, brand: read?.brand || pack.brand }; setLabelValues({ ...values, basis: read?.basis || 'g', portion: read?.portion || null, net: read?.net || null, quote: read?.quote || '', ...named }); setItems([{ name: packName(named), from: 0, per100: values, label: true, food: null, options: pack.options || [], grams: String(read?.portion?.grams || guess?.grams || pack.net || 100) }]); }
+    else if (pack && values) { const named = { product: read?.product || pack.product, brand: read?.brand || pack.brand }; setLabelValues({ ...values, basis: read?.basis || 'g', portion: read?.portion || null, net: read?.net || null, quote: read?.quote || '', labelId: read?.id || null, ...named }); setItems([{ name: packName(named), from: 0, per100: values, label: true, food: null, options: pack.options || [], grams: String(read?.portion?.grams || guess?.grams || pack.net || 100) }]); }
     else setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, options: pack && i === 0 ? pack.options || [] : it.options, grams: String(it.grams) })));
   }
   const pack = result?.package || null, aiKcal = result?.items?.[0]?.per100?.kcal;
@@ -171,6 +173,34 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
           <button type="button" className="button button--primary" disabled={!!busy || !kept.length} onClick={save}>Добавить {n(total)} ккал</button>
         </div>
       </>}
+      {result?.id && !busy && <WrongAnswer state={wrong} onChange={setWrong} canFix={!!image && !labelValues && !pack?.match} onSend={async (comment, fix) => {
+        setWrong({ text: comment, sending: true });
+        try {
+          // Пересчитать: тот же кадр + поправка → новый список (поправка сохраняется как отзыв к прошлому ответу)
+          if (fix) { setBusy('AI пересчитывает с вашей поправкой…'); const data = await apiMutate('diary.photo', { image, hint: comment, fixOf: result.id }); show(image, data); haptic('success'); setWrong({ sent: true, fixed: true }); }
+          else { await apiMutate('diary.photo.feedback', { id: result.id, labelId: labelValues?.labelId || null, comment }); haptic('success'); setWrong({ sent: true }); }
+        } catch (e) { setWrong({ text: comment, error: e }); }
+        finally { setBusy(''); }
+      }} />}
     </div>
   </Sheet>;
+}
+
+const WRONG_REASONS = ['Не то блюдо', 'Не те граммы', 'Не те калории', 'Это напиток', 'Не тот продукт'];
+// Ссылка «AI ошибся?» → причины чипами и своими словами. state: null — свёрнуто, { text } — пишут, { sent } — отправлено
+function WrongAnswer({ state, onChange, onSend, canFix }) {
+  if (state?.sent) return <p className="small muted plate-photo__wrong-done">{state.fixed ? 'Пересчитали с вашей поправкой — проверьте список. Поправку запомнили, чтобы сканер ошибался реже.' : 'Спасибо — передали. По таким отзывам сканер учится ошибаться реже.'}</p>;
+  if (!state) return <button type="button" className="button button--ghost plate-photo__wrong" onClick={() => onChange({ text: '' })}>AI ошибся?</button>;
+  const text = state.text || '';
+  const add = reason => onChange({ ...state, text: text.includes(reason) ? text : (text ? text.replace(/[\s.,]*$/, '') + ', ' : '') + reason.toLowerCase() });
+  return <div className="plate-photo__wrong-form">
+    <strong>{canFix ? 'Что на самом деле?' : 'Что не так?'}</strong>
+    <div className="chips chips--wrap chips--flush" role="group" aria-label="Причина">{WRONG_REASONS.map(r => <button key={r} type="button" className="chip" onClick={() => add(r)}>{r}</button>)}</div>
+    <label className="field"><span className="field__label">Своими словами</span><textarea className="field__input" rows={3} maxLength={300} value={text} placeholder={canFix ? 'Например: паста с тунцом, а не с курицей' : 'Например: это газировка, а не сок; бутылка 2 л'} onChange={e => onChange({ ...state, text: e.target.value })} /></label>
+    <p className="small muted">{canFix ? 'Напишите, что на самом деле на тарелке, — AI посчитает заново. ' : ''}Только про еду, без имён и личных данных. Поправку увидит владелец приложения — чтобы научить сканер.</p>
+    {state.error && <ErrorNote error={state.error} />}
+    <div className="diary-inline-actions">{canFix
+      ? <button type="button" className="button button--primary" disabled={state.sending || text.trim().length < 2} onClick={() => onSend(text.trim(), true)}>Пересчитать</button>
+      : <button type="button" className="button button--primary" disabled={state.sending || text.trim().length < 2} onClick={() => onSend(text.trim(), false)}>Отправить</button>}<button type="button" className="button button--ghost" onClick={() => onChange(null)}>Отмена</button></div>
+  </div>;
 }

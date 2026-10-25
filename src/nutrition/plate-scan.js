@@ -6,8 +6,10 @@
  * Чистые функции без DOM — проверяет scripts/test-diary-extras.mjs.
  */
 export const SCAN_SIZE = 24;
-export const STEADY_MS = 1100;
-const DARK = 40, FLAT = 10, MOVING = 9;
+// Владелец 25.10.2026: «надо прям замереть» — порог дрожания вдвое мягче, ждём 0,7 с,
+// рывок руки туда-обратно (до SHAKE) отсчёт не сбрасывает, третий за отсчёт — сбрасывает
+export const STEADY_MS = 700;
+const DARK = 40, FLAT = 10, MOVING = 16, SHAKE = 40;
 
 /** RGBA (getImageData) → яркость 0–255 на точку */
 export function frameGray(rgba) {
@@ -43,9 +45,10 @@ export function scanStep(state, gray, now) {
   const base = { prev: gray, since: null, progress: 0 };
   if (mean < DARK) return { ...base, phase: 'dark' };
   if (spread < FLAT) return { ...base, phase: 'empty' };
-  if (motion > MOVING) return { ...base, phase: 'moving' };
+  const shakes = (state.since == null ? 0 : state.shakes || 0) + (motion > MOVING ? 1 : 0);
+  if (motion > SHAKE || shakes > 2) return { ...base, phase: 'moving' };
   const since = state.since ?? now, progress = Math.min(1, (now - since) / STEADY_MS);
-  return { prev: gray, since, progress, phase: progress >= 1 ? 'ready' : 'steady' };
+  return { prev: gray, since, progress, shakes, phase: progress >= 1 ? 'ready' : 'steady' };
 }
 
 export const SCAN_HINTS = {

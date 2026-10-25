@@ -10,6 +10,8 @@
  */
 export const ADMIN_PANES = [
   { value: 'stats', label: 'Аналитика' },
+  // Поправки «AI ошибся» к распознаванию еды — по ним правится подсказка модели (FT-748)
+  { value: 'ai', label: 'AI-сканер' },
   { value: 'trainers', label: 'Тренеры' },
   { value: 'tariffs', label: 'Тарифы' },
   { value: 'games', label: 'Игры' },
@@ -31,10 +33,10 @@ export const ADMIN_PANES = [
 /**
  * Десять подразделов в одной дорожке не помещались и листались за край —
  * теперь четыре группы в шапке, а подразделы группы — переключателем над
- * экраном (аудит 24.10.2026). У «Аналитики» подраздел один, переключателя нет.
+ * экраном (аудит 24.10.2026). У «Аналитики» с FT-748 два: цифры и поправки AI-сканера.
  */
 export const ADMIN_GROUPS = [
-  { value: 'analytics', label: 'Аналитика', panes: ['stats'] },
+  { value: 'analytics', label: 'Аналитика', panes: ['stats', 'ai'] },
   { value: 'people', label: 'Тренеры и тарифы', panes: ['trainers', 'tariffs'] },
   { value: 'content', label: 'Контент', panes: ['games', 'stories', 'look', 'import'] },
   { value: 'system', label: 'Система', panes: ['flags', 'versions', 'logs', 'export'] },

@@ -166,6 +166,12 @@ test('AI-сканер (FT-746): кадр снимается, когда в ра�
   s = scanStep(s, plate(7), 300); assert.equal(s.phase, 'moving', 'сдвинули — отсчёт заново'); assert.equal(s.since, null);
   s = scanStep(s, plate(7), 400); s = scanStep(s, plate(7), 400 + STEADY_MS - 1); assert.equal(s.phase, 'steady'); assert.ok(s.progress > 0.9);
   s = scanStep(s, plate(7), 400 + STEADY_MS); assert.equal(s.phase, 'ready');
+  // Дрожащая рука (FT-748): рывок туда-обратно отсчёт не сбрасывает, третий — сбрасывает
+  const jitter = k => Uint8Array.from(plate(), (v, i) => v + (i % 2 ? k : -k));
+  let h = scanStep(scanStep({}, plate(), 0), plate(), 100);
+  h = scanStep(h, jitter(25), 200); h = scanStep(h, plate(), 300);
+  assert.equal(h.phase, 'steady', 'рывок туда-обратно — держим'); assert.equal(h.since, 100);
+  h = scanStep(h, jitter(25), 400); assert.equal(h.phase, 'moving', 'третий рывок — заново');
   assert.deepEqual([...frameGray([255, 255, 255, 255, 0, 0, 0, 255])], [255, 0]);
 });
 

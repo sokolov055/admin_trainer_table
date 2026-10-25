@@ -64,3 +64,9 @@
 /* «Управление»: подразделы группы над экраном (TrainerApp.jsx, аудит
    24.10.2026) */
 .admin-panes { margin-bottom: var(--space-4); }
+
+/* «Управление → AI-сканер» (FT-748) */
+.ai-fix { display: grid; gap: 6px; }
+.ai-fix__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.ai-fix__text { margin: 0; font-size: var(--text-md); font-weight: 600; }
+.ai-fix p { margin: 0; }

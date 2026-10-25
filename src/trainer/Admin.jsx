@@ -14,6 +14,7 @@ import Games from './Games.jsx';
 import AdminStories from './AdminStories.jsx';
 import AdminLook from './AdminLook.jsx';
 import AdminVersions from './AdminVersions.jsx';
+import AdminAiScan from './AdminAiScan.jsx';
 import AdminImport from './AdminImport.jsx';
 import { Logs } from './screens.jsx';
 import {
@@ -48,6 +49,7 @@ export default function Admin({ pane }) {
   if (pane === 'import') return <AdminImport />;
   if (pane === 'versions') return <AdminVersions />;
   if (pane === 'logs') return <Logs />;
+  if (pane === 'ai') return <AdminAiScan />;
   if (pane === 'export') return <Export />;
   return <Stats />;
 }
