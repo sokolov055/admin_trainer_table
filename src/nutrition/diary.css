@@ -53,13 +53,31 @@
 .diary-track--protein > span { background: var(--macro-protein); }
 .diary-track--fat > span { background: var(--macro-fat); }
 .diary-track--carbs > span { background: var(--macro-carbs); }
-/* «Осталось …» и «Что влезет» — шапка правой колонки; подбор блюд — подвал
-   карточки под чертой, кнопка во всю ширину */
+/* «Осталось …» — шапка правой колонки; «Что съесть на …» — подвал карточки
+   под чертой, строкой-ссылкой во всю ширину (FT-744) */
 .diary-summary__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
 .diary-summary__head > strong { font-size: var(--text-md); font-weight: 650; }
-.diary-plan-row { margin: var(--space-4) calc(-1 * var(--space-4)) 0; padding: var(--space-4) var(--space-4) 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-2); }
-.diary-plan-row .button { align-self: stretch; }
-.diary-plan-row p { margin: 0; }
+.diary-next { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: calc(100% + 2 * var(--space-4)); min-height: 48px; margin: var(--space-4) calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4); border: 0; border-top: 1px solid var(--border); background: none; color: var(--accent); font: inherit; font-size: var(--text-base); font-weight: 600; text-align: left; cursor: pointer; transition: background-color var(--dur-press) var(--ease-out); }
+.diary-next:active { background: var(--surface-active); }
+.diary-next svg { flex: none; }
+@media (hover: hover) and (pointer: fine) { .diary-next:hover { background: var(--surface-hover); } }
+
+/* ---------- Записать еду (FT-744) ----------
+   Сразу под итогом: фото — во всю ширину заливкой акцента (главное действие),
+   под ним поиск и штрихкод поровну. Без фото главным становится поиск. */
+.diary-add { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.diary-add__row { display: flex; gap: var(--space-2); }
+.diary-add__row .button { flex: 1 1 0; gap: 6px; min-height: 48px; }
+.photo-hero { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 64px; padding: var(--space-3) var(--space-4); border: 0; border-radius: var(--radius); background: var(--accent-fill); color: var(--accent-text); font: inherit; text-align: left; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform var(--dur-press) var(--ease-out); }
+.photo-hero:active { transform: scale(0.98); }
+.photo-hero__icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: color-mix(in srgb, var(--accent-text) 18%, transparent); }
+.photo-hero__text { display: grid; gap: 2px; min-width: 0; }
+.photo-hero__text strong { font-size: var(--text-md); font-weight: 650; line-height: 1.2; }
+.photo-hero__text small { font-size: var(--text-sm); color: color-mix(in srgb, var(--accent-text) 82%, transparent); }
+.sheet .photo-hero { margin-bottom: var(--space-3); }
+.plate-photo__meal { margin-top: var(--space-3); }
+.recipe-entries { margin-bottom: var(--space-3); }
+@media (prefers-reduced-motion: reduce) { .photo-hero, .diary-next { transition: none; } .photo-hero:active { transform: none; } }
 
 /* ---------- Приёмы пищи ---------- */
 /* Четыре приёма — строки одной карточки, а не четыре карточки на рисунке:
@@ -105,8 +123,6 @@ button.diary-food-main:active { background: var(--surface-active); }
 /* ---------- «Добавить еду» внизу и завершение дня (FT-646) ----------
    Главное действие экрана — в зоне большого пальца, над панелью вкладок,
    а не в левом верхнем углу. */
-.diary-addbar { position: sticky; bottom: var(--float-bottom); z-index: 5; display: flex; justify-content: center; margin-top: var(--space-4); pointer-events: none; }
-.diary-addbar .button { pointer-events: auto; min-height: 52px; padding-inline: var(--space-6); border-radius: 999px; font-size: var(--text-base); box-shadow: var(--shadow-lg); }
 .diary-day-done { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .diary-day-done strong { font-size: var(--text-base); }
 .diary-day-done p { margin: 2px 0 0; }

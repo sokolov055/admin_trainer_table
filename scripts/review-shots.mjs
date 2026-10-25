@@ -67,13 +67,14 @@ const SCENARIOS = [
   // 2. Обычный день в граммах: поиск, «Только калории», кадр сканера, вода, «Завершить день»
   { id: 'n2-day', query: '', steps: [
     S.tab('Питание'), S.click('Считаю калории и хочу точности'), S.click('Продолжить'), S.wait(600),
-    S.click('Добавить в обед'), S.fill('Поиск продуктов и блюд', 'овс'), S.wait(700), S.shot('01-search'),
+    S.shot('00-diary-top'), S.click('Добавить в обед'), S.wait(400), S.shot('00b-picker'), S.fill('Поиск продуктов и блюд', 'овс'), S.wait(700), S.shot('01-search'),
     S.eval(async page => { await page.getByRole('dialog').locator('button').filter({ hasText: /овс/i }).first().click(); }), S.wait(400), S.shot('02-entry-form'),
     S.dialog(/^Записать/), S.wait(700),
     S.click('Добавить в обед'), S.dialog('Ещё способы'), S.dialog('Только калории'), S.wait(400), S.shot('03-quick'),
     S.fill('Калории, ккал', '650'), S.fill('Что это было', 'Бизнес-ланч'), S.shot('04-quick-filled'),
     S.dialog(/^Добавить \d/), S.wait(700), S.shot('05-quick-saved', true),
-    S.click('Добавить в обед'), S.dialog('Ещё способы'), S.dialog('Фото этикетки'), S.wait(400), S.shot('06-scan-guide'),
+    S.click('Добавить в обед'), S.dialog('Ещё способы'), S.dialog('Новый продукт'), S.dialog('Распознать этикетку'), S.wait(400), S.shot('06-scan-guide'),
+    S.close(), S.wait(300),
     S.close(), S.wait(300),
     S.click(/250 мл/), S.wait(500), S.shot('07-water', true),
     S.click('Завершить день'), S.wait(400), S.shot('08-finish-sheet'),
@@ -95,7 +96,7 @@ const SCENARIOS = [
     S.click('Ужин'), S.click('Быстро'), S.wait(300), S.shot('02-filtered', true),
     S.eval(async page => { await page.locator('.nutrition-diary').getByRole('button', { name: /^Добавить$/ }).first().click(); }), S.wait(400), S.shot('03-add-sheet'),
     S.dialog(/^Записать/), S.wait(700), S.click('Дневник'), S.wait(400), S.shot('04-added', true),
-    S.click('Рецепты'), S.click('Из того, что есть'), S.wait(600), S.shot('05-fridge', true),
+    S.click('Рецепты'), S.click(/^Из того, что есть дома/), S.wait(600), S.shot('05-fridge', true),
   ] },
   // 5. «+» на всех вкладках
   { id: 'n5-plus', query: '', steps: [

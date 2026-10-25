@@ -16,7 +16,6 @@
 .swap-details .swap-list { margin-top: var(--space-1, 4px); }
 
 /* ---------- «Что влезет» ---------- */
-.diary-snack-btn { flex: none; min-height: 32px; padding-block: 0; color: var(--accent-ink, var(--accent)); font-weight: 600; }
 .snack-list { margin-top: var(--space-2); }
 .snack-list .diary-catalog-row .button { flex: none; }
 

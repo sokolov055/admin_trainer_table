@@ -33,11 +33,15 @@ test('FT-736: фото тарелки → проверка граммов → з
   await page.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
+  // FT-744: фото — первым в листе «Добавить еду» и главной кнопкой под итогом дня
   await page.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Ещё способы' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /Сфотографировать еду/ }).waitFor();
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(shots, 'ft736-picker.png') });
-  await page.getByRole('dialog').getByRole('button', { name: 'Фото блюда', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Закрыть' }).first().click();
+  await page.waitForTimeout(400);
+  // Первый раз — лист с подсказкой «как снять»
+  await page.locator('.diary-add').getByRole('button', { name: /Сфотографировать еду/ }).click();
   const sheet = page.getByRole('dialog', { name: /Еда по фото/ });
   await sheet.getByText('Положите рядом вилку или ложку').waitFor();
   await page.screenshot({ path: join(shots, 'ft736-guide.png') });
@@ -50,17 +54,27 @@ test('FT-736: фото тарелки → проверка граммов → з
     x.fillStyle = '#8a5a2b'; x.beginPath(); x.arc(600, 520, 180, 0, Math.PI * 2); x.fill();
     return c.toDataURL('image/jpeg', 0.9).split(',')[1];
   });
-  await sheet.getByLabel('Снять тарелку').setInputFiles({ name: 'plate.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(jpeg, 'base64') });
+  const plate = { name: 'plate.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(jpeg, 'base64') };
+  await sheet.getByLabel('Снять тарелку').setInputFiles(plate);
   const list = sheet.getByRole('list', { name: 'Распознанные блюда' });
   await list.waitFor();
   assert.equal(await list.getByRole('listitem').count(), 3);
   await sheet.getByLabel('Граммы: Котлета куриная').fill('150');
+  // Приём угадан по часам — меняется до записи
+  await sheet.getByRole('group', { name: 'Куда записать' }).getByRole('button', { name: 'Обед' }).click();
   await sheet.getByRole('button', { name: 'Убрать Огурец свежий' }).click();
   assert.equal(await list.getByRole('listitem').count(), 2);
   await page.screenshot({ path: join(shots, 'ft736-result.png'), fullPage: false });
   await sheet.getByRole('button', { name: /^Добавить \d+ ккал$/ }).click();
   await page.getByText(/По фото записано: \d+ ккал, 2 блюда/).waitFor();
   await page.getByText('Котлета куриная, ~150 г').first().waitFor();
+  const lunch = await page.locator('.diary-meal').filter({ has: page.getByRole('heading', { name: 'Обед' }) }).innerText();
+  assert.match(lunch, /Котлета куриная/, 'записано в выбранный приём');
+
+  // Второй раз подсказки нет: кнопка сразу открывает камеру, снимок — сразу в распознавание
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.diary-add').getByRole('button', { name: /Сфотографировать еду/ }).click()]);
+  await chooser.setFiles(plate);
+  await page.getByRole('dialog', { name: /Еда по фото/ }).getByRole('list', { name: 'Распознанные блюда' }).waitFor();
   assert.deepEqual(pageErrors, []);
   void sent;
 });

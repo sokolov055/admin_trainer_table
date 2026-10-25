@@ -89,7 +89,7 @@ test('тур раздела — только его шаги, 3–4, кажды�
   }
   // Меню «Ещё» — только в первом входе: тур раздела запускают из меню
   assert.deepEqual(tourSteps({ section: 'overview' }).map((s) => s.title), ['Обзор — главное на сегодня', 'Сегодня', 'Истории']);
-  assert.ok(Object.values(tourSteps({ section: 'nutrition' })[2].target).some((t) => /diary-addbar/.test(t)));
+  assert.ok(Object.values(tourSteps({ section: 'nutrition' })[2].target).some((t) => /\.diary-add$/.test(t)));
   const workout = tourSteps({ section: 'workout' });
   assert.deepEqual(workout.map((s) => s.title), ['Тренировки', 'Начать тренировку', '«Легко», «Норм» или «Тяжело»', 'Выполненные']);
   assert.ok(workout.every((s) => s.tab === 'plan'));

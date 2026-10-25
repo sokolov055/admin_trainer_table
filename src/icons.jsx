@@ -239,6 +239,21 @@ export const IconSearch = (p) => (
   </Icon>
 );
 
+/** Еда по фото (FT-744) — камера */
+export const IconCamera = (p) => (
+  <Icon {...p}>
+    <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </Icon>
+);
+
+/** Штрихкод продукта (FT-744) */
+export const IconBarcode = (p) => (
+  <Icon {...p}>
+    <path d="M4 6v12M8 6v12M11 6v12M15 6v12M18 6v12M20 6v12" />
+  </Icon>
+);
+
 export const IconRefresh = (p) => (
   <Icon {...p}>
     <path d="M20 12a8 8 0 1 1-2.5-5.8" />

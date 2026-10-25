@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiMutate } from '../api.js';
 import { Note, Sheet } from '../ui.jsx';
 import { IconTrash } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { foodTitle } from './FoodFields.jsx';
 import ScanGuide from './ScanGuide.jsx';
-import { label, requestId, decimal } from './diary-model.js';
+import { DIARY_MEALS, label, requestId, decimal } from './diary-model.js';
 import { ErrorNote, n } from './diary-ui.jsx';
 import './food-scan.css';
 
@@ -40,10 +40,18 @@ function rowValues(it) {
   return { grams, kcal: per(src.kcal, grams), protein: per(src.protein, grams), fat: per(src.fat, grams), carbs: per(src.carbs, grams) };
 }
 
-export function PlatePhoto({ day, meal, onClose, onSaved }) {
+// «Как снять» показываем, пока человек ни разу не получил список по фото;
+// дальше «Сфотографировать еду» в дневнике сразу открывает камеру (FT-744)
+const GUIDE_KEY = 'plate_guide_seen_v1';
+export const plateGuideSeen = () => { try { return !!localStorage.getItem(GUIDE_KEY); } catch { return false; } };
+const markGuideSeen = () => { try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* не запомнили — подсказка покажется ещё раз */ } };
+
+// file — снимок, уже сделанный камерой из дневника: лист сразу его распознаёт
+export function PlatePhoto({ day, meal: initialMeal, file, onClose, onSaved }) {
   const [image, setImage] = useState(''), [result, setResult] = useState(null), [items, setItems] = useState([]);
-  const [busy, setBusy] = useState(''), [error, setError] = useState(null);
+  const [busy, setBusy] = useState(''), [error, setError] = useState(null), [meal, setMeal] = useState(initialMeal);
   const camera = useRef(null), gallery = useRef(null), sequence = useRef(0);
+  useEffect(() => { if (file) void take(file); }, []);
 
   const take = async file => {
     if (!file) return;
@@ -57,6 +65,7 @@ export function PlatePhoto({ day, meal, onClose, onSaved }) {
       if (ticket !== sequence.current) return;
       setResult(data);
       setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, grams: String(it.grams) })));
+      if (data.items.length) markGuideSeen();
       haptic('success');
     } catch (e) { if (ticket === sequence.current) setError(e); }
     finally { if (ticket === sequence.current) setBusy(''); }
@@ -96,7 +105,7 @@ export function PlatePhoto({ day, meal, onClose, onSaved }) {
   // один раз экраном-разрешением перед открытием всем (docs/legal, FT-736)
   return <Sheet title={'Еда по фото · ' + label(meal)} dirty={items.length > 0} locked={!!busy} onClose={onClose}>
     <div className="plate-photo">
-      {!image && <ScanGuide mode="plate" />}
+      {!image && !busy && <ScanGuide mode="plate" />}
       {image && <img className="food-scan-preview plate-photo__preview" src={image} alt="Снимок тарелки" />}
       <div className="diary-inline-actions">
         <button type="button" className={'button' + (image ? '' : ' button--primary')} disabled={!!busy} onClick={() => camera.current.click()}>{image ? 'Переснять' : 'Сделать снимок'}</button>
@@ -128,6 +137,8 @@ export function PlatePhoto({ day, meal, onClose, onSaved }) {
             </li>;
           })}
         </ul>
+        {/* Приём угадан по часам — поправить можно здесь же, до записи */}
+        <div className="chips chips--wrap chips--flush plate-photo__meal" role="group" aria-label="Куда записать">{DIARY_MEALS.map(m => <button key={m.id} type="button" className={'chip' + (meal === m.id ? ' chip--active' : '')} aria-pressed={meal === m.id} onClick={() => setMeal(m.id)}>{m.label}</button>)}</div>
         <div className="diary-form-footer">
           <button type="button" className="button button--primary" disabled={!!busy || !kept.length} onClick={save}>Добавить {n(total)} ккал</button>
         </div>
