@@ -152,8 +152,11 @@ function localStorageHas(key) {
   try { return localStorage.getItem(key) !== null; } catch (_) { return true; }
 }
 
-/** Карточка на «Обзоре» / в «Прогрессе». own — свой кабинет клиента */
-export default function DayCard({ clientRow, own = false }) {
+/**
+ * Карточка на «Обзоре» / в «Прогрессе». own — свой кабинет клиента (с
+ * плашкой закрытого кольца), mine — «Мои тренировки» тренера
+ */
+export default function DayCard({ clientRow, own = false, mine = false }) {
   const params = clientRow ? { clientRow } : {};
   const res = useData('client.day', params, [clientRow], { live: LIVE_MS });
   const [open, setOpen] = useState(false);
@@ -172,7 +175,7 @@ export default function DayCard({ clientRow, own = false }) {
           </div>
         )}
         <div className="day-card__head">
-          <h2 className="day-card__title">{own ? 'Мой день' : 'День клиента'}</h2>
+          <h2 className="day-card__title">{own || mine ? 'Мой день' : 'День клиента'}</h2>
           {data.inGoal && <span className="day-card__goal">день в цель</span>}
         </div>
         <button type="button" className="day-card__body" onClick={() => setOpen(true)}>

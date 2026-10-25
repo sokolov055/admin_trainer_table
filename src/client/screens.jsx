@@ -1757,7 +1757,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         {/* Плашка цели — только здесь (владелец, 21.10.2026: на каждом
             экране она мешала; цель — разговор о прогрессе) */}
         {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
-        {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} />}
+        {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} mine={self} />}
         {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
         {!familyRow && <Summary clientRow={clientRow} />}
         <Empty
@@ -1869,7 +1869,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       )}
 
       {/* «Разбор дня» (FT-738): у клиента — на «Обзоре», тренеру — здесь */}
-      {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} />}
+      {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} mine={self} />}
       {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
       {!familyRow && <Summary clientRow={clientRow} />}
 
