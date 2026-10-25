@@ -32,8 +32,8 @@ const stubs = {
   gestures: `export const useBackGesture=()=>{};`,
   offline: `export const localWrites=async()=>[]; export const onWritesChange=()=>()=>{}; export const queueWrite=async(k,p)=>{globalThis.__diary.queued.push({kind:k,params:p})}; export const isOffline=e=>e?.code===0; export const dropWrite=async()=>{};`,
   account: `export const offlineAccount=()=> 'unit-account';`,
-  ui: `import React from 'react'; export const Section=({children})=><section>{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Loading=()=> <div>Загрузка</div>;export const Sheet=({title,children})=><section role="dialog"><h2>{title}</h2>{children}</section>;export const formatNumber=n=>String(n);export const Qty=({value,unit})=><span>{value}{unit?' '+unit:''}</span>;export const BackButton=({label,onClick})=><button aria-label={'Назад: '+label} onClick={onClick}>{label}</button>;export const Chips=({items,value,onChange,label})=><div role="tablist" aria-label={label}>{items.map(i=><button key={i.value} role="tab" aria-selected={i.value===value} onClick={()=>onChange(i.value)}>{i.label}</button>)}</div>;`,
-  icons: `import React from 'react';const I=()=> <i/>; export const IconPlus=I,IconMinus=I,IconClose=I,IconHeart=I,IconCopy=I,IconTrash=I,IconChevron=I,IconNutrition=I,IconCheck=I,IconSearch=I,IconCamera=I,IconBarcode=I;`,
+  ui: `import React from 'react'; export const Section=({children})=><section>{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Loading=()=> <div>Загрузка</div>;export const Sheet=({title,children})=><section role="dialog"><h2>{title}</h2>{children}</section>;export const formatNumber=n=>String(n);export const useEdgeFade=()=>'';export const plural=(n,a,b,c)=>n%10===1&&n%100!==11?a:n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?b:c;export const Qty=({value,unit})=><span>{value}{unit?' '+unit:''}</span>;export const BackButton=({label,onClick})=><button aria-label={'Назад: '+label} onClick={onClick}>{label}</button>;export const Chips=({items,value,onChange,label})=><div role="tablist" aria-label={label}>{items.map(i=><button key={i.value} role="tab" aria-selected={i.value===value} onClick={()=>onChange(i.value)}>{i.label}</button>)}</div>;`,
+  icons: `import React from 'react';const I=()=> <i/>; export const IconPlus=I,IconMinus=I,IconClose=I,IconHeart=I,IconCopy=I,IconTrash=I,IconChevron=I,IconNutrition=I,IconCheck=I,IconSearch=I,IconCamera=I,IconBarcode=I,IconSliders=I;`,
   // Смахивание и «Вернуть» — свои модули с проверками; здесь удаление уходит сразу, чтобы видеть вызов сервера.
   SwipeRow: `import React from 'react'; export default ({children,onDelete,label,disabled})=><div data-swipe={label} data-disabled={disabled?'1':''}><button aria-label={label} onClick={onDelete}>x</button>{children}</div>;`,
   pendingDelete: `export const usePendingDelete=(commit,{onDone,onError}={})=>({remove:(id,payload)=>{globalThis.__diary.removed.push(id);Promise.resolve(commit(payload)).then(()=>onDone&&onDone(payload),e=>onError&&onError(e));},hidden:()=>false,bar:null,flush(){}});`,
@@ -301,6 +301,8 @@ test('углеводы по дням: клиент видит цель дня с
   assert.match(text, /Каша с бананом/);
   assert.doesNotMatch(text, /Омлет с сыром/, 'в день тренировки по умолчанию — блюда с углеводами');
   assert.match(text, /углеводов много/, 'подпись уровня у блюда');
+  assert.match(text, /Углеводов много/, 'включённый фильтр — строкой под рядом (FT-745)');
+  await act(async () => tree.root.findAll(n => n.type === 'button' && /^Фильтры/.test(n.props['aria-label'] || ''))[0].props.onClick());
   await act(async () => tree.root.findAll(n => n.type === 'button' && n.props.children === 'Любые')[0].props.onClick());
   assert.match(screen(tree), /Омлет с сыром/);
   tree.unmount();

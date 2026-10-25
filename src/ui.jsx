@@ -494,7 +494,7 @@ function useActiveInView(rowRef, value) {
  * подразделов (SubNav) и фильтров (Chips): на «Клиентах» фильтры
  * «Требуют внимания» обрезались краем без всякого намёка (FT-567).
  */
-function useEdgeFade(ref) {
+export function useEdgeFade(ref) {
   const [edges, setEdges] = useState('');
   useLayoutEffect(() => {
     const el = ref.current;

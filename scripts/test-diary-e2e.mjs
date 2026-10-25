@@ -622,8 +622,12 @@ test('план трёх разборов, пп. 10–11: норма по при�
   await diary.getByText(/из 600 ккал/).first().waitFor();
   await diary.getByText(/можно ещё 600/).first().waitFor();
   await diary.getByRole('tab', { name: 'Рецепты', exact: true }).click();
-  await diary.getByRole('button', { name: /под остаток$/ }).waitFor();
-  assert.equal(await diary.getByRole('button', { name: /под остаток$/ }).getAttribute('aria-pressed'), 'true');
+  // FT-745: калорийность — в листе «Фильтры», на экране — строка «Под остаток …»
+  await diary.getByText(/^Под остаток/).waitFor();
+  await diary.getByRole('button', { name: /^Фильтры/ }).click();
+  assert.equal(await dialog().getByRole('button', { name: /под остаток$/ }).getAttribute('aria-pressed'), 'true');
+  await dialog().getByRole('button', { name: /^Показать|^Блюд нет/ }).click();
+  await dialog().waitFor({ state: 'detached' });
   await diary.getByRole('button', { name: 'Ужин', exact: true }).click();
   await diary.getByText('Влезает в остаток', { exact: false }).first().waitFor();
   await page.screenshot({ path: join(shots, 'diary-recipes-390.png') });

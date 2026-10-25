@@ -76,7 +76,7 @@ const SCENARIOS = [
     S.click('Добавить в обед'), S.dialog('Ещё способы'), S.dialog('Новый продукт'), S.dialog('Распознать этикетку'), S.wait(400), S.shot('06-scan-guide'),
     S.close(), S.wait(300),
     S.close(), S.wait(300),
-    S.click(/250 мл/), S.wait(500), S.shot('07-water', true),
+    S.click('+ 250 мл'), S.wait(500), S.shot('07-water', true),
     S.click('Завершить день'), S.wait(400), S.shot('08-finish-sheet'),
     S.dialog('Завершить день'), S.wait(700), S.shot('09-day-done', true),
     S.click('Дописать'), S.wait(500), S.shot('10-reopened', true),
@@ -93,7 +93,7 @@ const SCENARIOS = [
   { id: 'n4-recipes', query: '', steps: [
     S.tab('Питание'), S.click('Считаю калории и хочу точности'), S.click('Продолжить'), S.wait(600),
     S.click('Рецепты'), S.wait(600), S.shot('01-recipes', true),
-    S.click('Ужин'), S.click('Быстро'), S.wait(300), S.shot('02-filtered', true),
+    S.click('Завтрак'), S.click(/^Фильтры/), S.wait(400), S.shot('01b-filters'), S.dialog(/^Показать|^Блюд нет/), S.wait(500), S.shot('02-filtered', true),
     S.eval(async page => { await page.locator('.nutrition-diary').getByRole('button', { name: /^Добавить$/ }).first().click(); }), S.wait(400), S.shot('03-add-sheet'),
     S.dialog(/^Записать/), S.wait(700), S.click('Дневник'), S.wait(400), S.shot('04-added', true),
     S.click('Рецепты'), S.click(/^Из того, что есть дома/), S.wait(600), S.shot('05-fridge', true),

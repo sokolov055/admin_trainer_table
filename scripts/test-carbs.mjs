@@ -133,7 +133,7 @@ const stubs = {
   api: `export const apiPublic=(a,p)=>globalThis.__ration.read(a,p);export const apiMutate=async()=>({});export const apiStale=()=>null;`,
   gestures: `export const useTabLock=()=>{}; export const useBackGesture=()=>{};`,
   telegram: `export const haptic=()=>{};`,
-  ui: `import React from 'react'; export const Section=({title,children})=><section>{title&&<h3>{title}</h3>}{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Search=()=>null;export const formatNumber=n=>String(n);export const plural=(n,a,b,c)=>a;export const Sheet=({title,children})=><section role="dialog"><h2>{title}</h2>{children}</section>;export const BackButton=({label,onClick})=><button aria-label={'Назад: '+label} onClick={onClick}>{label}</button>;`,
+  ui: `import React from 'react'; export const Section=({title,children})=><section>{title&&<h3>{title}</h3>}{children}</section>;export const Panel=({children})=><div>{children}</div>;export const Note=({children})=><aside>{children}</aside>;export const Search=()=>null;export const formatNumber=n=>String(n);export const useEdgeFade=()=>'';export const plural=(n,a,b,c)=>a;export const Sheet=({title,children})=><section role="dialog"><h2>{title}</h2>{children}</section>;export const BackButton=({label,onClick})=><button aria-label={'Назад: '+label} onClick={onClick}>{label}</button>;`,
   icons: `import React from 'react';const I=()=> <i/>; export const IconCheck=I,IconClose=I,IconBack=I,IconNutrition=I,IconShare=I;`,
   Extras: `export default ()=>null;`,
   Diary: `export const DiaryEntryForm=()=>null;`,

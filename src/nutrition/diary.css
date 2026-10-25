@@ -273,6 +273,13 @@ button.diary-food-main:active { background: var(--surface-active); }
 /* Рецепты под остаток нормы (план трёх разборов, п. 11) */
 .recipe-filters { margin-bottom: var(--space-3); }
 .recipe-filters__label { margin: var(--space-2) 0 0; font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+/* FT-745: на экране — «Фильтры · N» и приёмы одним рядом, остальное в листе */
+.recipe-filters__open { display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
+.recipe-filters__count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent-fill); color: var(--accent-text); font-size: var(--text-xs); line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.recipe-filters__now { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.recipe-filters .carb-hint { margin: var(--space-2) 0 0; }
+.recipe-filters__reset { margin-top: var(--space-3); }
+.recipe-empty { display: grid; justify-items: start; gap: var(--space-2); }
 .recipe-fits { color: var(--good-text) !important; }
 
 /* «Добавить еду» без плиток (25.10.2026): фото блюда и штрихкод — кнопками в поле поиска */

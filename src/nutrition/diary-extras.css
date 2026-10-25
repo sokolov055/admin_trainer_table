@@ -20,5 +20,7 @@
 .snack-list .diary-catalog-row .button { flex: none; }
 
 /* ---------- Без ограничений, рядом с водой ---------- */
-.free-marks { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
-.free-marks__head { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+/* Одна строка (FT-745): подпись на месте, чипы листаются вбок с затуханием края */
+.free-marks { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-1); border-top: 1px solid var(--border); }
+.free-marks__head { flex: none; font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+.free-marks__row { flex: 1; min-width: 0; }

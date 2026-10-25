@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiPublic, apiMutate } from '../api.js';
-import { Note, Sheet, formatNumber } from '../ui.jsx';
+import { Note, Sheet, formatNumber, useEdgeFade } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { queueWrite, isOffline } from '../offline-writes.js';
 import { CATALOG, setCatalog } from './catalog.js';
@@ -141,11 +141,12 @@ export function SnackIdeas({ remaining, onPick, onClose }) {
  * Отметки «без ограничений» рядом с водой: 0 ккал, одним нажатием, без
  * поиска. Запись — обычная запись дневника (kind 'free'), её видно в приёме
  * пищи и можно удалить смахиванием. Без связи — в очередь телефона, как
- * любая запись.
+ * любая запись. Одной строкой, листается вбок (FT-745): заголовок и два
+ * ряда чипов под водой занимали больше места, чем сама вода.
  */
 export function FreeMarks({ day, meal, disabled, onSaved, onError }) {
   const [busy, setBusy] = useState('');
-  const tokens = useRef({});
+  const tokens = useRef({}), row = useRef(null), edges = useEdgeFade(row);
   const mark = async id => {
     const preview = freeSnapshot(id);
     tokens.current[id] ||= requestId();
@@ -159,5 +160,5 @@ export function FreeMarks({ day, meal, disabled, onSaved, onError }) {
       } else onError(err);
     } finally { setBusy(''); }
   };
-  return <div className="free-marks"><p className="free-marks__head">Без ограничений · 0 ккал</p><div className="chips chips--wrap chips--flush" role="group" aria-label="Без ограничений, 0 ккал">{Object.entries(FREE).map(([id, f]) => <button key={id} type="button" className="chip" disabled={disabled || !!busy} aria-label={f.name + ': записать, 0 ккал'} onClick={() => mark(id)}>{busy === id ? 'Записываю…' : '+ ' + f.short}</button>)}</div></div>;
+  return <div className="free-marks"><span className="free-marks__head" aria-hidden="true">0 ккал</span><div ref={row} className={'chips chips--flush free-marks__row' + edges} role="group" aria-label="Без ограничений, 0 ккал">{Object.entries(FREE).map(([id, f]) => <button key={id} type="button" className="chip" disabled={disabled || !!busy} aria-label={f.name + ': записать, 0 ккал'} onClick={() => mark(id)}>{busy === id ? 'Записываю…' : '+ ' + f.short}</button>)}</div></div>;
 }
