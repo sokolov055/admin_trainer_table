@@ -12,7 +12,7 @@
  * старой сборке, на Android и в браузере всё здесь молча ничего не делает.
  */
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
-import { trackOf, volumeOf, setText as trackSetText } from './exercise-track.js';
+import { trackOf, byTime, volumeOf, setText as trackSetText } from './exercise-track.js';
 import { closeSets, resultIssue, withSet, withWarmup } from './workout-model.js';
 import { rateSet, isDumbbell, stepOf, suggestText, isAssisted, assistStep, settleOrder, tiredText } from './effort.js';
 
@@ -215,6 +215,10 @@ export function setQueue(s) {
       ...(suggestText(set, prevOf(ex, set), ex) || tiredText(ex, set) ? { suggest: suggestText(set, prevOf(ex, set), ex) || tiredText(ex, set) } : {}),
       // Отдых после этого подхода, если у упражнения он свой (20.10.2026)
       ...(ex.rest ? { rest: ex.rest } : {}),
+      // Результату нужны повторы, а их нет («Рукоход» без повторов в
+      // программе, FT-753): часы спросят их до оценки — иначе отметку не
+      // примут ни сервер, ни телефон
+      ...(needsReps(set, ex) ? { needReps: true } : {}),
       reps: strength ? String(set.reps || '').trim() : '',
       amount: strength ? '' : setText(set, ex),
       exerciseDone: n - 1,
@@ -313,6 +317,8 @@ const mine = (ex, a) => ex.id === String(a.exerciseId || '');
 /** Куда писать вес с часов: у веса помощи — в помощь (FT-628) */
 const loadKey = (ex) => (isAssisted(ex) ? 'assist' : 'weight');
 const whose = (set, a) => (set.who || '') === String(a.who || '');
+/** Подходу нужны повторы, а их нет (FT-753): не кардио и не на время */
+const needsReps = (set, ex) => !byTime(trackOf(ex)) && !(/^\d+$/.test(String(set.reps || '').trim()) && Number(set.reps) >= 1);
 /** Подход без подсказки веса — вес вписали с часов */
 const omitSuggest = ({ suggest, ...set }) => set;
 
@@ -370,7 +376,9 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         if (!target || target.state !== 'pending') return ex;
         marked = true;
         const next = { ...ex, sets: ex.sets.map((set) => set !== target ? set
-          : { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { [loadKey(ex)]: String(a.weight) } : {}) }) };
+          : { ...set, state: 'done', ...(WEIGHT_RE.test(String(a.weight || '')) ? { [loadKey(ex)]: String(a.weight) } : {}),
+            // Повторы, спрошенные часами (needReps, FT-753)
+            ...(/^\d{1,3}$/.test(String(a.reps ?? '')) && Number(a.reps) >= 1 ? { reps: String(a.reps) } : {}) }) };
         // Оценка с часов (03.10.2026): вес следующих подходов — по effort.js
         return isEffort(a.effort) ? rateSet(next, ex.sets.indexOf(target), a.effort).ex : next;
       }) };

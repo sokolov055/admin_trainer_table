@@ -372,3 +372,16 @@ test('FT-754: вес с часов снимает подсказку «−1 кг
   assert.equal(tiredText(worked, worked.sets[1]), '');
   assert.equal(tiredToday(tired, worked.sets), '');
 });
+
+test('FT-753: подход без повторов — часам needReps; повторы с часов приходят с отметкой, занятие сохраняется', () => {
+  const s = record({ exercises: [
+    { id: 'e1', name: 'Рукоход', track: { kind: 'bodyweight' }, sets: [set('pending', '', ''), set('pending', '', '8')] },
+  ] }).session;
+  const q = la.setQueue(s);
+  assert.deepEqual(q.map((x) => !!x.needReps), [true, false]);
+  const out = la.applyChecked(s, [{ kind: 'done', sessionId: 's1', exerciseId: 'e1', who: '', weight: '', setIndex: 0, effort: 'hard', reps: '6' }]);
+  assert.deepEqual(out.exercises[0].sets.map((x) => [x.state, x.reps]), [['done', '6'], ['pending', '8']]);
+  // Кардио и на время повторов не просят
+  const timed = record({ exercises: [{ id: 'e2', name: 'Планка', track: { kind: 'timed' }, sets: [set('pending', '', '')] }] }).session;
+  assert.equal(la.setQueue(timed)[0].needReps, undefined);
+});

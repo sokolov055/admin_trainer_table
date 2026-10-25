@@ -358,9 +358,14 @@ export function rateSet(ex, si, effort) {
       // перескакивало на третий, а второй оставался 15)
       else {
         const near = ex.sets.findIndex((x, i) => i > si && mine(x) && x.state === 'pending' && x.kind !== 'warmup');
-        if (near >= 0 && m.has(ex.sets[near]) && m.load(ex.sets[near]) < cur) {
-          to = (w, i) => (i === near && w < cur ? cur : null); dir = 1; suggest = 'kept';
-          touch = (x, i) => i === near;
+        const lifted = new Set(near >= 0 && m.has(ex.sets[near]) && m.load(ex.sets[near]) < cur ? [near] : []);
+        // Шаг на усталость (settleOrder) не взяли — сделали тяжелее
+        // подсказанного, и «Норм» (владелец, 26.10.2026, FT-754): все
+        // подходы со снятым шагом — до сделанного, а не по одному
+        ex.sets.forEach((x, i) => { if (open(x, i) && x.suggest === 'tired' && m.has(x) && m.load(x) < cur) lifted.add(i); });
+        if (lifted.size) {
+          to = (w, i) => (lifted.has(i) && w < cur ? cur : null); dir = 1; suggest = 'kept';
+          touch = (x, i) => lifted.has(i);
         }
       }
     }
