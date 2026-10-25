@@ -38,6 +38,7 @@ import { signupLead, clearSignupLead } from '../login-route.js';
 import { useFirstSteps, FirstHint, FirstRegime } from './FirstSteps.jsx';
 import Tour from './Tour.jsx';
 import TodayStrip from './TodayStrip.jsx';
+import DayCard from './DayReview.jsx';
 import Help from './Help.jsx';
 import { tourSections, markTourPassed } from './tour-model.js';
 import { forgetFocus } from './focus.jsx';
@@ -517,7 +518,9 @@ export default function ClientApp({ me, clientRow, preview }) {
           {t.id === 'overview' && (personal ? <Stories personal={personal} onOpen={openFromStory} /> : <StoriesWait />)}
           {/* «Сегодня» — три числа с подписями (FT-646); только в своём
               кабинете. Пока едет — свой скелетон (TodayStrip) */}
-          {t.id === 'overview' && own && <TodayStrip onOpen={go} />}
+          {/* «Мой день» — кольца и совет (FT-738) вместо «Сегодня»; пока
+              только тестовым (me.dayReview), остальным — прежние три числа */}
+          {t.id === 'overview' && own && (me && me.dayReview ? <DayCard own /> : <TodayStrip onOpen={go} />)}
           {/* Силовая с часов и первый день в режиме бывают не всегда — они
               встают под главной карточкой, а не над ней: появившись позже,
               не сдвигают «Оплачено вперёд» (аудит 24.10.2026) */}

@@ -577,6 +577,42 @@ function mockHealthDaily(params = {}) {
   return { from: days[0].date, days, latest, access };
 }
 
+// «Разбор дня»: правдоподобная неделя; сегодня — шаги почти добраны,
+// тренировка была, белка мало, сон короче обычного
+function mockDayReview(params = {}) {
+  if (new URLSearchParams(window.location.search).get('mockDay') !== '1') return { enabled: false };
+  const iso = (d) => new Date(Date.now() + 3 * 3600000 - d * 86400000).toISOString().slice(0, 10);
+  const today = iso(0);
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(params.day || '') ? params.day : today;
+  const back = Math.round((Date.parse(today) - Date.parse(day)) / 86400000);
+  const seed = (k) => ((back * 7 + k * 13) % 10) / 10;
+  const ringsOf = (b) => {
+    const s = b === 0 ? 0.86 : 0.6 + seed(1) * 0.7;
+    const trained = b === 0 || b % 3 === 2;
+    const food = b === 0 ? 0.47 : 0.7 + seed(2) * 0.4;
+    const sleep = b === 0 ? 0.81 : 0.85 + seed(3) * 0.3;
+    return [
+      { id: 'move', label: 'Движение', value: Math.round(8000 * s), target: 8000, progress: s, closed: s >= 1 },
+      { id: 'train', label: 'Тренировка', state: trained ? 'done' : 'rest', value: trained ? 58 : 0, doneWeek: 2, target: 3, progress: 1, closed: true },
+      { id: 'food', label: 'Питание', value: b === 0 ? 1490 : Math.round(1800 * food), target: 1800, protein: b === 0 ? 62 : Math.round(130 * food), proteinTarget: 130, progress: Math.min(food, 1), over: food > 1.1, closed: food >= 0.9 && food <= 1.1 },
+      { id: 'sleep', label: 'Сон', value: Math.round(420 * sleep), target: 420, usual: 430, progress: sleep, closed: sleep >= 1 },
+    ];
+  };
+  const rings = ringsOf(back);
+  const days = [...Array(7)].map((_, i) => {
+    const b = back + 6 - i;
+    const r = ringsOf(b);
+    return { day: iso(b), inGoal: r.every((x) => x.closed), rings: r.map(({ id, progress, closed, state }) => ({ id, progress, closed, state })) };
+  });
+  const tips = back === 0
+    ? [
+      { id: 'protein', side: 'food', text: 'Белка 62 из 130 г. Добавьте ещё 68 г — например, курицу или рыбу на обед и творог на ужин.' },
+      { id: 'steps', side: 'move', text: 'До нормы шагов 1 120 — это около 10 минут быстрой ходьбы.' },
+    ]
+    : [{ id: 'protein', side: 'food', text: `Белка было ${rings[2].protein} из 130 г.` }];
+  return { enabled: true, day, today, goal: 'muscle', goalLabel: 'Набрать мышцы', rings, inGoal: rings.every((x) => x.closed), tips, days };
+}
+
 function mockAwards(params = {}) {
   const now = new Date();
   const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1311,6 +1347,8 @@ const MOCK = {
     tgUsername: 'demo',
     photoUrl: '',
     plankGameEnabled: params.__role !== 'trainer' && new URLSearchParams(window.location.search).get('mockPlank') !== '0',
+    // ?mockDay=1 — «Мой день» с кольцами вместо «Сегодня» (FT-738)
+    dayReview: params.__role !== 'trainer' && new URLSearchParams(window.location.search).get('mockDay') === '1',
     hasPersonalSheet: true,
     // ?mockUnlinked=1 — клиент, зарегистрировавшийся сам, без тренера
     unlinked: new URLSearchParams(window.location.search).get('mockUnlinked') === '1',
@@ -2145,6 +2183,9 @@ const MOCK = {
   'client.awards': (params = {}) => mockAwards(params),
   'client.summary': (params = {}) => mockSummary(params),
   'client.summary.stories': () => mockSummaryStories(),
+  // «Разбор дня» (FT-738): в демо — только с ?mockDay=1, чтобы снимки и
+  // браузерные проверки «Обзора» не поменялись
+  'client.day': (params = {}) => mockDayReview(params),
   'client.goals.save': (params = {}) => {
     const week = Math.round(Number(params.week));
     const steps = Math.round(Number(params.steps) / 500) * 500;

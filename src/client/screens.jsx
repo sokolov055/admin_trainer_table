@@ -10,6 +10,7 @@ import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
 import HealthDaily, { SpentKcal } from './HealthDaily.jsx';
+import DayCard from './DayReview.jsx';
 import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
 import Wishes from './Wishes.jsx';
@@ -1756,6 +1757,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         {/* Плашка цели — только здесь (владелец, 21.10.2026: на каждом
             экране она мешала; цель — разговор о прогрессе) */}
         {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
+        {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} />}
         {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
         {!familyRow && <Summary clientRow={clientRow} />}
         <Empty
@@ -1866,6 +1868,8 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         />
       )}
 
+      {/* «Разбор дня» (FT-738): у клиента — на «Обзоре», тренеру — здесь */}
+      {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} />}
       {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
       {!familyRow && <Summary clientRow={clientRow} />}
 

@@ -168,6 +168,15 @@
   --effort-ok: #2672cd;
   --effort-hard: #b35600;
   --overtime: #a85a00;
+  /* Кольца «Разбора дня» (FT-738): данные, темой и палитрой не управляются */
+  --ring-move: #00b386;
+  --ring-move-end: #2ee6b0;
+  --ring-train: #2563ff;
+  --ring-train-end: #4da3ff;
+  --ring-food: #ff8a00;
+  --ring-food-end: #ffc21a;
+  --ring-sleep: #9b3df2;
+  --ring-sleep-end: #d77bff;
 
   /* --- глубина: смещение + мягкое размытие. Свечение без смещения —
          это декорация, а не тень. --- */
@@ -351,6 +360,14 @@
 
   --effort-ok: #2a74cf;
   --overtime: #ff9f0a;
+  --ring-move: #00e09a;
+  --ring-move-end: #6dffd2;
+  --ring-train: #3d7bff;
+  --ring-train-end: #6fc3ff;
+  --ring-food: #ff9500;
+  --ring-food-end: #ffd23f;
+  --ring-sleep: #b14dff;
+  --ring-sleep-end: #e597ff;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --pill-drop: rgba(0, 0, 0, 0.4);
@@ -429,6 +446,14 @@
 
     --effort-ok: #2a74cf;
     --overtime: #ff9f0a;
+    --ring-move: #00e09a;
+    --ring-move-end: #6dffd2;
+    --ring-train: #3d7bff;
+    --ring-train-end: #6fc3ff;
+    --ring-food: #ff9500;
+    --ring-food-end: #ffd23f;
+    --ring-sleep: #b14dff;
+    --ring-sleep-end: #e597ff;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --pill-drop: rgba(0, 0, 0, 0.4);
