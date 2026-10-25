@@ -1,0 +1,38 @@
+/* AI-сканер еды (FT-746): видоискатель во весь экран, рамка, подсказка снизу.
+   Поверх видео — всегда светлый текст на затемнении, в любой теме */
+.plate-scan { position: fixed; inset: 0; z-index: calc(var(--z-sheet) + 1); display: grid; grid-template-rows: auto 1fr auto; background: #000; color: #fff; animation: plate-scan-in var(--dur) var(--ease-out) both; }
+.plate-scan__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.plate-scan__top, .plate-scan__bottom { position: relative; z-index: 1; padding-inline: var(--space-4); }
+.plate-scan__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: calc(var(--space-3) + max(env(safe-area-inset-top, 0px), var(--inset-top, 0px))); padding-bottom: var(--space-6, 32px); background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent); }
+.plate-scan__badge { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); font-weight: 650; }
+.plate-scan__close { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.16); color: #fff; cursor: pointer; }
+
+.plate-scan__frame { position: relative; z-index: 1; align-self: center; justify-self: center; width: min(76vw, 52vh, 360px); aspect-ratio: 1; --corner: rgba(255, 255, 255, 0.9); }
+.plate-scan__frame.is-steady, .plate-scan__frame.is-ready { --corner: #22d3ee; }
+.plate-scan__frame i { position: absolute; width: 36px; height: 36px; border: 4px solid var(--corner); transition: border-color var(--dur-fast) var(--ease-out); }
+.plate-scan__frame i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 18px; }
+.plate-scan__frame i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 18px; }
+.plate-scan__frame i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 18px; }
+.plate-scan__frame i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 18px; }
+/* Луч ходит по рамке, пока сканер ищет; на «держите ровно» и при снимке — быстрее */
+.plate-scan__beam { position: absolute; left: 8%; right: 8%; top: 8%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #22d3ee, transparent); box-shadow: 0 0 12px #22d3ee; animation: plate-scan-beam 2.2s var(--ease-in-out, ease-in-out) infinite alternate; }
+.plate-scan__frame.is-steady .plate-scan__beam, .plate-scan__frame.is-ready .plate-scan__beam { animation-duration: 0.7s; }
+.plate-scan__frame.is-start .plate-scan__beam, .plate-scan__frame.is-dark .plate-scan__beam { opacity: 0; }
+
+.plate-scan__bottom { display: grid; gap: var(--space-3); padding-top: var(--space-6, 32px); padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, rgba(0, 0, 0, 0.65), transparent); text-align: center; }
+.plate-scan__hint { margin: 0; font-size: var(--text-md); font-weight: 600; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.plate-scan__bar { height: 4px; width: min(220px, 60%); justify-self: center; border-radius: 4px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
+.plate-scan__bar span { display: block; height: 100%; background: #22d3ee; transform-origin: left; transition: transform 150ms linear; }
+.plate-scan__actions { display: flex; gap: var(--space-3); }
+.plate-scan__actions button { flex: 1; min-height: 48px; border-radius: var(--radius); font: inherit; font-weight: 600; cursor: pointer; }
+.plate-scan__ghost { border: 1px solid rgba(255, 255, 255, 0.4); background: transparent; color: #fff; }
+.plate-scan__now { border: 0; background: #fff; color: #111; }
+.plate-scan__now:disabled { opacity: 0.5; cursor: default; }
+
+@keyframes plate-scan-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes plate-scan-beam { from { top: 8%; } to { top: 92%; } }
+@media (prefers-reduced-motion: reduce) {
+  .plate-scan { animation: none; }
+  .plate-scan__beam { animation: none; top: 50%; }
+  .plate-scan__bar span { transition: none; }
+}

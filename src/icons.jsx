@@ -247,6 +247,14 @@ export const IconCamera = (p) => (
   </Icon>
 );
 
+/** AI-сканер еды (FT-746) — рамка видоискателя с искрой */
+export const IconScan = (p) => (
+  <Icon {...p}>
+    <path d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3" />
+    <path d="M12 8.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" />
+  </Icon>
+);
+
 /** Штрихкод продукта (FT-744) */
 export const IconBarcode = (p) => (
   <Icon {...p}>

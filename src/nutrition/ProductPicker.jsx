@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiMutate } from '../api.js';
 import { Note, Loading, Sheet } from '../ui.jsx';
-import { IconHeart, IconChevron, IconCamera, IconBarcode } from '../icons.jsx';
+import { IconHeart, IconChevron, IconScan, IconBarcode } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { FoodFields, foodTitle, foodPer } from './FoodFields.jsx';
 import FoodScan from './FoodScan.jsx';
@@ -13,7 +13,7 @@ import { useDiaryResource, useOperation, Field, ErrorNote, n, macroLine } from '
  * же выбор ингредиента (ingredientsOnly).
  *
  * FT-744 (25.10.2026, владелец: «распознавание спрятано, а это наш козырь»):
- * сверху — «Сфотографировать еду» во всю ширину (когда фото доступно), под ним
+ * сверху — «Сканер еды · AI» (FT-746) во всю ширину (когда фото доступно), под ним
  * поиск со штрихкодом в поле. Под «Ещё» — три редких способа: «Новый продукт»
  * (этикетка камерой или вручную — бывшие «Фото этикетки» и «Свой продукт»,
  * лист один и тот же), «Только калории», «Ладонью». «Своё блюдо» отсюда
@@ -51,12 +51,12 @@ export function ProductPicker({ meal, onPick, onClose, onQuick, onPalm, onPhoto,
 }
 
 /**
- * «Сфотографировать еду» (FT-744) — главное действие добавления еды: кнопка
+ * «Сканер еды · AI» (FT-744, подпись FT-746) — главное действие добавления еды: кнопка
  * во всю ширину с заливкой акцента. Общая для дневника и листа «Добавить
  * еду», чтобы вид и подпись были одни.
  */
 export function PhotoHero({ onClick }) {
-  return <button type="button" className="photo-hero" onClick={onClick}><span className="photo-hero__icon"><IconCamera size={24} /></span><span className="photo-hero__text"><strong>Сфотографировать еду</strong><small>Блюда и граммы — по снимку</small></span></button>;
+  return <button type="button" className="photo-hero" onClick={onClick}><span className="photo-hero__icon"><IconScan size={24} /></span><span className="photo-hero__text"><strong>Сканер еды <span className="ai-badge">AI</span></strong><small>Наведите камеру на тарелку</small></span></button>;
 }
 
 function CustomProduct({ initialFields = {}, onCreated, onClose }) {

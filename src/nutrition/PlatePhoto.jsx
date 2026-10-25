@@ -40,14 +40,10 @@ function rowValues(it) {
   return { grams, kcal: per(src.kcal, grams), protein: per(src.protein, grams), fat: per(src.fat, grams), carbs: per(src.carbs, grams) };
 }
 
-// «Как снять» показываем, пока человек ни разу не получил список по фото;
-// дальше «Сфотографировать еду» в дневнике сразу открывает камеру (FT-744)
-const GUIDE_KEY = 'plate_guide_seen_v1';
-export const plateGuideSeen = () => { try { return !!localStorage.getItem(GUIDE_KEY); } catch { return false; } };
-const markGuideSeen = () => { try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* не запомнили — подсказка покажется ещё раз */ } };
-
-// file — снимок, уже сделанный камерой из дневника: лист сразу его распознаёт
-export function PlatePhoto({ day, meal: initialMeal, file, onClose, onSaved }) {
+// file — кадр AI-сканера (PlateScanner, FT-746): лист сразу его распознаёт, onRescan —
+// «Сканировать снова» обратно в видоискатель. Без file — запасной путь, когда
+// камеры в браузере нет (denied — не дали разрешение): «как снять» и снимок
+export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRescan, onClose, onSaved }) {
   const [image, setImage] = useState(''), [result, setResult] = useState(null), [items, setItems] = useState([]);
   const [busy, setBusy] = useState(''), [error, setError] = useState(null), [meal, setMeal] = useState(initialMeal);
   const camera = useRef(null), gallery = useRef(null), sequence = useRef(0);
@@ -60,12 +56,11 @@ export function PlatePhoto({ day, meal: initialMeal, file, onClose, onSaved }) {
     try {
       const src = await shrink(file);
       if (ticket !== sequence.current) return;
-      setImage(src); setBusy('Распознаём блюда… обычно 2–5 секунд');
+      setImage(src); setBusy('AI распознаёт блюда… обычно 2–5 секунд');
       const data = await apiMutate('diary.photo', { image: src });
       if (ticket !== sequence.current) return;
       setResult(data);
       setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, grams: String(it.grams) })));
-      if (data.items.length) markGuideSeen();
       haptic('success');
     } catch (e) { if (ticket === sequence.current) setError(e); }
     finally { if (ticket === sequence.current) setBusy(''); }
@@ -103,12 +98,13 @@ export function PlatePhoto({ day, meal: initialMeal, file, onClose, onSaved }) {
 
   // Пояснений на экране нет по просьбе владельца (25.10.2026): про Яндекс —
   // один раз экраном-разрешением перед открытием всем (docs/legal, FT-736)
-  return <Sheet title={'Еда по фото · ' + label(meal)} dirty={items.length > 0} locked={!!busy} onClose={onClose}>
+  return <Sheet title={'AI-распознавание · ' + label(meal)} dirty={items.length > 0} locked={!!busy} onClose={onClose}>
     <div className="plate-photo">
+      {denied && !image && <Note tone="warning">Нет доступа к камере — разрешите его в настройках телефона или сделайте снимок.</Note>}
       {!image && !busy && <ScanGuide mode="plate" />}
       {image && <img className="food-scan-preview plate-photo__preview" src={image} alt="Снимок тарелки" />}
       <div className="diary-inline-actions">
-        <button type="button" className={'button' + (image ? '' : ' button--primary')} disabled={!!busy} onClick={() => camera.current.click()}>{image ? 'Переснять' : 'Сделать снимок'}</button>
+        {onRescan ? <button type="button" className="button" disabled={!!busy} onClick={onRescan}>Сканировать снова</button> : <button type="button" className={'button' + (image ? '' : ' button--primary')} disabled={!!busy} onClick={() => camera.current.click()}>{image ? 'Переснять' : 'Сделать снимок'}</button>}
         <button type="button" className="button" disabled={!!busy} onClick={() => gallery.current.click()}>Выбрать фото</button>
       </div>
       <input ref={camera} className="food-scan-file" type="file" accept="image/*" capture="environment" aria-label="Снять тарелку" onChange={e => { void take(e.target.files?.[0]); e.target.value = ''; }} />

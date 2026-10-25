@@ -155,6 +155,20 @@ test('«Рецепты»: касание блюда раскрывает сос�
   tree.unmount();
 });
 
+test('AI-сканер (FT-746): кадр снимается, когда в рамке еда, светло и телефон замер', async () => {
+  const { scanStep, frameGray, STEADY_MS } = await import('../src/nutrition/plate-scan.js');
+  const plate = (shift = 0) => Uint8Array.from({ length: 576 }, (_, i) => 60 + ((i + shift) % 24) * 6);
+  assert.equal(scanStep({}, new Uint8Array(576).fill(15), 0).phase, 'dark');
+  assert.equal(scanStep({}, new Uint8Array(576).fill(160), 0).phase, 'empty', 'стена без деталей');
+  let s = scanStep({}, plate(), 0);
+  assert.equal(s.phase, 'moving', 'первый кадр — не с чем сравнить');
+  s = scanStep(s, plate(), 100); assert.equal(s.phase, 'steady');
+  s = scanStep(s, plate(7), 300); assert.equal(s.phase, 'moving', 'сдвинули — отсчёт заново'); assert.equal(s.since, null);
+  s = scanStep(s, plate(7), 400); s = scanStep(s, plate(7), 400 + STEADY_MS - 1); assert.equal(s.phase, 'steady'); assert.ok(s.progress > 0.9);
+  s = scanStep(s, plate(7), 400 + STEADY_MS); assert.equal(s.phase, 'ready');
+  assert.deepEqual([...frameGray([255, 255, 255, 255, 0, 0, 0, 255])], [255, 0]);
+});
+
 test('«Без ограничений»: одно нажатие — запись 0 ккал; без связи — в очередь телефона', async () => {
   const calls = [], saved = [];
   __x.mutate = async (a, p) => { calls.push([a, p]); return {}; };
