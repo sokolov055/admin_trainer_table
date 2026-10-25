@@ -71,11 +71,12 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
     const pack = data.package, guess = data.items[0], grams = String(guess?.grams || pack?.net || 100);
     const values = read?.label || pack?.label;
     if (pack?.match) setItems([{ ...(guess || {}), name: foodTitle(pack.match), from: 0, food: pack.match, options: pack.options || [], grams }]);
-    else if (pack && values) { setLabelValues({ ...values, basis: read?.basis || 'g', portion: read?.portion || null, net: read?.net || pack.net || null }); setItems([{ name: packName(pack), from: 0, per100: values, label: true, food: null, options: pack.options || [], grams: String(read?.portion?.grams || guess?.grams || pack.net || 100) }]); }
+    // Название, объём и цифры — с этикетки: лицевая сторона даёт только догадку («Сок» вместо «Напиток «Крюшон»»)
+    else if (pack && values) { const named = { product: read?.product || pack.product, brand: read?.brand || pack.brand }; setLabelValues({ ...values, basis: read?.basis || 'g', portion: read?.portion || null, net: read?.net || null, quote: read?.quote || '', ...named }); setItems([{ name: packName(named), from: 0, per100: values, label: true, food: null, options: pack.options || [], grams: String(read?.portion?.grams || guess?.grams || pack.net || 100) }]); }
     else setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, options: pack && i === 0 ? pack.options || [] : it.options, grams: String(it.grams) })));
   }
   const pack = result?.package || null, aiKcal = result?.items?.[0]?.per100?.kcal;
-  const unit = labelValues?.basis === 'ml' ? 'мл' : 'г', net = labelValues?.net || pack?.net || null;
+  const unit = labelValues?.basis === 'ml' ? 'мл' : 'г', net = labelValues?.net || null;
   const patch = (i, next) => setItems(list => list.map((it, k) => k === i ? { ...it, ...next } : it));
   const drop = i => setItems(list => list.filter((_, k) => k !== i));
   const kept = items.filter(it => rowValues(it).grams > 0);
@@ -89,7 +90,7 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
         const v = rowValues(it);
         // С этикетки — карточкой в справочник (как «Продукт с этикетки»), чтобы в следующий раз нашлась сразу
         if (it.label && !it.food) {
-          const r = await apiMutate('food.add', { name: pack?.product || it.name, brand: pack?.brand || '', barcode: '', preparation: 'as_sold', unit: unit === 'мл' ? 'ml' : 'g', kcal: it.per100.kcal, protein: it.per100.protein, fat: it.per100.fat, carbs: it.per100.carbs }).catch(() => null);
+          const r = await apiMutate('food.add', { name: cap(labelValues?.product || pack?.product || it.name), brand: labelValues?.brand || pack?.brand || '', barcode: '', preparation: 'as_sold', unit: unit === 'мл' ? 'ml' : 'g', kcal: it.per100.kcal, protein: it.per100.protein, fat: it.per100.fat, carbs: it.per100.carbs }).catch(() => null);
           if (r?.food) it.food = { ...r.food, kind: 'food', unit: r.food.unit || (unit === 'мл' ? 'ml' : 'g') };
         }
         const payload = it.food
@@ -129,9 +130,9 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
       <ErrorNote error={error} />
       {result && !busy && items.length === 0 && <Note tone="warning">Еды на фото не нашлось. Переснимите тарелку сверху целиком.</Note>}
       {pack && !busy && <div className="plate-pack">
-        <strong>Упаковка: {packName(pack)}</strong>
+        <strong>Упаковка: {packName(labelValues?.product ? labelValues : pack)}</strong>
         {pack.match ? <small>Нашли в справочнике — калории с этикетки, а не на глаз.</small>
-          : labelValues ? <small>{aiKcal ? 'AI на глаз давал ' + n(aiKcal) + ' ккал / 100 ' + unit + ', на этикетке ' + n(labelValues.kcal) + ' — ' + diffText(aiKcal, labelValues.kcal) + '.' : 'Цифры с этикетки — сверьте с упаковкой.'}</small>
+          : labelValues ? <>{labelValues.quote && <blockquote className="plate-pack__quote">С этикетки: «{labelValues.quote}»</blockquote>}<small>{aiKcal ? 'AI на глаз давал ' + n(aiKcal) + ' ккал / 100 ' + unit + ', на этикетке ' + n(labelValues.kcal) + ' — ' + diffText(aiKcal, labelValues.kcal) + '.' : 'Цифры с этикетки — сверьте с упаковкой.'}</small></>
           : <><small>У упаковки AI считает на глаз и может ошибиться в разы. Отсканируйте таблицу «Пищевая ценность» — калории будут точными.</small>
             {!scan && <button type="button" className="button button--primary" onClick={() => { haptic(); setScan(true); }}>Сканировать этикетку</button>}</>}
         {scan && <PlateScanner labelFor={pack} base={{ image, data: result }} onResult={r => { setScan(false); if (r.label) show(image, result, r.label); }} onShot={() => setScan(false)} onFallback={() => setScan(false)} onClose={() => setScan(false)} />}

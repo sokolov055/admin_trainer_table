@@ -138,7 +138,7 @@ export function PlateScanner({ mode = 'plate', note = '', onShot, onFallback, on
     </div>
     <div className="plate-scan__middle">
       {packing && <div className="plate-scan__found" role="status">
-        <small>Это упаковка</small>
+        <small>Похоже, это упаковка</small>
         <strong>{packName(stage.pack)}</strong>
         {stage.pack.options?.length > 0 && onResult && <div className="plate-scan__base" role="group" aria-label="Похожие в базе">
           <small>Похожие в базе — выберите, если это он:</small>
