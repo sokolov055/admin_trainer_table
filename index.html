@@ -62,6 +62,101 @@
          значение на обе означало бы светлую полоску над тёмным экраном -->
     <meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#17161a" media="(prefers-color-scheme: dark)" />
+
+    <!-- Заставка при холодном запуске (FT-750): знак-график превращается в
+         сборную гантель, снизу — «Fit Track». Только в приложении из
+         магазина и на установленном сайте; в браузере и при перезагрузке её
+         нет (скрипт сразу после разметки). Цвета фирменные, как у иконки, а
+         не темы: нативная заставка iPhone и Android тему не знает, а первый
+         кадр должен совпасть с ней точь-в-точь — знак 104 × 111 в центре
+         (mobile/gen_icons.py рисует его тем же размером).
+         Всё — CSS-анимация: она идёт мимо главного потока и не дёргается,
+         пока грузится и разбирается бандл. Числа — координаты иконки 512:
+         ось гантели y=440, столбики — верхние половины блинов. -->
+    <style>
+      @font-face { font-family: 'FT Splash'; src: url('site/fonts/manrope-latin.woff2') format('woff2'); font-weight: 200 800; font-display: block; }
+      .splash {
+        --sp-bg: #232726; --sp-cream: #ede8dd; --sp-green: #4e9d69; --sp-steel: #a3aaa7;
+        --sp-out: cubic-bezier(0.23, 1, 0.32, 1); --sp-move: cubic-bezier(0.77, 0, 0.175, 1);
+        position: fixed; inset: 0; z-index: 2147483000; background: var(--sp-bg);
+        -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+        /* Страховка без JS: что бы ни случилось со скриптом, через 6 с заставка не мешает */
+        animation: sp-gone 1ms linear 6s forwards;
+      }
+      /* Гантель 1050 × 742 единицы → 200 px; знак-график в начале — 0,3 px на
+         единицу (те же 104 px), отсюда масштаб 1,575. В конце гантель на
+         34 px выше центра, чтобы вместе с названием стоять посередине */
+      .splash__rig-svg { position: absolute; left: 50%; top: 50%; width: 200px; height: 141.33px; margin: -70.67px 0 0 -100px; overflow: visible; }
+      .splash__rig, .splash__plate { transform-box: view-box; transform-origin: 0 0; }
+      .splash__rig { transform: translate(248.59px, 39.16px) scale(1.575); }
+      .splash__part { transform-box: fill-box; }
+      .splash__low { transform-origin: 50% 0; transform: scaleY(0); }
+      .splash__grow-y { transform-origin: 50% 50%; transform: scaleY(0); }
+      .splash__grow-r { transform-origin: 0 50%; transform: scaleX(0); }
+      .splash__grow-l { transform-origin: 100% 50%; transform: scaleX(0); }
+      .splash__word {
+        position: absolute; left: 0; right: 0; top: calc(50% + 65px); margin: 0; text-align: center;
+        font: 760 40px/1 'FT Splash', 'Roboto', system-ui, sans-serif; letter-spacing: -0.035em;
+        color: var(--sp-cream); opacity: 0;
+      }
+      /* Точка над «i» — зелёная точка загрузки: «ı» без точки, своя падает на
+         место родной (замер по Manrope 760: середина ножки 0,14 em от начала
+         буквы, верх ножки 0,34 em от верха строки) и дышит, пока приложение
+         догружается */
+      .splash__i { position: relative; display: inline-block; }
+      .splash__dot {
+        position: absolute; left: 0.057em; top: 0.11em; width: 0.165em; height: 0.165em; border-radius: 50%;
+        background: var(--sp-green); opacity: 0; transform: translateY(-0.4em) scale(0.6);
+      }
+      .splash--go .splash__dot { animation: sp-dot 380ms var(--sp-out) 1260ms forwards, sp-breathe 900ms ease-in-out 1640ms infinite; }
+      .splash--go .splash__rig { animation: sp-camera 900ms var(--sp-move) 140ms forwards; }
+      .splash--go .splash__low { animation: sp-open-y 380ms var(--sp-out) forwards; }
+      .splash--go .splash__low--1 { animation-delay: 140ms; }
+      .splash--go .splash__low--2 { animation-delay: 180ms; }
+      .splash--go .splash__low--3 { animation-delay: 220ms; }
+      .splash--go .splash__p1 { animation: sp-plate-1 440ms var(--sp-move) 220ms forwards; }
+      .splash--go .splash__p2 { animation: sp-plate-2 440ms var(--sp-move) 220ms forwards; }
+      .splash--go .splash__p3 { animation: sp-plate-3 440ms var(--sp-move) 220ms forwards; }
+      .splash--go .splash__grow-y { animation: sp-open-y 360ms var(--sp-out) forwards; }
+      .splash--go .splash__grow-r, .splash--go .splash__grow-l { animation: sp-open-x 360ms var(--sp-out) forwards; }
+      .splash--go .splash__ic-l { animation-delay: 460ms; }
+      .splash--go .splash__handle { animation-delay: 500ms; animation-duration: 340ms; }
+      .splash--go .splash__c-l { animation-delay: 560ms; }
+      .splash--go .splash__s-l { animation-delay: 600ms; }
+      .splash--go .splash__ic-r { animation-delay: 700ms; }
+      .splash--go .splash__r3 { animation-delay: 720ms; }
+      .splash--go .splash__r2 { animation-delay: 780ms; }
+      .splash--go .splash__r1 { animation-delay: 840ms; }
+      .splash--go .splash__c-r { animation-delay: 890ms; }
+      .splash--go .splash__s-r { animation-delay: 930ms; }
+      .splash--go .splash__word { animation: sp-rise 460ms var(--sp-out) 1020ms forwards; }
+      .splash--out { animation: sp-fade 380ms var(--sp-out) forwards; pointer-events: none; }
+      .splash--out .splash__rig-svg { animation: sp-lift 380ms var(--sp-out) forwards; }
+      @keyframes sp-camera { to { transform: translate(0, -178.5px) scale(1); } }
+      @keyframes sp-open-y { to { transform: scaleY(1); } }
+      @keyframes sp-open-x { to { transform: scaleX(1); } }
+      /* Столбик x0, w0 → блин x1, w1: translateX(x1 − k·x0) scaleX(k), k = w1 / w0 */
+      @keyframes sp-plate-1 { to { transform: translateX(162.64px) scaleX(0.5532); } }
+      @keyframes sp-plate-2 { to { transform: translateX(133.23px) scaleX(0.6383); } }
+      @keyframes sp-plate-3 { to { transform: translateX(92.43px) scaleX(0.7216); } }
+      @keyframes sp-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      @keyframes sp-fade { to { opacity: 0; } }
+      @keyframes sp-lift { to { transform: translateY(-14px) scale(1.04); } }
+      @keyframes sp-dot { to { opacity: 1; transform: none; } }
+      @keyframes sp-breathe { 0%, 100% { opacity: 1; transform: none; } 50% { opacity: 0.4; transform: scale(0.8); } }
+      @keyframes sp-gone { to { visibility: hidden; pointer-events: none; } }
+      /* «Уменьшить движение»: сразу готовая гантель с названием, уход — растворением */
+      @media (prefers-reduced-motion: reduce) {
+        .splash.splash--go *, .splash.splash--out * { animation: none !important; }
+        .splash--go .splash__rig { transform: translate(0, -178.5px); }
+        .splash--go .splash__low, .splash--go .splash__grow-y, .splash--go .splash__grow-r, .splash--go .splash__grow-l { transform: none; }
+        .splash--go .splash__p1 { transform: translateX(162.64px) scaleX(0.5532); }
+        .splash--go .splash__p2 { transform: translateX(133.23px) scaleX(0.6383); }
+        .splash--go .splash__p3 { transform: translateX(92.43px) scaleX(0.7216); }
+        .splash--go .splash__word, .splash--go .splash__dot { opacity: 1; transform: none; }
+        .splash.splash--out { animation: sp-fade 240ms ease forwards; }
+      }
+    </style>
     <!-- ПЕРВЫМ ДЕЛОМ сохраняем фрагмент адреса.
          Telegram передаёт в нём подпись (tgWebAppData), а SDK при запуске
          вычищает адрес через history.replaceState. Если наш код прочитает
@@ -96,6 +191,106 @@
     <script src="telegram-web-app.js" defer></script>
   </head>
   <body>
+    <div id="splash" class="splash" role="img" aria-label="Fit Track">
+      <svg class="splash__rig-svg" viewBox="126 69 1050 742" aria-hidden="true">
+        <g class="splash__rig" fill="#a3aaa7">
+          <rect class="splash__part splash__grow-l splash__s-l" x="126" y="390" width="50" height="100" rx="12" />
+          <rect class="splash__part splash__grow-y splash__c-l" x="176" y="335" width="28" height="210" rx="8" />
+          <rect class="splash__part splash__grow-r splash__handle" x="426" y="380" width="450" height="120" rx="10" />
+          <rect class="splash__part splash__grow-y splash__ic-l" x="402" y="335" width="24" height="210" rx="8" />
+          <rect class="splash__part splash__grow-y splash__ic-r" x="876" y="335" width="24" height="210" rx="8" />
+          <g class="splash__plate splash__p1" fill="#ede8dd">
+            <rect x="82" y="283" width="94" height="157" />
+            <rect class="splash__part splash__low splash__low--1" x="82" y="430" width="94" height="167" />
+          </g>
+          <g class="splash__plate splash__p2" fill="#ede8dd">
+            <rect x="208" y="181" width="94" height="259" />
+            <rect class="splash__part splash__low splash__low--2" x="208" y="430" width="94" height="269" />
+          </g>
+          <g class="splash__plate splash__p3" fill="#4e9d69">
+            <rect x="332" y="69" width="97" height="371" />
+            <rect class="splash__part splash__low splash__low--3" x="332" y="430" width="97" height="381" />
+          </g>
+          <rect class="splash__part splash__grow-y splash__r3" fill="#4e9d69" x="900" y="69" width="70" height="742" />
+          <rect class="splash__part splash__grow-y splash__r2" fill="#ede8dd" x="976" y="181" width="60" height="518" />
+          <rect class="splash__part splash__grow-y splash__r1" fill="#ede8dd" x="1042" y="283" width="52" height="314" />
+          <rect class="splash__part splash__grow-y splash__c-r" x="1098" y="335" width="28" height="210" rx="8" />
+          <rect class="splash__part splash__grow-r splash__s-r" x="1126" y="390" width="50" height="100" rx="12" />
+        </g>
+      </svg>
+      <p class="splash__word">F<span class="splash__i">ı<span class="splash__dot"></span></span>t Track</p>
+    </div>
+    <!-- Показывать ли заставку и когда убрать (FT-750). Холодный запуск
+         приложения из магазина или с экрана «Домой»; в браузере, в Telegram и
+         при перезагрузке страницы — нет (флаг в sessionStorage живёт до
+         выгрузки страницы и умирает вместе с приложением). Порядок:
+         1) первый кадр — готовый знак, как нативная заставка;
+         2) нативную заставку снимаем, когда наш кадр уже нарисован, —
+            без мигания (её держит @capacitor/splash-screen, запас 2,5 с);
+         3) анимация 1,5 с и короткая пауза на готовой гантели; уходим, когда она доиграла и приложение
+            нарисовало экран (не скелет загрузки), но не позже 4 с;
+         4) касание пропускает. Старый JS: бандла здесь ещё нет. -->
+    <script>
+      (function () {
+        var el = document.getElementById('splash');
+        var root = document.documentElement;
+        var cap = window.Capacitor;
+        function nativeSplash() {
+          try {
+            if (!cap || !cap.isNativePlatform || !cap.isNativePlatform()) return null;
+            return (cap.Plugins && cap.Plugins.SplashScreen) || (cap.registerPlugin && cap.registerPlugin('SplashScreen')) || null;
+          } catch (_) { return null; }
+        }
+        function hideNative() {
+          var p = nativeSplash();
+          try { if (p && p.hide) p.hide({ fadeOutDuration: 0 }).catch(function () {}); } catch (_) {}
+        }
+        var show = false;
+        try {
+          var native = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+          var home = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+          if ((native || home) && !sessionStorage.getItem('splash-seen')) {
+            sessionStorage.setItem('splash-seen', '1');
+            show = true;
+          }
+        } catch (_) { show = false; }
+        if (!show) { el.parentNode.removeChild(el); hideNative(); return; }
+        root.classList.add('splash-on');
+        var started = 0;
+        var gone = false;
+        function leave() {
+          if (gone) return;
+          gone = true;
+          el.className += ' splash--out';
+          setTimeout(function () {
+            if (el.parentNode) el.parentNode.removeChild(el);
+            root.classList.remove('splash-on');
+          }, 400);
+        }
+        // Экран готов: React заменил заглушку и показывает не скелет загрузки
+        function ready() {
+          if (document.getElementById('boot')) return false;
+          return !document.querySelector('#root .app__body > [aria-busy="true"]:first-child');
+        }
+        function watch() {
+          if (gone) return;
+          var t = Date.now() - started;
+          if ((t >= 1700 && ready()) || t >= 4000) { leave(); return; }
+          setTimeout(watch, 80);
+        }
+        el.addEventListener('pointerdown', leave);
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            hideNative();
+            setTimeout(function () {
+              started = Date.now();
+              el.className += ' splash--go';
+              watch();
+            }, nativeSplash() ? 60 : 0);
+          });
+        });
+      })();
+    </script>
     <!-- Заглушка до запуска приложения. React заменит её первым же кадром.
          Без неё медленная сеть или браузер, который не смог выполнить
          бандл, выглядели как белый лист — клиенты так и говорили: «ссылка

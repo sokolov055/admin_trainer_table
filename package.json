@@ -27,6 +27,7 @@
     "test:offline": "node --test scripts/test-offline.mjs",
     "test:browser": "node --test scripts/test-browser.mjs",
     "test:reveal": "node --test scripts/test-reveal.mjs scripts/test-reveal-browser.mjs",
+    "test:splash": "node --test scripts/test-splash-browser.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:site": "node scripts/build-marketing-site.mjs",

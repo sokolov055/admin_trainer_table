@@ -89,10 +89,13 @@ export function startNative() {
   const bar = plugin('StatusBar');
   if (bar && bar.setBackgroundColor) {
     // Цвет строки — по настоящему фону страницы: тема бывает выбрана
-    // вручную, системной или пришла от Telegram
+    // вручную, системной или пришла от Telegram. Пока идёт заставка
+    // (FT-750, index.html: класс splash-on) — её фирменный тёмный
     let last = '';
     const paint = () => {
-      const color = toHex(getComputedStyle(document.body).backgroundColor);
+      const color = document.documentElement.classList.contains('splash-on')
+        ? '#232726'
+        : toHex(getComputedStyle(document.body).backgroundColor);
       if (!color || color === last) return;
       last = color;
       bar.setBackgroundColor({ color }).catch(() => {});
