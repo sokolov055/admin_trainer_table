@@ -220,7 +220,7 @@ test('карточка «Рациона»: «Чем заменить» — то�
 // правятся в строке, продукт меняется на карточку справочника; каждый — своя запись с пометкой блюда
 const plateStubs = {
   ...stubs,
-  icons: `import React from 'react';const I=()=> <i/>; export const IconTrash=I;`,
+  icons: `import React from 'react';const I=()=> <i/>; export const IconTrash=I,IconPlus=I;`,
   telegram: `export const haptic=()=>{};`,
   ScanGuide: `export default ()=>null;`,
   'plate-photo-io': `export const shrink=async()=>'';`,
@@ -267,7 +267,11 @@ test('еда по фото (FT-749): блюдо разложено на прод
   assert.ok(out().includes('Из справочника · 748 ккал / 100 г'));
 
   // + продукт к блюду: без калорий не записывается, со своими — «примерно»
-  await act(async () => button(tree, '+ продукт').props.onClick());
+  const adds = tree.root.findAll(n => n.type === 'button' && n.props.className === 'plate-dish__add');
+  const named = b => b.findByType('span').children.join('');
+  assert.deepEqual(adds.map(named), ['Добавить в «Гречка с маслом»', 'Добавить в «Котлета из индейки»'], 'кнопка называет блюдо — и исправленное название');
+  assert.ok(tree.root.findAll(n => n.type === 'button' && n.props.className === 'plate-photo__more').length === 1, 'отдельная кнопка «Другое блюдо или продукт»');
+  await act(async () => adds[0].props.onClick());
   const extra = inputs('Продукт').find(i => i.props.value === '');
   assert.ok(extra, 'пустая строка нового продукта');
   await act(async () => extra.props.onChange({ target: { value: 'Сыр' } }));

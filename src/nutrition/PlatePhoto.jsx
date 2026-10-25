@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiMutate, apiPublic } from '../api.js';
 import { Note, Sheet, plural } from '../ui.jsx';
-import { IconTrash } from '../icons.jsx';
+import { IconPlus, IconTrash } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { foodTitle, cap } from './FoodFields.jsx';
 import ScanGuide from './ScanGuide.jsx';
@@ -183,12 +183,14 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
                 <span className="plate-dish__sum">{n(list.reduce((s, it) => s + rowValues(it).kcal, 0))} ккал</span>
                 <button type="button" className="icon-button" aria-label={'Убрать блюдо ' + d.name} onClick={() => setItems(all => all.filter(it => it.dish !== d.key))}><IconTrash size={18} /></button>
               </div>
-              <ul className="plate-dish__list" aria-label={'Из чего: ' + d.name}>{list.map(row)}</ul>
-              <button type="button" className="button button--ghost plate-dish__add" onClick={() => addTo(d)}>+ продукт</button>
+              {/* Кнопка — внутри состава, под его продуктами: видно, что продукт добавится в это блюдо (владелец 25.10.2026) */}
+              <ul className="plate-dish__list" aria-label={'Из чего: ' + d.name}>{list.map(row)}
+                <li><button type="button" className="plate-dish__add" onClick={() => addTo(d)}><IconPlus size={16} /><span>Добавить в «{d.name.trim() || 'блюдо'}»</span></button></li>
+              </ul>
             </li>;
           })}
         </ul>
-        {!pack && <button type="button" className="button button--ghost plate-dish__add" onClick={addDish}>+ Добавить продукт</button>}
+        {!pack && <button type="button" className="plate-photo__more" onClick={addDish}><IconPlus size={18} />Другое блюдо или продукт</button>}
         {/* Приём угадан по часам — поправить можно здесь же, до записи */}
         <div className="chips chips--wrap chips--flush plate-photo__meal" role="group" aria-label="Куда записать">{DIARY_MEALS.map(m => <button key={m.id} type="button" className={'chip' + (meal === m.id ? ' chip--active' : '')} aria-pressed={meal === m.id} onClick={() => setMeal(m.id)}>{m.label}</button>)}</div>
         <div className="diary-form-footer">

@@ -58,7 +58,10 @@
 .plate-dish__head .icon-button { width: 44px; height: 44px; }
 .plate-dish__list { list-style: none; margin: 4px 0 0; padding: 0 0 0 12px; border-inline-start: 2px solid var(--border); }
 .plate-dish__list .plate-photo__row:last-child { border-bottom: 0; }
-.plate-dish__add { justify-self: start; margin-top: 4px; }
+/* «Добавить в блюдо» — последней строкой состава, цветом действия; «Другое блюдо» — отдельной плашкой под списком */
+.plate-dish__add { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 44px; padding: 0 12px; margin: 4px 0 8px; border: 0; border-radius: 999px; background: var(--accent-wash); color: var(--accent); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.plate-dish__add span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate-photo__more { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin-top: var(--space-3); border: 1.5px dashed var(--border); border-radius: var(--radius-lg); background: transparent; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .plate-pack { display: grid; gap: 10px; margin: 16px 0 0; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
 .plate-pack strong { font-size: var(--text-md); }
 .plate-pack small { color: var(--text-secondary); line-height: 1.4; }
