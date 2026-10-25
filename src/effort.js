@@ -512,9 +512,27 @@ export function settleOrder(exercises) {
 
 /** Подпись снятого шага: «−2,5 кг · после «Сведения рук»»; у помощи — «+5 кг помощи · …» */
 export function tiredText(ex, set) {
-  if (!ex || !ex.tired || !set || set.suggest !== 'tired' || set.state !== 'pending') return '';
+  // Рабочий подход уже сделан — дальше вес ведут оценки, «−1 кг» под
+  // подходом с другим весом противоречил полю (FT-754)
+  if (!ex || !ex.tired || !set || set.suggest !== 'tired' || set.state !== 'pending' || worked(ex)) return '';
   const step = String(ex.tired.step || '').replace('.', ',');
   return (isAssisted(ex) ? '+' + step + ' кг помощи' : '−' + step + ' кг') + ' · после «' + ex.tired.after + '»';
+}
+
+/**
+ * Строка «сегодня» при усталости (FT-754): «после «Пек-дек» — 2 кг, на шаг
+ * легче» — с весом, который стоит в подходе. Две строки («сегодня так же,
+ * закрепляем» и ниже «на шаг легче, −1 кг») читались как противоречие, а
+ * когда вес вернули руками или с часов, строка писала «−1 кг» над прежним
+ * весом. Пусто — шаг не снят: подход уже сделан или вес поменяли
+ */
+export function tiredToday(tired, sets, assist = false) {
+  if (!tired || !tired.after || !Array.isArray(sets)) return '';
+  if (sets.some((s) => s.state === 'done' && s.kind !== 'warmup' && !s.who)) return '';
+  const set = sets.find((s) => s.state === 'pending' && s.kind !== 'warmup' && s.suggest === 'tired');
+  const value = set && String((assist ? set.assist : set.weight) || '').trim();
+  if (!value) return '';
+  return 'сегодня после «' + tired.after + '» — ' + (assist ? 'помощь ' : '') + value.replace('.', ',') + ' кг, на шаг легче';
 }
 
 const plural = (n, one, few, many) => {

@@ -313,6 +313,8 @@ const mine = (ex, a) => ex.id === String(a.exerciseId || '');
 /** Куда писать вес с часов: у веса помощи — в помощь (FT-628) */
 const loadKey = (ex) => (isAssisted(ex) ? 'assist' : 'weight');
 const whose = (set, a) => (set.who || '') === String(a.who || '');
+/** Подход без подсказки веса — вес вписали с часов */
+const omitSuggest = ({ suggest, ...set }) => set;
 
 /**
  * Проиграть нажатое на плашке и часах в занятие:
@@ -343,7 +345,9 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         const key = loadKey(ex);
         const was = String(first[key] || '');
         return { ...ex, sets: ex.sets.map((set) => set.state === 'pending' && whose(set, a) && (set === first || String(set[key] || '') === was)
-          ? { ...set, [key]: String(a.value), own: true } : set) };
+          // Подсказка прежнего веса («−1 кг · после …») с ним уже не про
+          // этот подход (FT-754)
+          ? { ...omitSuggest(set), [key]: String(a.value), own: true } : set) };
       }) };
     } else if (a.kind === 'done') {
       // setIndex — какой по счёту подход (у пары — у своего человека): его и
@@ -402,7 +406,7 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
           const target = ex.sets.filter((set) => whose(set, a))[index];
           if (!target) return ex;
           const next = { ...ex, sets: ex.sets.map((set) => set !== target ? set
-            : { ...set, ...(weight !== null ? { [loadKey(ex)]: weight, own: true } : {}), ...(reps !== null ? { reps } : {}) }) };
+            : { ...(weight !== null ? omitSuggest(set) : set), ...(weight !== null ? { [loadKey(ex)]: weight, own: true } : {}), ...(reps !== null ? { reps } : {}) }) };
           return effort && target.state === 'pending' ? rateSet(next, ex.sets.indexOf(target), effort).ex : next;
         }) };
       }

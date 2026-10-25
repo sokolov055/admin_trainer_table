@@ -355,3 +355,20 @@ test('FT-753: отдых, кончившийся до того, как дошё�
   const live = la.applyActions(s, [{ kind: 'rest', sessionId: 's1', restUntil: now + 30000 }], 'ios', now);
   assert.equal(live.restUntil, now + 30000);
 });
+
+test('FT-754: вес с часов снимает подсказку «−1 кг · после …» с подхода; «сегодня» — одной строкой с весом', async () => {
+  const { tiredToday, tiredText } = await import(pathToFileURL(join(process.cwd(), 'src/effort.js')).href);
+  const tired = { after: 'Обратное разведение рук в тренажёре «Пек-дек»', step: '1' };
+  const s = record({ exercises: [
+    { id: 'e1', name: 'Подъём гантелей в стороны сидя', tired, sets: [set('pending', '2', '15', { suggest: 'tired' }), set('pending', '2', '15', { suggest: 'tired' })] },
+  ] }).session;
+  assert.equal(tiredToday(tired, s.exercises[0].sets), 'сегодня после «Обратное разведение рук в тренажёре «Пек-дек»» — 2 кг, на шаг легче');
+  const turned = la.applyActions(s, [{ kind: 'weight', sessionId: 's1', exerciseId: 'e1', who: '', value: '3' }]);
+  assert.deepEqual(turned.exercises[0].sets.map((x) => [x.weight, x.suggest || '']), [['3', ''], ['3', '']]);
+  assert.equal(tiredToday(tired, turned.exercises[0].sets), '', 'вес вернули — строки про шаг нет');
+  assert.equal(la.setQueue(turned)[0].suggest, undefined, 'и на часах');
+  // Первый подход сделан — подсказка на следующих не продолжается
+  const worked = { ...s.exercises[0], sets: [{ ...s.exercises[0].sets[0], state: 'done' }, s.exercises[0].sets[1]] };
+  assert.equal(tiredText(worked, worked.sets[1]), '');
+  assert.equal(tiredToday(tired, worked.sets), '');
+});
