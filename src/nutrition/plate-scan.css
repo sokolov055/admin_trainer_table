@@ -9,6 +9,7 @@
 
 .plate-scan__frame { position: relative; z-index: 1; align-self: center; justify-self: center; width: min(76vw, 52vh, 360px); aspect-ratio: 1; --corner: rgba(255, 255, 255, 0.9); }
 .plate-scan__frame.is-steady, .plate-scan__frame.is-ready { --corner: #22d3ee; }
+.plate-scan__frame--wide { width: min(88vw, 420px); aspect-ratio: 4 / 3; }
 .plate-scan__frame i { position: absolute; width: 36px; height: 36px; border: 4px solid var(--corner); transition: border-color var(--dur-fast) var(--ease-out); }
 .plate-scan__frame i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 18px; }
 .plate-scan__frame i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 18px; }

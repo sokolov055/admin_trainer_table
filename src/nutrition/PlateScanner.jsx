@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { IconClose } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { SCAN_SIZE, scanStep, frameGray, SCAN_HINTS } from './plate-scan.js';
+import { LABEL_HINT } from './live-label.js';
 import './plate-scan.css';
 
 /**
@@ -15,8 +16,18 @@ import './plate-scan.css';
  * одна и та же. Нет камеры или нет разрешения — onFallback: прежний лист со
  * снимком и выбором фото. Видео никуда не уходит: только один кадр, тот же
  * путь, что у снимка (уменьшение и отрезание метаданных — PlatePhoto).
+ *
+ * mode 'label' / 'barcode' (FT-748) — тот же видоискатель для этикетки и
+ * штрихкода там, где нет камеры приложения (сайт, Android до сборки): кадр
+ * снимается сам и читается на телефоне (FoodScan), а не уходит в AI.
  */
-export function PlateScanner({ onShot, onFallback, onClose }) {
+const MODES = {
+  plate: { title: 'Сканер еды', ai: true, aria: 'AI-сканер еды', hints: SCAN_HINTS },
+  label: { title: 'Этикетка', aria: 'Сканер этикетки', hints: { ...SCAN_HINTS, empty: LABEL_HINT, steady: 'Держите ровно — читаю', ready: 'Читаю этикетку…' } },
+  barcode: { title: 'Штрихкод', aria: 'Сканер штрихкода', hints: { ...SCAN_HINTS, empty: 'Наведите рамку на штрихкод', steady: 'Держите ровно — читаю', ready: 'Читаю штрихкод…' } },
+};
+export function PlateScanner({ mode = 'plate', onShot, onFallback, onClose }) {
+  const look = MODES[mode] || MODES.plate;
   const video = useRef(null), stream = useRef(null), state = useRef({}), shot = useRef(false), gallery = useRef(null);
   const [phase, setPhase] = useState('start'), [progress, setProgress] = useState(0);
   const stop = () => { stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; };
@@ -61,21 +72,21 @@ export function PlateScanner({ onShot, onFallback, onClose }) {
     return () => document.removeEventListener('keydown', key);
   }, []);
 
-  return createPortal(<div className="plate-scan" role="dialog" aria-modal="true" aria-label="AI-сканер еды">
+  return createPortal(<div className="plate-scan" role="dialog" aria-modal="true" aria-label={look.aria}>
     <video ref={video} className="plate-scan__video" muted playsInline autoPlay aria-hidden="true" />
     <div className="plate-scan__top">
-      <span className="plate-scan__badge"><span className="ai-badge">AI</span> Сканер еды</span>
+      <span className="plate-scan__badge">{look.ai && <><span className="ai-badge">AI</span> </>}{look.title}</span>
       <button type="button" className="plate-scan__close" aria-label="Закрыть сканер" onClick={() => { stop(); onClose(); }}><IconClose size={22} /></button>
     </div>
-    <div className={'plate-scan__frame is-' + phase} style={{ '--scan-progress': progress }} aria-hidden="true"><i /><i /><i /><i /><span className="plate-scan__beam" /></div>
+    <div className={'plate-scan__frame is-' + phase + (mode === 'plate' ? '' : ' plate-scan__frame--wide')} style={{ '--scan-progress': progress }} aria-hidden="true"><i /><i /><i /><i /><span className="plate-scan__beam" /></div>
     <div className="plate-scan__bottom">
-      <p className="plate-scan__hint" role="status">{SCAN_HINTS[phase] || SCAN_HINTS.empty}</p>
+      <p className="plate-scan__hint" role="status">{look.hints[phase] || look.hints.empty}</p>
       <div className="plate-scan__bar" aria-hidden="true"><span style={{ transform: 'scaleX(' + progress + ')' }} /></div>
       <div className="plate-scan__actions">
         <button type="button" className="plate-scan__ghost" onClick={() => gallery.current.click()}>Из галереи</button>
-        <button type="button" className="plate-scan__now" disabled={phase === 'start' || shot.current} onClick={shoot}>Распознать сейчас</button>
+        <button type="button" className="plate-scan__now" disabled={phase === 'start' || shot.current} onClick={shoot}>{mode === 'plate' ? 'Распознать сейчас' : 'Прочитать сейчас'}</button>
       </div>
-      <input ref={gallery} className="food-scan-file" type="file" accept="image/*" aria-label="Выбрать фото тарелки" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { shot.current = true; stop(); onShot(file); } }} />
+      <input ref={gallery} className="food-scan-file" type="file" accept="image/*" aria-label={mode === 'plate' ? 'Выбрать фото тарелки' : 'Выбрать фото этикетки'} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { shot.current = true; stop(); onShot(file); } }} />
     </div>
   </div>, document.body);
 }

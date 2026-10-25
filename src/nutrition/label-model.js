@@ -54,6 +54,8 @@ const num = s => Number(s.replace(/[,: ]/, '.'));
 function segmentNumbers(seg, rest = '') {
   const out = [];
   let bad = false;
+  // Одиночная «1» перед «г» читается как «l», «I», «|», «!» или «і»: «белки l г» — это «белки 1 г» (FT-748)
+  seg = seg.replace(/(^|[\s:])[lI|!іi](?=\s*[гgr](?![а-яa-z]))/g, '$11');
   for (const m of seg.matchAll(/(\d+(?:[.,:]\d+| \d(?=\s*[гg](?![а-яa-z])))?)(\s*%)?/g)) {
     if (m[2]) continue;
     const before = seg.slice(0, m.index);

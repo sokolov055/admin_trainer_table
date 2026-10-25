@@ -6,6 +6,7 @@ import { parseLabel, gtinFromCode } from './label-model.js';
 import { liveLabel, LABEL_HINT } from './live-label.js';
 import { nativeScanner, photoFile } from '../native-scan.js';
 import ScanGuide from './ScanGuide.jsx';
+import { PlateScanner } from './PlateScanner.jsx';
 import './food-scan.css';
 
 const BARCODE_HINT = 'Наведите рамку на штрихкод с цифрами или квадратный код «Честного знака»';
@@ -19,6 +20,9 @@ export default function FoodScan({ onDraft, onFound, disabled = false, start = '
   const [code, setCode] = useState(''), [found, setFound] = useState(null), [searched, setSearched] = useState(false), [reads, setReads] = useState([]), [percent, setPercent] = useState(0);
   // undefined — ещё узнаём, null — камеры приложения нет (сайт, старая сборка)
   const [native, setNative] = useState(undefined);
+  // Сайт и Android без модуля (FT-748): та же живая камера, что у AI-сканера, — кадр снимается сам
+  const [live, setLive] = useState('');
+  const webCam = native === null && typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
   const camera = useRef(null), gallery = useRef(null), canvas = useRef(null), photo = useRef(null), rotation = useRef(0), sequence = useRef(0), job = useRef(null), autoOpened = useRef('');
   const cancel = () => { ++sequence.current; job.current?.stop(); job.current = null; setBusy(''); };
   useEffect(() => () => { ++sequence.current; job.current?.stop(); }, []);
@@ -28,9 +32,11 @@ export default function FoodScan({ onDraft, onFound, disabled = false, start = '
   useEffect(() => {
     if (!start) { autoOpened.current = ''; return; }
     if (native && autoOpened.current !== start) { autoOpened.current = start; void openCamera(start); }
+    else if (webCam && autoOpened.current !== start) { autoOpened.current = start; setLive(start); }
   }, [start, native]);
   const reset = next => { cancel(); setMode(next); setImage(null); setError(''); setReads([]); setCode(''); setFound(null); setSearched(false); photo.current = null; canvas.current = null; rotation.current = 0; };
-  const begin = next => { reset(next); if (native) void openCamera(next); };
+  const begin = next => { reset(next); if (native) void openCamera(next); else if (webCam) setLive(next); };
+  const liveShot = async file => { const m = live; setLive(''); if (await loadPhoto(file)) await recognize(m); };
   const loadPhoto = async file => {
     if (!file) return false;
     cancel(); const ticket = sequence.current;
@@ -148,10 +154,13 @@ export default function FoodScan({ onDraft, onFound, disabled = false, start = '
       {/* «Как снять» — до первого снимка; после снимка место занимает само фото. В приложении
           подсказка — поверх камеры */}
       {native === null && !image && !reads.length && <ScanGuide mode={mode} />}
-      <p className="small muted">{native ? 'Камера и фото обрабатываются на телефоне и никуда не отправляются.' : 'Фото обрабатывается на телефоне и никуда не отправляется. Камера спросит разрешение при первом снимке.'}</p>
+      <p className="small muted">{native ? 'Камера и фото обрабатываются на телефоне и никуда не отправляются.' : webCam ? 'Камера и фото обрабатываются на телефоне и никуда не отправляются.' : 'Фото обрабатывается на телефоне и никуда не отправляется. Камера спросит разрешение при первом снимке.'}</p>
       {native
         ? <div className="diary-inline-actions"><button type="button" className="button button--primary" disabled={locked} onClick={() => void openCamera()}>Открыть камеру</button><button type="button" className="button" disabled={locked} onClick={() => void pickPhoto()}>Прикрепить фото</button></div>
-        : <div className="diary-inline-actions"><button type="button" className="button" disabled={locked} onClick={() => camera.current.click()}>Сделать снимок</button><button type="button" className="button" disabled={locked} onClick={() => gallery.current.click()}>Прикрепить фото</button></div>}
+        : webCam
+          ? <div className="diary-inline-actions"><button type="button" className="button button--primary" disabled={locked} onClick={() => setLive(mode)}>Включить камеру</button><button type="button" className="button" disabled={locked} onClick={() => gallery.current.click()}>Прикрепить фото</button></div>
+          : <div className="diary-inline-actions"><button type="button" className="button" disabled={locked} onClick={() => camera.current.click()}>Сделать снимок</button><button type="button" className="button" disabled={locked} onClick={() => gallery.current.click()}>Прикрепить фото</button></div>}
+      {live && <PlateScanner mode={live} onShot={file => void liveShot(file)} onFallback={why => { setLive(''); if (why === 'denied') setError('Нет доступа к камере. Разрешите его в настройках браузера или прикрепите фото.'); }} onClose={() => setLive('')} />}
       <input ref={camera} className="food-scan-file" type="file" accept="image/*" capture="environment" aria-label="Снять фото продукта" onChange={e => { void loadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
       <input ref={gallery} className="food-scan-file" type="file" accept="image/*" aria-label="Выбрать фото продукта" onChange={e => { void loadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
       {image && <><img className="food-scan-preview" src={image} alt="Выбранная этикетка или штрихкод для проверки" /><div className="diary-inline-actions"><button className="button" type="button" disabled={locked} onClick={rotate}>Повернуть фото</button><button className="button button--primary" type="button" disabled={locked} onClick={() => void recognize()}>{mode === 'barcode' ? 'Прочитать штрихкод' : 'Прочитать этикетку'}</button></div></>}

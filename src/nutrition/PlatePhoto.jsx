@@ -5,6 +5,7 @@ import { IconTrash } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { foodTitle } from './FoodFields.jsx';
 import ScanGuide from './ScanGuide.jsx';
+import FoodScan from './FoodScan.jsx';
 import { DIARY_MEALS, label, requestId, decimal } from './diary-model.js';
 import { ErrorNote, n } from './diary-ui.jsx';
 import './food-scan.css';
@@ -32,6 +33,10 @@ async function shrink(file) {
 }
 
 const per = (v, g) => Math.round(Number(v || 0) * g) / 100;
+const one = v => String(Math.round(Number(v || 0) * 10) / 10).replace('.', ',');
+const packName = pack => [pack?.product, pack?.brand].filter(Boolean).join(' · ') || 'продукт';
+// «на 39 % меньше» — насколько оценка на глаз разошлась с этикеткой
+const diffText = (ai, real) => { const d = Math.round((ai - real) / real * 100); return d === 0 ? 'совпало' : 'на ' + Math.abs(d) + ' % ' + (d < 0 ? 'меньше' : 'больше'); };
 
 // Строка списка: что записываем и сколько это калорий при этих граммах
 function rowValues(it) {
@@ -46,13 +51,15 @@ function rowValues(it) {
 export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRescan, onClose, onSaved }) {
   const [image, setImage] = useState(''), [result, setResult] = useState(null), [items, setItems] = useState([]);
   const [busy, setBusy] = useState(''), [error, setError] = useState(null), [meal, setMeal] = useState(initialMeal);
+  // Упаковка (FT-748): labelValues — КБЖУ на 100 г с этикетки (с фото или отсканированные), scan — открыт сканер этикетки
+  const [labelValues, setLabelValues] = useState(null), [scan, setScan] = useState(false);
   const camera = useRef(null), gallery = useRef(null), sequence = useRef(0);
   useEffect(() => { if (file) void take(file); }, []);
 
   const take = async file => {
     if (!file) return;
     const ticket = ++sequence.current;
-    setError(null); setResult(null); setItems([]); setBusy('Готовим фото…');
+    setError(null); setResult(null); setItems([]); setLabelValues(null); setScan(false); setBusy('Готовим фото…');
     try {
       const src = await shrink(file);
       if (ticket !== sequence.current) return;
@@ -60,10 +67,22 @@ export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRes
       const data = await apiMutate('diary.photo', { image: src });
       if (ticket !== sequence.current) return;
       setResult(data);
-      setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, grams: String(it.grams) })));
+      const pack = data.package, guess = data.items[0];
+      if (pack?.match) setItems([{ ...(guess || {}), name: foodTitle(pack.match), from: 0, food: pack.match, options: pack.options || [], grams: String(guess?.grams || pack.net || 100) }]);
+      else if (pack?.label) { setLabelValues(pack.label); setItems([{ name: packName(pack), from: 0, per100: pack.label, label: true, food: null, options: [], grams: String(guess?.grams || pack.net || 100) }]); }
+      else setItems(data.items.map((it, i) => ({ ...it, from: i, food: it.match || null, grams: String(it.grams) })));
       haptic('success');
     } catch (e) { if (ticket === sequence.current) setError(e); }
     finally { if (ticket === sequence.current) setBusy(''); }
+  };
+  const pack = result?.package || null, aiKcal = result?.items?.[0]?.per100?.kcal;
+  // Этикетку прочитал сканер: одна строка с цифрами этикетки вместо оценки на глаз
+  const applyLabel = fields => {
+    const v = { kcal: Number(fields.kcal), protein: Number(fields.protein || 0), fat: Number(fields.fat || 0), carbs: Number(fields.carbs || 0) };
+    setScan(false);
+    if (!Number.isFinite(v.kcal) || v.kcal <= 0) { setError(new Error('Калории на этикетке не прочитались. Отсканируйте таблицу ещё раз крупнее.')); return; }
+    setLabelValues(v);
+    setItems(list => [{ name: packName(pack), from: 0, per100: v, label: true, food: null, options: [], grams: list[0]?.grams || String(pack?.net || 100) }]);
   };
   const patch = (i, next) => setItems(list => list.map((it, k) => k === i ? { ...it, ...next } : it));
   const drop = i => setItems(list => list.filter((_, k) => k !== i));
@@ -76,6 +95,11 @@ export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRes
     try {
       for (const it of kept) {
         const v = rowValues(it);
+        // С этикетки — карточкой в справочник (как «Продукт с этикетки»), чтобы в следующий раз нашлась сразу
+        if (it.label && !it.food) {
+          const r = await apiMutate('food.add', { name: pack?.product || it.name, brand: pack?.brand || '', barcode: '', preparation: 'as_sold', unit: 'g', kcal: it.per100.kcal, protein: it.per100.protein, fat: it.per100.fat, carbs: it.per100.carbs }).catch(() => null);
+          if (r?.food) it.food = { ...r.food, kind: 'food', unit: r.food.unit || 'g' };
+        }
         const payload = it.food
           ? { day, meal, amount: v.grams, product: { kind: 'food', id: it.food.id }, preview: it.food }
           : (() => {
@@ -112,6 +136,17 @@ export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRes
       {busy && <p role="status" className="small">{busy}</p>}
       <ErrorNote error={error} />
       {result && !busy && items.length === 0 && <Note tone="warning">Еды на фото не нашлось. Переснимите тарелку сверху целиком.</Note>}
+      {pack && !busy && <div className="plate-pack">
+        <strong>Упаковка: {packName(pack)}</strong>
+        {pack.match ? <small>Нашли в справочнике — калории с этикетки, а не на глаз.</small>
+          : labelValues ? <small>{aiKcal ? 'AI на глаз давал ' + n(aiKcal) + ' ккал / 100 г, на этикетке ' + n(labelValues.kcal) + ' — ' + diffText(aiKcal, labelValues.kcal) + '.' : 'Цифры с этикетки — сверьте с упаковкой.'}</small>
+          : <><small>У упаковки AI считает на глаз и может ошибиться в разы. Отсканируйте таблицу «Пищевая ценность» — калории будут точными.</small>
+            {!scan && <button type="button" className="button button--primary" onClick={() => { haptic(); setScan(true); }}>Сканировать этикетку</button>}</>}
+        {scan && <FoodScan compact start="label" onClose={() => setScan(false)} onDraft={applyLabel} />}
+        {items.length === 1 && (pack.net || labelValues || pack.match) && <div className="chips chips--wrap chips--flush" role="group" aria-label="Сколько съели">
+          {[pack.net && ['Вся упаковка', pack.net], pack.net && ['Половина', Math.round(pack.net / 2)], ['100 г', 100], ['50 г', 50]].filter(Boolean).map(([t, g]) => <button key={t} type="button" className={'chip' + (String(g) === String(items[0].grams) ? ' chip--active' : '')} onClick={() => patch(0, { grams: String(g) })}>{t}{t.endsWith('г') ? '' : ' · ' + g + ' г'}</button>)}
+        </div>}
+      </div>}
       {items.length > 0 && <>
         <ul className="plate-photo__list" aria-label="Распознанные блюда">
           {items.map((it, i) => {
@@ -119,7 +154,7 @@ export function PlatePhoto({ day, meal: initialMeal, file, denied = false, onRes
             return <li key={it.from} className="plate-photo__row">
               <div className="plate-photo__main">
                 <strong>{it.food ? foodTitle(it.food) : it.name}</strong>
-                <small>{it.food ? 'Из справочника · ' + n(it.food.kcal) + ' ккал / 100 г' : 'Примерно, оценка по фото · ' + n(it.per100.kcal) + ' ккал / 100 г'}</small>
+                <small>{it.food ? 'Из справочника · ' + n(it.food.kcal) + ' ккал / 100 г' : it.label ? 'С этикетки · ' + n(it.per100.kcal) + ' ккал · Б ' + one(it.per100.protein) + ' · Ж ' + one(it.per100.fat) + ' · У ' + one(it.per100.carbs) + ' на 100 г' : 'Примерно, оценка по фото · ' + n(it.per100.kcal) + ' ккал / 100 г'}</small>
                 {(others.length > 0 || it.food) && <div className="plate-photo__options">
                   {it.food && <button type="button" className="chip" onClick={() => patch(i, { food: null })}>Оценка по фото</button>}
                   {others.map(o => <button type="button" className="chip" key={o.id} onClick={() => patch(i, { food: o })}>{foodTitle(o)}</button>)}

@@ -44,3 +44,7 @@
 .plate-photo__grams { display: grid; justify-items: end; gap: 4px; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .plate-photo__grams .field__input { width: 84px; text-align: right; }
 .plate-photo__row .icon-button { width: 44px; height: 44px; }
+.plate-pack { display: grid; gap: 10px; margin: 16px 0 0; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.plate-pack strong { font-size: var(--text-md); }
+.plate-pack small { color: var(--text-secondary); line-height: 1.4; }
+.plate-pack .button { justify-self: start; }
