@@ -37,3 +37,14 @@
   .plate-scan__beam { animation: none; top: 50%; }
   .plate-scan__bar span { transition: none; }
 }
+/* FT-748: AI узнал упаковку — карточка над рамкой, камера не закрывается */
+.plate-scan__middle { position: relative; z-index: 1; display: grid; align-content: center; justify-items: center; gap: var(--space-4); min-height: 0; }
+.plate-scan__found { display: grid; gap: 4px; width: min(92vw, 440px); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); text-align: left; animation: plate-scan-in var(--dur) var(--ease-out) both; }
+.plate-scan__found small { font-size: var(--text-sm); color: #22d3ee; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; }
+.plate-scan__found strong { font-size: var(--text-lg); line-height: 1.2; }
+.plate-scan__found span { font-size: var(--text-sm); line-height: 1.4; color: rgba(255, 255, 255, 0.85); }
+.plate-scan__base { display: grid; gap: 6px; margin-block: 4px; }
+.plate-scan__base small { text-transform: none; letter-spacing: 0; color: rgba(255, 255, 255, 0.85); font-weight: 600; }
+.plate-scan__base button { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; min-height: 44px; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: var(--radius); background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; text-align: left; cursor: pointer; }
+.plate-scan__base button b { font-weight: 650; }
+.plate-scan__base button span { font-size: var(--text-sm); color: rgba(255, 255, 255, 0.75); white-space: nowrap; }

@@ -27,7 +27,9 @@ export function FoodFields({ value, onChange }) {
   </>;
 }
 
-export const foodTitle = p => p.name + (p.brand ? ' · ' + p.brand : '');
+// Названия в справочнике бывают со строчной («гречка», «зефир фисташка…»): показываем с заглавной (FT-748)
+export const cap = s => (s ? String(s).charAt(0).toLocaleUpperCase('ru') + String(s).slice(1) : s);
+export const foodTitle = p => cap(p.name) + (p.brand ? ' · ' + p.brand : '');
 export const foodUnit = p => p.unit === 'portion' ? 'порц.' : p.unit === 'ml' ? 'мл' : 'г';
 /** «порция» или «100 г / 100 мл» — к чему относятся КБЖУ карточки */
 export const foodPer = p => p.unit === 'portion' ? 'порция' : '100 ' + foodUnit(p);

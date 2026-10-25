@@ -36,6 +36,10 @@ export function diaryMock(action, p = {}) {
       { name: 'Котлета куриная', search: 'котлета куриная', grams: 120, per100: { kcal: 190, protein: 18, fat: 11, carbs: 6 }, confidence: 0.8, match: null, options: [] },
       { name: 'Огурец свежий', search: 'огурец', grams: 60, per100: { kcal: 15, protein: 1, fat: 0, carbs: 3 }, confidence: 0.9, match: null, options: [] },
     ] };
+  } else if (action === 'diary.photo.label') {
+    // FT-748: ответ модели на кадр этикетки — заготовленный
+    if (!/^data:image\/jpeg;base64,/.test(String(p.image || ''))) fail(400, 'Не удалось прочитать фото. Наведите камеру ещё раз.');
+    result = { readable: true, basis: 'g', label: { kcal: 410, protein: 1, fat: 10.5, carbs: 78 }, portion: null, net: 250, product: 'Зефир «Фисташка»', brand: 'Самокат' };
   } else if (action === 'diary.photo.confirm') result = { ok: true };
   else if (action === 'diary.settings.save') {
     const old = s.settings || { mode: 'count', meals: null };
