@@ -89,7 +89,7 @@ const effortLabel = (effort) => (EFFORTS.find((e) => e.key === effort) || {}).la
 import CardioPlan, { CardioKind, IntervalsRow } from './trainer/CardioPlan.jsx';
 import ExerciseKind, { saveExerciseTrack } from './ExerciseKind.jsx';
 import { localRestPlatform, scheduleRestEnd, cancelRestEnd, alarmMovedTo } from './native-rest.js';
-import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyActions, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
+import { showWorkoutActivity, endWorkoutActivity, takePendingRest, takeActions, applyChecked, setWorkoutOpen, onWatchState, onLiveAction, isCoaching } from './native-activity.js';
 import './workout.css';
 import { usePinch } from './pinch.js';
 import ExercisePicker from './trainer/ExercisePicker.jsx';
@@ -510,6 +510,12 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     } else if (restClosed(restUntil)) {
       // Этот отдых уже закрыли в другом разделе — второй раз не звенит
       change(v => (v.restUntil === restUntil ? { ...v, restUntil: 0 } : v));
+    } else {
+      // Отдых занятия сменили часы или тренер — запущенный здесь больше не
+      // его отдых. Оставленный, он через полчаса всё ещё всплывал вне
+      // экрана тренировки «Отдых окончен» со старым «Дальше» (FT-753)
+      const here = restHere();
+      if (here && here.sessionId === record?.session?.id && here.until !== restUntil) setRestHere(null);
     }
   }, [restUntil, restStatus]);
 
@@ -531,7 +537,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       const actions = await takeActions(sessionId);
       const cur = state.current?.session;
       if (actions.length && cur?.id === sessionId && ['active', 'paused'].includes(cur.status)) {
-        if (applyActions(cur, actions) !== cur) { change(v => applyActions(v, actions, localRestPlatform())); save(); }
+        if (applyChecked(cur, actions) !== cur) { change(v => applyChecked(v, actions, localRestPlatform())); save(); }
       }
       const rest = await takePendingRest();
       const s = state.current?.session;

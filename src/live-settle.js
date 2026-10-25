@@ -15,7 +15,7 @@
 import { apiMutate, apiPublic } from './api.js';
 import { storageKey } from './workout-draft.js';
 import { uid } from './workout-model.js';
-import { applyActions, endWorkoutActivity, isWorkoutOpen, liveOwner, liveState, takeActions } from './native-activity.js';
+import { applyActions, applyChecked, endWorkoutActivity, isWorkoutOpen, liveOwner, liveState, takeActions } from './native-activity.js';
 
 const FORGOTTEN_MS = 4 * 60 * 60 * 1000;
 const OPEN = ['active', 'paused'];
@@ -54,7 +54,7 @@ export async function finishFromLive(sessionId, row) {
 
   const actions = await takeActions(sessionId);
   if (!OPEN.includes(base.session.status)) return false;
-  let session = applyActions(base.session, actions, 'ios');
+  let session = applyChecked(base.session, actions, 'ios');
   if (OPEN.includes(session.status)) session = applyActions(session, [{ kind: 'finish', sessionId }]);
 
   const edit = ((own && own.edit) || 0) + 1;

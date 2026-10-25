@@ -13,7 +13,7 @@
  */
 import { bridge, isNativeApp, plugin } from './native-bridge.js';
 import { trackOf, volumeOf, setText as trackSetText } from './exercise-track.js';
-import { closeSets, withSet, withWarmup } from './workout-model.js';
+import { closeSets, resultIssue, withSet, withWarmup } from './workout-model.js';
 import { rateSet, isDumbbell, stepOf, suggestText, isAssisted, assistStep, settleOrder, tiredText } from './effort.js';
 
 const isEffort = (e) => ['easy', 'ok', 'hard'].includes(e);
@@ -370,7 +370,10 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
         // Оценка с часов (03.10.2026): вес следующих подходов — по effort.js
         return isEffort(a.effort) ? rateSet(next, ex.sets.indexOf(target), a.effort).ex : next;
       }) };
-    } else if (a.kind === 'rest' && Number(a.restUntil) > (s.restUntil || 0) && s.status === 'active') {
+    } else if (a.kind === 'rest' && Number(a.restUntil) > Math.max(s.restUntil || 0, now) && s.status === 'active') {
+      // Отдых, кончившийся до того, как дошёл (часы без связи отдали его
+      // телефону позже, FT-753), — не отдых: «Отдых окончен» от него
+      // всплывал на телефоне, где отдых никто не запускал
       s = { ...s, restUntil: Math.round(Number(a.restUntil)), restLocal: platform };
     } else if (a.kind === 'restStop' && s.restUntil) {
       s = { ...s, restUntil: 0 };
@@ -447,6 +450,26 @@ export function applyActions(session, actions, platform = '', now = Date.now()) 
   if (s === session) return s;
   const settled = settleOrder(s.exercises);
   return settled === s.exercises ? s : { ...s, exercises: settled };
+}
+
+/**
+ * Нажатия с часов и плашки — как на сервере (watch-handlers.js applyChecked,
+ * FT-753): нажатие, после которого занятие не сохранить (подход «Тяжело» без
+ * повторов), пропускается, остальные — ложатся. Раньше одна такая отметка с
+ * часов останавливала сохранение всего занятия («Не сохранено: Рукоход,
+ * подход 1: Введите число повторов»), сервер отставал, и часы, следуя ему,
+ * возвращали к прошлому упражнению. Свои прежние ошибки занятия не трогаем
+ */
+export function applyChecked(session, actions, platform = '', now = Date.now()) {
+  const before = resultIssue(session);
+  const all = applyActions(session, actions, platform, now);
+  if (all === session || !resultIssue(all) || resultIssue(all) === before) return all;
+  let s = session;
+  for (const a of actions) {
+    const next = applyActions(s, [a], platform, now);
+    if (next !== s && (!resultIssue(next) || resultIssue(next) === before)) s = next;
+  }
+  return s;
 }
 
 /** Занятие завершено или отменено — плашку убрать. sessionId — только

@@ -326,3 +326,32 @@ test('нажатие на часах — событие «watch»: экран з
   off();
   assert.equal(fake.listeners.liveAction, undefined);
 });
+
+test('FT-753: отметка с часов без повторов пропускается, остальные нажатия ложатся — занятие можно сохранить', () => {
+  const s = record({ exercises: [
+    { id: 'e1', name: 'Жим лёжа', sets: [set('done'), set('pending', '62.5')] },
+    { id: 'e2', name: 'Рукоход', sets: [set('pending', '', ''), set('pending', '', '')] },
+  ] }).session;
+  const until = Date.now() + 90000;
+  const out = la.applyChecked(s, [
+    { kind: 'done', sessionId: 's1', exerciseId: 'e1', who: '', weight: '62.5', setIndex: 1 },
+    { kind: 'done', sessionId: 's1', exerciseId: 'e2', who: '', weight: '', setIndex: 0, effort: 'hard' },
+    { kind: 'rest', sessionId: 's1', restUntil: until },
+  ], 'ios');
+  assert.deepEqual(out.exercises[0].sets.map((x) => x.state), ['done', 'done'], 'подход с весом и повторами — отмечен');
+  assert.deepEqual(out.exercises[1].sets.map((x) => x.state), ['pending', 'pending'], 'без повторов — ждёт, как на сервере');
+  assert.equal(out.restUntil, until, 'отдых после него — есть');
+  // Всё в порядке — то же, что applyActions
+  const ok = [{ kind: 'done', sessionId: 's1', exerciseId: 'e1', who: '', weight: '62.5', setIndex: 1 }];
+  assert.deepEqual(la.applyChecked(s, ok), la.applyActions(s, ok));
+  assert.equal(la.applyChecked(s, []), s);
+});
+
+test('FT-753: отдых, кончившийся до того, как дошёл с часов, — не отдых (без «Отдых окончен»)', () => {
+  const now = 1_000_000_600_000;
+  const s = record({}).session;
+  const late = la.applyActions(s, [{ kind: 'rest', sessionId: 's1', restUntil: now - 60000 }], 'ios', now);
+  assert.equal(late.restUntil, 0);
+  const live = la.applyActions(s, [{ kind: 'rest', sessionId: 's1', restUntil: now + 30000 }], 'ios', now);
+  assert.equal(live.restUntil, now + 30000);
+});

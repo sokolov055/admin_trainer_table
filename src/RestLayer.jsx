@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { restHere, onRestHere, workoutScreens, closeRestHere, setRestHere } from './rest-here.js';
@@ -39,12 +39,18 @@ export default function RestLayer({ allowGame = false }) {
 
   // Развёрнут ли — по until: новый отдых начинается свёрнутым
   const [openUntil, setOpenUntil] = useState(0);
+  // Отдых, который этот слой видел идущим (FT-753): «Отдых окончен» — только
+  // у него, как на экране тренировки (restSeen). Кончившийся без нас —
+  // после перезапуска приложения — не всплывает: сигнал уже был
+  const seen = useRef(0);
   if (!active || typeof document === 'undefined' || !document.body) return null;
 
   // Давно кончившийся отдых (телефон спал полчаса) — не звенеть
   if (now - rest.until > 30 * 60 * 1000) return null;
 
   const over = rest.until - now <= 0;
+  if (!over) seen.current = rest.until;
+  else if (seen.current !== rest.until) return null;
   const close = () => { closeRestHere(rest.until); cancelRestEnd(); };
   if (!over && openUntil !== rest.until) {
     return createPortal(<RestPill left={rest.until - now} onOpen={() => setOpenUntil(rest.until)} />, document.body);
