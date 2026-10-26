@@ -1134,7 +1134,9 @@ Object.assign(demoExercises[2], { setupOk: true, setup: 'Стойки — крю
 
 // Тренажёры (FT-478) и замены (FT-479): у приседа — две стойки в разных
 // залах, занято — жим ногами
-const DEMO_RACK = { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' };
+const DEMO_RACK = { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.',
+  // Поля настройки (FT-760): значения у каждого клиента свои
+  fields: ['Крюки', 'Упоры'] };
 const DEMO_SMITH = { uid: 'smith1', name: 'Стойка у зеркала', photo: '', setup: '' };
 Object.assign(demoExercises[2], { machines: [DEMO_RACK, DEMO_SMITH], alternatives: [{ id: 10, name: 'Жим ногами' }] });
 // Техника приседа (FT-570): одна строка совпадает с настройкой — в занятии она не повторяется
@@ -2292,9 +2294,13 @@ const MOCK = {
   },
   // Своя настройка тренажёра у клиента — у каждого своя (07.10.2026)
   'client.machine.note.save': (params) => {
-    const text = String(params.text || '').trim().slice(0, 300);
+    const note = String(params.text || '').trim().slice(0, 300);
+    // Поля (FT-760): строка из них и заметки — как на сервере (composeText)
+    const values = Array.isArray(params.values) ? params.values.filter((v) => v && v.name && v.value) : null;
+    const line = values ? values.map((v) => v.name + ' ' + v.value).join(', ') : '';
+    const text = (line && note ? line + '. ' + note : line || note).slice(0, 300);
     if (!text) { delete demoNotes[params.target]; return { target: params.target, note: null }; }
-    demoNotes[params.target] = { text, by: params.__role === 'trainer' ? 'trainer' : 'client', updatedAt: new Date().toISOString() };
+    demoNotes[params.target] = { text, ...(values ? { values, note } : {}), by: params.__role === 'trainer' ? 'trainer' : 'client', updatedAt: new Date().toISOString() };
     return { target: params.target, note: demoNotes[params.target] };
   },
   'library.exercise.machine.save': (params) => {
@@ -2313,7 +2319,8 @@ const MOCK = {
     // Как на сервере: вид, фото списком, убрать одно или все
     const drop = [].concat(params.removePhotoUrls || [], params.removePhotoUrl || []);
     const photos = params.removePhoto ? [] : (m.photos || (m.photo ? [m.photo] : [])).filter((u) => !drop.includes(u));
-    Object.assign(m, { originalName: params.originalName ?? m.originalName, brand: params.brand ?? m.brand, muscleGroups: params.muscleGroups ?? m.muscleGroups ?? [], setupOk: params.setupOk ?? false, name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : (params.kind ? 'machine' : m.kind || 'machine'), photos, photo: photos[0] || '' });
+    Object.assign(m, { originalName: params.originalName ?? m.originalName, brand: params.brand ?? m.brand, muscleGroups: params.muscleGroups ?? m.muscleGroups ?? [], setupOk: params.setupOk ?? false, name, setup: String(params.setup || '').trim(), kind: params.kind === 'equipment' ? 'equipment' : (params.kind ? 'machine' : m.kind || 'machine'), photos, photo: photos[0] || '',
+      fields: Array.isArray(params.setupFields) ? params.setupFields : m.fields || [] });
     return { exercise: { ...e }, uid: m.uid };
   },
   'library.exercise.machine.delete': (params) => {

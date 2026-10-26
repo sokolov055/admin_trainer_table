@@ -111,6 +111,9 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const [weightStep, setWeightStep] = useState(machine?.weightStep ? String(machine.weightStep).replace('.', ',') : '');
   // Тренажёр или оборудование (владелец, 09.10.2026)
   const [kind, setKind] = useState(machine && machine.kind === 'equipment' ? 'equipment' : 'machine');
+  // Поля настройки (FT-760): «Сиденье», «Спинка» — общие для всех, кто на
+  // этом тренажёре; значения вписывает клиент в занятии
+  const [setupFields, setSetupFields] = useState(machine?.fields?.length ? machine.fields : []);
   // Фото несколько (09.10.2026): уже сохранённые — убранные удаляются только
   // по «Сохранить» — и новые, ещё не загруженные
   const had = machine ? (machine.photos && machine.photos.length ? machine.photos : machine.photo ? [machine.photo] : []) : [];
@@ -147,6 +150,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     try {
       const r = await apiMutate(exercise ? 'library.exercise.machine.save' : 'library.machine.save', {
         ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind, originalName, brand, muscleGroups, setupOk, weightStep,
+        setupFields: setupFields.map((f) => f.trim()).filter(Boolean),
         ...(dropped.length ? { removePhotoUrls: dropped } : {}),
       });
       result = exercise ? r.exercise : r.machine;
@@ -256,6 +260,19 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         <span className="field__hint">Без цифр: настройка у каждого клиента своя — её записывают в занятии. Каждый шаг — с новой строки.</span>
       </label>
       <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Инструкция оборудования проверена</label>
+      <fieldset className="field library__setup-fields">
+        <legend className="field__label">Поля настройки</legend>
+        {setupFields.map((f, i) => (
+          <div className="library__setup-field" key={i}>
+            <input className="field__input" value={f} maxLength={40} placeholder="Сиденье, спинка, высота блока…" autoFocus={!f}
+              aria-label={'Поле настройки ' + (i + 1)} onChange={(e) => setSetupFields((v) => v.map((x, k) => (k === i ? e.target.value : x)))} />
+            <button type="button" className="library__setup-field-x" aria-label={'Убрать поле ' + (f || i + 1)}
+              onClick={() => setSetupFields((v) => v.filter((_, k) => k !== i))}><IconClose size={14} /></button>
+          </div>
+        ))}
+        {setupFields.length < 12 && <button type="button" className="button button--ghost" onClick={() => setSetupFields((v) => [...v, ''])}>+ Поле</button>}
+        <span className="field__hint">Что клиент выставляет на тренажёре. Значения у каждого свои — текст или число, их вписывают в занятии. Клиент может добавить и своё поле — оно только у него.</span>
+      </fieldset>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       {asking ? (
         <Confirm

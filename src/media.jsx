@@ -6,6 +6,7 @@ import { mediaUrl } from './library.js';
 import { useVideoSrc } from './offline-media.js';
 import { isOffline, queueWrite } from './offline-writes.js';
 import { useReveal } from './reveal.js';
+import { noteFields, noteSummary, valuesToSave, OWN_FIELDS_MAX } from './machine-fields.js';
 
 /**
  * Видео и анимация техники упражнения.
@@ -191,13 +192,20 @@ export function PersonalNote({ text, trainer = false, by = '', local = false, la
  */
 // plaque — плашкой в шапке упражнения занятия (вариант А3, владелец,
 // 24.10.2026): подпись сверху, цифры или «+ Записать» снизу, касание —
-// правка; рядом стоит кнопка «Тренажёр» той же высоты
-export function MachineNote({ target, label = '', note, trainer, params, onSaved, plaque = false }) {
+// правка; рядом стоит кнопка «Тренажёр» той же высоты.
+// fields — поля настройки тренажёра (FT-760): у каждого строка значения
+// (текст или число), ниже — свои поля клиента и заметка
+export function MachineNote({ target, label = '', note, trainer, params, onSaved, plaque = false, fields = [] }) {
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(note ? note.text : '');
+  const [form, setForm] = useState(() => noteFields(note, fields));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { if (!editing) setText(note ? note.text : ''); }, [note, editing]);
+  // Список полей — строкой: новый массив с тем же составом не сбрасывает форму
+  const fieldsKey = fields.join('\n');
+  useEffect(() => { if (!editing) setForm(noteFields(note, fieldsKey ? fieldsKey.split('\n') : [])); }, [note, editing, fieldsKey]);
+  const setValue = (i, key, value) => setForm((f) => ({ ...f, values: f.values.map((v, k) => (k === i ? { ...v, [key]: value } : v)) }));
+  const ownCount = form.values.filter((v) => v.own).length;
+  const summary = noteSummary(note, fields);
   // Поле и «Сохранить» — на экран, не под нижнее меню (FT-595)
   const formRef = useReveal(editing && (error || 'open'));
 
@@ -205,7 +213,9 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
     setBusy(true);
     setError('');
     try {
-      const request = { ...params, target, text, ...(note && note.from ? { legacy: note.from } : {}) };
+      const values = valuesToSave(form.values);
+      const text = form.note;
+      const request = { ...params, target, text, values, ...(note && note.from ? { legacy: note.from } : {}) };
       let saved;
       try {
         saved = (await apiMutate('client.machine.note.save', request)).note;
@@ -215,7 +225,8 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
         if (!isOffline(e)) throw e;
         await queueWrite('note', request);
         const clean = String(text || '').trim();
-        saved = clean ? { text: clean, by: trainer ? 'trainer' : 'client', local: true } : null;
+        const line = [values.map((v) => v.name + ' ' + v.value).join(', '), clean].filter(Boolean).join('. ');
+        saved = line ? { text: line, values, note: clean, by: trainer ? 'trainer' : 'client', local: true } : null;
       }
       haptic('success');
       onSaved(saved);
@@ -233,11 +244,11 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
     const whose = trainer ? 'Настройка клиента' : 'Моя настройка';
     const head = (label || whose) + (note && note.shared ? ' · для тренажёра' : '') + (note && note.local ? ' · не отправлена' : '');
     return <button type="button" className={'workout__plaque' + (note ? '' : ' workout__plaque--empty')}
-      aria-label={whose + (label ? ' · ' + label : '') + (note ? ': ' + note.text + '. Изменить' : ': не записана. Записать')}
+      aria-label={whose + (label ? ' · ' + label : '') + (note ? ': ' + summary + '. Изменить' : ': не записана. Записать')}
       onClick={() => setEditing(true)}>
       <span className="workout__plaque-head">{head}</span>
       {/* «4-й» не рвётся на «4-» и «й»: дефис после цифры — неразрывный */}
-      <span className="workout__plaque-value">{note ? note.text.replace(/(\d)-(?=[а-яё])/gi, '$1‑') : label ? '+ Записать настройку' : '+ Записать'}</span>
+      <span className="workout__plaque-value">{note ? summary.replace(/(\d)-(?=[а-яё])/gi, '$1‑') : label ? '+ Записать настройку' : '+ Записать'}</span>
     </button>;
   }
   if (!editing) {
@@ -253,10 +264,27 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
         <span className="workout__note-add-act">Записать</span>
       </button>;
   }
+  const whose = trainer ? 'Настройка клиента' : 'Своя настройка';
+  const structured = form.values.length > 0;
   return <div className="workout__note-form" ref={formRef}>
-    <textarea className="field__input" rows={2} maxLength={300} value={text} autoFocus
-      aria-label={(trainer ? 'Настройка клиента' : 'Своя настройка') + (label ? ': ' + label : '')}
-      placeholder="Спинка 3, сиденье 5, упор на 2-й" onChange={(e) => setText(e.target.value)} />
+    {form.parsed && note && <p className="workout__note-parsed">Разобрали прошлую запись «{note.text}» по полям — проверьте.</p>}
+    {form.values.map((v, i) => (
+      <div className="workout__note-field" key={i}>
+        {v.own
+          ? <input className="field__input" value={v.name} maxLength={40} placeholder="Название" aria-label={'Своё поле ' + (i + 1) + ', название'}
+            autoFocus={!v.name} onChange={(e) => setValue(i, 'name', e.target.value)} />
+          : <span className="workout__note-field-name">{v.name}</span>}
+        <input className="field__input" value={v.value} maxLength={40} aria-label={whose + ': ' + (v.name || 'своё поле')}
+          autoFocus={!v.own && i === 0} onChange={(e) => setValue(i, 'value', e.target.value)} />
+        {v.own && <span className="workout__note-field-own">{trainer ? 'только у клиента' : 'только вы'}</span>}
+      </div>
+    ))}
+    {ownCount < OWN_FIELDS_MAX && <button type="button" className="workout__note-field-add"
+      onClick={() => setForm((f) => ({ ...f, values: [...f.values, { name: '', value: '', own: true }] }))}>+ Своё поле</button>}
+    <textarea className="field__input" rows={2} maxLength={300} value={form.note} autoFocus={!structured}
+      aria-label={whose + (label ? ': ' + label : '') + (structured ? ', заметка' : '')}
+      placeholder={structured ? 'Заметка: упор на 2-й, локти прижать' : 'Спинка 3, сиденье 5, упор на 2-й'}
+      onChange={(e) => { const value = e.target.value; setForm((f) => ({ ...f, note: value })); }} />
     {error && <p className="small danger">{error}</p>}
     <div className="workout__note-actions">
       <button type="button" className="button" disabled={busy} onClick={save}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>

@@ -37,18 +37,19 @@ export default function ClientSetup({ exerciseId, clientRow, members = [] }) {
   if (!info) return null;
   const machines = info.machines || [];
   const targets = machines.length
-    ? machines.map((m) => ({ target: machineTarget(info, m.uid), label: m.name }))
+    ? machines.map((m) => ({ target: machineTarget(info, m.uid), label: m.name, fields: m.fields || [] }))
     : (info.noteKey ? [{ target: info.noteKey, label: '' }] : []);
 
   const split = members.length > 1;
   if (split) {
     return (
       <div className="plan-edit__setups">
-        {members.map((who) => targets.map(({ target, label }) => (
+        {members.map((who) => targets.map(({ target, label, fields }) => (
           <div key={who + target}>
             <span className="small muted">{[who, label].filter(Boolean).join(' · ')}</span>
             <MachineNote
               target={target}
+              fields={fields}
               note={(notesBy[who] || {})[target]}
               trainer
               params={{ clientRow, member: who }}
@@ -66,11 +67,12 @@ export default function ClientSetup({ exerciseId, clientRow, members = [] }) {
 
   return (
     <div className="plan-edit__setups">
-      {targets.map(({ target, label }) => (
+      {targets.map(({ target, label, fields }) => (
         <div key={target}>
           {label && <span className="small muted">{label}</span>}
           <MachineNote
             target={target}
+            fields={fields}
             note={notes[target]}
             trainer
             params={{ clientRow }}

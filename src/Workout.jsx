@@ -2098,8 +2098,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         return (
           <div className="workout__member" key={w}>
             <span className="workout__member-name">{w}</span>
-            {canNote && targets.map(({ target, label }) => (
-              <MachineNote key={w + target} target={target} label={label} note={own[target]} trainer={!asClient} params={{ ...params, member: w }}
+            {canNote && targets.map(({ target, label, fields }) => (
+              <MachineNote key={w + target} target={target} label={label} fields={fields} note={own[target]} trainer={!asClient} params={{ ...params, member: w }}
                 onSaved={(n) => setNotesBy((v) => {
                   const next = { ...(v[w] || {}) };
                   if (n) next[target] = n; else delete next[target];
@@ -2118,7 +2118,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const noteTargetsOf = (info) => {
     const machines = info.machines || [];
     // У тренажёра — в этом упражнении (FT-759)
-    if (machines.length) return machines.map((m) => ({ target: machineTarget(info, m.uid), label: machines.length > 1 ? m.name : '' }));
+    // Поля настройки — тренажёра (FT-760)
+    if (machines.length) return machines.map((m) => ({ target: machineTarget(info, m.uid), label: machines.length > 1 ? m.name : '', fields: m.fields || [] }));
     return info.noteKey ? [{ target: info.noteKey, label: '' }] : [];
   };
 
@@ -2190,9 +2191,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const used = pin ? machines.filter((m) => m.uid === pin || m.kind === 'equipment') : machines;
     const usedInfo = info && used.length !== machines.length ? { ...info, machines: used } : info;
     const targets = usedInfo && !split ? noteTargetsOf(usedInfo) : [];
-    const noteCell = ({ target, label }, i) => (
+    const noteCell = ({ target, label, fields }, i) => (
       <div key={target} className={'workout__head-note' + (i === 0 && machines.length ? '' : ' workout__head-note--wide')}>
-        <MachineNote plaque target={target} label={label} note={notes[target]} trainer={!asClient} params={params}
+        <MachineNote plaque target={target} label={label} fields={fields} note={notes[target]} trainer={!asClient} params={params}
           onSaved={(n) => setNotes((v) => {
             const next = { ...v };
             if (n) next[target] = n; else delete next[target];

@@ -983,6 +983,51 @@ test('тренажёры на выбор: закреплённый — одно�
 });
 
 /**
+ * FT-760 (владелец, 26.10.2026): поля настройки у тренажёра. Плашка —
+ * значения строкой; старая запись разбирается по полям, лист просит
+ * проверить; сохранение уходит полями, заметка — отдельно
+ */
+test('поля настройки: старая строка разобрана, плашка строкой, сохранение полями', async () => {
+  data.clear();
+  const rack = { uid: 'rack1', name: 'Рама у окна', kind: 'machine', fields: ['Крюки', 'Упоры'] };
+  exerciseSetupResponse = { setups: { 79: {
+    name: 'Присед', setup: '', notes: '', machines: [rack], alternatives: [], noteKey: 'e:присед',
+    muscles: { primary: [], secondary: [] }, media: null,
+  } }, notes: { 'm:rack1|присед': { text: 'Крюки на 4-й, упоры на 2-й. Штанга с замками', by: 'client' } } };
+  const calls = [];
+  const api = globalThis.__workoutApi;
+  globalThis.__workoutApi = async (action, params) => {
+    calls.push([action, params]);
+    if (action === 'client.machine.note.save') return { note: { text: 'x', values: params.values, note: params.text, by: 'client' } };
+    return api(action, params);
+  };
+  let local;
+  try {
+    await act(async () => {
+      local = renderer.create(React.createElement(Workout, { launch: { block: {
+        title: 'Ноги', exercises: [{ name: 'Присед', exerciseId: 79, machine: { uid: 'rack1', name: 'Рама у окна' }, sets: '3', reps: '5', weight: '60' }],
+      }, month: 'Октябрь 2026' }, onClose() {} }));
+      await delay();
+    });
+    const plaque = () => local.root.find(n => n.type === 'button' && String(n.props.className || '').startsWith('workout__plaque'));
+    assert.equal(text(plaque()), 'Моя настройкаКрюки на 4‑й · Упоры на 2‑й');
+    await act(async () => { plaque().props.onClick(); await delay(); });
+    assert.ok(local.root.findAll(n => n.props.className === 'workout__note-parsed').length === 1, 'просит проверить разобранное');
+    const input = (label) => local.root.find(n => n.type === 'input' && n.props['aria-label'] === label);
+    assert.equal(input('Своя настройка: Крюки').props.value, 'на 4-й');
+    await act(async () => { input('Своя настройка: Упоры').props.onChange({ target: { value: '3' } }); await delay(); });
+    await act(async () => { local.root.findAllByType('button').find(b => text(b) === 'Сохранить').props.onClick(); await delay(); });
+    const saved = calls.find(([a]) => a === 'client.machine.note.save')[1];
+    assert.deepEqual(saved.values, [{ name: 'Крюки', value: 'на 4-й' }, { name: 'Упоры', value: '3' }]);
+    assert.equal(saved.text, 'Штанга с замками', 'не разобранное — заметкой');
+  } finally {
+    globalThis.__workoutApi = api;
+    exerciseSetupResponse = null;
+    if (local) local.unmount();
+  }
+});
+
+/**
  * Замена упражнения (владелец, 16.10.2026): кнопкой со списком, вес нового —
  * с прошлого раза; после первого подхода — пояснение, а не пропавшая кнопка.
  */
