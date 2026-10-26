@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { api, apiBatch, apiStale, clearApiCache } from './api.js';
-import { getInitData, environmentInfo, diagnoseMissingInitData } from './telegram.js';
+import { getInitData, environmentInfo, diagnoseMissingInitData, refreshTheme } from './telegram.js';
 import { clearToken, getToken, onTokenChange } from './session.js';
 import { readLoginTicket } from './auth-transfer.js';
 import { readInviteToken, removeInviteToken } from './invites.js';
@@ -14,6 +14,7 @@ import { setOfflineAccount } from './offline-account.js';
 import { setRights } from './rights.js';
 import { PlusOffer, usePlusLink } from './plus.jsx';
 import { refreshThemes } from './remote-themes.js';
+import { setStandardLook } from './palettes.js';
 import { refreshGamePacks } from './remote-games.js';
 
 // Кабинеты и экраны входа — по требованию (lazy.js): клиенту не нужен
@@ -164,6 +165,13 @@ export default function App() {
   };
 
   const authorized = !!initData || !!signedToken;
+  // Экраны входа — в стандартном оформлении, выбранная тема — после входа.
+  // До отрисовки, иначе тема мелькала бы на первом кадре.
+  const signingIn = !!(accessToken || inviteToken || loginTicket || !authorized);
+  useLayoutEffect(() => {
+    setStandardLook(signingIn);
+    refreshTheme();
+  }, [signingIn]);
 
   // Загружаемся, только когда есть чем представиться. Иначе первый же
   // запрос вернул бы отказ, и человек увидел бы ошибку вместо входа.

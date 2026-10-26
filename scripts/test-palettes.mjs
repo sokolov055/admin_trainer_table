@@ -16,7 +16,7 @@ globalThis.localStorage = {
   setItem: (k, v) => { if (broken) throw new Error('denied'); store.set(k, String(v)); },
 };
 
-const { PALETTES, STANDARD, PALETTE_KEY, BASE, WASH, artPeaks, paletteTokens, paletteColors, paletteCss, getPaletteId, setPaletteId, paletteById, forcedScheme, contrast, over, lum } = await import('../src/palettes.js');
+const { PALETTES, STANDARD, PALETTE_KEY, BASE, WASH, artPeaks, paletteTokens, paletteColors, paletteCss, getPaletteId, setPaletteId, paletteById, forcedScheme, setStandardLook, contrast, over, lum } = await import('../src/palettes.js');
 
 const HEX = /^#[0-9a-f]{6}$/;
 
@@ -153,6 +153,18 @@ test('«Хэллоуин» всегда тёмный, остальные — п�
   // telegram.js спрашивает палитру прежде выбора темы
   const tg = readFileSync(new URL('../src/telegram.js', import.meta.url), 'utf8');
   assert.match(tg, /const mode = forcedScheme\(\) \|\| getThemeMode\(\);/);
+});
+
+test('экран входа — стандартная тема, выбор возвращается после входа', () => {
+  setPaletteId('halloween');
+  setStandardLook(true);
+  assert.equal(getPaletteId(), STANDARD);
+  assert.equal(forcedScheme(), null, 'вход не навязывает тёмную тему Хэллоуина');
+  assert.equal(store.get(PALETTE_KEY), 'halloween', 'выбор на устройстве не стёрт');
+  setStandardLook(false);
+  assert.equal(getPaletteId(), 'halloween');
+  assert.equal(forcedScheme(), 'dark');
+  setPaletteId(STANDARD);
 });
 
 test('«Хэллоуин»: цельный рисунок, предметы не налезают друг на друга (FT-702)', async () => {

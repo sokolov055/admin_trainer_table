@@ -298,8 +298,22 @@ export function paletteById(id) {
   return BY_ID.get(id) || BY_ID.get(STANDARD);
 }
 
-/** Выбранная палитра; хранилище недоступно (приватный режим) — стандартная */
+/**
+ * Экран входа — всегда в стандартном оформлении: выбор хранится на
+ * устройстве, и после выхода праздничная тема встречала бы следующего
+ * человека. Выбор не стирается — тема вернётся после входа (App.jsx).
+ */
+let standardLook = false;
+export function setStandardLook(on) {
+  if (standardLook === !!on) return;
+  standardLook = !!on;
+  applyPalette();
+  listeners.forEach((fn) => fn());
+}
+
+/** Выбранная палитра; хранилище недоступно (приватный режим) или экран входа — стандартная */
 export function getPaletteId() {
+  if (standardLook) return STANDARD;
   try {
     const saved = localStorage.getItem(PALETTE_KEY);
     if (isOpen(saved)) return saved;
