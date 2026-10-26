@@ -515,14 +515,20 @@ export function settleOrder(exercises) {
     if (!after) return ex;
     const assist = isAssisted(ex);
     const m = measure(assist);
+    // Не легче разминки, нет её — не легче блина, как после «тяжело»
+    // (FT-763: перерыв и новые повторы дали 1 кг, усталость — 0 кг)
+    const warm = ex.sets.filter((s) => s.kind === 'warmup' && m.has(s)).map(m.load);
+    const floor = warm.length ? Math.max(...warm) : assist ? -Infinity : unitOf(ex);
     let step = 0;
     const sets = ex.sets.map((s) => {
       if (s.state !== 'pending' || s.kind === 'warmup' || s.own || !m.has(s)) return s;
       const w = m.load(s);
+      if (w <= floor) return s;
       const one = assist ? assistStep(ex) : stepOf(ex, w);
-      const value = text(assist ? Math.max(0, one - w) : Math.max(0, w - one));
+      const load = Math.max(floor, w - one);
+      const value = text(assist ? Math.max(0, -load) : load);
       if (num(value) === num(s[m.key])) return s;
-      step = one;
+      step = Math.round((w - load) * 100) / 100;
       return { ...s, [m.key]: value, suggest: 'tired' };
     });
     return step ? { ...ex, sets, tired: { after: String(after.name || '').slice(0, 80), step: text(step) } } : ex;
