@@ -38,7 +38,7 @@ import { SCHEDULE_UNKNOWN } from './schedule-text.js';
 import { GoalBanner } from './focus.jsx';
 import { onlineDaysLeft, onlineDay } from '../online.js';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
-import { useRights, hasPlus, isPro, can, gate, setRights } from '../rights.js';
+import { useRights, isPro, can, gate } from '../rights.js';
 import { PlusBadge, openPlusOffer } from '../plus.jsx';
 import { useQuickRequest } from '../quick-actions.js';
 import { revealSoon } from '../reveal.js';
@@ -2329,28 +2329,6 @@ function MeasureTable({ rows, fields, onMove = null }) {
  * clientRow, и анкету можно заполнить за того, кто приложением не
  * пользуется.
  */
-/**
- * Раздел закрыт тарифом (FT-545). Ни цены, ни «купить», ни ссылки на
- * оплату: на iPhone это запрещено (App Store 3.1.1), а один текст на все
- * платформы проще держать честным. Пробный период — бесплатный, без карты.
- */
-function PlusLocked({ rights, busy, error, onTrial }) {
-  const canTrial = !!(rights && rights.canTrial);
-  return (
-    <>
-      <Note tone="info">
-        Подбор рациона входит в «Плюс». Норма КБЖУ выше остаётся с вами.
-      </Note>
-      {canTrial && (
-        <button className="button button--block button--primary" disabled={busy} onClick={onTrial}>
-          {busy ? 'Включаем…' : `Попробовать «Плюс» — ${rights.trialDays} дней бесплатно`}
-        </button>
-      )}
-      {error && <Note tone="critical">{error}</Note>}
-    </>
-  );
-}
-
 // self — «Мои тренировки» тренера (21.10.2026): раздел как у клиента —
 // свой дневник, вода, рацион; данные — своей карточки (clientRow), сервер
 // пускает тренера в неё клиентом (selfAsClient)
@@ -2368,8 +2346,6 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
   const [trial, setTrial] = useState(false);
   // Рацион — в «Плюсе» клиента и на платной ступени тренера (FT-545)
   const rights = useRights();
-  const [plusBusy, setPlusBusy] = useState(false);
-  const [plusError, setPlusError] = useState('');
 
   // Рацион — экран поверх питания. Его «назад» (кнопка, жест, Back) живёт
   // в самом Ration: шаг за шагом, как кнопка в его шапке (FT-567)
@@ -2543,7 +2519,9 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
         </Section>
       )}
 
-      {configured && !editing && !byTrainer && !diaryEnabled && (
+      {/* Рацион без «Плюса» на iPhone не показываем совсем — ни замка, ни
+          кнопки пробного (FT-767/768): пробный включается сам */}
+      {configured && !editing && !byTrainer && !diaryEnabled && (clientView || gate('ration', rights) !== 'hidden') && (
         <Section>
           <Panel pad>
             <h3 style={{ margin: '0 0 6px', fontSize: 'var(--text-md)', fontWeight: 640 }}>
@@ -2553,20 +2531,10 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
               Отметьте продукты, которые есть, — приложение подберёт блюда,
               соберёт из них день под вашу норму и покажет, что докупить.
             </p>
-            {!clientView && !hasPlus(rights) ? (
-              <PlusLocked
-                rights={rights}
-                busy={plusBusy}
-                error={plusError}
-                onTrial={() => {
-                  setPlusBusy(true);
-                  setPlusError('');
-                  apiMutate('client.plus.trial', {})
-                    .then((res) => setRights(res.rights))
-                    .catch((e) => setPlusError(e.message || 'Не получилось — попробуйте ещё раз.'))
-                    .finally(() => setPlusBusy(false));
-                }}
-              />
+            {!clientView && gate('ration', rights) === 'plus' ? (
+              <button className="button button--block" onClick={() => openPlusOffer('ration')}>
+                <PlusBadge /> Подбор рациона — в «Плюсе»
+              </button>
             ) : clientView ? (
               <>
                 <Note tone="info">

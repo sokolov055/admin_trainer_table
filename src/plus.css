@@ -9,3 +9,18 @@
 .plus-offer__price { margin: var(--space-3) 0; font-size: var(--text-base); }
 .plus-offer__price strong { font-size: 28px; font-variant-numeric: tabular-nums; }
 .plus-more { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; margin-top: var(--space-3); padding: var(--space-3) 0 0; border: 0; border-top: 1px solid var(--border); background: none; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; }
+
+/* Пробный сам (FT-768): подарок после анкеты, конец пробного, строка в «Моих данных» */
+.plus-gift__mark { width: 72px; height: 72px; margin: var(--space-2) auto var(--space-3); border-radius: 22px; background: var(--accent-fill); color: var(--accent-text); display: grid; place-items: center; font-size: 42px; font-weight: 300; line-height: 1; }
+.plus-gift__title { margin: 0 0 var(--space-3); font-size: var(--text-lg); line-height: 1.25; text-wrap: balance; }
+.plus-gift__list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-2); }
+.plus-gift__list li::before { content: "✓"; margin-right: var(--space-2); color: var(--accent); font-weight: 700; }
+.plus-gift__note { margin: 0 0 var(--space-3); }
+.plus-gift__ads { display: flex; gap: var(--space-2); align-items: flex-start; margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--text-secondary); }
+.plus-gift__ads input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+.plus-gift .button + .button { margin-top: var(--space-2); }
+.plus-status { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); width: 100%; min-height: 44px; padding: var(--space-3) 0; border: 0; background: none; color: var(--text); font: inherit; text-align: left; }
+.plus-status--tap { cursor: pointer; }
+.plus-status__name { font-weight: 600; }
+.plus-status__value { color: var(--text-secondary); font-size: var(--text-sm); text-align: right; }
+.plus-ads__hint { display: block; margin-top: 2px; }

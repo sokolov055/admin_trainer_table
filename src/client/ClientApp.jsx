@@ -51,6 +51,8 @@ import CareerHub from '../CareerHub.jsx';
 import { useCareer } from '../CareerSession.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import { requestQuick } from '../quick-actions.js';
+import { PlusMoments, PlusStatus, MarketingSwitch } from '../plus.jsx';
+import { setRights, useRights } from '../rights.js';
 import './overview.css';
 import './client-menu.css';
 
@@ -136,6 +138,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   // «Установить / Открыть в приложении» (AppHint.jsx)
   const android = canOpenInApp() ? [{ id: 'android-app', label: 'Приложение для Android', note: 'Шаги и уведомления', Icon: IconPhone, action: showAppHint }] : [];
   const own = !clientRow && !preview && !(me && me.member);
+  const rights = useRights();
   const [consented, setConsented] = useState(false);
   const [onboarding, setOnboarding] = useState(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -352,7 +355,10 @@ export default function ClientApp({ me, clientRow, preview }) {
   if (onboardingOpen && onboarding?.eligible) return <Onboarding initial={onboarding} lead={lead} name={me?.name}
     onClose={(r) => { onboardingClosed.current = true; setOnboarding(r); setOnboardingOpen(false); dropLead(); }}
     onDisabled={() => { setOnboarding(null); setOnboardingOpen(false); dropLead(); }}
-    onDone={() => { onboardingClosed.current = true; forgetFocus(); setOnboarding(null); setOnboardingOpen(false); dropLead(); setView('overview'); firstSteps.refresh(); }} />;
+    onDone={() => { onboardingClosed.current = true; forgetFocus(); setOnboarding(null); setOnboardingOpen(false); dropLead(); setView('overview'); firstSteps.refresh();
+      // Пробный «Плюс» включён в конце анкеты (FT-768) — права заново, иначе
+      // подарок покажется только при следующем запуске
+      apiPublic('tariff.rights', {}).then((r) => r && r.rights && setRights(r.rights)).catch(() => {}); }} />;
 
   if (own && justSignedUp && !permsDone && !permissionsAsked()) {
     if (perms === null) return <div className="app"><main className="app__body"><Loading rows={3} /></main></div>;
@@ -548,6 +554,14 @@ export default function ClientApp({ me, clientRow, preview }) {
               Заполнять всё сразу не обязательно.
             </p>
             <Profile clientRow={clientRow} />
+            {/* «Плюс» и рассылка (FT-768) — только в своём кабинете и только
+                с включёнными тарифами: до TARIFFS обоих блоков нет */}
+            {own && rights && rights.on && (
+              <Section title="«Плюс» и письма">
+                <PlusStatus />
+                <MarketingSwitch />
+              </Section>
+            )}
             {/* Данные о здоровье (FT-708): что читается, подключить, отозвать
                 согласие. Путь «Мои данные» → «Здоровье» назван в документах */}
             {(!clientRow || preview) && (
@@ -634,6 +648,7 @@ export default function ClientApp({ me, clientRow, preview }) {
       )}
 
       <TabBar tabs={TABS} active={view} onSelect={go} action={quickAction} />
+      <PlusMoments enabled={own} />
     </div>
   );
 }

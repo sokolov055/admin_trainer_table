@@ -159,21 +159,24 @@ test('в режиме «глазами клиента» раздел виден,
  * Сервер отказывает сам; экран не должен вести к отказу.
  * -------------------------------------------------------------------------- */
 
-test('без «Плюса» — вместо «Собрать рацион» пробный период, без цены и оплаты', async () => {
-  globalThis.__rights = { on: true, plus: false, canTrial: true, trialDays: 14 };
+test('FT-768: без «Плюса» на iPhone раздела рациона нет совсем, на сайте — отметка «Плюс»', async () => {
+  // iPhone: ни замка, ни кнопки пробного — пробный включается сам
+  globalThis.__rights = { on: true, plus: false, canTrial: true, trialDays: 14, sellDigital: false };
   const tree = await render({});
   const shown = whole(tree);
   assert.equal(button(tree, 'Собрать рацион'), undefined, 'кнопка ведёт к отказу API');
-  assert.ok(shown.includes('входит в «Плюс»'));
-  assert.ok(button(tree, 'Попробовать «Плюс» — 14 дней бесплатно'), 'пробного нет');
-  // «докупить» в тексте про список покупок — не продажа
+  assert.ok(!shown.includes('Что приготовить из того, что дома'), 'закрытое на iPhone не показываем');
+  assert.equal(tree.root.findAllByType('button').filter((b) => /Попробовать|Плюс/.test(text(b))).length, 0);
   assert.ok(!/₽|(^|[^а-яё])купить|оплат|подписк/i.test(shown), 'на iPhone цена и оплата запрещены (3.1.1)');
   tree.unmount();
 
-  globalThis.__rights = { on: true, plus: false, canTrial: false, trialDays: 14 };
-  const used = await render({});
-  assert.equal(used.root.findAllByType('button').filter((b) => /Попробовать «Плюс»/.test(text(b))).length, 0, 'пробный — один раз');
-  used.unmount();
+  // Сайт и Android: раздел виден с отметкой, касание — лист «Плюса»
+  globalThis.__rights = { on: true, plus: false, canTrial: false, trialDays: 14, sellDigital: true };
+  const web = await render({});
+  assert.ok(whole(web).includes('Что приготовить из того, что дома'));
+  assert.equal(button(web, 'Собрать рацион'), undefined);
+  assert.ok(web.root.findAllByType('button').some((b) => /Подбор рациона — в «Плюсе»/.test(text(b))));
+  web.unmount();
   globalThis.__rights = null;
 });
 

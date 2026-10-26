@@ -12,7 +12,7 @@ import { canOpenInApp } from './open-in-app.js';
 import { lazyPage, Deferred, warmUp } from './lazy.js';
 import { setOfflineAccount } from './offline-account.js';
 import { setRights } from './rights.js';
-import { PlusOffer } from './plus.jsx';
+import { PlusOffer, usePlusLink } from './plus.jsx';
 import { refreshThemes } from './remote-themes.js';
 import { refreshGamePacks } from './remote-games.js';
 
@@ -90,6 +90,8 @@ export default function App() {
 
   // Права по тарифу (FT-545) приезжают с «кто я»; экраны читают их через useRights
   useEffect(() => { setRights(state.me ? state.me.rights : null); }, [state.me]);
+  // Ссылка из письма «Продлить» (?plus) — лист «Плюса» на сайте (FT-768)
+  usePlusLink();
 
   // Кабинет показан — догружаем остальное, пока человек смотрит на него
   const role = state.me && state.me.role;
