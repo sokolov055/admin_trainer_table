@@ -6080,7 +6080,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .library__photo { position: relative; width: 88px; height: 88px; border-radius: var(--radius); overflow: hidden; background: var(--surface-sunken); }
 .library__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .library__photo-x { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; }
-/* Поля настройки тренажёра (FT-760): название и крестик в строку */
+/* Регулировки тренажёра (FT-760): название и крестик в строку */
 .library__setup-fields { display: grid; gap: var(--space-2); }
 .library__setup-field { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: var(--space-2); align-items: center; }
 .library__setup-field-x { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); cursor: pointer; }

@@ -267,20 +267,20 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
   const whose = trainer ? 'Настройка клиента' : 'Своя настройка';
   const structured = form.values.length > 0;
   return <div className="workout__note-form" ref={formRef}>
-    {form.parsed && note && <p className="workout__note-parsed">Разобрали прошлую запись «{note.text}» по полям — проверьте.</p>}
+    {form.parsed && note && <p className="workout__note-parsed">Разобрали прошлую запись «{note.text}» по регулировкам — проверьте.</p>}
     {form.values.map((v, i) => (
       <div className="workout__note-field" key={i}>
         {v.own
-          ? <input className="field__input" value={v.name} maxLength={40} placeholder="Название" aria-label={'Своё поле ' + (i + 1) + ', название'}
+          ? <input className="field__input" value={v.name} maxLength={40} placeholder="Что регулируется" aria-label={'Своя регулировка ' + (i + 1) + ', название'}
             autoFocus={!v.name} onChange={(e) => setValue(i, 'name', e.target.value)} />
           : <span className="workout__note-field-name">{v.name}</span>}
-        <input className="field__input" value={v.value} maxLength={40} aria-label={whose + ': ' + (v.name || 'своё поле')}
+        <input className="field__input" value={v.value} maxLength={40} aria-label={whose + ': ' + (v.name || 'своя регулировка')}
           autoFocus={!v.own && i === 0} onChange={(e) => setValue(i, 'value', e.target.value)} />
         {v.own && <span className="workout__note-field-own">{trainer ? 'только у клиента' : 'только вы'}</span>}
       </div>
     ))}
     {ownCount < OWN_FIELDS_MAX && <button type="button" className="workout__note-field-add"
-      onClick={() => setForm((f) => ({ ...f, values: [...f.values, { name: '', value: '', own: true }] }))}>+ Своё поле</button>}
+      onClick={() => setForm((f) => ({ ...f, values: [...f.values, { name: '', value: '', own: true }] }))}>+ Своя регулировка</button>}
     <textarea className="field__input" rows={2} maxLength={300} value={form.note} autoFocus={!structured}
       aria-label={whose + (label ? ': ' + label : '') + (structured ? ', заметка' : '')}
       placeholder={structured ? 'Заметка: упор на 2-й, локти прижать' : 'Спинка 3, сиденье 5, упор на 2-й'}

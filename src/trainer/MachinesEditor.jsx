@@ -261,17 +261,17 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       </label>
       <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Инструкция оборудования проверена</label>
       <fieldset className="field library__setup-fields">
-        <legend className="field__label">Поля настройки</legend>
+        <legend className="field__label">Регулировки</legend>
         {setupFields.map((f, i) => (
           <div className="library__setup-field" key={i}>
             <input className="field__input" value={f} maxLength={40} placeholder="Сиденье, спинка, высота блока…" autoFocus={!f}
-              aria-label={'Поле настройки ' + (i + 1)} onChange={(e) => setSetupFields((v) => v.map((x, k) => (k === i ? e.target.value : x)))} />
-            <button type="button" className="library__setup-field-x" aria-label={'Убрать поле ' + (f || i + 1)}
+              aria-label={'Регулировка ' + (i + 1)} onChange={(e) => setSetupFields((v) => v.map((x, k) => (k === i ? e.target.value : x)))} />
+            <button type="button" className="library__setup-field-x" aria-label={'Убрать регулировку ' + (f || i + 1)}
               onClick={() => setSetupFields((v) => v.filter((_, k) => k !== i))}><IconClose size={14} /></button>
           </div>
         ))}
-        {setupFields.length < 12 && <button type="button" className="button button--ghost" onClick={() => setSetupFields((v) => [...v, ''])}>+ Поле</button>}
-        <span className="field__hint">Что клиент выставляет на тренажёре. Значения у каждого свои — текст или число, их вписывают в занятии. Клиент может добавить и своё поле — оно только у него.</span>
+        {setupFields.length < 12 && <button type="button" className="button button--ghost" onClick={() => setSetupFields((v) => [...v, ''])}>+ Регулировка</button>}
+        <span className="field__hint">Что клиент выставляет на тренажёре: сиденье, спинка, высота блока. Цифры у каждого свои — их вписывают в занятии, текстом или числом. Клиент может добавить и свою регулировку — она только у него.</span>
       </fieldset>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       {asking ? (
