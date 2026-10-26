@@ -1,0 +1,11 @@
+/* «Плюс» (FT-767): отметка у закрытого и лист с предложением */
+.plus-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; background: var(--accent-fill); color: var(--accent-text); font-size: 11.5px; font-weight: 750; letter-spacing: 0.02em; line-height: 1; vertical-align: middle; white-space: nowrap; }
+.plus-teaser { display: grid; justify-items: start; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
+.plus-teaser p { margin: 0; }
+.plus-offer__lead { margin: 0 0 var(--space-3); }
+.plus-offer__list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-3); }
+.plus-offer__list li { display: grid; gap: 2px; }
+.plus-offer__list span { color: var(--text-secondary); font-size: var(--text-sm); }
+.plus-offer__price { margin: var(--space-3) 0; font-size: var(--text-base); }
+.plus-offer__price strong { font-size: 28px; font-variant-numeric: tabular-nums; }
+.plus-more { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; margin-top: var(--space-3); padding: var(--space-3) 0 0; border: 0; border-top: 1px solid var(--border); background: none; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; }

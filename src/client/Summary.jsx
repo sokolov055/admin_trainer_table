@@ -5,6 +5,8 @@ import './summary.css';
 import { IconChevron, IconDelta } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { MuscleSummary } from '../muscles/MuscleMap.jsx';
+import { useRights, gate } from '../rights.js';
+import { PlusBadge, openPlusOffer } from '../plus.jsx';
 import { periodTitle, compareText, metricRows, recordText, localPeriod, backText } from './summaryText.js';
 
 /**
@@ -40,6 +42,9 @@ export function Change({ row }) {
 export default function Summary({ clientRow }) {
   const [period, setPeriod] = useState('week');
   const [offset, setOffset] = useState(0);
+  // Итоги месяца с балансом мышц — в «Плюсе» (FT-767): на сайте и Android
+  // «Месяц» с отметкой открывает предложение, на iPhone его нет
+  const monthGate = gate('summaries', useRights());
   const touch = useRef(null);
   const params = { period, offset, ...(clientRow ? { clientRow } : {}) };
   const { data, loading } = useData('client.summary', params, [clientRow, period, offset]);
@@ -127,12 +132,17 @@ export default function Summary({ clientRow }) {
               </button>
             </div>
             <div className="summary__period">
-              <Segmented
-                label="Период итогов"
-                items={[{ value: 'week', label: 'Неделя' }, { value: 'month', label: 'Месяц' }]}
-                value={period}
-                onChange={(v) => { if (v !== period) { setPeriod(v); setOffset(0); haptic(); } }}
-              />
+              {monthGate !== 'hidden' && (
+                <Segmented
+                  label="Период итогов"
+                  items={[{ value: 'week', label: 'Неделя' }, { value: 'month', label: monthGate === 'plus' ? <>Месяц <PlusBadge /></> : 'Месяц' }]}
+                  value={period}
+                  onChange={(v) => {
+                    if (v === 'month' && monthGate === 'plus') { openPlusOffer('summaries'); return; }
+                    if (v !== period) { setPeriod(v); setOffset(0); haptic(); }
+                  }}
+                />
+              )}
             </div>
           </div>
 

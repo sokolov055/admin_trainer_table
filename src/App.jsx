@@ -12,6 +12,7 @@ import { canOpenInApp } from './open-in-app.js';
 import { lazyPage, Deferred, warmUp } from './lazy.js';
 import { setOfflineAccount } from './offline-account.js';
 import { setRights } from './rights.js';
+import { PlusOffer } from './plus.jsx';
 import { refreshThemes } from './remote-themes.js';
 import { refreshGamePacks } from './remote-games.js';
 
@@ -278,6 +279,7 @@ export default function App() {
             : <ClientApp me={me} />}
       </Deferred>
       <Gestures />
+      <PlusOffer />
       <RestLayer allowGame={games} />
       {/* Подсказка живёт не только сразу после входа. Ставят приложение
           редко с первого раза: человек заходит посмотреть баланс, закрывает

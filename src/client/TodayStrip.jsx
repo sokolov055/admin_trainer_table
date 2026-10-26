@@ -1,6 +1,6 @@
 import React from 'react';
 import { useData } from '../useData.js';
-import { useRights, hasPlus } from '../rights.js';
+import { useRights, can } from '../rights.js';
 import { formatNumber, Qty } from '../ui.jsx';
 import { today } from '../nutrition/diary-model.js';
 import './today-strip.css';
@@ -24,8 +24,8 @@ export default function TodayStrip({ onOpen }) {
   // Пока цифры едут — заглушка той же высоты: ряд стоит над главной
   // карточкой «Обзора», и вставленный позже толкал её вниз (аудит 24.10.2026)
   if (!awards.data && awards.loading) return <StripWait />;
-  // Дневник — в «Плюсе»: без него запрос дневника не делаем вовсе
-  return hasPlus(rights)
+  // Дневник закрыт (старый тренер без ступени) — запрос дневника не делаем вовсе
+  return can('diary', rights)
     ? <WithDiary awards={awards.data} onOpen={onOpen} />
     : <Strip awards={awards.data} day={null} onOpen={onOpen} />;
 }

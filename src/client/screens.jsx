@@ -38,7 +38,8 @@ import { SCHEDULE_UNKNOWN } from './schedule-text.js';
 import { GoalBanner } from './focus.jsx';
 import { onlineDaysLeft, onlineDay } from '../online.js';
 import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
-import { useRights, hasPlus, isPro, setRights } from '../rights.js';
+import { useRights, hasPlus, isPro, can, gate, setRights } from '../rights.js';
+import { PlusBadge, openPlusOffer } from '../plus.jsx';
 import { useQuickRequest } from '../quick-actions.js';
 import { revealSoon } from '../reveal.js';
 
@@ -1649,8 +1650,16 @@ function useProgressBundle(clientRow, familyRow = null) {
 
 // familyRow — показатели члена семьи: смотреть можно, записывать замер — нет
 // self — «Мои тренировки» тренера: шаги подключаются с его телефона, как у клиента
+// Без «Плюса» график «Динамика» — за столько дней (FT-767)
+const CHART_FREE_DAYS = 92;
+
 export function Progress({ clientRow, clientView = false, familyRow = null, self = false }) {
   const { loading, data, error, reload } = useProgressBundle(clientRow, familyRow);
+  // График за всё время — в «Плюсе» (FT-767); без него — последние 3 месяца.
+  // Тренеру в карточке клиента — всегда целиком. Данные не режутся: итоги и
+  // таблица изменений считаются по всем замерам
+  const rights = useRights();
+  const chartGate = clientRow && !self ? 'open' : gate('progressCharts', rights);
   const [field, setField] = useState('Вес');
   // Изменение за всё время или с прошлого замера: первое отвечает «куда я
   // пришёл», второе — «что дала последняя неделя-две»
@@ -1803,6 +1812,11 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       .filter((r) => r[activeField] !== null && r[activeField] !== undefined)
       .map((r) => ({ x: r.date, y: r[activeField] })),
   }));
+  const chartFrom = chartGate === 'open' ? '' : new Date(Date.now() - CHART_FREE_DAYS * 86400000).toISOString().slice(0, 10);
+  const chartShown = chartFrom
+    ? chartSeries.map((s) => ({ ...s, points: s.points.filter((p) => String(p.x).slice(0, 10) >= chartFrom) }))
+    : chartSeries;
+  const chartCut = !!chartFrom && chartSeries.some((s, i) => s.points.length > chartShown[i].points.length);
 
   // Ведущая серия — первая: у сольного клиента она единственная, у
   // сплит-пары крупная цифра всё равно может быть только чья-то одна.
@@ -1886,9 +1900,14 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       )}
 
       {hasRows && (
-        <Section title="Динамика" note={'по датам замеров,' + unit}>
+        <Section title="Динамика" note={(chartFrom ? 'за 3 месяца,' : 'по датам замеров,') + unit}>
           <Panel pad>
-            <LineChart series={chartSeries} unit={unit} />
+            <LineChart series={chartShown} unit={unit} />
+            {chartCut && chartGate === 'plus' && (
+              <button type="button" className="plus-more" onClick={() => openPlusOffer('progressCharts')}>
+                <span>Весь путь с первого замера</span> <PlusBadge />
+              </button>
+            )}
           </Panel>
         </Section>
       )}
@@ -2398,7 +2417,9 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
   }
 
   const showForm = editing || !configured;
-  const diaryEnabled = clientRow ? isPro(rights) : hasPlus(rights);
+  // Базовый дневник клиенту бесплатно (FT-767); тренеру дневник клиента —
+  // на платной ступени. Рацион из холодильника — в «Плюсе»
+  const diaryEnabled = clientRow ? isPro(rights) : can('diary', rights);
 
   // Экран рациона занимает всё место: это отдельная работа в три шага, и
   // норма над ней превратилась бы в шапку, которую человек прокручивает
@@ -2442,7 +2463,7 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
 
   return (
     <>
-      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} dayNote={(day) => <SpentKcal clientRow={clientRow} day={day} />} onPlan={self || (!clientRow && hasPlus(rights)) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} dayNote={(day) => <SpentKcal clientRow={clientRow} day={day} />} onPlan={(self || !clientRow) && can('ration', rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
       {(!diaryEnabled || diaryTab === 'settings' || editing) && <>
       {configured && (
         <Lead

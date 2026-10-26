@@ -5,6 +5,8 @@ import ThemeMascot from './ThemeMascot.jsx';
 import { listPalettes, getPaletteId, setPaletteId, forcedScheme, onPalette, getThemesVersion, paletteById } from './palettes.js';
 import { haptic, refreshTheme } from './telegram.js';
 import { IconCheck, IconHome, IconPlan, IconProgress, IconNutrition, IconPlus } from './icons.jsx';
+import { useRights, gate } from './rights.js';
+import { PlusBadge, openPlusOffer } from './plus.jsx';
 import './appearance.css';
 
 /**
@@ -80,7 +82,13 @@ function LookPreview() {
   );
 }
 
+// Праздничная тема — со своим рисунком фона или картинкой вместо «+»
+const isPremium = (p) => !!(p.art || p.mascot);
+
 function PalettePicker({ current, onPick }) {
+  // Праздничные темы — в «Плюсе» (FT-767): на сайте и Android с отметкой,
+  // на iPhone их нет. Уже стоящую не снимаем — она остаётся в списке
+  const themeGate = gate('themesPremium', useRights());
   const pick = (id) => {
     if (id === current) return;
     haptic('light');
@@ -90,8 +98,9 @@ function PalettePicker({ current, onPick }) {
   return (
     <Panel pad>
       <div className="palettes" role="radiogroup" aria-label="Цвета и темы">
-        {listPalettes().map((p) => {
+        {listPalettes().filter((p) => !isPremium(p) || themeGate !== 'hidden' || p.id === current).map((p) => {
           const on = p.id === current;
+          const locked = isPremium(p) && themeGate === 'plus' && !on;
           const [a, b, c] = p.swatch;
           return (
             <button
@@ -100,7 +109,7 @@ function PalettePicker({ current, onPick }) {
               role="radio"
               aria-checked={on}
               className={'palette' + (on ? ' is-on' : '')}
-              onClick={() => pick(p.id)}
+              onClick={() => (locked ? openPlusOffer('themesPremium') : pick(p.id))}
             >
               <span
                 className="palette__disc"
@@ -109,6 +118,7 @@ function PalettePicker({ current, onPick }) {
                 {on && <span className="palette__check"><IconCheck size={14} strokeWidth={2.5} /></span>}
               </span>
               <span className="palette__name">{p.name}</span>
+              {locked && <PlusBadge />}
             </button>
           );
         })}

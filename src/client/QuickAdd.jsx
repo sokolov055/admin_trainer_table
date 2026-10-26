@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sheet } from '../ui.jsx';
 import { useData } from '../useData.js';
-import { useRights, hasPlus } from '../rights.js';
+import { useRights, can } from '../rights.js';
 import { blockSessions } from '../plan-model.js';
 import { label as mealLabel, mealNow } from '../nutrition/diary-model.js';
 import { IconPlay, IconScale, IconRuler, IconDrop, IconNutrition, IconSend } from '../icons.jsx';
@@ -21,7 +21,7 @@ import './quick-add.css';
  * Только действия, которые в приложении уже есть. Плитка не открывает
  * свою форму, а переключает вкладку и просит её открыть свою
  * (quick-actions.js): форма одна, и правится в одном месте. Еда и вода —
- * с «Плюсом», «Написать тренеру» — когда тренер есть: пожелание тренеру внизу
+ * всем (базовый дневник бесплатный, FT-767), «Написать тренеру» — когда тренер есть: пожелание тренеру внизу
  * «Тренировок» (Wishes.jsx) — единственный способ написать ему из
  * приложения.
  *
@@ -40,7 +40,7 @@ export default function QuickAdd({ me, clientRow, preview, tab, onClose, onPick,
   // клиента у тренера (не «глазами») дневника и пожелания нет вовсе
   const own = !clientRow;
   const workout = useMainAction(clientRow, preview);
-  const food = hasPlus(rights) && (own || preview);
+  const food = can('diary', rights) && (own || preview);
   const coach = own ? !!(me && !me.unlinked) : !!preview;
 
   const actions = {

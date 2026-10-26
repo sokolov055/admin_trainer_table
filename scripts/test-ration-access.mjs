@@ -64,6 +64,8 @@ const output = await build({
           contents: `export const useRights = () => globalThis.__rights || null;
             export const hasPlus = (r) => !r || r.plus !== false;
             export const isPro = (r) => !r || r.pro !== false;
+            export const can = (k, r = globalThis.__rights) => !r || (r.features && k in r.features ? r.features[k] !== false : r.plus !== false && r.pro !== false);
+            export const gate = (k, r = globalThis.__rights) => can(k, r) ? 'open' : r && r.sellDigital ? 'plus' : 'hidden';
             export const setRights = (r) => { globalThis.__rights = r; };`,
         };
         if (args.path === 'workout') return {
@@ -175,6 +177,21 @@ test('без «Плюса» — вместо «Собрать рацион» п�
   globalThis.__rights = null;
 });
 
+test('FT-767: без «Плюса» базовый дневник открыт, рациона из холодильника нет', async () => {
+  globalThis.__rights = { on: true, plus: false, canTrial: true, trialDays: 14, features: { diary: true, ration: false } };
+  const tree = await render({});
+  assert.ok(whole(tree).includes('diary-screen'), 'базовый дневник бесплатный');
+  assert.equal(button(tree, 'План меню'), undefined, 'рацион — в «Плюсе»');
+  assert.equal(button(tree, 'Собрать рацион'), undefined, 'кнопка ведёт к отказу API');
+  tree.unmount();
+
+  globalThis.__rights = { on: true, plus: true, features: { diary: true, ration: true } };
+  const plus = await render({});
+  assert.ok(button(plus, 'План меню'));
+  plus.unmount();
+  globalThis.__rights = null;
+});
+
 test('с «Плюсом» и без прав от сервера — как было', async () => {
   for (const rights of [{ on: true, plus: true }, null]) {
     globalThis.__rights = rights;
@@ -208,6 +225,13 @@ test('rights.js: нет прав — открыто; платформа для �
   assert.equal(r.appPlatform({ isNativeApp: () => false, iosApp: () => false }), 'web');
   assert.equal(r.appPlatform({ isNativeApp: () => true, iosApp: () => true }), 'ios');
   assert.equal(r.appPlatform({ isNativeApp: () => true, iosApp: () => false }), 'android');
+  // FT-767: функции по ключам; закрытое на iPhone не показывается совсем
+  assert.equal(r.can('foodPhoto', null), true);
+  assert.equal(r.can('foodPhoto', { plus: true, features: { foodPhoto: false } }), false);
+  assert.equal(r.can('diary', { plus: false }), false, 'старый сервер без списка — по «Плюсу»');
+  assert.equal(r.gate('foodPhoto', { features: { foodPhoto: true } }), 'open');
+  assert.equal(r.gate('foodPhoto', { features: { foodPhoto: false }, sellDigital: true }), 'plus');
+  assert.equal(r.gate('foodPhoto', { features: { foodPhoto: false }, sellDigital: false }), 'hidden');
 });
 
 
