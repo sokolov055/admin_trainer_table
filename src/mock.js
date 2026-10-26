@@ -1602,14 +1602,33 @@ const MOCK = {
   },
   'auth.trainer.link.inspect': () => ({ trainerName: 'Константин Соколов' }),
   // Вход по телефону (FT-489): звонок «проходит» на третьем опросе, код
-  // из СМС в демо — 123456; ?mockPhone=0 — способа нет, как без ключа SMS.ru
-  'auth.phone.options': () => (new URLSearchParams(window.location.search).get('mockPhone') === '0'
-    ? { call: false, sms: false } : { call: true, sms: true }),
+  // из СМС в демо — 123456; ?mockPhone=0 — способа нет, как без ключа SMS.ru.
+  // Регистрация «как в Робокассе» (FT-769) — с ?mockSignup=1 (на сервере —
+  // когда одобрено имя отправителя СМС). Номер на …00 — уже есть кабинет;
+  // почта anna@… — «Нашли ваш кабинет»; код письма — 123456
+  'auth.phone.options': () => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('mockPhone') === '0') return { call: false, sms: false };
+    return { call: true, sms: q.get('mockSignup') === '1' };
+  },
   'auth.phone.request': (p) => mockPhoneRequest(p),
   'auth.phone.confirm': (p) => {
     const r = mockPhoneConfirm(p);
     if (r.waiting) return r;
-    return p.name ? { token: 'demo-session', created: true } : { needName: true };
+    if (mockPhoneCheck.phone.endsWith('00')) { setDemoLoginRole('client'); return { token: 'demo-session', created: false }; }
+    if (p.attach) { setDemoLoginRole('client'); return { token: 'demo-session', created: false, attached: true }; }
+    if (!p.name) return { needName: true, questionnaire: new URLSearchParams(window.location.search).get('mockOnboarding') === '1' };
+    setDemoLoginRole('client');
+    return { token: 'demo-session', created: true, ...(p.trainer ? { trainer: 'Константин Соколов' } : {}) };
+  },
+  'auth.phone.email.request': (p) => {
+    if (String(p.email || '').startsWith('owner@')) throw Object.assign(new Error('Это почта тренера — войдите на странице для тренеров: app.fitness100.ru/trainer.'), { code: 409 });
+    return { sent: true, ttlMin: 15 };
+  },
+  'auth.phone.email.confirm': (p) => {
+    if (String(p.code) !== '123456') throw Object.assign(new Error('Код не подошёл.'), { code: 400 });
+    const email = String(p.email || '').trim().toLowerCase();
+    return { email, found: email.startsWith('anna@') ? { name: 'Анна Ковалёва', trainerName: 'Константин Соколов', hasPhone: false } : null };
   },
   'account.phone.get': () => ({ phone: mockPhoneLogin, options: { call: true, sms: true } }),
   'account.phone.request': (p) => mockPhoneRequest(p),

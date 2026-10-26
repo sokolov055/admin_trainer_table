@@ -376,3 +376,21 @@
 }
 .signin__paste:active { transform: scale(0.96); }
 .signin__paste:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Регистрация по номеру (FT-769): точки шагов, выбор «тренер / сам», карточка найденного кабинета */
+.phone-signup { display: grid; gap: var(--space-3); }
+.signin .phone-signup .app__back { position: static; margin: 0; justify-self: start; }
+.phone-signup .signin__step { display: grid; gap: var(--space-3); }
+.phone-signup__dots { display: flex; gap: 5px; }
+.phone-signup__dots i { flex: 1; height: 4px; border-radius: 999px; background: var(--border); transition: background-color 0.25s ease; }
+.phone-signup__dots i.is-on { background: var(--accent); }
+.phone-signup__title { margin: 0; font-size: var(--text-xl); line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+.phone-signup__choice, .phone-signup__card { display: flex; gap: var(--space-3); align-items: center; width: 100%; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); font: inherit; text-align: left; }
+.phone-signup__choice { min-height: 64px; cursor: pointer; }
+.phone-signup__choice:active { transform: scale(0.98); }
+.phone-signup__choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.phone-signup__choice > span:last-child, .phone-signup__card > span:last-child { display: grid; gap: 2px; }
+.phone-signup__icon { width: 40px; height: 40px; flex: none; border-radius: var(--radius); display: grid; place-items: center; background: var(--accent-wash); color: var(--accent-ink); }
+.phone-signup__ava { width: 42px; height: 42px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent-fill); color: var(--accent-text); font-weight: 700; }
+.phone-signup__ads { margin-top: calc(var(--space-1) * -1); }
+@media (prefers-reduced-motion: reduce) { .phone-signup__choice:active { transform: none; } }

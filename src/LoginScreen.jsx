@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiPublic } from './api.js';
 import PhoneLogin from './PhoneLogin.jsx';
+import PhoneSignup, { looksLikeEmail, formatPhone } from './PhoneSignup.jsx';
 import OtpStage from './OtpStage.jsx';
 import { haptic } from './telegram.js';
 import { Segmented, BackButton } from './ui.jsx';
@@ -119,6 +120,10 @@ function ClientPage({ onTrainer, onRegister, details }) {
   const phone = way === 'phone' && options;
   const first = step === 'email';
 
+  // Регистрация по номеру (FT-769) — когда у SMS.ru одобрено имя отправителя:
+  // без кода в СМС этот путь не работает, и остаётся прежний экран
+  if (options && options.sms) return <TabbedClient options={options} onTrainer={onTrainer} onRegister={onRegister} details={details} />;
+
   return (
     <div className="login__inner signin">
       {step !== 'name' && <header className="signin__head">
@@ -163,6 +168,89 @@ function ClientPage({ onTrainer, onRegister, details }) {
         </div>
       )}
 
+      {step !== 'name' && details}
+      {first && (
+        <a className="login__about" href={import.meta.env.BASE_URL + 'site/'}>
+          Возможности Fit Track
+        </a>
+      )}
+    </div>
+  );
+}
+
+/* ==========================================================================
+ * Клиент: «Вход» и «Регистрация» (FT-769, как в Робокассе)
+ *
+ * «Вход» — одно поле «Номер или почта»: номер — код в СМС, почта — код
+ * письмом (прежний EmailFlow). «Регистрация» — по номеру. Перепутал вкладку
+ * — не страшно: номер, у которого уже есть кабинет, просто входит в него.
+ * ========================================================================== */
+
+function TabbedClient({ options, onTrainer, onRegister, details }) {
+  const [tab, setTab] = useState('signup');
+  const [typed, setTyped] = useState('');
+  const [via, setVia] = useState(null); // { kind: 'phone' | 'email', value }
+  const [step, setStepOnly] = useState('email');
+  const setStep = (next) => { setStepOnly(next); onRegister(next === 'name'); };
+  const [inner, setInner] = useState('phone'); // шаг PhoneSignup
+  const digitsOnly = typed.replace(/\D/g, '');
+  const ready = looksLikeEmail(typed) || digitsOnly.length >= 10;
+  // Первый экран — шапка, вкладки, «Вы тренер?»; дальше только шаг
+  const first = !via && (tab === 'signin' || inner === 'phone');
+
+  const go = (event) => {
+    event.preventDefault();
+    if (!ready) return;
+    setVia(looksLikeEmail(typed) ? { kind: 'email', value: typed.trim() } : { kind: 'phone', value: typed });
+  };
+
+  return (
+    <div className="login__inner signin">
+      {first && <header className="signin__head">
+        <span className="signin__mark" aria-hidden="true"><IconKey size={22} /></span>
+        <h1 className="login__title">{tab === 'signup' ? 'Регистрация' : 'Вход'}</h1>
+      </header>}
+
+      {first && (
+        <div className="login__ways">
+          <Segmented label="Вход или регистрация" items={[{ value: 'signin', label: 'Вход' }, { value: 'signup', label: 'Регистрация' }]}
+            value={tab} onChange={setTab} />
+        </div>
+      )}
+
+      {tab === 'signup' && !via && <PhoneSignup key="signup" options={options} onStep={setInner} />}
+
+      {tab === 'signin' && !via && (
+        <form className="signin__step" onSubmit={go} noValidate>
+          <label className="field">
+            <span className="field__label">Номер или почта</span>
+            <input className="field__input" inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
+              placeholder="+7 900 000-00-00 или почта" value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus />
+            <span className="field__hint">Номер — код в СМС, почта — код в письме. Пароль не нужен.</span>
+          </label>
+          <button className="button button--primary button--block signin__submit" disabled={!ready}>Получить код</button>
+        </form>
+      )}
+
+      {via && via.kind === 'phone' && (
+        <PhoneSignup key="signin-phone" options={options} phone={formatPhone(via.value)} onBack={() => setVia(null)} />
+      )}
+      {via && via.kind === 'email' && (
+        <>
+          {step === 'email' && <BackButton label="Назад" onClick={() => setVia(null)} />}
+          <EmailFlow role="client" initialEmail={via.value} autoAsk onStep={setStep} onTrainerEmail={onTrainer} />
+        </>
+      )}
+
+      {first && (
+        <div className="signin__more">
+          {isNativeApp() && <PasteLink />}
+          <button type="button" className="signin__switch" onClick={() => onTrainer()}>
+            <span><span className="signin__switch-q">Вы тренер?</span> Вход для тренеров</span>
+            <IconChevron size={18} />
+          </button>
+        </div>
+      )}
       {step !== 'name' && details}
       {first && (
         <a className="login__about" href={import.meta.env.BASE_URL + 'site/'}>
@@ -235,7 +323,7 @@ function TrainerPage({ email, onBack, onClient, onRegister, details }) {
  * ни к чему: после кода сразу кабинет.
  * ========================================================================== */
 
-function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
+function EmailFlow({ role, initialEmail = '', autoAsk = false, onStep, onTrainerEmail }) {
   const trainer = role === 'trainer';
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
@@ -296,6 +384,12 @@ function EmailFlow({ role, initialEmail = '', onStep, onTrainerEmail }) {
     setSentAt(Date.now());
     go('code');
   });
+
+  // Почта пришла с вкладки «Вход» (FT-769) — код сразу, без второго нажатия
+  const asked = useRef(false);
+  useEffect(() => {
+    if (autoAsk && !asked.current && /\S+@\S+\.\S+/.test(email.trim())) { asked.current = true; ask(); }
+  }, []);
 
   const resend = () => run(async () => {
     await request();

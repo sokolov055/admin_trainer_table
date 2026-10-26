@@ -29,6 +29,11 @@ export function pendingTrainerLink() {
   try { return localStorage.getItem(KEY) || ''; } catch (_) { return ''; }
 }
 
+/** Ссылка тренера, вставленная при регистрации (FT-769), — на обзор, если привязка не прошла */
+export function rememberTrainerLink(token) {
+  try { localStorage.setItem(KEY, String(token || '')); } catch (_) {}
+}
+
 export function forgetTrainerLink() {
   try { localStorage.removeItem(KEY); } catch (_) {}
 }
