@@ -15,7 +15,10 @@ function outcome(c) {
   const out = web[c.fn](...structuredClone(c.args));
   if (c.fn !== 'rateSet') return out;
   const key = (c.expect && c.expect.key) || 'weight';
-  return { ...(key !== 'weight' ? { key } : {}), values: out.ex.sets.map((s) => s[key] ?? ''), raised: out.raised, lowered: out.lowered };
+  return { ...(key !== 'weight' ? { key } : {}), values: out.ex.sets.map((s) => s[key] ?? ''), raised: out.raised, lowered: out.lowered,
+    // Отдых и подписи — когда пример их проверяет (26.10.2026, FT-757/758)
+    ...(c.expect && 'capped' in c.expect ? { capped: out.capped } : {}),
+    ...(c.expect && c.expect.suggests ? { suggests: out.ex.sets.map((s) => s.suggest || '') } : {}) };
 }
 
 for (const c of cases) {

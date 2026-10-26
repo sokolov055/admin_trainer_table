@@ -12,9 +12,9 @@
  * Вес — главный рычаг, отдых — запасной. Правила — владельца, 22.10.2026
  * (44 ответа «как поступил бы тренер», Notion «Подбор веса как у
  * тренера»), подробно — у rateSet. Главное: отсчёт только от сделанного
- * сейчас — после «тяжело» следующий подход не тяжелее сделанного, даже если
- * в прошлый раз дальше шла лесенка (до 22.10 она сохранялась, и после
- * «тяжело» вес рос). Тяжело — отдых на 60 с дольше.
+ * сейчас — каждое «тяжело» снимает со следующих подходов шаг, «легко»
+ * прибавляет один шаг, но не выше лесенки прошлого раза (26.10.2026,
+ * FT-755–757). Тяжело — отдых на 60 с дольше.
  *   Разминочные подходы оценок не имеют («Готово») и вес не двигают. Новый
  *   вес встаёт только в нетронутые подходы того же человека: что вписано
  *   руками — не трогаем.
@@ -232,9 +232,10 @@ function wasLoad(ex, i) {
 }
 
 /**
- * Сколько «Легко» прибавляет (владелец, 22.10.2026): при шаге 2,5 и меньше
- * — два шага (60 → 65), при крупном шаге (5, 10) и у гантелей — один
- * (присед 100 → 110, гантели 20 → 22)
+ * Сколько прибавляет «всё легко» к следующему занятию (владелец,
+ * 22.10.2026): при шаге 2,5 и меньше — два шага (60 → 65), при крупном шаге
+ * (5, 10) и у гантелей — один (присед 100 → 110, гантели 20 → 22). Внутри
+ * занятия «Легко» — всегда один шаг (26.10.2026, FT-755)
  */
 export function raiseOf(ex, step) {
   return step >= 5 || isDumbbell(ex) ? step : step * 2;
@@ -257,24 +258,26 @@ function bodyweight(ex, set) {
  * Подход si отмечен оценкой effort: у подхода — оценка, у следующих
  * неотмеченных рабочих того же человека — новый вес (у помощи — помощь, у
  * своего веса — повторы) с причиной в suggest. Правила владельца
- * 22.10.2026 (Notion, «Подбор веса как у тренера»). Отсчёт — только от
- * сделанного сейчас: лесенка прошлого раза ничего не решает — после
- * «тяжело» следующий подход не тяжелее сделанного.
+ * 22.10.2026 (Notion, «Подбор веса как у тренера») с правкой 26.10.2026
+ * (FT-755–758). Отсчёт — только от сделанного сейчас.
  *
  *   Тяжело, не добил повторы  → вес по формуле от сделанного, вниз до блина
  *                               и хотя бы на блин легче (60 × 8 из 10 → 55);
- *   тяжело второй раз подряд  → −шаг, один раз (третье подряд не снимает);
- *   тяжело на первом подходе лесенки → −шаг: разминочный и тот тяжело;
- *   тяжело, повторы сделаны   → дальше не тяжелее сделанного (лесенка не
- *                               растёт, ровные — как были), отдых дольше;
- *   легко на первом подходе лесенки → лесенка как была;
- *   легко дальше по лесенке   → следующим их вес + шаг;
- *   легко на ровных           → +2 шага (крупный шаг, гантели — +1), а если
- *                               раньше в упражнении было «тяжело» — +1 шаг;
+ *   тяжело, повторы сделаны   → −шаг, каждый раз (7,5 → 5 → 2,5); до 26.10
+ *                               вес держался, а шаг снимало только второе
+ *                               «тяжело» подряд;
+ *   тяжело — не ниже разминки → вес разминки упражнения — предел, без
+ *                               разминки — один блин;
+ *   легко                     → следующим не меньше сделанного + шаг (один,
+ *                               26.10; было два), что в лесенке и так
+ *                               тяжелее — как было (30 · 40 · 50 · 55, на 40
+ *                               «легко» — дальше 50, а не 55);
  *   больше повторов, чем в плане (легко, норм) → вес по формуле на план,
  *                               вниз до блина; у «легко» — не меньше прибавки;
  *   норм и не добил           → первый раз держим, второй — −шаг;
  *   свой вес: легко — +2 повтора, тяжело и не добил — цель по сделанному.
+ * Подпись у подходов, которые оценка не сдвинула, снимается: причина в ней —
+ * от прежней оценки (FT-758: «Норм» на 50, а у 60 — «было легко»).
  * Разминку оценка не двигает (на ней «Готово»), вписанное руками — тоже.
  * Ограничения на число прибавок за занятие нет.
  */
@@ -287,7 +290,6 @@ export function rateSet(ex, si, effort) {
   // Что можно сдвигать: следующие неотмеченные рабочие того же человека, не вписанные руками
   const open = (x, i) => i > si && mine(x) && x.state === 'pending' && x.kind !== 'warmup' && !x.own;
   const before = ex.sets.slice(0, si).filter((x) => mine(x) && x.state === 'done' && x.kind !== 'warmup');
-  const last = before[before.length - 1];
   const plan = repsPlan(ex);
   const reps = num(set.reps);
   const short = !!plan && reps > 0 && reps < plan.lo;
@@ -299,27 +301,28 @@ export function rateSet(ex, si, effort) {
   let suggest = '';
   // Какие подходы правило может сдвинуть — обычно open
   let touch = open;
+  // Впереди подход тяжелее этого (лесенка ещё растёт): «легко» без сдвига —
+  // не «прибавлять некуда», отдых не короче
+  let ahead = false;
   if (set.kind !== 'warmup' && isEffort(effort) && m.has(set)) {
     const cur = m.load(set);
     const step = assist ? assistStep(ex) : stepOf(ex, cur);
     const unit = assist ? step : unitOf(ex);
+    // Шаг оценки — не меньше блина: у лёгкого веса шаг вдвое меньше (1,25 на
+    // блоке с 7,5), а груза 6,25 нет — «тяжело» даёт 5 (FT-756)
+    const move = Math.max(step, unit);
     const nextAt = ex.sets.map((x, i) => (open(x, i) && m.has(x) ? i : -1)).filter((i) => i >= 0);
-    // Какая схема впереди — лесенка (дальше тяжелее) или нет: по прошлому
-    // разу, если он есть, — подобранный вес могли поправить руками
-    // (21.10.2026: подобрано 50, сделал 45 — это не лесенка); нет — по тому,
-    // что стоит в подходах
+    // Какие подходы впереди не легче этого: по прошлому разу, если он есть,
+    // — подобранный вес могли поправить руками (21.10.2026: подобрано 50,
+    // сделал 45); нет — по тому, что стоит в подходах
     const was = wasLoad(ex, si);
     const thenAt = nextAt.map((i) => wasLoad(ex, i));
     const history = was !== null && thenAt.length > 0 && thenAt.every((w) => w !== null);
     const from = history ? was : cur;
     const loads = history ? thenAt : nextAt.map((i) => m.load(ex.sets[i]));
-    // Без прошлого раза вес этого подхода, вписанный руками легче
-    // подобранного, — тоже не лесенка: человек сам сбавил
-    const ladder = !(set.own && !history) && loads.some((w) => w > from);
     // Подход не легче этого (по прошлому разу или по тому, что стоит):
     // его «легко» подтягивает, а сброс и облегчённый последний — свои
     const level = new Map(nextAt.map((i, k) => [i, loads[k] >= from]));
-    const first = !before.length;
     // Не выше cap: сколько можно, столько и оставить
     const cap = (c) => (w) => (w > c ? c : null);
     // Не ниже top: следующие не легче этого подтянуть
@@ -327,26 +330,25 @@ export function rateSet(ex, si, effort) {
     // По формуле вверх — только вес; у помощи формулы нет
     const scaled = over && !assist ? scaleTo(ex, cur, reps, plan.hi) : null;
     if (effort === 'hard') {
+      // Каждое «тяжело» — шаг вниз, не ниже разминки (владелец, 26.10.2026,
+      // FT-756: 7,5 → 5 → 2,5); разминки нет — не ниже блина, у помощи — без предела
+      const warm = ex.sets.filter((x) => mine(x) && x.kind === 'warmup' && m.has(x)).map(m.load);
+      const floor = warm.length ? Math.max(...warm) : assist ? -Infinity : unit;
+      let down = cur - move;
       if (short) {
         const lack = plan.lo - reps;
         // У помощи формулы нет: +шаг, не добил 4 и больше — +2 шага
-        to = cap(assist ? cur - step * (lack >= 4 ? 2 : 1) : Math.min(scaleTo(ex, cur, reps, plan.lo), cur - unit));
-        dir = -1; suggest = 'short';
-      } else if (last && last.effort === 'hard' && !last.lowered) {
-        to = cap(cur - step); dir = -1; suggest = 'hard';
-      } else if (first && ladder) {
-        to = cap(cur - step); dir = -1; suggest = 'first';
-      } else {
-        to = cap(cur); suggest = 'held';
+        down = assist ? cur - step * (lack >= 4 ? 2 : 1) : Math.min(scaleTo(ex, cur, reps, plan.lo), cur - unit);
       }
+      to = cap(Math.min(cur, Math.max(down, floor)));
+      dir = -1; suggest = short ? 'short' : 'hard';
     } else if (effort === 'easy') {
+      // Один шаг (FT-755), а лесенка прошлого раза выше него — как была:
+      // «легко» догоняет план, а не прибавляет к нему (FT-757)
       dir = 1;
       suggest = over ? 'over' : 'easy';
-      if (ladder && !over) to = first ? null : (w) => (w >= cur ? w + step : null);
-      else {
-        const raise = before.some((x) => x.effort === 'hard') ? step : raiseOf(ex, step);
-        to = lift(scaled === null ? cur + raise : Math.max(cur + raise, scaled));
-      }
+      to = lift(scaled === null ? cur + move : Math.max(cur + move, scaled));
+      ahead = nextAt.some((i) => m.load(ex.sets[i]) > cur);
     } else if (effort === 'ok') {
       if (scaled !== null && scaled > cur) { to = lift(scaled); dir = 1; suggest = 'over'; }
       else if (short && before.some((x) => num(x.reps) > 0 && num(x.reps) < plan.lo)) { to = cap(cur - step); dir = -1; suggest = 'again'; }
@@ -377,37 +379,46 @@ export function rateSet(ex, si, effort) {
   let changed = false;
   // Что сдвинула эта оценка — чтобы «не то нажал» вернуло (unrateAt)
   const moved = [];
+  // Чьи подписи сняты: причина в них — от прежней оценки (FT-758)
+  const cleared = [];
+  const stale = (x, i) => {
+    // Подпись усталости — своя, её снимает первый рабочий подход (FT-754)
+    if (i <= si || !mine(x) || x.state !== 'pending' || !x.suggest || x.suggest === 'tired') return x;
+    cleared.push({ i, suggest: x.suggest });
+    const { suggest: _, ...rest } = x;
+    return rest;
+  };
   const sets = ex.sets.map((x, i) => {
     if (i === si) return { ...x, state: 'done', effort };
-    if (!to || !touch(x, i)) return x;
+    if (!to || !touch(x, i)) return stale(x, i);
     let value;
     if (key === 'reps') {
       const r = to(num(x.reps));
-      if (r === null) return x;
+      if (r === null) return stale(x, i);
       value = String(r);
     } else {
-      if (!m.has(x)) return x;
+      if (!m.has(x)) return stale(x, i);
       const n = to(m.load(x), i);
-      if (n === null) return x;
+      if (n === null) return stale(x, i);
       value = text(assist ? Math.max(0, -n) : Math.max(0, n));
     }
     // Сдвигать некуда (помощь уже 0) — подход как был
-    if (num(value) === num(x[key]) && String(x[key] ?? '') !== '') return x;
+    if (num(value) === num(x[key]) && String(x[key] ?? '') !== '') return stale(x, i);
     changed = true;
     moved.push({ i, key, from: String(x[key] ?? ''), to: value, suggest: x.suggest || '' });
     return { ...x, [key]: value, suggest };
   });
   // raised / lowered — оценка сдвинула следующие подходы; capped — хотели
   // прибавить, а некуда (помощь уже 0): по нему отдых короче (restFor)
-  const capped = effort === 'easy' && key !== 'reps' && dir > 0 && !!to && !changed;
-  sets[si] = { ...sets[si], ...(moved.length ? { moved } : {}), ...(dir > 0 && changed ? { raised: true } : {}),
+  const capped = effort === 'easy' && key !== 'reps' && dir > 0 && !!to && !changed && !ahead;
+  sets[si] = { ...sets[si], ...(moved.length ? { moved } : {}), ...(cleared.length ? { cleared } : {}), ...(dir > 0 && changed ? { raised: true } : {}),
     ...(dir < 0 && changed ? { lowered: true } : {}), ...(capped ? { capped: true } : {}) };
   return { ex: { ...ex, sets }, raised: dir > 0 && changed, lowered: dir < 0 && changed, capped };
 }
 
 /** Снять отметку: оценка и признак прибавки уходят вместе с ней */
 export function unrate(set) {
-  const { effort, raised, lowered, capped, moved, ...rest } = set;
+  const { effort, raised, lowered, capped, moved, cleared, ...rest } = set;
   return { ...rest, state: 'pending' };
 }
 
@@ -419,8 +430,12 @@ export function unrate(set) {
  */
 export function unrateAt(ex, si) {
   const moved = (ex.sets[si] && ex.sets[si].moved) || [];
+  const cleared = (ex.sets[si] && ex.sets[si].cleared) || [];
   return { ...ex, sets: ex.sets.map((x, i) => {
     if (i === si) return unrate(x);
+    const back = cleared.find((c) => c.i === i);
+    // Снятая подпись возвращается, если подходу с тех пор не дали новую
+    if (back) return x.state === 'pending' && !x.suggest ? { ...x, suggest: back.suggest } : x;
     const mv = moved.find((m) => m.i === i);
     // Вписанный руками тоже: значение то, что поставила оценка, — после неё не трогали
     if (!mv || x.state !== 'pending' || String(x[mv.key] ?? '') !== mv.to) return x;
@@ -434,7 +449,7 @@ export function rerate(ex, si, effort) {
   return rateSet(unrateAt(ex, si), si, effort);
 }
 
-const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'дважды тяжело', held: 'было тяжело',
+const WHY = { easy: 'было легко', short: 'не добил повторы', hard: 'было тяжело', held: 'было тяжело',
   first: 'тяжело уже на первом', over: 'повторов больше плана', again: 'снова не добил', more: 'было легко', fewer: 'не добил повторы',
   tired: 'после другого на эти мышцы', kept: 'на прошлом «Норм»' };
 

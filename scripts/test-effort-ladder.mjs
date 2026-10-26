@@ -5,9 +5,10 @@ import { rateSet, rerate, unrateAt } from '../src/effort.js';
 /**
  * Подсказка веса отсчитывается от того, что сделано сейчас, а не от веса
  * прошлой тренировки (владелец, 16.10.2026): прошлый раз 50 · 50 · 50,
- * сегодня первый подход 60 — «легко» даёт следующим 65, а не 50. Правила
- * прибавок и «тяжело» — владельца 22.10.2026 (Notion, «как у тренера»):
- * «легко» при шаге 2,5 — два шага, после «тяжело» дальше не тяжелее.
+ * сегодня первый подход 60 — «легко» даёт следующим 62,5, а не 50. Правила
+ * прибавок и «тяжело» — владельца 22.10.2026 (Notion, «как у тренера») с
+ * правкой 26.10.2026: «легко» — один шаг (FT-755), каждое «тяжело» — шаг
+ * вниз (FT-756).
  */
 
 const press = (weights, last = weights) => ({
@@ -21,7 +22,7 @@ const rate = (ex, si, effort, weight) => {
 };
 
 test('сделали тяжелее прошлого раза и «легко» — дальше от сделанного, а не от прошлого', () => {
-  assert.deepEqual(rate(press([50, 50, 50]), 0, 'easy', 60), ['60', '65', '65']);
+  assert.deepEqual(rate(press([50, 50, 50]), 0, 'easy', 60), ['60', '62.5', '62.5']);
 });
 
 test('«тяжело» и не добил — от сделанного по формуле, вниз до блина', () => {
@@ -37,8 +38,8 @@ test('«норм» — ближайший следующий не легче э�
   assert.deepEqual(rate(press([50, 50, 50]), 0, 'ok'), ['50', '50', '50']);
 });
 
-test('вес как в прошлый раз, «легко» — +2 шага следующим', () => {
-  assert.deepEqual(rate(press([100, 100, 100]), 0, 'easy'), ['100', '105', '105']);
+test('вес как в прошлый раз, «легко» — +шаг следующим (FT-755)', () => {
+  assert.deepEqual(rate(press([100, 100, 100]), 0, 'easy'), ['100', '102.5', '102.5']);
 });
 
 test('после «тяжело» лесенка прошлого раза не растёт (жалоба владельца 22.10.2026)', () => {
@@ -56,13 +57,13 @@ test('подход, который в прошлый раз был легче, �
 
 test('без истории — как раньше: не легче сделанного двигаем, ниже не трогаем', () => {
   const ex = { name: 'Жим лёжа', target: '8', sets: [50, 50, 40].map((w) => ({ weight: String(w), reps: '8', state: 'pending', kind: 'work' })) };
-  assert.deepEqual(rate(ex, 0, 'easy'), ['50', '55', '40']);
+  assert.deepEqual(rate(ex, 0, 'easy'), ['50', '52.5', '40']);
 });
 
 test('вписанное руками не трогаем', () => {
   const ex = press([50, 50, 50]);
   ex.sets[1] = { ...ex.sets[1], own: true };
-  assert.deepEqual(rate(ex, 0, 'easy', 60), ['60', '50', '65']);
+  assert.deepEqual(rate(ex, 0, 'easy', 60), ['60', '50', '62.5']);
 });
 
 /** «Нажал не то» (19.10.2026): оценку можно поменять, прибавка веса возвращается */
@@ -72,7 +73,7 @@ const states = (ex) => ex.sets.map((s) => s.state[0]).join('');
 test('«легко» нажали по ошибке → «норм»: веса следующих подходов вернулись', () => {
   const ex = press([60, 60, 60]);
   const easy = rateSet(ex, 0, 'easy').ex;
-  assert.deepEqual(ws(easy), ['60', '65', '65']);
+  assert.deepEqual(ws(easy), ['60', '62.5', '62.5']);
   const ok = rerate(easy, 0, 'ok').ex;
   assert.deepEqual(ws(ok), ['60', '60', '60']);
   assert.equal(ok.sets[0].effort, 'ok');
@@ -84,7 +85,7 @@ test('«легко» нажали по ошибке → «норм»: веса �
 test('«норм» → «легко»: прибавка появилась', () => {
   const ok = rateSet(press([60, 60, 60]), 0, 'ok').ex;
   assert.deepEqual(ws(ok), ['60', '60', '60']);
-  assert.deepEqual(ws(rerate(ok, 0, 'easy').ex), ['60', '65', '65']);
+  assert.deepEqual(ws(rerate(ok, 0, 'easy').ex), ['60', '62.5', '62.5']);
 });
 
 test('«снять отметку» возвращает прибавленный вес', () => {
@@ -105,13 +106,13 @@ test('следующий подход уже сделан — его вес не
   const easy = rateSet(press([60, 60, 60]), 0, 'easy').ex;
   const next = { ...easy, sets: easy.sets.map((s, i) => (i === 1 ? { ...s, state: 'done', effort: 'ok' } : s)) };
   // Сделанный второй остаётся как есть, ещё не сделанный третий — возвращается
-  assert.deepEqual(ws(unrateAt(next, 0)), ['60', '65', '60']);
+  assert.deepEqual(ws(unrateAt(next, 0)), ['60', '62.5', '60']);
 });
 
 test('смена оценки у второго подхода не трогает первый', () => {
   let ex = rateSet(press([60, 60, 60]), 0, 'ok').ex;
   ex = rateSet(ex, 1, 'easy').ex;
-  assert.deepEqual(ws(ex), ['60', '60', '65']);
+  assert.deepEqual(ws(ex), ['60', '60', '62.5']);
   ex = rerate(ex, 1, 'hard').ex;
   assert.equal(ex.sets[0].effort, 'ok');
   assert.equal(ex.sets[1].effort, 'hard');
@@ -119,20 +120,22 @@ test('смена оценки у второго подхода не трогае
 });
 
 /**
- * Аудит 20.10.2026: «тяжело» второй раз подряд снимает шаг один раз —
- * третье «тяжело» подряд вес не трогает; отдых короче только когда
- * прибавлять некуда (capped), а не при любом «легко» без прибавки
+ * Владелец, 26.10.2026 (FT-756): каждое «тяжело» снимает шаг (7,5 → 5 →
+ * 2,5), не ниже разминки; до этого вес держался, а шаг снимало только второе
+ * «тяжело» подряд. Отдых короче только когда прибавлять некуда (capped)
  */
-test('третье «тяжело» подряд не снимает второй шаг', () => {
+test('каждое «тяжело» подряд снимает шаг, не ниже разминки (FT-756)', () => {
   const ex = press([100, 100, 100, 100]);
   const r1 = rateSet(ex, 0, 'hard');
-  assert.equal(r1.lowered, false, 'первое тяжело — вес держим');
+  assert.equal(r1.lowered, true, 'первое тяжело — уже шаг вниз');
+  assert.deepEqual(r1.ex.sets.map((s) => s.weight), ['100', '97.5', '97.5', '97.5']);
   const r2 = rateSet(r1.ex, 1, 'hard');
-  assert.equal(r2.lowered, true);
-  assert.deepEqual(r2.ex.sets.map((s) => s.weight), ['100', '100', '97.5', '97.5']);
+  assert.deepEqual(r2.ex.sets.map((s) => s.weight), ['100', '97.5', '95', '95']);
   const r3 = rateSet(r2.ex, 2, 'hard');
-  assert.equal(r3.lowered, false, 'шаг уже снят — третье тяжело вес не трогает');
-  assert.deepEqual(r3.ex.sets.map((s) => s.weight), ['100', '100', '97.5', '97.5']);
+  assert.deepEqual(r3.ex.sets.map((s) => s.weight), ['100', '97.5', '95', '92.5']);
+  // Разминка 95 — ниже неё не опускаем
+  const warm = { ...ex, sets: [{ weight: '95', reps: '12', state: 'done', kind: 'warmup' }, ...ex.sets] };
+  assert.deepEqual(rateSet(rateSet(warm, 1, 'hard').ex, 2, 'hard').ex.sets.map((s) => s.weight), ['95', '100', '97.5', '95', '95']);
 });
 
 test('capped: «легко» на лёгком подходе лесенки — отдых обычный, на последнем без следующих — тоже не capped', () => {
@@ -142,4 +145,22 @@ test('capped: «легко» на лёгком подходе лесенки —
   const own = { ...press([100, 100]), track: { kind: 'bodyweight' } };
   const bare = { ...own, sets: own.sets.map((s) => ({ ...s, weight: '' })) };
   assert.equal(rateSet(bare, 0, 'easy').capped, false, 'без веса оценка веса не касается');
+});
+
+/**
+ * FT-758 (26.10.2026): «Легко» на 40 подняло следующие, третий вписан 50 и
+ * отмечен «Норм» — у четвёртого (60) оставалась подпись «+10 кг · было
+ * легко». Причина в подписи — от прежней оценки: «Норм» её снимает, а
+ * «снять отметку» возвращает
+ */
+test('FT-758: оценка без сдвига снимает у следующих подпись прежней, «снять» возвращает', () => {
+  const ex = { name: 'Жим ногами', target: '15', load: { step: 5 }, sets: [
+    { weight: '40', reps: '15', state: 'done', kind: 'work', effort: 'easy' },
+    { weight: '50', reps: '15', state: 'pending', kind: 'work', own: true, suggest: 'easy' },
+    { weight: '60', reps: '15', state: 'pending', kind: 'work', suggest: 'easy' },
+  ] };
+  const ok = rateSet(ex, 1, 'ok').ex;
+  assert.deepEqual(ws(ok), ['40', '50', '60']);
+  assert.equal(ok.sets[2].suggest, undefined);
+  assert.equal(unrateAt(ok, 1).sets[2].suggest, 'easy');
 });
