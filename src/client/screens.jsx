@@ -1530,11 +1530,15 @@ function MonthVisibility({ month, hidden, clientRow, onChanged }) {
   };
 
   // Одной строкой (QA 20.10.2026): панель с абзацем и кнопкой во всю ширину
-  // занимала четверть первого экрана ради редкого действия
+  // занимала четверть первого экрана ради редкого действия.
+  // С названием листа (FT-762, 26.10.2026): листа текущего месяца нет —
+  // выбран чип «Октябрь 2026», а программа и эта строка — последнего листа
+  // («Октябрь 2025»). Без названия тренер скрыл «Октябрь 2025», думая, что
+  // прячет октябрь этого года
   return (
     <div className={'plan__visibility' + (hidden ? ' plan__visibility--hidden' : '')}>
       <span className="plan__visibility-text">
-        {hidden ? 'Скрыт от клиента' : 'Виден клиенту'}
+        {'Лист «' + month + '» ' + (hidden ? 'скрыт от клиента' : 'виден клиенту')}
         <span className="plan__visibility-note">{hidden ? ' · останется у вас со всем содержимым' : ''}</span>
       </span>
       <button type="button" className="button button--ghost" onClick={toggle} disabled={busy}>
