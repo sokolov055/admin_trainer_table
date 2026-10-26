@@ -511,6 +511,8 @@ export function settleOrder(exercises) {
     const before = ex.lastRun && Array.isArray(ex.lastRun.before) ? ex.lastRun.before : null;
     const key = muscleOf(ex);
     if (!before || !key || before.includes(key)) return ex;
+    // Вес уже снижен за перерыв — второй раз не снимаем (владелец, FT-764)
+    if (ex.lastRun.reason === 'break') return ex;
     const after = out.find((x) => x !== ex && worked(x) && muscleOf(x) === key);
     if (!after) return ex;
     const assist = isAssisted(ex);
