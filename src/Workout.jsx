@@ -97,7 +97,7 @@ import { ExerciseMachines } from './trainer/MachinesEditor.jsx';
 import { HistoryPick } from './trainer/HistoryMove.jsx';
 
 import { useData } from './useData.js';
-import { MachineNote } from './media.jsx';
+import { MachineNote, machineTarget } from './media.jsx';
 import { EFFORTS, restFor, roundRest, rateSet, rerate, unrateAt, suggestText, otherMachineText, wasSet, repsGoalText, repsLeftText, isAssisted, settleOrder } from './effort.js';
 import { RestScreen, RestPill } from './RestScreen.jsx';
 import { usePlankAccess } from './plank-access.js';
@@ -2117,7 +2117,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   /** Куда писать настройку: каждый тренажёр упражнения, а без них — само упражнение */
   const noteTargetsOf = (info) => {
     const machines = info.machines || [];
-    if (machines.length) return machines.map((m) => ({ target: 'm:' + m.uid, label: machines.length > 1 ? m.name : '' }));
+    // У тренажёра — в этом упражнении (FT-759)
+    if (machines.length) return machines.map((m) => ({ target: machineTarget(info, m.uid), label: machines.length > 1 ? m.name : '' }));
     return info.noteKey ? [{ target: info.noteKey, label: '' }] : [];
   };
 

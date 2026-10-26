@@ -152,15 +152,27 @@ export function MachinePhoto({ machine }) {
 }
 
 /**
+ * Ключ настройки тренажёра uid в упражнении (FT-759, 26.10.2026):
+ * m:<uid>|<name_key> — на одном тренажёре делают несколько упражнений, и
+ * настройка у них своя. Без ключа упражнения — прежний m:<uid>
+ */
+export function machineTarget(info, uid) {
+  const key = info && info.noteKey ? String(info.noteKey).slice(2) : '';
+  return 'm:' + uid + (key ? '|' + key : '');
+}
+
+/**
  * Личная настройка клиента на тренажёре (07.10.2026): «спинка 3, сиденье
  * 5» — у каждого клиента своя, поэтому живёт не у тренажёра, а у клиента.
- * Видна первой: ради неё в зале и открывают
+ * Видна первой: ради неё в зале и открывают. shared — старая, записанная на
+ * тренажёр без упражнения, и чья она, не понять (FT-759): пометка, пока не
+ * запишут свою для упражнения
  */
-export function PersonalNote({ text, trainer = false, by = '', local = false, label = '' }) {
+export function PersonalNote({ text, trainer = false, by = '', local = false, label = '', shared = false }) {
   if (!text) return null;
   return (
     <div className="machine__note">
-      <strong>{trainer ? 'Настройка клиента' : 'Ваша настройка' + (by === 'trainer' ? ' · записал тренер' : '')}{label ? ' · ' + label : ''}{local ? ' · на телефоне, отправится при связи' : ''}</strong>
+      <strong>{trainer ? 'Настройка клиента' : 'Ваша настройка' + (by === 'trainer' ? ' · записал тренер' : '')}{label ? ' · ' + label : ''}{shared ? ' · для тренажёра' : ''}{local ? ' · на телефоне, отправится при связи' : ''}</strong>
       <span>{text}</span>
     </div>
   );
@@ -219,7 +231,7 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
     // Тренажёров несколько — подпись короче: их имя («Стойка у зеркала»),
     // чья настройка и кто записал — в листе «Тренажёр»
     const whose = trainer ? 'Настройка клиента' : 'Моя настройка';
-    const head = (label || whose) + (note && note.local ? ' · не отправлена' : '');
+    const head = (label || whose) + (note && note.shared ? ' · для тренажёра' : '') + (note && note.local ? ' · не отправлена' : '');
     return <button type="button" className={'workout__plaque' + (note ? '' : ' workout__plaque--empty')}
       aria-label={whose + (label ? ' · ' + label : '') + (note ? ': ' + note.text + '. Изменить' : ': не записана. Записать')}
       onClick={() => setEditing(true)}>
@@ -231,7 +243,7 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
   if (!editing) {
     return note
       ? <div className="workout__note">
-        <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} label={label} />
+        <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} label={label} shared={!!note.shared} />
         <button type="button" className="workout__note-edit" onClick={() => setEditing(true)}>Изменить</button>
       </div>
       // Пустая — плашкой на том же месте, что записанная (вариант А2,
@@ -272,9 +284,10 @@ export function MachineInfo({ machine, principle = '', note = '', trainer = fals
 /**
  * Тренажёры упражнения в карточке программы: каждый раскрывается фото,
  * личной настройкой и регулировками; общий принцип — под списком один раз.
- * notes — личные настройки клиента { 'm:<uid>': текст }
+ * notes — личные настройки клиента { machineTarget: текст }, noteKey —
+ * упражнения, в котором тренажёры
  */
-export function MachineList({ machines, notes = {} }) {
+export function MachineList({ machines, notes = {}, noteKey = '' }) {
   if (!machines || !machines.length) return null;
   return (
     <div className="machines">
@@ -284,9 +297,9 @@ export function MachineList({ machines, notes = {} }) {
           <summary>
             {m.photo && <img className="machines__thumb" src={mediaUrl(m.photo)} alt="" loading="lazy" draggable="false" />}
             <span>{m.name}</span>
-            {notes['m:' + m.uid] && <span className="machines__mine">ваша настройка</span>}
+            {notes[machineTarget({ noteKey }, m.uid)] && <span className="machines__mine">ваша настройка</span>}
           </summary>
-          <MachineInfo machine={m} note={notes['m:' + m.uid]} />
+          <MachineInfo machine={m} note={notes[machineTarget({ noteKey }, m.uid)]} />
         </details>
       ))}
     </div>

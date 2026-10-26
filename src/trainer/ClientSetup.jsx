@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiPublic } from '../api.js';
-import { MachineNote } from '../media.jsx';
+import { MachineNote, machineTarget } from '../media.jsx';
 import '../workout.css';
 
 /**
@@ -37,7 +37,7 @@ export default function ClientSetup({ exerciseId, clientRow, members = [] }) {
   if (!info) return null;
   const machines = info.machines || [];
   const targets = machines.length
-    ? machines.map((m) => ({ target: 'm:' + m.uid, label: m.name }))
+    ? machines.map((m) => ({ target: machineTarget(info, m.uid), label: m.name }))
     : (info.noteKey ? [{ target: info.noteKey, label: '' }] : []);
 
   const split = members.length > 1;

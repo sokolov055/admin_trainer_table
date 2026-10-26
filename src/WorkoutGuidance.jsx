@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { resolveGuidance, guideSteps, stepLabel, instructionParts } from './equipment-guidance.js';
-import { MachinePhoto, Media, PersonalNote } from './media.jsx';
+import { MachinePhoto, Media, PersonalNote, machineTarget } from './media.jsx';
 import { MuscleFigure, MuscleNames } from './muscles/MuscleMap.jsx';
 import { Sheet } from './ui.jsx';
 import { IconPlay } from './icons.jsx';
@@ -144,11 +144,11 @@ export function MachineGuide({ info, notes = {}, trainer = false }) {
       <div className="guide">
         {list.map((m) => {
           const setup = m.setupOk === false ? { steps: [], mistakes: [] } : instructionParts(m.setup);
-          const note = notes['m:' + m.uid];
+          const note = notes[machineTarget(info, m.uid)];
           return <section key={m.uid} className="guide__machine">
             <p className="guide__machine-name">{m.name}</p>
             {/* Настройка клиента — до фото: в зале смотрят ради неё */}
-            {note && <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} />}
+            {note && <PersonalNote text={note.text} trainer={trainer} by={note.by} local={!!note.local} shared={!!note.shared} />}
             <MachinePhoto machine={m} />
             {setup.steps.length > 0 && <section className="guide__group">
               <h4 className="guide__h">Как настроить</h4>

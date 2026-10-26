@@ -320,7 +320,7 @@ const PLAN_BLOCKS = [
         lastRun: { date: '2026-09-29', weights: ['60', '80', '95', '95', '95'], reps: ['5', '5', '5', '5', '5'], planReps: '5', effort: 'easy', streak: 0, action: 'up', step: 10 },
         // Тренажёры и замены (FT-478, FT-479): прошлый раз — на раме у окна
         machine: { uid: 'rack01', name: 'Силовая рама у окна' },
-        notes: { 'm:rack01': 'Крюки на 4-й, упоры на 2-й' },
+        notes: { 'm:rack01|приседания со штангой': 'Крюки на 4-й, упоры на 2-й' },
         exercise: { name: 'Приседания со штангой', muscle: 'Ноги', equipment: 'Штанга', notes: '', media: { kind: 'animation', url: 'Barbell_Squat' },
           machines: [
             { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' },
@@ -1142,7 +1142,7 @@ Object.assign(demoExercises[2], { notes: 'Стойки — крюки на ур�
 const demoMachines = [DEMO_RACK, DEMO_SMITH];
 let demoMachineSeq = 0;
 // Своя настройка Анны на раме — записал тренер
-let demoNotes = { 'm:rack01': { text: 'Крюки на 4-й, упоры на 2-й', by: 'trainer', updatedAt: '2026-10-01T10:00:00.000Z' } };
+let demoNotes = { 'm:rack01|приседания со штангой': { text: 'Крюки на 4-й, упоры на 2-й', by: 'trainer', updatedAt: '2026-10-01T10:00:00.000Z' } };
 
 /** Фото тренажёра в демо — data-URL сразу в каталог (library.js, uploadMachinePhoto) */
 export function mockMachinePhoto(exerciseId, uid, url) {

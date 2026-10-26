@@ -1473,7 +1473,7 @@ function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
               : !card.media && !card.setup && !(card.machines && card.machines.length) && <p className="small muted" style={{ marginBottom: 0 }}>Техника к этому упражнению пока не записана.</p>}
             {/* Тренажёры (FT-478): у каждого фото и своя настройка; общая
                 инструкция — общий принцип под ними */}
-            <MachineList machines={card.machines} notes={ex.notes || {}} />
+            <MachineList machines={card.machines} notes={ex.notes || {}} noteKey={card.noteKey} />
             {/* Своя настройка у упражнения без тренажёров — у каждого клиента своя */}
             {!(card.machines && card.machines.length) && card.noteKey && ex.notes && <PersonalNote text={ex.notes[card.noteKey]} />}
             {card.setup && (

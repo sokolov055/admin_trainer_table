@@ -913,7 +913,7 @@ test('тренажёры закрепил тренер: выбора нет, п�
   exerciseSetupResponse = { setups: { 77: {
     name: 'Жим лёжа', setup: '', notes: '', machines: [bar, bench], primaryEquipmentUid: 'bar1', alternatives: [], noteKey: 'e:жим лёжа',
     muscles: { primary: [], secondary: [] }, media: null,
-  } }, notes: { 'm:bar1': { text: 'Хват 81', by: 'client', from: 'e:жим лёжа' } } };
+  } }, notes: { 'm:bar1|жим лёжа': { text: 'Хват 81', by: 'client', from: 'e:жим лёжа' } } };
   const calls = [];
   const api = globalThis.__workoutApi;
   globalThis.__workoutApi = async (action, params) => {
@@ -945,7 +945,7 @@ test('тренажёры закрепил тренер: выбора нет, п�
     await act(async () => { local.root.find(n => n.type === 'textarea' && /Спинка 3/.test(n.props.placeholder || '')).props.onChange({ target: { value: 'Хват 80' } }); await delay(); });
     await act(async () => { local.root.findAllByType('button').find(b => text(b) === 'Сохранить').props.onClick(); await delay(); });
     const saved = calls.find(([a]) => a === 'client.machine.note.save')[1];
-    assert.deepEqual([saved.target, saved.text, saved.legacy], ['m:bar1', 'Хват 80', 'e:жим лёжа'], 'старая переезжает под гриф');
+    assert.deepEqual([saved.target, saved.text, saved.legacy], ['m:bar1|жим лёжа', 'Хват 80', 'e:жим лёжа'], 'старая переезжает под гриф — в этом упражнении (FT-759)');
   } finally {
     globalThis.__workoutApi = api;
     exerciseSetupResponse = null;
@@ -962,7 +962,8 @@ test('тренажёры на выбор: закреплённый — одно�
   exerciseSetupResponse = { setups: { 79: {
     name: 'Присед', setup: '', notes: '', machines: [rack, smith], alternatives: [], noteKey: 'e:присед',
     muscles: { primary: [], secondary: [] }, media: null,
-  } }, notes: { 'm:rack1': { text: 'Крюки на 4-й', by: 'trainer' } } };
+  // Старая у тренажёра без упражнения, чья — не понять (FT-759): с пометкой
+  } }, notes: { 'm:rack1|присед': { text: 'Крюки на 4-й', by: 'trainer', from: 'm:rack1', shared: true } } };
   let local;
   try {
     await act(async () => {
@@ -972,7 +973,7 @@ test('тренажёры на выбор: закреплённый — одно�
       await delay();
     });
     const plaques = local.root.findAll(n => n.type === 'button' && String(n.props.className || '').startsWith('workout__plaque'));
-    assert.deepEqual(plaques.map(text), ['Моя настройкаКрюки на 4‑й']);
+    assert.deepEqual(plaques.map(text), ['Моя настройка · для тренажёраКрюки на 4‑й']);
     const machineBtn = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn'));
     assert.equal(machineBtn.props['aria-label'], 'Тренажёр: Рама у окна');
   } finally {
