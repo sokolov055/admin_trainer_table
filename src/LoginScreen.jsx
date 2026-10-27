@@ -120,9 +120,9 @@ function ClientPage({ onTrainer, onRegister, details }) {
   const phone = way === 'phone' && options;
   const first = step === 'email';
 
-  // Регистрация по номеру (FT-769) — когда у SMS.ru одобрено имя отправителя:
-  // без кода в СМС этот путь не работает, и остаётся прежний экран
-  if (options && options.sms) return <TabbedClient options={options} onTrainer={onTrainer} onRegister={onRegister} details={details} />;
+  // Регистрация по номеру (FT-769) — когда есть код: в СМС (одобрено имя
+  // отправителя SMS.ru) или в Telegram. Только звонок — прежний экран
+  if (options && (options.sms || options.tg)) return <TabbedClient options={options} onTrainer={onTrainer} onRegister={onRegister} details={details} />;
 
   return (
     <div className="login__inner signin">

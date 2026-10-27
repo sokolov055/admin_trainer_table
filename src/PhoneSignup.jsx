@@ -20,7 +20,8 @@ export { formatPhone, looksLikeEmail };
  * Регистрация и вход по номеру «как в Робокассе» (FT-769, макет согласован
  * владельцем 26.10.2026). Сервер — lib/phone-login.js.
  *
- *   номер → код из СМС (звонок — запасной)
+ *   номер → код в Telegram или СМС (звонок — запасной; нет Telegram —
+ *     сервер сам переводит на звонок, tgFailed)
  *     номер уже открывает кабинет → кабинет
  *     нет → почта по желанию → код из письма
  *       почта открывает кабинет → «Нашли ваш кабинет» → номер к нему
@@ -57,6 +58,8 @@ export default function PhoneSignup({ options = { call: true, sms: true }, phone
   const [sentAt, setSentAt] = useState(0);
   const timer = useRef(null);
   useKeyboardInset();
+  // Код в Telegram дешевле СМС и не требует имени отправителя (27.10.2026)
+  const firstWay = options.tg ? 'tg' : options.sms ? 'sms' : 'call';
 
   useEffect(() => () => clearTimeout(timer.current), []);
   // Экран входа прячет шапку и вкладки после первого шага (макет FT-769)
@@ -111,7 +114,7 @@ export default function PhoneSignup({ options = { call: true, sms: true }, phone
   // С вкладки «Вход» номер пришёл готовым — код сразу
   const started = useRef(false);
   useEffect(() => {
-    if (initial && !started.current && digits(phone).length === 11) { started.current = true; start(options.sms ? 'sms' : 'call'); }
+    if (initial && !started.current && digits(phone).length === 11) { started.current = true; start(firstWay); }
   }, []);
 
   const submitCode = async (value) => {
@@ -229,13 +232,15 @@ export default function PhoneSignup({ options = { call: true, sms: true }, phone
       )}
 
       {step === 'phone' && (
-        <form className="signin__step" onSubmit={(e) => { e.preventDefault(); if (digits(phone).length === 11 && !busy) start(options.sms ? 'sms' : 'call'); }}>
+        <form className="signin__step" onSubmit={(e) => { e.preventDefault(); if (digits(phone).length === 11 && !busy) start(firstWay); }}>
           <label className="field">
             <span className="field__label">Номер телефона</span>
             <input className="field__input" type="tel" inputMode="tel" autoComplete="tel" placeholder="+7 900 000-00-00"
               value={phone} onFocus={() => { if (!phone) setPhone('+7'); }}
               onChange={(e) => setPhone(formatPhone(e.target.value))} disabled={busy} autoFocus />
-            <span className="field__hint">Пришлём код в СМС. Номер уже есть у нас — просто войдёте в свой кабинет.</span>
+            <span className="field__hint">
+              {options.tg ? 'Пришлём код в Telegram, а если его нет — попросим позвонить.' : 'Пришлём код в СМС.'} Номер уже есть у нас — просто войдёте в свой кабинет.
+            </span>
           </label>
           {problem && <p className="login__problem" role="alert">{problem}</p>}
           <button className="button button--primary button--block signin__submit" disabled={busy || digits(phone).length !== 11}>
@@ -249,29 +254,33 @@ export default function PhoneSignup({ options = { call: true, sms: true }, phone
           {check.method === 'call' ? (
             <>
               <h2 className="phone-signup__title">Позвоните на номер</h2>
-              <p className="signin__lead">С номера {formatPhone(phone)} — звонок бесплатный и сбросится сам.</p>
+              <p className="signin__lead">
+                {check.tgFailed && 'В Telegram этот номер не нашли. '}С номера {formatPhone(phone)} — звонок бесплатный и сбросится сам.
+              </p>
               <a className="button button--primary button--block phone__call" href={'tel:' + check.callPhone}>Позвонить {check.callPhonePretty}</a>
             </>
           ) : (
             <>
-              <h2 className="phone-signup__title">Код из СМС</h2>
-              <p className="signin__lead">Отправили на {formatPhone(phone)}</p>
+              <h2 className="phone-signup__title">{check.method === 'tg' ? 'Код в Telegram' : 'Код из СМС'}</h2>
+              <p className="signin__lead">
+                {check.method === 'tg' ? <>Пришёл в чат «Коды подтверждения» на номере {formatPhone(phone)}</> : <>Отправили на {formatPhone(phone)}</>}
+              </p>
             </>
           )}
           <div className="field signin__otp">
             <OtpStage length={check.method === 'call' ? 4 : 6} readOnly={check.method === 'call'} value={code} onChange={setCode}
-              onComplete={submitCode} phase={phase} onSettled={onSettled} label="Код из СМС" doneLabel="Номер подтверждён" autoFocus />
+              onComplete={submitCode} phase={phase} onSettled={onSettled} label={check.method === 'tg' ? 'Код из Telegram' : 'Код из СМС'} doneLabel="Номер подтверждён" autoFocus />
           </div>
           {check.method === 'call' && phase === 'checking' && <p className="small muted" aria-live="polite">Ждём звонка…</p>}
           {problem && <p className="login__problem" role="alert">{problem}</p>}
-          {check.method === 'sms' && phase !== 'success' && (
-            <button type="button" className="signin__resend" onClick={() => start('sms')} disabled={busy || phase === 'checking' || left > 0}>
+          {check.method !== 'call' && phase !== 'success' && (
+            <button type="button" className="signin__resend" onClick={() => start(check.method)} disabled={busy || phase === 'checking' || left > 0}>
               {left > 0 ? <>Отправить снова через <span className="signin__timer">{clock(left)}</span></> : 'Отправить код ещё раз'}
             </button>
           )}
-          {check.method === 'sms' && options.call && phase !== 'success' && (
+          {check.method !== 'call' && options.call && phase !== 'success' && (
             <button type="button" className="signin__resend" onClick={() => start('call')} disabled={busy || phase === 'checking'}>
-              Не приходит? Позвонить вместо СМС
+              {check.method === 'tg' ? 'Нет Telegram? Подтвердить звонком' : 'Не приходит? Позвонить вместо СМС'}
             </button>
           )}
         </div>

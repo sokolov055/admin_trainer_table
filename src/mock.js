@@ -521,9 +521,9 @@ let mockPhoneCheck = null;
 function mockPhoneRequest(p = {}) {
   const phone = String(p.phone || '').replace(/\D/g, '');
   if (!/^7\d{10}$/.test(phone)) mockFail('Проверьте номер: нужен российский, +7 и десять цифр.');
-  mockPhoneCheck = { key: 'demo-' + Date.now(), phone, method: p.method === 'sms' ? 'sms' : 'call', polls: 0 };
-  return mockPhoneCheck.method === 'sms'
-    ? { key: mockPhoneCheck.key, method: 'sms', ttlMin: 10 }
+  mockPhoneCheck = { key: 'demo-' + Date.now(), phone, method: p.method === 'sms' || p.method === 'tg' ? p.method : 'call', polls: 0 };
+  return mockPhoneCheck.method !== 'call'
+    ? { key: mockPhoneCheck.key, method: mockPhoneCheck.method, ttlMin: 10 }
     : { key: mockPhoneCheck.key, method: 'call', callPhone: '+78005008275', callPhonePretty: '+7 (800) 500-8275', ttlMin: 5 };
 }
 
@@ -1609,7 +1609,8 @@ const MOCK = {
   'auth.phone.options': () => {
     const q = new URLSearchParams(window.location.search);
     if (q.get('mockPhone') === '0') return { call: false, sms: false };
-    return { call: true, sms: q.get('mockSignup') === '1' };
+    // ?mockTg=1 — код в Telegram (Telegram Gateway, 27.10.2026)
+    return { call: true, sms: q.get('mockSignup') === '1', tg: q.get('mockTg') === '1' };
   },
   'auth.phone.request': (p) => mockPhoneRequest(p),
   'auth.phone.confirm': (p) => {
