@@ -51,6 +51,10 @@ const CHECK_MIN_MS = 1800;
 /** Повторный код — не чаще раза в минуту (так же считает сервер) */
 const RESEND_SEC = 60;
 
+function tgTest() {
+  try { return new URLSearchParams(window.location.search).has('tgtest'); } catch (_) { return false; }
+}
+
 export default function LoginScreen({ details }) {
   const [page, setPage] = useState(initialLoginPage);
   // На страницу тренера пришли с клиентской — тогда «назад» ведёт обратно
@@ -112,7 +116,9 @@ function ClientPage({ onTrainer, onRegister, details }) {
   useEffect(() => {
     let alive = true;
     apiPublic('auth.phone.options', {})
-      .then((o) => { if (alive && o && o.call) setOptions(o); })
+      // ?tgtest — проба кода в Telegram до РКН: сервер шлёт его только номерам
+      // из TG_GATEWAY_ONLY, остальным — звонок, как без этого
+      .then((o) => { if (alive && o && o.call) setOptions(tgTest() ? { ...o, tg: true } : o); })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
