@@ -118,7 +118,10 @@ function ClientPage({ onTrainer, onRegister, details }) {
     apiPublic('auth.phone.options', {})
       // ?tgtest — проба кода в Telegram до РКН: сервер шлёт его только номерам
       // из TG_GATEWAY_ONLY, остальным — звонок, как без этого
-      .then((o) => { if (alive && o && o.call) setOptions(tgTest() ? { ...o, tg: true } : o); })
+      .then((o) => {
+        const way = o && tgTest() ? { ...o, tg: true } : o;
+        if (alive && way && (way.call || way.tg)) setOptions(way);
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
