@@ -24,6 +24,8 @@ import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck,
 import { haptic } from '../telegram.js';
 import { captureScreen, useBackGesture } from '../gestures.jsx';
 import { supersets, blockSessions, pickBlock, doneLine, roundLine } from '../plan-model.js';
+import { weekPlan, weekQueue, lighten, monthWeeks } from '../plan-weeks.js';
+import { WeekStrip, WeekChoice, WeeksSettings } from './PlanWeeks.jsx';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
@@ -432,6 +434,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [selectingBlocks, setSelectingBlocks] = useState(false);
   const [selectedBlocks, setSelectedBlocks] = useState(() => new Set());
   const [blockUndo, setBlockUndo] = useState(null);
+  // Недельные циклы (IDEA-7, plan-weeks.js): какая неделя открыта (null —
+  // текущая), настройка после правки до перечитывания, закрытый лист выбора
+  const [weekSel, setWeekSel] = useState(null);
+  const [weeksLocal, setWeeksLocal] = useState(null); // { month, weeks }
+  const [choiceClosed, setChoiceClosed] = useState(false);
+  useEffect(() => { setWeekSel(null); setWeeksLocal(null); }, [month]);
   useEffect(() => {
     setSelectingBlocks(false);
     setSelectedBlocks(new Set());
@@ -486,13 +494,20 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     if (error || !data) return true;
     const live = sessions.find((x) => x.status === 'active' || x.status === 'paused');
     if (live) { openWorkout({ sessionId: live.id }); return true; }
-    const queue = (data.blocks || []).filter((b) => !blockSessions(sessions, b, data.month).length);
-    const block = pickBlock(data.blocks, queue, want);
+    // Недели включены — очередь этой недели, лёгкая неделя — веса ниже
+    const qplan = weekPlan({ blocks: data.blocks, sessions, month: data.month, cfg: data.weeks });
+    const qweek = qplan && qplan.currentIndex >= 0 ? qplan.weeks[qplan.currentIndex] : null;
+    const queue = qweek
+      ? weekQueue(qweek).map((r) => r.block)
+      : (data.blocks || []).filter((b) => !blockSessions(sessions, b, data.month).length);
+    const picked = pickBlock(data.blocks, queue, want);
+    const light = !!(picked && qweek && qweek.kind === 'light' && !qweek.short && !want.startedAt);
+    const block = light ? lighten(picked, qplan.cfg.lightPct) : picked;
     // С часов и такой тренировки в текущем месяце нет — просьба снимается
     if (!block) { if (!want.blockId && !want.startedAt) openWorkout({ block: FREE_BLOCK, month: '' }); return true; }
     // «Было» — с занятиями, ещё не дошедшими до сервера, как у «Начать тренировку»
     localWorkouts(clientRow).catch(() => []).then((local) => {
-      openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [], ...(want.startedAt ? { startedAt: want.startedAt } : {}) });
+      openWorkout({ block: light ? lighten(withLocalWeights(picked, local), qplan.cfg.lightPct) : withLocalWeights(block, local), month: data.month, members: data.members || [], ...(light ? { deload: true } : {}), ...(want.startedAt ? { startedAt: want.startedAt } : {}) });
     });
     return true;
   }, quickHere);
@@ -558,8 +573,18 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // Проведённой считается тренировка, у которой есть завершённое занятие
   // этого месяца. Порядок в «Очереди» — тот же, что в программе.
   // Один проход по журналу на все тренировки, а не три фильтра на каждую
-  const pastOf = new Map(shownBlocks.map((b) => [b, blockSessions(sessions, b, data.month)]));
-  const queueBlocks = shownBlocks.filter((b) => !pastOf.get(b).length);
+  // Недели включены (IDEA-7) — проведённой считается в выбранной неделе,
+  // очередь — этой недели с долгами прошлой первыми; выключены — как было
+  const weeksCfg = weeksLocal && weeksLocal.month === data.month ? weeksLocal.weeks : data.weeks;
+  const wplan = shownBlocks.length ? weekPlan({ blocks: shownBlocks, sessions, month: data.month, cfg: weeksCfg }) : null;
+  const weekIndex = wplan ? (weekSel !== null && weekSel < wplan.weeks.length ? weekSel : Math.max(0, wplan.currentIndex)) : -1;
+  const week = wplan ? wplan.weeks[weekIndex] : null;
+  const rowOf = new Map(week ? week.rows.map((r) => [r.block, r]) : []);
+  // Лёгкая неделя — по сегодняшней, а не по открытой: занятие запишется сегодня
+  const todayWeek = wplan && wplan.currentIndex >= 0 ? wplan.weeks[wplan.currentIndex] : null;
+  const lightNow = !!(todayWeek && todayWeek.kind === 'light' && !todayWeek.short);
+  const pastOf = new Map(shownBlocks.map((b) => [b, week ? rowOf.get(b).sessions : blockSessions(sessions, b, data.month)]));
+  const queueBlocks = week ? weekQueue(week).map((r) => r.block) : shownBlocks.filter((b) => !pastOf.get(b).length);
   const visibleBlocks = planTab === 'all' ? shownBlocks : queueBlocks;
   // «Выполненные» (01.10.2026) — все завершённые занятия месяца по дате
   // занятия, свежие сверху: тренировки программы (и повторы), свободные.
@@ -590,7 +615,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // связи вторая подряд тренировка подсказывала бы вес двухнедельной давности
   const startBlock = async (block) => {
     const local = familyRow ? [] : await localWorkouts(clientRow).catch(() => []);
-    openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [] });
+    const planned = withLocalWeights(block, local);
+    openWorkout({ block: lightNow ? lighten(planned, weeksCfg.lightPct) : planned, month: data.month, members: data.members || [], ...(lightNow ? { deload: true } : {}) });
   };
   // Нет связи — честно: что на экране и от какого числа
   const savedAt = journalOffline ? apiStoredAt('client.plan', params) : 0;
@@ -881,12 +907,32 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {/* Подразделы месяца — «где я», а не фильтр: утопленная дорожка
           (variant="nav", как в «Питании»). Синей заливкой остаётся один ряд —
           месяцы над ним (DESIGN-APP §6, §10; аудит 24.10.2026) */}
+      {/* Недельные циклы (IDEA-7): тренер включает по месяцу */}
+      {canEdit && shownBlocks.length > 0 && monthWeeks(data.month) && (
+        <WeeksSettings
+          clientRow={clientRow}
+          month={data.month}
+          weeks={weeksCfg}
+          onSaved={(weeks) => { setWeeksLocal({ month: data.month, weeks }); reload(); }}
+        />
+      )}
+      {wplan && planTab !== 'done' && <WeekStrip plan={wplan} sel={weekIndex} onSelect={setWeekSel} />}
+      {wplan && wplan.pending.length > 0 && !choiceClosed && !clientRow && !familyRow && (
+        <WeekChoice
+          plan={wplan}
+          month={data.month}
+          clientRow={clientRow}
+          onClose={() => setChoiceClosed(true)}
+          onChosen={(weeks) => { setWeeksLocal({ month: data.month, weeks }); setChoiceClosed(true); reload(); }}
+        />
+      )}
+
       {(shownBlocks.length > 0 || doneSessions.length > 0) && (
         <Chips
           variant="nav"
           label="Тренировки месяца"
           items={[
-            { value: 'queue', label: 'Очередь · ' + queueBlocks.length },
+            { value: 'queue', label: (week ? 'Очередь недели · ' : 'Очередь · ') + queueBlocks.length },
             { value: 'done', label: 'Выполненные · ' + doneSessions.length },
             // Вся программа месяца: проведённые отмечены зелёным
             ...(shownBlocks.length ? [{ value: 'all', label: 'Вся программа · ' + shownBlocks.length }] : []),
@@ -926,8 +972,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {planTab === 'queue' && queueBlocks.length === 0 && shownBlocks.length > 0 && (
         <Empty
           icon={IconPlan}
-          title="Все тренировки месяца проведены"
-          text="Программа пройдена целиком. Выполненные — на соседней вкладке."
+          title={week ? 'Все тренировки недели проведены' : 'Все тренировки месяца проведены'}
+          text={week ? 'Неделя пройдена. Следующая — в полоске недель выше.' : 'Программа пройдена целиком. Выполненные — на соседней вкладке.'}
         />
       )}
 
@@ -1046,7 +1092,15 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
               ? <span className="plan__title-done"><IconCheck size={18} aria-label="Проведена" />{t}</span>
               : t;
           })()}
-          note={shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
+          note={<>
+            {shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
+            {/* Недели: пропуск прошедшей недели и долг прошлой — словами */}
+            {week && planTab === 'queue' && rowOf.get(block) && (rowOf.get(block).missed
+              ? <span className="plan__week-debt"> · не выполнена</span>
+              : rowOf.get(block).carried && rowOf.get(block).done === 0
+                ? <span className="plan__week-debt"> · долг с недели {week.n - 1}</span>
+                : null)}
+          </>}
         >
           <Panel>
             {/* Какие мышцы в работе (FT-491) — по программе тренировки:

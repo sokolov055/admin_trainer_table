@@ -1,0 +1,199 @@
+/* Недельные циклы программы (IDEA-7, PlanWeeks.jsx). Токены — DESIGN-APP.md */
+
+.plan-weeks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.plan-weeks__strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.plan-weeks__week {
+  min-height: 56px;
+  padding: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease;
+}
+
+.plan-weeks__week:active { transform: scale(.96); }
+.plan-weeks__week strong { font-size: var(--text-base); font-variant-numeric: tabular-nums; }
+.plan-weeks__week span { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.plan-weeks__week.is-short { background: var(--surface-sunken); }
+.plan-weeks__week.is-now { border-color: var(--accent); }
+
+.plan-weeks__week[aria-selected="true"] {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--accent-text);
+}
+
+.plan-weeks__week[aria-selected="true"] span { color: var(--accent-text); }
+
+.plan-weeks__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-top: 2px;
+  background: transparent;
+}
+
+.plan-weeks__dot.is-done { background: var(--good); }
+.plan-weeks__dot.is-missed { background: var(--warning); }
+
+.plan-weeks__card {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plan-weeks__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plan-weeks__head > div { display: flex; flex-direction: column; gap: 2px; }
+.plan-weeks__head span { font-size: var(--text-sm); color: var(--text-secondary); }
+
+.plan-weeks__kind {
+  flex: none;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
+.plan-weeks__kind--heavy { background: var(--warning-fill); color: var(--warning-text); }
+.plan-weeks__kind--light { background: var(--good-fill); color: var(--good-text); }
+
+.plan-weeks__bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.plan-weeks__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--good);
+  transition: width .3s ease;
+}
+
+.plan-weeks__summary { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); }
+
+/* Лист «доделать или пропустить» */
+.plan-weeks__choice { display: flex; flex-direction: column; gap: var(--space-3); }
+.plan-weeks__lead { margin: 0; color: var(--text-secondary); }
+
+.plan-weeks__missed {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  list-style: none;
+  border-radius: var(--radius-sm);
+  background: var(--warning-fill);
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
+.plan-weeks__option {
+  min-height: 56px;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+}
+
+.plan-weeks__option span { font-size: var(--text-sm); font-weight: 400; opacity: .9; }
+.plan-weeks__hint { margin: 0; text-align: center; }
+
+/* Настройка тренера */
+.plan-weeks__settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.plan-weeks__settings-note { display: block; font-size: var(--text-sm); font-weight: 400; color: var(--text-muted); }
+
+.plan-weeks__fold {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.plan-weeks__fold span { font-size: var(--text-sm); color: var(--text-secondary); }
+.plan-weeks__fold strong { flex: none; color: var(--accent); font-size: var(--text-sm); }
+.plan-weeks__kinds { display: flex; flex-direction: column; gap: 6px; }
+
+.plan-weeks__kind-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plan-weeks__kind-row > span { display: flex; flex-direction: column; }
+.plan-weeks__kind-row > span span { font-size: var(--text-xs); color: var(--text-muted); }
+
+.plan-weeks__pct {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.plan-weeks__pct select { width: auto; }
+.plan-weeks__rule { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.plan__week-debt {
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-weeks__week, .plan-weeks__bar span { transition: none; }
+}

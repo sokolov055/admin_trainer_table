@@ -3,6 +3,7 @@ import { Sheet } from '../ui.jsx';
 import { useData } from '../useData.js';
 import { useRights, can } from '../rights.js';
 import { blockSessions } from '../plan-model.js';
+import { weekPlan, weekQueue } from '../plan-weeks.js';
 import { label as mealLabel, mealNow } from '../nutrition/diary-model.js';
 import { IconPlay, IconScale, IconRuler, IconDrop, IconNutrition, IconSend } from '../icons.jsx';
 import './quick-add.css';
@@ -126,7 +127,12 @@ function useMainAction(clientRow, preview) {
     };
   }
 
-  const next = (plan.data.blocks || []).find((b) => !blockSessions(sessions, b, plan.data.month).length);
+  // Недели включены (IDEA-7) — следующая из очереди этой недели
+  const wp = weekPlan({ blocks: plan.data.blocks, sessions, month: plan.data.month, cfg: plan.data.weeks });
+  const wk = wp && wp.currentIndex >= 0 ? wp.weeks[wp.currentIndex] : null;
+  const next = wk
+    ? (weekQueue(wk)[0] || {}).block
+    : (plan.data.blocks || []).find((b) => !blockSessions(sessions, b, plan.data.month).length);
   if (next) return { title: 'Начать тренировку', note: next.title + ' · следующая по плану', payload: { title: next.title } };
 
   return { title: 'Свободная тренировка', note: 'Без программы: что сделаете, то и запишется', payload: { free: true } };

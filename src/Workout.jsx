@@ -318,7 +318,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const freshRecord = session => ({ session, revision: 0, dirty: true, tick: Date.now(), edit: 1 });
   // Подходы к силовой с часов («Обзор», client/WatchSuggest.jsx): начало —
   // по часам, чтобы сервер совместил занятие с их тренировкой
-  const planned = l => ({ ...fromPlan(l.block, l.month, l.members || []), ...(l.startedAt ? { startedAt: l.startedAt } : {}) });
+  // deload — лёгкая неделя программы (plan-weeks.js): сервер не берёт её веса в «было»
+  const planned = l => ({ ...fromPlan(l.block, l.month, l.members || []), ...(l.startedAt ? { startedAt: l.startedAt } : {}), ...(l.deload ? { deload: true } : {}) });
 
   useEffect(() => {
     mounted.current = true;

@@ -57,6 +57,10 @@ const FIELDS = ['Вес', 'Талия', 'Ягодицы', 'Грудь', 'Рук�
 /** Какие месяцы тренер скрыл от клиента. Демо начинает с одного скрытого:
  *  оба состояния кнопки должны быть видны без лишних нажатий. */
 let hiddenMonths = ['Июль 2026'];
+// Недели месяца в демо (IDEA-7): ?mockWeeks=1 — у сентября включены, тяжёлая вторая и лёгкая третья
+const demoWeeks = typeof location !== 'undefined' && new URLSearchParams(location.search).get('mockWeeks') === '1'
+  ? { 'Сентябрь 2026': { on: true, kinds: ['normal', 'normal', 'heavy', 'light'], lightPct: 20, rule: 'client', choices: {} } }
+  : {};
 
 // Тренеры сервиса: владелец, одна заявка и работающий тренер
 let mockTrainers = [
@@ -1968,8 +1972,21 @@ const MOCK = {
           })) }))
           : PLAN_BLOCKS)
         : [],
+      // Недельные циклы (IDEA-7): ?mockWeeks=1 — включены у первого месяца
+      weeks: demoWeeks[month] || null,
       note: month ? '' : 'В таблице клиента пока нет ни одного листа с программой.',
     };
+  },
+
+  'plan.weeks.save': (params) => {
+    const w = params.weeks || {};
+    demoWeeks[params.month] = w.on ? { on: true, kinds: w.kinds || [], lightPct: w.lightPct || 20, rule: w.rule || 'client', choices: (demoWeeks[params.month] || {}).choices || {} } : null;
+    return { weeks: demoWeeks[params.month] };
+  },
+  'plan.week.choose': (params) => {
+    const w = demoWeeks[params.month];
+    if (w) w.choices[params.week + ':' + params.blockId] = params.choice;
+    return { weeks: w || null };
   },
 
   'plan.month.visibility': (params) => {
