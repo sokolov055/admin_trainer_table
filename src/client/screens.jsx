@@ -496,7 +496,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     if (live) { openWorkout({ sessionId: live.id }); return true; }
     // Программа по неделям — очередь текущего цикла; лёгкая тренировка —
     // занятие с пометкой (deload): её веса не станут «было» для обычных
-    const qplan = weekPlan({ blocks: data.blocks, sessions, month: data.month, cfg: data.weeks });
+    const qplan = weekPlan({ blocks: data.blocks, sessions, month: data.month, cfg: data.weeks, prev: data.prev, latest: (data.available || [])[0] === data.month });
     const qweek = qplan && qplan.currentIndex >= 0 ? qplan.weeks[qplan.currentIndex] : null;
     const queue = qweek
       ? weekQueue(qweek).map((r) => r.block)
@@ -505,9 +505,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     const light = !!(block && block.load === 'light');
     // С часов и такой тренировки в текущем месяце нет — просьба снимается
     if (!block) { if (!want.blockId && !want.startedAt) openWorkout({ block: FREE_BLOCK, month: '' }); return true; }
-    // «Было» — с занятиями, ещё не дошедшими до сервера, как у «Начать тренировку»
+    // «Было» — с занятиями, ещё не дошедшими до сервера, как у «Начать тренировку».
+    // Долг прошлого месяца — занятие его программы (block.month)
     localWorkouts(clientRow).catch(() => []).then((local) => {
-      openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [], ...(light ? { deload: true } : {}), ...(want.startedAt ? { startedAt: want.startedAt } : {}) });
+      openWorkout({ block: withLocalWeights(block, local), month: block.month || data.month, members: data.members || [], ...(light ? { deload: true } : {}), ...(want.startedAt ? { startedAt: want.startedAt } : {}) });
     });
     return true;
   }, quickHere);
@@ -576,15 +577,20 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // Программа по неделям (IDEA-7) — проведённой считается в выбранном
   // цикле, очередь — его недели программы с долгами прошлого первыми; без
   // недель у тренировок — как было
+  // Стык месяцев (28.10.2026): это последний лист — программа крутится,
+  // пока не назначена следующая; долг последнего цикла прошлого месяца
+  // (data.prev) — первым в первый цикл этого
   const weeksCfg = weeksLocal && weeksLocal.month === data.month ? weeksLocal.weeks : data.weeks;
-  const wplan = shownBlocks.length ? weekPlan({ blocks: shownBlocks, sessions, month: data.month, cfg: weeksCfg }) : null;
+  const wplan = shownBlocks.length ? weekPlan({ blocks: shownBlocks, sessions, month: data.month, cfg: weeksCfg, prev: data.prev, latest: months[0] === data.month }) : null;
   const weekIndex = wplan ? (weekSel !== null && weekSel < wplan.weeks.length ? weekSel : Math.max(0, wplan.currentIndex)) : -1;
   const week = wplan ? wplan.weeks[weekIndex] : null;
   const rowOf = new Map(week ? week.rows.map((r) => [r.block, r]) : []);
   const programWeeks = programLength(shownBlocks);
   const pastOf = new Map(shownBlocks.map((b) => [b, week ? (rowOf.has(b) ? rowOf.get(b).sessions : []) : blockSessions(sessions, b, data.month)]));
   const queueBlocks = week ? weekQueue(week).map((r) => r.block) : shownBlocks.filter((b) => !pastOf.get(b).length);
-  const visibleBlocks = planTab === 'all' ? shownBlocks : queueBlocks;
+  // Долг прошлого месяца — тренировка той программы: своей строкой над очередью, не в правке
+  const foreignDebts = planTab === 'queue' ? queueBlocks.filter((b) => b.foreign) : [];
+  const visibleBlocks = (planTab === 'all' ? shownBlocks : queueBlocks).filter((b) => !b.foreign);
   // «Выполненные» (01.10.2026) — все завершённые занятия месяца по дате
   // занятия, свежие сверху: тренировки программы (и повторы), свободные.
   // Какого месяца: открыли лист программы сами — того месяца; иначе —
@@ -615,8 +621,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const startBlock = async (block) => {
     const local = familyRow ? [] : await localWorkouts(clientRow).catch(() => []);
     // Лёгкая тренировка программы — занятие с пометкой: «было» для обычных
-    // берётся не с неё (сервер, exercise-history.js)
-    openWorkout({ block: withLocalWeights(block, local), month: data.month, members: data.members || [], ...(block.load === 'light' ? { deload: true } : {}) });
+    // берётся не с неё (сервер, exercise-history.js). Долг прошлого месяца —
+    // занятие его программы (block.month)
+    openWorkout({ block: withLocalWeights(block, local), month: block.month || data.month, members: data.members || [], ...(block.load === 'light' ? { deload: true } : {}) });
   };
   // Нет связи — честно: что на экране и от какого числа
   const savedAt = journalOffline ? apiStoredAt('client.plan', params) : 0;
@@ -932,8 +939,24 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           month={data.month}
           clientRow={clientRow}
           onClose={() => setChoiceClosed(true)}
-          onChosen={(weeks) => { setWeeksLocal({ month: data.month, weeks }); setChoiceClosed(true); reload(); }}
+          // Выбор за прошлый месяц хранится у него — сюда он придёт с перечитыванием (data.prev)
+          onChosen={(weeks) => { if (wplan.pendingMonth === data.month) setWeeksLocal({ month: data.month, weeks }); setChoiceClosed(true); reload(); }}
         />
+      )}
+      {foreignDebts.length > 0 && (
+        <Section title="Долг прошлого месяца">
+          <Panel pad>
+            {foreignDebts.map((block) => (
+              <div className="plan__done" key={'debt' + block.id}>
+                <div>
+                  <strong>{block.title}</strong>
+                  <span>Программа «{block.month}» · не выполнена в последнем цикле</span>
+                </div>
+                {!running && !familyRow && <button className="button button--primary" onClick={() => startBlock(block)}>Начать</button>}
+              </div>
+            ))}
+          </Panel>
+        </Section>
       )}
 
       {(shownBlocks.length > 0 || doneSessions.length > 0) && (

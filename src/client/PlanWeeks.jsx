@@ -3,7 +3,7 @@ import { apiMutate } from '../api.js';
 import { Segmented, Sheet, Note } from '../ui.jsx';
 import { IconAlert } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength } from '../plan-weeks.js';
+import { weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength, startWeekOf } from '../plan-weeks.js';
 import './plan-weeks.css';
 
 /**
@@ -23,20 +23,34 @@ const plural = (n, one, few, many) => {
 const workouts = (n) => n + ' ' + plural(n, 'тренировка', 'тренировки', 'тренировок');
 const STATUS = { done: 'выполнен', missed: 'не выполнен', open: 'идёт', empty: 'без тренировок' };
 
+/** «декабря» из «Декабрь 2026» — для «программа декабря не назначена» */
+function monthGen(label) {
+  const names = { Январь: 'январь', Февраль: 'февраль', Март: 'март', Апрель: 'апрель', Май: 'май', Июнь: 'июнь',
+    Июль: 'июль', Август: 'август', Сентябрь: 'сентябрь', Октябрь: 'октябрь', Ноябрь: 'ноябрь', Декабрь: 'декабрь' };
+  const name = String(label || '').split(' ')[0];
+  const gen = { январь: 'января', февраль: 'февраля', март: 'марта', апрель: 'апреля', май: 'мая', июнь: 'июня',
+    июль: 'июля', август: 'августа', сентябрь: 'сентября', октябрь: 'октября', ноябрь: 'ноября', декабрь: 'декабря' };
+  return gen[names[name]] || label;
+}
+
 /** Циклы месяца с оценками и сводка выбранного */
 export function WeekStrip({ plan, sel, onSelect }) {
   const w = plan.weeks[sel];
   const { score } = plan;
   const summary = w.status === 'empty'
     ? 'В этой неделе программы нет тренировок'
-    : (w.full ? `Сделано ${w.done} из ${w.need}` : `Короткий цикл: обязательно ${w.done} из ${w.need}, остальное — по желанию`)
-      + (w.rows.some((r) => r.carried) ? ' · с долгом прошлого цикла' : '')
+    : `Сделано ${w.done} из ${w.need}`
+      + (w.rows.some((r) => r.carried && r.block.foreign) ? ' · с долгом прошлого месяца'
+        : w.rows.some((r) => r.carried) ? ' · с долгом прошлого цикла' : '')
+      + (w.extra ? ' · по прошлой программе: ' + w.extra : '')
       + (w.missed ? ' · не выполнено: ' + w.missed : '');
-  const month = score.allDone && score.graded === score.total
-    ? 'Все циклы месяца выполнены — молодец!'
-    : score.graded
-      ? `Месяц: выполнено ${score.done} из ${score.graded} ${plural(score.graded, 'прошедшего цикла', 'прошедших циклов', 'прошедших циклов')}`
-      : '';
+  const month = w.beyond
+    ? `Программа ${monthGen(w.beyond)} не назначена — пока идёт эта, по кругу`
+    : score.allDone && score.graded === score.total
+      ? 'Все циклы месяца выполнены — молодец!'
+      : score.graded
+        ? `Месяц: выполнено ${score.done} из ${score.graded} ${plural(score.graded, 'прошедшего цикла', 'прошедших циклов', 'прошедших циклов')}`
+        : '';
   return (
     <div className="plan-weeks">
       <div className="plan-weeks__strip" role="tablist" aria-label="Циклы месяца">
@@ -47,11 +61,11 @@ export function WeekStrip({ plan, sel, onSelect }) {
             role="tab"
             aria-selected={i === sel}
             aria-label={`Цикл ${x.n}, ${weekDates(x)}: ${STATUS[x.status]}`}
-            className={'plan-weeks__week' + (!x.full ? ' is-short' : '') + (x.current ? ' is-now' : '')}
+            className={'plan-weeks__week' + (x.beyond ? ' is-short' : '') + (x.current ? ' is-now' : '')}
             onClick={() => { onSelect(i); haptic(); }}
           >
             <strong>{x.n}</strong>
-            <span>{x.from === x.to ? x.from : x.from + '–' + x.to}</span>
+            <span>{x.from + '–' + x.to}</span>
             <i className={'plan-weeks__dot is-' + x.status} aria-hidden="true" />
           </button>
         ))}
@@ -59,7 +73,7 @@ export function WeekStrip({ plan, sel, onSelect }) {
       <div className="plan-weeks__card">
         <div className="plan-weeks__head">
           <div>
-            <strong>Цикл {w.n} из {plan.weeks.length}</strong>
+            <strong>Цикл {w.n}{w.beyond ? '' : ' из ' + plan.own}</strong>
             <span>{weekDates(w)}{w.current ? ' · сейчас' : ''}{plan.length > 1 ? ' · неделя ' + w.week + ' программы' : ''}</span>
           </div>
           {w.load
@@ -78,12 +92,17 @@ export function WeekStrip({ plan, sel, onSelect }) {
   );
 }
 
-/** Цикл закончился с пропусками, тренер оставил выбор клиенту */
-export function WeekChoice({ plan, month, clientRow, onChosen, onClose }) {
+/**
+ * Цикл закончился с пропусками, тренер оставил выбор клиенту. В первом
+ * цикле месяца — последний цикл прошлого: выбор сохраняется под ним
+ * (plan.pendingMonth)
+ */
+export function WeekChoice({ plan, month: shownMonth, clientRow, onChosen, onClose }) {
   const [busy, setBusy] = useState('');
   const [failure, setFailure] = useState('');
   const w = plan.pendingWeek;
   const rows = plan.pending;
+  const month = plan.pendingMonth || shownMonth;
   const choose = async (choice) => {
     setBusy(choice);
     setFailure('');
@@ -106,6 +125,7 @@ export function WeekChoice({ plan, month, clientRow, onChosen, onClose }) {
       <div className="plan-weeks__choice">
         <p className="plan-weeks__lead">
           {one ? 'Одна тренировка не выполнена' : `${workouts(rows.length)} не выполнено`} · {weekDates(w)}
+          {month !== shownMonth ? ` · программа «${month}»` : ''}
         </p>
         <ul className="plan-weeks__missed">
           {rows.map((r) => <li key={r.block.id}>{r.block.title}</li>)}
@@ -139,9 +159,10 @@ const RULE_HINT = {
 };
 
 /**
- * Тренер: на сколько недель программа, пометка каждой недели, правило о
- * пропущенных. Недели и пометки — у тренировок (onBlocks сохраняет
- * программу, как любая её правка), правило — у месяца
+ * Тренер: на сколько недель программа, пометка каждой недели, с какой
+ * недели начать месяц, правило о пропущенных. Недели и пометки — у
+ * тренировок (onBlocks сохраняет программу, как любая её правка),
+ * остальное — у месяца
  */
 export function WeeksSettings({ clientRow, month, blocks, weeks, onBlocks, onSaved }) {
   const [open, setOpen] = useState(false);
@@ -149,11 +170,12 @@ export function WeeksSettings({ clientRow, month, blocks, weeks, onBlocks, onSav
   const [failure, setFailure] = useState('');
   const length = programLength(blocks);
   const rule = (weeks && weeks.rule) || 'client';
-  const saveRule = async (next) => {
+  const startWeek = startWeekOf(weeks, length);
+  const saveMonth = async (patch) => {
     setBusy(true);
     setFailure('');
     try {
-      const res = await apiMutate('plan.weeks.save', { clientRow, month, weeks: { rule: next } });
+      const res = await apiMutate('plan.weeks.save', { clientRow, month, weeks: patch });
       onSaved(res.weeks);
     } catch (error) {
       setFailure(error.message || 'Не сохранилось');
@@ -161,6 +183,7 @@ export function WeeksSettings({ clientRow, month, blocks, weeks, onBlocks, onSav
       setBusy(false);
     }
   };
+  const saveRule = (next) => saveMonth({ rule: next });
   const setLoad = (week, load) => {
     haptic();
     onBlocks(blocks.map((b) => {
@@ -185,10 +208,19 @@ export function WeeksSettings({ clientRow, month, blocks, weeks, onBlocks, onSav
             <Segmented items={LENGTHS} value={length} label="На сколько недель программа" onChange={(n) => { haptic(); onBlocks(withLength(blocks, n)); }} />
             <span className="small muted">
               {length
-                ? 'У каждой тренировки — своя неделя (в её заголовке). Месяц делится на циклы по календарю, программа идёт по кругу; за каждый цикл клиенту — оценка.'
+                ? 'У каждой тренировки — своя неделя (в её заголовке). Месяц делится на циклы — целые недели с понедельника, программа идёт по кругу; за каждый цикл клиенту — оценка.'
                 : 'Все тренировки — одна очередь на месяц, как раньше.'}
             </span>
           </div>
+          {length > 1 && (
+            <div className="plan-weeks__rule">
+              <strong>Начать с недели</strong>
+              <Segmented items={Array.from({ length }, (_, i) => ({ value: i + 1, label: String(i + 1) }))} value={startWeek} label="Начать с недели" disabled={busy} onChange={(n) => { haptic(); saveMonth({ startWeek: n }); }} />
+              <span className="small muted">
+                Та же программа, что в прошлом месяце, продолжается с недели, на которой он кончился, — подставляется само. Новая — с первой.
+              </span>
+            </div>
+          )}
           {length > 0 && (
             <div className="plan-weeks__kinds">
               {Array.from({ length }, (_, i) => i + 1).map((week) => {

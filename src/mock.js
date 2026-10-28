@@ -1991,7 +1991,8 @@ const MOCK = {
 
   'plan.weeks.save': (params) => {
     const w = params.weeks || {};
-    demoWeeks[params.month] = { rule: w.rule || 'client', choices: (demoWeeks[params.month] || {}).choices || {} };
+    const was = demoWeeks[params.month] || {};
+    demoWeeks[params.month] = { rule: w.rule || was.rule || 'client', startWeek: w.startWeek || was.startWeek || 1, choices: was.choices || {} };
     return { weeks: demoWeeks[params.month] };
   },
   'plan.week.choose': (params) => {
