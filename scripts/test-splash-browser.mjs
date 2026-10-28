@@ -133,18 +133,15 @@ test('готовая гантель с названием помещается �
   } finally { await browser.close(); }
 });
 
-test('iPhone с экрана «Домой»: знак по центру экрана, а не короткого окна — без прыжка', async () => {
+test('сайт с экрана «Домой» iPhone: заставки и картинок запуска нет — запуск системный (решение владельца 28.10.2026)', async () => {
+  // iOS 26 даёт сайту окно короче экрана на первых кадрах (WebKit 301108), под тёмной заставкой мелькала полоса
+  assert.doesNotMatch(html, /apple-touch-startup-image/);
   const browser = await chromium.launch();
   try {
-    const { page, errors } = await open(browser, { home: true, holdFrames: true });
-    assert.equal((await splashState(page)).present, true, 'на установленном сайте заставка есть');
-    // Первый кадр: окно 844, экран 900 — знак на 450, как на картинке запуска
-    const mid = await page.evaluate(() => {
-      const rects = [...document.querySelectorAll('.splash__plate > rect:first-child')].map((r) => r.getBoundingClientRect());
-      return (Math.min(...rects.map((r) => r.top)) + Math.max(...rects.map((r) => r.bottom))) / 2;
-    });
-    assert.ok(Math.abs(mid - 450) < 0.6, 'знак по центру экрана: ' + mid);
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.splash__word')).top), '515px', 'название — от той же середины');
+    const { page, errors } = await open(browser, { home: true });
+    const s = await splashState(page);
+    assert.equal(s.present, false);
+    assert.equal(s.on, false);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 });
