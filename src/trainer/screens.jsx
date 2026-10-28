@@ -23,32 +23,6 @@ import { SOURCES } from './Metrics.jsx';
  * Клиенты
  * ================================================================== */
 
-/** «Без программы на декабрь: 3» — кто идёт по неделям, а следующего листа нет */
-function ProgramGaps({ gaps, onOpen }) {
-  const n = gaps.clients.length;
-  const gen = (label) => {
-    const g = { Январь: 'январь', Февраль: 'февраль', Март: 'март', Апрель: 'апрель', Май: 'май', Июнь: 'июнь',
-      Июль: 'июль', Август: 'август', Сентябрь: 'сентябрь', Октябрь: 'октябрь', Ноябрь: 'ноябрь', Декабрь: 'декабрь' };
-    return g[String(label).split(' ')[0]] || label;
-  };
-  const starts = new Date(gaps.startsOn + 'T12:00:00');
-  const started = starts <= new Date();
-  return (
-    <Note tone="warning" icon={IconAlert}>
-      <strong>Без программы на {gen(gaps.month)}: {n} {plural(n, 'клиент', 'клиента', 'клиентов')}</strong>
-      <br />
-      {started ? 'Месяц уже начался' : 'Месяц начнётся'} в понедельник {formatDate(gaps.startsOn)}. Пока не назначите — у клиента продолжается прошлая программа по кругу.
-      <br />
-      {gaps.clients.map((c, i) => (
-        <React.Fragment key={c.row}>
-          {i > 0 ? ', ' : ''}
-          <button type="button" className="note__link" onClick={() => onOpen(c.row)}>{c.name}</button>
-        </React.Fragment>
-      ))}
-    </Note>
-  );
-}
-
 // adding — что открыто из «+» в шапке (TrainerApp): 'add' — новый клиент,
 // 'link' — привязать по ID или ссылке; onAdding(null) — закрыть
 export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = null, onAdding = () => {} }) {
@@ -146,11 +120,6 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
           заходят за людьми — кто сегодня, кто следующий, до кого не
           дошли руки. */}
       <TrainerDay summary={s} clients={clients} attention={needsAttention.length} />
-
-      {/* Программа по неделям, стык месяцев (28.10.2026): с четверга перед
-          понедельником, с которого начинается месяц, — у кого листа на него
-          нет. Без него у клиента крутится прошлая программа */}
-      {data.programGaps && <ProgramGaps gaps={data.programGaps} onOpen={(row) => { const c = data.clients.find((x) => x.row === row); if (c) onOpenClient(c); }} />}
 
       {/* Календарь пересчитывается сам — при входе и когда страницу тянут
           вниз, — и строка с кнопкой «Обновить» больше не нужна: список

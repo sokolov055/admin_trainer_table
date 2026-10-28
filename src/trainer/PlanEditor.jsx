@@ -9,8 +9,6 @@ import BlockOrder from './BlockOrder.jsx';
 import { BlockEdit, AddBlock, blankExercise } from './PlanInline.jsx';
 import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
-import { programLength } from '../plan-weeks.js';
-import { ProgramLength, BlockWeek } from '../client/PlanWeeks.jsx';
 
 /**
  * Редактор шаблона (программы или одной тренировки) в «Библиотеке».
@@ -121,9 +119,6 @@ export default function PlanEditor({
         title: b.title,
         ...(b.id ? { id: b.id } : {}),
         ...(b.sourceId ? { sourceId: b.sourceId } : {}),
-        // Неделя программы и пометка (plan-weeks.js) — иначе пересохранение их стёрло бы
-        ...(b.week ? { week: b.week } : {}),
-        ...(b.load ? { load: b.load } : {}),
         exercises: b.exercises.filter((e) => String(e.name || '').trim()),
       }));
       // В сервер — только то, что он хранит (plan-payload.js); шаблону — как было
@@ -179,10 +174,6 @@ export default function PlanEditor({
         </div>
       )}
 
-      {/* Программа по неделям (IDEA-7): на сколько недель и неделя тренировки */}
-      {!single && !ordering && (
-        <ProgramLength blocks={draft} onChange={(list) => { setDraft(list); setFailure(null); }} />
-      )}
       {!ordering && draft.map((block, bi) => (
         <div className="plan-edit__block" key={bi}>
           {block.sourceId && workoutTemplates && (
@@ -203,9 +194,6 @@ export default function PlanEditor({
               onChange={(e) => change((next) => { next[bi].title = e.target.value; return next; })}
             />
           </div>
-          {!single && programLength(draft) > 0 && (
-            <BlockWeek block={block} length={programLength(draft)} onChange={(next) => change((list) => { list[bi] = { ...next, exercises: list[bi].exercises }; return list; })} />
-          )}
           {/* Упражнения — тем же редактором, что в программе клиента */}
           <BlockEdit
             block={block}

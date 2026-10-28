@@ -128,7 +128,7 @@ function useMainAction(clientRow, preview) {
   }
 
   // Недели включены (IDEA-7) — следующая из очереди этой недели
-  const wp = weekPlan({ blocks: plan.data.blocks, sessions, month: plan.data.month, cfg: plan.data.weeks, prev: plan.data.prev, latest: (plan.data.available || [])[0] === plan.data.month });
+  const wp = weekPlan({ blocks: plan.data.blocks, sessions, month: plan.data.month, cfg: plan.data.weeks });
   const wk = wp && wp.currentIndex >= 0 ? wp.weeks[wp.currentIndex] : null;
   const next = wk
     ? (weekQueue(wk)[0] || {}).block

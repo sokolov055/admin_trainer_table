@@ -55,9 +55,7 @@
 }
 
 .plan-weeks__dot.is-done { background: var(--good); }
-.plan-weeks__dot.is-missed { background: var(--critical); }
-.plan-weeks__week[aria-selected="true"] .plan-weeks__dot.is-done,
-.plan-weeks__week[aria-selected="true"] .plan-weeks__dot.is-missed { box-shadow: 0 0 0 1.5px var(--accent-text); }
+.plan-weeks__dot.is-missed { background: var(--warning); }
 
 .plan-weeks__card {
   padding: var(--space-3) var(--space-4);
@@ -93,9 +91,7 @@
 
 button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .plan-weeks__kind--heavy { background: var(--warning-fill); color: var(--warning-text); }
-.plan-weeks__kind--light { background: var(--info-fill); color: var(--info-text); }
-.plan-weeks__kind--done { background: var(--good-fill); color: var(--good-text); }
-.plan-weeks__kind--missed { background: var(--warning-fill); color: var(--warning-text); }
+.plan-weeks__kind--light { background: var(--good-fill); color: var(--good-text); }
 
 .plan-weeks__bar {
   height: 6px;
@@ -113,16 +109,6 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 }
 
 .plan-weeks__summary { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); }
-
-.plan-weeks__month {
-  margin: 0;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.plan-weeks__month.is-praise { color: var(--good-text); font-weight: 600; }
 
 /* Лист «доделать или пропустить» */
 .plan-weeks__choice { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -177,15 +163,13 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
   cursor: pointer;
 }
 
-.plan-weeks__fold span { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-sm); color: var(--text-secondary); }
-.plan-weeks__fold span strong { font-size: var(--text-base); color: var(--text); }
+.plan-weeks__fold span { font-size: var(--text-sm); color: var(--text-secondary); }
 .plan-weeks__fold strong { flex: none; color: var(--accent); font-size: var(--text-sm); }
 .plan-weeks__kinds { display: flex; flex-direction: column; gap: 6px; }
 
 .plan-weeks__kind-row {
   min-height: 44px;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
@@ -205,22 +189,6 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .plan-weeks__pct select { width: auto; }
 .plan-weeks__rule { display: flex; flex-direction: column; gap: var(--space-2); }
 
-.plan-weeks__block {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4) 0;
-}
-
-.plan-weeks__block label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.plan-weeks__block select { width: auto; min-height: 36px; padding-block: 4px; font-size: var(--text-sm); }
-
 .plan__week-debt {
   color: var(--warning-text);
   font-weight: 600;
@@ -229,7 +197,3 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .plan-weeks__week, .plan-weeks__bar span { transition: none; }
 }
-
-/* Шаблон программы (PlanEditor) */
-.plan-weeks__template { margin-bottom: var(--space-3); }
-.plan-edit__block .plan-weeks__block { padding: 0 0 var(--space-2); }
