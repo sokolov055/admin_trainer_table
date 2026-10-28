@@ -86,5 +86,10 @@ test('длина программы: по кругу при сокращении
   assert.deepEqual(withLength([b('a', 'А'), b('b', 'Б', 3), b('c', 'В', 2)], 2).map((x) => x.week), [1, 1, 2]);
   assert.deepEqual(withLength(PROGRAM, 0).map((x) => 'week' in x), [false, false, false, false]);
   assert.equal(weekLoad(PROGRAM, 2), 'light');
+  // Длиннее — поровну по порядку: 12 тренировок на 4 недели по 3
+  const twelve = Array.from({ length: 12 }, (_, i) => b(String.fromCharCode(97 + i), String(i), 1));
+  assert.deepEqual(withLength(twelve, 4).map((x) => x.week), [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]);
+  assert.equal(programLength(withLength(twelve, 4)), 4);
+  assert.equal(programLength(withLength(PROGRAM, 4)), 4);
   assert.equal(weekLoad([A, b('x', 'Х', 1, 'heavy')], 1), '');
 });

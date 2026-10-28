@@ -182,15 +182,17 @@ export function weekQueue(cycle) {
 }
 
 /**
- * Программа на n недель: у каждой тренировки неделя от 1 до n (была больше —
- * по кругу, не было — первая); 0 — снять недели, программа на месяц.
+ * Программа на n недель: 0 — снять недели, программа на месяц. Длиннее, чем
+ * сейчас, — тренировки по порядку поровну на n недель (12 на 4 — по 3), иначе
+ * длина не вырастет: она — самая большая неделя. Короче — по кругу.
  */
 export function withLength(blocks, n) {
-  return (blocks || []).map((b) => {
-    if (!n) {
-      const { week: _drop, ...rest } = b;
-      return rest;
-    }
-    return { ...b, week: ((weekOf(b) - 1) % n) + 1 };
-  });
+  const list = blocks || [];
+  if (!n) return list.map(({ week: _drop, ...rest }) => rest);
+  if (n > programLength(list) && list.length) {
+    const order = list.map((b, i) => [b, i]).sort((x, y) => weekOf(x[0]) - weekOf(y[0]) || x[1] - y[1]);
+    const week = new Map(order.map(([b], i) => [b, Math.min(n, Math.ceil((i + 1) * n / list.length))]));
+    return list.map((b) => ({ ...b, week: week.get(b) }));
+  }
+  return list.map((b) => ({ ...b, week: ((weekOf(b) - 1) % n) + 1 }));
 }
