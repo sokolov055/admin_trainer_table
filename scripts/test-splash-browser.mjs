@@ -18,14 +18,19 @@ const html = readFileSync('index.html', 'utf8')
   .replace(/<script type="module"[^>]*><\/script>/, '');
 const URL_ = 'https://app.test/';
 
-async function open(browser, { native = false, appAt = 300, reduced = false, holdFrames = false } = {}) {
+async function open(browser, { native = false, home = false, appAt = 300, reduced = false, holdFrames = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference' });
   await ctx.route(URL_ + '**', (route) => route.fulfill({ body: html, contentType: 'text/html' }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript(([native, appAt, holdFrames]) => {
+  await page.addInitScript(([native, home, appAt, holdFrames]) => {
     window.__hides = [];
+    // iPhone с экрана «Домой»: окно 844 при экране 900 — как на первых кадрах запуска
+    if (home) {
+      Object.defineProperty(navigator, 'standalone', { get: () => true });
+      Object.defineProperty(screen, 'height', { get: () => 900 });
+    }
     if (native) {
       window.Capacitor = {
         isNativePlatform: () => true,
@@ -45,7 +50,7 @@ async function open(browser, { native = false, appAt = 300, reduced = false, hol
         document.getElementById('root').innerHTML = '<div class="app"><main class="app__body"><h1>Обзор</h1></main></div>';
       }, appAt));
     }
-  }, [native, appAt, holdFrames]);
+  }, [native, home, appAt, holdFrames]);
   await page.goto(URL_);
   return { ctx, page, errors };
 }
@@ -125,6 +130,22 @@ test('готовая гантель с названием помещается �
     assert.ok(box.left > 16 && box.right < 374, 'по ширине ' + JSON.stringify(box));
     // Гантель и название вместе — посередине экрана
     assert.ok(Math.abs((box.top + box.bottom) / 2 - 422) < 8, 'по высоте ' + JSON.stringify(box));
+  } finally { await browser.close(); }
+});
+
+test('iPhone с экрана «Домой»: знак по центру экрана, а не короткого окна — без прыжка', async () => {
+  const browser = await chromium.launch();
+  try {
+    const { page, errors } = await open(browser, { home: true, holdFrames: true });
+    assert.equal((await splashState(page)).present, true, 'на установленном сайте заставка есть');
+    // Первый кадр: окно 844, экран 900 — знак на 450, как на картинке запуска
+    const mid = await page.evaluate(() => {
+      const rects = [...document.querySelectorAll('.splash__plate > rect:first-child')].map((r) => r.getBoundingClientRect());
+      return (Math.min(...rects.map((r) => r.top)) + Math.max(...rects.map((r) => r.bottom))) / 2;
+    });
+    assert.ok(Math.abs(mid - 450) < 0.6, 'знак по центру экрана: ' + mid);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.splash__word')).top), '515px', 'название — от той же середины');
+    assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 });
 
