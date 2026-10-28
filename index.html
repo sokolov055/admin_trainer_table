@@ -104,10 +104,6 @@
       :root.splash-on { background: #232726 !important; }
       .splash {
         --sp-bg: #232726; --sp-cream: #ede8dd; --sp-green: #4e9d69; --sp-steel: #a3aaa7;
-        /* Середина экрана. На iPhone с экрана «Домой» скрипт ниже ставит её в
-           пикселях по высоте экрана: окно на первых кадрах короче экрана,
-           и знак по 50 % окна стоял выше картинки запуска, а потом прыгал */
-        --sp-mid: 50%;
         --sp-out: cubic-bezier(0.23, 1, 0.32, 1); --sp-move: cubic-bezier(0.77, 0, 0.175, 1);
         position: fixed; inset: 0; z-index: 2147483000; background: var(--sp-bg);
         -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
@@ -117,7 +113,7 @@
       /* Гантель 1050 × 742 единицы → 200 px; знак-график в начале — 0,3 px на
          единицу (те же 104 px), отсюда масштаб 1,575. В конце гантель на
          34 px выше центра, чтобы вместе с названием стоять посередине */
-      .splash__rig-svg { position: absolute; left: 50%; top: var(--sp-mid); width: 200px; height: 141.33px; margin: -70.67px 0 0 -100px; overflow: visible; }
+      .splash__rig-svg { position: absolute; left: 50%; top: 50%; width: 200px; height: 141.33px; margin: -70.67px 0 0 -100px; overflow: visible; }
       .splash__rig, .splash__plate { transform-box: view-box; transform-origin: 0 0; }
       .splash__rig { transform: translate(248.59px, 39.16px) scale(1.575); }
       .splash__part { transform-box: fill-box; }
@@ -126,7 +122,7 @@
       .splash__grow-r { transform-origin: 0 50%; transform: scaleX(0); }
       .splash__grow-l { transform-origin: 100% 50%; transform: scaleX(0); }
       .splash__word {
-        position: absolute; left: 0; right: 0; top: calc(var(--sp-mid) + 65px); margin: 0; text-align: center;
+        position: absolute; left: 0; right: 0; top: calc(50% + 65px); margin: 0; text-align: center;
         font: 760 40px/1 'FT Splash', 'Roboto', system-ui, sans-serif; letter-spacing: -0.035em;
         color: var(--sp-cream); opacity: 0;
       }
@@ -286,14 +282,6 @@
           }
         } catch (_) { show = false; }
         if (!show) { el.parentNode.removeChild(el); hideNative(); return; }
-        // iPhone с экрана «Домой» (28.10.2026): окно на первых кадрах короче
-        // экрана примерно на 70 pt снизу, и знак, стоящий по центру окна, был
-        // выше картинки запуска, а когда окно дорастало — прыгал вниз. Центр —
-        // по экрану: страница начинается с его верха (black-translucent)
-        try {
-          var sh = window.screen && window.screen.height;
-          if (window.navigator.standalone === true && sh > 0) el.style.setProperty('--sp-mid', (sh / 2) + 'px');
-        } catch (_) {}
         root.classList.add('splash-on');
         var started = 0;
         var gone = false;
