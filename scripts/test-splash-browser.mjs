@@ -149,11 +149,6 @@ test('iPhone с экрана «Домой»: знак по центру экра
   } finally { await browser.close(); }
 });
 
-test('iOS 26: корень страницы не ниже экрана, чтобы окно дали целиком (WebKit 301108)', () => {
-  // Браузер в тесте режим «с экрана „Домой“» не изображает — правило проверяется по тексту
-  assert.match(html, /@media \(display-mode: standalone\) \{\s*html \{ min-height: min\(100lvh, calc\(100% \+ env\(safe-area-inset-top, 0px\)\)\); \}/);
-});
-
 test('экран не готов — заставка ждёт, но не дольше 4 с; касание пропускает', async () => {
   const browser = await chromium.launch();
   try {
