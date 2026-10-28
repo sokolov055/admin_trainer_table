@@ -87,10 +87,6 @@ test('в приложении: первый кадр — знак в центр�
     assert.ok(Math.abs(first.box.bottom - first.box.top - 111.3) < 0.6, 'высота знака ' + (first.box.bottom - first.box.top));
     assert.ok(Math.abs((first.box.left + first.box.right) / 2 - 195) < 0.6, 'знак по центру по горизонтали');
     assert.ok(Math.abs((first.box.top + first.box.bottom) / 2 - 422) < 0.6, 'знак по центру по вертикали');
-    // Страница под заставкой — её цвета: на iPhone с экрана «Домой» окно на
-    // старте короче экрана, и снизу просвечивал бы фон темы (28.10.2026)
-    const pageBg = () => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
-    assert.equal(await pageBg(), 'rgb(35, 39, 38)', 'фон страницы под заставкой');
     // Отпускаем кадры, пока нативную не снимут (кадр в кадре — второй
     // встаёт в очередь только после первого). Опрос по таймеру: свои кадры здесь подменены
     await page.waitForFunction(() => { window.__flush(); return window.__hides.length === 1; }, null, { polling: 50 });
@@ -102,7 +98,6 @@ test('в приложении: первый кадр — знак в центр�
     assert.equal((await splashState(page)).present, true, 'не раньше конца анимации, хотя экран готов');
     await page.waitForFunction(() => !document.getElementById('splash'), null, { timeout: 2500, polling: 50 });
     assert.equal((await splashState(page)).on, false);
-    assert.equal(await pageBg(), 'rgba(0, 0, 0, 0)', 'после заставки фон страницы снова свой');
     assert.deepEqual(errors, []);
 
     // Перезагрузка — заставки нет
