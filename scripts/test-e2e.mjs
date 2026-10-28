@@ -1434,7 +1434,12 @@ test('шаблон назначается клиенту, общий копир�
 
     await tab.getByRole('button', { name: 'Назначить клиенту' }).click();
     await visible('.item').first().click();
-    await tab.getByRole('button', { name: 'Назначить', exact: true }).click();
+    // Форма «Назначить» (FT-775): месяц чипами, «как клиент пойдёт» с предпросмотром по циклам
+    await tab.getByRole('radio', { name: 'Одна неделя по кругу' }).waitFor({ timeout: 5000 });
+    assert.equal(await tab.getByRole('radio', { name: 'Одна неделя по кругу' }).getAttribute('aria-checked'), 'true', '3 тренировки — по умолчанию по кругу');
+    await tab.getByRole('radio', { name: 'Разложить на недели' }).click();
+    assert.ok((await tab.locator('.wk-prev').textContent()).includes('Тренировка 1'), 'предпросмотр по циклам показывает тренировки');
+    await tab.getByRole('button', { name: /^Назначить/ }).click();
     await assert.doesNotReject(tab.getByText('Назначено').waitFor({ timeout: 5000 }), 'шаблон назначен');
 
     // Общий шаблон другого тренера — к себе

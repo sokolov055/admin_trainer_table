@@ -15,6 +15,7 @@
  * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
+import { withLength, monthWeeks } from './plan-weeks.js';
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
 import { onboardingMock, firstStepsMock, focusMock } from './onboarding-mock.js';
@@ -2518,7 +2519,25 @@ const MOCK = {
       w.status = 'done';
       w.reply = w.reply || `Программа назначена — «${params.month}» в «Тренировках».`;
     });
-    return { month: params.month, blocks: demoTemplate(params.templateId).blocks };
+    // Как клиент пойдёт по списку (FT-775): по кругу — неделя 1, разложить — поровну, списком — без недель
+    const how = params.how || '';
+    const n = how === 'cycle' ? 1 : how === 'split' ? Number(params.length) || 2 : 0;
+    const blocks = how && params.mode !== 'append' ? withLength(demoTemplate(params.templateId).blocks, n) : demoTemplate(params.templateId).blocks;
+    if (params.mode !== 'append') {
+      PLAN_BLOCKS.length = 0;
+      PLAN_BLOCKS.push(...blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e })) })));
+      demoWeeks[params.month] = { rule: 'client', startWeek: Number(params.startWeek) || 1, choices: {} };
+    }
+    return { month: params.month, blocks };
+  },
+  // Справка форме «Назначить» (FT-775): в демо октябрь — та же программа на 2 недели с ?mockWeeks=1
+  'plan.assign.info': (params) => {
+    const cycles = monthWeeks(params.month);
+    const prevLabel = MONTHS[0];
+    const prev = cycles && mockWeeksOn && params.month !== prevLabel
+      ? { month: prevLabel, length: 2, startWeek: 1, rule: 'client', cycles: (monthWeeks(prevLabel) || []).length, same: Number(params.templateId) === 1, continueWeek: 2 }
+      : null;
+    return { month: params.month, cycles: cycles ? cycles.length : 0, startsOn: cycles ? cycles[0].start : '', count: MONTHS.includes(params.month) ? PLAN_BLOCKS.length : 0, prev };
   },
 
   'trainer.metrics': (params) => demoMetrics(params),

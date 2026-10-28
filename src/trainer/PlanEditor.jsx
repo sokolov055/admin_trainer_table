@@ -9,8 +9,8 @@ import BlockOrder from './BlockOrder.jsx';
 import { BlockEdit, AddBlock, blankExercise } from './PlanInline.jsx';
 import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
-import { programLength } from '../plan-weeks.js';
-import { ProgramLength, BlockWeek } from '../client/PlanWeeks.jsx';
+import { shownLength, resized, withWeekLoad, movedToWeek, copiedWeek, weekOrder } from '../plan-weeks.js';
+import { LengthPicker, WeekSections, MoveWeek } from '../client/PlanWeeks.jsx';
 
 /**
  * Редактор шаблона (программы или одной тренировки) в «Библиотеке».
@@ -40,7 +40,12 @@ export default function PlanEditor({
   workoutTemplates = null, onDirty = null,
 }) {
   const [draft, setDraft] = useState(() => (blocks.length
-    ? blocks.map((b) => ({ id: b.id || '', title: b.title, sourceId: b.sourceId || null, exercises: b.exercises.map((e) => ({ ...blankExercise(), ...e })) }))
+    ? blocks.map((b) => ({
+      id: b.id || '', title: b.title, sourceId: b.sourceId || null,
+      // Неделя и нагрузка недели (plan-weeks.js) — иначе правка шаблона их теряла
+      ...(b.week ? { week: b.week } : {}), ...(b.load ? { load: b.load } : {}),
+      exercises: b.exercises.map((e) => ({ ...blankExercise(), ...e })),
+    }))
     : [{ title: 'Тренировка № 1', exercises: [blankExercise()] }]));
   // Изменилось ли что-то против открытого — экрану шаблона, чтобы спросить
   // перед выходом (аудит 24.10.2026). Сравнение снимком: правка и откат
@@ -52,6 +57,11 @@ export default function PlanEditor({
   const [failure, setFailure] = useState(null);
   const [ordering, setOrdering] = useState(false);
   const rootRef = useRef(null);
+  // Недели — разделы (FT-775): выбранная длина может быть больше той, что у
+  // тренировок, — новые недели пустые, пока тренер в них что-то не положит
+  const [lengthPick, setLengthPick] = useState(0);
+  const length = single ? 0 : shownLength(draft, lengthPick);
+  const setLength = (n) => { setLengthPick(n); change((list) => resized(list, n)); };
 
   // Панель кнопок вынесена в body и не прячется вместе с вкладкой: раздел
   // «Шаблоны» остаётся смонтированным (hidden), и панель ездила по всем
@@ -73,7 +83,7 @@ export default function PlanEditor({
   const openBlock = (i) => {
     setOrdering(false);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      const el = document.querySelectorAll('.plan-edit__block')[i];
+      const el = document.querySelector('.plan-edit__block[data-index="' + i + '"]');
       if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }));
   };
@@ -137,6 +147,44 @@ export default function PlanEditor({
     }
   };
 
+  // Одна тренировка редактора: номер — по месту в шаблоне, под заголовком
+  // у программы по неделям — «В неделю…» (перенос; поля «Неделя/Нагрузка»
+  // у тренировки больше нет — нагрузка у недели в заголовке раздела)
+  const renderBlock = (block, bi) => {
+    // Номер — по месту на экране: в разделах недель тренировки идут по неделям
+    const num = length ? weekOrder(draft, length).indexOf(block) + 1 : bi + 1;
+    return (
+    <div className="plan-edit__block" key={bi} data-index={bi}>
+      {block.sourceId && workoutTemplates && (
+        <span className="plan-edit__source">
+          из шаблона «{(workoutTemplates.find((t) => t.id === block.sourceId) || {}).title || 'тренировки'}» · правка здесь — только в этом шаблоне
+        </span>
+      )}
+      {/* Номер и название — одной строкой: по номеру тренировки видно
+          издалека, когда листаешь длинную программу */}
+      <div className="plan-edit__block-head">
+        {!single && <span className="plan-edit__block-num" aria-hidden="true">{num}</span>}
+        <input
+          aria-label={'Название тренировки ' + num}
+          className="field__input plan-edit__title"
+          value={block.title}
+          maxLength={160}
+          disabled={busy}
+          onChange={(e) => change((next) => { next[bi].title = e.target.value; return next; })}
+        />
+        {length > 1 && <MoveWeek block={block} length={length} disabled={busy} onMove={(week) => change((list) => movedToWeek(list, list[bi], week))} />}
+      </div>
+      {/* Упражнения — тем же редактором, что в программе клиента */}
+      <BlockEdit
+        block={block}
+        canRemove={!single && draft.length > 1}
+        onChange={(exercises) => change((next) => { next[bi].exercises = exercises; return next; })}
+        onRemove={() => change((next) => next.filter((_, k) => k !== bi))}
+      />
+    </div>
+    );
+  };
+
   return (
     <div className="plan-edit" ref={rootRef}>
       <p className="small muted" style={{ marginTop: 0 }}>
@@ -179,48 +227,43 @@ export default function PlanEditor({
         </div>
       )}
 
-      {/* Программа по неделям (IDEA-7): на сколько недель и неделя тренировки */}
+      {/* Программа по неделям (FT-775): «Одна / 2 / 3 / 4 / Список» и что
+          получит клиент — одной фразой; тренировки — под заголовками недель */}
       {!single && !ordering && (
-        <ProgramLength blocks={draft} onChange={(list) => { setDraft(list); setFailure(null); }} />
-      )}
-      {!ordering && draft.map((block, bi) => (
-        <div className="plan-edit__block" key={bi}>
-          {block.sourceId && workoutTemplates && (
-            <span className="plan-edit__source">
-              из шаблона «{(workoutTemplates.find((t) => t.id === block.sourceId) || {}).title || 'тренировки'}» · правка здесь — только в этом шаблоне
-            </span>
-          )}
-          {/* Номер и название — одной строкой: по номеру тренировки видно
-              издалека, когда листаешь длинную программу */}
-          <div className="plan-edit__block-head">
-            {!single && <span className="plan-edit__block-num" aria-hidden="true">{bi + 1}</span>}
-            <input
-              aria-label={'Название тренировки ' + (bi + 1)}
-              className="field__input plan-edit__title"
-              value={block.title}
-              maxLength={160}
-              disabled={busy}
-              onChange={(e) => change((next) => { next[bi].title = e.target.value; return next; })}
-            />
-          </div>
-          {!single && programLength(draft) > 0 && (
-            <BlockWeek block={block} length={programLength(draft)} onChange={(next) => change((list) => { list[bi] = { ...next, exercises: list[bi].exercises }; return list; })} />
-          )}
-          {/* Упражнения — тем же редактором, что в программе клиента */}
-          <BlockEdit
-            block={block}
-            canRemove={!single && draft.length > 1}
-            onChange={(exercises) => change((next) => { next[bi].exercises = exercises; return next; })}
-            onRemove={() => change((next) => next.filter((_, k) => k !== bi))}
-          />
+        <div className="panel panel--pad plan-edit__weeks">
+          <LengthPicker value={length} onChange={setLength} count={draft.length} disabled={busy} />
         </div>
-      ))}
+      )}
+      {!ordering && length > 0 && (
+        <WeekSections
+          blocks={draft}
+          length={length}
+          canEdit
+          disabled={busy}
+          renderBlock={(block) => renderBlock(block, draft.indexOf(block))}
+          onLoad={(week, load) => change((list) => withWeekLoad(list, week, load))}
+          onCopyWeek={(from, to) => change((list) => copiedWeek(list, from, to))}
+          addSlot={(week, label) => (
+            <AddBlock
+              key={'add' + week}
+              busy={busy}
+              label={label}
+              primary={label === 'Новая тренировка'}
+              onAdd={(made) => change((next) => {
+                next.push({ ...(made || { title: `Тренировка № ${next.length + 1}`, exercises: [blankExercise()] }), week });
+                return next;
+              })}
+            />
+          )}
+        />
+      )}
+      {!ordering && length === 0 && draft.map((block, bi) => renderBlock(block, bi))}
 
       {/* Программа-шаблон: «+» под последней тренировкой — новая или из
           шаблона тренировки, копией, которая помнит, откуда взята
           (sourceId). Поправят шаблон тренировки — приложение спросит,
           обновить ли её здесь. */}
-      {!single && !ordering && (
+      {!single && !ordering && length === 0 && (
         <AddBlock
           busy={busy}
           onAdd={(made) => change((next) => {

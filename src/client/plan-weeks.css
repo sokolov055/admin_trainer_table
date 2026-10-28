@@ -149,77 +149,175 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .plan-weeks__option span { font-size: var(--text-sm); font-weight: 400; opacity: .9; }
 .plan-weeks__hint { margin: 0; text-align: center; }
 
-/* Настройка тренера */
-.plan-weeks__settings {
+/* ==========================================================================
+ * Тренер: неделя — раздел (FT-775). Заголовок недели с нагрузкой,
+ * «+ Тренировка в неделю N», пустая неделя, перенос; строка состояния
+ * месяца; листы «Разложить по неделям» и «Настроить»; форма «Назначить»
+ * ========================================================================== */
+
+.wk { margin-top: var(--space-5); }
+.wk + .wk { margin-top: var(--space-6); }
+
+.wk__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  margin-bottom: var(--space-2);
+}
+
+.wk__head h3 { margin: 0; font-size: var(--text-md); font-weight: 650; letter-spacing: -0.014em; }
+.wk__count { font-size: var(--text-sm); color: var(--text-muted); }
+.wk__spacer { flex: 1; }
+
+.wk__load {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font: 600 var(--text-sm)/1 var(--font);
+  color: var(--text-secondary);
+}
+
+.wk__load--light { background: var(--info-fill); color: var(--info-text); border-color: transparent; }
+.wk__load--heavy { background: var(--warning-fill); color: var(--warning-text); border-color: transparent; }
+.wk__load svg { width: 12px; height: 12px; }
+.wk__load select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; font: inherit; }
+.wk__load select:disabled { cursor: default; }
+.wk__load:has(select:disabled) { opacity: .5; }
+
+.wk__add {
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--space-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  font: 600 var(--text-sm)/1 var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.wk__add:disabled { opacity: .5; cursor: default; }
+
+.wk__empty {
+  padding: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
+}
+
+.wk__row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.wk__row .wk__add { width: auto; margin: 0; padding: 0 14px; }
+
+/* Перенос в другую неделю — ссылкой под нагрузкой тренировки */
+.wk__move {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.wk__move select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; font: inherit; }
+
+/* Переключатель длины и фраза под ним */
+.wk-pick { display: flex; flex-direction: column; gap: var(--space-2); }
+.wk-pick__hint { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); }
+/* Пять позиций («1 2 3 4 Список») на 390 px: без боковых отступов «Список» не режется */
+.wk-pick .chips--track .chip { padding: 0 2px; font-size: var(--text-sm); }
+.wk-pick__hint strong { color: var(--text); font-weight: 620; }
+
+/* Строка состояния месяца у тренера */
+.wk-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
 }
 
-.plan-weeks__settings-note { display: block; font-size: var(--text-sm); font-weight: 400; color: var(--text-muted); }
+.wk-status__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.wk-status__top strong { font-weight: 620; }
+.wk-status__link { flex: none; min-height: 32px; padding: 0; border: 0; background: none; color: var(--accent); font: 600 var(--text-sm)/1 var(--font); cursor: pointer; }
+.wk-status p { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.wk-status__warn { color: var(--warning-text) !important; }
+.wk-status .button { margin-top: 4px; align-self: flex-start; }
 
-.plan-weeks__fold {
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
+/* Предпросмотр: неделя → тренировки */
+.wk-prev {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+}
+
+.wk-prev div { display: flex; gap: var(--space-2); }
+.wk-prev b { flex: none; width: 76px; font-weight: 650; color: var(--text); }
+.wk-prev span { color: var(--text-secondary); min-width: 0; }
+
+/* Листы «Разложить» и «Настроить»: ряд — заголовок, переключатель, фраза */
+.wk-rows { display: flex; flex-direction: column; gap: var(--space-4); }
+.wk-rows__item { display: flex; flex-direction: column; gap: 6px; }
+.wk-rows__item > strong { font-weight: 620; }
+.wk-rows__item > span { font-size: var(--text-sm); color: var(--text-secondary); }
+.wk-rows__pill { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 40px; flex-wrap: wrap; }
+.wk-rows__pill > span { display: flex; flex-direction: column; }
+.wk-rows__pill > span small { font-size: var(--text-xs); color: var(--text-muted); }
+
+/* Форма «Назначить»: как клиент пойдёт — карточки-варианты, линия недель */
+.wk-opts { display: grid; gap: var(--space-2); }
+
+.wk-opt {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  font: inherit;
+  color: var(--text);
   cursor: pointer;
 }
 
-.plan-weeks__fold span { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-sm); color: var(--text-secondary); }
-.plan-weeks__fold span strong { font-size: var(--text-base); color: var(--text); }
-.plan-weeks__fold strong { flex: none; color: var(--accent); font-size: var(--text-sm); }
-.plan-weeks__kinds { display: flex; flex-direction: column; gap: 6px; }
+.wk-opt[aria-checked="true"] { border-color: var(--accent); background: var(--accent-wash); }
+.wk-opt__mark { flex: none; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: grid; place-items: center; }
+.wk-opt[aria-checked="true"] .wk-opt__mark { border-color: var(--accent-fill); background: var(--accent-fill); color: var(--accent-text); }
+.wk-opt__mark svg { width: 12px; height: 12px; }
+.wk-opt__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.wk-opt__body strong { font-weight: 620; }
+.wk-opt__body span { font-size: var(--text-sm); color: var(--text-secondary); }
+.wk-opt__body .chips { margin-top: 6px; }
 
-.plan-weeks__kind-row {
-  min-height: 44px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
+.wk-tl { display: flex; align-items: center; gap: 4px; margin: 4px 0; font-size: var(--text-sm); flex-wrap: wrap; }
+.wk-tl i { font-style: normal; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: var(--surface-sunken); color: var(--text-secondary); font-weight: 650; font-variant-numeric: tabular-nums; }
+.wk-tl i.is-on { background: var(--accent-fill); color: var(--accent-text); }
+.wk-tl i.is-next { background: var(--info-fill); color: var(--info-text); }
+.wk-tl em { font-style: normal; color: var(--text-muted); padding: 0 4px; }
 
-.plan-weeks__kind-row > span { display: flex; flex-direction: column; }
-.plan-weeks__kind-row > span span { font-size: var(--text-xs); color: var(--text-muted); }
-
-.plan-weeks__pct {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-}
-
-.plan-weeks__pct select { width: auto; }
-.plan-weeks__rule { display: flex; flex-direction: column; gap: var(--space-2); }
-
-.plan-weeks__block {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4) 0;
-}
-
-.plan-weeks__block label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.plan-weeks__block select { width: auto; min-height: 36px; padding-block: 4px; font-size: var(--text-sm); }
+.plan__block-move { display: flex; justify-content: flex-end; padding: 0 var(--space-4); }
 
 .plan__week-debt {
   color: var(--warning-text);
@@ -230,6 +328,3 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
   .plan-weeks__week, .plan-weeks__bar span { transition: none; }
 }
 
-/* Шаблон программы (PlanEditor) */
-.plan-weeks__template { margin-bottom: var(--space-3); }
-.plan-edit__block .plan-weeks__block { padding: 0 0 var(--space-2); }

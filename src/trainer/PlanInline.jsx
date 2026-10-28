@@ -682,13 +682,21 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
 /**
  * «+» под последней тренировкой: из шаблонов тренировок или новая
  */
-export function AddBlock({ onAdd, busy }) {
+export function AddBlock({ onAdd, busy, label = '', primary = false }) {
   const [mode, setMode] = useState(''); // '' | 'menu' | 'templates'
   const templates = useData('library.templates', { kind: 'workout' }, [mode === 'templates']);
   const [loading, setLoading] = useState(0);
   // Меню и список шаблонов — под последней тренировкой, у нижнего края: на экран
   const ref = useReveal(mode && mode + (mode === 'templates' && !templates.loading ? ':ready' : ''));
   if (!mode) {
+    // С подписью — в разделе недели («+ Тренировка в неделю 2», FT-775), без — круглый «+»
+    if (label) {
+      return (
+        <button type="button" className={primary ? 'button button--primary' : 'wk__add'} disabled={busy} onClick={() => { setMode('menu'); haptic(); }}>
+          {primary ? label : '+ ' + label}
+        </button>
+      );
+    }
     return (
       <button type="button" className="plan-inline__plus" aria-label="Добавить тренировку" disabled={busy} onClick={() => { setMode('menu'); haptic(); }}>
         <IconPlus size={22} />

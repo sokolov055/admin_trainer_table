@@ -21,7 +21,8 @@ import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachinesEditor, MachineForm, AlternativesEditor, extrasHint } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
-import { programLength } from '../plan-weeks.js';
+import { programLength, monthWeeks, parseMonth, monthLabelOf, defaultHow, assignPreview, workoutsOf } from '../plan-weeks.js';
+import { WeekPreview } from '../client/PlanWeeks.jsx';
 import { TEMPLATE_GOALS, PLACES, minutesText, timesText } from '../client/programs-model.js';
 
 /**
@@ -576,30 +577,74 @@ function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onD
  * ========================================================================== */
 
 /**
- * Шаблон — клиенту: кому, в какой месяц и как.
+ * Шаблон — клиенту: в какой месяц и как клиент по нему пойдёт (FT-775,
+ * решения владельца 28.10.2026).
  *
- * «Заменить» — месяц становится шаблоном целиком; «Дописать» — тренировки
- * шаблона добавляются в конец месяца (так из шаблонов тренировок
- * собирается программа). В «было» у упражнений сервер кладёт последний
- * вес клиента — по нему программу и правят под человека.
+ * Шаблон без недель: «одна неделя по кругу» (все тренировки каждую неделю,
+ * умолчание при 2–4 тренировках), «разложить на недели» (по порядку
+ * поровну) или «просто списком» (как раньше; умолчание иначе) — с
+ * предпросмотром по циклам месяца. Шаблон по неделям: тот же, что в прошлом
+ * месяце, — «Продолжить» с недели, на которой тот кончился (подставляется
+ * само), или «Заново»; новый — с первой. «Дописать в месяц» — когда в месяце
+ * уже есть тренировки или назначается шаблон одной тренировки. В «было» у
+ * упражнений сервер кладёт последний вес клиента.
  */
-export function AssignForm({ template, clientRow, defaultMonth, onDone }) {
-  const [month, setMonth] = useState(defaultMonth || monthName());
+export function AssignForm({ template, clientRow, clientName = '', defaultMonth, onDone }) {
+  // Из пожелания клиента (Wishes.jsx) шаблон приходит без тренировок — дочитать
+  const [tpl, setTpl] = useState(template);
+  useEffect(() => {
+    if (template.blocks) { setTpl(template); return; }
+    let alive = true;
+    apiPublic('library.template.get', { id: template.id })
+      .then((t) => { if (alive) setTpl(t && t.template ? t.template : t); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [template]);
+  const blocks = (tpl && tpl.blocks) || [];
+  const weeks = programLength(blocks);
+
+  const thisMonth = monthName();
+  const nextMonth = nextMonthLabel(thisMonth);
+  const [month, setMonth] = useState(defaultMonth || thisMonth);
+  const [custom, setCustom] = useState(false);
+  const monthChips = [...new Set([defaultMonth, thisMonth, nextMonth].filter(Boolean))];
   const [mode, setMode] = useState(template.kind === 'workout' ? 'append' : 'replace');
-  // Программа по неделям (plan-weeks.js): с какой недели начать месяц.
-  // '' — само: тот же шаблон, что в прошлом месяце, продолжится по кругу
-  const [startWeek, setStartWeek] = useState('');
-  const weeks = programLength(template.blocks || []);
+  const [how, setHow] = useState(''); // '' — умолчание по шаблону (defaultHow)
+  const [length, setLength] = useState(2);
+  const [startWeek, setStartWeek] = useState(''); // '' — само (сервер: продолжить или с первой)
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
+
+  const label = month.trim();
+  const info = useData('plan.assign.info', { clientRow, month: label || '—', templateId: template.id }, [clientRow, label, template.id]);
+  const facts = info.data && info.data.month === label ? info.data : null;
+  const cycles = monthWeeks(label) || [];
+  const who = clientName || 'клиент';
+  // Родительный падеж месяца — по воскресенью первого цикла: оно всегда в этом месяце (правило четверга)
+  const gen = cycles.length ? cycles[0].monthGen : '';
+  const monthWord = label.split(' ')[0];
+
+  const howNow = how || defaultHow(blocks);
+  const prev = facts && facts.prev;
+  const same = !!(prev && prev.same);
+  const continueWeek = same ? prev.continueWeek : 1;
+  const chosenStart = startWeek === '' ? continueWeek : Number(startWeek);
+  const replacing = mode === 'replace';
+  const preview = replacing
+    ? assignPreview(weeks ? { blocks, month: label, startWeek: chosenStart } : { blocks, month: label, how: howNow, length })
+    : [];
 
   const apply = async () => {
     setBusy(true);
     setFailure(null);
     try {
-      await apiMutate('plan.fromTemplate', { clientRow, month: month.trim(), templateId: template.id, mode, ...(mode === 'replace' && startWeek ? { startWeek } : {}) });
+      await apiMutate('plan.fromTemplate', {
+        clientRow, month: label, templateId: template.id, mode,
+        ...(replacing && !weeks ? { how: howNow, ...(howNow === 'split' ? { length } : {}) } : {}),
+        ...(replacing && weeks > 1 && startWeek !== '' ? { startWeek: Number(startWeek) } : {}),
+      });
       haptic('success');
-      onDone(month.trim());
+      onDone(label);
     } catch (err) {
       setFailure(err);
     } finally {
@@ -607,43 +652,128 @@ export function AssignForm({ template, clientRow, defaultMonth, onDone }) {
     }
   };
 
+  // Линия недель: прошлый месяц и этот — какая неделя программы в каком цикле
+  const timeline = same && weeks > 1 && cycles.length ? (
+    <div className="wk-tl" aria-hidden="true">
+      <em>{prev.month.split(' ')[0].slice(0, 3).toLowerCase()}</em>
+      {Array.from({ length: prev.cycles }, (_, i) => ((prev.startWeek - 1 + i) % prev.length) + 1).map((w, i) => (
+        <i key={'p' + i} className={i === prev.cycles - 1 ? 'is-on' : ''}>{w}</i>
+      ))}
+      <em>{monthWord.slice(0, 3).toLowerCase()}</em>
+      {cycles.map((_, i) => <i key={'n' + i} className="is-next">{((chosenStart - 1 + i) % weeks) + 1}</i>)}
+    </div>
+  ) : null;
+
   return (
-    <div className="library__form">
-      <Field label="Месяц программы" inputMode="text" value={month} onChange={setMonth} hint="Как месяц называется у клиента; если его нет — он появится" />
-      <Segmented
-        items={[
-          { value: 'replace', label: 'Заменить месяц' },
-          { value: 'append', label: 'Дописать в месяц' },
-        ]}
-        value={mode}
-        onChange={setMode}
-        label="Как назначить"
-      />
-      <p className="small muted" style={{ margin: 0 }}>
-        {mode === 'replace'
-          ? 'Программа месяца станет этим шаблоном целиком.'
-          : 'Тренировки шаблона добавятся в конец месяца, остальное останется.'}
-        {' '}Прошлые веса клиента подставятся в «было».
-      </p>
-      {weeks > 1 && mode === 'replace' && (
-        <>
+    <div className="library__form wk-rows">
+      <div className="wk-rows__item">
+        <strong>Месяц</strong>
+        {custom
+          ? <Field label="Как месяц называется у клиента" inputMode="text" value={month} onChange={setMonth} hint="Нет такого — появится" />
+          : (
+            <Chips
+              items={[...monthChips.map((m) => ({ value: m, label: m })), { value: '__other', label: 'Другой…' }]}
+              value={month}
+              label="Месяц программы"
+              onChange={(v) => { if (v === '__other') { setCustom(true); setMonth(''); } else setMonth(v); haptic(); }}
+            />
+          )}
+        <span>
+          {cycles.length ? `Циклы ${gen} — с понедельника ${cycles[0].from} ${cycles[0].fromGen}. ` : label ? 'Месяц не по календарю — без циклов и оценок. ' : ''}
+          {facts ? (facts.count ? `${monthWord}: у клиента уже ${workoutsOf(facts.count)}.` : `${monthWord}: у клиента пока пусто.`) : ''}
+        </span>
+      </div>
+
+      {(template.kind === 'workout' || (facts && facts.count > 0)) && (
+        <div className="wk-rows__item">
+          <strong>Как назначить</strong>
           <Segmented
-            items={[{ value: '', label: 'Само' }, ...Array.from({ length: weeks }, (_, i) => ({ value: i + 1, label: String(i + 1) }))]}
-            value={startWeek}
-            onChange={setStartWeek}
-            label="Начать с недели"
+            items={[{ value: 'replace', label: 'Заменить месяц' }, { value: 'append', label: 'Дописать в месяц' }]}
+            value={mode}
+            onChange={(v) => { haptic(); setMode(v); }}
+            label="Как назначить"
           />
-          <p className="small muted" style={{ margin: 0 }}>
-            Начать с недели: «само» — тот же шаблон, что в прошлом месяце, продолжится с недели, на которой он кончился; новый — с первой.
-          </p>
-        </>
+          <span>{replacing ? 'Программа месяца станет этим шаблоном целиком.' : 'Тренировки шаблона добавятся в конец месяца, остальное останется.'}</span>
+        </div>
       )}
+
+      {replacing && !weeks && blocks.length > 0 && (
+        <div className="wk-rows__item">
+          <strong>Как {who} пойдёт по программе</strong>
+          <div className="wk-opts" role="radiogroup" aria-label="Как клиент пойдёт по программе">
+            {[
+              { value: 'cycle', title: 'Одна неделя по кругу', text: `Все ${workoutsOf(blocks.length)} — каждую неделю. За неделю — оценка «выполнена».` },
+              { value: 'split', title: 'Разложить на недели', text: 'Разные тренировки в разные недели — по порядку поровну. Потом можно перенести.' },
+              { value: 'list', title: 'Просто списком на месяц', text: `Как раньше: очередь из ${blocks.length} ${blocks.length % 10 === 1 && blocks.length % 100 !== 11 ? 'тренировки' : 'тренировок'}, без циклов и оценок.` },
+            ].map((o) => (
+              <button type="button" role="radio" aria-checked={howNow === o.value} className="wk-opt" key={o.value} onClick={() => { haptic(); setHow(o.value); }}>
+                <span className="wk-opt__mark" aria-hidden="true">{howNow === o.value && <IconCheck size={12} />}</span>
+                <span className="wk-opt__body">
+                  <strong>{o.title}</strong>
+                  <span>{o.text}</span>
+                  {o.value === 'split' && howNow === 'split' && (
+                    <Segmented items={[2, 3, 4].map((n) => ({ value: n, label: String(n) }))} value={length} label="На сколько недель" track onChange={(n) => { haptic(); setLength(n); }} />
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {replacing && weeks > 1 && (
+        <div className="wk-rows__item">
+          <strong>С какой недели начнёт</strong>
+          <span>
+            {same
+              ? `${prev.month.split(' ')[0]}: у клиента эта же программа, кончается на неделе ${((prev.startWeek - 1 + prev.cycles - 1) % prev.length) + 1} — ${monthWord.toLowerCase()} продолжит с недели ${continueWeek}.`
+              : 'Новая для клиента программа — с первой недели.'}
+          </span>
+          {timeline}
+          <Segmented
+            items={same
+              ? [{ value: '', label: `Продолжить · с ${continueWeek}-й` }, { value: 1, label: 'Заново · с 1-й' }]
+              : Array.from({ length: weeks }, (_, i) => ({ value: i === 0 ? '' : i + 1, label: `С ${i + 1}-й` }))}
+            value={startWeek}
+            onChange={(v) => { haptic(); setStartWeek(v); }}
+            label="С какой недели начнёт"
+            track
+          />
+        </div>
+      )}
+
+      {replacing && (weeks > 0 || howNow !== 'list') && preview.length > 0 && (
+        <WeekPreview rows={preview.map((c) => ({ key: c.n, label: `${c.from}–${c.to} ${c.monthGen.slice(0, 3)}`, titles: c.titles }))} />
+      )}
+      {replacing && !weeks && howNow === 'list' && blocks.length > 0 && (
+        <WeekPreview rows={[{ key: 'list', label: 'Очередь', titles: blocks.map((b) => b.title) }]} />
+      )}
+
+      {replacing && (weeks > 0 || howNow !== 'list') && (
+        <div className="wk-rows__item">
+          <strong>Пропущенные тренировки</strong>
+          <span>
+            {same ? `Как в прошлом месяце: ${RULE_WORD[prev.rule] || RULE_WORD.client}.` : `${RULE_WORD.client[0].toUpperCase() + RULE_WORD.client.slice(1)} — доделать или пропустить.`}
+            {' '}Поменять — в карточке клиента, «Настроить».
+          </span>
+        </div>
+      )}
+
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      <button className="button button--primary button--block" disabled={busy || !month.trim()} onClick={apply}>
-        {busy ? 'Назначаем…' : 'Назначить'}
+      <button className="button button--primary button--block" disabled={busy || !label} onClick={apply}>
+        {busy ? 'Назначаем…' : cycles.length ? `Назначить на ${monthWord.toLowerCase()}` : 'Назначить'}
       </button>
+      <p className="small muted" style={{ margin: 0, textAlign: 'center' }}>Прошлые веса клиента подставятся в «было»</p>
     </div>
   );
+}
+
+const RULE_WORD = { client: `решает клиент`, redo: 'доделывать', skip: 'пропускать' };
+
+/** «Октябрь 2026» → «Ноябрь 2026» */
+function nextMonthLabel(label) {
+  const p = parseMonth(label);
+  return p ? monthLabelOf(p.year, p.month + 1) : '';
 }
 
 function AssignToClient({ template, owner, onDone, onCancel }) {
@@ -676,7 +806,7 @@ function AssignToClient({ template, owner, onDone, onCancel }) {
       <Section title={client ? client.name : 'Кому назначить'} note={`«${template.title}»`}>
         {client ? (
           <Panel pad>
-            <AssignForm template={template} clientRow={client.row} onDone={(month) => setDone({ client, month })} />
+            <AssignForm template={template} clientRow={client.row} clientName={client.name.split(' ')[0]} onDone={(month) => setDone({ client, month })} />
           </Panel>
         ) : (
           <>

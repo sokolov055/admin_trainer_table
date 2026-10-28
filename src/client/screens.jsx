@@ -24,8 +24,8 @@ import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck,
 import { haptic } from '../telegram.js';
 import { captureScreen, useBackGesture } from '../gestures.jsx';
 import { supersets, blockSessions, pickBlock, doneLine, roundLine } from '../plan-model.js';
-import { weekPlan, weekQueue, monthWeeks, programLength, LOAD_LABEL } from '../plan-weeks.js';
-import { WeekStrip, WeekChoice, WeeksSettings, BlockWeek } from './PlanWeeks.jsx';
+import { weekPlan, weekQueue, monthWeeks, shownLength, resized, withWeekLoad, movedToWeek, copiedWeek, weekOrder } from '../plan-weeks.js';
+import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, MoveWeek } from './PlanWeeks.jsx';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
@@ -439,7 +439,13 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [weekSel, setWeekSel] = useState(null);
   const [weeksLocal, setWeeksLocal] = useState(null); // { month, weeks }
   const [choiceClosed, setChoiceClosed] = useState(false);
-  useEffect(() => { setWeekSel(null); setWeeksLocal(null); }, [month]);
+  // Неделя — раздел (FT-775): открытый лист («Разложить по неделям» /
+  // «Настроить»), выбранная длина больше той, что у тренировок (пустые недели)
+  const [weeksSheet, setWeeksSheet] = useState(''); // '' | 'spread' | 'settings'
+  const [lengthPick, setLengthPick] = useState(0);
+  const [weeksBusy, setWeeksBusy] = useState(false);
+  const [weeksFailure, setWeeksFailure] = useState('');
+  useEffect(() => { setWeekSel(null); setWeeksLocal(null); setWeeksSheet(''); setLengthPick(0); setWeeksFailure(''); }, [month]);
   useEffect(() => {
     setSelectingBlocks(false);
     setSelectedBlocks(new Set());
@@ -585,7 +591,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const weekIndex = wplan ? (weekSel !== null && weekSel < wplan.weeks.length ? weekSel : Math.max(0, wplan.currentIndex)) : -1;
   const week = wplan ? wplan.weeks[weekIndex] : null;
   const rowOf = new Map(week ? week.rows.map((r) => [r.block, r]) : []);
-  const programWeeks = programLength(shownBlocks);
+  const programWeeks = shownLength(shownBlocks, lengthPick);
+  // «Вся программа» по неделям — разделами (FT-775)
+  const grouped = planTab === 'all' && programWeeks > 0;
   const pastOf = new Map(shownBlocks.map((b) => [b, week ? (rowOf.has(b) ? rowOf.get(b).sessions : []) : blockSessions(sessions, b, data.month)]));
   const queueBlocks = week ? weekQueue(week).map((r) => r.block) : shownBlocks.filter((b) => !pastOf.get(b).length);
   // Долг прошлого месяца — тренировка той программы: своей строкой над очередью, не в правке
@@ -681,15 +689,43 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => push(list, seq), 700);
   };
+  // Настройка месяца по неделям (plan.weeks.save): правило, с какой недели начался
+  const saveMonthWeeks = async (patch) => {
+    setWeeksBusy(true);
+    setWeeksFailure('');
+    try {
+      const res = await apiMutate('plan.weeks.save', { clientRow, month: data.month, weeks: patch });
+      setWeeksLocal({ month: data.month, weeks: res.weeks });
+      reload();
+    } catch (error) {
+      setWeeksFailure(error.message || 'Не сохранилось');
+      throw error;
+    } finally {
+      setWeeksBusy(false);
+    }
+  };
+  // «Разложить по неделям» (FT-775): список становится программой по неделям —
+  // тренировки с неделями тем же снимком, правило и «с какой недели» — у месяца
+  const spreadWeeks = async ({ blocks: laid, rule, startWeek }) => {
+    commit(laid);
+    try {
+      await saveMonthWeeks({ rule, startWeek });
+      setWeeksSheet('');
+      setPlanTab('all');
+      haptic('success');
+    } catch (_) { /* ошибка показана в листе */ }
+  };
   const renameBlock = async (block, title) => {
     commit(shownBlocks.map((b) => (b === block ? { ...b, title } : b)));
   };
-  const newBlock = (made) => {
-    const list = [...shownBlocks, made || {
-      title: 'Тренировка № ' + (shownBlocks.length + 1),
-      // Программа по неделям — в неделю открытого цикла
-      ...(week ? { week: week.week } : {}),
-      exercises: [{ name: '', sets: '3', reps: '', weight: '', prevWeight: '', rpe: '', supersetGroup: '', performers: [], splitWeights: {}, splitPrev: {}, exerciseId: null, technique: '', cardio: null }],
+  const newBlock = (made, toWeek = 0) => {
+    const list = [...shownBlocks, {
+      ...(made || {
+        title: 'Тренировка № ' + (shownBlocks.length + 1),
+        exercises: [{ name: '', sets: '3', reps: '', weight: '', prevWeight: '', rpe: '', supersetGroup: '', performers: [], splitWeights: {}, splitPrev: {}, exerciseId: null, technique: '', cardio: null }],
+      }),
+      // Программа по неделям — в неделю раздела (FT-775), а из «Очереди» — открытого цикла
+      ...(toWeek ? { week: toWeek } : week ? { week: week.week } : {}),
     }];
     commit(list);
     const tab = planTab === 'done' ? 'queue' : planTab;
@@ -923,13 +959,31 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           месяцы над ним (DESIGN-APP §6, §10; аудит 24.10.2026) */}
       {/* Программа по неделям (IDEA-7): на сколько недель, пометки, правило */}
       {canEdit && shownBlocks.length > 0 && monthWeeks(data.month) && (
-        <WeeksSettings
-          clientRow={clientRow}
+        <MonthStatus
           month={data.month}
           blocks={shownBlocks}
-          weeks={weeksCfg}
-          onBlocks={(list) => commit(list)}
-          onSaved={(weeks) => { setWeeksLocal({ month: data.month, weeks }); reload(); }}
+          plan={wplan}
+          cfg={weeksCfg}
+          months={months}
+          onSpread={() => setWeeksSheet('spread')}
+          onSettings={() => setWeeksSheet('settings')}
+        />
+      )}
+      {weeksSheet === 'spread' && (
+        <SpreadSheet month={data.month} blocks={shownBlocks} cfg={weeksCfg} busy={weeksBusy} onClose={() => setWeeksSheet('')} onApply={spreadWeeks} />
+      )}
+      {weeksSheet === 'settings' && (
+        <WeeksSheet
+          month={data.month}
+          blocks={shownBlocks}
+          length={programWeeks}
+          cfg={weeksCfg}
+          busy={weeksBusy}
+          failure={weeksFailure}
+          onLength={(n) => { setLengthPick(n); commit(resized(shownBlocks, n)); if (!n) setWeeksSheet(''); }}
+          onLoad={(w, load) => commit(withWeekLoad(shownBlocks, w, load))}
+          onMonth={(patch) => saveMonthWeeks(patch).catch(() => {})}
+          onClose={() => setWeeksSheet('')}
         />
       )}
       {wplan && planTab !== 'done' && <WeekStrip plan={wplan} sel={weekIndex} onSelect={setWeekSel} />}
@@ -1045,7 +1099,76 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <MuscleSummary tally={tallyExercises(shownBlocks.flatMap((b) => b.exercises))} section="Мышцы программы" />
       )}
 
-      {(planTab === 'queue' || planTab === 'all') && <div className={'plan__blocks' + (selectingBlocks ? ' plan__blocks--selecting' : '')} ref={blocksRef}>{visibleBlocks.map((block, i, shownList) => {
+      {(planTab === 'queue' || planTab === 'all') && <div className={'plan__blocks' + (selectingBlocks ? ' plan__blocks--selecting' : '')} ref={blocksRef}>{grouped
+        ? (
+          <WeekSections
+            blocks={visibleBlocks}
+            length={programWeeks}
+            canEdit={canEdit && !selectingBlocks}
+            current={week ? week.week : 0}
+            disabled={saveState === 'saving'}
+            renderBlock={(block) => renderBlock(block)}
+            onLoad={(w, load) => commit(withWeekLoad(shownBlocks, w, load))}
+            onCopyWeek={(from, to) => commit(copiedWeek(shownBlocks, from, to))}
+            addSlot={(w, label) => (
+              <Deferred fallback={null} key={'add' + w}>
+                <AddBlock label={label} primary={label === 'Новая тренировка'} busy={saveState === 'saving'} onAdd={(made) => newBlock(made, w)} />
+              </Deferred>
+            )}
+          />
+        )
+        : visibleBlocks.map((block) => renderBlock(block))}</div>}
+
+      {selectingBlocks && selectedBlocks.size > 0 && (
+        <div className="plan__block-actions" role="toolbar" aria-label="Действия с выбранными тренировками">
+          <span>Выбрано: {selectedBlocks.size}</span>
+          <button type="button" className="button" onClick={() => copyBlocks([...selectedBlocks])}><IconCopy size={16} />Копировать</button>
+          {/* Удаление обратимо («Вернуть» ниже) — мягкая опасная .button.danger;
+              класса button--danger в стилях не было (аудит 24.10.2026) */}
+          <button type="button" className="button danger" disabled={shownBlocks.length - selectedBlocks.size < 1} onClick={() => removeBlocks([...selectedBlocks])}><IconTrash size={16} />Удалить</button>
+        </div>
+      )}
+
+      {/* «+» под последней тренировкой: из шаблонов тренировок или новая;
+          в разделах недель — свой «+» у каждой недели */}
+      {canEdit && (planTab === 'queue' || planTab === 'all') && shownBlocks.length > 0 && !grouped && (
+        <Deferred fallback={null}>
+          <AddBlock onAdd={newBlock} busy={saveState === 'saving'} />
+        </Deferred>
+      )}
+      {canEdit && planTab === 'all' && shownBlocks.length > 0 && !templateTool && (
+        <button className="button button--block plan__as-template" onClick={() => { setTemplateTool('save'); setSavedTemplate(false); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { /* старый браузер */ } }}>
+          Сохранить как шаблон
+        </button>
+      )}
+
+      {totalExercises > 0 && !familyRow && (
+        <p className="small muted" style={{ marginTop: 22, textAlign: 'center' }}>
+          Откройте тренировку, чтобы записывать подходы и рабочие веса
+        </p>
+      )}
+
+      {/* «Программы тренера» (FT-497) — перед пожеланием: выбрать готовую
+          и попросить тренера. Клиенту с тренером и тренеру «глазами
+          клиента»; без тренера, у семьи и в «Моих тренировках» — нет */}
+      {(!clientRow || clientView) && !familyRow && !data.self && (
+        <Deferred fallback={null}>
+          <ProgramsSection clientRow={clientRow} clientView={clientView} onOpenAll={() => { captureScreen(); setShowcase(true); }} />
+        </Deferred>
+      )}
+
+      {/* Пожелание тренеру своими словами (FT-498) — клиенту, в конце
+          программы: прочитал, что предстоит, — тут же можно попросить
+          поменять. В «глазами клиента» и у семьи — нет: писать за другого
+          нельзя */}
+      {!clientRow && !familyRow && !data.self && <Wishes />}
+      </>
+    </>
+  );
+
+  // Одна тренировка программы — в «Очереди» и во «Всей программе». Функция
+  // объявлена после return, чтобы видеть всё состояние экрана
+  function renderBlock(block) {
         const past = pastOf.get(block) || [];
         const bi = shownBlocks.indexOf(block);
         const editHere = canEdit && !made0(planTab);
@@ -1097,17 +1220,22 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           data-done={past.length ? '' : undefined}
           onPointerDown={canEdit && !selectingBlocks && !past.length ? (e) => {
             if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select')) return;
-            const movable = shownList.filter((b) => !(pastOf.get(b) || []).length);
+            // В разделах недель порядок экрана — по неделям: перетащенная в
+            // другую неделю тренировка получает неделю соседа (FT-775)
+            const displayed = grouped ? weekOrder(shownBlocks, programWeeks) : shownBlocks;
+            const movable = displayed.filter((b) => !(pastOf.get(b) || []).length);
             holdToReorder(e, {
               row: e.currentTarget.closest('.plan__block-swipe') || e.currentTarget,
-              rows: () => (blocksRef.current ? [...blocksRef.current.querySelectorAll(':scope > [data-block]:not([data-done])')] : []),
+              rows: () => (blocksRef.current ? [...blocksRef.current.querySelectorAll('[data-block]:not([data-done])')] : []),
               onDrop: (from, to) => {
                 // Переставили среди оставшихся — в месяце они занимают те же места
                 const order = [...movable];
+                const neighbour = order[to];
                 const [moved] = order.splice(from, 1);
-                order.splice(to, 0, moved);
-                const slots = shownBlocks.map((b, k) => (movable.includes(b) ? k : -1)).filter((k) => k >= 0);
-                const next = [...shownBlocks];
+                const placed = grouped && neighbour && neighbour !== moved ? movedToWeek([moved], moved, neighbour.week || 1)[0] : moved;
+                order.splice(to, 0, placed);
+                const slots = displayed.map((b, k) => (movable.includes(b) ? k : -1)).filter((k) => k >= 0);
+                const next = [...displayed];
                 slots.forEach((at, k) => { next[at] = order[k]; });
                 commit(next);
                 setOpenBlocks({});
@@ -1128,8 +1256,6 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             {shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
             {/* Программа по неделям: неделя во «Всей программе», пометка,
                 пропуск прошедшего цикла и долг прошлого — словами */}
-            {programWeeks > 1 && planTab === 'all' && ' · неделя ' + (block.week || 1)}
-            {block.load && ' · ' + LOAD_LABEL[block.load].toLowerCase()}
             {week && planTab === 'queue' && rowOf.get(block) && (rowOf.get(block).missed
               ? <span className="plan__week-debt"> · не выполнена</span>
               : rowOf.get(block).carried && rowOf.get(block).done === 0
@@ -1138,9 +1264,11 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           </>}
         >
           <Panel>
-            {/* Тренер: неделя программы и нагрузка этой тренировки */}
-            {canEdit && programWeeks > 0 && !selectingBlocks && (
-              <BlockWeek block={block} length={programWeeks} onChange={(next) => commit(shownBlocks.map((b) => (b === block ? next : b)))} />
+            {/* Тренер, «Вся программа» по неделям: перенести в другую неделю (FT-775) */}
+            {canEdit && grouped && programWeeks > 1 && !selectingBlocks && (
+              <div className="plan__block-move">
+                <MoveWeek block={block} length={programWeeks} onMove={(w) => commit(movedToWeek(shownBlocks, block, w))} />
+              </div>
             )}
             {/* Какие мышцы в работе (FT-491) — по программе тренировки:
                 с первого взгляда ясно, что за день */}
@@ -1228,53 +1356,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </div>
         </PlanBlockSwipe>
         );
-      })}</div>}
-
-      {selectingBlocks && selectedBlocks.size > 0 && (
-        <div className="plan__block-actions" role="toolbar" aria-label="Действия с выбранными тренировками">
-          <span>Выбрано: {selectedBlocks.size}</span>
-          <button type="button" className="button" onClick={() => copyBlocks([...selectedBlocks])}><IconCopy size={16} />Копировать</button>
-          {/* Удаление обратимо («Вернуть» ниже) — мягкая опасная .button.danger;
-              класса button--danger в стилях не было (аудит 24.10.2026) */}
-          <button type="button" className="button danger" disabled={shownBlocks.length - selectedBlocks.size < 1} onClick={() => removeBlocks([...selectedBlocks])}><IconTrash size={16} />Удалить</button>
-        </div>
-      )}
-
-      {/* «+» под последней тренировкой: из шаблонов тренировок или новая */}
-      {canEdit && (planTab === 'queue' || planTab === 'all') && shownBlocks.length > 0 && (
-        <Deferred fallback={null}>
-          <AddBlock onAdd={newBlock} busy={saveState === 'saving'} />
-        </Deferred>
-      )}
-      {canEdit && planTab === 'all' && shownBlocks.length > 0 && !templateTool && (
-        <button className="button button--block plan__as-template" onClick={() => { setTemplateTool('save'); setSavedTemplate(false); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { /* старый браузер */ } }}>
-          Сохранить как шаблон
-        </button>
-      )}
-
-      {totalExercises > 0 && !familyRow && (
-        <p className="small muted" style={{ marginTop: 22, textAlign: 'center' }}>
-          Откройте тренировку, чтобы записывать подходы и рабочие веса
-        </p>
-      )}
-
-      {/* «Программы тренера» (FT-497) — перед пожеланием: выбрать готовую
-          и попросить тренера. Клиенту с тренером и тренеру «глазами
-          клиента»; без тренера, у семьи и в «Моих тренировках» — нет */}
-      {(!clientRow || clientView) && !familyRow && !data.self && (
-        <Deferred fallback={null}>
-          <ProgramsSection clientRow={clientRow} clientView={clientView} onOpenAll={() => { captureScreen(); setShowcase(true); }} />
-        </Deferred>
-      )}
-
-      {/* Пожелание тренеру своими словами (FT-498) — клиенту, в конце
-          программы: прочитал, что предстоит, — тут же можно попросить
-          поменять. В «глазами клиента» и у семьи — нет: писать за другого
-          нельзя */}
-      {!clientRow && !familyRow && !data.self && <Wishes />}
-      </>
-    </>
-  );
+  }
 }
 
 /** Правка в развёрнутой тренировке — во «Очереди» и во «Всей программе» */

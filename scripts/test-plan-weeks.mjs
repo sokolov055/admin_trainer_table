@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { monthWeeks, weekDates, weekPlan, weekQueue, programLength, withLength, weekLoad, cycleMonthOf, startWeekOf } from '../src/plan-weeks.js';
+import {
+  monthWeeks, weekDates, weekPlan, weekQueue, programLength, withLength, weekLoad, cycleMonthOf, startWeekOf,
+  byWeek, shownLength, weekOrder, resized, withWeekLoad, movedToWeek, copiedWeek, defaultHow, assignPreview, lengthHint,
+} from '../src/plan-weeks.js';
 
 /**
  * Программа по неделям (IDEA-7, 27–28.10.2026): программа на 1–4 недели
@@ -23,6 +26,7 @@ const done = (block, day) => doneAt(block, `2026-11-${day}`);
 const cfg = (extra = {}) => ({ rule: 'client', startWeek: 1, choices: {}, ...extra });
 const at = (day) => new Date(`2026-11-${day}T12:00:00`);
 const titles = (rows) => rows.map((r) => r.block.title);
+const titles2 = (list) => list.map((x) => x.title);
 
 test('ноябрь 2026: четыре целых цикла 2–29 ноября; 1 ноября — октябрь, 30 ноября — декабрь', () => {
   assert.deepEqual(monthWeeks(MONTH).map(weekDates), ['2–8 ноября', '9–15 ноября', '16–22 ноября', '23–29 ноября']);
@@ -148,4 +152,62 @@ test('длина программы: по кругу при сокращении
   assert.equal(programLength(withLength(twelve, 4)), 4);
   assert.equal(programLength(withLength(PROGRAM, 4)), 4);
   assert.equal(weekLoad([A, b('x', 'Х', 1, 'heavy')], 1), '');
+});
+
+/* Неделя — раздел (FT-775, 28.10.2026): правила редактора, листа «Разложить» и формы «Назначить» */
+
+test('разделы недель: тренировки по неделям, порядок экрана — по неделям', () => {
+  const mixed = [C, A, D, B];
+  assert.deepEqual(byWeek(mixed, 2).map((g) => [g.week, titles2(g.blocks)]), [[1, ['А', 'Б']], [2, ['В', 'Г']]]);
+  // Выбранная длина больше — пустые недели на экране, у тренировок — как было
+  assert.equal(shownLength(PROGRAM, 4), 4);
+  assert.equal(shownLength(PROGRAM, 1), 2);
+  assert.deepEqual(byWeek(PROGRAM, 3)[2].blocks, []);
+  assert.deepEqual(titles2(weekOrder(mixed, 2)), ['А', 'Б', 'В', 'Г']);
+  assert.deepEqual(weekOrder(mixed, 0), mixed);
+});
+
+test('длина с экрана: больше — тренировки не двигаются, меньше — по кругу, список — разложить поровну, 0 — снять', () => {
+  assert.deepEqual(resized(PROGRAM, 4), PROGRAM);
+  assert.deepEqual(resized(PROGRAM, 1).map((x) => x.week), [1, 1, 1, 1]);
+  const list = [b('x', 'Х'), b('y', 'У'), b('z', 'Ж')];
+  assert.deepEqual(resized(list, 2).map((x) => x.week), [1, 2, 2]);
+  assert.deepEqual(resized(list, 1).map((x) => x.week), [1, 1, 1]);
+  assert.deepEqual(resized(PROGRAM, 0).map((x) => 'week' in x), [false, false, false, false]);
+});
+
+test('нагрузка — у недели целиком; перенос берёт нагрузку новой недели; копия недели — новыми тренировками', () => {
+  const heavy = withWeekLoad(PROGRAM, 1, 'heavy');
+  assert.deepEqual(heavy.map((x) => x.load || ''), ['heavy', 'heavy', 'light', 'light']);
+  assert.equal(weekLoad(heavy, 1), 'heavy');
+  assert.deepEqual(withWeekLoad(heavy, 2, '').map((x) => 'load' in x), [true, true, false, false]);
+  const moved = movedToWeek(PROGRAM, A, 2);
+  assert.deepEqual(moved.map((x) => [x.week, x.load || '']), [[2, 'light'], [1, ''], [2, 'light'], [2, 'light']]);
+  assert.equal(moved[0].id, A.id);
+  const copied = copiedWeek([A, B], 1, 2);
+  assert.equal(copied.length, 4);
+  assert.deepEqual(copied.slice(2).map((x) => [x.title, x.week, 'id' in x]), [['А', 2, false], ['Б', 2, false]]);
+  assert.notEqual(copied[2].exercises, A.exercises);
+});
+
+test('назначить список: умолчание — по кругу при 2–4 тренировках; предпросмотр по циклам', () => {
+  const three = [b('x', 'Верх'), b('y', 'Низ'), b('z', 'Всё')];
+  assert.equal(defaultHow(three), 'cycle');
+  assert.equal(defaultHow([three[0]]), 'list');
+  assert.equal(defaultHow([...three, ...three]), 'list');
+  // Ноябрь 2026 — 4 цикла; по кругу: все три в каждом
+  const cycle = assignPreview({ blocks: three, month: MONTH, how: 'cycle' });
+  assert.equal(cycle.length, 4);
+  assert.deepEqual(cycle.map((c) => [c.week, c.titles.length]), [[1, 3], [1, 3], [1, 3], [1, 3]]);
+  // Разложить на 2: Верх | Низ, Всё — по кругу
+  const split = assignPreview({ blocks: three, month: MONTH, how: 'split', length: 2 });
+  assert.deepEqual(split.map((c) => c.titles), [['Верх'], ['Низ', 'Всё'], ['Верх'], ['Низ', 'Всё']]);
+  assert.deepEqual(assignPreview({ blocks: three, month: MONTH, how: 'list' }), []);
+  // Шаблон по неделям: продолжить со 2-й
+  assert.deepEqual(assignPreview({ blocks: PROGRAM, month: MONTH, startWeek: 2 }).map((c) => c.week), [2, 1, 2, 1]);
+  assert.deepEqual(assignPreview({ blocks: three, month: 'Разминка', how: 'cycle' }), []);
+  assert.match(lengthHint(0), /списком/);
+  assert.match(lengthHint(1, { count: 3 }), /Все 3 тренировки — каждую неделю/);
+  assert.match(lengthHint(2, { cycles: 4 }), /Две разные недели.*4 цикла/);
+  assert.match(lengthHint(4, { cycles: 4 }), /каждую неделю по разу/);
 });

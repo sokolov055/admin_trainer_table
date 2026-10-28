@@ -269,6 +269,7 @@ export function weekQueue(cycle) {
  * Программа на n недель: 0 — снять недели, программа на месяц. Длиннее, чем
  * сейчас, — тренировки по порядку поровну на n недель (12 на 4 — по 3), иначе
  * длина не вырастет: она — самая большая неделя. Короче — по кругу.
+ * «Разложить по неделям» (FT-775) и «Назначить» делают именно это
  */
 export function withLength(blocks, n) {
   const list = blocks || [];
@@ -279,4 +280,125 @@ export function withLength(blocks, n) {
     return list.map((b) => ({ ...b, week: week.get(b) }));
   }
   return list.map((b) => ({ ...b, week: ((weekOf(b) - 1) % n) + 1 }));
+}
+
+/**
+ * Неделя — раздел (FT-775, решение владельца 28.10.2026): тренировки лежат
+ * под заголовками недель, а не носят номер недели полем. Правила ниже —
+ * для редактора шаблона и программы клиента.
+ */
+
+/**
+ * Длина программы в редакторе: выбранная тренером (lengthPick) может быть
+ * больше той, что у тренировок, — новые недели пустые, тренировки не двигаются
+ * (так тренер добавляет неделю, не ломая первые). Сохраняется только то, что
+ * у тренировок: пустая последняя неделя при сохранении исчезает
+ */
+export function shownLength(blocks, lengthPick) {
+  return Math.max(programLength(blocks), Math.floor(Number(lengthPick)) || 0);
+}
+
+/**
+ * Сменить длину с экрана: больше — новые недели пустые (тренировки не
+ * двигаются, нужен lengthPick); из списка — разложить по порядку поровну;
+ * меньше — лишние недели сливаются в первые по кругу; 0 — список
+ */
+export function resized(blocks, n) {
+  const length = programLength(blocks);
+  if (!n || !length) return withLength(blocks, n);
+  if (n >= length) return blocks;
+  return withLength(blocks, n);
+}
+
+/** Тренировки по неделям: [{ week, blocks }] на все недели 1..length, порядок — как в программе */
+export function byWeek(blocks, length) {
+  const list = blocks || [];
+  return Array.from({ length }, (_, i) => ({ week: i + 1, blocks: list.filter((b) => weekOf(b) === i + 1) }));
+}
+
+/** Порядок экрана: по неделям, внутри недели — как в программе */
+export function weekOrder(blocks, length) {
+  return length ? byWeek(blocks, length).flatMap((w) => w.blocks) : (blocks || []);
+}
+
+/** Пометка недели целиком (решение 28.10.2026: нагрузка — у недели, не у тренировки) */
+export function withWeekLoad(blocks, week, load) {
+  return (blocks || []).map((b) => {
+    if (weekOf(b) !== week) return b;
+    const { load: _drop, ...rest } = b;
+    return load ? { ...rest, load } : rest;
+  });
+}
+
+/** Перенести тренировку в другую неделю: пометка — новой недели */
+export function movedToWeek(blocks, block, week) {
+  const load = weekLoad(blocks, week);
+  return (blocks || []).map((b) => {
+    if (b !== block) return b;
+    const { load: _drop, ...rest } = b;
+    return { ...rest, week, ...(load ? { load } : {}) };
+  });
+}
+
+/**
+ * Скопировать неделю from в пустую неделю to: те же тренировки новыми
+ * (без id и занятий), пометка — недели to. Названия те же — тренер поправит
+ */
+export function copiedWeek(blocks, from, to) {
+  const list = blocks || [];
+  const load = weekLoad(list, to);
+  const copies = list.filter((b) => weekOf(b) === from).map(({ id: _id, load: _load, ...b }) => ({
+    ...b, week: to, ...(load ? { load } : {}),
+    exercises: (b.exercises || []).map((e) => ({ ...e })),
+  }));
+  return [...list, ...copies];
+}
+
+/** Одной фразой, что получит клиент при такой длине (редактор, лист «Настроить», форма «Назначить») */
+export function lengthHint(length, { cycles = 0, count = 0 } = {}) {
+  if (!length) return 'Тренировки идут списком, по очереди на месяц: без циклов и оценок, как раньше.';
+  if (length === 1) return (count ? `Все ${workoutsOf(count)} — ` : 'Все тренировки — ') + 'каждую неделю, до конца месяца. За каждую неделю клиенту оценка «выполнена».';
+  const n = ['', 'Одна', 'Две', 'Три', 'Четыре', 'Пять', 'Шесть', 'Семь', 'Восемь'][length] || String(length);
+  const loop = length === 2 ? 'неделю 1, потом неделю 2, потом снова 1' : `неделю 1, потом 2… до ${length}-й и снова 1`;
+  const tail = cycles ? (cycles === length ? ` В этом месяце ${cycles} цикла — каждую неделю по разу.` : ` В этом месяце ${cycles} ${cyclesOf(cycles)}.`) : '';
+  return `${n} разные недели. Клиент делает ${loop} — до конца месяца. За каждую неделю — оценка «выполнена».${tail}`;
+}
+
+const pluralOf = (n, one, few, many) => {
+  const a = n % 10;
+  const b = n % 100;
+  if (a === 1 && b !== 11) return one;
+  if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
+  return many;
+};
+export const workoutsOf = (n) => n + ' ' + pluralOf(n, 'тренировка', 'тренировки', 'тренировок');
+const cyclesOf = (n) => pluralOf(n, 'цикл', 'цикла', 'циклов');
+
+/** Как клиент пойдёт по шаблону без недель (форма «Назначить», FT-775) */
+export const ASSIGN_HOWS = ['cycle', 'split', 'list'];
+
+/**
+ * Умолчание при назначении списка (решение владельца 28.10.2026): 2–4
+ * тренировки — это обычная неделя, по кругу; иначе — списком
+ */
+export function defaultHow(blocks) {
+  const n = (blocks || []).length;
+  return n >= 2 && n <= 4 ? 'cycle' : 'list';
+}
+
+/**
+ * Предпросмотр назначения: что клиент получит в каждом цикле месяца.
+ * [{ n, from, to, monthGen, week, titles }]; без недель (списком) — []
+ */
+export function assignPreview({ blocks, month, how = '', length = 0, startWeek = 1 }) {
+  const cycles = monthWeeks(month);
+  if (!cycles) return [];
+  const list = how === 'cycle' ? withLength(blocks, 1) : how === 'split' ? withLength(blocks, length) : how === 'list' ? [] : (blocks || []);
+  const n = programLength(list);
+  if (!n) return [];
+  const start = startWeekOf({ startWeek }, n);
+  return cycles.map((c, i) => {
+    const week = ((start - 1 + i) % n) + 1;
+    return { ...c, week, titles: list.filter((b) => weekOf(b) === week).map((b) => b.title) };
+  });
 }
