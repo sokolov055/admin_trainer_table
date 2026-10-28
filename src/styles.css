@@ -3452,6 +3452,25 @@ code {
   color: var(--info-text);
 }
 
+.note--warning {
+  background: var(--warning-fill);
+  border-color: var(--warning-line, var(--border));
+  color: var(--warning-text);
+}
+
+/* Имя клиента в напоминании «Без программы на декабрь» — ссылкой в карточку */
+.note__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  min-height: 0;
+}
+
 /* ==========================================================================
    Питание
    ========================================================================== */

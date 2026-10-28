@@ -18,14 +18,19 @@ const html = readFileSync('index.html', 'utf8')
   .replace(/<script type="module"[^>]*><\/script>/, '');
 const URL_ = 'https://app.test/';
 
-async function open(browser, { native = false, appAt = 300, reduced = false, holdFrames = false } = {}) {
+async function open(browser, { native = false, home = false, appAt = 300, reduced = false, holdFrames = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference' });
   await ctx.route(URL_ + '**', (route) => route.fulfill({ body: html, contentType: 'text/html' }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript(([native, appAt, holdFrames]) => {
+  await page.addInitScript(([native, home, appAt, holdFrames]) => {
     window.__hides = [];
+    // iPhone с экрана «Домой»: окно 844 при экране 900 — как на первых кадрах запуска
+    if (home) {
+      Object.defineProperty(navigator, 'standalone', { get: () => true });
+      Object.defineProperty(screen, 'height', { get: () => 900 });
+    }
     if (native) {
       window.Capacitor = {
         isNativePlatform: () => true,
@@ -45,7 +50,7 @@ async function open(browser, { native = false, appAt = 300, reduced = false, hol
         document.getElementById('root').innerHTML = '<div class="app"><main class="app__body"><h1>Обзор</h1></main></div>';
       }, appAt));
     }
-  }, [native, appAt, holdFrames]);
+  }, [native, home, appAt, holdFrames]);
   await page.goto(URL_);
   return { ctx, page, errors };
 }
@@ -87,6 +92,10 @@ test('в приложении: первый кадр — знак в центр�
     assert.ok(Math.abs(first.box.bottom - first.box.top - 111.3) < 0.6, 'высота знака ' + (first.box.bottom - first.box.top));
     assert.ok(Math.abs((first.box.left + first.box.right) / 2 - 195) < 0.6, 'знак по центру по горизонтали');
     assert.ok(Math.abs((first.box.top + first.box.bottom) / 2 - 422) < 0.6, 'знак по центру по вертикали');
+    // Страница под заставкой — её цвета: на iPhone с экрана «Домой» окно на
+    // старте короче экрана, и снизу просвечивал бы фон темы (28.10.2026)
+    const pageBg = () => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+    assert.equal(await pageBg(), 'rgb(35, 39, 38)', 'фон страницы под заставкой');
     // Отпускаем кадры, пока нативную не снимут (кадр в кадре — второй
     // встаёт в очередь только после первого). Опрос по таймеру: свои кадры здесь подменены
     await page.waitForFunction(() => { window.__flush(); return window.__hides.length === 1; }, null, { polling: 50 });
@@ -98,6 +107,7 @@ test('в приложении: первый кадр — знак в центр�
     assert.equal((await splashState(page)).present, true, 'не раньше конца анимации, хотя экран готов');
     await page.waitForFunction(() => !document.getElementById('splash'), null, { timeout: 2500, polling: 50 });
     assert.equal((await splashState(page)).on, false);
+    assert.equal(await pageBg(), 'rgba(0, 0, 0, 0)', 'после заставки фон страницы снова свой');
     assert.deepEqual(errors, []);
 
     // Перезагрузка — заставки нет
@@ -121,6 +131,27 @@ test('готовая гантель с названием помещается �
     // Гантель и название вместе — посередине экрана
     assert.ok(Math.abs((box.top + box.bottom) / 2 - 422) < 8, 'по высоте ' + JSON.stringify(box));
   } finally { await browser.close(); }
+});
+
+test('iPhone с экрана «Домой»: знак по центру экрана, а не короткого окна — без прыжка', async () => {
+  const browser = await chromium.launch();
+  try {
+    const { page, errors } = await open(browser, { home: true, holdFrames: true });
+    assert.equal((await splashState(page)).present, true, 'на установленном сайте заставка есть');
+    // Первый кадр: окно 844, экран 900 — знак на 450, как на картинке запуска
+    const mid = await page.evaluate(() => {
+      const rects = [...document.querySelectorAll('.splash__plate > rect:first-child')].map((r) => r.getBoundingClientRect());
+      return (Math.min(...rects.map((r) => r.top)) + Math.max(...rects.map((r) => r.bottom))) / 2;
+    });
+    assert.ok(Math.abs(mid - 450) < 0.6, 'знак по центру экрана: ' + mid);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.splash__word')).top), '515px', 'название — от той же середины');
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});
+
+test('iOS 26: корень страницы не ниже экрана, чтобы окно дали целиком (WebKit 301108)', () => {
+  // Браузер в тесте режим «с экрана „Домой“» не изображает — правило проверяется по тексту
+  assert.match(html, /@media \(display-mode: standalone\) \{\s*html \{ min-height: min\(100lvh, calc\(100% \+ env\(safe-area-inset-top, 0px\)\)\); \}/);
 });
 
 test('экран не готов — заставка ждёт, но не дольше 4 с; касание пропускает', async () => {

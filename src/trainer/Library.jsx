@@ -21,6 +21,7 @@ import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachinesEditor, MachineForm, AlternativesEditor, extrasHint } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
+import { programLength } from '../plan-weeks.js';
 import { TEMPLATE_GOALS, PLACES, minutesText, timesText } from '../client/programs-model.js';
 
 /**
@@ -585,6 +586,10 @@ function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onD
 export function AssignForm({ template, clientRow, defaultMonth, onDone }) {
   const [month, setMonth] = useState(defaultMonth || monthName());
   const [mode, setMode] = useState(template.kind === 'workout' ? 'append' : 'replace');
+  // Программа по неделям (plan-weeks.js): с какой недели начать месяц.
+  // '' — само: тот же шаблон, что в прошлом месяце, продолжится по кругу
+  const [startWeek, setStartWeek] = useState('');
+  const weeks = programLength(template.blocks || []);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
 
@@ -592,7 +597,7 @@ export function AssignForm({ template, clientRow, defaultMonth, onDone }) {
     setBusy(true);
     setFailure(null);
     try {
-      await apiMutate('plan.fromTemplate', { clientRow, month: month.trim(), templateId: template.id, mode });
+      await apiMutate('plan.fromTemplate', { clientRow, month: month.trim(), templateId: template.id, mode, ...(mode === 'replace' && startWeek ? { startWeek } : {}) });
       haptic('success');
       onDone(month.trim());
     } catch (err) {
@@ -620,6 +625,19 @@ export function AssignForm({ template, clientRow, defaultMonth, onDone }) {
           : 'Тренировки шаблона добавятся в конец месяца, остальное останется.'}
         {' '}Прошлые веса клиента подставятся в «было».
       </p>
+      {weeks > 1 && mode === 'replace' && (
+        <>
+          <Segmented
+            items={[{ value: '', label: 'Само' }, ...Array.from({ length: weeks }, (_, i) => ({ value: i + 1, label: String(i + 1) }))]}
+            value={startWeek}
+            onChange={setStartWeek}
+            label="Начать с недели"
+          />
+          <p className="small muted" style={{ margin: 0 }}>
+            Начать с недели: «само» — тот же шаблон, что в прошлом месяце, продолжится с недели, на которой он кончился; новый — с первой.
+          </p>
+        </>
+      )}
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       <button className="button button--primary button--block" disabled={busy || !month.trim()} onClick={apply}>
         {busy ? 'Назначаем…' : 'Назначить'}
