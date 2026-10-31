@@ -6581,7 +6581,11 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
    правку, как схема: пунктир под ним; крестики подходов — зона касания 36 px;
    кнопки панели одной высоты */
 .plan-inline__name { text-decoration: underline dotted var(--text-muted); text-underline-offset: 4px; text-decoration-thickness: 1px; }
-.plan-inline__set-x::before { inset: -8px; }
+/* Запас нажатия растёт вверх и вправо, а не вниз (FT-761): накладка во все
+   стороны накрывала середину кружка подхода, и тап по подходу (сменить тип)
+   перехватывал крестик удаления — подход не выбирался. Низ накладки на 2 px
+   ниже значка: середина 40-пиксельного подхода свободна */
+.plan-inline__set-x::before { inset: -8px -8px -2px -2px; }
 .plan-inline__rounds-col .plan-inline__set-x::before { inset: -11px; }
 .plan-inline__panel-actions .button, .plan-inline__round-done, .plan-inline__set-add .button, .plan-inline__group-actions .button, .plan-inline__set-kind .button { min-height: 40px; }
 

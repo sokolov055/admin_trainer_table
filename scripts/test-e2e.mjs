@@ -1205,8 +1205,12 @@ test('мои тренировки: программа, прогресс, пит�
     await scheme.click();
     await firstBlock.getByRole('button', { name: 'Разминочный в начало' }).click();
     await assert.doesNotReject(firstBlock.locator('.plan-inline__scheme strong', { hasText: '1 разм. +' }).first().waitFor({ timeout: 5000 }), 'разминка в схеме');
+    // FT-761: крестик удаления не должен накрывать середину подхода — иначе
+    // тап по подходу попадает в него и удаляет подход вместо выбора
+    const setsBefore = await firstBlock.locator('.plan-inline__set').count();
     await firstBlock.locator('.plan-inline__set').first().click();
     await firstBlock.getByRole('button', { name: 'Удалить выбранный подход' }).waitFor({ timeout: 5000 });
+    assert.equal(await firstBlock.locator('.plan-inline__set').count(), setsBefore, 'тап по подходу выбирает его, а не удаляет');
     if (process.env.SHOT_INLINE) await phone.screenshot({ path: process.env.SHOT_INLINE });
     await firstBlock.getByRole('button', { name: 'Готово' }).click();
 
