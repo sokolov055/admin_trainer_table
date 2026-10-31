@@ -490,15 +490,24 @@ test('суперсет показан одной группой с числом 
  * А2 (24.10.2026) — кнопкой «Техника», текст — листом снизу. Своя настройка
  * клиента — на виду, плашкой в карточке.
  */
-test('в активной тренировке один раздел: настройка, техника, мышцы', async () => {
-  await section('Тренировка 2 — низ').getByRole('button', { name: 'Начать тренировку' }).click();
+test('в активной тренировке один раздел: настройка, техника, мышцы', async (t) => {
+  // Своя сессия: ошибка справки не оставляет занятие открытым для следующих тестов.
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  t.after(() => context.close());
+  const page = await context.newPage();
+  page.on('pageerror', error => consoleErrors.push(String(error)));
+  await page.goto(origin);
+  await page.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+  await page.reload();
+  await page.getByRole('button', { name: 'Тренировки', exact: true }).click();
+  await page.locator('.section', { has: page.getByRole('heading', { name: 'Тренировка 2 — низ' }) }).getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('heading', { name: 'Тренировка 2 — низ' }).first().waitFor({ timeout: 20000 });
 
   const squat = page.locator('.workout__exercise').filter({ hasText: 'Присед со штангой' });
   const chip = squat.locator('.workout__about');
   await chip.first().waitFor({ timeout: 10000 });
   assert.equal(await chip.count(), 1, 'справка — одной кнопкой');
-  await squat.getByText('Крюки на 4-й, упоры на 2-й').waitFor({ timeout: 5000 });
+  await squat.getByRole('button', { name: /Крюки на 4-й · Упоры на 2-й/ }).waitFor({ timeout: 5000 });
   await chip.first().click();
   const about = page.locator('.guide-sheet');
   // А3 (24.10.2026): в «Технике» — анимация, схема мышц и шаги; тренажёр и
@@ -511,12 +520,12 @@ test('в активной тренировке один раздел: настр
   await page.keyboard.press('Escape');
   await about.waitFor({ state: 'detached', timeout: 5000 });
   await squat.locator('.workout__machine-btn').click();
-  await about.getByRole('heading', { name: 'Как настроить', exact: true }).waitFor({ timeout: 5000 });
+  await about.getByRole('heading', { name: 'Тренажёр', exact: true }).waitFor({ timeout: 5000 });
   const machine = await about.evaluate((d) => d.textContent);
   assert.ok(machine.includes('Силовая рама у окна') && machine.includes('Крюки на 4-й, упоры на 2-й'), 'тренажёр, фото и настройка клиента');
   await page.keyboard.press('Escape');
   await about.waitFor({ state: 'detached', timeout: 5000 });
-  assert.equal(await squat.getByText('Крюки на 4-й, упоры на 2-й').isVisible(), true, 'своя настройка на виду');
+  assert.equal(await squat.getByRole('button', { name: /Крюки на 4-й · Упоры на 2-й/ }).isVisible(), true, 'своя настройка на виду');
 
   await page.getByRole('button', { name: 'Ещё', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Отменить занятие' }).click();
@@ -1079,7 +1088,9 @@ test('FT-567: видимый «назад» и Back браузера на экр
 
     // Рацион: Back браузера (как жест и системный Back) — на шаг, как кнопка
     await openTabOn(phone, 'Питание');
-    // Рацион открывается после нормы — в демо её сначала посчитать
+    // Анкета теперь в «Ещё», дневник остаётся отдельной вкладкой (FT-744).
+    await phone.getByRole('tab', { name: 'Ещё', exact: true }).click();
+    await phone.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
     await phone.getByPlaceholder('лет').fill('31');
     await phone.getByPlaceholder('кг').first().fill('64');
     await phone.getByPlaceholder('см').fill('168');
@@ -1088,7 +1099,8 @@ test('FT-567: видимый «назад» и Back браузера на экр
     await phone.locator('text=Тренировок в неделю').locator('xpath=..').getByText('3', { exact: true }).first().click();
     await phone.getByText('Похудение', { exact: true }).first().click();
     await phone.getByRole('button', { name: 'Посчитать норму' }).click();
-    const build = phone.getByRole('button', { name: 'План меню', exact: true });
+    await phone.getByRole('tab', { name: 'Рецепты', exact: true }).click();
+    const build = phone.getByRole('button', { name: /Из того, что есть дома/ });
     await build.waitFor({ timeout: 10000 });
     {
       await build.click();
@@ -1712,18 +1724,22 @@ test('протянуть подход далеко влево и отпусти�
     await c.locator('.workout__about').first().waitFor({ timeout: 10000 });
     await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await c.waitForTimeout(300);
-    // Вес на одну сторону (07.10.2026): отметка в первом подходе — у всех,
-    // в другом — только у него
+    // Одинаковая отметка показывается только у первого подхода (QA 20.10).
+    // Проверяем касание подписи и сохранение настройки для всех подходов.
     const sides = c.locator('.workout__exercise').nth(1).locator('.workout__side input');
-    if (await sides.count()) {
-      await sides.first().tap();
-      for (let k = 0; k < await sides.count(); k += 1) assert.equal(await sides.nth(k).isChecked(), true, 'первый подход — отметка у всех');
-      await sides.nth(1).tap();
-      assert.equal(await sides.nth(1).isChecked(), false, 'второй сняли');
-      assert.equal(await sides.nth(2).isChecked(), true, 'третий не тронут');
-      if (process.env.SHOT_SIDE) await c.screenshot({ path: process.env.SHOT_SIDE });
-    }
+    assert.equal(await sides.count(), 1, 'одна общая отметка вместо повторов');
+    const sideLabel = sides.first().locator('..');
+    await sideLabel.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await sideLabel.tap();
+    assert.equal(await sides.first().isChecked(), true);
+    await c.waitForFunction(() => {
+      const sessions = JSON.parse(localStorage.getItem('workout_demo_server:3') || '[]');
+      const session = sessions.find(s => s.status === 'active');
+      return session?.exercises[1].sets.every(s => s.side === 'one');
+    });
+    if (process.env.SHOT_SIDE) await c.screenshot({ path: process.env.SHOT_SIDE });
     const before = await rows.count();
+    await rows.nth(1).evaluate(el => el.scrollIntoView({ block: 'center' }));
     const b = await rows.nth(1).boundingBox();
     const x0 = b.x + b.width - 20;
     const y = b.y + 10;
