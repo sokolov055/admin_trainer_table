@@ -82,6 +82,37 @@ let origin;
 /** Ошибки в консоли — такой же провал, как непрошедший сценарий */
 const consoleErrors = [];
 
+test('FT-776: Настройки владельца с выбранными стартовыми программами, сохранение и повторное открытие', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  const errors = [];
+  phone.on('pageerror', e => errors.push(e.message));
+  try {
+    await phone.addInitScript(() => {
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      if (!localStorage.getItem('fittrack_demo_onboarding_catalog')) localStorage.setItem('fittrack_demo_onboarding_catalog', JSON.stringify(
+        [1, 2, 3].map(id => ({ id, goal: 'any', experience: 'beginner', place: 'gym', days: 2 }))));
+    });
+    const openSettings = async () => {
+      await phone.getByRole('button', { name: 'Меню', exact: true }).click();
+      await phone.getByRole('button', { name: /Настройки/ }).click();
+      await phone.getByText('Анкета перед выбором программы', { exact: true }).waitFor();
+      await phone.getByText('Стартовые программы и включение', { exact: true }).click();
+    };
+    await phone.goto(origin + '/?mockRole=trainer');
+    await openSettings();
+    assert.equal(await phone.locator('.onboarding-admin__fields select').count(), 12);
+    await phone.locator('.onboarding-admin__fields select').first().selectOption('muscle');
+    await phone.getByRole('button', { name: 'Сохранить стартовые программы', exact: true }).click();
+    await phone.waitForFunction(() => JSON.parse(localStorage.getItem('fittrack_demo_onboarding_catalog'))[0].goal === 'muscle');
+    if (process.env.SHOT_FT776_SETTINGS) await phone.screenshot({ path: process.env.SHOT_FT776_SETTINGS, fullPage: true });
+    await phone.reload();
+    await openSettings();
+    assert.equal(await phone.locator('.onboarding-admin__fields select').first().inputValue(), 'muscle');
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
 before(async () => {
   execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', 'dist-demo'], {
     cwd: ROOT,

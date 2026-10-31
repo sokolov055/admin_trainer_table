@@ -48,10 +48,12 @@ function norm(a, compute) {
 
 export function onboardingMock(action, p, compute) {
   const saved = load();
-  if (action === 'owner.onboarding.get') return { enabled: enabled(), emergencyOff: false, catalog: [], templates: programs };
+  const catalog = () => JSON.parse(localStorage.getItem('fittrack_demo_onboarding_catalog') || '[]');
+  if (action === 'owner.onboarding.get') return { enabled: enabled(), emergencyOff: false, catalog: catalog(), templates: programs };
   if (action === 'owner.onboarding.save') {
     localStorage.setItem('fittrack_demo_onboarding_off', p.enabled ? '0' : '1');
-    return { enabled: enabled(), emergencyOff: false, catalog: p.catalog || [], templates: programs };
+    if (p.catalog) localStorage.setItem('fittrack_demo_onboarding_catalog', JSON.stringify(p.catalog));
+    return { enabled: enabled(), emergencyOff: false, catalog: catalog(), templates: programs };
   }
   // Цель и график в «Моих данных» (FT-582): программа «подходит», пока ответы
   // те же, что при её выборе

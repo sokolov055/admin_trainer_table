@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { apiPublic, apiMutate } from '../api.js';
 import { Section, Panel } from '../ui.jsx';
-import { QUESTIONS } from '../client/onboarding-model.js';
+import { GOALS, QUESTIONS } from '../client/onboarding-model.js';
 import '../client/onboarding.css';
+
+// В анкете цель — отдельный шаг, остальные вопросы хранятся по ключам.
+const CONDITIONS = [
+  { key: 'goal', label: 'Цель', options: GOALS.map(g => [g.id, g.title]) },
+  ...Object.values(QUESTIONS).map(q => ({ ...q, label: q.eyebrow })),
+];
 
 export default function OnboardingSetting() {
   const [data, setData] = useState(null);
@@ -38,7 +44,7 @@ export default function OnboardingSetting() {
             <label><input type="checkbox" disabled={busy} checked={!!row} onChange={(e) => setCatalog((rows) => e.target.checked
               ? [...rows, { id: t.id, goal: 'any', experience: 'beginner', place: 'gym', days: 2 }]
               : rows.filter((r) => r.id !== t.id))} /> {t.title}</label>
-            {row && <div className="onboarding-admin__fields">{QUESTIONS.map((q) => <label key={q.key}>{q.label}
+            {row && <div className="onboarding-admin__fields">{CONDITIONS.map((q) => <label key={q.key}>{q.label}
               <select disabled={busy} value={row[q.key]} onChange={(e) => change(t.id, q.key, q.key === 'days' ? Number(e.target.value) : e.target.value)}>
                 {['goal', 'experience'].includes(q.key) && <option value="any">Любой вариант</option>}
                 {q.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
