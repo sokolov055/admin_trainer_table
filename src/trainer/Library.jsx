@@ -22,7 +22,8 @@ import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachinesEditor, MachineForm, AlternativesEditor, extrasHint } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
 import { programLength, monthWeeks, parseMonth, monthLabelOf, defaultHow, assignPreview, workoutsOf } from '../plan-weeks.js';
-import { WeekPreview } from '../client/PlanWeeks.jsx';
+import { dateKey, nextMonday, scheduledPlan } from '../program-timeline.js';
+import { WeekPreview, ProgramDates } from '../client/PlanWeeks.jsx';
 import { TEMPLATE_GOALS, PLACES, minutesText, timesText } from '../client/programs-model.js';
 
 /**
@@ -448,7 +449,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onD
   // копии. Ответ ждёт сохранение — кнопка крутится, пока тренер решает.
   const [ask, setAsk] = useState(null); // { programs, resolve }
 
-  const submit = async (clean) => {
+  const submit = async (clean, weekLength) => {
     let propagate = false;
     if (kind === 'workout' && template) {
       const usage = await apiPublic('library.template.usage', { id: template.id });
@@ -467,6 +468,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onD
       isPublic,
       ...(kind === 'program' ? { place, days, minutes, forClients } : {}),
       blocks: clean,
+      weekLength,
       propagate,
     });
   };
@@ -545,6 +547,7 @@ function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onD
       <Section title={kind === 'program' ? 'Тренировки' : 'Упражнения'}>
         <PlanEditor
           blocks={blocks}
+          weekLength={template && template.weekLength || 0}
           single={kind === 'workout'}
           submitLabel="Сохранить шаблон"
           workoutTemplates={workoutList}
@@ -601,7 +604,7 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
     return () => { alive = false; };
   }, [template]);
   const blocks = (tpl && tpl.blocks) || [];
-  const weeks = programLength(blocks);
+  const weeks = Math.max(programLength(blocks), Number(tpl && tpl.weekLength) || 0);
 
   const thisMonth = monthName();
   const nextMonth = nextMonthLabel(thisMonth);
@@ -611,17 +614,20 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
   const [mode, setMode] = useState(template.kind === 'workout' ? 'append' : 'replace');
   const [how, setHow] = useState(''); // '' — умолчание по шаблону (defaultHow)
   const [length, setLength] = useState(2);
+  const [startsInput, setStartsInput] = useState('');
+  const [endsOn, setEndsOn] = useState('');
+  const [loadAccepted, setLoadAccepted] = useState(false);
   const [startWeek, setStartWeek] = useState(''); // '' — само (сервер: продолжить или с первой)
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
 
   const label = month.trim();
-  const info = useData('plan.assign.info', { clientRow, month: label || '—', templateId: template.id }, [clientRow, label, template.id]);
-  const facts = info.data && info.data.month === label ? info.data : null;
   const cycles = monthWeeks(label) || [];
+  const startsOn = startsInput || (cycles[0] && cycles[0].start > dateKey() ? cycles[0].start : nextMonday());
+  const info = useData('plan.assign.info', { clientRow, month: label || '—', templateId: template.id, startsOn }, [clientRow, label, template.id, startsOn]);
+  const facts = info.data && info.data.month === label ? info.data : null;
   const who = clientName || 'клиент';
   // Родительный падеж месяца — по воскресенью первого цикла: оно всегда в этом месяце (правило четверга)
-  const gen = cycles.length ? cycles[0].monthGen : '';
   const monthWord = label.split(' ')[0];
 
   const howNow = how || defaultHow(blocks);
@@ -630,9 +636,14 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
   const continueWeek = same ? prev.continueWeek : 1;
   const chosenStart = startWeek === '' ? continueWeek : Number(startWeek);
   const replacing = mode === 'replace';
-  const preview = replacing
+  const legacyPreview = replacing
     ? assignPreview(weeks ? { blocks, month: label, startWeek: chosenStart } : { blocks, month: label, how: howNow, length })
     : [];
+  const weekly = replacing && (weeks > 0 || howNow !== 'list');
+  const laid = weekly ? (weeks ? blocks : blocks.map((b, i) => ({ ...b, week: howNow === 'cycle' ? 1 : Math.min(length, Math.ceil((i + 1) * length / blocks.length)) }))) : [];
+  const size = weeks || (howNow === 'cycle' ? 1 : length);
+  const preview = weekly ? scheduledPlan({ blocks: laid, sessions: [], month: label, cfg: { schedule: 1, startsOn, endsOn, startWeek: chosenStart, length: size }, today: new Date(startsOn + 'T12:00:00') }).weeks.slice(0, 4).map((w) => ({ ...w, titles: w.rows.map((r) => r.block.title) })) : legacyPreview;
+  const heavy = weekly && preview.some((w) => w.need > 6);
 
   const apply = async () => {
     setBusy(true);
@@ -640,8 +651,9 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
     try {
       await apiMutate('plan.fromTemplate', {
         clientRow, month: label, templateId: template.id, mode,
+        ...(weekly ? { effectiveOn: startsOn, weeks: { schedule: 1, startsOn, endsOn, effectiveOn: startsOn, length: size } } : {}),
         ...(replacing && !weeks ? { how: howNow, ...(howNow === 'split' ? { length } : {}) } : {}),
-        ...(replacing && weeks > 1 && startWeek !== '' ? { startWeek: Number(startWeek) } : {}),
+        ...(weekly ? { startWeek: chosenStart } : {}),
       });
       haptic('success');
       onDone(label);
@@ -667,7 +679,7 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
   return (
     <div className="library__form wk-rows">
       <div className="wk-rows__item">
-        <strong>Месяц</strong>
+        <strong>Раздел истории программы</strong>
         {custom
           ? <Field label="Как месяц называется у клиента" inputMode="text" value={month} onChange={setMonth} hint="Нет такого — появится" />
           : (
@@ -679,7 +691,7 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
             />
           )}
         <span>
-          {cycles.length ? `Циклы ${gen} — с понедельника ${cycles[0].from} ${cycles[0].fromGen}. ` : label ? 'Месяц не по календарю — без циклов и оценок. ' : ''}
+          {cycles.length ? 'Месяц группирует историю. Срок программы задаётся отдельно. ' : label ? 'Месяц не по календарю — без циклов и оценок. ' : ''}
           {facts ? (facts.count ? `${monthWord}: у клиента уже ${workoutsOf(facts.count)}.` : `${monthWord}: у клиента пока пусто.`) : ''}
         </span>
       </div>
@@ -688,12 +700,12 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
         <div className="wk-rows__item">
           <strong>Как назначить</strong>
           <Segmented
-            items={[{ value: 'replace', label: 'Заменить месяц' }, { value: 'append', label: 'Дописать в месяц' }]}
+            items={[{ value: 'replace', label: 'Новая программа' }, { value: 'append', label: 'Дописать в месяц' }]}
             value={mode}
             onChange={(v) => { haptic(); setMode(v); }}
             label="Как назначить"
           />
-          <span>{replacing ? 'Программа месяца станет этим шаблоном целиком.' : 'Тренировки шаблона добавятся в конец месяца, остальное останется.'}</span>
+          <span>{replacing ? 'Начало действия задаётся ниже. Прежняя версия сохранится до этой даты.' : 'Тренировки шаблона добавятся в конец месяца, остальное останется.'}</span>
         </div>
       )}
 
@@ -742,6 +754,9 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
         </div>
       )}
 
+      {weekly && <ProgramDates startsOn={startsOn} endsOn={endsOn} onStart={setStartsInput} onEnd={setEndsOn} />}
+      {weekly && <p className="small">{size} {size === 1 ? 'неделя' : 'недели'} по кругу. {endsOn ? `До ${endsOn.split('-').reverse().join('.')}.` : 'До замены тренером, без ежемесячного назначения.'} Неполная неделя начала — без оценки пропусков.</p>}
+      {heavy && <label className="library__check"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} /><span>В одной неделе больше 6 тренировок. Я проверил распределение и подтверждаю его.</span></label>}
       {replacing && (weeks > 0 || howNow !== 'list') && preview.length > 0 && (
         <WeekPreview rows={preview.map((c) => ({ key: c.n, label: `${c.from}–${c.to} ${c.monthGen.slice(0, 3)}`, titles: c.titles }))} />
       )}
@@ -760,8 +775,8 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
       )}
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      <button className="button button--primary button--block" disabled={busy || !label} onClick={apply}>
-        {busy ? 'Назначаем…' : cycles.length ? `Назначить на ${monthWord.toLowerCase()}` : 'Назначить'}
+      <button className="button button--primary button--block" disabled={busy || !label || (weekly && !startsOn) || (heavy && !loadAccepted)} onClick={apply}>
+        {busy ? 'Назначаем…' : weekly ? 'Назначить программу' : cycles.length ? `Назначить на ${monthWord.toLowerCase()}` : 'Назначить'}
       </button>
       <p className="small muted" style={{ margin: 0, textAlign: 'center' }}>Прошлые веса клиента подставятся в «было»</p>
     </div>

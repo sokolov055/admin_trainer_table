@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { dateKey, nextMonday, programSize, addDays } from '../program-timeline.js';
 import { apiMutate } from '../api.js';
 import { Segmented, Sheet, Note } from '../ui.jsx';
 import { IconAlert } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import {
-  weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength, startWeekOf,
+  weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength, withWeekLoad, startWeekOf,
   byWeek, lengthHint, monthWeeks, parseMonth, monthLabelOf,
 } from '../plan-weeks.js';
 import './plan-weeks.css';
@@ -24,7 +25,7 @@ const plural = (n, one, few, many) => {
   return many;
 };
 const workouts = (n) => n + ' ' + plural(n, 'тренировка', 'тренировки', 'тренировок');
-const STATUS = { done: 'выполнен', missed: 'не выполнен', open: 'идёт', empty: 'без тренировок' };
+const STATUS = { done: 'выполнен', missed: 'не выполнен', open: 'идёт', empty: 'неделя отдыха', paused: 'пауза', expired: 'программа завершена', partial: 'неполная неделя', scheduled: 'скоро начнётся', legacy: 'прежний список' };
 
 /** «декабря» из «Декабрь 2026» — для «программа декабря не назначена» */
 function monthGen(label) {
@@ -39,15 +40,24 @@ function monthGen(label) {
 /** Циклы месяца с оценками и сводка выбранного */
 export function WeekStrip({ plan, sel, onSelect }) {
   const w = plan.weeks[sel];
+  const [windowStart, setWindowStart] = useState(null);
+  const firstShown = Math.min(Math.max(0, plan.weeks.length - 5), windowStart === null ? Math.max(0, sel - 2) : windowStart);
   const { score } = plan;
-  const summary = w.status === 'empty'
+  const summary = w.status === 'legacy' ? 'Пока действует прежний список тренировок'
+    : w.status === 'paused' ? 'Плановые тренировки временно приостановлены'
+    : w.status === 'expired' ? 'Срок программы закончился'
+    : w.status === 'empty'
     ? 'В этой неделе программы нет тренировок'
     : `Сделано ${w.done} из ${w.need}`
       + (w.rows.some((r) => r.carried && r.block.foreign) ? ' · с долгом прошлого месяца'
         : w.rows.some((r) => r.carried) ? ' · с долгом прошлого цикла' : '')
       + (w.extra ? ' · по прошлой программе: ' + w.extra : '')
       + (w.missed ? ' · не выполнено: ' + w.missed : '');
-  const month = w.beyond
+  const month = plan.scheduled
+    ? w.status === 'scheduled' ? `Программа начнётся ${plan.cfg.startsOn.split('-').reverse().join('.')}` : w.status === 'expired' ? 'Программа завершена. Тренер назначит следующую.'
+      : w.status === 'paused' ? 'Программа на паузе. Эта неделя не считается пропуском.'
+        : plan.cfg.endsOn ? `Программа действует до ${plan.cfg.endsOn.split('-').reverse().join('.')}` : 'Программа действует до замены тренером'
+    : w.beyond
     ? `Программа ${monthGen(w.beyond)} не назначена — пока идёт эта, по кругу`
     : score.allDone && score.graded === score.total
       ? 'Все циклы месяца выполнены — молодец!'
@@ -56,14 +66,14 @@ export function WeekStrip({ plan, sel, onSelect }) {
         : '';
   return (
     <div className="plan-weeks">
-      <div className="plan-weeks__strip" role="tablist" aria-label="Циклы месяца">
-        {plan.weeks.map((x, i) => (
+      <div className="plan-weeks__strip" role="tablist" aria-label="Недели программы">
+        {plan.weeks.slice(firstShown, firstShown + 5).map((x, offset) => { const i = firstShown + offset; return (
           <button
             key={x.n}
             type="button"
             role="tab"
             aria-selected={i === sel}
-            aria-label={`Цикл ${x.n}, ${weekDates(x)}: ${STATUS[x.status]}`}
+            aria-label={`Неделя ${x.week}, ${weekDates(x)}: ${STATUS[x.status]}`}
             className={'plan-weeks__week' + (x.beyond ? ' is-short' : '') + (x.current ? ' is-now' : '')}
             onClick={() => { onSelect(i); haptic(); }}
           >
@@ -71,13 +81,14 @@ export function WeekStrip({ plan, sel, onSelect }) {
             <span>{x.from + '–' + x.to}</span>
             <i className={'plan-weeks__dot is-' + x.status} aria-hidden="true" />
           </button>
-        ))}
+        ); })}
       </div>
+      {plan.weeks.length > 5 && <div className="wk__row"><button className="button button--ghost" disabled={firstShown === 0} onClick={() => setWindowStart(Math.max(0, firstShown - 5))}>Раньше</button><button className="button button--ghost" disabled={firstShown + 5 >= plan.weeks.length} onClick={() => setWindowStart(firstShown + 5)}>Позже</button><button className="button button--ghost" onClick={() => { setWindowStart(null); onSelect(Math.max(0, plan.currentIndex)); }}>Эта неделя</button></div>}
       <div className="plan-weeks__card">
         <div className="plan-weeks__head">
           <div>
-            <strong>Цикл {w.n}{w.beyond ? '' : ' из ' + plan.own}</strong>
-            <span>{weekDates(w)}{w.current ? ' · сейчас' : ''}{plan.length > 1 ? ' · неделя ' + w.week + ' программы' : ''}</span>
+            <strong>{w.current ? 'Эта неделя' : 'Неделя'} · {weekDates(w)}</strong>
+            <span>{`Неделя ${w.week} из ${w.length || plan.length}`}{w.load ? ' · ' + LOAD_LABEL[w.load].toLowerCase() : ''}{!w.full && w.need ? ' · неполная неделя, без оценки пропусков' : ''}</span>
           </div>
           {w.load
             ? <span className={'plan-weeks__kind plan-weeks__kind--' + w.load}>{LOAD_LABEL[w.load]}</span>
@@ -102,6 +113,7 @@ export function WeekStrip({ plan, sel, onSelect }) {
  */
 export function WeekChoice({ plan, month: shownMonth, clientRow, onChosen, onClose }) {
   const [busy, setBusy] = useState('');
+  const [selected, setSelected] = useState(() => new Set(plan.pending.map((r) => r.block.id)));
   const [failure, setFailure] = useState('');
   const w = plan.pendingWeek;
   const rows = plan.pending;
@@ -112,7 +124,7 @@ export function WeekChoice({ plan, month: shownMonth, clientRow, onChosen, onClo
     try {
       let weeks = null;
       for (const r of rows) {
-        const res = await apiMutate('plan.week.choose', { ...(clientRow ? { clientRow } : {}), month, week: w.n, blockId: r.block.id, choice });
+        const res = await apiMutate('plan.week.choose', { ...(clientRow ? { clientRow } : {}), month, week: w.n, blockId: r.block.id, choice: choice === 'redo' && !selected.has(r.block.id) ? 'skip' : choice });
         weeks = res.weeks;
       }
       haptic('success');
@@ -124,22 +136,22 @@ export function WeekChoice({ plan, month: shownMonth, clientRow, onChosen, onClo
   };
   const one = rows.length === 1;
   return (
-    <Sheet title={`Цикл ${w.n} закончился`} onClose={onClose}>
+    <Sheet title="Прошлая неделя завершилась" onClose={onClose}>
       <div className="plan-weeks__choice">
         <p className="plan-weeks__lead">
           {one ? 'Одна тренировка не выполнена' : `${workouts(rows.length)} не выполнено`} · {weekDates(w)}
           {month !== shownMonth ? ` · программа «${month}»` : ''}
         </p>
         <ul className="plan-weeks__missed">
-          {rows.map((r) => <li key={r.block.id}>{r.block.title}</li>)}
+          {rows.map((r) => <li key={r.block.id}><label><input type="checkbox" checked={selected.has(r.block.id)} onChange={() => setSelected((old) => { const next = new Set(old); if (next.has(r.block.id)) next.delete(r.block.id); else next.add(r.block.id); return next; })} /> {r.block.title}</label></li>)}
         </ul>
         <button type="button" className="button button--primary button--block plan-weeks__option" disabled={!!busy} onClick={() => choose('redo')}>
-          <strong>{busy === 'redo' ? 'Сохраняю…' : 'Доделать в этом цикле'}</strong>
-          <span>{one ? 'Встанет первой в очередь' : 'Встанут первыми в очередь'} — цикл станет длиннее</span>
+          <strong>{busy === 'redo' ? 'Сохраняю…' : 'Перенести выбранные'}</strong>
+          <span>На этой неделе станет {((plan.weeks[plan.currentIndex] || {}).need || 0) + rows.reduce((sum, r) => sum + (selected.has(r.block.id) ? r.missed || 1 : 0), 0)} тренировок</span>
         </button>
         <button type="button" className="button button--block plan-weeks__option" disabled={!!busy} onClick={() => choose('skip')}>
-          <strong>{busy === 'skip' ? 'Сохраняю…' : 'Пропустить, идти дальше'}</strong>
-          <span>Останется «не выполнена», цикл — по программе</span>
+          <strong>{busy === 'skip' ? 'Сохраняю…' : 'Оставить в прошлой неделе'}</strong>
+          <span>История сохранится, эта неделя останется по плану</span>
         </button>
         <p className="small muted plan-weeks__hint">Тренер увидит ваш выбор</p>
         {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
@@ -279,12 +291,12 @@ const monthWord = (label) => String(label || '').split(' ')[0];
  * неделям» (список) или «Настроить» (по неделям)
  */
 export function MonthStatus({ month, blocks, plan, cfg, months, onSpread, onSettings, today = new Date() }) {
-  const length = programLength(blocks);
+  const length = programSize(blocks, cfg);
   const count = blocks.length;
   const cur = plan && plan.currentIndex >= 0 ? plan.weeks[plan.currentIndex] : null;
   // Следующий месяц без программы — с четверга перед его понедельником (как напоминание в «Клиентах»)
   const next = nextMonthOf(month);
-  const nextCycles = next && length && months[0] === month && !months.includes(next) ? monthWeeks(next) : null;
+  const nextCycles = !(cfg && cfg.schedule === 1) && next && length && months[0] === month && !months.includes(next) ? monthWeeks(next) : null;
   const soon = nextCycles && (new Date(nextCycles[0].start + 'T00:00:00').getTime() - today.getTime()) <= 4 * 24 * 60 * 60 * 1000;
   const nextWeek = length ? ((startWeekOf(cfg, length) - 1 + (monthWeeks(month) || []).length) % length) + 1 : 0;
   const rule = (cfg && cfg.rule) || 'client';
@@ -292,14 +304,15 @@ export function MonthStatus({ month, blocks, plan, cfg, months, onSpread, onSett
     <div className="wk-status" data-reveal="">
       <div className="wk-status__top">
         <strong>
-          {monthWord(month)}: {length ? (length === 1 ? 'одна неделя по кругу' : `${length} недели по кругу`) : `${workouts(count)} списком`}
+          {cfg && cfg.schedule === 1 ? 'Программа' : monthWord(month)}: {length ? (length === 1 ? 'одна неделя по кругу' : `${length} недели по кругу`) : `${workouts(count)} списком`}
         </strong>
         {length > 0 && <button type="button" className="wk-status__link" onClick={() => { haptic(); onSettings(); }}>Настроить</button>}
       </div>
       {length
         ? (
           <p>
-            {cur ? `Сейчас цикл ${cur.n} (${shortDates(cur)}) = неделя ${cur.week} программы. ` : ''}
+            {cur ? `Сейчас ${shortDates(cur)} — неделя ${cur.week} из ${length}. ` : ''}
+            {cfg && cfg.schedule === 1 ? (cfg.endsOn ? `Действует до ${cfg.endsOn.split('-').reverse().join('.')}. ` : 'Действует до замены тренером. ') : ''}
             Пропуски: {rule === 'redo' ? 'доделывать' : rule === 'skip' ? 'пропускать' : 'решает клиент'}.
           </p>
         )
@@ -331,16 +344,17 @@ export function WeekPreview({ rows }) {
  * 1), правило. Старые клиенты не меняются, пока тренер не нажмёт (решение
  * владельца 28.10.2026)
  */
-export function SpreadSheet({ month, blocks, cfg, onApply, onClose, busy = false, today = new Date() }) {
+export function SpreadSheet({ month, blocks, cfg, onApply, onClose, busy = false }) {
   const [n, setN] = useState(blocks.length >= 2 && blocks.length <= 4 ? 1 : Math.min(4, Math.max(2, blocks.length)));
   const [rule, setRule] = useState((cfg && cfg.rule) || 'client');
+  const [startsOn, setStartsOn] = useState(dateKey());
+  const [endsOn, setEndsOn] = useState('');
+  const [loadAccepted, setLoadAccepted] = useState(false);
   const cycles = monthWeeks(month) || [];
   const laid = withLength(blocks, n);
-  const now = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-  const curIndex = cycles.findIndex((c) => now >= c.start && now <= c.end);
-  // Текущий цикл — неделя 1: startWeek такой, чтобы цикл curIndex + 1 получил неделю 1
-  const startWeek = curIndex > 0 ? ((n - (curIndex % n)) % n) + 1 : 1;
-  const cur = curIndex >= 0 ? cycles[curIndex] : null;
+  const overloaded = byWeek(laid, n).some((g) => g.blocks.length > 6);
+
+
   return (
     <Sheet title="Разложить по неделям" onClose={onClose}>
       <div className="wk-rows">
@@ -352,8 +366,9 @@ export function SpreadSheet({ month, blocks, cfg, onApply, onClose, busy = false
         <WeekPreview rows={byWeek(laid, n).map((g) => ({ key: g.week, label: `Неделя ${g.week}`, titles: g.blocks.map((b) => b.title) }))} />
         <div className="wk-rows__item">
           <strong>Клиент начнёт с недели 1</strong>
+          <ProgramDates startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} />
           <span>
-            {cur ? `Сейчас идёт цикл ${shortDates(cur)} — он станет неделей 1. ` : 'Первый цикл месяца — неделя 1. '}
+            Программа начнётся с выбранной даты. Неполная неделя не получит оценку «не выполнена».
             Проведённые тренировки остаются выполненными.
           </span>
         </div>
@@ -362,7 +377,8 @@ export function SpreadSheet({ month, blocks, cfg, onApply, onClose, busy = false
           <Segmented items={RULES} value={rule} label="Пропущенные тренировки" track onChange={(v) => { haptic(); setRule(v); }} />
           <span>{RULE_HINT[rule]}</span>
         </div>
-        <button type="button" className="button button--primary button--block" disabled={busy} onClick={() => onApply({ blocks: laid, rule, startWeek })}>
+        {overloaded && <label className="wk__row"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} />В одной неделе больше 6 тренировок. Я проверил распределение.</label>}
+        <button type="button" className="button button--primary button--block" disabled={busy || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: laid, rule, startWeek: 1, schedule: 1, startsOn, endsOn, length: n })}>
           {busy ? 'Сохраняю…' : 'Разложить'}
         </button>
       </div>
@@ -374,53 +390,45 @@ export function SpreadSheet({ month, blocks, cfg, onApply, onClose, busy = false
  * Лист «Настроить» у программы по неделям: длина, нагрузка недель, с какой
  * недели начался месяц, правило — с одной фразой у каждого
  */
-export function WeeksSheet({ month, blocks, length, cfg, onLength, onLoad, onMonth, onClose, busy = false, failure = '' }) {
-  const cycles = monthWeeks(month) || [];
-  const startWeek = startWeekOf(cfg, length);
-  const rule = (cfg && cfg.rule) || 'client';
-  const next = nextMonthOf(month);
-  const nextWeek = ((startWeek - 1 + cycles.length) % length) + 1;
-  return (
-    <Sheet title={`Недели: ${month}`} onClose={onClose}>
-      <div className="wk-rows">
-        <div className="wk-rows__item">
-          <strong>Недель в программе</strong>
-          <LengthPicker
-            value={length}
-            onChange={onLength}
-            cycles={cycles.length}
-            count={blocks.length}
-            hint="Меньше — лишние недели сольются в первые; больше — новые недели пустые, тренировки не двигаются. «Список» — снять недели."
-          />
-        </div>
-        <div className="wk-rows__item">
-          <strong>Нагрузка недель</strong>
-          {byWeek(blocks, length).map((g) => (
-            <div className="wk-rows__pill" key={g.week}>
-              <span>Неделя {g.week}<small>{g.blocks.length ? workouts(g.blocks.length) : 'пока пусто'}</small></span>
-              <Segmented items={LOADS} value={weekLoad(blocks, g.week)} label={`Нагрузка недели ${g.week}`} track disabled={!g.blocks.length} onChange={(load) => { haptic(); onLoad(g.week, load); }} />
-            </div>
-          ))}
-          <span>Только подпись в заголовке — упражнения и веса не меняются. Лёгкая тренировка не становится «было» для обычных.</span>
-        </div>
-        {length > 1 && (
-          <div className="wk-rows__item">
-            <strong>{monthWord(month)} начался с недели</strong>
-            <Segmented items={Array.from({ length }, (_, i) => ({ value: i + 1, label: String(i + 1) }))} value={startWeek} label="Начался с недели" track disabled={busy} onChange={(n) => { haptic(); onMonth({ startWeek: n }); }} />
-            <span>
-              {cycles.length ? `Цикл 1 (${shortDates(cycles[0])}) — неделя ${startWeek}, дальше по кругу. ` : ''}
-              {next ? `${monthWord(next)} продолжит с недели ${nextWeek} — подставится само.` : ''}
-            </span>
-          </div>
-        )}
-        <div className="wk-rows__item">
-          <strong>Пропущенные тренировки</strong>
-          <Segmented items={RULES} value={rule} label="Пропущенные тренировки" track disabled={busy} onChange={(v) => { haptic(); onMonth({ rule: v }); }} />
-          <span>{RULE_HINT[rule]}</span>
-        </div>
-        {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
-        <button type="button" className="button button--primary button--block" onClick={onClose}>Готово</button>
-      </div>
-    </Sheet>
-  );
+export function ProgramDates({ startsOn, endsOn, onStart, onEnd, disabled = false }) {
+  return <>
+    <label className="field"><span className="field__label">Дата начала</span><input className="field__input" type="date" value={startsOn} disabled={disabled} onChange={(e) => onStart(e.target.value)} /></label>
+    <label className="field"><span className="field__label">Срок программы</span><select className="field__input" value={endsOn ? 'date' : 'open'} onChange={(e) => onEnd(e.target.value === 'open' ? '' : addDays(startsOn || dateKey(), 27))}><option value="open">До замены тренером</option><option value="date">До даты</option></select></label>
+    {endsOn && <label className="field"><span className="field__label">Последний день программы</span><input className="field__input" type="date" min={startsOn} value={endsOn} onChange={(e) => onEnd(e.target.value)} /></label>}
+  </>;
+}
+
+export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false, failure = '' }) {
+  const [draft, setDraft] = useState(blocks);
+  const [n, setN] = useState(length);
+  const [rule, setRule] = useState(cfg && cfg.rule || 'client');
+  const [startsOn, setStartsOn] = useState(cfg && cfg.startsOn || dateKey());
+  const [endsOn, setEndsOn] = useState(cfg && cfg.endsOn || '');
+  const [startWeek, setStartWeek] = useState('');
+  const [effectiveOn, setEffectiveOn] = useState(cfg && cfg.effectiveOn > dateKey() ? cfg.effectiveOn : nextMonday());
+  const [pauses, setPauses] = useState(cfg && cfg.pauses || []);
+  const [pauseFrom, setPauseFrom] = useState(dateKey());
+  const [pauseTo, setPauseTo] = useState('');
+  const [loadAccepted, setLoadAccepted] = useState(false);
+  const overloaded = byWeek(draft, n).some((g) => g.blocks.length > 6);
+  return <Sheet title="Настроить программу" onClose={onClose}><div className="wk-rows">
+    <div className="wk-rows__item"><strong>Недель в программе</strong><LengthPicker value={n} onChange={(v) => { setN(v); setDraft(withLength(draft, v)); }} list={false} count={draft.length} />
+      <span>Предпросмотр ниже покажет результат перераспределения. Пустая неделя сохранится как отдых.</span></div>
+    <WeekPreview rows={byWeek(draft, n).map((g) => ({ key: g.week, label: `Неделя ${g.week}`, titles: g.blocks.map((b) => b.title) }))} />
+    {byWeek(draft, n).map((g) => <div className="wk-rows__pill" key={g.week}><span>Неделя {g.week}<small>{workouts(g.blocks.length)}</small></span><Segmented items={LOADS} value={weekLoad(draft, g.week)} label={`Нагрузка недели ${g.week}`} onChange={(load) => setDraft(withWeekLoad(draft, g.week, load))} /></div>)}
+    <ProgramDates startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} disabled={cfg && cfg.schedule === 1} />
+    <label className="field"><span className="field__label">Применить изменения с</span><input className="field__input" type="date" min={dateKey()} value={effectiveOn} onChange={(e) => setEffectiveOn(e.target.value)} /></label>
+    <span>По умолчанию — следующий понедельник. Прошлые недели и проведённые занятия сохранятся.</span>
+    <label className="field"><span className="field__label">Неделя продолжения</span><select className="field__input" value={startWeek} onChange={(e) => setStartWeek(e.target.value)}><option value="">Продолжить по порядку</option>{Array.from({ length: n }, (_, i) => <option key={i} value={i + 1}>Начать с недели {i + 1}</option>)}</select></label>
+    <div className="wk-rows__item"><strong>Пропущенные тренировки</strong><Segmented items={RULES} value={rule} label="Пропущенные тренировки" onChange={setRule} /><span>{RULE_HINT[rule]}</span></div>
+    <div className="wk-rows__item"><strong>Паузы программы</strong><span>Дни паузы не считаются пропусками. Полная неделя паузы не сдвигает программу. Причину указывать не нужно.</span>
+      {pauses.map((p, i) => <div className="wk__row" key={p.from}><span>{p.from} — {p.to || 'до возобновления'}</span><button className="button" onClick={() => { if (!p.to && p.from < dateKey()) { setPauses(pauses.map((v, j) => i === j ? { ...v, to: addDays(dateKey(), -1) } : v)); setEffectiveOn(dateKey()); } else setPauses(pauses.filter((_, j) => j !== i)); }}>{p.to ? 'Убрать' : 'Возобновить сегодня'}</button></div>)}
+      <label className="field"><span className="field__label">Начало паузы</span><input className="field__input" type="date" min={dateKey()} value={pauseFrom} onChange={(e) => setPauseFrom(e.target.value)} /></label>
+      <label className="field"><span className="field__label">Конец паузы, если известен</span><input className="field__input" type="date" min={pauseFrom} value={pauseTo} onChange={(e) => setPauseTo(e.target.value)} /></label>
+      <button className="button" onClick={() => { setPauses([...pauses, { from: pauseFrom, to: pauseTo }]); setEffectiveOn(pauseFrom); }}>Добавить паузу</button>
+    </div>
+    {overloaded && <label className="library__check"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} /><span>В одной неделе больше 6 тренировок. Я проверил и подтверждаю распределение.</span></label>}
+    {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
+    <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить программу'}</button>
+  </div></Sheet>;
 }

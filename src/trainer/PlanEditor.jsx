@@ -37,7 +37,7 @@ import { LengthPicker, WeekSections, MoveWeek } from '../client/PlanWeeks.jsx';
  */
 export default function PlanEditor({
   blocks, onSaved, onSubmit, single = false, submitLabel = 'Сохранить шаблон',
-  workoutTemplates = null, onDirty = null,
+  workoutTemplates = null, onDirty = null, weekLength = 0,
 }) {
   const [draft, setDraft] = useState(() => (blocks.length
     ? blocks.map((b) => ({
@@ -59,7 +59,7 @@ export default function PlanEditor({
   const rootRef = useRef(null);
   // Недели — разделы (FT-775): выбранная длина может быть больше той, что у
   // тренировок, — новые недели пустые, пока тренер в них что-то не положит
-  const [lengthPick, setLengthPick] = useState(0);
+  const [lengthPick, setLengthPick] = useState(weekLength);
   const length = single ? 0 : shownLength(draft, lengthPick);
   const setLength = (n) => { setLengthPick(n); change((list) => resized(list, n)); };
 
@@ -138,7 +138,7 @@ export default function PlanEditor({
       }));
       // В сервер — только то, что он хранит (plan-payload.js); шаблону — как было
       const forServer = clean.map((b) => ({ ...b, exercises: b.exercises.map(planExerciseForSave) }));
-      const result = onSubmit ? await onSubmit(clean) : await apiMutate('plan.save', { blocks: forServer });
+      const result = onSubmit ? await onSubmit(clean, length) : await apiMutate('plan.save', { blocks: forServer });
       onSaved(result);
     } catch (error) {
       setFailure(error);

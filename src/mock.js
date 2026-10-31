@@ -15,6 +15,7 @@
  * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
+import { dateKey, nextMonday, versionAt } from './program-timeline.js';
 import { withLength, monthWeeks } from './plan-weeks.js';
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
@@ -400,6 +401,27 @@ function demoMuscles(name) {
 const withDemoMuscles = (blocks) => blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e, ...demoMuscles(e.name), ...(e.muscles ? { muscles: e.muscles } : {}) })) }));
 
 const MONTHS = ['Сентябрь 2026', 'Август 2026', 'Июль 2026', 'Июнь 2026'];
+try {
+  const saved = JSON.parse(localStorage.getItem('ft775-program-demo') || 'null');
+  if (saved) { PLAN_BLOCKS.splice(0, PLAN_BLOCKS.length, ...saved.blocks); Object.assign(demoWeeks, saved.weeks); if (!MONTHS.includes(saved.month)) MONTHS.unshift(saved.month); }
+} catch { /* Демо остаётся доступным при закрытом хранилище. */ }
+function saveDemoProgram(params, blocks) {
+  const was = demoWeeks[params.month] || {};
+  const next = { ...was, ...(params.weeks || {}) };
+  if (was.schedule === 1) {
+    const from = params.effectiveOn || nextMonday();
+    if (from !== (was.effectiveOn || was.startsOn)) {
+      const { history, ...settings } = was;
+      next.history = [...(history || []), { from: was.effectiveOn || was.startsOn, blocks: structuredClone(PLAN_BLOCKS), settings }];
+    }
+    next.effectiveOn = from;
+  }
+  demoWeeks[params.month] = next;
+  blocks.forEach((b, i) => { b.id ||= 'b' + String(i + 1).padStart(16, '0'); });
+  if (!MONTHS.includes(params.month)) MONTHS.unshift(params.month);
+  if (next.schedule === 1) localStorage.setItem('ft775-program-demo', JSON.stringify({ month: params.month, blocks, weeks: demoWeeks }));
+}
+
 
 const CLIENTS = [
   { row: 3, name: 'Анна Морозова', source: 'referral', price: 3000, count: 10, balance: 12000, trainings: 6, revenue: 18000, payer: '', template: 'P01 — Набор массы', monthStatus: '✅ Сентябрь 2026 создан', lastMeasureStatus: '✅ 13.09.2026', monthSheetStatus: '✅ Сентябрь 2026', lastTrainingDate: daysAgo(2), nextTrainingDate: daysAhead(2, '10:00'), startDate: daysAgo(400), birthDate: null, chatId: '11111', clientKey: 'anna', hasLink: true },
@@ -1885,16 +1907,18 @@ const MOCK = {
     const blocks = (params.blocks || [])
       .map((b) => ({
         title: b.title,
+        ...(b.id ? { id: b.id } : {}),
         ...(b.week ? { week: b.week } : {}),
         ...(b.load ? { load: b.load } : {}),
         exercises: (b.exercises || []).filter((e) => String(e.name || '').trim()),
       }))
       .filter((b) => b.exercises.length);
 
+    saveDemoProgram(params, blocks);
     PLAN_BLOCKS.length = 0;
     PLAN_BLOCKS.push(...blocks);
 
-    return { month: params.month, blocks };
+    return { month: params.month, blocks, weeks: demoWeeks[params.month] };
   },
 
   'plan.month.create': (params) => ({ month: params.month, blocks: [] }),
@@ -1986,6 +2010,7 @@ const MOCK = {
         : [],
       // Программа по неделям (IDEA-7): правило о пропущенных и выборы
       weeks: demoWeeks[month] || { rule: 'client', choices: {} },
+      ...(demoWeeks[month] && demoWeeks[month].schedule === 1 ? { programBlocks: PLAN_BLOCKS, ...(trainer ? {} : { blocks: versionAt(PLAN_BLOCKS, demoWeeks[month], dateKey()).blocks }) } : {}),
       note: month ? '' : 'В таблице клиента пока нет ни одного листа с программой.',
     };
   },
@@ -1993,7 +2018,7 @@ const MOCK = {
   'plan.weeks.save': (params) => {
     const w = params.weeks || {};
     const was = demoWeeks[params.month] || {};
-    demoWeeks[params.month] = { rule: w.rule || was.rule || 'client', startWeek: w.startWeek || was.startWeek || 1, choices: was.choices || {} };
+    demoWeeks[params.month] = { ...was, ...w, rule: w.rule || was.rule || 'client', startWeek: w.startWeek || was.startWeek || 1, choices: was.choices || {} };
     return { weeks: demoWeeks[params.month] };
   },
   'plan.week.choose': (params) => {
@@ -2526,7 +2551,8 @@ const MOCK = {
     if (params.mode !== 'append') {
       PLAN_BLOCKS.length = 0;
       PLAN_BLOCKS.push(...blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e })) })));
-      demoWeeks[params.month] = { rule: 'client', startWeek: Number(params.startWeek) || 1, choices: {} };
+      demoWeeks[params.month] = { rule: 'client', startWeek: Number(params.startWeek) || 1, choices: {}, ...(params.weeks || {}) };
+      saveDemoProgram(params, PLAN_BLOCKS);
     }
     return { month: params.month, blocks };
   },

@@ -86,6 +86,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
   const tests = data.clients.filter((c) => c.test && !c.pairHidden);
 
   const needsAttention = clients.filter((c) => {
+    if (c.program && c.program.attention) return true;
     // Онлайн-клиент (FT-530) с тренером не занимается — «давно не был» не
     // про него; внимания требует срок ведения: истёк или осталось 3 дня и
     // меньше (тогда же приходит напоминание, 21.10.2026)
@@ -290,6 +291,7 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
                 )}
               </div>
               <div className="item__meta">
+                {c.program && <span>{c.program.attention ? <Tag tone="warn">{c.program.text}</Tag> : c.program.text}</span>}
                 {c.online ? (
                   onlineLeft !== null && onlineLeft < 0
                     ? <Tag tone="warn">онлайн · {onlineLabel(c.onlineUntil)}</Tag>

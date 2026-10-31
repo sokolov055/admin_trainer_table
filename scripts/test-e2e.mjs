@@ -1946,3 +1946,50 @@ test('в карточке клиента тренировки выбираютс
     await context.close();
   }
 });
+
+
+test('FT-775: программа по датам переживает reload, пауза сохраняется одним действием', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', isMobile: true, hasTouch: true });
+  const phone = await context.newPage();
+  const errors = [];
+  phone.on('pageerror', (e) => errors.push(String(e)));
+  try {
+    await phone.goto(origin);
+    await phone.evaluate(() => {
+      const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - (now.getDay() + 6) % 7 - 14);
+      const month = 'Октябрь 2026';
+      const blocks = ['Текущая А', 'Текущая Б', 'Следующая В'].map((title, i) => ({ id: 'b' + String(i + 1).padStart(16, '0'), title, week: i < 2 ? 1 : 2,
+        exercises: [{ name: 'Жим лёжа', sets: '3', reps: '8', weight: '40', prevWeight: '', exerciseId: null }] }));
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      localStorage.setItem('ft775-program-demo', JSON.stringify({ month, blocks, weeks: { [month]: { schedule: 1, startsOn: key(start), effectiveOn: key(start), length: 2, startWeek: 1, rule: 'skip', choices: {} } } }));
+    });
+    await phone.reload();
+    await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    await phone.getByRole('heading', { name: 'Текущая А', exact: true }).waitFor();
+    assert.equal(await phone.getByRole('heading', { name: 'Следующая В', exact: true }).count(), 0);
+    await phone.reload();
+    await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    await phone.getByRole('heading', { name: 'Текущая Б', exact: true }).waitFor();
+    if (process.env.SHOT_FT775_CLIENT) await phone.screenshot({ path: process.env.SHOT_FT775_CLIENT, fullPage: true });
+    await phone.evaluate(() => {
+      const saved = localStorage.getItem('ft775-program-demo');
+      localStorage.clear();
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      localStorage.setItem('ft775-program-demo', saved);
+    });
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    await phone.getByRole('button', { name: 'Настроить', exact: true }).click();
+    await phone.getByRole('button', { name: 'Добавить паузу', exact: true }).click();
+    await phone.getByRole('button', { name: 'Сохранить программу', exact: true }).click();
+    await phone.getByText('Программа на паузе. Эта неделя не считается пропуском.', { exact: true }).waitFor();
+    assert.equal(await phone.getByRole('button', { name: 'Начать тренировку', exact: true }).count(), 0);
+    const stored = await phone.evaluate(() => JSON.parse(localStorage.getItem('ft775-program-demo')));
+    assert.equal(stored.weeks['Октябрь 2026'].pauses.length, 1);
+    assert.equal(stored.weeks['Октябрь 2026'].history.length, 1);
+    if (process.env.SHOT_FT775_TRAINER) await phone.screenshot({ path: process.env.SHOT_FT775_TRAINER, fullPage: true });
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});

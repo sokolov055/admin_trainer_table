@@ -1,4 +1,5 @@
 import { blockSessions } from './plan-model.js';
+import { scheduledPlan, programSize } from './program-timeline.js';
 
 /**
  * Программа по неделям, раскладка по циклам месяца (IDEA-7, решения
@@ -152,7 +153,8 @@ const inRange = (s, c) => {
  * Без недель у тренировок или месяц не разобрать — null (месячная очередь).
  */
 export function weekPlan({ blocks, sessions, month, cfg, prev = null, latest = false, today = new Date() }) {
-  const length = programLength(blocks);
+  if (cfg && cfg.schedule === 1) return scheduledPlan({ blocks, sessions, month, cfg, today });
+  const length = programSize(blocks, cfg);
   if (!length) return null;
   const cycles = monthWeeks(month);
   if (!cycles) return null;
@@ -261,6 +263,7 @@ export function weekPlan({ blocks, sessions, month, cfg, prev = null, latest = f
 /** Очередь цикла: долги прошлого — первыми, дальше как в программе */
 export function weekQueue(cycle) {
   if (!cycle) return [];
+  if (['scheduled', 'paused', 'expired'].includes(cycle.status)) return [];
   const open = cycle.rows.filter((r) => r.left > 0);
   return [...open.filter((r) => r.carried && r.done === 0), ...open.filter((r) => !(r.carried && r.done === 0))];
 }
