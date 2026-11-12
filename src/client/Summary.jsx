@@ -39,7 +39,7 @@ export function Change({ row }) {
   );
 }
 
-export default function Summary({ clientRow }) {
+export default function Summary({ clientRow, compact = false }) {
   const [period, setPeriod] = useState('week');
   const [offset, setOffset] = useState(0);
   // Итоги месяца с балансом мышц — в «Плюсе» (FT-767): на сайте и Android
@@ -156,9 +156,11 @@ export default function Summary({ clientRow }) {
             ) : (
               <>
                 {/* С чем сравнивают стрелки под цифрами */}
-                <p className="summary__compare">Стрелки — {compareText(s)}</p>
+                {/* compact — во вкладке «Сила» (12.11.2026): без строки цифр,
+                    только рекорды и мышцы; цифры недели — по «Все упражнения» */}
+                {!compact && <p className="summary__compare">Стрелки — {compareText(s)}</p>}
 
-                <dl className="summary__facts">
+                {!compact && <dl className="summary__facts">
                   {facts.map((r) => (
                     <div key={r.id} className="summary__fact">
                       <dt className="summary__label">{r.label}</dt>
@@ -168,7 +170,7 @@ export default function Summary({ clientRow }) {
                       <dd className="summary__change"><Change row={r} /></dd>
                     </div>
                   ))}
-                </dl>
+                </dl>}
 
                 {s.records.length > 0 && (
                   <div className="summary__records">

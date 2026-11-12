@@ -719,7 +719,7 @@ export function Processes() {
             : 'занятий за этот период ещё не было'
         }
         facts={[
-          { label: 'Клиентов', value: formatNumber(now.activeClients, 0) },
+          { label: 'Клиентов в работе', value: formatNumber(now.activeClients, 0) },
           { label: 'Молчат месяц', value: formatNumber(now.silentClients, 0) },
         ]}
       />

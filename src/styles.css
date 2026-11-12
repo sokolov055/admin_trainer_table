@@ -4477,6 +4477,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 /* Выбор показателя в «Прогрессе» — между итогом и графиком */
 .progress__fields { margin-top: var(--space-4); }
 .progress__fields .chips { margin-bottom: 0; }
+.progress__tabs { margin-top: var(--space-4); }
 
 /* Логи: длинный итог действия — строкой под записью, с переносом */
 .log__result { margin-top: 5px; overflow-wrap: anywhere; color: var(--text-secondary); }
@@ -6643,3 +6644,47 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
   height: max(44px, 100%);
   transform: translateY(-50%);
 }
+
+/* «Прогресс» картинками (12.11.2026, ProgressVisual.jsx): одна большая картинка и 2–3 метрики словами */
+.pv-card { margin-top: var(--space-4); padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.pv-card__label { font-size: 13px; color: var(--text-muted); }
+.pv-card__line { margin: 4px 0 0; font-size: 14px; color: var(--text-secondary); }
+.pv-hero { font-size: 34px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pv-hero--sm { font-size: 24px; }
+.pv-hero small { font-size: 15px; font-weight: 600; color: var(--text-muted); }
+.pv-spark { display: block; width: 100%; height: 84px; margin-top: 10px; }
+.pv-spark__area { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
+.pv-spark__line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.pv-spark__dot { fill: var(--accent); }
+.pv-link { justify-self: start; margin-top: 6px; padding: 6px 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
+.pv-lifts { display: grid; gap: 8px; margin-top: 12px; }
+.pv-lift { display: grid; grid-template-columns: minmax(0, 7.5em) 1fr auto; gap: 8px; align-items: center; font-size: 14px; }
+.pv-lift__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-lift__bar { position: relative; height: 10px; border-radius: 6px; background: var(--surface-sunken); }
+.pv-lift__bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; }
+.pv-lift__was { background: var(--border); }
+.pv-lift__now { background: var(--text-muted); opacity: .55; }
+.pv-lift__now.is-up { background: var(--good-text, #2e7d32); opacity: .9; }
+.pv-lift__now.is-down { background: var(--warning-text, #b45a12); opacity: .8; }
+.pv-lift__delta { min-width: 3.5em; text-align: right; }
+.pv-rings { display: flex; justify-content: space-around; margin-top: 10px; }
+.pv-ring { display: grid; justify-items: center; gap: 6px; }
+.pv-ring__disc { width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.pv-ring__disc span { width: 60px; height: 60px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+.pv-ring small { font-size: 12px; color: var(--text-muted); }
+.pv-link--block { display: block; margin: var(--space-4) auto 0; }
+.pv-measures { display: grid; margin-top: 4px; }
+.pv-measure { display: grid; grid-template-columns: 1fr 110px 4.2em; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.pv-measure:last-child { border-bottom: 0; }
+.pv-measure__name { display: grid; min-width: 0; }
+.pv-measure__name strong { font-size: 15px; }
+.pv-measure__name small { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.pv-measure__delta { text-align: right; }
+.pv-mini { width: 110px; height: 30px; }
+.pv-mini__line { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.pv-mini--good { color: var(--good-text, #2e7d32); }
+.pv-mini--off { color: var(--warning-text, #b45a12); }
+.pv-mini--flat { color: var(--text-muted); }
+.pv-mini__line { stroke: currentColor; }
+.pv-mini__area { fill: currentColor; opacity: .12; }
+.pv-mini__dot { fill: currentColor; }

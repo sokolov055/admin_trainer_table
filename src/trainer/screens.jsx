@@ -111,7 +111,9 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
 
   const filters = [
     // Было «Ближайшие» — обещало больше, чем показывает (FT-567)
-    { value: 'next', label: `Сегодня · ${upcoming.length}` },
+    // «Ещё сегодня» — клиенты, чьё занятие сегодня ещё впереди; крупное
+    // «N занятий» над списком — весь день по календарю, с проведёнными
+    { value: 'next', label: `Ещё сегодня · ${upcoming.length}` },
     { value: 'all', label: `Все · ${clients.length}` },
     { value: 'splits', label: `Сплиты · ${splits.length}` },
     { value: 'online', label: `Онлайн · ${online.length}` },
@@ -367,6 +369,9 @@ function TrainerDay({ summary, clients, attention }) {
 
   let hint;
   if (next) hint = 'следующее — ' + next.name + ', ' + formatWhen(next.at);
+  // Сколько ещё впереди — то же число, что у фильтра «Ещё сегодня» (11.11.2026)
+  const ahead = clients.filter((c) => c.nextTrainingDate && isToday(c.nextTrainingDate)).length;
+  if (total && ahead) hint = 'ещё ' + ahead + ' ' + plural(ahead, 'клиент', 'клиента', 'клиентов') + ' · ' + hint;
   else hint = 'впереди занятий не назначено';
   if (day && day.total && left === 0) hint = 'все занятия на сегодня проведены · ' + hint;
 
@@ -374,7 +379,9 @@ function TrainerDay({ summary, clients, attention }) {
 
   const facts = [
     summary.totalTrainings + ' ' + plural(summary.totalTrainings, 'тренировка', 'тренировки', 'тренировок') + ' за месяц',
-    attention ? 'внимания требуют ' + attention + ' из ' + summary.count : 'внимания никто не требует',
+    // «из N» — те же клиенты, что в фильтре «Все» (без тестовых; 11.11.2026:
+    // summary.count считал и тестовых, и «из 9» не сходилось со «Все · 8»)
+    attention ? 'внимания требуют ' + attention + ' из ' + clients.length : 'внимания никто не требует',
     uninvited ? 'не приглашены ' + uninvited : 'приглашены все',
   ];
 

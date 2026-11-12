@@ -226,7 +226,7 @@ function AwardList({ awards }) {
 }
 
 // preview — тренер смотрит «глазами клиента»: всё видно, править нельзя
-export default function Goals({ clientRow, preview = false }) {
+export default function Goals({ clientRow, preview = false, compact = false }) {
   const { data, loading } = useData('client.awards', clientRow ? { clientRow } : {}, [clientRow]);
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -300,14 +300,15 @@ export default function Goals({ clientRow, preview = false }) {
                 {series && ' · ' + series}
               </p>
             </GoalCard>
-            <GoalCard title={(ring('year').label || parts(data.today).y) + ' год'} layout={year} grid>
+            {/* compact — «Прогресс → Активность» (12.11.2026): годовая сетка уходит, неделя и месяц остаются */}
+            {!compact && <GoalCard title={(ring('year').label || parts(data.today).y) + ' год'} layout={year} grid>
               <ul className="goal-legend">
                 <li><span className="goal-dot goal-dot--done" aria-hidden="true" />сделано {formatNumber(year.done)}</li>
                 <li><span className="goal-dot goal-dot--missed" aria-hidden="true" />пропущено {formatNumber(year.missed)}</li>
                 <li><span className="goal-dot goal-dot--ahead" aria-hidden="true" />впереди {formatNumber(year.ahead)}</li>
               </ul>
               {year.per > 1 && <p className="goal-card__foot">Одна точка — {trainings(year.per)}</p>}
-            </GoalCard>
+            </GoalCard>}
             <Panel pad>
               <div className="goals__lines">
                 {lines.map((l, i) => (

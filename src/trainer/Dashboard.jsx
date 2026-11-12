@@ -305,9 +305,28 @@ export function Dashboard({ onGo, onOpenClient }) {
         facts={[
           { label: 'Тренировок', value: formatNumber(f.trainings, 0) + (pace.trainings ? ' · было ' + formatNumber(pace.trainings, 0) : '') },
           { label: 'Прибыль', value: formatMoney(f.profit) },
-          { label: 'Клиентов', value: formatNumber(f.activeClients, 0) },
+          // Подпись — как у цели «Клиентов в работе»: занимались в этом месяце
+          { label: 'Клиентов в работе', value: formatNumber(f.activeClients, 0) },
         ]}
       />
+
+      {/* Кому позвонить — выше цифр (владелец, 11.11.2026): со Сводки
+          начинают день, и люди важнее процентов */}
+      {quiet ? (
+        <Section title="Сделать на этой неделе">
+          <Panel>
+            <Empty
+              icon={IconCheck}
+              title="Всё на месте"
+              text="Никто не молчит, пакеты оплачены, замеры свежие, программы на месяц у всех."
+            />
+          </Panel>
+        </Section>
+      ) : signals.map((s) => (
+        <Section key={s.id} title={s.title(s.list.length)} note={s.note}>
+          <People list={s.list} note={s.line} onOpen={onOpenClient} at={s.at} />
+        </Section>
+      ))}
 
       <Section
         title="Главные цифры месяца"
@@ -360,21 +379,6 @@ export function Dashboard({ onGo, onOpenClient }) {
         </Panel>
       </Section>
 
-      {quiet ? (
-        <Section title="Сделать на этой неделе">
-          <Panel>
-            <Empty
-              icon={IconCheck}
-              title="Всё на месте"
-              text="Никто не молчит, пакеты оплачены, замеры свежие, программы на месяц у всех."
-            />
-          </Panel>
-        </Section>
-      ) : signals.map((s) => (
-        <Section key={s.id} title={s.title(s.list.length)} note={s.note}>
-          <People list={s.list} note={s.line} onOpen={onOpenClient} at={s.at} />
-        </Section>
-      ))}
 
       <p className="small muted metrics__foot">
         Всё считается из календаря, оплат, замеров и программ — вписывать

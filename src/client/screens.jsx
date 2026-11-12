@@ -29,7 +29,8 @@ import { weekPlan, weekQueue, monthWeeks, shownLength, withWeekLoad, movedToWeek
 import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, MoveWeek } from './PlanWeeks.jsx';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
-import { recentDeltas, savedPeriod, savePeriod } from './deltas.js';
+import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
+import { WeightCard, MeasuresCard, StrengthCard, WeekRings } from './ProgressVisual.jsx';
 import { Media, SetupText, MachineList, PersonalNote } from '../media.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 import WorkoutBoundary from '../WorkoutBoundary.jsx';
@@ -1839,6 +1840,16 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   // пришёл», второе — «что дала последняя неделя-две»
   const [period, setPeriodState] = useState(savedPeriod);
   const setPeriod = (value) => { setPeriodState(value); savePeriod(value); };
+  // Вкладка ленты (11.11.2026): главное — запись замера и карточка веса —
+  // над вкладками, остальное по темам. У семьи «Активности» нет — там пусто
+  const [tabState, setTabState] = useState(savedProgressTab);
+  const setTab = (value) => { setTabState(value); saveProgressTab(value); };
+  const tabs = familyRow ? PROGRESS_TABS.filter((t) => t.value !== 'activity') : PROGRESS_TABS;
+  const tab = tabs.some((t) => t.value === tabState) ? tabState : 'body';
+  // Таблицы и графики по каждому замеру — по кнопке, не в ленте (12.11.2026)
+  const [allMeasures, setAllMeasures] = useState(false);
+  const [allLifts, setAllLifts] = useState(false);
+  const [allHealth, setAllHealth] = useState(false);
 
   // Форма нового замера. Открыта или нет — состояние экрана, а не данных:
   // после записи закрывается сама и просит перечитать замеры.
@@ -1973,6 +1984,9 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   // Одна метрика за раз. Вес и обхваты живут в разных диапазонах: на общей
   // оси линия веса прижмётся к низу, а двух шкал на графике быть не должно.
   const fields = measureFields(measurements, series);
+  const weightPoints = ((series[0] && series[0].rows) || [])
+    .filter((r) => r['Вес'] !== null && r['Вес'] !== undefined)
+    .map((r) => ({ x: r.date, y: r['Вес'] }));
   const available = fields.filter((f) =>
     series.some((s) => s.rows.some((r) => r[f] !== null && r[f] !== undefined))
   );
@@ -2032,38 +2046,24 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
       {addMeasure}
 
-      {/* Карточка веса — сразу под записью замера, выше целей и итогов:
-          «сколько я вешу» — первый вопрос экрана, и под годом точек целей
-          её было не найти (аудит 24.10.2026). Цели и итоги — следом (FT-490,
-          FT-493): цели — «иду ли я по плану», итоги — «что я сделал» */}
-      {hasRows ? (
-        <Lead
-          label={activeField}
-          value={last ? <Qty value={formatNumber(last.y)} unit={unit.trim()} /> : '—'}
-          hint={
-            change !== null
-              ? 'было ' + formatNumber(first.y) + unit + (period === 'last' ? ' на прошлом замере, ' : ' с ') + formatDate(first.x, false)
-              : last ? 'замер от ' + formatDate(last.x) : undefined
-          }
-          facts={facts.length ? facts : undefined}
-        />
-      ) : (
-        // Замеров нет, но программа месяца заполнена — вести экран нечем,
-        // кроме роста весов, и это честный ответ на «что изменилось».
-        <Lead
-          label="Рабочие веса"
-          value={<Qty value={grew.length} unit={'из ' + lifts.length} />}
-          hint="упражнений прибавили с прошлого месяца"
-          facts={progress && progress.currentMonth
-            ? [{ label: 'Месяц', value: progress.currentMonth }]
-            : undefined}
-        />
-      )}
-
       {/* «Разбор дня» (FT-738): у клиента — на «Обзоре», тренеру — здесь */}
       {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} mine={self} />}
-      {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
-      {!familyRow && <Summary clientRow={clientRow} />}
+
+      <div className="progress__tabs">
+        <Segmented label="Раздел прогресса" items={tabs} value={tab} onChange={setTab} />
+      </div>
+
+      {tab === 'body' && <>
+      {/* Тело картинками: вес линией, у каждого замера свой маленький график; таблицы — «Все замеры» */}
+      {hasRows && <WeightCard points={weightPoints} aim={measureAim('Вес', goal)} />}
+      {hasRows && <MeasuresCard rows={(series[0] && series[0].rows) || []} fields={fields} aimOf={(f) => measureAim(f, goal)}
+        open={allMeasures} onAll={() => { haptic(); setAllMeasures((v) => !v); }} />}
+      {!hasRows && (
+        <Empty icon={IconRuler} title="Замеров пока нет"
+          text="Запишите вес или обхваты — здесь появится линия веса и изменения на фигуре."
+          action={!familyRow && !adding ? <button className="button button--primary" onClick={() => { haptic(); openForm('measure')(); }}>Записать первый замер</button> : null} />
+      )}
+      {hasRows && allMeasures && <>
 
       {/* Выбор показателя — прямо над графиком, который он переключает:
           сверху, над итогом, он читался как отдельный фильтр экрана */}
@@ -2126,7 +2126,13 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         </Section>
       )}
 
-      {lifts.length > 0 && (
+      </>}
+      </>}
+
+      {tab === 'strength' && <>
+      <StrengthCard lifts={lifts} open={allLifts} onAll={() => { haptic(); setAllLifts((v) => !v); }} />
+      {!familyRow && <Summary clientRow={clientRow} compact={!allLifts} />}
+      {lifts.length > 0 && allLifts && (
         <Section
           title="Рабочие веса"
           note={(progress && progress.currentMonth ? progress.currentMonth : 'этот месяц') + ' против прошлого месяца'}
@@ -2158,9 +2164,12 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         </Section>
       )}
 
-      {/* Сырые замеры — в самом низу: до них доходят, когда нужна не
+      {lifts.length === 0 && <Empty icon={IconProgress} title="Рабочих весов пока нет" text="Они подтянутся из программы месяца, когда появятся тренировки." />}
+      </>}
+
+      {/* Сырые замеры — в самом низу «Тела»: до них доходят, когда нужна не
           картина, а конкретная цифра за конкретную дату */}
-      {hasRows
+      {tab === 'body' && hasRows && allMeasures && (hasRows
         ? series.map((s, i) => (
             <Section key={i} title={s.label ? 'Замеры: ' + s.label : 'Замеры'}>
               <Panel pad>
@@ -2189,16 +2198,24 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
               />
             </Panel>
           </Section>
-        )}
+        ))}
 
       {moving && (
         <MeasureMove from={moving.from} sheetName={moving.sheetName} clientRow={clientRow}
           onClose={() => setMoving(null)} onMoved={reload} />
       )}
 
-      {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
-      {!familyRow && <HealthDaily clientRow={clientRow} />}
-      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
+      {tab === 'activity' && !familyRow && <>
+        <WeekRings clientRow={clientRow} />
+        <Goals clientRow={clientRow} preview={clientView} compact={!allHealth} />
+        <Steps clientRow={clientRow} self={self} preview={clientView} />
+        {/* Здоровье и тренировки с часов — по кнопке: много цифр (12.11.2026) */}
+        <button type="button" className="pv-link pv-link--block" aria-expanded={allHealth} onClick={() => { haptic(); setAllHealth((v) => !v); }}>
+          {allHealth ? 'Свернуть здоровье' : 'Сон, пульс и тренировки с часов'}
+        </button>
+        {allHealth && <HealthDaily clientRow={clientRow} />}
+        {allHealth && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
+      </>}
     </>
   );
 }

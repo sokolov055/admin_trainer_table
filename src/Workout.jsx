@@ -1,6 +1,7 @@
 import { primaryEquipment } from './equipment-guidance.js';
 import WorkoutGuidance, { MachineGuide } from './WorkoutGuidance.jsx';
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { GamesNav } from './client/GamesHub.jsx';
 import { flushSync, createPortal } from 'react-dom';
 import { apiStale, apiPublic, apiMutate, apiWait } from './api.js';
 import { dropLocalWorkout, enqueueWorkout, journalGet, journalList, peekLocalWorkout, settleClosed } from './workout-outbox.js';
@@ -114,6 +115,7 @@ const labels = { active: 'Идёт', paused: 'На паузе', completed: 'За
 // backLabel — куда ведёт «назад»: из программы — к ней, из меню — к списку клиентов
 export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose, backLabel = 'К программе' }) {
   const plankEnabled = usePlankAccess();
+  const openGames = useContext(GamesNav);
   const [record, setRecord] = useState(null);
   const [history, setHistory] = useState([]);
   const [ready, setReady] = useState(false);
@@ -2496,7 +2498,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       </fieldset>
       {/* Главная кнопка после завершения — уйти к программе: занятие закончено,
           «Продолжить» — на случай ошибки, а не следующий шаг (QA 20.10.2026) */}
-      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{setsWord(stats.done)} · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>{backLabel}</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button></div>}
+      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{setsWord(stats.done)} · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>{backLabel}</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button>{/* Игры — после тренировки, не на отдыхе (владелец, 11.11.2026) */}{asClient && openGames && s.status === 'completed' && <button className="button" onClick={openGames}>Игры</button>}</div>}
       {/* «Сохранить сейчас» и «Скачать результат» убраны (03.10.2026):
           сохраняется само. Не сохранилось — «Повторить» в сообщении об
           ошибке вверху; конфликт версий — «Скачать мой черновик» там же */}

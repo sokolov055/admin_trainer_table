@@ -351,10 +351,12 @@ test('не тренер на /trainer: после кода — заявка с �
 test('три игры доступны тестовому клиенту и скрыты без серверного разрешения', async () => {
   try {
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /^Игры/ }).click();
   await page.getByRole('button', { name: /Тренер в планке/ }).click();
   await page.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
   await page.getByRole('button', { name: 'Свернуть игру', exact: true }).click();
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /^Игры/ }).click();
   await page.getByRole('button', { name: /На самокате до зала/ }).click();
   await page.locator('.menu__item').first().waitFor({ state: 'hidden' });
   const shell = await page.locator('.game-shell--scooter').evaluate(el => {
@@ -377,6 +379,7 @@ test('три игры доступны тестовому клиенту и ск
   assert.equal(await page.evaluate(() => document.documentElement.classList.contains('game-is-open') || document.querySelector('.app__header').inert), false);
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /^Игры/ }).click();
   await page.getByRole('button', { name: /Три в ряд/ }).click();
   await page.getByRole('button', { name: 'Играть', exact: true }).click();
   await page.getByRole('button', { name: 'Подсказка', exact: true }).click();
@@ -398,6 +401,7 @@ test('три игры доступны тестовому клиенту и ск
     assert.equal(await normal.getByRole('button', { name: /На самокате до зала/ }).count(), 0);
     assert.equal(await normal.getByRole('button', { name: /Три в ряд/ }).count(), 0);
     assert.equal(await normal.getByRole('button', { name: /Карьера в фитнесе/ }).count(), 0);
+    assert.equal(await normal.getByRole('button', { name: /^Игры/ }).count(), 0);
   } finally { await normalContext.close(); }
   } catch (error) {
     console.error('Game QA:', error, await page.locator('[data-scooter=viewport]').evaluateAll(els => els.map(el => ({ phase: el.dataset.phase, lane: el.dataset.lane }))));
@@ -407,6 +411,7 @@ test('три игры доступны тестовому клиенту и ск
 
 test('карьера в фитнесе: ступень, задание в игре с целью и возврат в карьеру', async () => {
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /^Игры/ }).click();
   await page.getByRole('button', { name: /Карьера в фитнесе/ }).click();
   await page.getByText('Ступень 1 из 10').waitFor();
   await page.getByRole('heading', { name: 'Тренировки на улице' }).waitFor();
@@ -426,6 +431,7 @@ test('карьера в фитнесе: ступень, задание в игр
   await page.getByRole('button', { name: 'Тренировки', exact: true }).waitFor();
   // Обычная игра из меню — снова без задания
   await page.getByRole('button', { name: 'Меню', exact: true }).click();
+  await page.getByRole('button', { name: /^Игры/ }).click();
   await page.getByRole('button', { name: /Три в ряд/ }).click();
   assert.equal(await page.locator('.career-note').count(), 0);
   assert.equal(await page.locator('[data-match=moves]').innerText(), '20');
@@ -445,6 +451,7 @@ test('карьера: бонус в задании, пауза ведёт в к�
     }, state);
     await p.reload();
     await p.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 60000 });
+    await p.getByRole('button', { name: /^Игры/ }).click();
     await p.getByRole('button', { name: /Карьера в фитнесе/ }).click();
     await p.locator('.career-step').first().waitFor();
   };
@@ -982,7 +989,7 @@ test('смахнуть вправо возвращает из «Моих дан�
  * «Глазами клиента» вместо пункта меню). Смахнули вправо с первого
  * раздела или «К карточке» — снова карточка этого клиента.
  */
-test('игра на отдыхе у тестового клиента глазами тренера (FT-572)', async () => {
+test('игра на отдыхе у тестового клиента глазами тренера (FT-572); в меню — «Ещё → Игры»', async () => {
   const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', hasTouch: true, isMobile: true });
   const phone = await context.newPage();
   phone.on('pageerror', error => consoleErrors.push(String(error)));
@@ -995,6 +1002,7 @@ test('игра на отдыхе у тестового клиента глаза
     await phone.getByRole('button', { name: 'Глазами клиента' }).click();
     await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     assert.equal(await phone.getByRole('button', { name: /Тренер в планке/ }).count(), 0);
+    assert.equal(await phone.getByRole('button', { name: /^Игры/ }).count(), 0);
     await phone.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
     await phone.getByRole('button', { name: 'К карточке', exact: true }).click();
     await phone.getByRole('button', { name: /Изменить карточку/ }).click();
@@ -1002,6 +1010,7 @@ test('игра на отдыхе у тестового клиента глаза
     await phone.waitForFunction(() => !document.querySelector('.client-test input').disabled);
     await phone.getByRole('button', { name: 'Глазами клиента' }).click();
     await phone.getByRole('button', { name: 'Меню', exact: true }).click();
+    await phone.getByRole('button', { name: /^Игры/ }).click();
     await phone.getByRole('button', { name: /Тренер в планке/ }).click();
     await phone.getByRole('button', { name: 'Поставить тренера в планку' }).waitFor();
     await phone.getByRole('button', { name: 'Свернуть игру', exact: true }).click();
@@ -1285,7 +1294,10 @@ test('мои тренировки: программа, прогресс, пит�
       await phone.getByRole('tab', { name: tab, exact: true }).click();
       await phone.locator(`.card-section[data-view]:not([hidden])`).waitFor({ timeout: 5000 });
       if (tab === 'Прогресс') {
-        // Тренировки с часов — рядом с шагами; совпавшая с занятием совмещена
+        // Тренировки с часов — рядом с шагами, во вкладке «Активность» (11.11.2026);
+        // совпавшая с занятием совмещена
+        await phone.getByRole('radio', { name: 'Активность', exact: true }).click();
+        await phone.getByRole('button', { name: 'Сон, пульс и тренировки с часов' }).click();
         await phone.getByText('Тренировки с часов').waitFor({ timeout: 5000 });
         await phone.getByText('Совмещено с «Верх»').waitFor({ timeout: 5000 });
         if (process.env.SHOT_HW) { await phone.getByText('Тренировки с часов').scrollIntoViewIfNeeded(); await phone.screenshot({ path: process.env.SHOT_HW }); }
@@ -1344,6 +1356,8 @@ test('карта мышц: тренировка, программа, итоги 
     await assert.doesNotReject(edit.getByText(/Грудь, трицепс/).waitFor({ timeout: 5000 }), 'в свёрнутой строке — новая основная группа');
 
     await phone.getByRole('tab', { name: 'Прогресс', exact: true }).click();
+    // Итоги с картой мышц — во вкладке «Сила» (11.11.2026)
+    await phone.getByRole('radio', { name: 'Сила', exact: true }).click();
     await assert.doesNotReject(phone.locator('.summary__muscles').waitFor({ timeout: 10000 }));
   } finally {
     await context.close();

@@ -126,7 +126,7 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
   // Игра на отдыхе — тоже на весь экран: касание по кнопке и есть жест,
   // без которого браузер не уберёт адресную строку (19.10.2026)
   const openGame = (event, kind) => {
-    setGameKind(kind); setGameUntil(until);
+    setGameKind(kind); setGameUntil(until); rememberGame(kind);
     if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) enterFullscreen(event.currentTarget);
   };
   const share = over ? 1 : Math.max(0, Math.min(1, left / Math.max(1, total)));
@@ -185,14 +185,9 @@ export function RestScreen({ until, total, now, next, onMore, onStop, onCollapse
         </div>
       )}
       {over && allowGame && (activeRound(plank.round) || scooterActive || matchActive || bliniActive) && <p className="rest-screen__game-paused" role="status">Игра на паузе. Сделай подход — продолжим на следующем отдыхе.</p>}
-      {!over && allowGame && <>
-        <div className="rest-screen__games" aria-label="Игры на отдыхе">
-          <button type="button" onClick={(event) => { openGame(event, 'plank'); }}><IconPlankGame size={64} /><span>{activeRound(plank.round) ? 'Продолжить игру' : 'Тренер в планке'}</span></button>
-          <button type="button" onClick={(event) => { openGame(event, 'scooter'); }}><IconScooterGame size={64} /><span>{scooterActive ? 'Продолжить поездку' : 'На самокате до зала'}</span></button>
-          <button type="button" onClick={(event) => { openGame(event, 'match'); }}><IconMatchGame size={64} /><span>{matchActive ? 'Продолжить три в ряд' : 'Три в ряд'}</span></button>
-          <button type="button" onClick={(event) => { openGame(event, 'blini'); }}><IconBliniGame size={64} /><span>{bliniActive ? 'Продолжить блины' : 'Блины'}</span></button>
-        </div>
-      </>}
+      {!over && allowGame && <RestGames featured={featuredGame({ plank: activeRound(plank.round), scooter: scooterActive, match: matchActive, blini: bliniActive })}
+        active={{ plank: activeRound(plank.round), scooter: scooterActive, match: matchActive, blini: bliniActive }}
+        left={left} onOpen={openGame} />}
       <div className={'rest-screen__actions' + (onMore ? '' : ' rest-screen__actions--one')}>
         {over
           ? <button type="button" className="button button--primary rest-screen__main" onClick={leave(onStop)}>Закрыть</button>
@@ -228,5 +223,64 @@ export function RestPill({ left, onOpen }) {
       <strong role="timer" aria-live="off">{clock(left)}</strong>
       <IconChevron size={16} className="rest-pill__up" aria-hidden="true" />
     </button>
+  );
+}
+
+/*
+ * Игры на отдыхе (владелец, 12.11.2026, вариант А): последняя игра — крупной
+ * карточкой в её цветах, остальные — маленькими иконками. Игры задуманы именно
+ * для отдыха между подходами; карточка «Продолжить» — одно касание до своей
+ * партии. Подписи кнопок прежние: по ним игру находят и проверки.
+ */
+const GAMES = {
+  plank: { Icon: IconPlankGame, name: 'Тренер в планке', go: 'Продолжить игру', note: 'Фитнес-викторина на 10 секунд' },
+  scooter: { Icon: IconScooterGame, name: 'На самокате до зала', go: 'Продолжить поездку', note: 'Заезд, пока идёт отдых' },
+  match: { Icon: IconMatchGame, name: 'Три в ряд', go: 'Продолжить три в ряд', note: 'Пара ходов между подходами' },
+  blini: { Icon: IconBliniGame, name: 'Блины', go: 'Продолжить блины', note: 'Докати блины до помоста' },
+};
+const ORDER = ['plank', 'scooter', 'match', 'blini'];
+const LAST_KEY = 'ft.rest.lastGame';
+
+function rememberGame(kind) {
+  try { localStorage.setItem(LAST_KEY, kind); } catch (_) { /* не запомнили — покажем первую */ }
+}
+
+/** Какую игру показать крупно: последняя, если её партия идёт; иначе любая идущая; иначе последняя */
+export function featuredGame(active, last = (() => { try { return localStorage.getItem(LAST_KEY); } catch (_) { return null; } })()) {
+  if (last && GAMES[last] && active[last]) return last;
+  const going = ORDER.find((k) => active[k]);
+  if (going) return going;
+  return last && GAMES[last] ? last : 'plank';
+}
+
+function RestGames({ featured, active, left, onOpen }) {
+  const main = GAMES[featured];
+  const label = (k) => (active[k] ? GAMES[k].go : GAMES[k].name);
+  const Main = main.Icon;
+  return (
+    <div className="rest-games" role="group" aria-label="Игры на отдыхе">
+      <button type="button" className={'rest-games__main rest-games__main--' + featured} aria-label={label(featured)}
+        onClick={(event) => onOpen(event, featured)}>
+        <Main size={56} />
+        <span className="rest-games__text">
+          <strong>{main.name}</strong>
+          <small>{active[featured] ? 'Партия ждёт — продолжим' : main.note}</small>
+        </span>
+        <span className="rest-games__go" aria-hidden="true">{active[featured] ? 'Дальше' : 'Играть'}</span>
+      </button>
+      <div className="rest-games__others">
+        {ORDER.filter((k) => k !== featured).map((k) => {
+          const { Icon } = GAMES[k];
+          return (
+            <button key={k} type="button" className="rest-games__mini" aria-label={label(k)} title={label(k)}
+              onClick={(event) => onOpen(event, k)}>
+              <Icon size={40} />
+              {active[k] && <span className="rest-games__dot" aria-hidden="true" />}
+            </button>
+          );
+        })}
+        <span className="rest-games__hint">ещё игры</span>
+      </div>
+    </div>
   );
 }

@@ -54,6 +54,22 @@ const MEASURE_ROWS = [
   { date: daysAgo(4), 'Вес': 76.9, 'Талия': 85.5, 'Грудь': 106.5, 'Бедро': 61.5, 'Рука': 36.5, 'Ягодицы': 98.5, 'Плечи': 121 },
 ];
 
+/** Подписи «Обзора» как у сервера (handlers.js monthSheetStatus, measures.js) */
+function currentMonthLabelLike(now = new Date()) {
+  const name = now.toLocaleDateString('ru-RU', { month: 'long' });
+  return name.charAt(0).toUpperCase() + name.slice(1) + ' ' + now.getFullYear();
+}
+function demoMonthStatus() {
+  const label = currentMonthLabelLike();
+  return MONTHS.includes(label) ? '✅ ' + label : '❌ нет "' + label + '"';
+}
+function measureStatusLike(rows, now = new Date()) {
+  const last = rows.map((r) => String(r.date).slice(0, 10)).sort().pop();
+  if (!last) return '❌ нет замеров';
+  const month = now.toISOString().slice(0, 7);
+  return (last.slice(0, 7) === month ? '✅ ' : '❌ ') + last.split('-').reverse().join('.');
+}
+
 const FIELDS = ['Вес', 'Талия', 'Ягодицы', 'Грудь', 'Рука', 'Бедро', 'Плечи'];
 
 /** Какие месяцы тренер скрыл от клиента. Демо начинает с одного скрытого:
@@ -968,7 +984,8 @@ function demoFinance(months) {
 function demoProcess(months) {
   const trainings = demoFinance(months).trainings;
   return {
-    activeClients: 23,
+    // Тот же счёт, что у денег (сервер: оба — workedOver за период)
+    activeClients: 15,
     measuredClients: 9 * months.length,
     measuredShare: 39,
     trainings,
@@ -1736,9 +1753,13 @@ const MOCK = {
     scheduleKnown: true,
     startDate: daysAgo(400),
     birthDate: null,
-    lastMeasureStatus: '✅ 13.09.2026',
-    monthSheetStatus: '✅ Сентябрь 2026',
-    currentMonthName: 'Сентябрь 2026',
+    // Как сервер (measures.js): дата самого позднего замера, ✅ — если он в
+    // этом месяце. Раньше здесь стояло «13.09.2026» при замере 4 дня назад
+    lastMeasureStatus: measureStatusLike(MEASURE_ROWS),
+    // Демо-программа заведена на сентябрь 2026 (MONTHS): в другом месяце
+    // сервер ответил бы «нет "<текущий месяц>"», так и показываем
+    monthSheetStatus: demoMonthStatus(),
+    currentMonthName: currentMonthLabelLike(),
     hasPersonalSheet: true,
     // Отмены и переносы — как отдаёт сервер тренеру
     scheduleChanges: {

@@ -34,3 +34,25 @@ export function savedPeriod() {
 export function savePeriod(value) {
   try { localStorage.setItem(KEY, value); } catch (_) { /* не запомнили — не беда */ }
 }
+
+/*
+ * Вкладки «Прогресса» (владелец, 11.11.2026): лента из ~12 экранов разбита
+ * на «Тело / Сила / Активность». Выбранная — тоже удобство одного телефона.
+ */
+const TAB_KEY = 'progress_tab_v1';
+export const PROGRESS_TABS = [
+  { value: 'body', label: 'Тело' },
+  { value: 'strength', label: 'Сила' },
+  { value: 'activity', label: 'Активность' },
+];
+
+export function savedProgressTab() {
+  try {
+    const v = localStorage.getItem(TAB_KEY);
+    return PROGRESS_TABS.some((t) => t.value === v) ? v : 'body';
+  } catch (_) { return 'body'; }
+}
+
+export function saveProgressTab(value) {
+  try { localStorage.setItem(TAB_KEY, value); } catch (_) { /* не запомнили — не беда */ }
+}

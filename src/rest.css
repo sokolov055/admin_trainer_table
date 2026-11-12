@@ -1,6 +1,6 @@
 /* Экран отдыха и свёрнутая плашка (RestScreen.jsx) — и в тренировке, и
    в любом разделе (RestLayer.jsx) */
-.rest-screen { position: fixed; inset: 0; z-index: var(--z-rest); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); background: var(--bg, #111); color: var(--text); animation: rest-in var(--dur) var(--ease-out) both; }
+.rest-screen { position: fixed; inset: 0; z-index: var(--z-rest, 90); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); background: var(--bg, #111); color: var(--text); animation: rest-in var(--dur) var(--ease-out) both; }
 @keyframes rest-in { from { opacity: 0; transform: scale(0.98); } }
 .rest-screen__label { margin: 0; font-size: 22px; font-weight: 700; color: var(--accent); }
 .rest-screen--over .rest-screen__label { color: var(--warning-text); }
@@ -21,12 +21,25 @@
 /* «Вес тот же» — утопленной подложкой и вторичным текстом: серый на --border был 3,3–4,4:1 (аудит 24.10.2026) */
 .rest-screen__next-change--same, .rest-screen__next-change--new { background: var(--surface-sunken); color: var(--text-secondary); }
 .rest-screen__actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; width: min(100%, 420px); }
-.rest-screen__games { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: min(100%, 440px); }
-@media (max-width: 359px) { .rest-screen__games { grid-template-columns: repeat(2, 1fr); } }
-.rest-screen__games button { min-width: 0; min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 7px 5px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; transition: transform var(--dur-press, 120ms) var(--ease-out, ease-out), background-color var(--dur-fast, 160ms) var(--ease-out, ease-out); }
-.rest-screen__games button:active { transform: scale(.96); }
-.rest-screen__games span { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; font-size: 12px; line-height: 1.2; font-weight: 700; text-align: center; -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
-.rest-screen__games .game-menu-icon { flex: 0 0 auto; }
+/* Игры на отдыхе (вариант А, 12.11.2026): карточка последней игры в её цветах + мини-иконки остальных */
+.rest-games { width: min(100%, 420px); display: grid; gap: 10px; }
+.rest-games__main { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 76px; padding: 10px 12px; border: 0; border-radius: 18px; color: #fff; font: inherit; text-align: left; cursor: pointer; background: linear-gradient(135deg, #7b3fe4, #e8833a); box-shadow: 0 6px 18px rgba(0, 0, 0, .14); transition: transform var(--dur-press, 120ms) var(--ease-out, ease-out); }
+.rest-games__main--plank { background: linear-gradient(135deg, #e0782f, #2f8f5b); }
+.rest-games__main--scooter { background: linear-gradient(135deg, #2f8f5b, #2673d0); }
+.rest-games__main--match { background: linear-gradient(135deg, #7b3fe4, #e8833a); }
+.rest-games__main--blini { background: linear-gradient(135deg, #1f4d3a, #3a7f5f); }
+.rest-games__main:active { transform: scale(.98); }
+.rest-games__main .game-menu-icon { box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.rest-games__text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.rest-games__text strong { font-size: 17px; line-height: 1.2; }
+.rest-games__text small { font-size: 13px; line-height: 1.3; opacity: .92; }
+.rest-games__go { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; background: #fff; color: #2b2b2b; font-weight: 800; font-size: 14px; }
+.rest-games__others { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.rest-games__mini { position: relative; display: inline-flex; padding: 0; border: 0; background: none; border-radius: 24%; cursor: pointer; transition: transform var(--dur-press, 120ms) var(--ease-out, ease-out); }
+.rest-games__mini:active { transform: scale(.94); }
+.rest-games__dot { position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+.rest-games__hint { font-size: 13px; color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) { .rest-games__main, .rest-games__mini { transition: none; } .rest-games__main:active, .rest-games__mini:active { transform: none; } }
 .rest-screen--over .rest-screen__actions { grid-template-columns: 1fr; }
 .rest-screen__actions .button { min-height: 56px; font-size: 17px; }
 @media (prefers-reduced-motion: reduce) { .rest-screen { animation: none; } .rest-screen__bar { transition: none; } }
@@ -36,7 +49,7 @@
 @keyframes rest-out { to { opacity: 0; transform: scale(0.98); } }
 @media (prefers-reduced-motion: reduce) { .rest-screen--leaving { animation: none; } }
 /* Экран отдыха — поверх всего (портал в body): под ним ничего не листается */
-.rest-screen { touch-action: none; overscroll-behavior: contain; z-index: var(--z-rest); }
+.rest-screen { touch-action: none; overscroll-behavior: contain; z-index: var(--z-rest, 90); }
 /* Вниз — свернуть, как шторку. Горизонтальный и короткий жесты не мешают
    кнопкам и не срабатывают случайно. */
 .rest-screen:not(.rest-screen--over) { cursor: ns-resize; }
@@ -78,4 +91,3 @@
 .rest-pill--island .rest-pill__dot { background: #ff9f0a; }
 .rest-pill--island .rest-pill__up { transform: none; color: rgba(255, 255, 255, 0.6); }
 @keyframes rest-island-in { from { opacity: 0; transform: translate(-50%, -12px) scale(0.9); } }
-@media (prefers-reduced-motion: reduce) { .rest-screen__games button { transition: none; } .rest-screen__games button:active { transform: none; } }

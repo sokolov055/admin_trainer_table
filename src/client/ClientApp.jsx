@@ -47,6 +47,7 @@ import Permissions, { usePermissions, permissionsAsked, appOffer, AppOffer } fro
 import { HealthConnectScreen, HealthSettings, useHealthAsk } from './HealthConnect.jsx';
 import GameShell from '../GameShell.jsx';
 import { GAME_ITEMS } from '../game-icons.jsx';
+import GamesHub, { GAMES_HUB, GamesNav } from './GamesHub.jsx';
 import CareerHub from '../CareerHub.jsx';
 import { useCareer } from '../CareerSession.jsx';
 import QuickAdd from './QuickAdd.jsx';
@@ -102,7 +103,8 @@ const MENU = [
 // Игры — общий список с «Моими тренировками» владельца (game-icons.jsx).
 // Отдельной группой с заголовком в конце меню (аудит 24.10.2026): пять
 // пунктов с картинками 64 px стояли между «Семьёй» и «Моими данными», и
-// «Настройки» с «Моим тренером» уходили за край панели
+// «Настройки» с «Моим тренером» уходили за край панели.
+// С 11.11.2026 в меню один пункт «Игры» (GAMES_HUB), сами игры — экраны за ним
 const GAMES = GAME_ITEMS.map((g) => ({ ...g, game: true }));
 
 // Семья — в меню, только если тренер открыл её этому человеку и в ней
@@ -242,7 +244,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   // «Глазами клиента» — меню как у клиента, с «Моим тренером» (03.10.2026)
   const menu = [...(familyMembers.length ? [FAMILY] : []), ...MENU, ...(tours.length || hasGuide(storyTopics) ? [guide] : []), ...(own || (preview && !(me && me.member)) ? [TRAINER] : []), ...android];
   const games = plankEnabled ? GAMES : [];
-  const VIEWS = TABS.concat(menu, games);
+  const VIEWS = TABS.concat(menu, games, plankEnabled ? [GAMES_HUB] : []);
 
   // «Мои данные» и «Настройки» открываются из меню поверх вкладок:
   // смахнуть вправо — вернуться на ту вкладку, где был человек
@@ -314,6 +316,10 @@ export default function ClientApp({ me, clientRow, preview }) {
     haptic();
   };
   goRef.current = go;
+
+  // «Игры» с экрана завершённой тренировки (Workout.jsx): занятие живёт во
+  // вкладке «Тренировки», go ему не передаётся — берёт из контекста
+  const openGames = plankEnabled ? () => goRef.current && goRef.current('games') : null;
 
   // «+» посередине меню — лист быстрой записи (пункт 13 плана, 21.10.2026).
   // Плитка листа переключает вкладку и оставляет ей запрос: форма замера,
@@ -406,6 +412,7 @@ export default function ClientApp({ me, clientRow, preview }) {
   };
 
   return (
+    <GamesNav.Provider value={openGames}>
     <div className="app">
       {preview && (
         <aside className="client-preview" aria-label="Режим просмотра клиента">
@@ -470,9 +477,8 @@ export default function ClientApp({ me, clientRow, preview }) {
           {menu.map(menuItem)}
         </div>
         {games.length > 0 && (
-          <div className="client-menu__group" role="group" aria-labelledby="client-menu-games">
-            <h2 className="client-menu__title" id="client-menu-games">Игры</h2>
-            <div className="menu__list client-menu">{games.map(menuItem)}</div>
+          <div className="client-menu__group">
+            <div className="menu__list client-menu">{menuItem(GAMES_HUB)}</div>
           </div>
         )}
 
@@ -547,6 +553,7 @@ export default function ClientApp({ me, clientRow, preview }) {
         {view === 'scooter-game' && plankEnabled && <GameShell kind="scooter"><ScooterGame immersive onClose={() => go(lastTab)} /></GameShell>}
         {view === 'match-game' && plankEnabled && <GameShell kind="match"><MatchGame onClose={() => go(lastTab)} /></GameShell>}
         {view === 'blini-game' && plankEnabled && <GameShell kind="blini"><BliniGame onClose={() => go(lastTab)} /></GameShell>}
+        {view === 'games' && plankEnabled && <GamesHub onOpen={go} />}
         {view === 'profile' && (
           <>
             <p className="small muted">
@@ -650,6 +657,7 @@ export default function ClientApp({ me, clientRow, preview }) {
       <TabBar tabs={TABS} active={view} onSelect={go} action={quickAction} />
       <PlusMoments enabled={own} />
     </div>
+    </GamesNav.Provider>
   );
 }
 
