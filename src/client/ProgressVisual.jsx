@@ -10,10 +10,12 @@ import { Delta, Qty, formatNumber, formatDate } from '../ui.jsx';
  */
 
 /** Вес линией: число крупно, изменение словами, под ним площадь графика */
-export function WeightCard({ points, aim = 0 }) {
+export function WeightCard({ points, aim = 0, period = 'all' }) {
   if (!points.length) return null;
   const last = points[points.length - 1];
-  const first = points[0];
+  // «С прошлого замера» (FT-782): изменение между двумя последними точками
+  const recent = period === 'last' && points.length > 1;
+  const first = recent ? points[points.length - 2] : points[0];
   const change = points.length > 1 ? Math.round((last.y - first.y) * 10) / 10 : null;
   const ys = points.map((p) => p.y);
   const min = Math.min(...ys);
@@ -32,14 +34,15 @@ export function WeightCard({ points, aim = 0 }) {
       <div className="pv-hero"><Qty value={formatNumber(last.y)} unit="кг" /></div>
       <p className="pv-card__line">
         {change !== null
-          ? <><Delta value={change} suffix=" кг" aim={aim} /> с {formatDate(first.x, false)}</>
+          ? <><Delta value={change} suffix=" кг" aim={aim} /> {recent ? 'с прошлого замера, ' : 'с '}{formatDate(first.x, false)}</>
           : 'замер от ' + formatDate(last.x)}
       </p>
       {points.length > 1 && (
         <svg className="pv-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
           aria-label={'График веса: с ' + formatNumber(first.y) + ' до ' + formatNumber(last.y) + ' кг'}>
-          <path d={line + ` L ${W} ${H} L 0 ${H} Z`} className="pv-spark__area" />
-          <path d={line} className="pv-spark__line" />
+          {!recent && <path d={line + ` L ${W} ${H} L 0 ${H} Z`} className="pv-spark__area" />}
+          <path d={line} className={'pv-spark__line' + (recent ? ' is-past' : '')} />
+          {recent && <path d={`M ${xy[xy.length - 2][0]} ${xy[xy.length - 2][1]} L ${xy[xy.length - 1][0]} ${xy[xy.length - 1][1]}`} className="pv-spark__line pv-spark__line--recent" />}
           <circle cx={xy[xy.length - 1][0]} cy={xy[xy.length - 1][1]} r="4.5" className="pv-spark__dot" />
         </svg>
       )}
@@ -48,7 +51,7 @@ export function WeightCard({ points, aim = 0 }) {
 }
 
 /** Мини-график одного замера: линия за всё время, точка на последнем */
-function Spark({ values, tone }) {
+function Spark({ values, tone, recent = false }) {
   const W = 110;
   const H = 30;
   const min = Math.min(...values);
@@ -58,8 +61,10 @@ function Spark({ values, tone }) {
   const [lx, ly] = pts[pts.length - 1];
   return (
     <svg className={'pv-mini pv-mini--' + tone} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
-      <path d={line + ` L ${W} ${H} L 0 ${H} Z`} className="pv-mini__area" />
-      <path d={line} className="pv-mini__line" />
+      {!recent && <path d={line + ` L ${W} ${H} L 0 ${H} Z`} className="pv-mini__area" />}
+      <path d={line} className={'pv-mini__line' + (recent ? ' is-past' : '')} />
+      {recent && <path d={`M ${pts[pts.length - 2][0]} ${pts[pts.length - 2][1]} L ${lx} ${ly}`} className="pv-mini__line pv-mini__line--recent" />}
+      {recent && <circle cx={pts[pts.length - 2][0]} cy={pts[pts.length - 2][1]} r="2.6" className="pv-mini__dot" />}
       <circle cx={lx} cy={ly} r="3" className="pv-mini__dot" />
     </svg>
   );
@@ -70,19 +75,22 @@ function Spark({ values, tone }) {
  * обхвата — было → стало, свой маленький график за всё время и итог стрелкой.
  * Зелёный — в сторону цели клиента, оранжевый — от неё.
  */
-export function MeasuresCard({ rows, fields, aimOf, onAll, open }) {
+export function MeasuresCard({ rows, fields, aimOf, onAll, open, period = 'all' }) {
   const list = fields
     .filter((f) => f !== 'Вес')
     .map((f) => ({ f, pts: rows.filter((r) => r[f] !== null && r[f] !== undefined).map((r) => ({ x: r.date, y: r[f] })) }))
     .filter((m) => m.pts.length > 0);
   if (!list.length) return null;
-  const since = rows.length ? formatDate(rows[0].date, false) : '';
+  const recent = period === 'last' && rows.length > 1;
+  const since = !rows.length ? ''
+    : recent ? formatDate(rows[rows.length - 2].date, false) + ' → ' + formatDate(rows[rows.length - 1].date, false)
+      : 'с ' + formatDate(rows[0].date, false);
   return (
     <section className="pv-card" aria-label="Замеры">
-      <div className="pv-card__label">Замеры{since ? ' · с ' + since : ''}</div>
+      <div className="pv-card__label">Замеры{since ? ' · ' + since : ''}</div>
       <div className="pv-measures">
         {list.map(({ f, pts }) => {
-          const first = pts[0].y;
+          const first = (recent && pts.length > 1 ? pts[pts.length - 2] : pts[0]).y;
           const last = pts[pts.length - 1].y;
           const change = Math.round((last - first) * 10) / 10;
           const aim = aimOf(f);
@@ -93,7 +101,7 @@ export function MeasuresCard({ rows, fields, aimOf, onAll, open }) {
                 <strong>{f}</strong>
                 <small>{pts.length > 1 ? formatNumber(first) + ' → ' + formatNumber(last) + ' см' : formatNumber(last) + ' см'}</small>
               </div>
-              {pts.length > 1 ? <Spark values={pts.map((p) => p.y)} tone={tone} /> : <span />}
+              {pts.length > 1 ? <Spark values={pts.map((p) => p.y)} tone={tone} recent={recent} /> : <span />}
               <span className="pv-measure__delta">{pts.length > 1 ? <Delta value={change} aim={aim} /> : ''}</span>
             </div>
           );

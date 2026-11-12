@@ -1945,41 +1945,8 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       </div>
     );
 
-  if (!hasRows && lifts.length === 0) {
-    return (
-      <>
-        {/* Пустой экран — одно действие (FT-495): кнопка «Записать первый
-            замер» стоит в самом пустом состоянии, а не отдельно над ним.
-            Пока форма открыта, на её месте — она */}
-        {adding && addMeasure}
-        {/* Плашка цели — только здесь (владелец, 21.10.2026: на каждом
-            экране она мешала; цель — разговор о прогрессе) */}
-        {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
-        {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} mine={self} />}
-        {!familyRow && <Goals clientRow={clientRow} preview={clientView} />}
-        {!familyRow && <Summary clientRow={clientRow} />}
-        <Empty
-          icon={IconProgress}
-          title="Прогресс пока не из чего собрать"
-          text={
-            familyRow
-              ? 'Замеров и рабочих весов пока нет.'
-              : (measurements && measurements.note)
-            || 'Запишите первый замер — и здесь появятся динамика, изменения и таблица замеров. '
-               + 'Рабочие веса подтянутся из программы месяца.'
-          }
-          action={!familyRow && !adding ? (
-            <button className="button button--primary" onClick={() => { setAdded(null); setAdding(true); }}>
-              Записать первый замер
-            </button>
-          ) : null}
-        />
-        {!familyRow && <Steps clientRow={clientRow} self={self} preview={clientView} />}
-        {!familyRow && <HealthDaily clientRow={clientRow} />}
-      {!familyRow && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
-      </>
-    );
-  }
+  // Пустой «Прогресс» (нет замеров и весов, например «Мои тренировки» тренера)
+  // рисуется теми же вкладками: пустые состояния — внутри «Тела» и «Силы» (12.11.2026)
 
   // Одна метрика за раз. Вес и обхваты живут в разных диапазонах: на общей
   // оси линия веса прижмётся к низу, а двух шкал на графике быть не должно.
@@ -2055,8 +2022,17 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
 
       {tab === 'body' && <>
       {/* Тело картинками: вес линией, у каждого замера свой маленький график; таблицы — «Все замеры» */}
-      {hasRows && <WeightCard points={weightPoints} aim={measureAim('Вес', goal)} />}
-      {hasRows && <MeasuresCard rows={(series[0] && series[0].rows) || []} fields={fields} aimOf={(f) => measureAim(f, goal)}
+      {/* Общий переключатель периода для веса и замеров (FT-782, владелец 12.11.2026);
+          тот же выбор, что был у таблицы «Изменения по замерам» */}
+      {hasRows && series.some((x) => x.rows.length > 1) && (
+        <div className="progress__period">
+          <Segmented track label="Изменения за период"
+            items={[{ value: 'all', label: 'За всё время' }, { value: 'last', label: 'С прошлого замера' }]}
+            value={period} onChange={setPeriod} />
+        </div>
+      )}
+      {hasRows && <WeightCard points={weightPoints} aim={measureAim('Вес', goal)} period={period} />}
+      {hasRows && <MeasuresCard rows={(series[0] && series[0].rows) || []} fields={fields} aimOf={(f) => measureAim(f, goal)} period={period}
         open={allMeasures} onAll={() => { haptic(); setAllMeasures((v) => !v); }} />}
       {!hasRows && (
         <Empty icon={IconRuler} title="Замеров пока нет"
@@ -2089,7 +2065,6 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {hasDeltas && (
         <Section title="Изменения по замерам" note={period === 'last' ? 'от прошлого замера к последнему' : 'от первого к последнему'}>
           <Panel pad>
-            {periodChoice}
             {series.map((s, i) => (
               <div key={i} style={{ marginBottom: series.length > 1 && i < series.length - 1 ? 20 : 0 }}>
                 {s.label && (

@@ -6688,3 +6688,9 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .pv-mini__line { stroke: currentColor; }
 .pv-mini__area { fill: currentColor; opacity: .12; }
 .pv-mini__dot { fill: currentColor; }
+/* FT-782: «С прошлого замера» — весь путь серым, последний отрезок цветом */
+.progress__period { margin-top: var(--space-3, 12px); }
+.pv-spark__line.is-past { stroke: var(--border); }
+.pv-spark__line--recent { stroke: var(--accent); stroke-width: 3.5; }
+.pv-mini__line.is-past { stroke: var(--border); }
+.pv-mini__line--recent { stroke: currentColor; stroke-width: 3; }

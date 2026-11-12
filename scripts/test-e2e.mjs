@@ -113,6 +113,25 @@ test('FT-776: Настройки владельца с выбранными ст
   } finally { await context.close(); }
 });
 
+test('пустой «Прогресс» (нет замеров и весов, как «Мои тренировки» тренера) — те же вкладки, 12.11.2026', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  const errors = [];
+  phone.on('pageerror', e => errors.push(e.message));
+  try {
+    await phone.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockEmpty=1');
+    await phone.getByRole('button', { name: 'Прогресс', exact: true }).click();
+    await phone.getByRole('radio', { name: 'Тело', exact: true }).waitFor();
+    await phone.getByText('Замеров пока нет', { exact: true }).waitFor();
+    await phone.getByRole('radio', { name: 'Сила', exact: true }).click();
+    await phone.getByText('Рабочих весов пока нет', { exact: true }).waitFor();
+    await phone.getByRole('radio', { name: 'Активность', exact: true }).click();
+    assert.equal(await phone.getByText('Прогресс пока не из чего собрать').count(), 0);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
 before(async () => {
   execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', 'dist-demo'], {
     cwd: ROOT,
