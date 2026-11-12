@@ -557,10 +557,15 @@ export function Chips({ items, value, onChange, variant, className, label }) {
  * track — дорожка с отступом снизу: «чьи / какие» над списком (раздел
  * «Шаблоны»). Без него дорожка ставится сама и отступа не добавляет.
  */
-export function Segmented({ items, value, onChange, label, disabled, wrap, track }) {
-  const auto = !track && !wrap && items.length >= 2 && items.length <= 3;
+export function Segmented({ items, value, onChange, label, disabled, wrap, track, glide }) {
+  const auto = !track && !glide && !wrap && items.length >= 2 && items.length <= 3;
+  // glide — белая подложка выбранного едет под кнопками, как сегменты iOS
+  // (12.11.2026, «Прогресс»): дорожка с равными долями, подложка — одна
+  const index = Math.max(0, items.findIndex((item) => (typeof item === 'string' ? item : item.value) === value));
   return (
-    <div className={'chips chips--flush' + (wrap ? ' chips--wrap' : '') + (track || auto ? ' chips--track' : '') + (auto ? ' chips--track-tight' : '')} role="radiogroup" aria-label={label}>
+    <div className={'chips chips--flush' + (wrap ? ' chips--wrap' : '') + (track || auto || glide ? ' chips--track' : '') + (auto || glide ? ' chips--track-tight' : '') + (glide ? ' chips--glide' : '')} role="radiogroup" aria-label={label}
+      style={glide ? { '--seg-n': items.length, '--seg-i': index } : undefined}>
+      {glide && <span className="chips__thumb" aria-hidden="true" />}
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
         const text = typeof item === 'string' ? item : item.label;

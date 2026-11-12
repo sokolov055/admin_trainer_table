@@ -1,5 +1,5 @@
 import { useReturnScroll } from '../scroll.js';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
@@ -1846,6 +1846,37 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   const setTab = (value) => { setTabState(value); saveProgressTab(value); };
   const tabs = familyRow ? PROGRESS_TABS.filter((t) => t.value !== 'activity') : PROGRESS_TABS;
   const tab = tabs.some((t) => t.value === tabState) ? tabState : 'body';
+  // Переключение вкладок как в iOS (12.11.2026): панель въезжает со стороны
+  // выбранной вкладки, экран не прыгает. Вкладки липнут к верху; если они
+  // прилипли (ушли за край), новая панель открывается с начала — под ними
+  const [dir, setDir] = useState(0);
+  const tabsAnchor = useRef(null);
+  const tabsBar = useRef(null);
+  const pendingScroll = useRef(null);
+  const switchTab = (value) => {
+    if (value === tab) return;
+    const order = tabs.map((t) => t.value);
+    setDir(order.indexOf(value) > order.indexOf(tab) ? 1 : -1);
+    const anchor = tabsAnchor.current;
+    const bar = tabsBar.current;
+    if (anchor && bar && typeof window !== 'undefined') {
+      const stick = parseFloat(window.getComputedStyle(bar).top) || 0;
+      const docTop = anchor.getBoundingClientRect().top + window.scrollY;
+      if (window.scrollY > docTop - stick) pendingScroll.current = docTop - stick;
+    }
+    haptic();
+    setTab(value);
+  };
+  useLayoutEffect(() => {
+    if (pendingScroll.current === null) return;
+    window.scrollTo(0, pendingScroll.current);
+    pendingScroll.current = null;
+  }, [tab]);
+  const pane = (id) => ({
+    className: 'progress__pane' + (id === tab ? ' is-active' + (dir > 0 ? ' from-right' : dir < 0 ? ' from-left' : '') : ''),
+    'aria-hidden': id === tab ? undefined : true,
+    'data-pane': id,
+  });
   // Таблицы и графики по каждому замеру — по кнопке, не в ленте (12.11.2026)
   const [allMeasures, setAllMeasures] = useState(false);
   const [allLifts, setAllLifts] = useState(false);
@@ -2016,17 +2047,21 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {/* «Разбор дня» (FT-738): у клиента — на «Обзоре», тренеру — здесь */}
       {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} mine={self} />}
 
-      <div className="progress__tabs">
-        <Segmented label="Раздел прогресса" items={tabs} value={tab} onChange={setTab} />
+      <div ref={tabsAnchor} aria-hidden="true" />
+      <div className="progress__tabs" ref={tabsBar}>
+        <Segmented glide label="Раздел прогресса" items={tabs} value={tab} onChange={switchTab} />
       </div>
 
-      {tab === 'body' && <>
+      {/* Три панели всегда в DOM (12.11.2026): переключение без загрузки заново и
+          без прыжка — неактивные скрыты, но сохраняют ширину для графиков */}
+      <div className="progress__panes">
+      <div {...pane('body')}>
       {/* Тело картинками: вес линией, у каждого замера свой маленький график; таблицы — «Все замеры» */}
       {/* Общий переключатель периода для веса и замеров (FT-782, владелец 12.11.2026);
           тот же выбор, что был у таблицы «Изменения по замерам» */}
       {hasRows && series.some((x) => x.rows.length > 1) && (
         <div className="progress__period">
-          <Segmented track label="Изменения за период"
+          <Segmented glide label="Изменения за период"
             items={[{ value: 'all', label: 'За всё время' }, { value: 'last', label: 'С прошлого замера' }]}
             value={period} onChange={setPeriod} />
         </div>
@@ -2102,9 +2137,42 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       )}
 
       </>}
-      </>}
+      {/* Сырые замеры — в самом низу «Тела»: до них доходят, когда нужна не
+          картина, а конкретная цифра за конкретную дату */}
+      {hasRows && allMeasures && (hasRows
+        ? series.map((s, i) => (
+            <Section key={i} title={s.label ? 'Замеры: ' + s.label : 'Замеры'}>
+              <Panel pad>
+                {/* Ошиблись датой (годом) — перенести замер целиком: лист с
+                    выбором даты вместо window.prompt (аудит 24.10.2026) */}
+                <MeasureTable rows={s.rows} fields={fields} onMove={familyRow ? null : (from) => {
+                  haptic();
+                  setMoving({ from, sheetName: (measureSeries[i] && measureSeries[i].sheetName) || '' });
+                }} />
+              </Panel>
+            </Section>
+          ))
+        : (
+          <Section title="Замеры">
+            <Panel pad>
+              {/* Кнопка — здесь же, а не ссылка на «кнопку вверху» (аудит
+                  24.10.2026); форма откроется наверху и экран подъедет к ней */}
+              <Empty
+                icon={IconRuler}
+                text={(measurements && measurements.note) || 'Замеров пока нет.'}
+                action={!familyRow && !adding ? (
+                  <button className="button" onClick={() => { haptic(); openForm('measure')(); }}>
+                    Записать первый замер
+                  </button>
+                ) : null}
+              />
+            </Panel>
+          </Section>
+        ))}
 
-      {tab === 'strength' && <>
+      </div>
+
+      <div {...pane('strength')}>
       <StrengthCard lifts={lifts} open={allLifts} onAll={() => { haptic(); setAllLifts((v) => !v); }} />
       {!familyRow && <Summary clientRow={clientRow} compact={!allLifts} />}
       {lifts.length > 0 && allLifts && (
@@ -2140,47 +2208,9 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       )}
 
       {lifts.length === 0 && <Empty icon={IconProgress} title="Рабочих весов пока нет" text="Они подтянутся из программы месяца, когда появятся тренировки." />}
-      </>}
+      </div>
 
-      {/* Сырые замеры — в самом низу «Тела»: до них доходят, когда нужна не
-          картина, а конкретная цифра за конкретную дату */}
-      {tab === 'body' && hasRows && allMeasures && (hasRows
-        ? series.map((s, i) => (
-            <Section key={i} title={s.label ? 'Замеры: ' + s.label : 'Замеры'}>
-              <Panel pad>
-                {/* Ошиблись датой (годом) — перенести замер целиком: лист с
-                    выбором даты вместо window.prompt (аудит 24.10.2026) */}
-                <MeasureTable rows={s.rows} fields={fields} onMove={familyRow ? null : (from) => {
-                  haptic();
-                  setMoving({ from, sheetName: (measureSeries[i] && measureSeries[i].sheetName) || '' });
-                }} />
-              </Panel>
-            </Section>
-          ))
-        : (
-          <Section title="Замеры">
-            <Panel pad>
-              {/* Кнопка — здесь же, а не ссылка на «кнопку вверху» (аудит
-                  24.10.2026); форма откроется наверху и экран подъедет к ней */}
-              <Empty
-                icon={IconRuler}
-                text={(measurements && measurements.note) || 'Замеров пока нет.'}
-                action={!familyRow && !adding ? (
-                  <button className="button" onClick={() => { haptic(); openForm('measure')(); }}>
-                    Записать первый замер
-                  </button>
-                ) : null}
-              />
-            </Panel>
-          </Section>
-        ))}
-
-      {moving && (
-        <MeasureMove from={moving.from} sheetName={moving.sheetName} clientRow={clientRow}
-          onClose={() => setMoving(null)} onMoved={reload} />
-      )}
-
-      {tab === 'activity' && !familyRow && <>
+      {!familyRow && <div {...pane('activity')}>
         <WeekRings clientRow={clientRow} />
         <Goals clientRow={clientRow} preview={clientView} compact={!allHealth} />
         <Steps clientRow={clientRow} self={self} preview={clientView} />
@@ -2190,7 +2220,14 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         </button>
         {allHealth && <HealthDaily clientRow={clientRow} />}
         {allHealth && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}
-      </>}
+      </div>}
+      </div>
+
+      {moving && (
+        <MeasureMove from={moving.from} sheetName={moving.sheetName} clientRow={clientRow}
+          onClose={() => setMoving(null)} onMoved={reload} />
+      )}
+
     </>
   );
 }
