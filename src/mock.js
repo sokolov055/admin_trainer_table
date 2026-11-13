@@ -1239,6 +1239,16 @@ let demoTemplates = [
     place: 'gym', days: 4, minutes: 25, minutesAuto: true, forClients: true },
   { id: 5, kind: 'program', title: 'Ягодицы с нуля дома', goal: 'Тонус', level: 'Новичок', description: 'Резинка и гантели, по 40 минут.', isPublic: false, mine: true, author: 'Константин', blocks: [demoBlocks[1]], uses: 0,
     place: 'home', days: 2, minutes: 40, minutesAuto: false, forClients: true },
+  // Силовая + кардио отдельными тренировками — старая программа: предложение прицепить (FT-788)
+  { id: 6, kind: 'program', title: 'Сила + кардио', goal: 'Похудение', level: 'Средний', description: '', isPublic: false, mine: true, author: 'Константин', uses: 0,
+    place: 'gym', days: 3, minutes: 60, minutesAuto: false, forClients: false, weekLength: 1,
+    blocks: [
+      { title: 'Ноги', week: 1, exercises: [{ name: 'Приседания со штангой', sets: '4', reps: '10', weight: '', rpe: '', supersetGroup: '' }] },
+      { title: 'Кардио · дорожка', week: 1, exercises: [{ name: 'Беговая дорожка', sets: '1', reps: '', weight: '', rpe: '', supersetGroup: '', cardio: { machine: 'treadmill', metrics: ['time'], targets: { time: '20', distance: '', kcal: '', pulse: '' }, settings: { speed: '', incline: '', level: '' }, intervals: null } }] },
+      { title: 'Спина', week: 1, exercises: [{ name: 'Тяга верхнего блока', sets: '4', reps: '12', weight: '', rpe: '', supersetGroup: '' }] },
+      { title: 'Кардио · дорожка', week: 1, exercises: [{ name: 'Беговая дорожка', sets: '1', reps: '', weight: '', rpe: '', supersetGroup: '', cardio: { machine: 'treadmill', metrics: ['time'], targets: { time: '20', distance: '', kcal: '', pulse: '' }, settings: { speed: '', incline: '', level: '' }, intervals: null } }] },
+      { title: 'Грудь', week: 1, exercises: [{ name: 'Жим лёжа', sets: '4', reps: '8', weight: '', rpe: '', supersetGroup: '' }] },
+    ] },
 ];
 // Заявки клиента из витрины: id шаблона → id пожелания
 const demoShowcaseAsked = new Map();

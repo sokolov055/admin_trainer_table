@@ -1,5 +1,5 @@
 import { blockSessions } from './plan-model.js';
-import { scheduledPlan, programSize } from './program-timeline.js';
+import { scheduledPlan, programSize, sessionsOf } from './program-timeline.js';
 
 /**
  * Программа по неделям, раскладка по циклам месяца (IDEA-7, решения
@@ -277,12 +277,130 @@ export function weekQueue(cycle) {
 export function withLength(blocks, n) {
   const list = blocks || [];
   if (!n) return list.map(({ week: _drop, ...rest }) => rest);
+  // Занятие (FT-788) не разрывается: раскладываются занятия, а не тренировки
+  const units = sessionUnits(list);
   if (n > programLength(list) && list.length) {
-    const order = list.map((b, i) => [b, i]).sort((x, y) => weekOf(x[0]) - weekOf(y[0]) || x[1] - y[1]);
-    const week = new Map(order.map(([b], i) => [b, Math.min(n, Math.ceil((i + 1) * n / list.length))]));
+    const week = new Map();
+    units.forEach((g, i) => g.forEach((b) => week.set(b, Math.min(n, Math.ceil((i + 1) * n / units.length)))));
     return list.map((b) => ({ ...b, week: week.get(b) }));
   }
-  return list.map((b) => ({ ...b, week: ((weekOf(b) - 1) % n) + 1 }));
+  const folded = list.map((b) => ({ ...b, week: ((weekOf(b) - 1) % n) + 1 }));
+  if (!list.some((b) => b.with)) return folded;
+  // Недели сливаются по кругу — занятия целиком, в порядке недель
+  const at = new Map(list.map((b, i) => [b, i]));
+  return units.flat().map((b) => folded[at.get(b)]).sort((x, y) => weekOf(x) - weekOf(y));
+}
+
+/** Занятия программы по порядку недель (внутри недели — как в программе) */
+function sessionUnits(list) {
+  const weeks = [...new Set(list.map(weekOf))].sort((a, b) => a - b);
+  return weeks.flatMap((w) => sessionsOf(list.filter((b) => weekOf(b) === w)));
+}
+
+/* --------------------------------------------------------------------------
+ * Занятия (FT-788, 13.11.2026): соседние тренировки недели за один приход —
+ * силовая + кардио. У тренировки with: true — она вместе с предыдущей
+ * -------------------------------------------------------------------------- */
+
+/** Тренировка из одного кардио: все упражнения — кардио */
+export const isCardioBlock = (b) => !!b && (b.exercises || []).length > 0 && b.exercises.every((e) => e && e.cardio);
+
+/** Занятия недели (или программы без недель): [[силовая, кардио], [силовая]] */
+export function weekSessions(blocks, week = 0) {
+  const list = (blocks || []).filter((b) => !week || weekOf(b) === week);
+  return sessionsOf(list);
+}
+
+/** Занятие, в котором тренировка (в её неделе) */
+export function sessionOfBlock(blocks, block, weekly = true) {
+  return weekSessions(blocks, weekly ? weekOf(block) : 0).find((g) => g.includes(block)) || [block];
+}
+
+/** «В одно занятие»: занятие, которое начинается с head, — к предыдущему */
+export function joinedSession(blocks, head) {
+  return (blocks || []).map((b) => (b === head ? { ...b, with: true } : b));
+}
+
+/** «Разделить»: тренировки занятия — каждая сама по себе */
+export function splitSession(blocks, group) {
+  return (blocks || []).map((b) => (group.includes(b) && b.with ? withoutWith(b) : b));
+}
+
+const withoutWith = ({ with: _drop, ...rest }) => rest;
+
+/**
+ * Перестановка в «Свернуть»: перетащенная тренировка выходит из своего
+ * занятия; брошенная внутрь чужого занятия — входит в него
+ */
+export function reorderedBlocks(blocks, from, to) {
+  const next = [...(blocks || [])];
+  const [moved] = next.splice(from, 1);
+  if (!moved) return next;
+  // Ушла голова занятия — следующая тренировка становится головой
+  if (!moved.with && next[from] && next[from].with) next[from] = withoutWith(next[from]);
+  const after = next[to];
+  const inside = !!(after && after.with);
+  next.splice(to, 0, inside ? { ...moved, with: true } : withoutWith(moved));
+  return next;
+}
+
+/**
+ * Перетащили тренировку (карточка клиента): ушла голова занятия — её
+ * соседка становится головой; встала перед тренировкой с with — внутри
+ * чужого занятия, и входит в него; иначе — сама по себе
+ */
+export function regroupedAfterMove(list, placed, oldFollower, wasHead) {
+  const out = (list || []).map((b) => (wasHead && b === oldFollower && b.with ? withoutWith(b) : b));
+  const week = out.filter((b) => weekOf(b) === weekOf(placed));
+  const after = week[week.indexOf(placed) + 1];
+  const inside = !!(after && after.with);
+  return out.map((b) => (b === placed ? (inside ? { ...b, with: true } : withoutWith(b)) : b));
+}
+
+/** Соседка тренировки в её неделе (следующая) — для regroupedAfterMove */
+export function followerOf(list, block) {
+  const week = (list || []).filter((b) => weekOf(b) === weekOf(block));
+  return week[week.indexOf(block) + 1] || null;
+}
+
+/** Удалить тренировки: удалили голову занятия — следующая становится головой */
+export function removedBlocks(list, indices) {
+  const gone = new Set(indices);
+  const all = list || [];
+  return all.map((b, i) => {
+    if (gone.has(i) || !b.with) return b;
+    // Предыдущая в той же неделе удалена и была головой (или тоже удалена до головы)
+    const week = all.map((x, k) => [x, k]).filter(([x]) => weekOf(x) === weekOf(b));
+    const at = week.findIndex(([, k]) => k === i);
+    for (let j = at - 1; j >= 0; j -= 1) {
+      const [x, k] = week[j];
+      if (!gone.has(k)) return b;
+      if (!x.with) return withoutWith(b);
+    }
+    return withoutWith(b);
+  }).filter((_, i) => !gone.has(i));
+}
+
+/**
+ * Кардио отдельной тренировкой сразу после силовой той же недели — то,
+ * что старые программы предлагают прицепить (FT-788). Кардио без силовой
+ * перед ним — свободный день, его не трогаем
+ */
+export function looseCardio(blocks) {
+  const list = blocks || [];
+  const out = [];
+  [...new Set(list.map(weekOf))].forEach((w) => {
+    const week = list.filter((b) => weekOf(b) === w);
+    week.forEach((b, i) => {
+      if (i > 0 && !b.with && isCardioBlock(b) && !isCardioBlock(week[i - 1])) out.push(b);
+    });
+  });
+  return out;
+}
+
+/** Прицепить найденные кардио к силовым перед ними */
+export function attachedCardio(blocks, loose) {
+  return (blocks || []).map((b) => (loose.includes(b) ? { ...b, with: true } : b));
 }
 
 /**
@@ -333,14 +451,27 @@ export function withWeekLoad(blocks, week, load) {
   });
 }
 
-/** Перенести тренировку в другую неделю: пометка — новой недели */
+/**
+ * Перенести в другую неделю: занятие целиком (FT-788, владелец 13.11.2026),
+ * в конец той недели; пометка — новой недели
+ */
 export function movedToWeek(blocks, block, week) {
-  const load = weekLoad(blocks, week);
-  return (blocks || []).map((b) => {
-    if (b !== block) return b;
+  const list = blocks || [];
+  const load = weekLoad(list, week);
+  const group = sessionOfBlock(list, block);
+  const moved = group.map((b, i) => {
     const { load: _drop, ...rest } = b;
-    return { ...rest, week, ...(load ? { load } : {}) };
+    const out = { ...rest, week, ...(load ? { load } : {}) };
+    return i === 0 ? withoutWith(out) : out;
   });
+  if (group.length === 1) {
+    // Одна тренировка остаётся на своём месте, если не встаёт внутрь чужого занятия
+    const inPlace = list.map((b) => (b === block ? moved[0] : b));
+    const there = inPlace.filter((b) => weekOf(b) === week);
+    const next = there[there.indexOf(moved[0]) + 1];
+    if (!next || !next.with) return inPlace;
+  }
+  return [...list.filter((b) => !group.includes(b)), ...moved];
 }
 
 /**

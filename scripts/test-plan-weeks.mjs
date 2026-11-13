@@ -211,3 +211,74 @@ test('назначить список: умолчание — по кругу п
   assert.match(lengthHint(2, { cycles: 4 }), /Две разные недели.*4 цикла/);
   assert.match(lengthHint(4, { cycles: 4 }), /каждую неделю по разу/);
 });
+
+// Занятия: силовая + кардио (FT-788, 13.11.2026)
+import { isCardioBlock, weekSessions, joinedSession, splitSession, reorderedBlocks, looseCardio, attachedCardio } from '../src/plan-weeks.js';
+const card = (id, week = 1, extra = {}) => ({ id, title: id, week, exercises: [{ name: 'Дорожка', cardio: { machine: 'treadmill' } }], ...extra });
+const str = (id, week = 1, extra = {}) => ({ id, title: id, week, exercises: [{ name: 'Присед' }], ...extra });
+
+test('занятия недели: with — вместе с предыдущей; первая в неделе — всегда своё', () => {
+  const list = [str('A'), card('K', 1, { with: true }), str('B'), card('X', 2, { with: true })];
+  assert.deepEqual(weekSessions(list, 1).map((g) => g.map((b) => b.id)), [['A', 'K'], ['B']]);
+  assert.deepEqual(weekSessions(list, 2).map((g) => g.map((b) => b.id)), [['X']]);
+});
+test('«В одно занятие» и «Разделить»', () => {
+  const list = [str('A'), card('K'), str('B')];
+  const joined = joinedSession(list, list[1]);
+  assert.deepEqual(weekSessions(joined, 1).map((g) => g.length), [2, 1]);
+  const split = splitSession(joined, weekSessions(joined, 1)[0]);
+  assert.deepEqual(weekSessions(split, 1).map((g) => g.length), [1, 1, 1]);
+});
+test('«В неделю…» переносит занятие целиком в конец недели', () => {
+  const list = [str('A'), card('K', 1, { with: true }), str('B'), str('C', 2), card('Q', 2, { with: true })];
+  const moved = movedToWeek(list, list[0], 2);
+  assert.deepEqual(moved.map((b) => b.id + b.week), ['B1', 'C2', 'Q2', 'A2', 'K2']);
+  assert.ok(!moved[3].with && moved[4].with);
+  assert.deepEqual(weekSessions(moved, 2).map((g) => g.map((b) => b.id)), [['C', 'Q'], ['A', 'K']]);
+  // перенос кардио из занятия уносит и силовую
+  assert.deepEqual(movedToWeek(list, list[1], 2).filter((b) => b.week === 2).map((b) => b.id), ['C', 'Q', 'A', 'K']);
+  // одна тренировка не встаёт внутрь чужого занятия
+  const lone = [str('C', 2), str('Z', 1), card('Q', 2, { with: true })];
+  assert.deepEqual(weekSessions(movedToWeek(lone, lone[1], 2), 2).map((g) => g.map((b) => b.id)), [['C', 'Q'], ['Z']]);
+});
+test('перестановка: вынесенная тренировка выходит из занятия, брошенная внутрь — входит', () => {
+  const list = [str('A'), card('K', 1, { with: true }), str('B'), str('C')];
+  const out = reorderedBlocks(list, 1, 3);
+  assert.deepEqual(weekSessions(out, 1).map((g) => g.map((b) => b.id)), [['A'], ['B'], ['C'], ['K']]);
+  const head = reorderedBlocks(list, 0, 3);
+  assert.deepEqual(weekSessions(head, 1).map((g) => g.map((b) => b.id)), [['K'], ['B'], ['C'], ['A']]);
+  const inside = reorderedBlocks(list, 3, 1);
+  assert.deepEqual(weekSessions(inside, 1).map((g) => g.map((b) => b.id)), [['A', 'C', 'K'], ['B']]);
+});
+test('кардио после силовой — предложение прицепить; кардио в начале недели и после кардио — нет', () => {
+  const list = [card('K0'), str('A'), card('K1'), card('K2'), str('B', 2), card('K3', 2), card('K4', 2, { with: true })];
+  assert.deepEqual(looseCardio(list).map((b) => b.id), ['K1', 'K3']);
+  const fixed = attachedCardio(list, looseCardio(list));
+  assert.deepEqual(weekSessions(fixed, 1).map((g) => g.map((b) => b.id)), [['K0'], ['A', 'K1'], ['K2']]);
+  assert.equal(looseCardio(fixed).length, 0);
+  assert.ok(isCardioBlock(card('x')) && !isCardioBlock(str('y')) && !isCardioBlock({ exercises: [] }));
+});
+test('разложить на недели — занятия не разрываются; без with — как раньше', () => {
+  const list = [str('A'), card('K', 1, { with: true }), str('B'), str('C')];
+  assert.deepEqual(withLength(list, 3).map((b) => b.id + b.week), ['A1', 'K1', 'B2', 'C3']);
+  const two = [str('A', 1), str('B', 2), card('K', 2, { with: true }), str('C', 3)];
+  const folded = withLength(two, 2);
+  assert.deepEqual(weekSessions(folded, 1).map((g) => g.map((b) => b.id)), [['A'], ['C']]);
+  assert.deepEqual(weekSessions(folded, 2).map((g) => g.map((b) => b.id)), [['B', 'K']]);
+});
+import { removedBlocks, regroupedAfterMove, followerOf } from '../src/plan-weeks.js';
+test('удалили силовую из занятия — кардио становится своим занятием; удалили кардио — силовая остаётся', () => {
+  const list = [str('A'), card('K', 1, { with: true }), card('Q', 1, { with: true }), str('B')];
+  assert.deepEqual(weekSessions(removedBlocks(list, [0]), 1).map((g) => g.map((b) => b.id)), [['K', 'Q'], ['B']]);
+  assert.deepEqual(weekSessions(removedBlocks(list, [1]), 1).map((g) => g.map((b) => b.id)), [['A', 'Q'], ['B']]);
+  assert.deepEqual(weekSessions(removedBlocks(list, [0, 1]), 1).map((g) => g.map((b) => b.id)), [['Q'], ['B']]);
+});
+test('перетаскивание в карточке клиента: голова ушла — соседка своя; внутрь занятия — входит', () => {
+  const list = [str('A'), card('K', 1, { with: true }), str('B'), str('C')];
+  const moved = list[0];
+  const follower = followerOf(list, moved);
+  const order = [list[1], list[2], moved, list[3]];
+  assert.deepEqual(weekSessions(regroupedAfterMove(order, moved, follower, true), 1).map((g) => g.map((b) => b.id)), [['K'], ['B'], ['A'], ['C']]);
+  const into = [list[0], list[3], list[1], list[2]];
+  assert.deepEqual(weekSessions(regroupedAfterMove(into, list[3], null, true), 1).map((g) => g.map((b) => b.id)), [['A', 'C', 'K'], ['B']]);
+});

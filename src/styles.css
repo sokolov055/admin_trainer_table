@@ -2283,6 +2283,8 @@ th.sticky, td.sticky {
 }
 
 .block-order--settle .block-order__row { transition: none; }
+/* Тренировки одного занятия (FT-788) */
+.block-order__row.is-joined { border-left: 4px solid var(--accent); }
 
 .block-order__content:has(.block-order__menu) { flex-wrap: wrap; }
 .block-order__menu {

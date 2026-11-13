@@ -9,8 +9,8 @@ import BlockOrder from './BlockOrder.jsx';
 import { BlockEdit, AddBlock, blankExercise } from './PlanInline.jsx';
 import { usePinch } from '../pinch.js';
 import { copyPlanBlocks } from '../plan-block-actions.js';
-import { shownLength, resized, withWeekLoad, movedToWeek, copiedWeek, weekOrder } from '../plan-weeks.js';
-import { LengthPicker, WeekSections, MoveWeek } from '../client/PlanWeeks.jsx';
+import { shownLength, resized, withWeekLoad, movedToWeek, copiedWeek, weekOrder, joinedSession, splitSession, reorderedBlocks, removedBlocks, looseCardio, attachedCardio } from '../plan-weeks.js';
+import { LengthPicker, WeekSections, MoveWeek, SessionGroups, LooseCardio } from '../client/PlanWeeks.jsx';
 
 /**
  * Редактор шаблона (программы или одной тренировки) в «Библиотеке».
@@ -37,13 +37,15 @@ import { LengthPicker, WeekSections, MoveWeek } from '../client/PlanWeeks.jsx';
  */
 export default function PlanEditor({
   blocks, onSaved, onSubmit, single = false, submitLabel = 'Сохранить шаблон',
-  workoutTemplates = null, onDirty = null, weekLength = 0,
+  workoutTemplates = null, onDirty = null, weekLength = 0, storeKey = '',
 }) {
   const [draft, setDraft] = useState(() => (blocks.length
     ? blocks.map((b) => ({
       id: b.id || '', title: b.title, sourceId: b.sourceId || null,
       // Неделя и нагрузка недели (plan-weeks.js) — иначе правка шаблона их теряла
       ...(b.week ? { week: b.week } : {}), ...(b.load ? { load: b.load } : {}),
+      // Занятие (FT-788): вместе с предыдущей тренировкой
+      ...(b.with ? { with: true } : {}),
       exercises: b.exercises.map((e) => ({ ...blankExercise(), ...e })),
     }))
     : [{ title: 'Тренировка № 1', exercises: [blankExercise()] }]));
@@ -134,6 +136,7 @@ export default function PlanEditor({
         // Неделя программы и пометка (plan-weeks.js) — иначе пересохранение их стёрло бы
         ...(b.week ? { week: b.week } : {}),
         ...(b.load ? { load: b.load } : {}),
+        ...(b.with ? { with: true } : {}),
         exercises: b.exercises.filter((e) => String(e.name || '').trim()),
       }));
       // В сервер — только то, что он хранит (plan-payload.js); шаблону — как было
@@ -146,6 +149,12 @@ export default function PlanEditor({
       setBusy(false);
     }
   };
+
+  // Занятия (FT-788): блоки в change — копии, поэтому по месту в списке
+  const joinAt = (block) => { const i = draft.indexOf(block); change((list) => joinedSession(list, list[i])); };
+  const splitAt = (group) => { const at = group.map((b) => draft.indexOf(b)); change((list) => splitSession(list, at.map((i) => list[i]))); };
+  const loose = single ? [] : looseCardio(draft);
+  const attachLoose = () => { const at = loose.map((b) => draft.indexOf(b)); change((list) => attachedCardio(list, at.map((i) => list[i]))); };
 
   // Одна тренировка редактора: номер — по месту в шаблоне, под заголовком
   // у программы по неделям — «В неделю…» (перенос; поля «Неделя/Нагрузка»
@@ -179,7 +188,7 @@ export default function PlanEditor({
         block={block}
         canRemove={!single && draft.length > 1}
         onChange={(exercises) => change((next) => { next[bi].exercises = exercises; return next; })}
-        onRemove={() => change((next) => next.filter((_, k) => k !== bi))}
+        onRemove={() => change((next) => removedBlocks(next, [bi]))}
       />
     </div>
     );
@@ -190,6 +199,8 @@ export default function PlanEditor({
       <p className="small muted" style={{ marginTop: 0 }}>
         Пустые строки не сохраняются — упражнение без названия просто исчезнет.
       </p>
+
+      {!ordering && <LooseCardio count={loose.length} storeKey={storeKey} disabled={busy} onAttach={attachLoose} />}
 
       {!single && draft.length > 1 && (
         <div className="plan-edit__order-bar">
@@ -205,17 +216,13 @@ export default function PlanEditor({
           blocks={draft}
           disabled={busy}
           onOpen={openBlock}
-          onMove={(from, to) => change((next) => {
-            const [moved] = next.splice(from, 1);
-            next.splice(to, 0, moved);
-            return next;
-          })}
+          onMove={(from, to) => change((next) => reorderedBlocks(next, from, to))}
           onCopy={(indices) => change((next) => copyPlanBlocks(next, indices))}
           onRemove={(indices) => {
             if (draft.length - indices.length < 1) return;
             const names = indices.map((i) => '«' + (draft[i].title || 'Без названия') + '»');
             setUndo({ draft, text: names.length === 1 ? 'Удалена ' + names[0] : 'Удалено тренировок: ' + names.length });
-            change((next) => next.filter((_, i) => !indices.includes(i)));
+            change((next) => removedBlocks(next, indices));
           }}
         />
       )}
@@ -241,6 +248,8 @@ export default function PlanEditor({
           canEdit
           disabled={busy}
           renderBlock={(block) => renderBlock(block, draft.indexOf(block))}
+          onJoin={joinAt}
+          onSplit={splitAt}
           onLoad={(week, load) => change((list) => withWeekLoad(list, week, load))}
           onCopyWeek={(from, to) => change((list) => copiedWeek(list, from, to))}
           addSlot={(week, label) => (
@@ -257,7 +266,9 @@ export default function PlanEditor({
           )}
         />
       )}
-      {!ordering && length === 0 && draft.map((block, bi) => renderBlock(block, bi))}
+      {!ordering && length === 0 && (single
+        ? draft.map((block, bi) => renderBlock(block, bi))
+        : <SessionGroups blocks={draft} renderBlock={(block) => renderBlock(block, draft.indexOf(block))} canEdit={!busy} onJoin={joinAt} onSplit={splitAt} />)}
 
       {/* Программа-шаблон: «+» под последней тренировкой — новая или из
           шаблона тренировки, копией, которая помнит, откуда взята

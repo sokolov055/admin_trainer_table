@@ -355,3 +355,85 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .wk-opt:disabled .wk-opt__body strong { color: var(--text-secondary); }
 .wk-today { margin: 0; padding: 8px 10px; border-radius: var(--radius-md, 10px); background: var(--accent-wash); color: var(--accent-ink); font-size: var(--text-sm); }
 .wk-today b { font-weight: 650; }
+
+/* ==========================================================================
+ * Занятия (FT-788, макет session-mockup.html): силовая + кардио в рамке,
+ * «В одно занятие» между занятиями, предложение прицепить кардио; ритм
+ * ========================================================================== */
+
+.wk-join {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
+}
+.wk-join::before, .wk-join::after { content: ""; flex: 1; border-top: 1px dashed var(--border-strong); }
+.wk-join button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font: 600 var(--text-sm)/1 var(--font);
+  cursor: pointer;
+}
+.wk-join button:disabled { opacity: .5; cursor: default; }
+
+.wk-sess {
+  border: 2px solid var(--accent);
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--accent-wash);
+  padding: 6px;
+  margin: var(--space-2) 0;
+}
+.wk-sess__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 6px 4px;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--accent-ink);
+}
+.wk-sess__head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-sess__split {
+  flex: none;
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font: 600 var(--text-sm)/1 var(--font);
+  cursor: pointer;
+}
+.wk-sess__then { text-align: center; font-size: var(--text-xs, 12px); font-weight: 600; color: var(--accent-ink); margin: 2px 0; }
+.wk-sess__lone { font-size: var(--text-sm); font-weight: 650; color: var(--text-muted); margin: var(--space-2) 6px 4px; }
+
+.wk-loose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--warning-fill);
+  color: var(--warning-text);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+}
+
+.wk-beat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.wk-beat__top { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
+.wk-beat__drop { border: 0; background: none; color: var(--accent); font: 600 var(--text-sm)/1 var(--font); cursor: pointer; min-height: 32px; }

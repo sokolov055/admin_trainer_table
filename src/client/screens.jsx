@@ -25,8 +25,8 @@ import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck,
 import { haptic } from '../telegram.js';
 import { captureScreen, useBackGesture } from '../gestures.jsx';
 import { supersets, blockSessions, pickBlock, doneLine, roundLine } from '../plan-model.js';
-import { weekPlan, weekQueue, monthWeeks, shownLength, withWeekLoad, movedToWeek, copiedWeek, weekOrder } from '../plan-weeks.js';
-import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, MoveWeek } from './PlanWeeks.jsx';
+import { weekPlan, weekQueue, monthWeeks, shownLength, withWeekLoad, movedToWeek, copiedWeek, weekOrder, joinedSession, splitSession, removedBlocks, regroupedAfterMove, followerOf, looseCardio, attachedCardio } from '../plan-weeks.js';
+import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, MoveWeek, SessionGroups, LooseCardio } from './PlanWeeks.jsx';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
@@ -663,6 +663,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             // Неделя программы и пометка (plan-weeks.js)
             ...(b.week ? { week: b.week } : {}),
             ...(b.load ? { load: b.load } : {}),
+            // Занятие (FT-788): вместе с предыдущей тренировкой
+            ...(b.with ? { with: true } : {}),
             // Только то, что сервер хранит (plan-payload.js): иначе большая
             // программа не пролезала в предел запроса
             exercises: b.exercises.filter((e) => String(e.name || '').trim()).map(planExerciseForSave),
@@ -738,7 +740,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const removeBlocks = (indices) => {
     if (!indices.length || shownBlocks.length - indices.length < 1) return;
     setBlockUndo({ blocks: shownBlocks, count: indices.length });
-    commit(shownBlocks.filter((_, index) => !indices.includes(index)), { keepUndo: true });
+    commit(removedBlocks(shownBlocks, indices), { keepUndo: true });
     setSelectedBlocks(new Set());
     setSelectingBlocks(false);
     haptic('success');
@@ -1099,6 +1101,11 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <MuscleSummary tally={tallyExercises(shownBlocks.flatMap((b) => b.exercises))} section="Мышцы программы" />
       )}
 
+      {canEdit && planTab === 'all' && !selectingBlocks && (() => {
+        const loose = looseCardio(shownBlocks);
+        return <LooseCardio count={loose.length} storeKey={`c${clientRow}:${data.month}`} disabled={saveState === 'saving'} onAttach={() => commit(attachedCardio(shownBlocks, loose))} />;
+      })()}
+
       {(planTab === 'queue' || planTab === 'all') && <div className={'plan__blocks' + (selectingBlocks ? ' plan__blocks--selecting' : '')} ref={blocksRef}>{grouped
         ? (
           <WeekSections
@@ -1108,6 +1115,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             current={week ? week.week : 0}
             disabled={saveState === 'saving'}
             renderBlock={(block) => renderBlock(block)}
+            onJoin={(head) => commit(joinedSession(shownBlocks, head))}
+            onSplit={(group) => commit(splitSession(shownBlocks, group))}
             onLoad={(w, load) => commit(withWeekLoad(shownBlocks, w, load))}
             onCopyWeek={(from, to) => commit(copiedWeek(shownBlocks, from, to))}
             addSlot={(w, label) => (
@@ -1117,7 +1126,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             )}
           />
         )
-        : visibleBlocks.map((block) => renderBlock(block))}</div>}
+        : planTab === 'all'
+          ? <SessionGroups blocks={visibleBlocks} renderBlock={(block) => renderBlock(block)} canEdit={canEdit && !selectingBlocks} disabled={saveState === 'saving'}
+            onJoin={(head) => commit(joinedSession(shownBlocks, head))} onSplit={(group) => commit(splitSession(shownBlocks, group))} />
+          : visibleBlocks.map((block) => renderBlock(block))}</div>}
 
       {selectingBlocks && selectedBlocks.size > 0 && (
         <div className="plan__block-actions" role="toolbar" aria-label="Действия с выбранными тренировками">
@@ -1237,7 +1249,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 const slots = displayed.map((b, k) => (movable.includes(b) ? k : -1)).filter((k) => k >= 0);
                 const next = [...displayed];
                 slots.forEach((at, k) => { next[at] = order[k]; });
-                commit(next);
+                // Занятие (FT-788): вынесенная выходит из него, брошенная внутрь — входит
+                commit(regroupedAfterMove(next, placed, followerOf(displayed, moved), !moved.with));
                 setOpenBlocks({});
               },
             });
@@ -1336,7 +1349,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                   clientRow={clientRow && !clientView ? clientRow : 0}
                   canRemove={shownBlocks.length > 1}
                   onChange={(exercises) => commit(shownBlocks.map((b, k) => (k === bi ? { ...b, exercises } : b)))}
-                  onRemove={() => commit(shownBlocks.filter((_, k) => k !== bi))}
+                  onRemove={() => commit(removedBlocks(shownBlocks, [bi]))}
                   // Перенесли историю (HistoryMove) — «Было» и веса заново с сервера
                   onHistoryMoved={() => reload()}
                 />

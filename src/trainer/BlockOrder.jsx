@@ -267,7 +267,9 @@ export default function BlockOrder({ blocks, onMove, onCopy, onRemove, onOpen, d
           return (
             <li
               key={i}
-              className={'block-order__row' + (dragging === i ? ' is-dragging' : '') + (picked ? ' is-picked' : '')}
+              // Тренировки одного занятия (FT-788) — с синей полосой
+              className={'block-order__row' + (dragging === i ? ' is-dragging' : '') + (picked ? ' is-picked' : '')
+                + ((block.with && i > 0 && (Number(blocks[i - 1].week) || 1) === (Number(block.week) || 1)) || (blocks[i + 1] && blocks[i + 1].with && (Number(blocks[i + 1].week) || 1) === (Number(block.week) || 1)) ? ' is-joined' : '')}
               tabIndex={0}
               aria-label={selecting
                 ? `${i + 1}. ${title} — ${picked ? 'выбрана' : 'не выбрана'}`

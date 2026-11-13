@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { dateKey, nextMonday, programSize, addDays, WEEKDAY_SHORT } from '../program-timeline.js';
+import { dateKey, nextMonday, programSize, addDays, WEEKDAY_SHORT, sessionsOf, sessionQueue as sessionQueueOf, MAX_RHYTHM } from '../program-timeline.js';
 import { apiMutate } from '../api.js';
 import { Segmented, Sheet, Note } from '../ui.jsx';
-import { IconAlert, IconCheck } from '../icons.jsx';
+import { IconAlert, IconCheck, IconLink } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import {
   weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength, withWeekLoad, startWeekOf,
@@ -25,6 +25,25 @@ const plural = (n, one, few, many) => {
   return many;
 };
 const workouts = (n) => n + ' ' + plural(n, 'тренировка', 'тренировки', 'тренировок');
+const sessionsWord = (n) => n + ' ' + plural(n, 'занятие', 'занятия', 'занятий');
+
+/**
+ * Строки недели — занятиями (FT-788): «Ноги + Кардио». rows — строки
+ * недели из scheduledPlan (extra — вторая и дальше тренировка занятия)
+ */
+export function sessionRows(rows) {
+  return (rows || []).reduce((list, r) => {
+    if (r.extra && list.length) list[list.length - 1].push(r);
+    else list.push([r]);
+    return list;
+  }, []);
+}
+/** Что сверх занятий: «кардио 1 из 2», если всё дополнительное — кардио */
+const extraLine = (w) => {
+  if (!w.extraNeed) return '';
+  const cardio = w.rows.filter((r) => r.extra).every((r) => (r.block.exercises || []).length && r.block.exercises.every((e) => e && e.cardio));
+  return ` · ${cardio ? 'кардио' : 'к занятиям'} ${w.extraDone} из ${w.extraNeed}`;
+};
 const STATUS = { done: 'выполнен', missed: 'не выполнен', open: 'идёт', empty: 'неделя отдыха', paused: 'пауза', expired: 'программа завершена', partial: 'неполная неделя', scheduled: 'скоро начнётся', legacy: 'прежний список' };
 
 /** «декабря» из «Декабрь 2026» — для «программа декабря не назначена» */
@@ -86,7 +105,7 @@ export function WeekStrip({ plan, sel, onSelect }) {
     : w.status === 'expired' ? 'Срок программы закончился'
     : w.status === 'empty'
     ? 'В этой неделе программы нет тренировок'
-    : `Сделано ${w.done} из ${w.need}`
+    : (w.extraNeed ? `Занятий ${w.done} из ${w.need}` + extraLine(w) : `Сделано ${w.done} из ${w.need}`)
       + (w.rows.some((r) => r.carried && r.block.foreign) ? ' · с долгом прошлого месяца'
         : w.rows.some((r) => r.carried) ? ' · с долгом прошлого цикла' : '')
       + (w.extra ? ' · по прошлой программе: ' + w.extra : '')
@@ -139,7 +158,7 @@ export function WeekStrip({ plan, sel, onSelect }) {
         <div className="plan-weeks__head">
           <div>
             <strong>{w.current ? 'Эта неделя' : 'Неделя'} · {weekDates(w)}</strong>
-            <span>{`Неделя ${w.week} из ${w.length || plan.length}`}{w.load ? ' · ' + LOAD_LABEL[w.load].toLowerCase() : ''}{!w.full && w.need ? ' · неполная неделя, без оценки пропусков' : ''}</span>
+            <span>{w.rhythm ? `${sessionsWord(w.rhythm)} в неделю${w.length > 1 ? ` · неделя ${w.week} из ${w.length}` : ''}` : `Неделя ${w.week} из ${w.length || plan.length}`}{w.load ? ' · ' + LOAD_LABEL[w.load].toLowerCase() : ''}{!w.full && w.need ? ' · неполная неделя, без оценки пропусков' : ''}</span>
           </div>
           {w.load
             ? <span className={'plan-weeks__kind plan-weeks__kind--' + w.load}>{LOAD_LABEL[w.load]}</span>
@@ -285,22 +304,24 @@ export function MoveWeek({ block, length, onMove, disabled = false }) {
  * (addSlot(week, label) — кнопка родителя, иначе onAdd), пустая неделя —
  * «Скопировать неделю K». current — неделя программы текущего цикла
  */
-export function WeekSections({ blocks, length, canEdit = false, current = 0, renderBlock, onLoad, onAdd, addSlot, onCopyWeek, disabled = false }) {
+export function WeekSections({ blocks, length, canEdit = false, current = 0, renderBlock, onLoad, onAdd, addSlot, onCopyWeek, onJoin, onSplit, disabled = false }) {
   const groups = byWeek(blocks, length);
   const filled = groups.filter((g) => g.blocks.length);
   return (
     <>
-      {groups.map((g) => (
+      {groups.map((g) => {
+        const sessions = sessionsOf(g.blocks).length;
+        return (
         <section className="wk" key={g.week} aria-label={`Неделя ${g.week}`}>
           <div className="wk__head">
             <h3>Неделя {g.week}</h3>
-            <span className="wk__count">{g.blocks.length ? workouts(g.blocks.length) : 'пока пусто'}{current === g.week ? ' · сейчас' : ''}</span>
+            <span className="wk__count">{g.blocks.length ? (sessions < g.blocks.length ? `${sessionsWord(sessions)} · ${workouts(g.blocks.length)}` : workouts(g.blocks.length)) : 'пока пусто'}{current === g.week ? ' · сейчас' : ''}</span>
             <span className="wk__spacer" />
             {canEdit
               ? <WeekLoadPick week={g.week} value={weekLoad(blocks, g.week)} disabled={disabled || !g.blocks.length} onChange={(load) => onLoad(g.week, load)} />
               : weekLoad(blocks, g.week) && <span className={'wk__load wk__load--' + weekLoad(blocks, g.week)}>{LOAD_LABEL[weekLoad(blocks, g.week)]}</span>}
           </div>
-          {g.blocks.map((b) => renderBlock(b, g.week))}
+          <SessionGroups blocks={g.blocks} week={g.week} renderBlock={renderBlock} canEdit={canEdit} disabled={disabled} onJoin={onJoin} onSplit={onSplit} />
           {canEdit && g.blocks.length === 0 && (
             <div className="wk__empty">
               <span>{filled.length ? 'Пока без тренировок. Перенесите сюда из другой недели или:' : 'Пока без тренировок.'}</span>
@@ -320,8 +341,74 @@ export function WeekSections({ blocks, length, canEdit = false, current = 0, ren
             <button type="button" className="wk__add" disabled={disabled} onClick={() => { haptic(); onAdd(g.week); }}>+ Тренировка в неделю {g.week}</button>
           ))}
         </section>
-      ))}
+        );
+      })}
     </>
+  );
+}
+
+/**
+ * Тренировки недели занятиями (FT-788, макет 13.11.2026): занятие из
+ * нескольких тренировок — в рамке «Занятие 2 · Спина + Кардио» с
+ * «Разделить»; между занятиями — «В одно занятие» (следующее — к
+ * предыдущему). onJoin(head) — первая тренировка занятия, которое
+ * цепляется; onSplit(group) — тренировки занятия. Без onJoin — только показ
+ */
+export function SessionGroups({ blocks, week = 0, renderBlock, canEdit = false, disabled = false, onJoin, onSplit }) {
+  const groups = sessionsOf(blocks);
+  const framed = groups.some((g) => g.length > 1);
+  return groups.map((g, i) => (
+    <React.Fragment key={'s' + blocks.indexOf(g[0])}>
+      {i > 0 && canEdit && onJoin && (
+        <div className="wk-join">
+          <button type="button" disabled={disabled} onClick={() => { haptic(); onJoin(g[0]); }} aria-label={`«${g[0].title}» — в одно занятие с «${groups[i - 1][groups[i - 1].length - 1].title}»`}>
+            <IconLink size={14} />В одно занятие
+          </button>
+        </div>
+      )}
+      {g.length > 1 ? (
+        <div className="wk-sess" role="group" aria-label={`Занятие ${i + 1}`}>
+          <div className="wk-sess__head">
+            <span>Занятие {i + 1} · {g.map((b) => b.title || 'Без названия').join(' + ')}</span>
+            {canEdit && onSplit && <button type="button" className="wk-sess__split" disabled={disabled} onClick={() => { haptic(); onSplit(g); }}>Разделить</button>}
+          </div>
+          {g.map((b, k) => (
+            <React.Fragment key={'b' + blocks.indexOf(b)}>
+              {k > 0 && <div className="wk-sess__then" aria-hidden="true">+ после «{g[k - 1].title || 'тренировки'}»</div>}
+              {renderBlock(b, week)}
+            </React.Fragment>
+          ))}
+        </div>
+      ) : (
+        <>
+          {framed && <div className="wk-sess__lone">Занятие {i + 1}</div>}
+          {renderBlock(g[0], week)}
+        </>
+      )}
+    </React.Fragment>
+  ));
+}
+
+/**
+ * Старые программы (FT-788): кардио отдельной тренировкой сразу после
+ * силовой — «Прицепить каждое к силовой перед ним?». «Оставить так»
+ * больше не спрашивает у этой программы (ключ — в памяти телефона)
+ */
+export function LooseCardio({ count, storeKey, onAttach, disabled = false }) {
+  const key = 'ft.looseCardio.' + storeKey;
+  const [hidden, setHidden] = useState(() => {
+    try { return !!storeKey && localStorage.getItem(key) === '1'; } catch (_) { return false; }
+  });
+  if (!count || hidden) return null;
+  return (
+    <div className="wk-loose" role="note">
+      <strong>{count === 1 ? 'Кардио — отдельной тренировкой' : `${count} кардио — отдельными тренировками`}</strong>
+      <span>{count === 1 ? 'Прицепить его к силовой перед ним? Это будет одно занятие.' : 'Прицепить каждое к силовой перед ним? В неделе будет меньше занятий, а тренировки останутся теми же.'}</span>
+      <div className="wk__row">
+        <button type="button" className="button button--primary" disabled={disabled} onClick={() => { haptic(); onAttach(); }}>Прицепить</button>
+        <button type="button" className="button" onClick={() => { haptic(); setHidden(true); try { if (storeKey) localStorage.setItem(key, '1'); } catch (_) { /* приватный режим */ } }}>Оставить так</button>
+      </div>
+    </div>
   );
 }
 
@@ -398,17 +485,97 @@ export function DayPicker({ value, onChange }) {
   );
 }
 
-/** «Сегодня по плану: B · Спина» и дни недели — у недели с днями занятий */
+/** «Сегодня по плану: B · Спина + Кардио» и дни недели — у недели с днями занятий */
 function DayLine({ week }) {
   const today = dateKey();
-  const planned = week.rows.filter((r) => r.day);
-  const now = week.current && planned.find((r) => r.date === today && r.left > 0);
+  const groups = sessionRows(week.rows);
+  const name = (g) => g.map((r) => r.block.title + (r.left === 0 ? ' ✓' : '')).join(' + ');
+  const planned = groups.filter((g) => g[0].day);
+  const free = groups.filter((g) => !g[0].day);
+  const now = week.current && planned.find((g) => g[0].date === today && g.some((r) => r.left > 0));
   return (
     <p className="wk-today">
-      {now ? <><b>Сегодня по плану: {now.block.title}</b><br /></> : null}
-      {planned.map((r) => `${WEEKDAY_SHORT[r.day]} — ${r.block.title}${r.left === 0 ? ' ✓' : ''}`).join(' · ')}
-      {week.rows.some((r) => !r.day) ? ' · в любой день: ' + week.rows.filter((r) => !r.day).map((r) => r.block.title + (r.left === 0 ? ' ✓' : '')).join(', ') : ''}
+      {now ? <><b>Сегодня по плану: {now.map((r) => r.block.title).join(' + ')}</b><br /></> : null}
+      {planned.map((g) => `${WEEKDAY_SHORT[g[0].day]} — ${name(g)}`).join(' · ')}
+      {free.length ? ' · в любой день: ' + free.map(name).join(', ') : ''}
     </p>
+  );
+}
+
+/**
+ * Ритм (FT-788, макет program-week-mockup.html, раздел 2): сколько занятий
+ * в неделю — одно число или чередование недель (3 · 1), у недель
+ * чередования свои дни; неделя с одним занятием — дальше по очереди или
+ * всегда одно и то же. value — { rhythm: [], rhythmDays: [[]], one: ключ
+ * занятия или '' }; sessions — [{ key, title }] занятия программы по порядку;
+ * count — занятий в неделе программы (для «Все»)
+ */
+export function RhythmPicker({ value, onChange, sessions = [], count = 0, seedDays = [] }) {
+  const rhythm = value.rhythm || [];
+  const days = value.rhythmDays || [];
+  const alternate = rhythm.length > 1;
+  const set = (patch) => onChange({ ...value, ...patch });
+  const setAt = (i, n) => set({ rhythm: rhythm.map((x, k) => (k === i ? n : x)) });
+  const lightWeek = alternate && rhythm.includes(1) && rhythm.some((n) => n > 1);
+  const counts = [1, 2, 3, 4, 5, 6, 7].map((n) => ({ value: n, label: String(n) }));
+  return (
+    <div className="wk-rows__item">
+      <strong>Сколько занятий в неделю</strong>
+      {!alternate && (
+        <Segmented
+          items={counts}
+          value={rhythm[0] || 0}
+          label="Занятий в неделю"
+          track
+          onChange={(n) => { haptic(); set({ rhythm: n ? [n] : [], rhythmDays: [], one: '' }); }}
+        />
+      )}
+      {alternate && rhythm.map((n, i) => (
+        <div className="wk-beat" key={i}>
+          <div className="wk-beat__top">
+            <b>Неделя {i + 1}</b>
+            {rhythm.length > 2 && <button type="button" className="wk-beat__drop" onClick={() => { haptic(); set({ rhythm: rhythm.filter((_, k) => k !== i), rhythmDays: days.filter((_, k) => k !== i) }); }}>Убрать</button>}
+          </div>
+          <Segmented items={counts} value={n} label={`Занятий в неделю ${i + 1}`} track onChange={(v) => { haptic(); setAt(i, v); }} />
+          <DayPicker value={days[i] || []} onChange={(d) => set({ rhythmDays: rhythm.map((_, k) => (k === i ? d : days[k] || [])) })} />
+        </div>
+      ))}
+      <div className="wk__row">
+        <button type="button" aria-pressed={!rhythm.length} className={'chip' + (!rhythm.length ? ' chip--active' : '')}
+          onClick={() => { haptic(); set({ rhythm: [], rhythmDays: [], one: '' }); }}>
+          Как в программе
+        </button>
+        <button type="button" aria-pressed={alternate} className={'chip' + (alternate ? ' chip--active' : '')}
+          onClick={() => { haptic(); set(alternate ? { rhythm: [rhythm[0]], rhythmDays: [], one: '' } : { rhythm: [rhythm[0] || count || 3, 1], rhythmDays: [seedDays || [], []] }); }}>
+          Чередовать недели
+        </button>
+        {alternate && rhythm.length < MAX_RHYTHM && (
+          <button type="button" className="chip" onClick={() => { haptic(); set({ rhythm: [...rhythm, rhythm[0]] }); }}>+ неделя</button>
+        )}
+      </div>
+      <span>
+        {!rhythm.length
+          ? `Все занятия недели программы${count ? ` (${count})` : ''} — каждую неделю.`
+          : alternate
+            ? `Ритм ${rhythm.join(' · ')} — и так по кругу. Считаются занятия (дни прихода), очередь продолжается с того места, где клиент остановился. Дни недели можно не отмечать.`
+            : `${rhythm[0]} в неделю. Занятия идут по кругу: на следующей неделе — с того места, где остановились.`}
+      </span>
+      {lightWeek && sessions.length > 1 && (
+        <>
+          <strong>Неделя с одним занятием</strong>
+          <Segmented items={[{ value: 'next', label: 'Дальше по очереди' }, { value: 'one', label: 'Всегда одно' }]} value={value.one !== '' && value.one !== undefined ? 'one' : 'next'} label="Неделя с одним занятием"
+            onChange={(v) => { haptic(); set({ one: v === 'one' ? sessions[sessions.length - 1].key : '' }); }} />
+          {value.one !== '' && value.one !== undefined && (
+            <div className="chips chips--wrap" role="radiogroup" aria-label="Какое занятие">
+              {sessions.map((x) => (
+                <button key={x.key} type="button" role="radio" aria-checked={x.key === value.one} className={'chip' + (x.key === value.one ? ' chip--active' : '')} onClick={() => { haptic(); set({ one: x.key }); }}>{x.title}</button>
+              ))}
+            </div>
+          )}
+          {value.one !== '' && value.one !== undefined && <span>Это занятие — только в неделю с одним, в остальные недели его нет.</span>}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -418,7 +585,8 @@ export const firstWeekDefault = (days) => (days && days.length ? 'days' : 'order
 export function FirstWeekPicker({ startsOn, days, blocks, value, onChange }) {
   const start = weekdayOf(startsOn);
   const list = days || [];
-  const names = (blocks || []).map((b) => b.title);
+  // Занятия, а не тренировки (FT-788): «Ноги + Кардио»
+  const names = sessionsOf(blocks || []).map((g) => g.map((b) => b.title).join(' + '));
   const dayName = (d) => WEEKDAY_SHORT[d];
   const left = list.filter((d) => d >= start);
   const byDays = list.length
@@ -527,6 +695,10 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   const [effectiveOn, setEffectiveOn] = useState(cfg && cfg.effectiveOn > dateKey() ? cfg.effectiveOn : nextMonday());
   const [pauses, setPauses] = useState(cfg && cfg.pauses || []);
   const [days, setDays] = useState(cfg && cfg.days || []);
+  // Ритм (FT-788): «всегда одно» занятие — по id его первой тренировки
+  const [beat, setBeat] = useState({ rhythm: cfg && cfg.rhythm || [], rhythmDays: cfg && cfg.rhythmDays || [], one: cfg && cfg.oneSession || '' });
+  const alternate = beat.rhythm.length > 1;
+  const queue = sessionQueueOf(draft);
   const [pauseFrom, setPauseFrom] = useState(dateKey());
   const [pauseTo, setPauseTo] = useState('');
   const [loadAccepted, setLoadAccepted] = useState(false);
@@ -537,7 +709,9 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
     <WeekPreview rows={byWeek(draft, n).map((g) => ({ key: g.week, label: `Неделя ${g.week}`, titles: g.blocks.map((b) => b.title) }))} />
     {byWeek(draft, n).map((g) => <div className="wk-rows__pill" key={g.week}><span>Неделя {g.week}<small>{workouts(g.blocks.length)}</small></span><Segmented items={LOADS} value={weekLoad(draft, g.week)} label={`Нагрузка недели ${g.week}`} onChange={(load) => setDraft(withWeekLoad(draft, g.week, load))} /></div>)}
     <ProgramDates startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} disabled={cfg && cfg.schedule === 1} />
-    <div className="wk-rows__item"><strong>Дни занятий</strong><DayPicker value={days} onChange={setDays} /><span>Тренировки недели встают на эти дни по порядку. Можно не указывать.</span></div>
+    {queue.length > 0 && <RhythmPicker value={beat} onChange={setBeat} seedDays={days} count={sessionsOf(draft.filter((b) => weekOf(b) === 1)).length}
+      sessions={queue.filter((g) => g[0].id).map((g) => ({ key: g[0].id, title: g.map((b) => b.title).join(' + ') }))} />}
+    {!alternate && <div className="wk-rows__item"><strong>Дни занятий</strong><DayPicker value={days} onChange={setDays} /><span>Занятия недели встают на эти дни по порядку. Можно не указывать.</span></div>}
     <label className="field"><span className="field__label">Применить изменения с</span><input className="field__input" type="date" min={dateKey()} value={effectiveOn} onChange={(e) => setEffectiveOn(e.target.value)} /></label>
     <span>По умолчанию — следующий понедельник. Прошлые недели и проведённые занятия сохранятся.</span>
     <label className="field"><span className="field__label">Неделя продолжения</span><select className="field__input" value={startWeek} onChange={(e) => setStartWeek(e.target.value)}><option value="">Продолжить по порядку</option>{Array.from({ length: n }, (_, i) => <option key={i} value={i + 1}>Начать с недели {i + 1}</option>)}</select></label>
@@ -550,6 +724,8 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
     </div>
     {overloaded && <label className="library__check"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} /><span>В одной неделе больше 6 тренировок. Я проверил и подтверждаю распределение.</span></label>}
     {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
-    <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days, ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить программу'}</button>
+    <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days: alternate ? [] : days,
+      rhythm: beat.rhythm, rhythmDays: alternate ? beat.rhythmDays.slice(0, beat.rhythm.length).map((d) => d || []) : [], oneSession: alternate ? beat.one || '' : '',
+      ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить программу'}</button>
   </div></Sheet>;
 }
