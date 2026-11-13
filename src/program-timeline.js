@@ -12,6 +12,33 @@ const maxWeek = (blocks) => Math.max(0, ...(blocks || []).map((b) => Number(b.we
 export const programSize = (blocks, cfg) => Math.max(maxWeek(blocks), Number(cfg && cfg.length) || 0);
 export const inPause = (day, cfg) => (cfg.pauses || []).some((p) => day >= p.from && (!p.to || day <= p.to));
 
+/** Дни занятий клиента: 1 — понедельник … 7 — воскресенье, по порядку, без повторов */
+export const cleanDays = (days) => [...new Set((Array.isArray(days) ? days : []).map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 7))].sort((a, b) => a - b);
+/** Что делать с неделей, если программа начинается не с понедельника */
+export const FIRST_WEEK = ['days', 'order', 'all'];
+export const WEEKDAY_SHORT = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/**
+ * Первая неделя версии, начатой среди недели (решение владельца 13.11.2026):
+ * 'days' — по дням программы, тренировки прошедших дней пропускаются без
+ * долга; 'order' — по порядку на оставшиеся дни, не поместившиеся уходят
+ * в следующую неделю; 'all' — все тренировки недели за оставшиеся дни.
+ * Тренировки недели раскладываются по дням клиента по порядку; лишние — без дня.
+ * Возвращает { own, deferred, dayOf }
+ */
+export function laidWeek(blocks, { days = [], from, startDay = '', mode = 'all', activeCount = 7 }) {
+  const list = cleanDays(days);
+  const date = (d) => addDays(from, d - 1);
+  const mid = !!startDay && startDay > from;
+  const dayOf = new Map(blocks.map((b, i) => [b, list[i] || 0]));
+  if (!mid || mode === 'all' || (mode === 'days' && !list.length)) return { own: blocks, deferred: [], dayOf };
+  if (mode === 'days') return { own: blocks.filter((b) => !dayOf.get(b) || date(dayOf.get(b)) >= startDay), deferred: [], dayOf };
+  const left = list.length ? list.filter((d) => date(d) >= startDay) : [];
+  const fits = list.length ? left.length : Math.max(1, Math.round(blocks.length * activeCount / 7));
+  const own = blocks.slice(0, fits);
+  return { own, deferred: blocks.slice(fits), dayOf: new Map(own.map((b, i) => [b, left[i] || 0])) };
+}
+
 export function versionAt(blocks, cfg, day) {
   const versions = [...(cfg.history || []), { from: cfg.effectiveOn || cfg.startsOn || '', blocks, settings: cfg }];
   return versions.filter((v) => v.from <= day).sort((a, b) => b.from.localeCompare(a.from))[0] || versions[0];
@@ -47,17 +74,27 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
     const decide = (r) => previous.rule === 'client' ? (cfg.choices || {})[`${previous.n}:${r.block.id}`] : previous.rule;
     const debts = !paused && !expired && previous && previous.status !== 'paused'
       ? previous.rows.filter((r) => r.missed && decide(r) === 'redo') : [];
-    const own = activeDays.length ? v.blocks.filter((b) => (Number(b.week) || 1) === week) : [];
-    const rowBlocks = [...own, ...debts.map((r) => r.block).filter((b) => !own.some((x) => x.id === b.id))];
+    const startDay = v.from || first;
+    const laid = laidWeek(activeDays.length ? v.blocks.filter((b) => (Number(b.week) || 1) === week) : [], {
+      days: settings.days, from, startDay: startDay > from && startDay <= end ? startDay : '',
+      mode: FIRST_WEEK.includes(settings.firstWeek) ? settings.firstWeek : 'all', activeCount: activeDays.length,
+    });
+    const own = laid.own;
+    // Не поместились в первую неделю «по порядку» — в следующую, без долга
+    const moved = !paused && !expired && previous ? previous.deferred || [] : [];
+    const same = (a, b) => a === b || (!!a.id && a.id === b.id);
+    const rowBlocks = [...own, ...[...debts.map((r) => r.block), ...moved].filter((b, i, all) => !own.some((x) => same(x, b)) && all.findIndex((x) => same(x, b)) === i)];
     const rows = rowBlocks.map((block) => {
       const debt = debts.find((r) => r.block.id === block.id);
-      const carried = !!debt;
-      const required = Number(own.some((b) => b.id === block.id)) + (debt ? debt.missed : 0);
+      const shifted = moved.some((b) => same(b, block));
+      const carried = !!debt || shifted;
+      const day = laid.dayOf.get(block) || 0;
+      const required = Number(own.some((b) => b.id === block.id)) + (debt ? debt.missed : 0) + Number(shifted);
       const here = sessions.filter((s) => s.status === 'completed' && s.month === month
         && (s.sourceBlockId ? s.sourceBlockId === block.id : s.sourceBlock === block.title)
         && (settings.legacyList ? dateKey(s.startedAt || s.updatedAt) <= end : activeDays.includes(dateKey(s.startedAt || s.updatedAt))));
       const done = here.length;
-      return { block, sessions: here, carried, required, done, left: Math.max(0, required - done), missed: ended && activeDays.length === 7 && !settings.legacyList ? Math.max(0, required - done) : 0 };
+      return { block, day, date: day ? addDays(from, day - 1) : '', shifted, sessions: here, carried, required, done, left: Math.max(0, required - done), missed: ended && activeDays.length === 7 && !settings.legacyList ? Math.max(0, required - done) : 0 };
     });
     const need = rows.reduce((sum, r) => sum + r.required, 0);
     const done = rows.reduce((sum, r) => sum + Math.min(r.done, r.required), 0);
@@ -67,6 +104,7 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
       fromGen: new Date(from + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }).replace(/^\d+\s*/, ''),
       monthGen: new Date(end + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }).replace(/^\d+\s*/, ''),
       week, length, rule, ended, full, current: now >= from && now <= end, rows, need, done, extra: 0,
+      days: cleanDays(settings.days), deferred: laid.deferred,
       load: loads.size === 1 ? [...loads][0] : '', missed: ended ? Math.max(0, need - done) : 0,
       status: now < first ? 'scheduled' : expired ? 'expired' : paused ? 'paused' : settings.legacyList ? 'legacy' : !need ? 'empty' : done >= need ? 'done' : ended && full ? 'missed' : ended ? 'partial' : 'open',
     });

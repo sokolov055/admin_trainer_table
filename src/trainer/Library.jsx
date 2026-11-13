@@ -22,8 +22,8 @@ import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachinesEditor, MachineForm, AlternativesEditor, extrasHint } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
 import { programLength, monthWeeks, parseMonth, monthLabelOf, defaultHow, assignPreview, workoutsOf } from '../plan-weeks.js';
-import { dateKey, nextMonday, scheduledPlan } from '../program-timeline.js';
-import { WeekPreview, ProgramDates } from '../client/PlanWeeks.jsx';
+import { dateKey, nextMonday, scheduledPlan, WEEKDAY_SHORT } from '../program-timeline.js';
+import { WeekPreview, ProgramDates, DayPicker, FirstWeekPicker, firstWeekDefault, weekdayOf } from '../client/PlanWeeks.jsx';
 import { TEMPLATE_GOALS, PLACES, minutesText, timesText } from '../client/programs-model.js';
 
 /**
@@ -616,6 +616,8 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
   const [length, setLength] = useState(2);
   const [startsInput, setStartsInput] = useState('');
   const [endsOn, setEndsOn] = useState('');
+  const [days, setDays] = useState([]);
+  const [firstPick, setFirstPick] = useState(''); // '' — по умолчанию: по дням, если они есть, иначе по порядку
   const [loadAccepted, setLoadAccepted] = useState(false);
   const [startWeek, setStartWeek] = useState(''); // '' — само (сервер: продолжить или с первой)
   const [busy, setBusy] = useState(false);
@@ -642,7 +644,11 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
   const weekly = replacing && (weeks > 0 || howNow !== 'list');
   const laid = weekly ? (weeks ? blocks : blocks.map((b, i) => ({ ...b, week: howNow === 'cycle' ? 1 : Math.min(length, Math.ceil((i + 1) * length / blocks.length)) }))) : [];
   const size = weeks || (howNow === 'cycle' ? 1 : length);
-  const preview = weekly ? scheduledPlan({ blocks: laid, sessions: [], month: label, cfg: { schedule: 1, startsOn, endsOn, startWeek: chosenStart, length: size }, today: new Date(startsOn + 'T12:00:00') }).weeks.slice(0, 4).map((w) => ({ ...w, titles: w.rows.map((r) => r.block.title) })) : legacyPreview;
+  const firstWeek = firstPick === 'days' && !days.length ? firstWeekDefault(days) : firstPick || firstWeekDefault(days);
+  const midWeek = weekly && startsOn && weekdayOf(startsOn) !== 1;
+  const startWeekBlocks = weekly ? laid.filter((b) => (Number(b.week) || 1) === (((chosenStart - 1) % size) + 1)) : [];
+  const preview = weekly ? scheduledPlan({ blocks: laid, sessions: [], month: label, cfg: { schedule: 1, startsOn, endsOn, startWeek: chosenStart, length: size, days, firstWeek }, today: new Date(startsOn + 'T12:00:00') }).weeks.slice(0, 4)
+    .map((w) => ({ ...w, titles: w.rows.map((r) => (r.day ? WEEKDAY_SHORT[r.day] + ' ' : '') + r.block.title + (r.shifted ? (r.required > 1 ? ' ×2 (одна — с прошлой недели)' : ' (с прошлой недели)') : '')) })) : legacyPreview;
   const heavy = weekly && preview.some((w) => w.need > 6);
 
   const apply = async () => {
@@ -651,7 +657,7 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
     try {
       await apiMutate('plan.fromTemplate', {
         clientRow, month: label, templateId: template.id, mode,
-        ...(weekly ? { effectiveOn: startsOn, weeks: { schedule: 1, startsOn, endsOn, effectiveOn: startsOn, length: size } } : {}),
+        ...(weekly ? { effectiveOn: startsOn, weeks: { schedule: 1, startsOn, endsOn, effectiveOn: startsOn, length: size, days, firstWeek } } : {}),
         ...(replacing && !weeks ? { how: howNow, ...(howNow === 'split' ? { length } : {}) } : {}),
         ...(weekly ? { startWeek: chosenStart } : {}),
       });
@@ -754,11 +760,30 @@ export function AssignForm({ template, clientRow, clientName = '', defaultMonth,
         </div>
       )}
 
+      {weekly && (
+        <div className="wk-rows__item">
+          <strong>Начало</strong>
+          <Chips
+            items={[...new Set([dateKey(), nextMonday()])].map((d) => ({ value: d, label: (d === dateKey() ? 'Сегодня, ' : '') + WEEKDAY_SHORT[weekdayOf(d)].toLowerCase() + ' ' + Number(d.slice(8)) }))}
+            value={startsOn}
+            label="Начало программы"
+            onChange={(v) => { haptic(); setStartsInput(v); }}
+          />
+        </div>
+      )}
       {weekly && <ProgramDates startsOn={startsOn} endsOn={endsOn} onStart={setStartsInput} onEnd={setEndsOn} />}
+      {weekly && (
+        <div className="wk-rows__item">
+          <strong>Дни занятий</strong>
+          <DayPicker value={days} onChange={setDays} />
+          <span>{days.length ? `Тренировки недели встают на эти дни по порядку${startWeekBlocks.length > days.length ? '; лишние — в любой день' : ''}. День — подсказка клиенту: сделал в другой — засчитано.` : 'Можно не указывать: тогда клиент делает тренировки недели в любые дни.'}</span>
+        </div>
+      )}
+      {midWeek && startWeekBlocks.length > 0 && <FirstWeekPicker startsOn={startsOn} days={days} blocks={startWeekBlocks} value={firstWeek} onChange={setFirstPick} />}
       {weekly && <p className="small">{size} {size === 1 ? 'неделя' : 'недели'} по кругу. {endsOn ? `До ${endsOn.split('-').reverse().join('.')}.` : 'До замены тренером, без ежемесячного назначения.'} Неполная неделя начала — без оценки пропусков.</p>}
       {heavy && <label className="library__check"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} /><span>В одной неделе больше 6 тренировок. Я проверил распределение и подтверждаю его.</span></label>}
       {replacing && (weeks > 0 || howNow !== 'list') && preview.length > 0 && (
-        <WeekPreview rows={preview.map((c) => ({ key: c.n, label: `${c.from}–${c.to} ${c.monthGen.slice(0, 3)}`, titles: c.titles }))} />
+        <WeekPreview rows={preview.map((c) => ({ key: c.n, label: `${c.from}–${c.to} ${c.monthGen.slice(0, 3)}${c.n === 1 && midWeek ? ' · неполная' : ''}`, titles: c.titles }))} />
       )}
       {replacing && !weeks && howNow === 'list' && blocks.length > 0 && (
         <WeekPreview rows={[{ key: 'list', label: 'Очередь', titles: blocks.map((b) => b.title) }]} />

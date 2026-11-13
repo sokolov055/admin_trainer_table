@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { dateKey, nextMonday, programSize, addDays } from '../program-timeline.js';
+import { dateKey, nextMonday, programSize, addDays, WEEKDAY_SHORT } from '../program-timeline.js';
 import { apiMutate } from '../api.js';
 import { Segmented, Sheet, Note } from '../ui.jsx';
-import { IconAlert } from '../icons.jsx';
+import { IconAlert, IconCheck } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import {
   weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength, withWeekLoad, startWeekOf,
@@ -100,6 +100,7 @@ export function WeekStrip({ plan, sel, onSelect }) {
           </div>
         )}
         <p className="plan-weeks__summary">{summary}</p>
+        {w.rows && w.rows.some((r) => r.day) && <DayLine week={w} />}
         {month && <p className={'plan-weeks__month' + (score.allDone && score.graded === score.total ? ' is-praise' : '')}>{month}</p>}
       </div>
     </div>
@@ -328,6 +329,73 @@ export function MonthStatus({ month, blocks, plan, cfg, months, onSpread, onSett
 }
 
 /** Предпросмотр: неделя → названия тренировок */
+/** День недели даты «ГГГГ-ММ-ДД»: 1 — понедельник … 7 — воскресенье */
+export const weekdayOf = (key) => ((new Date(key + 'T12:00:00').getDay() + 6) % 7) + 1;
+
+/** Дни занятий клиента — любой набор из семи, можно ни одного (13.11.2026) */
+export function DayPicker({ value, onChange }) {
+  const set = new Set(value || []);
+  return (
+    <div className="chips wk-days" role="group" aria-label="Дни занятий">
+      {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+        <button key={d} type="button" aria-pressed={set.has(d)} className={'chip' + (set.has(d) ? ' chip--active' : '')}
+          onClick={() => { haptic(); onChange([1, 2, 3, 4, 5, 6, 7].filter((x) => (x === d ? !set.has(d) : set.has(x)))); }}>
+          {WEEKDAY_SHORT[d]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** «Сегодня по плану: B · Спина» и дни недели — у недели с днями занятий */
+function DayLine({ week }) {
+  const today = dateKey();
+  const planned = week.rows.filter((r) => r.day);
+  const now = week.current && planned.find((r) => r.date === today && r.left > 0);
+  return (
+    <p className="wk-today">
+      {now ? <><b>Сегодня по плану: {now.block.title}</b><br /></> : null}
+      {planned.map((r) => `${WEEKDAY_SHORT[r.day]} — ${r.block.title}${r.left === 0 ? ' ✓' : ''}`).join(' · ')}
+      {week.rows.some((r) => !r.day) ? ' · в любой день: ' + week.rows.filter((r) => !r.day).map((r) => r.block.title + (r.left === 0 ? ' ✓' : '')).join(', ') : ''}
+    </p>
+  );
+}
+
+/** Как идёт неделя, если программа начинается не с понедельника */
+export const firstWeekDefault = (days) => (days && days.length ? 'days' : 'order');
+
+export function FirstWeekPicker({ startsOn, days, blocks, value, onChange }) {
+  const start = weekdayOf(startsOn);
+  const list = days || [];
+  const names = (blocks || []).map((b) => b.title);
+  const dayName = (d) => WEEKDAY_SHORT[d];
+  const left = list.filter((d) => d >= start);
+  const byDays = list.length
+    ? names.map((t, i) => (list[i] && list[i] >= start ? `${dayName(list[i])} — ${t}` : '')).filter(Boolean).join(', ') || 'На этой неделе занятий не останется'
+    : '';
+  const fits = list.length ? left.length : Math.max(1, Math.round(names.length * (8 - start) / 7));
+  const byOrder = names.slice(0, fits).map((t, i) => (left[i] ? `${dayName(left[i])} — ${t}` : t)).join(', ');
+  const rest = names.slice(fits);
+  const options = [
+    { value: 'days', title: 'По дням программы', text: list.length ? `${byDays}. Прошедшие дни пропускаются, долгом не считаются.` : 'Сначала отметьте дни занятий выше.', off: !list.length },
+    { value: 'order', title: 'Сначала то, что по порядку', text: `${byOrder || '—'}.${rest.length ? ` ${rest.join(', ')} — в начало следующей недели.` : ''}` },
+    { value: 'all', title: 'Успеть всю неделю', text: `${names.join(', ')} — за оставшиеся дни, как раньше.` },
+  ];
+  return (
+    <div className="wk-rows__item">
+      <strong>Эта неделя начинается {['', 'с понедельника', 'со вторника', 'со среды', 'с четверга', 'с пятницы', 'с субботы', 'с воскресенья'][start]} — что делать?</strong>
+      <div className="wk-opts" role="radiogroup" aria-label="Первая неделя">
+        {options.map((o) => (
+          <button type="button" role="radio" aria-checked={value === o.value} aria-disabled={o.off} disabled={o.off} className="wk-opt" key={o.value} onClick={() => { haptic(); onChange(o.value); }}>
+            <span className="wk-opt__mark" aria-hidden="true">{value === o.value && <IconCheck size={12} />}</span>
+            <span className="wk-opt__body"><strong>{o.title}</strong><span>{o.text}</span></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function WeekPreview({ rows }) {
   return (
     <div className="wk-prev">
@@ -407,6 +475,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   const [startWeek, setStartWeek] = useState('');
   const [effectiveOn, setEffectiveOn] = useState(cfg && cfg.effectiveOn > dateKey() ? cfg.effectiveOn : nextMonday());
   const [pauses, setPauses] = useState(cfg && cfg.pauses || []);
+  const [days, setDays] = useState(cfg && cfg.days || []);
   const [pauseFrom, setPauseFrom] = useState(dateKey());
   const [pauseTo, setPauseTo] = useState('');
   const [loadAccepted, setLoadAccepted] = useState(false);
@@ -417,6 +486,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
     <WeekPreview rows={byWeek(draft, n).map((g) => ({ key: g.week, label: `Неделя ${g.week}`, titles: g.blocks.map((b) => b.title) }))} />
     {byWeek(draft, n).map((g) => <div className="wk-rows__pill" key={g.week}><span>Неделя {g.week}<small>{workouts(g.blocks.length)}</small></span><Segmented items={LOADS} value={weekLoad(draft, g.week)} label={`Нагрузка недели ${g.week}`} onChange={(load) => setDraft(withWeekLoad(draft, g.week, load))} /></div>)}
     <ProgramDates startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} disabled={cfg && cfg.schedule === 1} />
+    <div className="wk-rows__item"><strong>Дни занятий</strong><DayPicker value={days} onChange={setDays} /><span>Тренировки недели встают на эти дни по порядку. Можно не указывать.</span></div>
     <label className="field"><span className="field__label">Применить изменения с</span><input className="field__input" type="date" min={dateKey()} value={effectiveOn} onChange={(e) => setEffectiveOn(e.target.value)} /></label>
     <span>По умолчанию — следующий понедельник. Прошлые недели и проведённые занятия сохранятся.</span>
     <label className="field"><span className="field__label">Неделя продолжения</span><select className="field__input" value={startWeek} onChange={(e) => setStartWeek(e.target.value)}><option value="">Продолжить по порядку</option>{Array.from({ length: n }, (_, i) => <option key={i} value={i + 1}>Начать с недели {i + 1}</option>)}</select></label>
@@ -429,6 +499,6 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
     </div>
     {overloaded && <label className="library__check"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} /><span>В одной неделе больше 6 тренировок. Я проверил и подтверждаю распределение.</span></label>}
     {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
-    <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить программу'}</button>
+    <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days, ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить программу'}</button>
   </div></Sheet>;
 }

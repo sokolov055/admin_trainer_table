@@ -64,3 +64,64 @@ test('перенос требует выбора, сохраняет оценк�
   assert.equal(p.weeks[0].status, 'missed');
   assert.equal(current(p).need, 3);
 });
+
+// Дни занятий и старт среди недели (решение владельца 13.11.2026)
+const abc = ['A', 'B', 'C'].map((t) => ({ id: t, title: t, week: 1, exercises: [] }));
+const wed = { schedule: 1, startsOn: '2026-11-18', length: 1, rule: 'client', startWeek: 1 };
+const plan = (settings, day = '2026-11-18', sessions = []) => scheduledPlan({ blocks: abc, sessions, month: 'Ноябрь 2026', cfg: settings, today: new Date(day + 'T12:00:00') });
+const titles = (w) => w.rows.map((r) => (r.day ? ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][r.day] + ' ' : '') + r.block.title);
+
+test('старт в среду «по дням» Пн Ср Пт: Ср B, Пт C, A пропущена без долга', () => {
+  const p = plan({ ...wed, days: [1, 3, 5], firstWeek: 'days' });
+  assert.deepEqual(titles(current(p)), ['Ср B', 'Пт C']);
+  assert.equal(current(p).need, 2);
+  const next = plan({ ...wed, days: [1, 3, 5], firstWeek: 'days' }, '2026-11-23');
+  assert.deepEqual(titles(current(next)), ['Пн A', 'Ср B', 'Пт C']);
+  assert.equal(next.pending.length, 0);
+});
+test('старт в среду «по дням» Пн Вт Пт: только Пт C; Пн Чт Вс: Чт B, Вс C', () => {
+  assert.deepEqual(titles(current(plan({ ...wed, days: [5, 1, 2], firstWeek: 'days' }))), ['Пт C']);
+  assert.deepEqual(titles(current(plan({ ...wed, days: [1, 4, 7], firstWeek: 'days' }))), ['Чт B', 'Вс C']);
+});
+test('старт в среду «по порядку»: Ср A, Пт B, C — первой в следующей неделе, без долга', () => {
+  const cfg2 = { ...wed, days: [1, 3, 5], firstWeek: 'order' };
+  assert.deepEqual(titles(current(plan(cfg2))), ['Ср A', 'Пт B']);
+  const next = current(plan(cfg2, '2026-11-23'));
+  assert.deepEqual(titles(next), ['Пн A', 'Ср B', 'Пт C']);
+  assert.equal(next.need, 4);
+  const c = next.rows.find((r) => r.shifted);
+  assert.equal(c.block.id, 'C');
+  assert.equal(c.required, 2);
+  assert.ok(c.carried);
+  // через неделю — снова три
+  assert.equal(current(plan(cfg2, '2026-11-30')).need, 3);
+});
+test('«по порядку» без дней — по доле оставшихся дней недели', () => {
+  assert.equal(current(plan({ ...wed, firstWeek: 'order' })).need, 2);
+  assert.equal(current(plan({ ...wed, startsOn: '2026-11-21', firstWeek: 'order' }, '2026-11-21')).need, 1);
+});
+test('«успеть всю неделю», старые программы без выбора и старт в понедельник — как раньше', () => {
+  assert.deepEqual(titles(current(plan({ ...wed, days: [1, 3, 5], firstWeek: 'all' }))), ['Пн A', 'Ср B', 'Пт C']);
+  assert.equal(current(plan(wed)).need, 3);
+  const mon = { ...wed, startsOn: '2026-11-16', days: [1, 3, 5], firstWeek: 'days' };
+  assert.deepEqual(titles(current(plan(mon))), ['Пн A', 'Ср B', 'Пт C']);
+});
+test('«по дням» без дней клиента работает как «успеть всю неделю»', () => {
+  assert.equal(current(plan({ ...wed, firstWeek: 'days' })).need, 3);
+});
+test('перенос «по порядку» переживает неделю паузы', () => {
+  const cfg2 = { ...wed, days: [1, 3, 5], firstWeek: 'order', pauses: [{ from: '2026-11-23', to: '2026-11-29' }] };
+  assert.equal(current(plan(cfg2, '2026-11-23')).status, 'paused');
+  assert.equal(current(plan(cfg2, '2026-11-30')).need, 4);
+});
+test('сделанная в другой день тренировка засчитывается', () => {
+  const cfg2 = { ...wed, days: [1, 3, 5], firstWeek: 'days' };
+  const s = [{ id: 's1', status: 'completed', month: 'Ноябрь 2026', sourceBlockId: 'B', startedAt: '2026-11-19T10:00:00' }];
+  assert.equal(current(plan(cfg2, '2026-11-19', s)).done, 1);
+});
+test('перенос «по порядку» у тренировок без id (предпросмотр шаблона) — только не поместившиеся', () => {
+  const raw = ['A', 'B', 'C'].map((t) => ({ title: t, week: 1, exercises: [] }));
+  const p = scheduledPlan({ blocks: raw, sessions: [], month: 'Ноябрь 2026', cfg: { ...wed, days: [1, 3, 5], firstWeek: 'order' }, today: new Date('2026-11-18T12:00:00') });
+  assert.deepEqual(p.weeks[1].rows.filter((r) => r.shifted).map((r) => r.block.title), ['C']);
+  assert.equal(p.weeks[1].need, 4);
+});

@@ -328,3 +328,11 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
   .plan-weeks__week, .plan-weeks__bar span { transition: none; }
 }
 
+
+/* Дни занятий и первая неделя (13.11.2026) */
+.wk-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; overflow: visible; }
+.wk-days .chip { min-width: 0; min-height: 40px; padding-inline: 0; justify-content: center; }
+.wk-opt:disabled { opacity: 1; color: var(--text-secondary); cursor: default; }
+.wk-opt:disabled .wk-opt__body strong { color: var(--text-secondary); }
+.wk-today { margin: 0; padding: 8px 10px; border-radius: var(--radius-md, 10px); background: var(--accent-wash); color: var(--accent-ink); font-size: var(--text-sm); }
+.wk-today b { font-weight: 650; }
