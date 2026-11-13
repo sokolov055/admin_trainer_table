@@ -113,7 +113,7 @@ if (SCENES.includes('nutrition')) {
     await page.getByText('Женский', { exact: true }).first().click(); say('sex');
     await page.getByText(/^Подвижный/).first().click(); say('life');
     await page.locator('text=Тренировок в неделю').locator('xpath=..').getByText('3', { exact: true }).first().click(); say('per week');
-    await page.getByText('Похудение', { exact: true }).first().click(); say('goal');
+    await page.getByText('Похудеть', { exact: true }).first().click(); say('goal');
     await page.getByRole('button', { name: 'Посчитать норму' }).click();
     await page.waitForTimeout(1500);
     await top(page);

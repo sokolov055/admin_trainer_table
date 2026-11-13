@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { Section, Panel, Segmented, Qty, formatNumber, plural } from '../ui.jsx';
 import { IconCheck, IconChevron } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { goalDots, dotsLabel, daysLeft } from './goal-dots.js';
+import { useFocus } from './focus.jsx';
+import { GOALS } from './onboarding-model.js';
 import './goals.css';
 
 /**
@@ -29,6 +31,10 @@ import './goals.css';
  * (владелец, 08.10.2026); у клиента «Изменить» нет. Новая цель действует с
  * недели, в которую поставлена: прошлые недели сервер меряет прежней
  * (client_goal_history), выполненные не проваливаются задним числом.
+ *
+ * Цель тела — «Похудеть», «Быть в форме», «Набрать мышцы» (FT-787) — первой
+ * карточкой. Одна на всё приложение (client.focus): тренер ставит её здесь,
+ * клиент может поменять в анкете «Питания», и здесь она тоже поменяется.
  */
 
 const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
@@ -149,7 +155,29 @@ function whoSet(goal, viewer) {
   return goal.setBy === 'trainer' ? 'цель поставил тренер' : goal.setBy === 'self' ? 'по вашему графику из анкеты' : 'цель по умолчанию — её поставит тренер';
 }
 
-function GoalForm({ goal, clientRow, onDone }) {
+/** Цель тела — карточкой: что выбрано и на что влияет */
+function BodyGoalCard({ focus, viewer }) {
+  const picked = focus && GOALS.find((g) => g.id === focus.goal);
+  if (!picked && viewer !== 'trainer') return null;
+  return (
+    <Panel pad className="goal-card">
+      <div className="goal-card__head">
+        <h3 className="goal-card__title">Цель</h3>
+        {picked && <span className="goal-card__count">{picked.title}</span>}
+      </div>
+      <p className="goal-card__foot">
+        {picked ? 'По ней считаются норма питания и цвет изменений в замерах' : 'Не выбрана — нажмите «Изменить»'}
+      </p>
+    </Panel>
+  );
+}
+
+function GoalForm({ goal, body, clientRow, onDone }) {
+  const [bodyGoal, setBodyGoal] = useState(GOALS.some((g) => g.id === body) ? body : null);
+  // Цель доехала после открытия формы — подставить, если ещё не выбирали
+  useEffect(() => {
+    if (GOALS.some((g) => g.id === body)) setBodyGoal((v) => v || body);
+  }, [body]);
   const [week, setWeek] = useState(goal.week);
   const [steps, setSteps] = useState(goal.steps);
   const [busy, setBusy] = useState(false);
@@ -160,7 +188,7 @@ function GoalForm({ goal, clientRow, onDone }) {
     setBusy(true);
     setProblem('');
     try {
-      await apiMutate('client.goals.save', { ...(clientRow ? { clientRow } : {}), week, steps });
+      await apiMutate('client.goals.save', { ...(clientRow ? { clientRow } : {}), week, steps, ...(bodyGoal ? { goal: bodyGoal } : {}) });
       haptic();
       onDone();
     } catch (e) {
@@ -171,6 +199,17 @@ function GoalForm({ goal, clientRow, onDone }) {
 
   return (
     <div className="goal-form">
+      <div className="goal-form__field">
+        <div className="goal-form__label">Цель</div>
+        <Segmented
+          label="Цель"
+          items={GOALS.map((g) => ({ value: g.id, label: g.title }))}
+          value={bodyGoal}
+          onChange={setBodyGoal}
+          disabled={busy}
+          wrap
+        />
+      </div>
       <div className="goal-form__field">
         <div className="goal-form__label">Тренировок в неделю</div>
         <Segmented
@@ -193,7 +232,7 @@ function GoalForm({ goal, clientRow, onDone }) {
         />
       </div>
       <p className="small muted">
-        Новая цель действует с этой недели, прошлые недели считаются по прежней — выполненные
+        Цель меняет и норму питания, если анкета питания заполнена. Новая цель тренировок действует с этой недели, прошлые недели считаются по прежней — выполненные
         остаются выполненными. Цель месяца и года считается из недельной. Тренировка — день, когда
         было занятие с тренером, по программе в приложении или с часов от 20 минут.
       </p>
@@ -230,6 +269,7 @@ export default function Goals({ clientRow, preview = false, compact = false }) {
   const { data, loading } = useData('client.awards', clientRow ? { clientRow } : {}, [clientRow]);
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(false);
+  const focus = useFocus(clientRow);
 
   // Пока едет — заглушки карточек недели, месяца и года: блок, вставленный
   // позже, толкал вниз всё под ним (аудит 24.10.2026). Не доехал — его
@@ -280,10 +320,11 @@ export default function Goals({ clientRow, preview = false, compact = false }) {
       <div className="goals">
         {editing ? (
           <Panel pad>
-            <GoalForm goal={data.goal} clientRow={clientRow} onDone={() => setEditing(false)} />
+            <GoalForm goal={data.goal} body={focus && focus.goal} clientRow={clientRow} onDone={() => setEditing(false)} />
           </Panel>
         ) : (
           <>
+            <BodyGoalCard focus={focus} viewer={viewer} />
             <GoalCard title="Неделя" layout={week}>
               <p className="goal-card__foot">
                 {week.done >= week.target

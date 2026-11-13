@@ -132,6 +132,40 @@ test('пустой «Прогресс» (нет замеров и весов, к
   } finally { await context.close(); }
 });
 
+test('цель клиента в «Целях»: тренер ставит «Похудеть», анкета питания открывается с ней (FT-787)', async () => {
+  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  const errors = [];
+  phone.on('pageerror', e => errors.push(e.message));
+  const shown = () => phone.locator('#root main:not([hidden])');
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('tab', { name: /^Все · / }).click();
+    await shown().locator('.item').first().click();
+    await phone.getByRole('tab', { name: 'Прогресс', exact: true }).click();
+    await phone.getByRole('radio', { name: 'Активность', exact: true }).click();
+    await phone.getByText('Не выбрана — нажмите «Изменить»', { exact: true }).waitFor();
+    await phone.getByRole('button', { name: 'Изменить', exact: true }).click();
+    const form = phone.locator('.goal-form');
+    // Один список на всё приложение: «Стать сильнее» — то же, что набор
+    assert.deepEqual(await form.getByRole('radiogroup', { name: 'Цель' }).getByRole('radio').allInnerTexts(), ['Похудеть', 'Быть в форме', 'Набрать мышцы']);
+    await form.getByRole('radio', { name: 'Похудеть', exact: true }).click();
+    await phone.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    const card = phone.locator('.goal-card').first();
+    await card.getByText('Похудеть', { exact: true }).waitFor();
+    await phone.getByRole('tab', { name: 'Питание', exact: true }).click();
+    await shown().getByRole('tab', { name: 'Ещё', exact: true }).click();
+    await phone.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
+    const picked = await phone.evaluate(() => [...document.querySelectorAll('[role=radio]')]
+      .filter((e) => e.offsetParent && e.getAttribute('aria-checked') === 'true' && /Похудеть|Быть в форме|Набрать мышцы/.test(e.textContent))
+      .map((e) => e.textContent.trim()));
+    assert.deepEqual(picked, ['Похудеть'], 'анкета питания — с целью из «Целей»');
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
 before(async () => {
   execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', 'dist-demo'], {
     cwd: ROOT,
@@ -1156,7 +1190,7 @@ test('FT-567: видимый «назад» и Back браузера на экр
     await phone.getByText('Женский', { exact: true }).first().click();
     await phone.getByText(/^Подвижный/).first().click();
     await phone.locator('text=Тренировок в неделю').locator('xpath=..').getByText('3', { exact: true }).first().click();
-    await phone.getByText('Похудение', { exact: true }).first().click();
+    await phone.getByText('Похудеть', { exact: true }).first().click();
     await phone.getByRole('button', { name: 'Посчитать норму' }).click();
     await phone.getByRole('tab', { name: 'Рецепты', exact: true }).click();
     const build = phone.getByRole('button', { name: /Из того, что есть дома/ });

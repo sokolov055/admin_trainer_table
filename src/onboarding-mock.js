@@ -28,9 +28,17 @@ programs.forEach((p) => p.blocks.forEach((b) => b.exercises.forEach((e) => {
 })));
 // Шаблон на месяц: одни и те же занятия по кругу — карточка показывает их один раз
 programs[0].blocks = [...programs[0].blocks, ...programs[0].blocks.map((b) => ({ ...b }))];
-const NUTRITION_GOAL = { lose: 'lose', fitness: 'keep', strength: 'keep', muscle: 'gain' };
-const GOAL_LABELS = { lose: 'Похудеть', fitness: 'Быть в форме', strength: 'Стать сильнее', muscle: 'Набрать мышцы' };
-const NUT_LABELS = { lose: 'Похудение', keep: 'Поддержание формы', gain: 'Набор мышечной массы' };
+// Одна цель на всё приложение (FT-787): «Стать сильнее» — набор
+const NUTRITION_GOAL = { lose: 'lose', fitness: 'keep', strength: 'gain', muscle: 'gain' };
+const GOAL_LABELS = { lose: 'Похудеть', fitness: 'Быть в форме', muscle: 'Набрать мышцы' };
+const NUT_LABELS = { lose: 'Похудеть', keep: 'Быть в форме', gain: 'Набрать мышцы' };
+const GOAL_OF_NUTRITION = { lose: 'lose', keep: 'fitness', gain: 'muscle' };
+// Цель от тренера в «Целях» без анкеты питания (FT-787) — как nutrition_goal на сервере
+let trainerGoal = null;
+export function setMockGoal(goal) { trainerGoal = NUTRITION_GOAL[goal] || null; }
+export function mockGoalOf(nutrition) {
+  return (nutrition && nutrition.survey && nutrition.survey.goal) || trainerGoal || '';
+}
 const complete = (a) => ['goal', 'experience', 'place', 'days'].every((k) => a[k] !== undefined);
 const ageOf = (a) => (a.birth ? Math.floor((Date.now() - new Date(a.birth + 'T12:00:00Z')) / (365.25 * 86400000)) : a.age);
 const body = (a) => ['sex', 'height', 'weight'].every((k) => a[k] !== undefined) && !!ageOf(a);
@@ -100,8 +108,8 @@ export function onboardingMock(action, p, compute) {
 /** Цель для разделов в демо: из пройденной анкеты, иначе из анкеты питания */
 export function focusMock(nutrition, compute) {
   const s = load();
-  let goal = s.completed ? s.answers.goal : null;
-  if (!goal && nutrition) goal = { lose: 'lose', keep: 'fitness', gain: 'muscle' }[nutrition.survey.goal] || null;
+  let goal = s.completed ? (s.answers.goal === 'strength' ? 'muscle' : s.answers.goal) : null;
+  if (trainerGoal || nutrition) goal = GOAL_OF_NUTRITION[mockGoalOf(nutrition)] || goal;
   const n = s.completed ? norm(s.answers, compute) : null;
   const kcal = nutrition ? nutrition.targets : n && n.ready ? n : null;
   return { goal, goalLabel: goal ? GOAL_LABELS[goal] : '', source: s.completed ? 'onboarding' : 'nutrition',

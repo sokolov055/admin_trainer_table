@@ -19,7 +19,7 @@ import { dateKey, nextMonday, versionAt } from './program-timeline.js';
 import { withLength, monthWeeks } from './plan-weeks.js';
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
-import { onboardingMock, firstStepsMock, focusMock } from './onboarding-mock.js';
+import { onboardingMock, firstStepsMock, focusMock, setMockGoal, mockGoalOf } from './onboarding-mock.js';
 import { isoDay, addOnlineMonths } from './online.js';
 import { diaryMock } from './nutrition/diary-mock.js';
 
@@ -522,9 +522,9 @@ const NUTRITION_OPTIONS = {
   trainingStep: 0.05,
   trainingsMax: 14,
   goal: [
-    { value: 'lose', label: 'Похудение' },
-    { value: 'keep', label: 'Поддержание формы' },
-    { value: 'gain', label: 'Набор мышечной массы' },
+    { value: 'lose', label: 'Похудеть' },
+    { value: 'keep', label: 'Быть в форме' },
+    { value: 'gain', label: 'Набрать мышцы' },
   ],
   limits: {
     age: { min: 14, max: 100 },
@@ -2092,6 +2092,8 @@ const MOCK = {
     pace: nutrition ? nutrition.pace : null,
     plans: nutrition ? nutrition.plans : [],
     options: NUTRITION_OPTIONS,
+    // Цель из «Целей» — подставляется в анкету (FT-787)
+    prefill: { goal: mockGoalOf(nutrition) },
     meals: [],
     sheetName: 'Питание',
     note: nutrition ? '' : 'Анкета питания ещё не заполнена.',
@@ -2290,6 +2292,11 @@ const MOCK = {
     if (!(week >= 1 && week <= 7)) mockFail('Тренировок в неделю — от 1 до 7.');
     if (!(steps >= 1000 && steps <= 50000)) mockFail('Шагов в день — от 1000 до 50000.');
     mockGoal = { week, steps, setBy: params.clientRow ? 'trainer' : 'client', updatedAt: new Date().toISOString() };
+    if (params.goal) {
+      setMockGoal(params.goal);
+      // Анкета питания заполнена — цель и в ней (FT-787)
+      if (nutrition && nutrition.survey) nutrition.survey.goal = { lose: 'lose', fitness: 'keep', muscle: 'gain' }[params.goal] || nutrition.survey.goal;
+    }
     return mockAwards(params);
   },
   // Тренировки с часов в «Моих тренировках»: одна совмещена с занятием, две короткие скрыты

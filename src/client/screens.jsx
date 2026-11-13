@@ -1804,8 +1804,10 @@ function useProgressBundle(clientRow, familyRow = null) {
                   : null,
                 measurements: merged,
                 pending: pending.length,
+                // Без анкеты — цель, поставленная тренером (FT-787)
                 goal: (nutrition && nutrition.ok && nutrition.data
-                  && nutrition.data.survey && nutrition.data.survey.goal) || null,
+                  && ((nutrition.data.survey && nutrition.data.survey.goal)
+                    || (nutrition.data.prefill && nutrition.data.prefill.goal))) || null,
               },
             });
           });
@@ -2968,7 +2970,9 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
     // Активность — двумя вопросами: чем занят день и сколько тренировок
     lifestyle: (survey && survey.lifestyle) || '',
     trainings: survey && survey.trainings !== undefined && survey.trainings !== null ? String(survey.trainings) : '',
-    goal: (survey && survey.goal) || '',
+    // Цель — та же, что в «Целях» (FT-787): её мог поставить тренер или
+    // анкета подбора; здесь её можно поменять
+    goal: (survey && survey.goal) || (prefill && prefill.goal) || '',
   }));
 
   // Чего нет ни там, ни там, остаётся пустым: выдумать возраст или вес
