@@ -75,7 +75,7 @@ export default function PushSetting({ clientRow, legend = 'Напоминани�
       <div className="survey__legend">
         {legend}
         <span className="survey__legend-note">
-          взвешивание раз в неделю, замеры раз в месяц и конец отдыха на тренировке
+          взвешивание раз в неделю, замеры раз в месяц, тренировки в зале и конец оплаченных занятий
         </span>
       </div>
 

@@ -97,7 +97,7 @@ export async function enableNativePush(clientRow) {
   }
 
   try {
-    await push.createChannel({ id: 'fit', name: 'Напоминания', description: 'Взвешивание, замеры, конец отдыха', importance: 4, visibility: 1 });
+    await push.createChannel({ id: 'fit', name: 'Напоминания', description: 'Взвешивание, замеры, тренировки, оплата занятий', importance: 4, visibility: 1 });
   } catch (_) { /* канал уже есть */ }
 
   const token = await register(push);

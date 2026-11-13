@@ -126,6 +126,8 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   const [ask, setAsk] = useState(null); // перенос занятия ждёт ответа «чей»
   const [undo, setUndo] = useState(null);
   const [failure, setFailure] = useState(null);
+  // Сервер ответил, что остаток тренировку уже не покрывает (FT-784)
+  const [unpaid, setUnpaid] = useState(false);
   const [agendaDays, setAgendaDays] = useState(28);
   // Лента сетки или месяца: листнуть пружиной и «въехать» после прыжка
   const pager = useRef(null);
@@ -263,6 +265,12 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   }, []);
 
   useEffect(() => {
+    if (!unpaid) return undefined;
+    const t = setTimeout(() => setUnpaid(false), 10000);
+    return () => clearTimeout(t);
+  }, [unpaid]);
+
+  useEffect(() => {
     if (!undo) return undefined;
     const t = setTimeout(() => setUndo(null), 6000);
     return () => clearTimeout(t);
@@ -287,7 +295,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
         }}
         clients={(clients.data && clients.data.clients) || []}
         onOpenClient={onOpenClient}
-        onDone={() => { closeForm(); setTick((t) => t + 1); }}
+        onDone={(res) => { closeForm(); setUnpaid(!!(res && res.unpaid)); setTick((t) => t + 1); }}
         onCancel={formGuard.leave}
         confirm={formGuard.confirm}
         onDirty={setFormDirty}
@@ -326,7 +334,8 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
     setMoves((m) => ({ ...m, [event.id]: at }));
     setFailure(null);
     try {
-      await apiMutate('trainer.schedule.save', moveRequest(event, next, change));
+      const res = await apiMutate('trainer.schedule.save', moveRequest(event, next, change));
+      setUnpaid(!!(res && res.unpaid));
       setCache((c) => {
         const n = new Map(c);
         const old = n.get(event.id);
@@ -422,6 +431,11 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
         </div>
       )}
 
+      {unpaid && (
+        <div className="cal-note" role="status">
+          <Note tone="warning" icon={IconAlert}>Тренировка не оплачена: у клиента кончились оплаченные занятия — напомните ему взять деньги.</Note>
+        </div>
+      )}
       {failure && (
         <div className="cal-note">
           <Note tone="critical" icon={IconAlert}>Не удалось перенести: {failure.message || 'повторите ещё раз'}</Note>
@@ -1494,9 +1508,9 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
     setBusy(true);
     setFailure(null);
     try {
-      await fn();
+      const res = await fn();
       haptic('success');
-      onDone();
+      onDone(res);
     } catch (err) {
       setFailure(err);
     } finally {
