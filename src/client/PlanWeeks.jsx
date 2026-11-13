@@ -78,7 +78,8 @@ export function WeekStrip({ plan, sel, onSelect }) {
         : '';
   return (
     <div className="plan-weeks">
-      <div className={'plan-weeks__nav' + (paged ? ' is-paged' : '')}>
+      {/* data-no-swipe: свайп по полоске листает недели, а не вкладки карточки */}
+      <div className={'plan-weeks__nav' + (paged ? ' is-paged' : '')} {...(paged ? { 'data-no-swipe': '' } : {})}>
         {paged && <button type="button" className="plan-weeks__arrow" aria-label="Раньше" disabled={firstShown === 0} onClick={() => go(-1)}>‹</button>}
         <div
           className="plan-weeks__strip"
