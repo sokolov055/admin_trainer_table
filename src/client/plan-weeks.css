@@ -32,8 +32,21 @@
   transition: transform .12s ease;
 }
 
+.plan-weeks__nav { display: flex; align-items: stretch; gap: 4px; }
+.plan-weeks__nav .plan-weeks__strip { flex: 1; min-width: 0; touch-action: pan-y; }
+.plan-weeks__arrow {
+  flex: none; width: 28px; border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--accent); font: inherit; font-size: 24px; line-height: 1; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.plan-weeks__arrow:disabled { color: var(--border-strong); cursor: default; }
+.plan-weeks__arrow:not(:disabled):active { background: var(--accent-wash); }
+.plan-weeks__back {
+  align-self: flex-end; margin-top: -4px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--accent-ink); font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
 .plan-weeks__week:active { transform: scale(.96); }
-.plan-weeks__week strong { font-size: var(--text-base); font-variant-numeric: tabular-nums; }
+.plan-weeks__week strong { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .plan-weeks__week span { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .plan-weeks__week.is-short { background: var(--surface-sunken); }
 .plan-weeks__week.is-now { border-color: var(--accent); }

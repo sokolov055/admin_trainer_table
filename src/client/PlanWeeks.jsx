@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { dateKey, nextMonday, programSize, addDays, WEEKDAY_SHORT } from '../program-timeline.js';
 import { apiMutate } from '../api.js';
 import { Segmented, Sheet, Note } from '../ui.jsx';
@@ -37,11 +37,23 @@ function monthGen(label) {
   return gen[names[name]] || label;
 }
 
+/** Месяц под датами недели: «ноя», на стыке — «ноя–дек» */
+const shortMonths = (w) => {
+  const a = String(w.fromGen || w.monthGen || '').slice(0, 3);
+  const b = String(w.monthGen || '').slice(0, 3);
+  return a && a !== b ? a + '–' + b : b;
+};
+
 /** Циклы месяца с оценками и сводка выбранного */
 export function WeekStrip({ plan, sel, onSelect }) {
   const w = plan.weeks[sel];
   const [windowStart, setWindowStart] = useState(null);
   const firstShown = Math.min(Math.max(0, plan.weeks.length - 5), windowStart === null ? Math.max(0, sel - 2) : windowStart);
+  const total = plan.weeks.length;
+  const paged = total > 5;
+  const currentShown = plan.currentIndex >= firstShown && plan.currentIndex < firstShown + 5;
+  const touchX = useRef(null);
+  const go = (dir) => { haptic(); setWindowStart(Math.min(Math.max(0, total - 5), Math.max(0, firstShown + dir * 5))); };
   const { score } = plan;
   const summary = w.status === 'legacy' ? 'Пока действует прежний список тренировок'
     : w.status === 'paused' ? 'Плановые тренировки временно приостановлены'
@@ -66,24 +78,36 @@ export function WeekStrip({ plan, sel, onSelect }) {
         : '';
   return (
     <div className="plan-weeks">
-      <div className="plan-weeks__strip" role="tablist" aria-label="Недели программы">
-        {plan.weeks.slice(firstShown, firstShown + 5).map((x, offset) => { const i = firstShown + offset; return (
-          <button
-            key={x.n}
-            type="button"
-            role="tab"
-            aria-selected={i === sel}
-            aria-label={`Неделя ${x.week}, ${weekDates(x)}: ${STATUS[x.status]}`}
-            className={'plan-weeks__week' + (x.beyond ? ' is-short' : '') + (x.current ? ' is-now' : '')}
-            onClick={() => { onSelect(i); haptic(); }}
-          >
-            <strong>{x.n}</strong>
-            <span>{x.from + '–' + x.to}</span>
-            <i className={'plan-weeks__dot is-' + x.status} aria-hidden="true" />
-          </button>
-        ); })}
+      <div className={'plan-weeks__nav' + (paged ? ' is-paged' : '')}>
+        {paged && <button type="button" className="plan-weeks__arrow" aria-label="Раньше" disabled={firstShown === 0} onClick={() => go(-1)}>‹</button>}
+        <div
+          className="plan-weeks__strip"
+          role="tablist"
+          aria-label="Недели программы"
+          onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+          onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - (touchX.current ?? e.changedTouches[0].clientX); touchX.current = null; if (paged && Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); }}
+        >
+          {plan.weeks.slice(firstShown, firstShown + 5).map((x, offset) => { const i = firstShown + offset; return (
+            <button
+              key={x.n}
+              type="button"
+              role="tab"
+              aria-selected={i === sel}
+              aria-label={`${weekDates(x)}: ${STATUS[x.status]}`}
+              className={'plan-weeks__week' + (x.beyond ? ' is-short' : '') + (x.current ? ' is-now' : '')}
+              onClick={() => { onSelect(i); haptic(); }}
+            >
+              <strong>{x.from + '–' + x.to}</strong>
+              <span>{shortMonths(x)}</span>
+              <i className={'plan-weeks__dot is-' + x.status} aria-hidden="true" />
+            </button>
+          ); })}
+        </div>
+        {paged && <button type="button" className="plan-weeks__arrow" aria-label="Позже" disabled={firstShown + 5 >= total} onClick={() => go(1)}>›</button>}
       </div>
-      {plan.weeks.length > 5 && <div className="wk__row"><button className="button button--ghost" disabled={firstShown === 0} onClick={() => setWindowStart(Math.max(0, firstShown - 5))}>Раньше</button><button className="button button--ghost" disabled={firstShown + 5 >= plan.weeks.length} onClick={() => setWindowStart(firstShown + 5)}>Позже</button><button className="button button--ghost" onClick={() => { setWindowStart(null); onSelect(Math.max(0, plan.currentIndex)); }}>Эта неделя</button></div>}
+      {paged && plan.currentIndex >= 0 && !currentShown && (
+        <button type="button" className="plan-weeks__back" onClick={() => { haptic(); setWindowStart(null); onSelect(plan.currentIndex); }}>К этой неделе</button>
+      )}
       <div className="plan-weeks__card">
         <div className="plan-weeks__head">
           <div>
