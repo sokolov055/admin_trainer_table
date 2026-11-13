@@ -33,7 +33,13 @@
 }
 
 .plan-weeks__nav { display: flex; align-items: stretch; gap: 4px; }
-.plan-weeks__nav .plan-weeks__strip { flex: 1; min-width: 0; touch-action: pan-y; }
+.plan-weeks__nav .plan-weeks__strip { flex: 1; min-width: 0; }
+.plan-weeks__strip.is-scroll {
+  display: flex; position: relative; overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.plan-weeks__strip.is-scroll::-webkit-scrollbar { display: none; }
+.plan-weeks__strip.is-scroll .plan-weeks__week { flex: 0 0 calc((100% - 24px) / 5); scroll-snap-align: start; }
 .plan-weeks__arrow {
   flex: none; width: 28px; border: 0; border-radius: var(--radius-sm); background: transparent;
   color: var(--accent); font: inherit; font-size: 24px; line-height: 1; cursor: pointer;

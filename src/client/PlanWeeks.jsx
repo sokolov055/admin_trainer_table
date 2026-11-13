@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { dateKey, nextMonday, programSize, addDays, WEEKDAY_SHORT } from '../program-timeline.js';
 import { apiMutate } from '../api.js';
 import { Segmented, Sheet, Note } from '../ui.jsx';
@@ -47,13 +47,39 @@ const shortMonths = (w) => {
 /** Циклы месяца с оценками и сводка выбранного */
 export function WeekStrip({ plan, sel, onSelect }) {
   const w = plan.weeks[sel];
-  const [windowStart, setWindowStart] = useState(null);
-  const firstShown = Math.min(Math.max(0, plan.weeks.length - 5), windowStart === null ? Math.max(0, sel - 2) : windowStart);
   const total = plan.weeks.length;
   const paged = total > 5;
-  const currentShown = plan.currentIndex >= firstShown && plan.currentIndex < firstShown + 5;
-  const touchX = useRef(null);
-  const go = (dir) => { haptic(); setWindowStart(Math.min(Math.max(0, total - 5), Math.max(0, firstShown + dir * 5))); };
+  // Барабан (13.11.2026): недели едут за пальцем с инерцией и встают по
+  // неделе — родная прокрутка с привязкой; стрелки — плавно на 5 недель
+  const rowRef = useRef(null);
+  const [view, setView] = useState({ start: true, end: false, now: true });
+  const smooth = () => (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+  const tileAt = (i) => rowRef.current && rowRef.current.children[i];
+  const centerOn = (i, behavior) => {
+    const row = rowRef.current;
+    const tile = tileAt(i);
+    if (row && tile) row.scrollTo({ left: tile.offsetLeft - (row.clientWidth - tile.offsetWidth) / 2, behavior });
+  };
+  const measure = () => {
+    const row = rowRef.current;
+    if (!row) return;
+    const tile = tileAt(plan.currentIndex);
+    const now = !tile || (tile.offsetLeft + tile.offsetWidth > row.scrollLeft + 1 && tile.offsetLeft < row.scrollLeft + row.clientWidth - 1);
+    const next = { start: row.scrollLeft <= 1, end: row.scrollLeft + row.clientWidth >= row.scrollWidth - 1, now };
+    setView((v) => (v.start === next.start && v.end === next.end && v.now === next.now ? v : next));
+  };
+  // Первый показ — выбранная неделя посередине, без анимации
+  useLayoutEffect(() => { if (paged) { centerOn(sel, 'auto'); measure(); } }, [paged, total]);
+  useEffect(() => {
+    if (!paged || typeof window === 'undefined') return undefined;
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [paged, total, plan.currentIndex]);
+  const go = (dir) => {
+    haptic();
+    const row = rowRef.current;
+    if (row) row.scrollBy({ left: dir * row.clientWidth, behavior: smooth() });
+  };
   const { score } = plan;
   const summary = w.status === 'legacy' ? 'Пока действует прежний список тренировок'
     : w.status === 'paused' ? 'Плановые тренировки временно приостановлены'
@@ -80,15 +106,15 @@ export function WeekStrip({ plan, sel, onSelect }) {
     <div className="plan-weeks">
       {/* data-no-swipe: свайп по полоске листает недели, а не вкладки карточки */}
       <div className={'plan-weeks__nav' + (paged ? ' is-paged' : '')} {...(paged ? { 'data-no-swipe': '' } : {})}>
-        {paged && <button type="button" className="plan-weeks__arrow" aria-label="Раньше" disabled={firstShown === 0} onClick={() => go(-1)}>‹</button>}
+        {paged && <button type="button" className="plan-weeks__arrow" aria-label="Раньше" disabled={view.start} onClick={() => go(-1)}>‹</button>}
         <div
-          className="plan-weeks__strip"
+          ref={rowRef}
+          className={'plan-weeks__strip' + (paged ? ' is-scroll' : '')}
           role="tablist"
           aria-label="Недели программы"
-          onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
-          onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - (touchX.current ?? e.changedTouches[0].clientX); touchX.current = null; if (paged && Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); }}
+          onScroll={paged ? measure : undefined}
         >
-          {plan.weeks.slice(firstShown, firstShown + 5).map((x, offset) => { const i = firstShown + offset; return (
+          {plan.weeks.map((x, i) => (
             <button
               key={x.n}
               type="button"
@@ -102,12 +128,12 @@ export function WeekStrip({ plan, sel, onSelect }) {
               <span>{shortMonths(x)}</span>
               <i className={'plan-weeks__dot is-' + x.status} aria-hidden="true" />
             </button>
-          ); })}
+          ))}
         </div>
-        {paged && <button type="button" className="plan-weeks__arrow" aria-label="Позже" disabled={firstShown + 5 >= total} onClick={() => go(1)}>›</button>}
+        {paged && <button type="button" className="plan-weeks__arrow" aria-label="Позже" disabled={view.end} onClick={() => go(1)}>›</button>}
       </div>
-      {paged && plan.currentIndex >= 0 && !currentShown && (
-        <button type="button" className="plan-weeks__back" onClick={() => { haptic(); setWindowStart(null); onSelect(plan.currentIndex); }}>К этой неделе</button>
+      {paged && plan.currentIndex >= 0 && !view.now && (
+        <button type="button" className="plan-weeks__back" onClick={() => { haptic(); onSelect(plan.currentIndex); centerOn(plan.currentIndex, smooth()); }}>К этой неделе</button>
       )}
       <div className="plan-weeks__card">
         <div className="plan-weeks__head">
