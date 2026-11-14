@@ -262,7 +262,8 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
                 <span className="wc-menu__ic">⇄</span>Перенести
               </button>
             )}
-            {editable && menu.id && !menu.done && (
+            {/* На дне с записью занятие с тренером — переключать нечего */}
+            {editable && menu.id && !menu.done && !(w.booked || []).some((b) => b.day === menu.day) && (
               <button type="button" className={'wc-menu__opt' + (solo.has(menu.id) ? '' : ' is-solo')} disabled={busy} onClick={() => toggleSolo(menu)}>
                 <span className="wc-menu__ic">{solo.has(menu.id) ? '👤' : '📱'}</span>
                 {busy ? 'Сохраняю…' : solo.has(menu.id) ? 'С тренером — на этой неделе' : 'Сам, по приложению — на этой неделе'}

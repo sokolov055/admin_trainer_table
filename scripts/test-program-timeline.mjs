@@ -273,3 +273,8 @@ test('«сам»: отметка недели важнее программы; �
   assert.ok(more.layout.filter((x) => x.day).every((x) => x.id !== 'b' || x.day !== 18));
   assert.equal(more.layout.filter((x) => x.id === 'b').length, 1);
 });
+test('«сам» на дне с записью (ручная правка недели) — занятие с тренером', () => {
+  const w = soloWeek(['2026-11-19'], { weekEdits: { '2026-11-16': [{ id: 'a', day: 2 }, { id: 'b', day: 4 }, { id: 'c', day: 6 }] } });
+  assert.equal(daysOf(w).b, 4);
+  assert.deepEqual(w.solo, []);
+});

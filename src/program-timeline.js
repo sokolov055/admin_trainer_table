@@ -299,7 +299,9 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
       days: beat ? beat.days : cleanDays(settings.days), deferred: laid.deferred, extraNeed, extraDone,
       layout: slots.map((x) => ({ id: x.g[0].id || '', day: x.day, ...(x.from ? { from: x.from } : {}) })), edited: !!edit, sent: [],
       booked, byBookings: !edit && booked.length > 0,
-      solo: [...new Set(slots.filter((x) => x.g[0] && soloOf(cfg, from, x.g[0].id)).map((x) => x.g[0].id))],
+      // «Сам» — только на дне без записи: есть запись — занятие с тренером,
+      // какой бы ни была отметка (владелец 14.11.2026)
+      solo: [...new Set(slots.filter((x) => x.g[0] && soloOf(cfg, from, x.g[0].id) && !booked.some((b) => b.day === x.day)).map((x) => x.g[0].id))],
       editable: activeDays.length > 0 && !expired && !settings.legacyList,
       ...(beat ? { rhythm: beat.count, phase: beat.phase, queueAt: beat.queueAt } : {}),
       load: loads.size === 1 ? [...loads][0] : '', missed: ended ? Math.max(0, need - done) : 0,
