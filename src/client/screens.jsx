@@ -21,19 +21,19 @@ import {
   Chips, Segmented, Options, Field, Note, Delta, Qty,
   formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconChevron, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
+import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { captureScreen, useBackGesture } from '../gestures.jsx';
-import { supersets, blockSessions, pickBlock, doneLine, roundLine } from '../plan-model.js';
+import { blockSessions, pickBlock } from '../plan-model.js';
 import { weekPlan, weekQueue, monthWeeks, shownLength, withWeekLoad, movedToWeek, copiedWeek, weekOrder, joinedSession, splitSession, removedBlocks, regroupedAfterMove, followerOf, looseCardio, attachedCardio } from '../plan-weeks.js';
-import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, MoveWeek, SessionGroups, LooseCardio } from './PlanWeeks.jsx';
+import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, SessionGroups, LooseCardio } from './PlanWeeks.jsx';
+import { PlanTabs, CardHead, CardMuscles, ExerciseStrip, StartButton, MoreToggle, TrainerTools, MoveButton, MoveWeekTool, DoneLine, CardExercises, ExerciseSheet, BlockMenu, DoneRow, DoneEmpty } from './PlanCard.jsx';
+import { dayLabel, sessionVolume, planSets, kg } from '../plan-card-model.js';
 import WeekEditor from './WeekEditor.jsx';
 import WeekCard from './WeekCard.jsx';
-import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
 import { WeightCard, MeasuresCard, StrengthCard, WeekRings } from './ProgressVisual.jsx';
-import { Media, SetupText, MachineList, PersonalNote } from '../media.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 import WorkoutBoundary from '../WorkoutBoundary.jsx';
 import SwipeRow from '../SwipeRow.jsx';
@@ -43,7 +43,7 @@ import { trainerOverview } from './trainer-overview.js';
 import { SCHEDULE_UNKNOWN } from './schedule-text.js';
 import { GoalBanner } from './focus.jsx';
 import { onlineDaysLeft, onlineDay } from '../online.js';
-import { BlockMuscles, MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
+import { MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 import { useRights, isPro, can, gate } from '../rights.js';
 import { PlusBadge, openPlusOffer } from '../plus.jsx';
 import { useQuickRequest } from '../quick-actions.js';
@@ -445,6 +445,11 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // это лента в несколько экранов, где нужная теряется. Свёрнутая
   // показывает, что в ней, и сразу даёт начать; развернуть — по нажатию.
   const [openBlocks, setOpenBlocks] = useState({});
+  // Карточка тренировки (FT-791): лист техники упражнения, «⋯» тренера и
+  // переименование из него (номер запроса — BlockTitle открывает поле)
+  const [techSheet, setTechSheet] = useState(null);
+  const [blockMenu, setBlockMenu] = useState(null);
+  const [renameAsk, setRenameAsk] = useState({});
   const [selectingBlocks, setSelectingBlocks] = useState(false);
   const [selectedBlocks, setSelectedBlocks] = useState(() => new Set());
   const [blockUndo, setBlockUndo] = useState(null);
@@ -1083,16 +1088,14 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
 
       {(shownBlocks.length > 0 || doneSessions.length > 0) && (
         <div className="plan__tabs-row">
-          <Chips
-            variant="nav"
-            className="plan__tabs"
-            label="Тренировки месяца"
+          {/* FT-791: словами, число — значком, ноль не показываем; без
+              недель (прежний список) — «В очереди» */}
+          <PlanTabs
             items={[
-              // Коротко (14.11.2026): «Неделя 3 · Сделано 0 · Вся 12»
-              { value: 'queue', label: (week ? 'Неделя ' : 'Очередь ') + queueBlocks.length },
-              { value: 'done', label: 'Сделано ' + doneSessions.length },
+              { value: 'queue', label: week ? 'На неделе' : 'В очереди', count: queueBlocks.length },
+              { value: 'done', label: 'Сделано', count: doneSessions.length, tone: 'good' },
               // Вся программа месяца: проведённые отмечены зелёным
-              ...(shownBlocks.length ? [{ value: 'all', label: 'Вся ' + shownBlocks.length }] : []),
+              ...(shownBlocks.length ? [{ value: 'all', label: 'Вся программа' }] : []),
             ]}
             value={planTab}
             onChange={setPlanTab}
@@ -1103,26 +1106,37 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <button className="button button--block plan__free" onClick={freeWorkout}>Свободная тренировка</button>
       )}
 
-      {planTab === 'done' && doneSessions.length === 0 && (
-        <Empty
-          icon={IconPlan}
-          title="Пока ничего не выполнено"
-          text={'В ' + monthIn(doneLabel) + ' ещё нет проведённых тренировок.'}
-          action={!running && !familyRow ? (
-            <button className="button button--primary" onClick={freeWorkout}>Начать свободную тренировку</button>
-          ) : null}
-        />
-      )}
+      {/* Пусто — гантель и одна кнопка к ближайшей тренировке недели, а не
+          «В ноябре ещё нет проведённых» (FT-791) */}
+      {planTab === 'done' && doneSessions.length === 0 && (() => {
+        const next = queueBlocks.find((b) => !b.foreign && (!currentQueue || currentQueue.has(b.id)));
+        const can = !running && !familyRow;
+        return (
+          <DoneEmpty
+            week={!!week}
+            next={next && can && (!week || week.current) ? next.title : ''}
+            onStart={next ? () => startBlock(next) : null}
+            onFree={can ? freeWorkout : null}
+          />
+        );
+      })()}
 
-      {planTab === 'done' && doneSessions.map((s) => (
-        <DoneSession
-          key={s.id}
-          session={s}
-          canOpen={!familyRow}
-          onRename={canEdit ? (title) => renameSession(s, title) : null}
-          onOpen={() => openWorkout({ sessionId: s.id })}
-        />
-      ))}
+      {planTab === 'done' && doneSessions.map((s) => {
+        const source = s.sourceBlockId ? shownBlocks.find((b) => b.id === s.sourceBlockId) : null;
+        const volume = sessionVolume(s);
+        return (
+          <DoneRow
+            key={s.id}
+            title={canEdit ? <BlockTitle title={s.title} onRename={(title) => renameSession(s, title)} /> : s.title}
+            when={formatDate(s.startedAt || s.updatedAt)}
+            done={s.done}
+            planned={source ? planSets(source.exercises) : 0}
+            volume={volume ? kg(volume) : ''}
+            sync={<SyncMark session={s} />}
+            onOpen={familyRow ? null : () => openWorkout({ sessionId: s.id })}
+          />
+        );
+      })}
 
       {planTab === 'queue' && queueBlocks.length === 0 && shownBlocks.length > 0 && (
         <Empty
@@ -1132,26 +1146,19 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         />
       )}
 
-      {canEdit && (planTab === 'queue' || planTab === 'all') && visibleBlocks.length > 0 && (
+      {/* «Выбрать несколько» — из «⋯» карточки (FT-791); здесь — пока выбирают */}
+      {canEdit && selectingBlocks && (planTab === 'queue' || planTab === 'all') && visibleBlocks.length > 0 && (
         <div className="plan__manage-bar">
-          {selectingBlocks ? (
-            <>
-              <button
-                type="button"
-                className="button button--ghost"
-                onClick={() => setSelectedBlocks(selectedBlocks.size === visibleBlocks.length
-                  ? new Set()
-                  : new Set(visibleBlocks.map((block) => shownBlocks.indexOf(block))))}
-              >
-                {selectedBlocks.size === visibleBlocks.length ? 'Снять все' : 'Выбрать все'}
-              </button>
-              <button type="button" className="button" onClick={() => { setSelectingBlocks(false); setSelectedBlocks(new Set()); }}>Отмена</button>
-            </>
-          ) : (
-            <button type="button" className="button" onClick={() => { setSelectingBlocks(true); setOpenBlocks({}); }}>
-              <IconCheck size={16} />Выбрать
-            </button>
-          )}
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => setSelectedBlocks(selectedBlocks.size === visibleBlocks.length
+              ? new Set()
+              : new Set(visibleBlocks.map((block) => shownBlocks.indexOf(block))))}
+          >
+            {selectedBlocks.size === visibleBlocks.length ? 'Снять все' : 'Выбрать все'}
+          </button>
+          <button type="button" className="button" onClick={() => { setSelectingBlocks(false); setSelectedBlocks(new Set()); }}>Отмена</button>
         </div>
       )}
 
@@ -1209,6 +1216,19 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         </button>
       )}
 
+      {/* Лист техники упражнения и «⋯» тренера (FT-791) */}
+      {techSheet && <ExerciseSheet ex={techSheet} onClose={() => setTechSheet(null)} />}
+      {blockMenu && (
+        <BlockMenu
+          title={blockMenu.block.title}
+          onClose={() => setBlockMenu(null)}
+          onRename={() => { const key = blockMenu.block.id || blockMenu.bi; setRenameAsk((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 })); }}
+          onCopy={() => copyBlocks([blockMenu.bi])}
+          onRemove={shownBlocks.length > 1 ? () => removeBlocks([blockMenu.bi]) : null}
+          onSelect={() => { setSelectingBlocks(true); setSelectedBlocks(new Set([blockMenu.bi])); setOpenBlocks({}); }}
+        />
+      )}
+
       {selectingBlocks && selectedBlocks.size > 0 && (
         <div className="plan__block-actions" role="toolbar" aria-label="Действия с выбранными тренировками">
           <span>Выбрано: {selectedBlocks.size}</span>
@@ -1262,21 +1282,29 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         const past = pastOf.get(block) || [];
         const bi = shownBlocks.indexOf(block);
         const editHere = canEdit && !made0(planTab);
-
-        // Во «Выполненных» — то, что сделано на последнем занятии, а не
-        // план: в зале упражнение могли заменить или добавить, а программа
-        // месяца от занятия не меняется. Старый ответ сервера (или Apps
-        // Script) состава не присылает — тогда, как раньше, план.
-        const made = planTab === 'done' && past[0] && Array.isArray(past[0].exercises) && past[0].exercises.length
-          ? past[0].exercises
-          : null;
-        const shownExercises = made || block.exercises;
         // Ключ — по месту в месяце: переименование не сворачивает тренировку
         const blockKey = planTab + ':' + (bi >= 0 ? bi : block.id);
         const open = !!openBlocks[blockKey];
+        // Правка — только кнопкой «Править», не любым раскрытием (FT-791):
+        // тренер не правит случайно
+        const editing = editHere && openBlocks[blockKey] === 'edit';
         const picked = selectedBlocks.has(bi);
-        const names = shownExercises.map((ex) => ex.name).filter(Boolean);
-        const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
+        const row = rowOf.get(block);
+        // Тренер в карточке клиента: «Провести» среди своих кнопок вместо
+        // большой «Начать»; в «Моих тренировках» тренер — сам себе клиент
+        const trainerView = !!clientRow && !clientView && !data.self;
+        const canStart = !running && !familyRow && (!week || week.current) && (!currentQueue || currentQueue.has(block.id));
+        const day = week && row && row.day ? dayLabel(week.start, row.day) : null;
+        const tools = editHere && !selectingBlocks;
+        const movable = tools && grouped && programWeeks > 1
+          ? <MoveWeekTool block={block} length={programWeeks} here={block.week || 1} onMove={(w) => commit(movedToWeek(shownBlocks, block, w))} />
+          : tools && canWeekEdit && cardShown && week && week.editable !== false && planTab === 'queue'
+            ? <MoveButton onClick={() => setWeekEditor(week.start)} />
+            : null;
+        const setOpen = (value) => setOpenBlocks((prev) => ({ ...prev, [blockKey]: value }));
+        const titleNode = canEdit
+          ? <BlockTitle title={block.title} request={renameAsk[block.id || bi] || 0} onRename={(v) => renameBlock(block, v)} />
+          : block.title;
 
         return (
         // Тренировку — удержанием вверх или вниз (владелец, 03.10.2026).
@@ -1309,7 +1337,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           // переставляются только оставшиеся, на свои же места
           data-done={past.length ? '' : undefined}
           onPointerDown={canEdit && !selectingBlocks && !past.length ? (e) => {
-            if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select')) return;
+            if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select, .pc-strip')) return;
             // В разделах недель порядок экрана — по неделям: перетащенная в
             // другую неделю тренировка получает неделю соседа (FT-775)
             const displayed = grouped ? weekOrder(shownBlocks, programWeeks) : shownBlocks;
@@ -1335,115 +1363,68 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           } : undefined}
         >
         {selectingBlocks && <span className={'plan__block-pick' + (picked ? ' is-on' : '')} aria-hidden="true">{picked && <IconCheck size={17} />}</span>}
-        <Section
-          title={(() => {
-            const t = canEdit ? <BlockTitle title={block.title} onRename={(v) => renameBlock(block, v)} /> : block.title;
-            // Во «Всей программе» проведённая — зелёной галочкой
-            return planTab === 'all' && past.length
-              ? <span className="plan__title-done"><IconCheck size={18} aria-label="Проведена" />{t}</span>
-              : t;
-          })()}
-          note={<>
-            {shownExercises.length + ' ' + plural(shownExercises.length, 'упражнение', 'упражнения', 'упражнений')}
-            {/* Программа по неделям: неделя во «Всей программе», пометка,
-                пропуск прошедшего цикла и долг прошлого — словами */}
-            {week && planTab === 'queue' && rowOf.get(block) && (rowOf.get(block).missed
-              ? <span className="plan__week-debt"> · не выполнена</span>
-              : rowOf.get(block).carried && rowOf.get(block).done === 0
-                ? <span className="plan__week-debt"> · долг с цикла {week.n - 1}</span>
-                : null)}
-          </>}
-        >
-          <Panel>
-            {/* Тренер, «Вся программа» по неделям: перенести в другую неделю (FT-775) */}
-            {canEdit && grouped && programWeeks > 1 && !selectingBlocks && (
-              <div className="plan__block-move">
-                <MoveWeek block={block} length={programWeeks} onMove={(w) => commit(movedToWeek(shownBlocks, block, w))} />
-              </div>
-            )}
-            {/* Какие мышцы в работе (FT-491) — по программе тренировки:
-                с первого взгляда ясно, что за день */}
-            <BlockMuscles exercises={block.exercises} />
-            {/* Веса живут в журнале, а не в программе: лист месяца — это
-                план, и занятие его не переписывает. Поэтому здесь не
-                «сколько ты поднял», а «эту тренировку ты уже провёл» и
-                прямая дорога к тому, с чем провёл. */}
+        {/* Карточка тренировки (FT-791, макет workout-card-mockup.html) */}
+        <section className="section enter plan-card">
+          <div className="pc-card">
+            <CardHead
+              day={day}
+              title={planTab === 'all' && past.length
+                // Во «Всей программе» проведённая — зелёной галочкой
+                ? <span className="plan__title-done"><IconCheck size={18} aria-label="Проведена" />{titleNode}</span>
+                : titleNode}
+              exercises={block.exercises}
+              onMenu={tools ? () => setBlockMenu({ block, bi }) : null}
+              note={week && planTab === 'queue' && row && (row.missed
+                ? <span className="plan__week-debt">не выполнена</span>
+                : row.carried && row.done === 0
+                  ? <span className="plan__week-debt">долг с цикла {week.n - 1}</span>
+                  : null)}
+            />
+            {/* Какие мышцы в работе (FT-491) — с первого взгляда ясно, что за день */}
+            <CardMuscles exercises={block.exercises} />
+            <ExerciseStrip exercises={block.exercises} onOpen={(ex) => setTechSheet(ex)} />
+            {/* Веса живут в журнале, а не в программе: здесь «эту тренировку
+                ты уже провёл» и прямая дорога к тому, с чем провёл */}
             {past.length > 0 && (
-              <div className="plan__done">
-                <div>
-                  <strong>Тренировка проведена</strong>
-                  <span>
-                    {formatDate(past[0].updatedAt)}
-                    {past[0].done ? ' · ' + past[0].done + ' ' + plural(past[0].done, 'подход', 'подхода', 'подходов') : ''}
-                    {past.length > 1 ? ' · всего раз: ' + past.length : ''}
-                  </span>
-                </div>
-                {!familyRow && <button className="button" onClick={() => openWorkout({ sessionId: past[0].id })}>Посмотреть веса</button>}
+              <DoneLine
+                when={formatDate(past[0].updatedAt)}
+                sets={past[0].done}
+                volume={sessionVolume(past[0]) ? kg(sessionVolume(past[0])) : ''}
+                times={past.length}
+                onOpen={familyRow ? null : () => openWorkout({ sessionId: past[0].id })}
+              />
+            )}
+            {canStart && !trainerView && <StartButton first={clientRow || clientView ? undefined : 'workout'} onStart={() => startBlock(block)} />}
+            {(tools || (trainerView && canStart)) && (
+              <TrainerTools
+                editing={editing}
+                onEdit={tools ? () => setOpen(editing ? false : 'edit') : null}
+                move={movable}
+                onStart={trainerView && canStart ? () => startBlock(block) : null}
+              />
+            )}
+            {!editing && <MoreToggle open={open} onToggle={() => setOpen(!open)} />}
+            {open && !editing && (
+              <CardExercises exercises={block.exercises} members={data.members} me={data.me} onOpen={(ex) => setTechSheet(ex)} />
+            )}
+            {editing && (
+              <div className="pc-edit">
+                <Deferred fallback={<p className="small muted">Открываю правку…</p>}>
+                  <BlockEdit
+                    block={block}
+                    members={data.members || []}
+                    clientRow={clientRow && !clientView ? clientRow : 0}
+                    canRemove={shownBlocks.length > 1}
+                    onChange={(exercises) => commit(shownBlocks.map((b, k) => (k === bi ? { ...b, exercises } : b)))}
+                    onRemove={() => commit(removedBlocks(shownBlocks, [bi]))}
+                    // Перенесли историю (HistoryMove) — «Было» и веса заново с сервера
+                    onHistoryMoved={() => reload()}
+                  />
+                </Deferred>
               </div>
             )}
-            {!running && !familyRow && (!week || week.current) && (!currentQueue || currentQueue.has(block.id)) && <button className="button button--primary button--block" data-first-action={clientRow || clientView ? undefined : 'workout'} onClick={() => startBlock(block)}>Начать тренировку</button>}
-            <button
-              type="button"
-              className="plan__toggle"
-              aria-expanded={open}
-              onClick={() => { setOpenBlocks((prev) => ({ ...prev, [blockKey]: !open })); haptic(); }}
-            >
-              <span className="plan__toggle-text">
-                <strong>{open ? 'Свернуть' : planTab === 'done' ? 'Что сделано' : 'Упражнения'}</strong>
-                {!open && preview && <span>{preview}</span>}
-              </span>
-              <IconChevron size={18} className={'plan__chevron' + (open ? ' plan__chevron--open' : '')} aria-hidden="true" />
-            </button>
-            {open && made && supersets(made).map((group, j) => {
-              // У пары — строкой на человека: «Евгений: 3 × 12 · 25 кг». В
-              // суперсете круги стоят у скобки, у упражнения — без них.
-              const line = group.superset ? roundLine : doneLine;
-              const rows = group.items.map((ex, k) => {
-                const who = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))];
-                return (
-                  <div className="exercise" style={{ minWidth: 0 }} key={k}>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="exercise__name">{ex.name}</div>
-                      {who.length
-                        ? who.map((w) => (
-                          <div className="exercise__scheme" key={w}>{w}: {line(ex.sets.filter((x) => x.who === w), ex.track)}</div>
-                        ))
-                        : <div className="exercise__scheme">{line(ex.sets, ex.track)}</div>}
-                    </div>
-                  </div>
-                );
-              });
-              if (!group.superset) return <React.Fragment key={'m' + j}>{rows}</React.Fragment>;
-              // Круги — подходы упражнения; у пары их вдвое больше, делим на людей
-              const people = (ex) => new Set(ex.sets.map((x) => x.who || '')).size || 1;
-              const rounds = Math.max(...group.items.map((ex) => Math.round(ex.sets.length / people(ex))));
-              return <Superset rounds={rounds} key={'m' + j}>{rows}</Superset>;
-            })}
-            {open && editHere && (
-              <Deferred fallback={<p className="small muted">Открываю правку…</p>}>
-                <BlockEdit
-                  block={block}
-                  members={data.members || []}
-                  clientRow={clientRow && !clientView ? clientRow : 0}
-                  canRemove={shownBlocks.length > 1}
-                  onChange={(exercises) => commit(shownBlocks.map((b, k) => (k === bi ? { ...b, exercises } : b)))}
-                  onRemove={() => commit(removedBlocks(shownBlocks, [bi]))}
-                  // Перенесли историю (HistoryMove) — «Было» и веса заново с сервера
-                  onHistoryMoved={() => reload()}
-                />
-              </Deferred>
-            )}
-            {open && !editHere && !made && supersets(block.exercises).map((group, j) => (
-              group.superset
-                ? (
-                  <Superset rounds={Number(group.sets) || 0} key={j}>
-                    {group.items.map((ex, k) => <ExerciseRow ex={ex} inSuperset members={data.members} me={data.me} key={k} />)}
-                  </Superset>
-                )
-                : <ExerciseRow ex={group.items[0]} members={data.members} me={data.me} key={j} />
-            ))}
-          </Panel>
-        </Section>
+          </div>
+        </section>
         </div>
         </PlanBlockSwipe>
         );
@@ -1468,11 +1449,17 @@ function monthAfter(label) {
  * Enter или уход из поля — сохранить, Escape — оставить как было. Пока
  * сервер отвечает, видно уже новое название
  */
-function BlockTitle({ title, onRename }) {
+function BlockTitle({ title, onRename, request = 0 }) {
   const [value, setValue] = useState(null); // null — не правится
   const [saving, setSaving] = useState('');
   const [failure, setFailure] = useState('');
   const done = useRef(false);
+  // «Переименовать» из «⋯» карточки (FT-791) — каждый новый номер открывает поле
+  useEffect(() => {
+    if (!request) return;
+    done.current = false;
+    setValue(title);
+  }, [request]);
   const finish = async (save) => {
     if (done.current) return;
     done.current = true;
@@ -1529,14 +1516,6 @@ function currentMonthLabel(now = new Date()) {
   return name[0].toUpperCase() + name.slice(1) + ' ' + now.getFullYear();
 }
 
-/** «Октябрь 2026» → «октябре»: «в октябре ещё нет…» */
-function monthIn(label) {
-  const IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
-  const m = /^(\S+)/.exec(String(label || ''));
-  const i = m ? MONTH_NAMES.indexOf(m[1].toLowerCase()) : -1;
-  return i >= 0 ? IN[i] : 'этом месяце';
-}
-
 /** Дата занятия в месяце «Сентябрь 2026»; непонятное название — да (не терять) */
 function inMonthLabel(iso, label) {
   const m = /^(\S+)\s+(\d{4})$/.exec(String(label || '').trim());
@@ -1563,61 +1542,6 @@ function PlanBlockSwipe({ enabled, block, index, done, onDelete, children }) {
 }
 
 /**
- * Проведённое занятие во «Выполненных»: название, когда, сколько подходов,
- * «Посмотреть веса» и по нажатию — что сделано. Свободная тренировка и
- * повтор той же тренировки программы — такие же строки.
- */
-function DoneSession({ session: s, canOpen, onRename, onOpen }) {
-  const [open, setOpen] = useState(false);
-  const exercises = Array.isArray(s.exercises) ? s.exercises : [];
-  const names = exercises.map((ex) => ex.name).filter(Boolean);
-  const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ' и ещё ' + (names.length - 2) : '');
-  return (
-    <Section title={onRename ? <BlockTitle title={s.title} onRename={onRename} /> : s.title} note={formatDate(s.startedAt || s.updatedAt)}>
-      <Panel>
-        <div className="plan__done">
-          <div>
-            <strong>{s.month ? 'Тренировка проведена' : 'Свободная тренировка'}</strong>
-            <span>{s.done ? s.done + ' ' + plural(s.done, 'подход', 'подхода', 'подходов') : 'без отмеченных подходов'}</span>
-            <SyncMark session={s} />
-          </div>
-          {canOpen && <button className="button" onClick={onOpen}>Посмотреть веса</button>}
-        </div>
-        {exercises.length > 0 && (
-          <button type="button" className="plan__toggle" aria-expanded={open} onClick={() => { setOpen(!open); haptic(); }}>
-            <span className="plan__toggle-text">
-              <strong>{open ? 'Свернуть' : 'Что сделано'}</strong>
-              {!open && preview && <span>{preview}</span>}
-            </span>
-            <IconChevron size={18} className={'plan__chevron' + (open ? ' plan__chevron--open' : '')} aria-hidden="true" />
-          </button>
-        )}
-        {open && supersets(exercises).map((group, j) => {
-          const line = group.superset ? roundLine : doneLine;
-          const rows = group.items.map((ex, k) => {
-            const who = [...new Set(ex.sets.map((x) => x.who).filter(Boolean))];
-            return (
-              <div className="exercise" style={{ minWidth: 0 }} key={k}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="exercise__name">{ex.name}</div>
-                  {who.length
-                    ? who.map((w) => <div className="exercise__scheme" key={w}>{w}: {line(ex.sets.filter((x) => x.who === w), ex.track)}</div>)
-                    : <div className="exercise__scheme">{line(ex.sets, ex.track)}</div>}
-                </div>
-              </div>
-            );
-          });
-          if (!group.superset) return <React.Fragment key={'m' + j}>{rows}</React.Fragment>;
-          const people = (ex) => new Set(ex.sets.map((x) => x.who || '')).size || 1;
-          const rounds = Math.max(...group.items.map((ex) => Math.round(ex.sets.length / people(ex))));
-          return <Superset rounds={rounds} key={'m' + j}>{rows}</Superset>;
-        })}
-      </Panel>
-    </Section>
-  );
-}
-
-/**
  * Где занятие (FT-566): ещё только на телефоне, не принято сервером или
  * только что ушло. Обычное занятие с сервера — без пометки.
  */
@@ -1638,129 +1562,6 @@ function nextMonthLabel() {
   const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   return names[next.getMonth()] + ' ' + next.getFullYear();
-}
-
-/**
- * Строка упражнения: название, подходы и повторы. Веса здесь нет
- * намеренно.
- *
- * В листе месяца «Вес» — это план тренера, и занятие его не переписывает:
- * лист остаётся шаблоном. Показанное рядом с упражнением число выглядело
- * как «твой рабочий вес» и жило своей жизнью — человек поднял больше, а в
- * программе всё то же самое. Настоящие веса лежат в журнале, и путь к ним
- * один: отметка «тренировка проведена» над списком.
- *
- * Внутри суперсета число подходов не повторяем у каждого: оно общее и
- * стоит в заголовке группы, а дважды написанное рядом читается как
- * «у каждого свои».
- */
-/**
- * Суперсет — скобкой справа, у скобки крупно число кругов: так тренер
- * рисует его от руки на листе, и так же читается с одного взгляда —
- * «эти упражнения — подряд, столько-то раз».
- */
-function Superset({ rounds, children }) {
-  const label = rounds ? rounds + ' ' + plural(rounds, 'круг', 'круга', 'кругов') : '';
-  return (
-    <div className="superset" role="group" aria-label={'Суперсет' + (label ? ', ' + label : '')}>
-      <div className="superset__head">
-        Суперсет
-        <span className="superset__hint">подряд, без отдыха между упражнениями</span>
-      </div>
-      <div className="superset__body">
-        <div className="superset__items">{children}</div>
-        {rounds > 0 && (
-          <div className="superset__bracket" aria-hidden="true">
-            <span className="superset__line" />
-            <span className="superset__count">
-              <strong>{rounds}</strong>
-              <span>{plural(rounds, 'круг', 'круга', 'кругов')}</span>
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// me — участник пары, который смотрит: его вес первым и подписан «Вы»,
-// чужое упражнение приглушено
-function ExerciseRow({ ex, inSuperset, members = [], me = '' }) {
-  // Упражнение из базы открывается карточкой: видео, техника, мышцы
-  const [open, setOpen] = useState(false);
-  const card = ex.exercise;
-  const scheme = [
-    // По типу: «3 × 12 на сторону», «20 мин · 8 км/ч», «4 × 60 с»
-    planScheme(ex, inSuperset),
-  ].filter(Boolean).join('   ·   ');
-
-  // Сплит: кто делает и с каким весом. Упражнение не для всех — помечено
-  // именем, чтобы в зале не пришлось вспоминать, чьё оно.
-  const split = members && members.length > 1;
-  const doers = split ? (ex.performers && ex.performers.length ? ex.performers : members) : [];
-  const mine = !!me && doers.includes(me);
-  const ordered = me ? [...doers.filter((m) => m === me), ...doers.filter((m) => m !== me)] : doers;
-  const weights = ordered
-    .map((m) => (ex.splitWeights && ex.splitWeights[m] ? (m === me ? 'Вы' : m) + ' ' + ex.splitWeights[m] + ' кг' : ''))
-    .filter(Boolean)
-    .join('   ·   ');
-
-  return (
-    <div className={'exercise' + (split && me && !mine ? ' exercise--other' : '')} style={{ minWidth: 0 }}>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        {card
-          ? (
-            <button type="button" className="exercise__name exercise__open" aria-expanded={open} onClick={() => { setOpen(!open); haptic(); }}>
-              {ex.name}
-              <span className="exercise__hint">{open ? 'свернуть' : card.setup || (card.machines && card.machines.length) ? 'техника и настройка' : 'техника'}</span>
-            </button>
-          )
-          : <div className="exercise__name">{ex.name}</div>}
-        {/* План — цифрами, которые ищут глазами: «4 × 8» заметно, RPE и
-            приёмы рядом тише */}
-        <div className="exercise__scheme">
-          {scheme ? scheme.split('   ·   ').map((part, i) => (i === 0
-            ? <span key={i}>{part.split(' · ').map((p, j) => (j === 0 ? <strong key={j} className="exercise__main">{p}</strong> : <span key={j}> · {p}</span>))}</span>
-            : <span key={i}>   ·   {part}</span>)) : '—'}
-        </div>
-        {split && doers.length < members.length && (
-          <div className="exercise__who">
-            {me ? (mine ? 'только вы' : 'делает ' + doers.join(' и ')) : 'только ' + doers.join(' и ')}
-          </div>
-        )}
-        {split && weights && <div className="exercise__scheme">{weights}</div>}
-        {card && open && (
-          <div className="exercise__card">
-            {(card.muscle || card.equipment) && (
-              <div className="exercise__scheme">{[card.muscle, card.equipment].filter(Boolean).join(' · ')}</div>
-            )}
-            <Media media={card.media} />
-            {card.notes
-              ? <p className="small" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{card.notes}</p>
-              : !card.media && !card.setup && !(card.machines && card.machines.length) && <p className="small muted" style={{ marginBottom: 0 }}>Техника к этому упражнению пока не записана.</p>}
-            {/* Тренажёры (FT-478): у каждого фото и своя настройка; общая
-                инструкция — общий принцип под ними */}
-            <MachineList machines={card.machines} notes={ex.notes || {}} noteKey={card.noteKey} />
-            {/* Своя настройка у упражнения без тренажёров — у каждого клиента своя */}
-            {!(card.machines && card.machines.length) && card.noteKey && ex.notes && <PersonalNote text={ex.notes[card.noteKey]} />}
-            {card.setup && (
-              <>
-                <h4 className="setup__title">{card.machines && card.machines.length ? 'Общий принцип настройки' : 'Как настроить тренажёр'}</h4>
-                <SetupText text={card.setup} />
-              </>
-            )}
-            {/* Замены (FT-479): тренажёр занят — что делать вместо; в
-                занятии меняются одним касанием */}
-            {card.alternatives && card.alternatives.length > 0 && (
-              <p className="small" style={{ marginBottom: 0 }}>
-                <strong>Можно заменить:</strong> {card.alternatives.map((a) => a.name).join(', ')}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 /**

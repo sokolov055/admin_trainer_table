@@ -215,3 +215,52 @@ test('16.10.2026: в plan.save — только то, что сервер хра
   assert.ok(JSON.stringify(out).length < 300, 'карточка с техникой и тренажёрами не уходит на сервер');
   assert.equal(heavy.exercise, card, 'на экране упражнение не тронуто');
 });
+
+/* ==========================================================================
+ * Карточка тренировки в списке (FT-791)
+ * ========================================================================== */
+
+test('FT-791: подходы и примерное время тренировки', async () => {
+  const { planSets, planMinutes } = await import('../src/plan-card-model.js');
+  const block = [
+    { name: 'Махи', sets: '3', reps: '15' },
+    { name: 'Жим', sets: '4', reps: '12', technique: 'rest120' },
+    { name: 'А', sets: '3', reps: '10', supersetGroup: 'g' },
+    { name: 'Б', sets: '3', reps: '10', supersetGroup: 'g' },
+  ];
+  assert.equal(planSets(block), 3 + 4 + 3 * 2, 'суперсет — круги у каждого упражнения');
+  const min = planMinutes(block);
+  assert.equal(min % 5, 0, 'кратно 5');
+  assert.ok(min >= 20 && min <= 40, 'похоже на правду: ' + min);
+  assert.equal(planMinutes([{ name: 'Беговая', track: { kind: 'cardio', machine: 'treadmill' }, reps: '20' }]), 20, 'кардио — по минутам плана');
+  assert.equal(planMinutes([]), 0);
+  assert.equal(planSets([{ name: 'Без числа' }]), 3, 'пусто — 3 подхода');
+});
+
+test('FT-791: метка дня — «Сегодня · чт» или «Пт · 15 нояб»', async () => {
+  const { dayLabel } = await import('../src/plan-card-model.js');
+  assert.deepEqual(dayLabel('2026-11-09', 4, '2026-11-12'), { today: true, text: 'Сегодня · чт' });
+  assert.equal(dayLabel('2026-11-09', 5, '2026-11-12').text, 'Пт · 13 нояб');
+  assert.equal(dayLabel('2026-11-09', 1, '2026-11-12').past, true);
+  assert.equal(dayLabel('2026-11-09', 0, '2026-11-12'), null, 'без дня — метки нет');
+  assert.equal(dayLabel('', 3), null);
+});
+
+test('FT-791: вес прошлого раза и «↑» плана выше', async () => {
+  const { lastWeightOf, kg } = await import('../src/plan-card-model.js');
+  assert.deepEqual(lastWeightOf({ lastWeight: '20', weight: '22.5' }), { last: '20 кг', up: '+2,5' });
+  assert.deepEqual(lastWeightOf({ lastWeight: '8,5', weight: '8' }), { last: '8,5 кг', up: '' });
+  assert.equal(lastWeightOf({ lastWeight: '', weight: '40' }), null, 'истории нет — веса нет');
+  assert.equal(lastWeightOf({ lastWeight: '10', track: { kind: 'cardio', machine: 'treadmill' } }), null, 'у кардио — нет');
+  assert.equal(kg(4900), '4 900');
+});
+
+test('FT-791: объём занятия и доля сделанного', async () => {
+  const { sessionVolume, doneShare, shortName } = await import('../src/plan-card-model.js');
+  assert.equal(sessionVolume({ exercises: [{ sets: [{ weight: '70', reps: '8' }, { weight: '', reps: '10' }] }, { sets: [{ weight: '20,5', reps: '10' }] }] }), 765);
+  assert.equal(sessionVolume({}), 0);
+  assert.equal(doneShare(11, 22), 0.5);
+  assert.equal(doneShare(30, 22), 1);
+  assert.equal(doneShare(5, 0), 1, 'свободная — полное кольцо');
+  assert.equal(shortName('Жим, лёжа'), 'Жим');
+});

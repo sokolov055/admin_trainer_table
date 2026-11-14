@@ -683,16 +683,12 @@ test('тренировку можно провести, и блок станов
   // должна оставаться та, которую делать следующей.
   await page.getByRole('tab', { name: /^Сделано/ }).click({ timeout: 20000 });
 
-  const done = section('Тренировка 1 — верх').locator('.plan__done');
+  // FT-791: во «Сделано» — строка-итог: кольцо, дата, подходы, объём;
+  // нажатие — веса занятия
+  const done = section('Тренировка 1 — верх');
   await done.waitFor({ timeout: 20000 });
-  await assert.doesNotReject(done.getByText('Тренировка проведена').waitFor({ timeout: 5000 }));
-
-  const block = section('Тренировка 1 — верх');
-  // Свёрнута и во «Выполненных»: «Что сделано» разворачивает
-  await block.locator('.plan__toggle').click();
-  await assert.doesNotReject(block.getByText('Жим лёжа').first().waitFor({ timeout: 5000 }),
-    'во «Выполненных» — упражнение занятия');
-  await assert.doesNotReject(block.getByText('1 × 8').waitFor({ timeout: 5000 }), 'и сколько сделано');
+  await assert.doesNotReject(done.locator('.pc-ring').waitFor({ timeout: 5000 }), 'кольцо доли подходов');
+  await assert.doesNotReject(done.getByText(/\d+ подход/).waitFor({ timeout: 5000 }), 'сколько сделано');
 
   await done.getByRole('button', { name: 'Посмотреть веса' }).click();
   await page.getByRole('heading', { name: 'Тренировка 1 — верх' }).first().waitFor({ timeout: 20000 });
@@ -710,7 +706,7 @@ test('тренировку можно провести, и блок станов
 test('проведённая тренировка уходит из очереди', async () => {
   // «К программе» убрано (09.10.2026): назад — смахнуть вправо
   await swipe(page, { x: 4, y: 420 }, { x: 340, y: 420 });
-  await page.getByRole('tab', { name: /^Очередь/ }).click({ timeout: 20000 });
+  await page.getByRole('tab', { name: /^В очереди/ }).click({ timeout: 20000 });
 
   // Только видимый раздел: посещённые остаются в разметке спрятанными
   const titles = await page.locator('#root main:not([hidden]) .section__title').allInnerTexts();
@@ -1301,10 +1297,10 @@ test('мои тренировки: программа, прогресс, пит�
     await phone.getByRole('button', { name: 'Новый месяц' }).waitFor({ timeout: 10000 });
     if (process.env.SHOT_MY) await phone.screenshot({ path: process.env.SHOT_MY });
 
-    // Развернуть первую тренировку: тап по схеме — подходы; «Разминочный в
-    // начало» — схема становится «1 разм. + …»
-    const firstBlock = phone.locator('#root main:not([hidden]) .section', { has: phone.locator('.plan__toggle') }).first();
-    await firstBlock.locator('.plan__toggle').click();
+    // «Править» в карточке (FT-791: правка — только кнопкой): тап по
+    // схеме — подходы; «Разминочный в начало» — схема становится «1 разм. + …»
+    const firstBlock = phone.locator('#root main:not([hidden]) .plan-card').first();
+    await firstBlock.getByRole('button', { name: 'Править' }).click();
     const scheme = firstBlock.locator('.plan-inline__scheme').first();
     await scheme.waitFor({ timeout: 10000 });
     await scheme.click();
@@ -1322,8 +1318,8 @@ test('мои тренировки: программа, прогресс, пит�
     // Суперсет (07.10.2026): обычный вид — схемы и число кругов; тап по
     // любой схеме — правка всего суперсета: поля у каждого упражнения и
     // общая колонка кругов. Добавленный круг — у всех сразу
-    const secondBlock = phone.locator('#root main:not([hidden]) .section', { has: phone.locator('.plan__toggle') }).nth(1);
-    await secondBlock.locator('.plan__toggle').click();
+    const secondBlock = phone.locator('#root main:not([hidden]) .plan-card').nth(1);
+    await secondBlock.getByRole('button', { name: 'Править' }).click();
     const superset = secondBlock.locator('.plan-inline__unit--superset').first();
     await superset.locator('.plan-inline__scheme').first().click();
     assert.equal(await superset.locator('.plan-inline__field--reps').count(), await superset.locator('.plan-inline__row').count(), 'поля у каждого упражнения суперсета');
@@ -1384,8 +1380,10 @@ test('карта мышц: тренировка, программа, итоги 
 
     const firstBlock = phone.locator('#root main:not([hidden]) .plan__block').first();
     await firstBlock.locator('.muscles--block').waitFor({ timeout: 10000 });
-    await assert.doesNotReject(firstBlock.getByText('Основная группа').waitFor({ timeout: 5000 }));
-    await assert.doesNotReject(firstBlock.getByText('Синергисты').waitFor({ timeout: 5000 }));
+    // FT-791: главные — чипами, помогающие — пунктиром «+ …», без слова «синергисты»
+    await assert.doesNotReject(firstBlock.locator('.pc-chip:not(.pc-chip--help)').first().waitFor({ timeout: 5000 }));
+    await assert.doesNotReject(firstBlock.locator('.pc-chip--help').waitFor({ timeout: 5000 }));
+    assert.equal(await firstBlock.getByText('Синергисты').count(), 0);
 
     await phone.getByRole('tab', { name: /^Вся / }).click();
     await assert.doesNotReject(phone.getByRole('heading', { name: 'Мышцы программы' }).waitFor({ timeout: 5000 }));
@@ -1394,7 +1392,7 @@ test('карта мышц: тренировка, программа, итоги 
     // Правка: «Жим лёжа» — грудь основная, трицепс синергист; тап по
     // трицепсу дважды — снят
     const block = phone.locator('#root main:not([hidden]) .plan__block').first();
-    await block.locator('.plan__toggle').click();
+    await block.getByRole('button', { name: 'Править' }).click();
     await block.locator('.plan-inline__name').first().click();
     const edit = block.locator('.muscle-edit').first();
     await edit.getByRole('button', { name: 'Изменить' }).click();
@@ -1926,10 +1924,11 @@ test('тренировка в программе переносится удер
     const blocks = phone.locator('#root main:not([hidden]) .plan__block');
     await blocks.nth(1).waitFor({ timeout: 10000 });
     const before = await titles();
-    const head = phone.locator('#root main:not([hidden]) .plan__block .section__head').first();
+    const head = phone.locator('#root main:not([hidden]) .plan__block .pc-head').first();
     const first = await blocks.first().boundingBox();
     const second = await blocks.nth(1).boundingBox();
-    assert.ok(second.y - first.y - first.height >= 28, 'тренировки разделены межблочным интервалом');
+    // FT-791: между карточками 12 px, как в макете
+    assert.ok(second.y - first.y - first.height >= 10, 'тренировки разделены межблочным интервалом');
     const b = await head.boundingBox();
     await phone.mouse.move(b.x + 20, b.y + b.height / 2);
     await phone.mouse.down();
@@ -2015,8 +2014,10 @@ test('в карточке клиента тренировки выбираютс
     const blocks = phone.locator('#root main:not([hidden]) .plan__block');
     await blocks.nth(1).waitFor({ timeout: 10000 });
     const before = await blocks.count();
-    await phone.getByRole('button', { name: 'Выбрать', exact: true }).click();
-    await blocks.nth(0).click();
+    // «Выбрать несколько» — из «⋯» карточки (FT-791): она уже выбрана
+    await blocks.nth(0).getByRole('button', { name: /^Ещё действия/ }).click();
+    await phone.getByRole('button', { name: 'Выбрать несколько' }).click();
+    await phone.getByText('Выбрано: 1').waitFor({ timeout: 5000 });
     await blocks.nth(1).click();
     if (process.env.SHOT_PLAN_ACTIONS) await phone.screenshot({ path: process.env.SHOT_PLAN_ACTIONS, fullPage: true });
     await phone.getByRole('button', { name: 'Копировать', exact: true }).click();
