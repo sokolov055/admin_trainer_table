@@ -554,3 +554,18 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
   .ws-day__dot svg, .ws-bar i, .ws-line__track i, .ws-eye__slash { transition: none; }
   .ws-chip:active, .ws-step:active, .ws-eye:active { transform: none; }
 }
+
+/* 14.11.2026, после проверки владельцем: подсказка глаза видна поверх
+   листа (шапка выше тела), кружки сроков тянутся пальцем */
+.ws-sheet .sheet__head { z-index: 4; }
+.ws-eye__toast { left: 46px; top: 50%; transform: translate(-4px, -50%); }
+.ws-eye__toast.is-shown { transform: translate(0, -50%); }
+.ws-drag { touch-action: none; cursor: grab; transition: transform .35s var(--ws-spring), box-shadow var(--dur-fast) var(--ease-out); }
+.ws-drag.is-dragging { transition: none; cursor: grabbing; box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent); }
+.ws-drag:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.ws-drag.is-locked { border-style: dashed; color: var(--text-muted); border-color: var(--border-strong); cursor: default; }
+.ws-line__date { position: relative; display: block; padding: 4px 6px; margin-top: -2px; border-radius: 8px; cursor: pointer; }
+.ws-line__date span { border-bottom: 1px dashed var(--border-strong); }
+.ws-line__date input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.ws-line__pt--end .ws-line__x { right: -4px; }
+@media (prefers-reduced-motion: reduce) { .ws-drag { transition: none; } }

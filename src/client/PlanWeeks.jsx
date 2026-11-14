@@ -873,28 +873,68 @@ function CycleBlock({ draft, n, onLength, onLoad }) {
   );
 }
 
+function LockGlyph() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
+}
+
+/**
+ * Точка на линии сроков, которую тянут пальцем: 8 px — один день, кружок
+ * едет за пальцем (до 44 px) и пружинит обратно, дата меняется сразу.
+ * Стрелки клавиатуры — ±1 день. Нажатие на дату под точкой — календарь
+ */
+function DragDot({ value, onChange, min = '', max = '', disabled = false, onLocked = null, label, stop = false, children }) {
+  const drag = useRef(null);
+  const [dx, setDx] = useState(0);
+  const clamp = (key) => (min && key < min ? min : max && key > max ? max : key);
+  const shift = (days) => { if (days) onChange(clamp(addDays(value, days))); };
+  return (
+    <span role="slider" tabIndex={disabled ? -1 : 0} aria-label={label} aria-valuetext={ruShort(value)} aria-disabled={disabled || undefined}
+      className={'ws-line__dot ws-drag' + (stop ? ' ws-line__dot--stop' : '') + (disabled ? ' is-locked' : '') + (dx ? ' is-dragging' : '')}
+      style={dx ? { transform: `translateX(${dx}px) scale(1.12)` } : undefined}
+      onPointerDown={(e) => { if (disabled) { if (onLocked) onLocked(); return; } e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX, base: value, days: 0 }; }}
+      onPointerMove={(e) => {
+        const d = drag.current; if (!d) return;
+        const px = e.clientX - d.x;
+        setDx(Math.max(-44, Math.min(44, px)) || 0.01);
+        const days = Math.round(px / 8);
+        if (days !== d.days) { d.days = days; haptic(); onChange(clamp(addDays(d.base, days))); }
+      }}
+      onPointerUp={() => { drag.current = null; setDx(0); }}
+      onPointerCancel={() => { drag.current = null; setDx(0); }}
+      onKeyDown={(e) => { if (disabled) return; if (e.key === 'ArrowLeft') { e.preventDefault(); shift(-1); } if (e.key === 'ArrowRight') { e.preventDefault(); shift(1); } }}>
+      {children}
+    </span>
+  );
+}
+
 /** «Сроки»: линия «старт → конец», паузы — полосатые плашки под ней */
 function DatesBlock({ startsOn, endsOn, onStart, onEnd, startLocked, pauses, onPauses, onPauseFrom }) {
   const [adding, setAdding] = useState(false);
   const [from, setFrom] = useState(dateKey());
   const [to, setTo] = useState('');
+  const [lockNote, setLockNote] = useState(false);
   const today = dateKey();
   return (
     <section className="ws-blk">
       <h3 className="ws-blk__h">Сроки</h3>
       <div className={'ws-line' + (pauses.length ? ' has-pause' : '')}>
         <span className="ws-line__track" aria-hidden="true"><i /></span>
-        <label className="ws-line__pt">
-          <span className="ws-line__dot"><IconPlay size={14} /></span>
-          <span>{ruShort(startsOn) || 'старт'}</span>
-          <input type="date" aria-label="Дата начала" value={startsOn} disabled={startLocked} onChange={(e) => onStart(e.target.value)} />
-        </label>
+        {/* Кружок тянется пальцем — ±1 день на 8 px; дата под ним открывает календарь */}
+        <span className="ws-line__pt">
+          <DragDot value={startsOn} max={endsOn} onChange={onStart} disabled={startLocked} onLocked={() => { haptic(); setLockNote(true); }} label="Дата начала">
+            {startLocked ? <LockGlyph /> : <IconPlay size={14} />}
+          </DragDot>
+          <label className="ws-line__date" onClick={startLocked ? () => setLockNote(true) : undefined}>
+            <span>{ruShort(startsOn) || 'старт'}</span>
+            <input type="date" aria-label="Дата начала" value={startsOn} max={endsOn || undefined} disabled={startLocked} onChange={(e) => e.target.value && onStart(e.target.value)} />
+          </label>
+        </span>
         {endsOn ? (
           <span className="ws-line__pt ws-line__pt--end">
-            <label>
-              <span className="ws-line__dot ws-line__dot--stop" />
+            <DragDot value={endsOn} min={startsOn} onChange={onEnd} label="Последний день программы" stop />
+            <label className="ws-line__date">
               <span>{ruShort(endsOn)}</span>
-              <input type="date" aria-label="Последний день программы" min={startsOn} value={endsOn} onChange={(e) => onEnd(e.target.value)} />
+              <input type="date" aria-label="Последний день программы" min={startsOn} value={endsOn} onChange={(e) => e.target.value && onEnd(e.target.value)} />
             </label>
             <button type="button" className="ws-line__x" aria-label="Без конца" onClick={() => { haptic(); onEnd(''); }}><IconClose size={12} /></button>
           </span>
@@ -904,6 +944,9 @@ function DatesBlock({ startsOn, endsOn, onStart, onEnd, startLocked, pauses, onP
           </button>
         )}
       </div>
+      {/* Сервер не сдвигает начало программы, у которой уже есть версии
+          (plan-weeks.js: history) — говорим об этом, а не молчим */}
+      {lockNote && <p className="ws-hint">Начало закреплено: программа уже менялась. Изменения — строкой «с …» внизу.</p>}
       <div className="ws-row">
         {pauses.map((p, k) => {
           const running = !p.to && p.from < today;
@@ -974,7 +1017,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
       : <section className="ws-blk"><h3 className="ws-blk__h">Дни</h3><DayDots value={days} onToggle={(d) => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort((a, b) => a - b))} /><p className="ws-hint">{daysLine(days, 0)}</p></section>}
     <CycleBlock draft={draft} n={n} onLength={(v) => { setN(v); setDraft(withLength(draft, v)); }} onLoad={(w, load) => setDraft(withWeekLoad(draft, w, load))} />
     {overloaded && <label className="library__check"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} /><span>В одной неделе больше 6 тренировок. Я проверил и подтверждаю распределение.</span></label>}
-    <DatesBlock startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} startLocked={!!(cfg && cfg.schedule === 1)}
+    <DatesBlock startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} startLocked={!!(cfg && cfg.schedule === 1 && (cfg.history || []).length)}
       pauses={pauses} onPauses={setPauses} onPauseFrom={setEffectiveOn} />
     <RuleBlock value={rule} onChange={setRule} />
     {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
