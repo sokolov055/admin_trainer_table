@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { dateKey, nextMonday, programSize, addDays, WEEKDAY_SHORT, sessionsOf, sessionQueue as sessionQueueOf, MAX_RHYTHM } from '../program-timeline.js';
 import { apiMutate } from '../api.js';
-import { Segmented, Sheet, Note, Switch } from '../ui.jsx';
-import { IconAlert, IconCheck, IconLink } from '../icons.jsx';
+import { Segmented, Sheet, Note } from '../ui.jsx';
+import { IconAlert, IconCheck, IconLink, IconPlus, IconMinus, IconPlay, IconClose } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import {
   weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength, withWeekLoad, startWeekOf,
@@ -699,6 +699,256 @@ export function ProgramDates({ startsOn, endsOn, onStart, onEnd, disabled = fals
   </>;
 }
 
+/* ==========================================================================
+ * Лист «Настроить программу» (14.11.2026, макет program-settings-mockup.html):
+ * четыре блока по частоте — «Неделя» (сколько в неделю и по каким дням),
+ * «Цикл» (недели и их нагрузка столбиками), «Сроки» (старт, конец, паузы),
+ * «Пропуск» (три плитки с маленькой анимацией). «Видна клиенту» — глаз в
+ * шапке, «Применить с» и неделя продолжения — строка над «Сохранить».
+ * Что сохраняется, не поменялось: те же поля weeks, что и раньше
+ * ========================================================================== */
+
+const ruShort = (key) => (key ? new Date(key + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '') : '');
+const LETTERS = ['А', 'Б', 'В', 'Г', 'Д', 'Е'];
+const LOAD_CYCLE = ['', 'light', 'heavy'];
+const RULE_TILES = [{ value: 'client', label: 'Клиент' }, { value: 'redo', label: 'Доделать' }, { value: 'skip', label: 'Дальше' }];
+const RULE_SHORT = { client: 'Клиент выберет: доделать или дальше', redo: 'Пропущенная встанет первой на следующей неделе', skip: 'Остаётся пропуском, идём дальше' };
+
+function Dumbbell() {
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true">
+      <rect x="1" y="9" width="4" height="6" rx="1" /><rect x="19" y="9" width="4" height="6" rx="1" />
+      <rect x="5" y="7" width="3" height="10" rx="1" /><rect x="16" y="7" width="3" height="10" rx="1" /><rect x="8" y="11" width="8" height="2" />
+    </svg>
+  );
+}
+function PauseGlyph() {
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2" /><rect x="14" y="5" width="4" height="14" rx="1.2" /></svg>;
+}
+function EyeGlyph({ off }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="3" />
+      <path className={'ws-eye__slash' + (off ? ' is-on' : '')} d="M4 4l16 16" />
+    </svg>
+  );
+}
+
+/** Глаз в шапке листа: видна программа клиенту или нет; нажатие — подсказка на секунду */
+function VisibilityEye({ visibility }) {
+  const [flash, setFlash] = useState('');
+  const [shown, setShown] = useState(false);
+  const timer = useRef(0);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const hidden = !!visibility.hidden;
+  return (
+    <button type="button" className={'ws-eye' + (hidden ? ' is-off' : '')} aria-pressed={!hidden} disabled={visibility.busy}
+      aria-label={hidden ? 'Скрыта от клиента — показать' : 'Видна клиенту — скрыть'}
+      onClick={() => { haptic(); visibility.onToggle(); setFlash(hidden ? 'Клиент видит' : 'Скрыта от клиента'); setShown(true); clearTimeout(timer.current); timer.current = setTimeout(() => setShown(false), 1500); }}>
+      <EyeGlyph off={hidden} />
+      <span className={'ws-eye__toast' + (shown ? ' is-shown' : '')} role="status">{flash}</span>
+    </button>
+  );
+}
+
+/** Число «в неделю» с −/+: подпрыгивает при смене */
+function CountDial({ value, onChange, note }) {
+  return (
+    <div className="ws-count">
+      <button type="button" className="ws-step" aria-label="Меньше занятий" disabled={value <= 1} onClick={() => { haptic(); onChange(value - 1); }}><IconMinus size={20} /></button>
+      <div className="ws-count__num" aria-live="polite"><b key={value}>{value || '—'}</b><small>{note}</small></div>
+      <button type="button" className="ws-step" aria-label="Больше занятий" disabled={value >= 7} onClick={() => { haptic(); onChange(value + 1); }}><IconPlus size={20} /></button>
+    </div>
+  );
+}
+
+/** Семь кружков: отмеченный день — синий с гантелей */
+function DayDots({ value, onToggle }) {
+  const set = new Set(value || []);
+  return (
+    <div className="ws-days" role="group" aria-label="Дни занятий">
+      {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+        <button key={d} type="button" aria-pressed={set.has(d)} className={'ws-day' + (set.has(d) ? ' is-on' : '')} onClick={() => { haptic(); onToggle(d); }}>
+          <small>{WEEKDAY_SHORT[d]}</small>
+          <span className="ws-day__dot"><Dumbbell /></span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const daysLine = (days, count) => {
+  const list = [...(days || [])].sort((a, b) => a - b);
+  if (!list.length) return 'в любые дни';
+  const more = count > list.length ? count - list.length : 0;
+  return list.map((d) => WEEKDAY_SHORT[d]).join(' · ') + (more ? ` + ещё ${more}` : '');
+};
+
+/**
+ * «Неделя»: число и дни — одно решение. Отметил больше дней, чем занятий, —
+ * число растёт; убавил число ниже числа дней — лишние дни снимаются.
+ * Число, равное неделе программы, — это «как в программе» (rhythm: [])
+ */
+function WeekBlock({ beat, setBeat, days, setDays, count, sessions }) {
+  const [ab, setAb] = useState(0);
+  const rhythm = beat.rhythm || [];
+  const rDays = beat.rhythmDays || [];
+  const alternate = rhythm.length > 1;
+  const i = Math.min(ab, Math.max(0, rhythm.length - 1));
+  const cur = alternate ? rhythm[i] : (rhythm[0] || count || 1);
+  const curDays = alternate ? (rDays[i] || []) : days;
+  const plain = (n) => (count && n === count ? [] : [n]);
+  const setCount = (n, nextDays = curDays) => {
+    const v = Math.min(7, Math.max(1, n));
+    const trimmed = nextDays.length > v ? [...nextDays].sort((a, b) => a - b).slice(0, v) : nextDays;
+    if (alternate) setBeat({ ...beat, rhythm: rhythm.map((x, k) => (k === i ? v : x)), rhythmDays: rhythm.map((_, k) => (k === i ? trimmed : rDays[k] || [])) });
+    else { setBeat({ rhythm: plain(v), rhythmDays: [], one: '' }); setDays(trimmed); }
+  };
+  const toggle = (d) => {
+    const next = curDays.includes(d) ? curDays.filter((x) => x !== d) : [...curDays, d].sort((a, b) => a - b);
+    setCount(Math.max(cur, next.length), next);
+  };
+  const flip = () => {
+    if (alternate) { setBeat({ rhythm: plain(rhythm[0]), rhythmDays: [], one: '' }); setDays(rDays[0] || []); }
+    else { setBeat({ rhythm: [cur, 1], rhythmDays: [days, []], one: '' }); }
+    setAb(0);
+  };
+  const lightWeek = alternate && rhythm.includes(1) && rhythm.some((n) => n > 1);
+  const oneOn = beat.one !== '' && beat.one !== undefined;
+  return (
+    <section className="ws-blk">
+      <h3 className="ws-blk__h">Неделя</h3>
+      {alternate && (
+        <div className="ws-ab">
+          <Segmented items={rhythm.map((n, k) => ({ value: k, label: `${LETTERS[k]} · ${n}` }))} value={i} label="Неделя чередования" track onChange={(k) => { haptic(); setAb(k); }} />
+          {rhythm.length < MAX_RHYTHM && <button type="button" className="ws-mini" aria-label="Добавить неделю чередования" onClick={() => { haptic(); setBeat({ ...beat, rhythm: [...rhythm, rhythm[0]], rhythmDays: [...rhythm.map((_, k) => rDays[k] || []), []] }); setAb(rhythm.length); }}><IconPlus size={16} /></button>}
+          {rhythm.length > 2 && <button type="button" className="ws-mini" aria-label={`Убрать неделю ${LETTERS[i]}`} onClick={() => { haptic(); setBeat({ ...beat, rhythm: rhythm.filter((_, k) => k !== i), rhythmDays: rDays.filter((_, k) => k !== i) }); setAb(0); }}><IconMinus size={16} /></button>}
+        </div>
+      )}
+      <CountDial value={cur} onChange={(n) => setCount(n)} note={!alternate && !rhythm.length && count ? 'как в программе' : 'в неделю'} />
+      <DayDots value={curDays} onToggle={toggle} />
+      <p className="ws-hint">{daysLine(curDays, cur)}</p>
+      {lightWeek && sessions.length > 1 && rhythm[i] === 1 && (
+        <div className="ws-one">
+          <Segmented items={[{ value: 'next', label: 'По очереди' }, { value: 'one', label: 'Всегда одно' }]} value={oneOn ? 'one' : 'next'} label="Неделя с одним занятием"
+            onChange={(v) => { haptic(); setBeat({ ...beat, one: v === 'one' ? sessions[sessions.length - 1].key : '' }); }} />
+          {oneOn && (
+            <div className="chips chips--wrap" role="radiogroup" aria-label="Какое занятие">
+              {sessions.map((x) => (
+                <button key={x.key} type="button" role="radio" aria-checked={x.key === beat.one} className={'chip' + (x.key === beat.one ? ' chip--active' : '')} onClick={() => { haptic(); setBeat({ ...beat, one: x.key }); }}>{x.title}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div className="ws-row ws-row--center">
+        <button type="button" className={'ws-chip' + (alternate ? ' is-on' : '')} aria-pressed={alternate} onClick={() => { haptic(); flip(); }}>⇄ Чередовать</button>
+      </div>
+    </section>
+  );
+}
+
+/** «Цикл»: сколько разных недель и столбики нагрузки — нажатие меняет обычная → лёгкая → тяжёлая */
+function CycleBlock({ draft, n, onLength, onLoad }) {
+  const weeks = byWeek(draft, n);
+  return (
+    <section className="ws-blk">
+      <h3 className="ws-blk__h">Цикл <span>недель</span></h3>
+      <Segmented items={PROGRAM_LENGTHS.map((v) => ({ value: v, label: String(v) }))} value={n} label="Недель в программе" track onChange={(v) => { haptic(); onLength(v); }} />
+      <div className="ws-bars">
+        {weeks.map((g) => {
+          const load = weekLoad(draft, g.week) || '';
+          const label = (LOADS.find((l) => l.value === load) || LOADS[0]).label.toLowerCase();
+          return (
+            <button key={g.week} type="button" className={'ws-bar' + (load ? ' ws-bar--' + load : '')} aria-label={`Неделя ${g.week}: ${workouts(g.blocks.length)}, ${label}. Нажмите, чтобы сменить нагрузку`}
+              onClick={() => { haptic(); onLoad(g.week, LOAD_CYCLE[(LOAD_CYCLE.indexOf(load) + 1) % LOAD_CYCLE.length]); }}>
+              <i><b>{g.blocks.length}</b></i>
+              <small>Н{g.week}</small>
+            </button>
+          );
+        })}
+      </div>
+      <div className="ws-legend" aria-hidden="true"><span className="ws-legend--light">лёгкая</span><span>обычная</span><span className="ws-legend--heavy">тяжёлая</span></div>
+    </section>
+  );
+}
+
+/** «Сроки»: линия «старт → конец», паузы — полосатые плашки под ней */
+function DatesBlock({ startsOn, endsOn, onStart, onEnd, startLocked, pauses, onPauses, onPauseFrom }) {
+  const [adding, setAdding] = useState(false);
+  const [from, setFrom] = useState(dateKey());
+  const [to, setTo] = useState('');
+  const today = dateKey();
+  return (
+    <section className="ws-blk">
+      <h3 className="ws-blk__h">Сроки</h3>
+      <div className={'ws-line' + (pauses.length ? ' has-pause' : '')}>
+        <span className="ws-line__track" aria-hidden="true"><i /></span>
+        <label className="ws-line__pt">
+          <span className="ws-line__dot"><IconPlay size={14} /></span>
+          <span>{ruShort(startsOn) || 'старт'}</span>
+          <input type="date" aria-label="Дата начала" value={startsOn} disabled={startLocked} onChange={(e) => onStart(e.target.value)} />
+        </label>
+        {endsOn ? (
+          <span className="ws-line__pt ws-line__pt--end">
+            <label>
+              <span className="ws-line__dot ws-line__dot--stop" />
+              <span>{ruShort(endsOn)}</span>
+              <input type="date" aria-label="Последний день программы" min={startsOn} value={endsOn} onChange={(e) => onEnd(e.target.value)} />
+            </label>
+            <button type="button" className="ws-line__x" aria-label="Без конца" onClick={() => { haptic(); onEnd(''); }}><IconClose size={12} /></button>
+          </span>
+        ) : (
+          <button type="button" className="ws-line__pt ws-line__pt--end" aria-label="Без конца — задать последний день" onClick={() => { haptic(); onEnd(addDays(startsOn || today, 27)); }}>
+            <span className="ws-line__dot">∞</span><span>без конца</span>
+          </button>
+        )}
+      </div>
+      <div className="ws-row">
+        {pauses.map((p, k) => {
+          const running = !p.to && p.from < today;
+          return (
+            <span className="ws-chip ws-chip--pause is-on" key={p.from}>
+              <PauseGlyph />{ruShort(p.from)}{p.to ? '–' + ruShort(p.to) : ' →'}
+              <button type="button" aria-label={running ? 'Возобновить сегодня' : 'Убрать паузу'} onClick={() => {
+                haptic();
+                if (running) { onPauses(pauses.map((v, j) => (j === k ? { ...v, to: addDays(today, -1) } : v))); onPauseFrom(today); } else onPauses(pauses.filter((_, j) => j !== k));
+              }}>{running ? <IconPlay size={12} /> : <IconClose size={12} />}</button>
+            </span>
+          );
+        })}
+        {!adding && <button type="button" className="ws-chip ws-chip--pause" onClick={() => { haptic(); setAdding(true); }}><PauseGlyph />Пауза</button>}
+      </div>
+      {adding && (
+        <div className="ws-pause">
+          <label><span>с</span><input type="date" min={today} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+          <label><span>по</span><input type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          <button type="button" className="button button--primary" disabled={!from} onClick={() => { haptic(); onPauses([...pauses, { from, to }]); onPauseFrom(from); setAdding(false); setTo(''); }}>Добавить</button>
+          <button type="button" className="ws-mini" aria-label="Отмена" onClick={() => setAdding(false)}><IconClose size={14} /></button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** «Пропуск»: красная точка на плитке показывает, что с ней будет */
+function RuleBlock({ value, onChange }) {
+  return (
+    <section className="ws-blk">
+      <h3 className="ws-blk__h">Пропуск</h3>
+      <div className="ws-tiles" role="radiogroup" aria-label="Пропущенные тренировки">
+        {RULE_TILES.map((t) => (
+          <button key={t.value} type="button" role="radio" aria-checked={value === t.value} className={'ws-tile ws-tile--' + t.value + (value === t.value ? ' is-on' : '')} onClick={() => { haptic(); onChange(t.value); }}>
+            <span className="ws-mini-week" aria-hidden="true"><b /><b className="is-miss" /><i /><b /><b /></span>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="ws-hint">{RULE_SHORT[value] || ''}</p>
+    </section>
+  );
+}
+
 export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false, failure = '', visibility = null }) {
   const [draft, setDraft] = useState(blocks);
   const [n, setN] = useState(length);
@@ -711,38 +961,36 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   const [days, setDays] = useState(cfg && cfg.days || []);
   // Ритм (FT-788): «всегда одно» занятие — по id его первой тренировки
   const [beat, setBeat] = useState({ rhythm: cfg && cfg.rhythm || [], rhythmDays: cfg && cfg.rhythmDays || [], one: cfg && cfg.oneSession || '' });
+  const [whenOpen, setWhenOpen] = useState(false);
   const alternate = beat.rhythm.length > 1;
   const queue = sessionQueueOf(draft);
-  const [pauseFrom, setPauseFrom] = useState(dateKey());
-  const [pauseTo, setPauseTo] = useState('');
   const [loadAccepted, setLoadAccepted] = useState(false);
   const overloaded = byWeek(draft, n).some((g) => g.blocks.length > 6);
-  return <Sheet title="Настроить программу" onClose={onClose}><div className="wk-rows">
-    {/* С 14.11.2026 «Скрыть от клиента» — здесь, а не строкой над программой */}
-    {visibility && <div className="wk-rows__item"><Switch checked={!visibility.hidden} disabled={visibility.busy} onChange={visibility.onToggle}>Программа видна клиенту</Switch>
-      <span>{visibility.sheet ? `Лист «${visibility.sheet}». ` : ''}{visibility.hidden ? 'Скрыта: у вас она остаётся со всем содержимым.' : 'Выключите, чтобы клиент пока её не видел.'}</span></div>}
-    <div className="wk-rows__item"><strong>Недель в программе</strong><LengthPicker value={n} onChange={(v) => { setN(v); setDraft(withLength(draft, v)); }} list={false} count={draft.length} />
-      <span>Предпросмотр ниже покажет результат перераспределения. Пустая неделя сохранится как отдых.</span></div>
-    <WeekPreview rows={byWeek(draft, n).map((g) => ({ key: g.week, label: `Неделя ${g.week}`, titles: g.blocks.map((b) => b.title) }))} />
-    {byWeek(draft, n).map((g) => <div className="wk-rows__pill" key={g.week}><span>Неделя {g.week}<small>{workouts(g.blocks.length)}</small></span><Segmented items={LOADS} value={weekLoad(draft, g.week)} label={`Нагрузка недели ${g.week}`} onChange={(load) => setDraft(withWeekLoad(draft, g.week, load))} /></div>)}
-    <ProgramDates startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} disabled={cfg && cfg.schedule === 1} />
-    {queue.length > 0 && <RhythmPicker value={beat} onChange={setBeat} seedDays={days} count={sessionsOf(draft.filter((b) => weekOf(b) === 1)).length}
-      sessions={queue.filter((g) => g[0].id).map((g) => ({ key: g[0].id, title: g.map((b) => b.title).join(' + ') }))} />}
-    {!alternate && <div className="wk-rows__item"><strong>Дни занятий</strong><DayPicker value={days} onChange={setDays} /><span>Занятия недели встают на эти дни по порядку. Можно не указывать.</span></div>}
-    <label className="field"><span className="field__label">Применить изменения с</span><input className="field__input" type="date" min={dateKey()} value={effectiveOn} onChange={(e) => setEffectiveOn(e.target.value)} /></label>
-    <span>По умолчанию — следующий понедельник. Прошлые недели и проведённые занятия сохранятся.</span>
-    <label className="field"><span className="field__label">Неделя продолжения</span><select className="field__input" value={startWeek} onChange={(e) => setStartWeek(e.target.value)}><option value="">Продолжить по порядку</option>{Array.from({ length: n }, (_, i) => <option key={i} value={i + 1}>Начать с недели {i + 1}</option>)}</select></label>
-    <div className="wk-rows__item"><strong>Пропущенные тренировки</strong><Segmented items={RULES} value={rule} label="Пропущенные тренировки" onChange={setRule} /><span>{RULE_HINT[rule]}</span></div>
-    <div className="wk-rows__item"><strong>Паузы программы</strong><span>Дни паузы не считаются пропусками. Полная неделя паузы не сдвигает программу. Причину указывать не нужно.</span>
-      {pauses.map((p, i) => <div className="wk__row" key={p.from}><span>{p.from} — {p.to || 'до возобновления'}</span><button className="button" onClick={() => { if (!p.to && p.from < dateKey()) { setPauses(pauses.map((v, j) => i === j ? { ...v, to: addDays(dateKey(), -1) } : v)); setEffectiveOn(dateKey()); } else setPauses(pauses.filter((_, j) => j !== i)); }}>{p.to ? 'Убрать' : 'Возобновить сегодня'}</button></div>)}
-      <label className="field"><span className="field__label">Начало паузы</span><input className="field__input" type="date" min={dateKey()} value={pauseFrom} onChange={(e) => setPauseFrom(e.target.value)} /></label>
-      <label className="field"><span className="field__label">Конец паузы, если известен</span><input className="field__input" type="date" min={pauseFrom} value={pauseTo} onChange={(e) => setPauseTo(e.target.value)} /></label>
-      <button className="button" onClick={() => { setPauses([...pauses, { from: pauseFrom, to: pauseTo }]); setEffectiveOn(pauseFrom); }}>Добавить паузу</button>
-    </div>
+  const weekCount = Math.max(0, ...byWeek(draft, n).map((g) => sessionsOf(g.blocks).length));
+  return <Sheet title="Программа" onClose={onClose} className="ws-sheet" action={visibility ? <VisibilityEye visibility={visibility} /> : null}><div className="ws">
+    {queue.length > 0
+      ? <WeekBlock beat={beat} setBeat={setBeat} days={days} setDays={setDays} count={weekCount}
+        sessions={queue.filter((g) => g[0].id).map((g) => ({ key: g[0].id, title: g.map((b) => b.title).join(' + ') }))} />
+      : <section className="ws-blk"><h3 className="ws-blk__h">Дни</h3><DayDots value={days} onToggle={(d) => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort((a, b) => a - b))} /><p className="ws-hint">{daysLine(days, 0)}</p></section>}
+    <CycleBlock draft={draft} n={n} onLength={(v) => { setN(v); setDraft(withLength(draft, v)); }} onLoad={(w, load) => setDraft(withWeekLoad(draft, w, load))} />
     {overloaded && <label className="library__check"><input type="checkbox" checked={loadAccepted} onChange={(e) => setLoadAccepted(e.target.checked)} /><span>В одной неделе больше 6 тренировок. Я проверил и подтверждаю распределение.</span></label>}
+    <DatesBlock startsOn={startsOn} endsOn={endsOn} onStart={setStartsOn} onEnd={setEndsOn} startLocked={!!(cfg && cfg.schedule === 1)}
+      pauses={pauses} onPauses={setPauses} onPauseFrom={setEffectiveOn} />
+    <RuleBlock value={rule} onChange={setRule} />
     {failure && <Note tone="critical" icon={IconAlert}>{failure}</Note>}
-    <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days: alternate ? [] : days,
-      rhythm: beat.rhythm, rhythmDays: alternate ? beat.rhythmDays.slice(0, beat.rhythm.length).map((d) => d || []) : [], oneSession: alternate ? beat.one || '' : '',
-      ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить программу'}</button>
+    <div className="ws-foot">
+      <button type="button" className="ws-chip ws-when" aria-expanded={whenOpen} onClick={() => { haptic(); setWhenOpen(!whenOpen); }}>
+        с {ruShort(effectiveOn)} · {startWeek ? `с недели ${startWeek}` : 'по порядку'} <span aria-hidden="true">▾</span>
+      </button>
+      {whenOpen && (
+        <div className="ws-when__panel">
+          <label className="field"><span className="field__label">Применить изменения с</span><input className="field__input" type="date" min={dateKey()} value={effectiveOn} onChange={(e) => setEffectiveOn(e.target.value)} /></label>
+          <Segmented items={[{ value: '', label: 'По порядку' }, ...Array.from({ length: n }, (_, k) => ({ value: String(k + 1), label: 'Н' + (k + 1) }))]} value={startWeek} label="С какой недели продолжить" onChange={(v) => { haptic(); setStartWeek(v); }} />
+        </div>
+      )}
+      <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days: alternate ? [] : days,
+        rhythm: beat.rhythm, rhythmDays: alternate ? beat.rhythmDays.slice(0, beat.rhythm.length).map((d) => d || []) : [], oneSession: alternate ? beat.one || '' : '',
+        ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
+    </div>
   </div></Sheet>;
 }

@@ -53,7 +53,7 @@ async function open(page, role) {
     check('7 дней', await card.locator('.wc-day').count() === 7);
     check('3 значка занятий', await card.locator('.wc-dot').count() === 3);
     check('вкладки короче', await main.getByRole('tab', { name: /^Неделя \d/ }).count() === 1 && await main.getByRole('tab', { name: /^Сделано/ }).count() === 1);
-    check('«+» свободная', await main.getByRole('button', { name: 'Свободная тренировка' }).count() === 1);
+    check('кнопка «Свободная тренировка»', await main.getByRole('button', { name: 'Свободная тренировка' }).count() === 1);
     // Кольцо не заходит на текст: цифра внутри внутреннего круга
     const geo = await card.locator('.wc-ring').evaluate((ring) => {
       const r = ring.getBoundingClientRect();
@@ -103,7 +103,7 @@ async function open(page, role) {
 
     // ⚙ — настройки с «видна клиенту» (у «Моих тренировок» видимости нет — проверяем только лист)
     await card.getByRole('button', { name: 'Настроить' }).click();
-    await page.getByText('Недель в программе').waitFor({ timeout: 5000 });
+    await page.getByRole('heading', { name: /Цикл/ }).waitFor({ timeout: 5000 });
     check('⚙ открывает «Настроить программу»', true);
     await page.keyboard.press('Escape');
     check('телефон: без ошибок', errors.length === 0, errors.join(' | '));
@@ -132,7 +132,7 @@ async function open(page, role) {
     const card = main.locator('.wc');
     await card.waitFor({ timeout: 10000 });
     await card.getByRole('button', { name: 'Настроить' }).click();
-    await page.getByText('Программа видна клиенту').waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: /Видна клиенту|Скрыта от клиента/ }).waitFor({ timeout: 5000 });
     check('карточка клиента: в ⚙ «Программа видна клиенту»', true);
     await page.screenshot({ path: `${DEST}-5-settings.png` });
     check('карточка клиента: без ошибок', errors.length === 0, errors.join(' | '));

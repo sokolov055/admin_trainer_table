@@ -1074,6 +1074,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <div className="plan__tabs-row">
           <Chips
             variant="nav"
+            className="plan__tabs"
             label="Тренировки месяца"
             items={[
               // Коротко (14.11.2026): «Неделя 3 · Сделано 0 · Вся 12»
@@ -1085,13 +1086,6 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             value={planTab}
             onChange={setPlanTab}
           />
-          {/* Свободная тренировка — без программы: что делал, то и записал.
-              Появится в «Сделано» этого месяца. С 14.11.2026 — круглая «+» */}
-          {!running && !familyRow && (
-            <button type="button" className="plan__free-plus" aria-label="Свободная тренировка" title="Свободная тренировка" onClick={() => { haptic(); freeWorkout(); }}>
-              <IconPlus size={22} />
-            </button>
-          )}
         </div>
       )}
       {!running && !familyRow && shownBlocks.length === 0 && doneSessions.length === 0 && (
@@ -1192,6 +1186,17 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           ? <SessionGroups blocks={visibleBlocks} renderBlock={(block) => renderBlock(block)} canEdit={canEdit && !selectingBlocks} disabled={saveState === 'saving'}
             onJoin={(head) => commit(joinedSession(shownBlocks, head))} onSplit={(group) => commit(splitSession(shownBlocks, group))} />
           : visibleBlocks.map((block) => renderBlock(block))}</div>}
+
+      {/* Свободная тренировка — без программы: что делал, то и записал.
+          Появится в «Сделано» этого месяца. С 14.11.2026 — подписанная
+          кнопка под списком, а не круглая «+» в строке вкладок (макет
+          program-settings-mockup.html, вариант А) */}
+      {!running && !familyRow && !selectingBlocks && (shownBlocks.length > 0 || doneSessions.length > 0) && !(planTab === 'done' && doneSessions.length === 0) && (
+        <button type="button" className="plan__free-add" onClick={() => { haptic(); freeWorkout(); }}>
+          <span className="plan__free-add-icon" aria-hidden="true"><IconPlus size={20} /></span>
+          Свободная тренировка
+        </button>
+      )}
 
       {selectingBlocks && selectedBlocks.size > 0 && (
         <div className="plan__block-actions" role="toolbar" aria-label="Действия с выбранными тренировками">

@@ -124,19 +124,31 @@ button.wc-dot:active { transform: scale(.9); }
 .plan__month-hidden svg { opacity: .8; }
 
 /* Вкладки и «+» свободной тренировки в одном ряду */
-.plan__tabs-row { display: flex; align-items: center; gap: var(--space-2); }
-.plan__tabs-row > .chips { flex: 1; min-width: 0; }
-.plan__free-plus {
-  flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%;
-  background: var(--accent-fill); color: var(--accent-text); box-shadow: var(--shadow-sm); cursor: pointer;
-  transition: transform var(--dur-press) var(--ease-out);
+.plan__tabs-row { display: flex; }
+/* Вкладки на всю ширину, поровну, текст по центру (14.11.2026, вариант А).
+   Нижний отступ .chips здесь не нужен — из-за него «+» съезжал вниз */
+.plan__tabs-row > .chips.plan__tabs { display: flex; flex: 1; min-width: 0; margin-bottom: var(--space-3); }
+.plan__tabs .chip { flex: 1 1 0; min-width: 0; justify-content: center; padding-inline: 8px; }
+/* Свободная тренировка — подписанная кнопка под списком; пунктир = «добавить своё» */
+.plan__free-add {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 56px; margin-top: var(--space-3);
+  padding: 10px 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent); border-radius: var(--radius-lg, 14px);
+  background: transparent; color: var(--accent); font: 650 var(--text-base, 15px)/1.2 var(--font); text-align: left; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
-.plan__free-plus:active { transform: scale(.94); }
+.plan__free-add-icon {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent);
+  transition: transform .4s cubic-bezier(.34, 1.56, .64, 1);
+}
+.plan__free-add:active { transform: scale(.98); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.plan__free-add:active .plan__free-add-icon { transform: rotate(90deg); }
 
 @media (prefers-reduced-motion: reduce) {
   .wc__body.is-next, .wc__body.is-prev { animation: wc-fade var(--dur-fast) var(--ease-out) both; }
   .wc-ring__fill { transition: none; }
   .wc__bars i.is-now, .wc-dot.is-done { animation: none; }
   .wc-burst { display: none; }
-  .wc__gear:active, button.wc-dot:active, .plan__free-plus:active { transform: none; }
+  .wc__gear:active, button.wc-dot:active, .plan__free-add:active { transform: none; }
+  .plan__free-add:active .plan__free-add-icon { transform: none; }
 }

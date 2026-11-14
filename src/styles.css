@@ -6549,6 +6549,7 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .sheet__close { position: absolute; right: -4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; }
 .sheet__close::before { content: ''; position: absolute; width: 36px; height: 36px; border-radius: 50%; background: var(--surface-sunken); z-index: -1; }
 .sheet__close:active { transform: translateY(-50%) scale(0.92); }
+.sheet__action { position: absolute; left: -4px; top: 50%; transform: translateY(-50%); display: flex; }
 .sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 2px 20px 4px; }
 /* 16px — иначе iOS приближает страницу при фокусе в поле */
 .sheet__body input, .sheet__body select, .sheet__body textarea { font-size: 16px; }

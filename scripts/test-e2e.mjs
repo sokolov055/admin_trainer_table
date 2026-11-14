@@ -2080,8 +2080,9 @@ test('FT-775: программа по датам переживает reload, п
     await phone.getByRole('button', { name: 'Меню', exact: true }).click();
     await phone.getByRole('button', { name: /Мои тренировки/ }).click();
     await phone.getByRole('button', { name: 'Настроить', exact: true }).click();
-    await phone.getByRole('button', { name: 'Добавить паузу', exact: true }).click();
-    await phone.getByRole('button', { name: 'Сохранить программу', exact: true }).click();
+    await phone.getByRole('button', { name: 'Пауза', exact: true }).click();
+    await phone.getByRole('button', { name: 'Добавить', exact: true }).click();
+    await phone.getByRole('button', { name: 'Сохранить', exact: true }).click();
     await phone.getByText('Пауза — неделя не считается пропуском', { exact: true }).waitFor();
     assert.equal(await phone.getByRole('button', { name: 'Начать тренировку', exact: true }).count(), 0);
     const stored = await phone.evaluate(() => JSON.parse(localStorage.getItem('ft775-program-demo')));

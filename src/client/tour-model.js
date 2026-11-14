@@ -49,7 +49,7 @@ export const TOUR_SECTIONS = [
       // клиента» метки нет — тогда любая кнопка занятия, без программы —
       // свободная тренировка
       { id: 'start', tab: 'plan', wait: true, title: 'Начать тренировку',
-        target: [PAGE + '[data-first-action="workout"]', PAGE + '.plan__block .button--primary', PAGE + '.plan__free', PAGE + '.plan__free-plus'],
+        target: [PAGE + '[data-first-action="workout"]', PAGE + '.plan__block .button--primary', PAGE + '.plan__free', PAGE + '.plan__free-add'],
         text: 'Откроются упражнения тренировки. Веса подставлены по прошлому разу, под подходом — что было тогда. Программы нет — «Свободная тренировка»: что сделали, то и записали.' },
       { id: 'effort', tab: 'plan', title: '«Легко», «Норм» или «Тяжело»',
         text: 'Сделали подход — оцените его одной кнопкой: по оценке приложение подстроит вес следующих подходов и отдых. Отдых можно свернуть, а после последнего подхода — «Завершить» вверху.' },

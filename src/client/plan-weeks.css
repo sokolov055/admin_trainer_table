@@ -449,3 +449,108 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .plan-weeks__week.is-edited::after {
   content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--warning);
 }
+
+/* ==========================================================================
+   Лист «Программа» (настройки, 14.11.2026 — program-settings-mockup.html)
+   ========================================================================== */
+.ws-sheet .sheet__panel { background: var(--bg); }
+.ws { display: flex; flex-direction: column; gap: 10px; --ws-spring: cubic-bezier(.34, 1.56, .64, 1); --ws-light: #5aa86e; }
+.ws-blk { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 14px; }
+.ws-blk__h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font-size: var(--text-sm); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.ws-blk__h span { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.ws-hint { margin: 8px 0 0; min-height: 18px; text-align: center; font-size: var(--text-sm); color: var(--text-muted); }
+.ws-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ws-row--center { justify-content: center; }
+.ws-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font: 600 var(--text-sm)/1 var(--font); cursor: pointer; }
+.ws-chip.is-on { background: var(--accent-wash); color: var(--accent-ink); border-color: transparent; }
+.ws-chip:active { transform: scale(.96); }
+.ws-mini { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); display: grid; place-items: center; cursor: pointer; }
+
+/* Глаз в шапке */
+.ws-eye { position: relative; width: 38px; height: 38px; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent-ink); cursor: pointer; transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.ws-eye.is-off { background: var(--surface-sunken); color: var(--text-muted); }
+.ws-eye:active { transform: scale(.92); }
+.ws-eye__slash { stroke-dasharray: 23; stroke-dashoffset: 23; transition: stroke-dashoffset .35s var(--ease-out); }
+.ws-eye__slash.is-on { stroke-dashoffset: 0; }
+.ws-eye__toast { position: absolute; left: 0; top: 44px; z-index: 3; white-space: nowrap; padding: 5px 9px; border-radius: 8px; background: var(--text); color: var(--surface); font: 600 12px/1.2 var(--font); opacity: 0; transform: translateY(-4px); transition: opacity .2s var(--ease-out), transform .2s var(--ease-out); pointer-events: none; }
+.ws-eye__toast.is-shown { opacity: 1; transform: none; }
+
+/* Неделя: число и дни */
+.ws-ab { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.ws-ab > :first-child { flex: 1; min-width: 0; }
+.ws-count { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 2px 0 12px; }
+.ws-step { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--accent); display: grid; place-items: center; cursor: pointer; }
+.ws-step:active { transform: scale(.92); }
+.ws-step:disabled { opacity: .35; cursor: default; }
+.ws-count__num { min-width: 110px; text-align: center; }
+.ws-count__num b { display: block; font-size: 40px; line-height: 1; font-weight: 760; font-variant-numeric: tabular-nums; animation: ws-bump .35s var(--ws-spring); }
+.ws-count__num small { font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); }
+@keyframes ws-bump { 0% { transform: scale(.85); } 45% { transform: scale(1.15); } 100% { transform: none; } }
+.ws-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.ws-day { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; }
+.ws-day small { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.ws-day__dot { width: 40px; height: 40px; max-width: 100%; aspect-ratio: 1; border-radius: 50%; border: 1.5px solid var(--border); background: var(--surface); display: grid; place-items: center; color: var(--accent-text); transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.ws-day__dot svg { transform: scale(0); transition: transform .35s var(--ws-spring); }
+.ws-day.is-on small { color: var(--accent); }
+.ws-day.is-on .ws-day__dot { background: var(--accent); border-color: var(--accent); }
+.ws-day.is-on .ws-day__dot svg { transform: scale(1); }
+.ws-one { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+
+/* Цикл: столбики нагрузки */
+.ws-bars { display: flex; justify-content: center; gap: 8px; align-items: flex-end; height: 108px; margin: 14px 2px 4px; }
+.ws-bar { flex: 0 1 72px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 5px; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; animation: ws-rise .45s var(--ws-spring) both; }
+.ws-bar i { display: block; height: 58%; border-radius: 10px 10px 4px 4px; background: var(--accent); transition: height .45s var(--ws-spring), background var(--dur-fast) var(--ease-out); }
+.ws-bar i b { display: block; padding-top: 6px; text-align: center; color: #fff; font: 700 13px/1 var(--font); }
+.ws-bar small { text-align: center; font-size: 12px; font-weight: 650; color: var(--text-muted); }
+.ws-bar--light i { height: 34%; background: var(--ws-light); }
+.ws-bar--heavy i { height: 88%; background: var(--warning); }
+.ws-bar--heavy i b { color: var(--warning-text); }
+.ws-bar:active i { filter: brightness(.94); }
+@keyframes ws-rise { from { opacity: 0; transform: translateY(8px); } }
+.ws-legend { display: flex; justify-content: center; gap: 14px; margin-top: 6px; font-size: 12px; color: var(--text-muted); }
+.ws-legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 3px; background: var(--accent); }
+.ws-legend .ws-legend--light::before { background: var(--ws-light); }
+.ws-legend .ws-legend--heavy::before { background: var(--warning); }
+
+/* Сроки: линия и паузы */
+.ws-line { position: relative; display: flex; justify-content: space-between; align-items: flex-start; min-height: 56px; }
+.ws-line__track { position: absolute; left: 22px; right: 22px; top: 16px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent) 60%, color-mix(in srgb, var(--accent) 25%, transparent)); }
+.ws-line__track i { position: absolute; left: 50%; top: -4px; height: 12px; width: 0; border-radius: 6px; background: repeating-linear-gradient(135deg, var(--warning) 0 4px, var(--warning-fill) 4px 8px); transition: width .45s var(--ease-out); }
+.ws-line.has-pause .ws-line__track i { width: 18%; }
+.ws-line__pt { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; padding: 0; border: 0; background: none; font: 650 var(--text-sm)/1.2 var(--font); color: var(--text); cursor: pointer; }
+.ws-line__pt label { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
+.ws-line__pt input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.ws-line__dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--accent); background: var(--surface); color: var(--accent); display: grid; place-items: center; font-size: 17px; font-weight: 700; }
+.ws-line__dot--stop::before { content: ""; width: 11px; height: 11px; border-radius: 2px; background: var(--accent); }
+.ws-line__x { position: absolute; top: -4px; right: 6px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: var(--surface-sunken); color: var(--text-secondary); display: grid; place-items: center; cursor: pointer; z-index: 2; }
+.ws-chip--pause.is-on { background: var(--warning-fill); color: var(--warning-text); border-color: var(--warning-line); }
+.ws-chip--pause button { display: grid; place-items: center; width: 22px; height: 22px; margin-right: -6px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .06); color: inherit; cursor: pointer; }
+.ws-pause { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; animation: ws-rise .3s var(--ease-out) both; }
+.ws-pause label { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--text-muted); }
+.ws-pause input { min-height: 38px; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; }
+
+/* Пропуск: три плитки с живой картинкой */
+.ws-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ws-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 9px; border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text-secondary); font: 650 var(--text-sm)/1.1 var(--font); cursor: pointer; transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out); }
+.ws-tile.is-on { border-color: var(--accent); background: var(--accent-wash); color: var(--accent-ink); }
+.ws-mini-week { position: relative; display: flex; align-items: center; gap: 6px; height: 26px; }
+.ws-mini-week b { width: 11px; height: 11px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 28%, var(--surface)); }
+.ws-mini-week b.is-miss { background: var(--critical); }
+.ws-mini-week i { width: 2px; height: 22px; background: var(--border-strong); }
+.ws-tile--redo .ws-mini-week b:nth-of-type(3) { visibility: hidden; }
+.ws-tile.is-on.ws-tile--client .is-miss { animation: ws-ask 2.2s var(--ease-out) infinite; }
+.ws-tile.is-on.ws-tile--redo .is-miss { animation: ws-redo 2.2s var(--ease-out) infinite; }
+.ws-tile.is-on.ws-tile--skip .is-miss { animation: ws-skip 2.2s var(--ease-out) infinite; }
+@keyframes ws-ask { 0%, 20%, 50%, 80%, 100% { transform: none; } 35%, 65% { transform: translateY(-5px); } }
+@keyframes ws-redo { 0%, 25% { transform: none; } 60%, 100% { transform: translateX(25px); background: var(--accent); } }
+@keyframes ws-skip { 0%, 30% { opacity: 1; } 60%, 100% { opacity: .2; } }
+
+/* Низ: когда вступит в силу и «Сохранить» — всегда под рукой */
+.ws-foot { position: sticky; bottom: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0 4px; background: linear-gradient(transparent, var(--bg) 22%); }
+.ws-when__panel { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); animation: ws-rise .25s var(--ease-out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-count__num b, .ws-bar, .ws-pause, .ws-when__panel, .ws-tile .is-miss { animation: none !important; }
+  .ws-day__dot svg, .ws-bar i, .ws-line__track i, .ws-eye__slash { transition: none; }
+  .ws-chip:active, .ws-step:active, .ws-eye:active { transform: none; }
+}
