@@ -217,3 +217,31 @@ test('ритм по программе на 2 недели: очередь — �
   const ids = (day) => current(joinedPlan({ ...mon, length: 2, rhythm: [2] }, day, [], two)).rows.map((r) => r.block.id).join('');
   assert.deepEqual(['2026-11-16', '2026-11-23'].map(ids), ['AB', 'CKA']);
 });
+
+// FT-788, этап 4: дни занятий по записям «Расписания»
+const three = ['a', 'b', 'c'].map((id) => ({ id, title: id.toUpperCase(), week: 1, exercises: [] }));
+const local = (key, h) => new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)), h, 0).toISOString();
+const byBook = { schedule: 1, startsOn: '2026-11-16', length: 1, rule: 'client', startWeek: 1, days: [1, 3, 6] };
+const weekOn = (settings) => scheduledPlan({ blocks: three, sessions: [], month: 'Ноябрь 2026', cfg: settings, today: new Date('2026-11-16T12:00:00') }).weeks[0];
+const dayOfRow = (w, id) => w.rows.find((r) => r.block.id === id).day;
+
+test('по записям: записи ср и пт — главные, третье занятие на свободный день программы (пн)', () => {
+  const w = weekOn({ ...byBook, bySchedule: 1, bookings: [{ id: 'e1', at: local('2026-11-18', 18) }, { id: 'e2', at: local('2026-11-20', 18) }] });
+  assert.deepEqual(['a', 'b', 'c'].map((id) => dayOfRow(w, id)), [1, 3, 5]);
+  assert.deepEqual(w.booked.map((b) => [b.day, b.time, b.id]), [[3, '18:00', 'e1'], [5, '18:00', 'e2']]);
+  assert.equal(w.byBookings, true);
+});
+test('перенос записи переносит занятие; без «По записям» записи ничего не меняют', () => {
+  const moved = weekOn({ ...byBook, bySchedule: 1, bookings: [{ id: 'e1', at: local('2026-11-19', 18) }, { id: 'e2', at: local('2026-11-20', 18) }] });
+  assert.deepEqual(['a', 'b', 'c'].map((id) => dayOfRow(moved, id)), [1, 4, 5]);
+  const off = weekOn({ ...byBook, bookings: [{ id: 'e1', at: local('2026-11-19', 18) }] });
+  assert.deepEqual(['a', 'b', 'c'].map((id) => dayOfRow(off, id)), [1, 3, 6]);
+  assert.deepEqual(off.booked, []);
+});
+test('по записям: правка недели важнее записей, записи вне недели и в паузу не считаются', () => {
+  const edited = weekOn({ ...byBook, bySchedule: 1, bookings: [{ id: 'e1', at: local('2026-11-19', 18) }],
+    weekEdits: { '2026-11-16': [{ id: 'a', day: 2 }, { id: 'b', day: 4 }, { id: 'c', day: 7 }] } });
+  assert.deepEqual(['a', 'b', 'c'].map((id) => dayOfRow(edited, id)), [2, 4, 7]);
+  const paused = weekOn({ ...byBook, bySchedule: 1, pauses: [{ from: '2026-11-19', to: '2026-11-19' }], bookings: [{ id: 'e1', at: local('2026-11-19', 18) }, { id: 'x', at: local('2026-11-25', 9) }] });
+  assert.deepEqual(paused.booked, []);
+});

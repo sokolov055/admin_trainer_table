@@ -6320,6 +6320,19 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 /* Занятие в расписании → программа и карточка клиента (FT-567) */
 .schedule__client-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Занятие программы на записи (FT-788, этап 4) */
+.cal-event__session { display: inline-block; max-width: 100%; margin-top: 2px; padding: 1px 5px; border-radius: 5px; background: rgba(255, 255, 255, .24); font-size: 10.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: cal-session-in .9s var(--ease-out) both; }
+.cal-agenda__item .cal-event__session { align-self: flex-start; }
+@keyframes cal-session-in { 0% { background: #fff; color: var(--accent-ink); } 100% { background: rgba(255, 255, 255, .24); } }
+.schedule__session { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 14px; background: var(--accent-wash); color: var(--text); text-align: left; cursor: pointer; font: inherit; }
+.schedule__session > span:nth-child(2) { flex: 1; min-width: 0; }
+.schedule__session small { display: block; font-size: 12px; font-weight: 600; color: var(--accent-ink); }
+.schedule__session b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schedule__session > svg { color: var(--accent-ink); flex: none; transform: rotate(-90deg); }
+.schedule__session-ic { width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent-fill); color: var(--accent-text); }
+.schedule__session-ic.is-cardio { background: var(--warning-fill); color: var(--warning-text); }
+.schedule__session:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .cal-event__session { animation: none; } .schedule__session:active { transform: none; } }
 
 /* Ряд фильтров, который листается вбок, — тот же намёк краем (FT-567) */
 .chips.is-more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }

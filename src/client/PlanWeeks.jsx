@@ -785,11 +785,34 @@ const daysLine = (days, count) => {
 };
 
 /**
+ * Откуда дни занятий (FT-788, этап 4): «По записям» — записи «Расписания»
+ * ставят занятия на свои дни, без записи — по дням ниже; «Только по дням» —
+ * расписание на программу не влияет (по умолчанию, как было)
+ */
+function DaySource({ value, onChange }) {
+  const items = [
+    { value: true, label: 'По записям', icon: <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5" /><path d="M8 3v4M16 3v4M3 10h18" /><circle cx="12" cy="15.5" r="2" /></svg> },
+    { value: false, label: 'Только по дням', icon: <span className="ws-src__dots" aria-hidden="true">{[1, 0, 1, 0, 0, 1, 0].map((on, i) => <i key={i} className={on ? 'is-on' : ''} />)}</span> },
+  ];
+  return (
+    <>
+      <div className="ws-src" role="radiogroup" aria-label="Дни занятий">
+        {items.map((it) => (
+          <button key={it.label} type="button" role="radio" aria-checked={value === it.value} className={'ws-src__opt' + (value === it.value ? ' is-on' : '')}
+            onClick={() => { haptic(); onChange(it.value); }}>{it.icon}{it.label}</button>
+        ))}
+      </div>
+      <p className="ws-hint">{value ? 'Записи в расписании — главные. Без записи — по дням выше.' : 'Записи в расписании на программу не влияют.'}</p>
+    </>
+  );
+}
+
+/**
  * «Неделя»: число и дни — одно решение. Отметил больше дней, чем занятий, —
  * число растёт; убавил число ниже числа дней — лишние дни снимаются.
  * Число, равное неделе программы, — это «как в программе» (rhythm: [])
  */
-function WeekBlock({ beat, setBeat, days, setDays, count, sessions }) {
+function WeekBlock({ beat, setBeat, days, setDays, count, sessions, source = null }) {
   const [ab, setAb] = useState(0);
   const rhythm = beat.rhythm || [];
   const rDays = beat.rhythmDays || [];
@@ -844,6 +867,7 @@ function WeekBlock({ beat, setBeat, days, setDays, count, sessions }) {
       <div className="ws-row ws-row--center">
         <button type="button" className={'ws-chip' + (alternate ? ' is-on' : '')} aria-pressed={alternate} onClick={() => { haptic(); flip(); }}>⇄ Чередовать</button>
       </div>
+      {source}
     </section>
   );
 }
@@ -1010,6 +1034,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   // Ритм (FT-788): «всегда одно» занятие — по id его первой тренировки
   const [beat, setBeat] = useState({ rhythm: cfg && cfg.rhythm || [], rhythmDays: cfg && cfg.rhythmDays || [], one: cfg && cfg.oneSession || '' });
   const [whenOpen, setWhenOpen] = useState(false);
+  const [bySchedule, setBySchedule] = useState(!!(cfg && cfg.bySchedule));
   const alternate = beat.rhythm.length > 1;
   const queue = sessionQueueOf(draft);
   const [loadAccepted, setLoadAccepted] = useState(false);
@@ -1018,6 +1043,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   return <Sheet title="Программа" onClose={onClose} className="ws-sheet" action={visibility ? <VisibilityEye visibility={visibility} /> : null}><div className="ws">
     {queue.length > 0
       ? <WeekBlock beat={beat} setBeat={setBeat} days={days} setDays={setDays} count={weekCount}
+        source={<DaySource value={bySchedule} onChange={setBySchedule} />}
         sessions={queue.filter((g) => g[0].id).map((g) => ({ key: g[0].id, title: g.map((b) => b.title).join(' + ') }))} />
       : <section className="ws-blk"><h3 className="ws-blk__h">Дни</h3><DayDots value={days} onToggle={(d) => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort((a, b) => a - b))} /><p className="ws-hint">{daysLine(days, 0)}</p></section>}
     <CycleBlock draft={draft} n={n} onLength={(v) => { setN(v); setDraft(withLength(draft, v)); }} onLoad={(w, load) => setDraft(withWeekLoad(draft, w, load))} />
@@ -1036,7 +1062,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
           <Segmented items={[{ value: '', label: 'По порядку' }, ...Array.from({ length: n }, (_, k) => ({ value: String(k + 1), label: 'Н' + (k + 1) }))]} value={startWeek} label="С какой недели продолжить" onChange={(v) => { haptic(); setStartWeek(v); }} />
         </div>
       )}
-      <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days: alternate ? [] : days,
+      <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days: alternate ? [] : days, bySchedule: bySchedule ? 1 : 0,
         rhythm: beat.rhythm, rhythmDays: alternate ? beat.rhythmDays.slice(0, beat.rhythm.length).map((d) => d || []) : [], oneSession: alternate ? beat.one || '' : '',
         ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
     </div>

@@ -428,6 +428,11 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).get(
   PLAN_BLOCKS.forEach((b, i) => { b.id = b.id || demoBlockId(i); b.week = 1; delete b.load; });
   const startsOn = addDays(monday(dateKey()), -7);
   demoWeeks[MONTHS[0]] = { schedule: 1, startsOn, effectiveOn: startsOn, length: 1, rule: 'client', startWeek: 1, days: [1, 3, 5], choices: {} };
+  // ?mockBook=1 — этап 4: дни по записям, записи ср и пт этой недели в 18:00
+  if (new URLSearchParams(location.search).get('mockBook') === '1') {
+    const at = (d, h) => { const [y, m, dd] = addDays(monday(dateKey()), d).split('-').map(Number); return new Date(y, m - 1, dd, h).toISOString(); };
+    Object.assign(demoWeeks[MONTHS[0]], { bySchedule: 1, days: [1, 3, 6], bookings: [{ id: 'demo-b1', at: at(2, 18) }, { id: 'demo-b2', at: at(4, 18) }] });
+  }
 }
 function saveDemoProgram(params, blocks) {
   const was = demoWeeks[params.month] || {};
@@ -1889,6 +1894,12 @@ const MOCK = {
       serviceEmail: '',
       feedUrl: '',
     };
+  },
+  // Этап 4 FT-788: в демо клиентов «по записям» нет — записи без подписи
+  'trainer.schedule.programs': (p = {}) => {
+    const w = demoWeeks[MONTHS[0]];
+    if (!w || !w.bySchedule || !String(p.rows || '').split(',').includes('3')) return { programs: {} };
+    return { programs: { 3: { month: MONTHS[0], blocks: PLAN_BLOCKS.map((b) => ({ id: b.id, title: b.title, week: b.week, ...(b.with ? { with: true } : {}) })), weeks: w } } };
   },
   'trainer.schedule.save': (params) => {
     const id = params.id || 'demo-custom-' + Date.now();

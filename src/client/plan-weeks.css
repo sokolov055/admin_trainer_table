@@ -581,3 +581,12 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .ws-weeks.is-open i:last-child { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 60%, var(--surface)), transparent); width: 40px; }
 @keyframes ws-pop { from { transform: scale(0); } }
 @media (prefers-reduced-motion: reduce) { .ws-tile-date b, .ws-weeks i { animation: none; } .ws-len > button:active, .ws-tile-date:active { transform: none; } }
+
+/* Откуда дни занятий (FT-788, этап 4) */
+.ws-src { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.ws-src__opt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text-secondary); font: 650 var(--text-sm)/1.1 var(--font); cursor: pointer; transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out); }
+.ws-src__opt.is-on { border-color: var(--accent); background: var(--accent-wash); color: var(--accent-ink); }
+.ws-src__opt:active { transform: scale(.97); }
+.ws-src__dots { display: flex; gap: 3px; height: 24px; align-items: center; }
+.ws-src__dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+.ws-src__dots i.is-on { background: var(--accent); }

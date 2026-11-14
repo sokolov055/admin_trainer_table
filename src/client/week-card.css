@@ -152,3 +152,8 @@ button.wc-dot:active { transform: scale(.9); }
   .wc__gear:active, button.wc-dot:active, .plan__free-add:active { transform: none; }
   .plan__free-add:active .plan__free-add-icon { transform: none; }
 }
+
+/* Записи «Расписания» (FT-788, этап 4): время под днём, занятие без записи — пунктиром */
+.wc-day__time { padding: 1px 4px; border-radius: 5px; background: var(--accent-wash); color: var(--accent-ink); font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.wc-day.is-self .wc-dot:not(.is-done) { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border-strong); color: var(--text-muted); }
+.wc-day__time.is-self { background: var(--surface-sunken); color: var(--text-muted); font-weight: 600; }

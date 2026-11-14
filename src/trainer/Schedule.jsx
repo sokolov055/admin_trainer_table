@@ -8,6 +8,7 @@ import { reloadWidgets } from '../native-widget.js';
 import { haptic } from '../telegram.js';
 import { Panel, Note, Field, Options, ErrorState, BackButton, Sheet, useLeaveGuard } from '../ui.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
+import { scheduledPlan, sessionQueue, dateKey as dayKey } from '../program-timeline.js';
 import { IconAlert, IconBack, IconCheck, IconChevron, IconCopy, IconMenu, IconPlus } from '../icons.jsx';
 import {
   addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
@@ -213,9 +214,14 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   // Удалённое с «Вернуть» прячется сразу; ключ строкой — чтобы список не
   // пересобирался на каждой отрисовке
   const hiddenKey = [...cache.keys()].filter((id) => del.hidden(id)).join(',');
-  const events = useMemo(() => [...cache.values()]
+  const shownEvents = useMemo(() => [...cache.values()]
     .filter((e) => !del.hidden(e.id))
     .map((e) => (moves[e.id] ? { ...e, ...moves[e.id], moving: true } : e)), [cache, moves, hiddenKey]);
+  // Занятие программы на запись (FT-788, этап 4) — только у клиентов, у
+  // которых тренер выбрал «По записям»; остальные записи как были
+  const rowsKey = [...new Set(shownEvents.filter((e) => e.clientRow).map((e) => Number(e.clientRow)))].sort((a, b) => a - b).join(',');
+  const programs = useData('trainer.schedule.programs', { rows: rowsKey }, [rowsKey, tick]);
+  const events = useMemo(() => withSessions(shownEvents, programs.data && programs.data.programs), [shownEvents, programs.data]);
 
   // Смена экрана без анимации — её делает лента (палец, пружина)
   function shift(dir) { setAnchor((a) => shifted(view, a, dir)); setPicker(false); }
@@ -577,6 +583,48 @@ function MiniMonth({ anchor, start, days, events, onPick }) {
 }
 
 /** Название события в сетке: клиент, иначе название */
+function Dumbbell() {
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true">
+      <rect x="1" y="9" width="4" height="6" rx="1" /><rect x="19" y="9" width="4" height="6" rx="1" />
+      <rect x="5" y="7" width="3" height="10" rx="1" /><rect x="16" y="7" width="3" height="10" rx="1" /><rect x="8" y="11" width="8" height="2" />
+    </svg>
+  );
+}
+
+/**
+ * Подписать записи занятием программы (FT-788, этап 4): неделя клиента
+ * раскладывается тем же расчётом, что на «Тренировках», а записи берутся
+ * с экрана — перенесённая пальцем запись сразу показывает новое занятие
+ */
+function withSessions(events, programs) {
+  if (!programs || !Object.keys(programs).length) return events;
+  const last = events.reduce((m, e) => (e.startsAt > m ? e.startsAt : m), '');
+  const plans = {};
+  Object.entries(programs).forEach(([row, p]) => {
+    const mine = events.filter((e) => String(e.clientRow) === row && !e.cancelledCharged);
+    const shown = new Set(mine.map((e) => e.id));
+    const bookings = [...(p.weeks.bookings || []).filter((b) => !shown.has(b.id)), ...mine.map((e) => ({ id: e.id, at: e.startsAt }))];
+    try {
+      const plan = scheduledPlan({ blocks: p.blocks, sessions: [], month: p.month, cfg: { ...p.weeks, bookings }, until: last ? dayKey(new Date(last)) : '' });
+      const groups = new Map(sessionQueue(p.blocks).map((g) => [g[0].id, g]));
+      (p.weeks.history || []).forEach((h) => sessionQueue(h.blocks || []).forEach((g) => { if (!groups.has(g[0].id)) groups.set(g[0].id, g); }));
+      plans[row] = { weeks: plan.weeks, groups };
+    } catch (_) { /* программа не разложилась — запись без подписи */ }
+  });
+  return events.map((e) => {
+    const plan = e.clientRow && plans[String(e.clientRow)];
+    if (!plan) return e;
+    const key = dayKey(new Date(e.startsAt));
+    const week = plan.weeks.find((w) => w.start <= key && w.end >= key);
+    const booked = week && (week.booked || []).find((b) => b.id === e.id);
+    const slot = booked && week.layout.find((it) => it.day === booked.day);
+    const g = slot && plan.groups.get(slot.id);
+    if (!g) return { ...e, session: null, sessionNone: !!week };
+    return { ...e, session: { id: g[0].id, title: g.map((b) => b.title).join(' + '), short: g[0].title, cardio: g.every((b) => b.cardio) } };
+  });
+}
+
 const labelOf = (e) => e.clientName || e.title || 'Без названия';
 /** В узких колонках недели и месяца — только имя, как в Google на телефоне */
 const shortLabelOf = (e) => labelOf(e).split(/\s+/)[0];
@@ -1235,6 +1283,8 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
                           {days === 7 && <span className="cal-event__name cal-event__short">{shortLabelOf(e)}</span>}
                           <span className={'cal-event__name' + (days === 7 ? ' cal-event__full' : '')}>{labelOf(e)}</span>
                           {height >= 30 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
+                          {/* Занятие программы — на «Дне» и «3 днях»; на неделе тесно */}
+                          {e.session && days < 7 && height >= 44 && <span key={e.session.id + e.startsAt} className={'cal-event__session' + (e.session.cardio ? ' is-cardio' : '')}>{e.session.short}</span>}
                         </button>
                       );
                     })}
@@ -1452,6 +1502,7 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
                     {isAllDay(e) ? 'Весь день' : hm(e.startsAt) + '–' + hm(e.endsAt)}
                     {e.cancelledCharged ? ' · отменено, списано' : e.personal ? ' · личное' : ''}
                   </span>
+                  {e.session && <span className={'cal-event__session' + (e.session.cardio ? ' is-cardio' : '')}>{e.session.title}</span>}
                 </button>
               ))}
             </div>
@@ -1562,6 +1613,15 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
             const who = clients.find((c) => c.row === Number(event.clientRow));
             return who ? (
               <div className="schedule__client-links">
+                {/* Занятие программы на эту запись (FT-788, этап 4) — у клиента «по записям» */}
+                {event.session && (
+                  <button type="button" className="schedule__session" onClick={() => onOpenClient(who, 'plan')}>
+                    <span className={'schedule__session-ic' + (event.session.cardio ? ' is-cardio' : '')} aria-hidden="true">{event.session.cardio ? '♥' : <Dumbbell />}</span>
+                    <span><small>По программе</small><b>{event.session.title}</b></span>
+                    <IconChevron size={16} />
+                  </button>
+                )}
+                {!event.session && event.sessionNone && <p className="small muted" style={{ margin: 0 }}>На эту запись занятий программы не осталось — свободная тренировка.</p>}
                 <button type="button" className="button" onClick={() => onOpenClient(who, 'plan')}>Программа клиента</button>
                 <button type="button" className="button button--ghost" onClick={() => onOpenClient(who, 'overview')}>Карточка</button>
               </div>

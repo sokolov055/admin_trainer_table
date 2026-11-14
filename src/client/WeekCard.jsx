@@ -190,12 +190,18 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
             const date = addDays(w.start, d - 1);
             const list = items.filter((it) => it.day === d);
             const open = editable && date >= today && !list.length;
+            // Запись «Расписания» (FT-788, этап 4): время под днём; занятие
+            // без записи у клиента «по записям» — пунктиром, он придёт сам
+            const booking = (w.booked || []).find((b) => b.day === d);
+            const self = !!cfg.bySchedule && list.length > 0 && !booking;
             return (
-              <div key={d} className={'wc-day' + (closedDay(date) ? ' is-closed' : '') + (date === today ? ' is-today' : '') + (open ? ' is-open' : '')}
+              <div key={d} className={'wc-day' + (closedDay(date) ? ' is-closed' : '') + (date === today ? ' is-today' : '') + (open ? ' is-open' : '') + (self ? ' is-self' : '')}
                 onClick={open && onEdit ? () => { haptic(); onEdit(w.start); } : undefined}>
                 <span className="wc-day__wd">{WEEKDAY_SHORT[d]}</span>
                 <b>{Number(date.slice(8))}</b>
                 <div className="wc-day__dots">{list.slice(0, 2).map(dot)}{list.length > 2 && <span className="wc-day__more">+{list.length - 2}</span>}</div>
+                {booking && <span className="wc-day__time" aria-label={`запись в ${booking.time}`}>{booking.time}</span>}
+                {self && <span className="wc-day__time is-self" aria-label="без записи, сам">сам</span>}
                 {list.length > 0 && <span className="wc-day__name">{shortTitle(list[0].title)}</span>}
               </div>
             );
