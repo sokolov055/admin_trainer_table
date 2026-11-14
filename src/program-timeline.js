@@ -139,18 +139,35 @@ export function bookedDays(bookings, from, end, active = null) {
 }
 
 /**
- * Занятия недели «по записям»: дни записей главные, остальные занятия — на
- * свободные дни программы, потом без дня; дни по порядку, занятия по
- * очереди. Лишние записи заранее получают занятия из очереди (scheduledPlan)
+ * Занятие «сам» на неделе (FT-788): отметка недели важнее отметки
+ * программы. id — первой тренировки занятия
  */
-export function slotsByBookings(slots, booked, programDays, from, startDay = '') {
-  const n = slots.length;
-  const chosen = booked.map((b) => b.day).slice(0, n);
-  cleanDays(programDays).forEach((d) => {
-    if (chosen.length < n && !chosen.includes(d) && (!startDay || addDays(from, d - 1) >= startDay)) chosen.push(d);
-  });
-  chosen.sort((a, b) => a - b);
-  return slots.map((x, i) => ({ ...x, day: chosen[i] || 0 }));
+export const soloOf = (cfg, start, id) => {
+  const week = cfg && cfg.weekSolo && cfg.weekSolo[start];
+  if (week && typeof week[id] === 'boolean') return week[id];
+  return !!(cfg && Array.isArray(cfg.solo) && cfg.solo.includes(id));
+};
+
+/**
+ * Занятия недели «по записям»: тренерские — на дни записей по порядку,
+ * занятия «сам» — на свободные от записей дни программы, тренерские без
+ * записи — на оставшиеся дни программы, иначе без дня. Порядок занятий
+ * внутри каждой группы — по очереди, дни — по возрастанию
+ */
+export function slotsByBookings(slots, booked, programDays, from, startDay = '', isSolo = () => false) {
+  const trainer = slots.filter((x) => !isSolo(x.g));
+  const solo = slots.filter((x) => isSolo(x.g));
+  const bookedList = booked.map((b) => b.day);
+  const free = cleanDays(programDays).filter((d) => !bookedList.includes(d) && (!startDay || addDays(from, d - 1) >= startDay));
+  const used = new Set();
+  const take = (list, n) => { const out = []; list.forEach((d) => { if (out.length < n && !used.has(d)) { out.push(d); used.add(d); } }); return out; };
+  const tBooked = take(bookedList, trainer.length);
+  const sDays = take(free, solo.length).sort((a, b) => a - b);
+  const tDays = [...tBooked, ...take(free, trainer.length - tBooked.length)].sort((a, b) => a - b);
+  const dayOf = new Map();
+  trainer.forEach((x, i) => dayOf.set(x, tDays[i] || 0));
+  solo.forEach((x, i) => dayOf.set(x, sDays[i] || 0));
+  return slots.map((x) => ({ ...x, day: dayOf.get(x) }));
 }
 
 /** Все даты считаются календарными, без сдвига при переходе летнего времени. */
@@ -206,16 +223,21 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
     });
     // Записи «Расписания» (этап 4) — только у клиента «по записям»
     const booked = cfg.bySchedule && activeDays.length && !expired && !settings.legacyList ? bookedDays(cfg.bookings, from, end, activeDays) : [];
-    // Записей больше, чем занятий, — лишняя запись берёт следующее занятие по очереди
-    const queue = booked.length > laid.slots.length ? sessionQueue(v.blocks) : [];
+    // «Сам» — клиент по приложению, без тренера: на запись не встаёт
+    const isSolo = (g) => !!g && !!g[0] && soloOf(cfg, from, g[0].id);
+    // Записей больше, чем тренерских занятий, — лишняя запись берёт следующее
+    // тренерское занятие по очереди
+    const trainerCount = laid.slots.filter((x) => !isSolo(x.g)).length;
+    const queue = booked.length > trainerCount ? sessionQueue(v.blocks).filter((g) => !isSolo(g)) : [];
     const extraSlots = [];
     if (queue.length) {
-      const last = laid.slots.length ? laid.slots[laid.slots.length - 1].g[0] : null;
+      const lastSlot = [...laid.slots].reverse().find((x) => !isSolo(x.g));
+      const last = lastSlot ? lastSlot.g[0] : null;
       let at = last ? queue.findIndex((g) => g[0] === last || (!!last.id && g[0].id === last.id)) : -1;
-      for (let i = laid.slots.length; i < booked.length; i += 1) { at = (at + 1) % queue.length; extraSlots.push({ g: queue[at], day: 0 }); }
+      for (let i = trainerCount; i < booked.length; i += 1) { at = (at + 1) % queue.length; extraSlots.push({ g: queue[at], day: 0 }); }
     }
     const planned = booked.length
-      ? slotsByBookings([...laid.slots, ...extraSlots], booked, beat ? beat.days : settings.days, from, startDay > from && startDay <= end ? startDay : '')
+      ? slotsByBookings([...laid.slots, ...extraSlots], booked, beat ? beat.days : settings.days, from, startDay > from && startDay <= end ? startDay : '', isSolo)
       : laid.slots;
     // Правка недели — её список занятий вместо раскладки программы
     const edit = activeDays.length && !expired && !settings.legacyList ? weekEditOf(cfg, from) : null;
@@ -277,6 +299,7 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
       days: beat ? beat.days : cleanDays(settings.days), deferred: laid.deferred, extraNeed, extraDone,
       layout: slots.map((x) => ({ id: x.g[0].id || '', day: x.day, ...(x.from ? { from: x.from } : {}) })), edited: !!edit, sent: [],
       booked, byBookings: !edit && booked.length > 0,
+      solo: [...new Set(slots.filter((x) => x.g[0] && soloOf(cfg, from, x.g[0].id)).map((x) => x.g[0].id))],
       editable: activeDays.length > 0 && !expired && !settings.legacyList,
       ...(beat ? { rhythm: beat.count, phase: beat.phase, queueAt: beat.queueAt } : {}),
       load: loads.size === 1 ? [...loads][0] : '', missed: ended ? Math.max(0, need - done) : 0,

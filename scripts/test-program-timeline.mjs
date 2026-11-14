@@ -250,3 +250,26 @@ test('по записям: записей больше, чем занятий, �
   assert.equal(w.need, 4);
   assert.deepEqual(w.layout.map((x) => [x.id, x.day]), [['a', 1], ['b', 2], ['c', 3], ['a', 4]]);
 });
+
+// Занятия «сам» (владелец 14.11.2026): вт с тренером, ср сам, чт и вс с тренером
+const four = ['a', 'b', 'c', 'd'].map((id) => ({ id, title: id.toUpperCase(), week: 1, exercises: [] }));
+const soloCfg = { schedule: 1, startsOn: '2026-11-16', length: 1, rule: 'client', startWeek: 1, days: [2, 3, 4, 7], bySchedule: 1, solo: ['b'] };
+const soloWeek = (bookDays, extra = {}) => scheduledPlan({ blocks: four, sessions: [], month: 'Ноябрь 2026', today: new Date('2026-11-16T12:00:00'),
+  cfg: { ...soloCfg, ...extra, bookings: bookDays.map((d, i) => ({ id: 'e' + i, at: local(d, 18) })) } }).weeks[0];
+const daysOf = (w) => Object.fromEntries(w.layout.map((x) => [x.id, x.day]));
+test('«сам»: записи вт, чт, вс — тренерские A C D на них, B в среду', () => {
+  const w = soloWeek(['2026-11-17', '2026-11-19', '2026-11-22']);
+  assert.deepEqual(daysOf(w), { a: 2, b: 3, c: 4, d: 7 });
+  assert.deepEqual(w.solo, ['b']);
+});
+test('«сам»: запись перенесли чт → ср — тренерское C в среду, B на четверг', () => {
+  assert.deepEqual(daysOf(soloWeek(['2026-11-17', '2026-11-18', '2026-11-22'])), { a: 2, b: 4, c: 3, d: 7 });
+});
+test('«сам»: отметка недели важнее программы; лишняя запись берёт тренерское', () => {
+  const w = soloWeek(['2026-11-17', '2026-11-19', '2026-11-22'], { weekSolo: { '2026-11-16': { b: false, d: true } } });
+  assert.deepEqual(w.solo, ['d']);
+  assert.equal(daysOf(w).d, 3);
+  const more = soloWeek(['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-22']);
+  assert.ok(more.layout.filter((x) => x.day).every((x) => x.id !== 'b' || x.day !== 18));
+  assert.equal(more.layout.filter((x) => x.id === 'b').length, 1);
+});

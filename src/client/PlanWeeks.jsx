@@ -808,6 +808,33 @@ function DaySource({ value, onChange }) {
 }
 
 /**
+ * Кто ведёт занятие (владелец 14.11.2026): «с тренером» встаёт на запись
+ * «Расписания», «сам» — клиент по приложению, на свой день из ⚙. Здесь —
+ * для всей программы; на отдельной неделе меняют в меню занятия
+ */
+function SoloPicker({ sessions, value, onChange }) {
+  if (!sessions.length) return null;
+  return (
+    <div className="ws-solo">
+      <h4 className="ws-solo__h">Кто ведёт занятие</h4>
+      {sessions.map((x, i) => {
+        const on = value.includes(x.key);
+        return (
+          <div className={'ws-solo__row' + (on ? ' is-solo' : '')} key={x.key}>
+            <span className="ws-solo__letter" aria-hidden="true">{String.fromCharCode(65 + (i % 26))}</span>
+            <span className="ws-solo__name">{x.title}<small>{on ? 'клиент сам, по приложению' : 'на записи с тренером'}</small></span>
+            <span className="ws-solo__seg" role="radiogroup" aria-label={'Кто ведёт: ' + x.title}>
+              <button type="button" role="radio" aria-checked={!on} className={!on ? 'is-on' : ''} onClick={() => { haptic(); onChange(value.filter((k) => k !== x.key)); }}>с тренером</button>
+              <button type="button" role="radio" aria-checked={on} className={on ? 'is-on is-solo' : ''} onClick={() => { haptic(); onChange([...value.filter((k) => k !== x.key), x.key]); }}>сам</button>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * «Неделя»: число и дни — одно решение. Отметил больше дней, чем занятий, —
  * число растёт; убавил число ниже числа дней — лишние дни снимаются.
  * Число, равное неделе программы, — это «как в программе» (rhythm: [])
@@ -1035,6 +1062,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   const [beat, setBeat] = useState({ rhythm: cfg && cfg.rhythm || [], rhythmDays: cfg && cfg.rhythmDays || [], one: cfg && cfg.oneSession || '' });
   const [whenOpen, setWhenOpen] = useState(false);
   const [bySchedule, setBySchedule] = useState(!!(cfg && cfg.bySchedule));
+  const [solo, setSolo] = useState((cfg && cfg.solo) || []);
   const alternate = beat.rhythm.length > 1;
   const queue = sessionQueueOf(draft);
   const [loadAccepted, setLoadAccepted] = useState(false);
@@ -1043,7 +1071,10 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   return <Sheet title="Программа" onClose={onClose} className="ws-sheet" action={visibility ? <VisibilityEye visibility={visibility} /> : null}><div className="ws">
     {queue.length > 0
       ? <WeekBlock beat={beat} setBeat={setBeat} days={days} setDays={setDays} count={weekCount}
-        source={<DaySource value={bySchedule} onChange={setBySchedule} />}
+        source={<>
+          <DaySource value={bySchedule} onChange={setBySchedule} />
+          {bySchedule && <SoloPicker value={solo} onChange={setSolo} sessions={queue.filter((g) => g[0].id).map((g) => ({ key: g[0].id, title: g.map((b) => b.title).join(' + ') }))} />}
+        </>}
         sessions={queue.filter((g) => g[0].id).map((g) => ({ key: g[0].id, title: g.map((b) => b.title).join(' + ') }))} />
       : <section className="ws-blk"><h3 className="ws-blk__h">Дни</h3><DayDots value={days} onToggle={(d) => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort((a, b) => a - b))} /><p className="ws-hint">{daysLine(days, 0)}</p></section>}
     <CycleBlock draft={draft} n={n} onLength={(v) => { setN(v); setDraft(withLength(draft, v)); }} onLoad={(w, load) => setDraft(withWeekLoad(draft, w, load))} />
@@ -1062,7 +1093,7 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
           <Segmented items={[{ value: '', label: 'По порядку' }, ...Array.from({ length: n }, (_, k) => ({ value: String(k + 1), label: 'Н' + (k + 1) }))]} value={startWeek} label="С какой недели продолжить" onChange={(v) => { haptic(); setStartWeek(v); }} />
         </div>
       )}
-      <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days: alternate ? [] : days, bySchedule: bySchedule ? 1 : 0,
+      <button className="button button--primary button--block" disabled={busy || !startsOn || !effectiveOn || (overloaded && !loadAccepted)} onClick={() => onApply({ blocks: draft, effectiveOn, weeks: { schedule: 1, startsOn, endsOn, length: n, rule, pauses, days: alternate ? [] : days, bySchedule: bySchedule ? 1 : 0, solo: solo.filter((id) => queue.some((g) => g[0].id === id)),
         rhythm: beat.rhythm, rhythmDays: alternate ? beat.rhythmDays.slice(0, beat.rhythm.length).map((d) => d || []) : [], oneSession: alternate ? beat.one || '' : '',
         ...(startWeek ? { startWeek: Number(startWeek) } : {}) } })}>{busy ? 'Сохраняю…' : 'Сохранить'}</button>
     </div>

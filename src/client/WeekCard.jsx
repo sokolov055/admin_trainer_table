@@ -144,8 +144,24 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
     setBusy(false);
   };
 
+  // «Сам / с тренером» на этой неделе (FT-788, владелец 14.11.2026): правят тренер и клиент
+  const solo = new Set(w.solo || []);
+  const toggleSolo = async (it) => {
+    setBusy(true);
+    setFailure('');
+    try {
+      const res = await apiMutate('plan.week.solo', { ...(clientRow ? { clientRow } : {}), month, week: w.start, id: it.id, solo: !solo.has(it.id) });
+      haptic('success');
+      setMenu(null);
+      onSaved(res.weeks);
+    } catch (error) {
+      setFailure(error.message || 'Не сохранилось');
+    }
+    setBusy(false);
+  };
+
   const dot = (it) => {
-    const cls = 'wc-dot' + (it.done ? ' is-done' : isCardio(it) ? ' is-cardio' : '') + (it.from ? ' is-moved' : '');
+    const cls = 'wc-dot' + (it.done ? ' is-done' : isCardio(it) ? ' is-cardio' : '') + (it.from ? ' is-moved' : '') + (!it.done && solo.has(it.id) ? ' is-solo' : '');
     const icon = it.done ? <IconCheck size={16} /> : isCardio(it) ? <IconHeart size={15} /> : <Dumbbell />;
     const label = `${it.title}${it.done ? ' — сделано' : ''}${it.from ? ', перенесено из ' + spanTiny(it.from) : ''}`;
     if (it.done) return <span key={it.idx} className={cls} role="img" aria-label={label}>{icon}</span>;
@@ -193,7 +209,8 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
             // Запись «Расписания» (FT-788, этап 4): время под днём; занятие
             // без записи у клиента «по записям» — пунктиром, он придёт сам
             const booking = (w.booked || []).find((b) => b.day === d);
-            const self = !!cfg.bySchedule && list.length > 0 && !booking;
+            const soloDay = list.some((it) => solo.has(it.id));
+            const self = !!cfg.bySchedule && list.length > 0 && !booking && !soloDay;
             return (
               <div key={d} className={'wc-day' + (closedDay(date) ? ' is-closed' : '') + (date === today ? ' is-today' : '') + (open ? ' is-open' : '') + (self ? ' is-self' : '')}
                 onClick={open && onEdit ? () => { haptic(); onEdit(w.start); } : undefined}>
@@ -201,7 +218,7 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
                 <b>{Number(date.slice(8))}</b>
                 <div className="wc-day__dots">{list.slice(0, 2).map(dot)}{list.length > 2 && <span className="wc-day__more">+{list.length - 2}</span>}</div>
                 {booking && <span className="wc-day__time" aria-label={`запись в ${booking.time}`}>{booking.time}</span>}
-                {self && <span className="wc-day__time is-self" aria-label="без записи, сам">сам</span>}
+                {soloDay && <span className="wc-day__time is-solo" aria-label="сам, по приложению">сам</span>}
                 {list.length > 0 && <span className="wc-day__name">{shortTitle(list[0].title)}</span>}
               </div>
             );
@@ -243,6 +260,12 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
             {editable && onEdit && (
               <button type="button" className="wc-menu__opt" onClick={() => { setMenu(null); onEdit(w.start); }}>
                 <span className="wc-menu__ic">⇄</span>Перенести
+              </button>
+            )}
+            {editable && menu.id && !menu.done && (
+              <button type="button" className={'wc-menu__opt' + (solo.has(menu.id) ? '' : ' is-solo')} disabled={busy} onClick={() => toggleSolo(menu)}>
+                <span className="wc-menu__ic">{solo.has(menu.id) ? '👤' : '📱'}</span>
+                {busy ? 'Сохраняю…' : solo.has(menu.id) ? 'С тренером — на этой неделе' : 'Сам, по приложению — на этой неделе'}
               </button>
             )}
             {editable && (

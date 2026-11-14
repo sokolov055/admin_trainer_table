@@ -590,3 +590,18 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .ws-src__dots { display: flex; gap: 3px; height: 24px; align-items: center; }
 .ws-src__dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
 .ws-src__dots i.is-on { background: var(--accent); }
+
+/* Кто ведёт занятие (владелец 14.11.2026): «с тренером» / «сам» — фиолетовое */
+.ws { --solo: #7a4fd0; --solo-wash: rgba(122, 79, 208, .12); --solo-ink: #5b35a8; }
+.ws-solo { margin-top: 14px; }
+.ws-solo__h { margin: 0 0 4px; font-size: var(--text-sm); font-weight: 700; color: var(--text-muted); }
+.ws-solo__row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+.ws-solo__row:first-of-type { border-top: 0; }
+.ws-solo__letter { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent-ink); font-weight: 800; font-size: 13px; transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.ws-solo__row.is-solo .ws-solo__letter { background: var(--solo-wash); color: var(--solo-ink); }
+.ws-solo__name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
+.ws-solo__name small { display: block; font-weight: 500; font-size: 12px; color: var(--text-muted); }
+.ws-solo__seg { display: flex; flex: none; padding: 3px; border-radius: 999px; background: var(--surface-sunken); }
+.ws-solo__seg button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); font: 650 12.5px/1 var(--font); cursor: pointer; transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.ws-solo__seg button.is-on { background: var(--surface); color: var(--accent-ink); box-shadow: var(--shadow-sm); }
+.ws-solo__seg button.is-on.is-solo { background: var(--solo); color: #fff; }

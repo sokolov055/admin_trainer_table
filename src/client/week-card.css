@@ -157,3 +157,11 @@ button.wc-dot:active { transform: scale(.9); }
 .wc-day__time { padding: 1px 4px; border-radius: 5px; background: var(--accent-wash); color: var(--accent-ink); font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
 .wc-day.is-self .wc-dot:not(.is-done) { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border-strong); color: var(--text-muted); }
 .wc-day__time.is-self { background: var(--surface-sunken); color: var(--text-muted); font-weight: 600; }
+
+/* Занятие «сам» — фиолетовое (владелец 14.11.2026): клиент по приложению, без тренера */
+.wc, .ws, .wc-menu { --solo: #7a4fd0; --solo-wash: rgba(122, 79, 208, .12); --solo-ink: #5b35a8; }
+.wc-dot.is-solo { background: var(--solo-wash); color: var(--solo-ink); box-shadow: inset 0 0 0 1.5px var(--solo); animation: wc-solo-in .45s cubic-bezier(.34, 1.56, .64, 1) both; }
+.wc-day__time.is-solo { background: var(--solo-wash); color: var(--solo-ink); }
+.wc-menu__opt.is-solo .wc-menu__ic { background: var(--solo-wash); }
+@keyframes wc-solo-in { from { transform: scale(.6); } }
+@media (prefers-reduced-motion: reduce) { .wc-dot.is-solo { animation: none; } }

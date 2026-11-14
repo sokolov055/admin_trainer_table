@@ -431,7 +431,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).get(
   // ?mockBook=1 — этап 4: дни по записям, записи ср и пт этой недели в 18:00
   if (new URLSearchParams(location.search).get('mockBook') === '1') {
     const at = (d, h) => { const [y, m, dd] = addDays(monday(dateKey()), d).split('-').map(Number); return new Date(y, m - 1, dd, h).toISOString(); };
-    Object.assign(demoWeeks[MONTHS[0]], { bySchedule: 1, days: [1, 3, 6], bookings: [{ id: 'demo-b1', at: at(2, 18) }, { id: 'demo-b2', at: at(4, 18) }] });
+    Object.assign(demoWeeks[MONTHS[0]], { bySchedule: 1, solo: [PLAN_BLOCKS[1].id], days: [1, 3, 6], bookings: [{ id: 'demo-b1', at: at(2, 18) }, { id: 'demo-b2', at: at(4, 18) }] });
   }
 }
 function saveDemoProgram(params, blocks) {
@@ -2072,6 +2072,13 @@ const MOCK = {
     return { weeks: demoWeeks[params.month] };
   },
   // Правки недель (FT-788): весь список правок целиком, версия — от затирания чужой
+  'plan.week.solo': (params) => {
+    const w = demoWeeks[params.month] || demoWeeks[MONTHS[0]];
+    const marks = { ...((w.weekSolo || {})[params.week] || {}) };
+    if (params.solo === (w.solo || []).includes(params.id)) delete marks[params.id]; else marks[params.id] = params.solo === true;
+    w.weekSolo = { ...(w.weekSolo || {}), [params.week]: marks };
+    return { weeks: w };
+  },
   'plan.week.edit': (params) => {
     const w = demoWeeks[params.month] || (demoWeeks[params.month] = { rule: 'client', choices: {} });
     if (Number(params.rev || 0) !== Number(w.weekEditsRev || 0)) throw Object.assign(new Error('План недель уже изменили на другом устройстве. Откройте редактор заново.'), { code: 409 });
