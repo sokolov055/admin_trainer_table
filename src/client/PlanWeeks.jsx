@@ -882,7 +882,7 @@ function LockGlyph() {
  * едет за пальцем (до 44 px) и пружинит обратно, дата меняется сразу.
  * Стрелки клавиатуры — ±1 день. Нажатие на дату под точкой — календарь
  */
-function DragDot({ value, onChange, min = '', max = '', disabled = false, onLocked = null, label, stop = false, children }) {
+function DragDot({ value, onChange, min = '', max = '', disabled = false, onLocked = null, label, stop = false, room = [-44, 44], children }) {
   const drag = useRef(null);
   const [dx, setDx] = useState(0);
   const clamp = (key) => (min && key < min ? min : max && key > max ? max : key);
@@ -895,7 +895,7 @@ function DragDot({ value, onChange, min = '', max = '', disabled = false, onLock
       onPointerMove={(e) => {
         const d = drag.current; if (!d) return;
         const px = e.clientX - d.x;
-        setDx(Math.max(-44, Math.min(44, px)) || 0.01);
+        setDx(Math.max(room[0], Math.min(room[1], px)) || 0.01);
         const days = Math.round(px / 8);
         if (days !== d.days) { d.days = days; haptic(); onChange(clamp(addDays(d.base, days))); }
       }}
@@ -921,7 +921,7 @@ function DatesBlock({ startsOn, endsOn, onStart, onEnd, startLocked, pauses, onP
         <span className="ws-line__track" aria-hidden="true"><i /></span>
         {/* Кружок тянется пальцем — ±1 день на 8 px; дата под ним открывает календарь */}
         <span className="ws-line__pt">
-          <DragDot value={startsOn} max={endsOn} onChange={onStart} disabled={startLocked} onLocked={() => { haptic(); setLockNote(true); }} label="Дата начала">
+          <DragDot value={startsOn} max={endsOn} onChange={onStart} disabled={startLocked} room={[-6, 44]} onLocked={() => { haptic(); setLockNote(true); }} label="Дата начала">
             {startLocked ? <LockGlyph /> : <IconPlay size={14} />}
           </DragDot>
           <label className="ws-line__date" onClick={startLocked ? () => setLockNote(true) : undefined}>
@@ -931,12 +931,15 @@ function DatesBlock({ startsOn, endsOn, onStart, onEnd, startLocked, pauses, onP
         </span>
         {endsOn ? (
           <span className="ws-line__pt ws-line__pt--end">
-            <DragDot value={endsOn} min={startsOn} onChange={onEnd} label="Последний день программы" stop />
-            <label className="ws-line__date">
-              <span>{ruShort(endsOn)}</span>
-              <input type="date" aria-label="Последний день программы" min={startsOn} value={endsOn} onChange={(e) => e.target.value && onEnd(e.target.value)} />
-            </label>
-            <button type="button" className="ws-line__x" aria-label="Без конца" onClick={() => { haptic(); onEnd(''); }}><IconClose size={12} /></button>
+            {/* Кружок у правого края едет только влево — за край карточки не уходит */}
+            <DragDot value={endsOn} min={startsOn} onChange={onEnd} label="Последний день программы" stop room={[-44, 6]} />
+            <span className="ws-line__under">
+              <button type="button" className="ws-line__x" aria-label="Без конца" onClick={() => { haptic(); onEnd(''); }}><IconClose size={12} /></button>
+              <label className="ws-line__date">
+                <span>{ruShort(endsOn)}</span>
+                <input type="date" aria-label="Последний день программы" min={startsOn} value={endsOn} onChange={(e) => e.target.value && onEnd(e.target.value)} />
+              </label>
+            </span>
           </span>
         ) : (
           <button type="button" className="ws-line__pt ws-line__pt--end" aria-label="Без конца — задать последний день" onClick={() => { haptic(); onEnd(addDays(startsOn || today, 27)); }}>

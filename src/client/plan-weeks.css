@@ -569,3 +569,13 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .ws-line__date input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .ws-line__pt--end .ws-line__x { right: -4px; }
 @media (prefers-reduced-motion: reduce) { .ws-drag { transition: none; } }
+
+/* 14.11.2026, видео владельца: лист съезжал вбок, когда кружок уходил за
+   край; крестик «без конца» лежал на кружке — теперь рядом с датой */
+.ws-sheet .sheet__body { overflow-x: hidden; }
+.ws-line__under { display: flex; align-items: center; gap: 2px; margin-right: -6px; }
+.ws-line__under .ws-line__x { position: static; flex: none; width: 24px; height: 24px; }
+.ws-line__under .ws-line__date { margin-top: 0; }
+.ws-line__pt { align-items: center; }
+.ws-line__pt--end { align-items: flex-end; }
+.ws-line__pt--end > .ws-drag { margin-right: 14px; }
