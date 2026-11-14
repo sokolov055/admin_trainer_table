@@ -4,7 +4,7 @@ import { apiMutate } from '../api.js';
 import { Sheet, Note } from '../ui.jsx';
 import { IconAlert, IconCheck, IconHeart, IconPlay } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { weekItems, removedFromWeek, spanTiny, sessionsText } from '../week-edits.js';
+import { weekItems, removedFromWeek, carriedToWeek, spanTiny, sessionsText } from '../week-edits.js';
 import './week-card.css';
 
 /**
@@ -60,7 +60,7 @@ function statusLine(w, cfg) {
   if (w.status === 'scheduled') return `Начнётся ${ru(cfg.startsOn)}`;
   if (w.status === 'paused') return 'Пауза — неделя не считается пропуском';
   if (w.status === 'expired') return 'Программа завершена';
-  if (w.status === 'legacy') return 'Пока идёт прежний список';
+  if (w.status === 'legacy') return 'Прежний список месяца, без недель';
   if (w.status === 'empty') return 'Неделя отдыха';
   if (w.status === 'done') return 'Неделя выполнена';
   if (w.status === 'missed') return `Не выполнено: ${w.missed}`;
@@ -79,11 +79,13 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
   const [anim, setAnim] = useState('');
   const [drawn, setDrawn] = useState(false);
   const [burst, setBurst] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const touch = useRef(null);
 
   // Кольцо дорисовывается при показе и при смене недели
   useEffect(() => {
     setDrawn(false);
+    setListOpen(false);
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
     return () => cancelAnimationFrame(id);
   }, [w.start]);
@@ -123,7 +125,15 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
     ? `${sessionsText(w.rhythm)} в неделю${w.length > 1 ? ` · ${w.week} из ${w.length}` : ''}`
     : w.length > 1 ? `Неделя ${w.week} из ${w.length}` : 'Одна неделя по кругу';
   const closedDay = (date) => date < cfg.startsOn || (cfg.endsOn && date > cfg.endsOn) || inPause(date, cfg);
-  const free = items.filter((it) => !it.day);
+  // Прежний список месяца (до программы по неделям): дней у него нет, «сделано»
+  // считается за месяц. На днях — проведённые на этой неделе, остаток месяца
+  // свёрнут в одну строку (владелец 14.11.2026)
+  const legacy = w.status === 'legacy';
+  const legacyDone = legacy ? w.rows.flatMap((r) => (r.sessions || []).map((x) => ({ r, key: dateKey(new Date(x.startedAt || x.updatedAt)) })))
+    .filter((x) => x.key >= w.start && x.key <= w.end)
+    .map((x, i) => ({ idx: 'L' + i, id: x.r.block.id, day: Math.round((Date.parse(x.key + 'T12:00:00Z') - Date.parse(w.start + 'T12:00:00Z')) / 864e5) + 1, rows: [x.r], title: x.r.block.title, done: true })) : [];
+  const dayItems = legacy ? legacyDone : items;
+  const free = legacy ? items.filter((it) => !it.done) : items.filter((it) => !it.day);
   const debts = w.rows.filter((r) => r.carried && !r.extra && !r.movedFrom && r.left > 0);
   // Точки недель — окно вокруг выбранной
   const from = Math.max(0, Math.min(sel - 4, plan.weeks.length - 9));
@@ -160,6 +170,25 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
     setBusy(false);
   };
 
+  // Невыполненное прошедшей недели — на текущую (владелец 14.11.2026)
+  const now = plan.weeks[plan.currentIndex];
+  const canCarry = (it) => !!(canEdit && now && now.editable && w.end < today && !it.done && it.id
+    && !(w.sent || []).some((x) => x.id === it.id && x.to === now.start));
+  const carry = async (it) => {
+    setBusy(true);
+    setFailure('');
+    try {
+      const weekEdits = carriedToWeek(cfg.weekEdits || {}, plan, now.start, it.id, w.start);
+      const res = await apiMutate('plan.week.edit', { ...(clientRow ? { clientRow } : {}), month, rev: Number(cfg.weekEditsRev) || 0, weekEdits, ...(trainer ? { notify: true } : {}) });
+      haptic('success');
+      setMenu(null);
+      onSaved(res.weeks);
+    } catch (error) {
+      setFailure(error.message || 'Не сохранилось');
+    }
+    setBusy(false);
+  };
+
   const dot = (it) => {
     const cls = 'wc-dot' + (it.done ? ' is-done' : isCardio(it) ? ' is-cardio' : '') + (it.from ? ' is-moved' : '') + (!it.done && solo.has(it.id) ? ' is-solo' : '');
     const icon = it.done ? <IconCheck size={16} /> : isCardio(it) ? <IconHeart size={15} /> : <Dumbbell />;
@@ -186,7 +215,7 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
                 style={{ strokeDasharray: C, strokeDashoffset: drawn ? C * (1 - ratio) : C }} />}
             </svg>
             <div className="wc-ring__num">
-              {need > 0 ? <><b>{Math.min(w.done, need)}/{need}</b><small>{need === 1 ? 'занятие' : 'занятий'}</small></> : <small>{w.status === 'paused' ? 'пауза' : '—'}</small>}
+              {need > 0 ? <><b>{Math.min(w.done, need)}/{need}</b><small>{legacy ? 'за месяц' : need === 1 ? 'занятие' : 'занятий'}</small></> : <small>{w.status === 'paused' ? 'пауза' : '—'}</small>}
             </div>
             {burst && <span className="wc-burst" aria-hidden="true">{[0, 1, 2, 3, 4, 5].map((i) => <i key={i} />)}</span>}
           </div>
@@ -204,7 +233,7 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
         <div className="wc__days">
           {[1, 2, 3, 4, 5, 6, 7].map((d) => {
             const date = addDays(w.start, d - 1);
-            const list = items.filter((it) => it.day === d);
+            const list = dayItems.filter((it) => it.day === d);
             const open = editable && date >= today && !list.length;
             // Запись «Расписания» (FT-788, этап 4): время под днём; занятие
             // без записи у клиента «по записям» — пунктиром, он придёт сам
@@ -224,9 +253,14 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
             );
           })}
         </div>
-        {(free.length > 0 || debts.length > 0) && (
+        {legacy && free.length > 0 && !listOpen && (
+          <button type="button" className="wc__more" onClick={() => { haptic(); setListOpen(true); }}>
+            ещё {free.length} в списке месяца ▾
+          </button>
+        )}
+        {((!legacy && free.length > 0) || (legacy && listOpen && free.length > 0) || debts.length > 0) && (
           <div className="wc__free">
-            <span>В любой день</span>
+            <span>{legacy ? 'Не сделано в месяце' : 'В любой день'}</span>
             {free.map((it) => (
               <span key={it.idx} className="wc__free-item">{dot(it)}{shortTitle(it.title)}</span>
             ))}
@@ -255,6 +289,11 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
             {onStart && (
               <button type="button" className="wc-menu__opt" onClick={() => { const b = menu.rows[0].block; setMenu(null); onStart(b); }}>
                 <span className="wc-menu__ic"><IconPlay size={16} /></span>Начать тренировку
+              </button>
+            )}
+            {canCarry(menu) && (
+              <button type="button" className="wc-menu__opt" disabled={busy} onClick={() => carry(menu)}>
+                <span className="wc-menu__ic">↪</span>{busy ? 'Сохраняю…' : `Перенести на эту неделю (${spanLong(now.start)})`}
               </button>
             )}
             {editable && onEdit && (

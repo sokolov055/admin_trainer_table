@@ -165,3 +165,7 @@ button.wc-dot:active { transform: scale(.9); }
 .wc-menu__opt.is-solo .wc-menu__ic { background: var(--solo-wash); }
 @keyframes wc-solo-in { from { transform: scale(.6); } }
 @media (prefers-reduced-motion: reduce) { .wc-dot.is-solo { animation: none; } }
+
+/* Прежний список месяца: остаток свёрнут в одну строку */
+.wc__more { display: block; margin: 8px auto 0; padding: 6px 12px; border: 1px dashed var(--border-strong); border-radius: 999px; background: transparent; color: var(--text-secondary); font: 600 var(--text-sm)/1.2 var(--font); cursor: pointer; }
+.wc__more:active { transform: scale(.97); }

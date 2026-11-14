@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  timelineWith, weekAt, weekItems, movedToDay, movedToWeek, removedFromWeek, addedToWeek, revertedWeek, clean,
+  timelineWith, weekAt, weekItems, movedToDay, movedToWeek, removedFromWeek, addedToWeek, carriedToWeek, revertedWeek, clean,
   firstOpenDay, freeDay, crowdedDays, changedWeeks, spanShort,
 } from '../src/week-edits.js';
 import { weekQueue } from '../src/plan-weeks.js';
@@ -96,4 +96,14 @@ test('сделанное занятие — при двух одинаковых
   const s = [{ status: 'completed', month: 'Январь 2091', sourceBlockId: C, startedAt: '2091-01-16T10:00:00' }];
   const items = weekItems(weekAt(tl(e, s), W1)).filter((it) => it.id === C);
   assert.deepEqual(items.map((it) => [it.day, it.done]), [[5, false], [2, true]]);
+});
+
+test('невыполненное прошедшей недели — на текущую: там +1, источник видит «отправлено», повтор не дублирует', () => {
+  const t = tl();
+  const edits = carriedToWeek({}, t, W2, C, W1);
+  assert.deepEqual(edits[W2].at(-1), { id: C, day: 0, from: W1 });
+  const t2 = tl(edits);
+  assert.equal(weekAt(t2, W2).need, 4);
+  assert.deepEqual(weekAt(t2, W1).sent, [{ id: C, to: W2 }]);
+  assert.equal(carriedToWeek(edits, t2, W2, C, W1), edits);
 });

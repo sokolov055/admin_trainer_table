@@ -126,6 +126,18 @@ export function removedFromWeek(edits, timeline, start, idx) {
   return { ...edits, [start]: list };
 }
 
+/**
+ * Невыполненное занятие прошедшей недели — на текущую (владелец 14.11.2026):
+ * правится только текущая неделя, у занятия from — откуда перенесено;
+ * прошедшая неделя не меняется (она уже оценена)
+ */
+export function carriedToWeek(edits, timeline, start, id, from) {
+  const list = listOf(edits, timeline, start);
+  if (list.length >= 21 || list.some((it) => it.id === id && it.from === from)) return edits;
+  list.push({ id, day: 0, from });
+  return { ...edits, [start]: list };
+}
+
 /** «+ занятие» — любое занятие программы на эту неделю */
 export function addedToWeek(edits, timeline, start, id, day = 0) {
   const list = listOf(edits, timeline, start);
