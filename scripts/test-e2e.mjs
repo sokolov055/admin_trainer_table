@@ -681,7 +681,7 @@ test('тренировку можно провести, и блок станов
 
   // Проведённая тренировка уезжает во вторую вкладку: наверху очереди
   // должна оставаться та, которую делать следующей.
-  await page.getByRole('tab', { name: /^Выполненные/ }).click({ timeout: 20000 });
+  await page.getByRole('tab', { name: /^Сделано/ }).click({ timeout: 20000 });
 
   const done = section('Тренировка 1 — верх').locator('.plan__done');
   await done.waitFor({ timeout: 20000 });
@@ -1387,7 +1387,7 @@ test('карта мышц: тренировка, программа, итоги 
     await assert.doesNotReject(firstBlock.getByText('Основная группа').waitFor({ timeout: 5000 }));
     await assert.doesNotReject(firstBlock.getByText('Синергисты').waitFor({ timeout: 5000 }));
 
-    await phone.getByRole('tab', { name: /^Вся программа/ }).click();
+    await phone.getByRole('tab', { name: /^Вся / }).click();
     await assert.doesNotReject(phone.getByRole('heading', { name: 'Мышцы программы' }).waitFor({ timeout: 5000 }));
     await assert.doesNotReject(phone.getByText('Без основной нагрузки:').first().waitFor({ timeout: 5000 }));
 
@@ -2031,7 +2031,7 @@ test('в карточке клиента тренировки выбираютс
     await phone.mouse.up();
     await phone.getByRole('button', { name: 'Вернуть', exact: true }).waitFor({ timeout: 5000 });
 
-    await phone.getByRole('tab', { name: /^Выполненные/ }).click();
+    await phone.getByRole('tab', { name: /^Сделано/ }).click();
     const rename = phone.getByRole('button', { name: /^Переименовать:/ }).first();
     await rename.waitFor({ timeout: 10000 });
     const original = (await rename.innerText()).trim();
@@ -2082,7 +2082,7 @@ test('FT-775: программа по датам переживает reload, п
     await phone.getByRole('button', { name: 'Настроить', exact: true }).click();
     await phone.getByRole('button', { name: 'Добавить паузу', exact: true }).click();
     await phone.getByRole('button', { name: 'Сохранить программу', exact: true }).click();
-    await phone.getByText('Программа на паузе. Эта неделя не считается пропуском.', { exact: true }).waitFor();
+    await phone.getByText('Пауза — неделя не считается пропуском', { exact: true }).waitFor();
     assert.equal(await phone.getByRole('button', { name: 'Начать тренировку', exact: true }).count(), 0);
     const stored = await phone.evaluate(() => JSON.parse(localStorage.getItem('ft775-program-demo')));
     assert.equal(stored.weeks['Октябрь 2026'].pauses.length, 1);

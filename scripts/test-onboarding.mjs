@@ -91,7 +91,7 @@ test('тур раздела — только его шаги, 3–4, кажды�
   assert.deepEqual(tourSteps({ section: 'overview' }).map((s) => s.title), ['Обзор — главное на сегодня', 'Сегодня', 'Истории']);
   assert.ok(Object.values(tourSteps({ section: 'nutrition' })[2].target).some((t) => /\.diary-add$/.test(t)));
   const workout = tourSteps({ section: 'workout' });
-  assert.deepEqual(workout.map((s) => s.title), ['Тренировки', 'Начать тренировку', '«Легко», «Норм» или «Тяжело»', 'Выполненные']);
+  assert.deepEqual(workout.map((s) => s.title), ['Тренировки', 'Начать тренировку', '«Легко», «Норм» или «Тяжело»', 'Сделано']);
   assert.ok(workout.every((s) => s.tab === 'plan'));
   // Запасные цели по порядку: своя кнопка, кнопка занятия, свободная тренировка
   assert.match(workout[1].target[0], /data-first-action="workout"/);

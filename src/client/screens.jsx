@@ -28,6 +28,7 @@ import { supersets, blockSessions, pickBlock, doneLine, roundLine } from '../pla
 import { weekPlan, weekQueue, monthWeeks, shownLength, withWeekLoad, movedToWeek, copiedWeek, weekOrder, joinedSession, splitSession, removedBlocks, regroupedAfterMove, followerOf, looseCardio, attachedCardio } from '../plan-weeks.js';
 import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, MoveWeek, SessionGroups, LooseCardio } from './PlanWeeks.jsx';
 import WeekEditor from './WeekEditor.jsx';
+import WeekCard from './WeekCard.jsx';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
@@ -373,6 +374,15 @@ function changeLine(counts, kind) {
   );
 }
 
+/** Перечёркнутый глаз — месяц скрыт от клиента */
+function EyeOff() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="скрыт от клиента">
+      <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.7 8.5 2 12 2 12s4 7 10 7a9.6 9.6 0 0 0 4.4-1" />
+    </svg>
+  );
+}
+
 export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [workout, setWorkout] = useState(null);
   // Из журнала тренировки — обратно к тому же месту программы
@@ -444,6 +454,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [choiceClosed, setChoiceClosed] = useState(false);
   // Редактор по неделям (FT-788, этап 3): с какой недели открыт, '' — закрыт
   const [weekEditor, setWeekEditor] = useState('');
+  const [visBusy, setVisBusy] = useState(false);
   // Неделя — раздел (FT-775): открытый лист («Разложить по неделям» /
   // «Настроить»), выбранная длина больше той, что у тренировок (пустые недели)
   const [editOn, setEditOn] = useState(nextMonday());
@@ -624,7 +635,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       value: m,
       // Пометка прямо в подписи, а не значком: тренер листает месяцы
       // глазами, и «скрыт» должно читаться, не требуя расшифровки.
-      label: hiddenMonths.indexOf(m) !== -1 ? m + ' · скрыт' : m,
+      // С 14.11.2026 — перечёркнутый глаз вместо «· скрыт» (макет week-zone-mockup-v2.html)
+      label: hiddenMonths.indexOf(m) !== -1 ? <span className="plan__month-hidden">{m}<EyeOff /></span> : m,
     })),
   ];
   const chipValue = !month && months.indexOf(nowLabel) === -1 ? '' : data.month;
@@ -649,6 +661,14 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // по id тренировки сервер переименует её и в журнале занятий
   const canRename = !!(data.canHide && data.month && !familyRow);
   const canEdit = canRename && !clientView && (!(weeksCfg && weeksCfg.schedule === 1) || planTab === 'all');
+  // Карточка недели (14.11.2026) — у программы по датам; месячные циклы — прежняя полоска
+  const cardShown = !!(wplan && wplan.scheduled && wplan.weeks.length);
+  const toggleVisibility = async () => {
+    setVisBusy(true);
+    haptic();
+    try { await apiMutate('plan.month.visibility', { clientRow, month: data.month, hidden: !isHidden }); reload(); } catch (_) { /* лист останется как был */ }
+    setVisBusy(false);
+  };
   // Недели правят тренер и сам клиент (решение владельца 13.11.2026); семья и «как видит клиент» — только смотрят
   const canWeekEdit = !!(wplan && wplan.scheduled && data.month && !familyRow && !clientView && !draft && (clientRow ? canRename : true));
 
@@ -873,7 +893,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {monthFailure && <p className="small plan__failure" role="alert">{monthFailure}</p>}
 
       {/* Своя программа тренера («Мои тренировки») — прятать не от кого */}
-      {data.canHide && !data.self && data.month && (
+      {data.canHide && !data.self && data.month && !cardShown && (
         <MonthVisibility
           month={data.month}
           hidden={isHidden}
@@ -962,7 +982,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           (variant="nav", как в «Питании»). Синей заливкой остаётся один ряд —
           месяцы над ним (DESIGN-APP §6, §10; аудит 24.10.2026) */}
       {/* Программа по неделям (IDEA-7): на сколько недель, пометки, правило */}
-      {canRename && !clientView && shownBlocks.length > 0 && monthWeeks(data.month) && (
+      {canRename && !clientView && shownBlocks.length > 0 && monthWeeks(data.month) && !cardShown && (
         <MonthStatus
           month={data.month}
           blocks={shownBlocks}
@@ -984,6 +1004,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           cfg={weeksCfg}
           busy={weeksBusy}
           failure={weeksFailure}
+          visibility={data.canHide && !data.self && data.month && cardShown ? { hidden: isHidden, busy: visBusy, onToggle: toggleVisibility, sheet: chipValue === data.month ? '' : data.month } : null}
           onApply={applyProgram}
           onClose={() => setWeeksSheet('')}
         />
@@ -993,7 +1014,23 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <p className="small muted">Прошлые недели сохранят прежнюю программу. Очередь клиента до этой даты не изменится.</p>
       </Panel>}
       {data.nextProgram && <Note>Следующая программа начнётся {data.nextProgram.startsOn.split('-').reverse().join('.')}.</Note>}
-      {wplan && planTab !== 'done' && <WeekStrip plan={wplan} sel={weekIndex} onSelect={setWeekSel} onEdit={canWeekEdit ? (w) => setWeekEditor(w.start) : null} />}
+      {wplan && planTab !== 'done' && !cardShown && <WeekStrip plan={wplan} sel={weekIndex} onSelect={setWeekSel} onEdit={canWeekEdit ? (w) => setWeekEditor(w.start) : null} />}
+      {cardShown && planTab !== 'done' && (
+        <WeekCard
+          plan={wplan}
+          sel={weekIndex}
+          onSelect={setWeekSel}
+          cfg={weeksCfg}
+          month={data.month}
+          clientRow={clientRow}
+          trainer={!!clientRow}
+          canEdit={canWeekEdit}
+          onSettings={canRename && !clientView ? () => setWeeksSheet('settings') : null}
+          onEdit={canWeekEdit ? (start) => setWeekEditor(start) : null}
+          onStart={!running && !familyRow ? startBlock : null}
+          onSaved={(weeks) => { setWeeksLocal({ month: data.month, weeks }); reload(); }}
+        />
+      )}
       {weekEditor && canWeekEdit && (
         <WeekEditor
           blocks={data.programBlocks || data.blocks}
@@ -1034,23 +1071,30 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       )}
 
       {(shownBlocks.length > 0 || doneSessions.length > 0) && (
-        <Chips
-          variant="nav"
-          label="Тренировки месяца"
-          items={[
-            { value: 'queue', label: (week ? 'Эта неделя · ' : 'Очередь · ') + queueBlocks.length },
-            { value: 'done', label: 'Выполненные · ' + doneSessions.length },
-            // Вся программа месяца: проведённые отмечены зелёным
-            ...(shownBlocks.length ? [{ value: 'all', label: 'Вся программа · ' + shownBlocks.length }] : []),
-          ]}
-          value={planTab}
-          onChange={setPlanTab}
-        />
+        <div className="plan__tabs-row">
+          <Chips
+            variant="nav"
+            label="Тренировки месяца"
+            items={[
+              // Коротко (14.11.2026): «Неделя 3 · Сделано 0 · Вся 12»
+              { value: 'queue', label: (week ? 'Неделя ' : 'Очередь ') + queueBlocks.length },
+              { value: 'done', label: 'Сделано ' + doneSessions.length },
+              // Вся программа месяца: проведённые отмечены зелёным
+              ...(shownBlocks.length ? [{ value: 'all', label: 'Вся ' + shownBlocks.length }] : []),
+            ]}
+            value={planTab}
+            onChange={setPlanTab}
+          />
+          {/* Свободная тренировка — без программы: что делал, то и записал.
+              Появится в «Сделано» этого месяца. С 14.11.2026 — круглая «+» */}
+          {!running && !familyRow && (
+            <button type="button" className="plan__free-plus" aria-label="Свободная тренировка" title="Свободная тренировка" onClick={() => { haptic(); freeWorkout(); }}>
+              <IconPlus size={22} />
+            </button>
+          )}
+        </div>
       )}
-
-      {/* Свободная тренировка — без программы: что делал, то и записал.
-          Появится во «Выполненных» этого месяца */}
-      {!running && !familyRow && planTab === 'queue' && (
+      {!running && !familyRow && shownBlocks.length === 0 && doneSessions.length === 0 && (
         <button className="button button--block plan__free" onClick={freeWorkout}>Свободная тренировка</button>
       )}
 

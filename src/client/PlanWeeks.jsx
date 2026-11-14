@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { dateKey, nextMonday, programSize, addDays, WEEKDAY_SHORT, sessionsOf, sessionQueue as sessionQueueOf, MAX_RHYTHM } from '../program-timeline.js';
 import { apiMutate } from '../api.js';
-import { Segmented, Sheet, Note } from '../ui.jsx';
+import { Segmented, Sheet, Note, Switch } from '../ui.jsx';
 import { IconAlert, IconCheck, IconLink } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import {
@@ -699,7 +699,7 @@ export function ProgramDates({ startsOn, endsOn, onStart, onEnd, disabled = fals
   </>;
 }
 
-export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false, failure = '' }) {
+export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false, failure = '', visibility = null }) {
   const [draft, setDraft] = useState(blocks);
   const [n, setN] = useState(length);
   const [rule, setRule] = useState(cfg && cfg.rule || 'client');
@@ -718,6 +718,9 @@ export function WeeksSheet({ blocks, length, cfg, onApply, onClose, busy = false
   const [loadAccepted, setLoadAccepted] = useState(false);
   const overloaded = byWeek(draft, n).some((g) => g.blocks.length > 6);
   return <Sheet title="Настроить программу" onClose={onClose}><div className="wk-rows">
+    {/* С 14.11.2026 «Скрыть от клиента» — здесь, а не строкой над программой */}
+    {visibility && <div className="wk-rows__item"><Switch checked={!visibility.hidden} disabled={visibility.busy} onChange={visibility.onToggle}>Программа видна клиенту</Switch>
+      <span>{visibility.sheet ? `Лист «${visibility.sheet}». ` : ''}{visibility.hidden ? 'Скрыта: у вас она остаётся со всем содержимым.' : 'Выключите, чтобы клиент пока её не видел.'}</span></div>}
     <div className="wk-rows__item"><strong>Недель в программе</strong><LengthPicker value={n} onChange={(v) => { setN(v); setDraft(withLength(draft, v)); }} list={false} count={draft.length} />
       <span>Предпросмотр ниже покажет результат перераспределения. Пустая неделя сохранится как отдых.</span></div>
     <WeekPreview rows={byWeek(draft, n).map((g) => ({ key: g.week, label: `Неделя ${g.week}`, titles: g.blocks.map((b) => b.title) }))} />

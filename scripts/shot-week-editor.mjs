@@ -45,7 +45,8 @@ const center = async (loc) => { const b = await loc.boundingBox(); return { x: b
     await page.getByRole('button', { name: 'Меню' }).click();
     await page.getByRole('button', { name: /Мои тренировки/ }).click();
     const main = page.locator('#root main:not([hidden])');
-    const editBtn = main.getByRole('button', { name: 'Изменить неделю' });
+    // С 14.11.2026 редактор — из карточки недели: свободный день или «Перенести»
+    const editBtn = main.locator('.wc-day.is-open').first();
     await editBtn.waitFor({ timeout: 10000 });
     await editBtn.scrollIntoViewIfNeeded();
     await shot('1-strip');
@@ -133,11 +134,11 @@ const center = async (loc) => { const b = await loc.boundingBox(); return { x: b
     await sheet.getByRole('button', { name: 'Сохранить' }).click();
     await page.locator('.we-sheet').waitFor({ state: 'detached', timeout: 5000 });
     await page.waitForTimeout(600);
-    const strip = main.locator('.plan-weeks__card');
+    const strip = main.locator('.wc');
     await strip.scrollIntoViewIfNeeded();
     await shot('10-saved');
-    const line = await strip.textContent();
-    check('после сохранения в неделе 2 занятия', /из 2/.test(line), line.slice(0, 120));
+    const line = await strip.locator('.wc-ring__num').textContent();
+    check('после сохранения в неделе 2 занятия', /\/2/.test(line), line);
     check('без ошибок в консоли', errors.length === 0, errors.join(' | '));
   } catch (e) {
     await shot('fail-phone');
@@ -156,7 +157,7 @@ const center = async (loc) => { const b = await loc.boundingBox(); return { x: b
     await page.getByRole('button', { name: 'Меню' }).click();
     await page.getByRole('button', { name: /Мои тренировки/ }).click();
     const main = page.locator('#root main:not([hidden])');
-    await main.getByRole('button', { name: 'Изменить неделю' }).click();
+    await main.locator('.wc-day.is-open').first().click();
     const sheet = page.locator('.we-sheet');
     await sheet.locator('.we-days').waitFor();
     await page.waitForTimeout(450);
@@ -197,7 +198,7 @@ const center = async (loc) => { const b = await loc.boundingBox(); return { x: b
     const choice = page.getByRole('button', { name: /Оставить в прошлой неделе/ });
     await choice.waitFor({ timeout: 8000 }).then(() => choice.click()).catch(() => {});
     await page.waitForTimeout(500);
-    const editBtn = main.getByRole('button', { name: 'Изменить неделю' });
+    const editBtn = main.locator('.wc-day.is-open').first();
     await editBtn.waitFor({ timeout: 10000 });
     await editBtn.click();
     const sheet = page.locator('.we-sheet');

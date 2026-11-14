@@ -132,7 +132,7 @@ test('без сети: две тренировки подряд, перезап�
     await runWorkout(page, 'Тренировка 1 — верх');
     await runWorkout(page, 'Тренировка 2 — низ');
 
-    await page.getByRole('tab', { name: /^Выполненные/ }).click({ timeout: 20000 });
+    await page.getByRole('tab', { name: /^Сделано/ }).click({ timeout: 20000 });
     await page.getByText(/Сохранено на телефоне/).nth(1).waitFor({ timeout: 10000 });
     assert.equal((await serverSessions(page)).length, before, 'на «сервер» без связи ничего не ушло');
     assert.equal((await stored(page, 'outbox')).length, 2, 'в очереди телефона — обе');
@@ -140,7 +140,7 @@ test('без сети: две тренировки подряд, перезап�
     // Перезапуск без сети — обе на месте
     await page.reload();
     await page.getByRole('button', { name: 'Тренировки', exact: true }).click({ timeout: 60000 });
-    await page.getByRole('tab', { name: /^Выполненные/ }).click({ timeout: 20000 });
+    await page.getByRole('tab', { name: /^Сделано/ }).click({ timeout: 20000 });
     await page.getByText(/Сохранено на телефоне/).nth(1).waitFor({ timeout: 10000 });
     assert.equal(await page.getByText(/Сохранено на телефоне/).count(), 2);
 
