@@ -383,21 +383,12 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
     setAsk(null);
     if (!change) { forget(a.event.id); haptic(); return; }
     commitMove(a.event, a.next, change).then((ok) => {
-      // Клиент «по записям» (FT-788, этап 4): занятие уехало вместе с записью.
-      // «Вернуть» — оставить занятие на прежнем дне: правка той недели
-      const pinned = (a.event.sessions || []).filter((x) => x.id && x.edit);
-      if (!ok || !a.event.session || !pinned.length) return;
+      // Клиент «по записям» (FT-788, этап 4): занятие уехало вместе с записью —
+      // просто сообщаем. «Вернуть» не нужно: перенос и так подтверждают в окне
+      // (владелец, 14.11.2026)
+      if (!ok || !a.event.session) return;
       del.flush();
-      setUndo({ text: `Занятие «${a.event.session.short}» → ${whenShort(a.next)}`, onUndo: async () => {
-        try {
-          for (const x of pinned) {
-            await apiMutate('plan.week.edit', { clientRow: x.edit.row, month: x.edit.month, rev: x.edit.rev, notify: false,
-              weekEdits: { ...x.edit.edits, [x.edit.week]: x.edit.layout.map(({ id, day, from }) => ({ id, day, ...(from ? { from } : {}) })) } });
-          }
-          haptic('success');
-        } catch (err) { setFailure(err); }
-        setTick((t) => t + 1);
-      } });
+      setUndo({ info: true, text: `Занятие «${a.event.session.short}» переехало вместе с записью` });
     });
   };
 
@@ -496,12 +487,12 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
       {undoShown && typeof document !== 'undefined' && createPortal(
         <div className={'undo-bar' + (undoLeaving ? ' undo-bar--leaving' : '')} role="status">
           <span>{undoShown.text}</span>
-          <button type="button" className="button button--ghost" disabled={undoLeaving} onClick={() => {
+          {!undoShown.info && <button type="button" className="button button--ghost" disabled={undoLeaving} onClick={() => {
             const u = undo;
             if (!u) return;
             setUndo(null);
-            if (u.onUndo) u.onUndo(); else commitMove(u.event, u.back);
-          }}>Вернуть</button>
+            commitMove(u.event, u.back);
+          }}>Вернуть</button>}
         </div>,
         document.body,
       )}
@@ -1363,8 +1354,9 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
                           {/* Неделя на телефоне — только имя, как в Google; на широком экране — целиком */}
                           {days === 7 && <span className="cal-event__name cal-event__short">{shortLabelOf(e)}</span>}
                           <span className={'cal-event__name' + (days === 7 ? ' cal-event__full' : '')}>{labelOf(e)}</span>
-                          {height >= 30 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
-                          {/* Занятие программы — на «Дне» и «3 днях»; на неделе тесно */}
+                          {/* Занятие программы — на «Дне» и «3 днях»; на неделе тесно. Высокая
+                              плитка — плашкой под временем, низкая (мелкий масштаб) — в строке времени */}
+                          {height >= 30 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}{e.session && days < 7 && height < 44 ? ' · ' + e.session.short : ''}</span>}
                           {e.session && days < 7 && height >= 44 && <span key={e.session.id + e.startsAt} className={'cal-event__session' + (e.session.cardio ? ' is-cardio' : '')}>{e.session.short}</span>}
                         </button>
                       );
