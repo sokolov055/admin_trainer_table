@@ -1,0 +1,115 @@
+/* Редактор программы по неделям (FT-788, WeekEditor.jsx). Токены — DESIGN-APP.md */
+
+.we { position: relative; display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-2); }
+
+.we-nav { display: flex; align-items: center; gap: var(--space-2); }
+.we-nav__arrow {
+  flex: none; width: 44px; height: 44px; border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--accent); font: inherit; font-size: 26px; line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.we-nav__arrow:disabled { color: var(--border-strong); cursor: default; }
+.we-nav__arrow:not(:disabled):active { background: var(--accent-wash); }
+.we-nav__title { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: var(--space-2); }
+.we-nav__title strong { font-size: var(--text-md); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.we-back {
+  align-self: center; margin-top: -6px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--accent-ink); font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
+.we-sub { margin: 0; text-align: center; font-size: var(--text-sm); color: var(--text-secondary); }
+
+.we-days { display: flex; flex-direction: column; gap: 6px; }
+.we-days.is-next { animation: we-in-next var(--dur-nav) var(--ease-ios) both; }
+.we-days.is-prev { animation: we-in-prev var(--dur-nav) var(--ease-ios) both; }
+.we-days.is-fade { animation: we-fade var(--dur-fast) var(--ease-out) both; }
+@keyframes we-in-next { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes we-in-prev { from { transform: translateX(-32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes we-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.we-day {
+  display: flex; align-items: flex-start; gap: var(--space-3); min-height: 48px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.we-day.is-today { border-color: var(--accent); }
+.we-day.is-closed { background: var(--surface-sunken); }
+.we-day.is-over { border-color: var(--accent); background: var(--accent-wash); }
+.we-day__label { flex: none; width: 52px; padding-top: 8px; font-size: var(--text-sm); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.we-day__label b { color: var(--text); font-weight: 620; }
+.we-day.is-today .we-day__label b { color: var(--accent-ink); }
+.we-day__items { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; min-height: 34px; justify-content: center; }
+.we-day__hint { font-size: var(--text-sm); color: var(--text-muted); }
+.we-day--free { border-style: dashed; }
+.we-day--free .we-day__label { width: auto; min-width: 52px; }
+
+.we-item {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 40px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--text); font: inherit; text-align: left; -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.we-item.is-movable { cursor: grab; }
+.we-item.is-movable:active { transform: scale(.985); }
+.we-item.is-done { background: var(--good-fill); border-color: var(--good-line); }
+.we-item.is-done .we-item__note { color: var(--good-text); }
+.we-item.is-moved { border-color: var(--accent); }
+.we-item.is-lifted { border-style: dashed; background: transparent; color: var(--text-muted); }
+.we-item.is-lifted .we-item__note, .we-item.is-lifted .we-item__grip { visibility: hidden; }
+.we-item__title { flex: 1; min-width: 0; font-size: var(--text-base); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.we-item__note { flex: none; font-size: var(--text-sm); color: var(--accent-ink); white-space: nowrap; }
+.we-item__grip { flex: none; color: var(--text-muted); letter-spacing: -2px; font-size: var(--text-sm); }
+
+/* Поднятое занятие едет за пальцем поверх листа (в body: у листа transform) */
+.we-ghost {
+  position: fixed; left: 0; top: 0; z-index: calc(var(--z-sheet) + 5); pointer-events: none; box-sizing: border-box;
+  min-height: 40px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font-size: var(--text-base); font-weight: 600;
+  box-shadow: var(--shadow-lg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Палец у края: кольцо заполняется — 0,5 с, после перелистывания — 1,2 с */
+.we-edge {
+  position: fixed; z-index: calc(var(--z-sheet) + 4); width: 36px; height: 36px; margin: -18px 0 0 -18px;
+  border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; display: grid; place-items: center;
+  background: var(--surface);
+}
+.we-edge i { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-fill); transform: scale(0); animation: we-arm 500ms linear forwards; }
+.we-edge.is-locked i { animation-duration: 1200ms; }
+@keyframes we-arm { to { transform: scale(1); } }
+
+.we-sent, .we-hint { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.we-warn { margin: 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--warning-fill); color: var(--warning-text); font-size: var(--text-sm); }
+.we-tools { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.we-changes { padding: 10px 12px; border-radius: var(--radius); background: var(--surface-sunken); font-size: var(--text-sm); }
+.we-changes strong { font-weight: 620; }
+.we-changes ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-secondary); }
+.we-save { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-1); }
+
+.we-menu { display: flex; flex-direction: column; gap: var(--space-2); padding-bottom: var(--space-2); }
+.we-menu__label { margin-top: var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+.we-menu__remove { color: var(--critical-text); }
+.we-add { display: flex; flex-direction: column; gap: 6px; }
+.we-add__row {
+  min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font: inherit; font-size: var(--text-base); text-align: left; cursor: pointer;
+}
+.we-add__row:active { transform: scale(.985); }
+
+/* Компьютер — неделя сеткой: семь колонок, «Без дня» под ними */
+@media (min-width: 900px) and (hover: hover) {
+  .sheet.we-sheet .sheet__panel { max-width: 960px; }
+  .we-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .we-day { flex-direction: column; gap: 6px; min-height: 180px; padding: 8px; }
+  .we-day__label { width: auto; padding-top: 0; }
+  .we-day__items { justify-content: flex-start; }
+  .we-day--free { grid-column: 1 / -1; min-height: 64px; flex-direction: row; }
+  .we-item { flex-wrap: wrap; }
+  .we-item__title { white-space: normal; }
+  .we-item__grip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-days.is-next, .we-days.is-prev { animation: we-fade var(--dur-fast) var(--ease-out) both; }
+  .we-item.is-movable:active, .we-add__row:active { transform: none; }
+  .we-edge i { animation: none; transform: scale(1); opacity: .5; }
+}

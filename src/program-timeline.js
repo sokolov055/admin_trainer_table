@@ -63,16 +63,31 @@ export function laidWeek(blocks, { days = [], from, startDay = '', mode = 'all',
   };
   const dayOf = daysOf(groups, list);
   const all = groups.flat();
-  if (!mid || mode === 'all' || (mode === 'days' && !list.length)) return { own: all, deferred: [], dayOf };
+  // slots — занятия недели с днём (0 — без дня): из них редактор недель
+  // берёт раскладку, которую тренер или клиент потом двигает
+  const slots = (gs, ds) => gs.map((g, i) => ({ g, day: ds[i] || 0 }));
+  if (!mid || mode === 'all' || (mode === 'days' && !list.length)) return { own: all, deferred: [], dayOf, slots: slots(groups, list) };
   if (mode === 'days') {
-    const kept = groups.filter((g, i) => !list[i] || date(list[i]) >= startDay);
-    return { own: kept.flat(), deferred: [], dayOf };
+    const kept = groups.map((g, i) => ({ g, day: list[i] || 0 })).filter((x) => !x.day || date(x.day) >= startDay);
+    return { own: kept.flatMap((x) => x.g), deferred: [], dayOf, slots: kept };
   }
   const left = list.length ? list.filter((d) => date(d) >= startDay) : [];
   const fits = list.length ? left.length : Math.max(1, Math.round(groups.length * activeCount / 7));
   const own = groups.slice(0, fits);
-  return { own: own.flat(), deferred: groups.slice(fits).flat(), dayOf: daysOf(own, left) };
+  return { own: own.flat(), deferred: groups.slice(fits).flat(), dayOf: daysOf(own, left), slots: slots(own, left) };
 }
+
+/**
+ * Правки недель (FT-788, этап 3, макет week-editor-mockup.html): у
+ * поправленной недели — свой список занятий: [{ id первой тренировки
+ * занятия, day 0–7 (0 — без дня), from — понедельник недели, откуда
+ * перенесено }]. Ключ — понедельник недели. Неделя без правки идёт по
+ * программе; сама программа (шаблон, очередь, ритм) от правок не меняется
+ */
+export const weekEditOf = (cfg, start) => {
+  const list = cfg && cfg.weekEdits && cfg.weekEdits[start];
+  return Array.isArray(list) ? list : null;
+};
 
 /**
  * Ритм на неделю k версии (k — сколько недель прошло без полных пауз):
@@ -105,11 +120,24 @@ export function versionAt(blocks, cfg, day) {
 }
 
 /** Все даты считаются календарными, без сдвига при переходе летнего времени. */
-export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = new Date() }) {
+export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = new Date(), until = '' }) {
   const now = dateKey(today);
   const first = cfg.startsOn;
   const start = monday(first);
-  const last = addDays(monday(now > first ? now : first), 28);
+  // until — досчитать недели до этой даты (редактор недель листает вперёд без ограничения)
+  const last = addDays(monday([now, first, String(until || '')].sort().pop()), 28);
+  // Занятие по id первой тренировки — в версии недели, потом в программе и прошлых версиях
+  const index = new Map();
+  const sessionsById = (list) => {
+    if (!index.has(list)) {
+      const map = new Map();
+      sessionQueue(list || []).forEach((g) => { const id = g[0] && g[0].id; if (id && !map.has(id)) map.set(id, g); });
+      index.set(list, map);
+    }
+    return index.get(list);
+  };
+  const findSession = (id, list) => sessionsById(list).get(id) || sessionsById(blocks).get(id)
+    || (cfg.history || []).map((h) => sessionsById(h.blocks).get(id)).find(Boolean) || null;
   const weeks = [];
   let n = 0;
   for (let from = start; from <= last && n < 2600; from = addDays(from, 7)) {
@@ -142,7 +170,19 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
       days: beat ? beat.days : settings.days, from, startDay: startDay > from && startDay <= end ? startDay : '',
       mode: FIRST_WEEK.includes(settings.firstWeek) ? settings.firstWeek : 'all', activeCount: activeDays.length,
     });
-    const own = laid.own;
+    // Правка недели — её список занятий вместо раскладки программы
+    const edit = activeDays.length && !expired && !settings.legacyList ? weekEditOf(cfg, from) : null;
+    const slots = edit
+      ? edit.map((it) => ({ g: findSession(it.id, v.blocks), day: Number(it.day) || 0, from: it.from || '' })).filter((x) => x.g)
+      : laid.slots;
+    const own = slots.flatMap((x) => x.g);
+    const daysOfBlock = new Map();
+    const movedFrom = new Map();
+    slots.forEach((x) => x.g.forEach((b) => {
+      if (!daysOfBlock.has(b)) daysOfBlock.set(b, []);
+      daysOfBlock.get(b).push(x.day);
+      if (x.from && !movedFrom.has(b)) movedFrom.set(b, x.from);
+    }));
     // Не поместились в первую неделю «по порядку» — в следующую, без долга
     const moved = !paused && !expired && previous ? previous.deferred || [] : [];
     const same = (a, b) => a === b || (!!a.id && a.id === b.id);
@@ -155,13 +195,16 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
       const debt = debts.find((r) => r.block.id === block.id);
       const shifted = moved.some((b) => same(b, block));
       const carried = !!debt || shifted;
-      const day = laid.dayOf.get(block) || 0;
+      // Одно занятие может стоять в неделе дважды — день строки самый ранний
+      const days = daysOfBlock.get(block) || [];
+      const day = days.filter(Boolean).sort((a, b) => a - b)[0] || 0;
       const required = own.filter((b) => same(b, block)).length + (debt ? debt.missed : 0) + Number(shifted);
       const here = sessions.filter((s) => s.status === 'completed' && s.month === month
         && (s.sourceBlockId ? s.sourceBlockId === block.id : s.sourceBlock === block.title)
         && (settings.legacyList ? dateKey(s.startedAt || s.updatedAt) <= end : activeDays.includes(dateKey(s.startedAt || s.updatedAt))));
       const done = here.length;
-      return { block, day, date: day ? addDays(from, day - 1) : '', shifted, sessions: here, carried, required, done, left: Math.max(0, required - done), missed: ended && activeDays.length === 7 && !settings.legacyList ? Math.max(0, required - done) : 0 };
+      return { block, day, days, date: day ? addDays(from, day - 1) : '', shifted, ...(movedFrom.has(block) ? { movedFrom: movedFrom.get(block) } : {}),
+        sessions: here, carried, required, done, left: Math.max(0, required - done), missed: ended && activeDays.length === 7 && !settings.legacyList ? Math.max(0, required - done) : 0 };
     });
     // Вторая и дальше тренировка занятия (кардио после силовой) — extra:
     // неделю и ритм считают занятия; сделана силовая — недоделанное кардио
@@ -185,11 +228,18 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
       monthGen: new Date(end + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }).replace(/^\d+\s*/, ''),
       week, length: beat ? rhythm.length : length, rule, ended, full, current: now >= from && now <= end, rows, need, done, extra: 0,
       days: beat ? beat.days : cleanDays(settings.days), deferred: laid.deferred, extraNeed, extraDone,
+      layout: slots.map((x) => ({ id: x.g[0].id || '', day: x.day, ...(x.from ? { from: x.from } : {}) })), edited: !!edit, sent: [],
+      editable: activeDays.length > 0 && !expired && !settings.legacyList,
       ...(beat ? { rhythm: beat.count, phase: beat.phase, queueAt: beat.queueAt } : {}),
       load: loads.size === 1 ? [...loads][0] : '', missed: ended ? Math.max(0, need - done) : 0,
       status: now < first ? 'scheduled' : expired ? 'expired' : paused ? 'paused' : settings.legacyList ? 'legacy' : !need ? 'empty' : done >= need ? 'done' : ended && full ? 'missed' : ended ? 'partial' : 'open',
     });
   }
+  // Куда ушли перенесённые занятия: «C · Грудь → 23–29» в неделе-источнике
+  weeks.forEach((w) => w.layout.forEach((it) => {
+    const src = it.from && weeks.find((x) => x.start === it.from);
+    if (src) src.sent.push({ id: it.id, to: w.start });
+  }));
   const currentIndex = weeks.findIndex((w) => w.current);
   const current = weeks[currentIndex];
   const previous = weeks.slice(0, Math.max(0, currentIndex)).reverse().find((w) => w.status !== 'paused' && w.status !== 'expired');

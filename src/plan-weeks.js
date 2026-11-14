@@ -264,7 +264,9 @@ export function weekPlan({ blocks, sessions, month, cfg, prev = null, latest = f
 export function weekQueue(cycle) {
   if (!cycle) return [];
   if (['scheduled', 'paused', 'expired'].includes(cycle.status)) return [];
-  const open = cycle.rows.filter((r) => r.left > 0);
+  // Поправленная неделя (FT-788) — по дням недели, без дня — в конце
+  const rows = cycle.rows.filter((r) => r.left > 0);
+  const open = cycle.edited ? [...rows].sort((a, b) => (a.day || 8) - (b.day || 8)) : rows;
   return [...open.filter((r) => r.carried && r.done === 0), ...open.filter((r) => !(r.carried && r.done === 0))];
 }
 

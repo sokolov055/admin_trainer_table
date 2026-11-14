@@ -437,3 +437,15 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 }
 .wk-beat__top { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .wk-beat__drop { border: 0; background: none; color: var(--accent); font: 600 var(--text-sm)/1 var(--font); cursor: pointer; min-height: 32px; }
+
+/* «Изменить неделю» — редактор по неделям (FT-788, WeekEditor.jsx) */
+.plan-weeks__edit {
+  align-self: flex-start; min-height: 36px; margin-top: var(--space-2); padding: 0; border: 0; background: none;
+  color: var(--accent); font: 600 var(--text-sm)/1 var(--font); cursor: pointer;
+}
+.plan-weeks__edit:active { transform: scale(.97); }
+/* Неделю меняли в редакторе — оранжевая метка в углу (макет week-editor-mockup.html) */
+.plan-weeks__week { position: relative; }
+.plan-weeks__week.is-edited::after {
+  content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--warning);
+}

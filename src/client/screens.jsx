@@ -27,6 +27,7 @@ import { captureScreen, useBackGesture } from '../gestures.jsx';
 import { supersets, blockSessions, pickBlock, doneLine, roundLine } from '../plan-model.js';
 import { weekPlan, weekQueue, monthWeeks, shownLength, withWeekLoad, movedToWeek, copiedWeek, weekOrder, joinedSession, splitSession, removedBlocks, regroupedAfterMove, followerOf, looseCardio, attachedCardio } from '../plan-weeks.js';
 import { WeekStrip, WeekChoice, MonthStatus, SpreadSheet, WeeksSheet, WeekSections, MoveWeek, SessionGroups, LooseCardio } from './PlanWeeks.jsx';
+import WeekEditor from './WeekEditor.jsx';
 import { planScheme } from '../exercise-track.js';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
@@ -441,6 +442,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [weekSel, setWeekSel] = useState(null);
   const [weeksLocal, setWeeksLocal] = useState(null); // { month, weeks }
   const [choiceClosed, setChoiceClosed] = useState(false);
+  // Редактор по неделям (FT-788, этап 3): с какой недели открыт, '' — закрыт
+  const [weekEditor, setWeekEditor] = useState('');
   // Неделя — раздел (FT-775): открытый лист («Разложить по неделям» /
   // «Настроить»), выбранная длина больше той, что у тренировок (пустые недели)
   const [editOn, setEditOn] = useState(nextMonday());
@@ -646,6 +649,8 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // по id тренировки сервер переименует её и в журнале занятий
   const canRename = !!(data.canHide && data.month && !familyRow);
   const canEdit = canRename && !clientView && (!(weeksCfg && weeksCfg.schedule === 1) || planTab === 'all');
+  // Недели правят тренер и сам клиент (решение владельца 13.11.2026); семья и «как видит клиент» — только смотрят
+  const canWeekEdit = !!(wplan && wplan.scheduled && data.month && !familyRow && !clientView && !draft && (clientRow ? canRename : true));
 
   const unnamed = (list) => list.some((b) => !b.exercises.length || b.exercises.some((e) => !String(e.name || '').trim()));
   const push = async (list, seq) => {
@@ -988,7 +993,20 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         <p className="small muted">Прошлые недели сохранят прежнюю программу. Очередь клиента до этой даты не изменится.</p>
       </Panel>}
       {data.nextProgram && <Note>Следующая программа начнётся {data.nextProgram.startsOn.split('-').reverse().join('.')}.</Note>}
-      {wplan && planTab !== 'done' && <WeekStrip plan={wplan} sel={weekIndex} onSelect={setWeekSel} />}
+      {wplan && planTab !== 'done' && <WeekStrip plan={wplan} sel={weekIndex} onSelect={setWeekSel} onEdit={canWeekEdit ? (w) => setWeekEditor(w.start) : null} />}
+      {weekEditor && canWeekEdit && (
+        <WeekEditor
+          blocks={data.programBlocks || data.blocks}
+          sessions={sessions}
+          month={data.month}
+          cfg={weeksCfg}
+          clientRow={clientRow}
+          trainer={!!clientRow}
+          start={weekEditor}
+          onClose={() => setWeekEditor('')}
+          onSaved={(weeks) => { setWeeksLocal({ month: data.month, weeks }); setWeekEditor(''); reload(); }}
+        />
+      )}
       {wplan && wplan.pending.length > 0 && !choiceClosed && !clientRow && !familyRow && (
         <WeekChoice
           plan={wplan}

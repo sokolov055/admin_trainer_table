@@ -15,7 +15,7 @@
  * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
-import { dateKey, nextMonday, versionAt } from './program-timeline.js';
+import { dateKey, nextMonday, versionAt, addDays, monday } from './program-timeline.js';
 import { withLength, monthWeeks } from './plan-weeks.js';
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
 import { workoutMock } from './workout-mock.js';
@@ -421,6 +421,14 @@ try {
   const saved = JSON.parse(localStorage.getItem('ft775-program-demo') || 'null');
   if (saved) { PLAN_BLOCKS.splice(0, PLAN_BLOCKS.length, ...saved.blocks); Object.assign(demoWeeks, saved.weeks); if (!MONTHS.includes(saved.month)) MONTHS.unshift(saved.month); }
 } catch { /* Демо остаётся доступным при закрытом хранилище. */ }
+// Редактор по неделям (FT-788) в демо: ?mockSchedule=1 — программа по датам
+// с прошлого понедельника, Пн Ср Пт; у тренировок id, как на сервере
+const demoBlockId = (i) => 'b' + (i + 1).toString(16).padStart(16, '0');
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('mockSchedule') === '1') {
+  PLAN_BLOCKS.forEach((b, i) => { b.id = b.id || demoBlockId(i); b.week = 1; delete b.load; });
+  const startsOn = addDays(monday(dateKey()), -7);
+  demoWeeks[MONTHS[0]] = { schedule: 1, startsOn, effectiveOn: startsOn, length: 1, rule: 'client', startWeek: 1, days: [1, 3, 5], choices: {} };
+}
 function saveDemoProgram(params, blocks) {
   const was = demoWeeks[params.month] || {};
   const next = { ...was, ...(params.weeks || {}) };
@@ -2052,6 +2060,19 @@ const MOCK = {
     demoWeeks[params.month] = { ...was, ...w, rule: w.rule || was.rule || 'client', startWeek: w.startWeek || was.startWeek || 1, choices: was.choices || {} };
     return { weeks: demoWeeks[params.month] };
   },
+  // Правки недель (FT-788): весь список правок целиком, версия — от затирания чужой
+  'plan.week.edit': (params) => {
+    const w = demoWeeks[params.month] || (demoWeeks[params.month] = { rule: 'client', choices: {} });
+    if (Number(params.rev || 0) !== Number(w.weekEditsRev || 0)) throw Object.assign(new Error('План недель уже изменили на другом устройстве. Откройте редактор заново.'), { code: 409 });
+    const before = JSON.stringify(w.weekEdits || {});
+    const changed = [...new Set([...Object.keys(w.weekEdits || {}), ...Object.keys(params.weekEdits || {})])]
+      .filter((k) => JSON.stringify((w.weekEdits || {})[k] || null) !== JSON.stringify((params.weekEdits || {})[k] || null)).sort();
+    if (before !== JSON.stringify(params.weekEdits || {})) {
+      w.weekEdits = { ...(params.weekEdits || {}) };
+      w.weekEditsRev = Number(w.weekEditsRev || 0) + 1;
+    }
+    return { weeks: w, changed };
+  },
   'plan.week.choose': (params) => {
     const w = demoWeeks[params.month] || (demoWeeks[params.month] = { rule: 'client', choices: {} });
     w.choices[params.week + ':' + params.blockId] = params.choice;
@@ -2588,7 +2609,7 @@ const MOCK = {
     const blocks = how && params.mode !== 'append' ? withLength(demoTemplate(params.templateId).blocks, n) : demoTemplate(params.templateId).blocks;
     if (params.mode !== 'append') {
       PLAN_BLOCKS.length = 0;
-      PLAN_BLOCKS.push(...blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => ({ ...e })) })));
+      PLAN_BLOCKS.push(...blocks.map((b, i) => ({ ...b, id: b.id || demoBlockId(i), exercises: b.exercises.map((e) => ({ ...e })) })));
       demoWeeks[params.month] = { rule: 'client', startWeek: Number(params.startWeek) || 1, choices: {}, ...(params.weeks || {}) };
       saveDemoProgram(params, PLAN_BLOCKS);
     }

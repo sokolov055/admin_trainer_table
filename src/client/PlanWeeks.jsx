@@ -8,6 +8,7 @@ import {
   weekDates, weekLoad, LOAD_LABEL, PROGRAM_LENGTHS, programLength, weekOf, withLength, withWeekLoad, startWeekOf,
   byWeek, lengthHint, monthWeeks, parseMonth, monthLabelOf,
 } from '../plan-weeks.js';
+import { weekItems, spanTiny } from '../week-edits.js';
 import './plan-weeks.css';
 
 /**
@@ -44,6 +45,13 @@ const extraLine = (w) => {
   const cardio = w.rows.filter((r) => r.extra).every((r) => (r.block.exercises || []).length && r.block.exercises.every((e) => e && e.cardio));
   return ` · ${cardio ? 'кардио' : 'к занятиям'} ${w.extraDone} из ${w.extraNeed}`;
 };
+/** «· одно перенесено с прошлой недели» — у недели, куда перенесли занятия (FT-788) */
+const movedLine = (w) => {
+  const moved = (w.layout || []).filter((it) => it.from);
+  if (!moved.length) return '';
+  const prev = moved.every((it) => it.from === addDays(w.start, -7));
+  return ` · ${moved.length === 1 ? 'одно' : moved.length} перенесено ${prev ? 'с прошлой недели' : 'с других недель'}`;
+};
 const STATUS = { done: 'выполнен', missed: 'не выполнен', open: 'идёт', empty: 'неделя отдыха', paused: 'пауза', expired: 'программа завершена', partial: 'неполная неделя', scheduled: 'скоро начнётся', legacy: 'прежний список' };
 
 /** «декабря» из «Декабрь 2026» — для «программа декабря не назначена» */
@@ -64,7 +72,7 @@ const shortMonths = (w) => {
 };
 
 /** Циклы месяца с оценками и сводка выбранного */
-export function WeekStrip({ plan, sel, onSelect }) {
+export function WeekStrip({ plan, sel, onSelect, onEdit = null }) {
   const w = plan.weeks[sel];
   const total = plan.weeks.length;
   const paged = total > 5;
@@ -109,6 +117,7 @@ export function WeekStrip({ plan, sel, onSelect }) {
       + (w.rows.some((r) => r.carried && r.block.foreign) ? ' · с долгом прошлого месяца'
         : w.rows.some((r) => r.carried) ? ' · с долгом прошлого цикла' : '')
       + (w.extra ? ' · по прошлой программе: ' + w.extra : '')
+      + movedLine(w)
       + (w.missed ? ' · не выполнено: ' + w.missed : '');
   const month = plan.scheduled
     ? w.status === 'scheduled' ? `Программа начнётся ${plan.cfg.startsOn.split('-').reverse().join('.')}` : w.status === 'expired' ? 'Программа завершена. Тренер назначит следующую.'
@@ -139,8 +148,8 @@ export function WeekStrip({ plan, sel, onSelect }) {
               type="button"
               role="tab"
               aria-selected={i === sel}
-              aria-label={`${weekDates(x)}: ${STATUS[x.status]}`}
-              className={'plan-weeks__week' + (x.beyond ? ' is-short' : '') + (x.current ? ' is-now' : '')}
+              aria-label={`${weekDates(x)}: ${STATUS[x.status]}${x.edited ? ', неделя изменена' : ''}`}
+              className={'plan-weeks__week' + (x.beyond ? ' is-short' : '') + (x.current ? ' is-now' : '') + (x.edited ? ' is-edited' : '')}
               onClick={() => { onSelect(i); haptic(); }}
             >
               <strong>{x.from + '–' + x.to}</strong>
@@ -171,6 +180,9 @@ export function WeekStrip({ plan, sel, onSelect }) {
         )}
         <p className="plan-weeks__summary">{summary}</p>
         {w.rows && w.rows.some((r) => r.day) && <DayLine week={w} />}
+        {onEdit && w.editable && w.end >= dateKey() && (
+          <button type="button" className="plan-weeks__edit" onClick={() => { haptic(); onEdit(w); }}>Изменить неделю</button>
+        )}
         {month && <p className={'plan-weeks__month' + (score.allDone && score.graded === score.total ? ' is-praise' : '')}>{month}</p>}
       </div>
     </div>
@@ -488,15 +500,17 @@ export function DayPicker({ value, onChange }) {
 /** «Сегодня по плану: B · Спина + Кардио» и дни недели — у недели с днями занятий */
 function DayLine({ week }) {
   const today = dateKey();
-  const groups = sessionRows(week.rows);
-  const name = (g) => g.map((r) => r.block.title + (r.left === 0 ? ' ✓' : '')).join(' + ');
-  const planned = groups.filter((g) => g[0].day);
-  const free = groups.filter((g) => !g[0].day);
-  const now = week.current && planned.find((g) => g[0].date === today && g.some((r) => r.left > 0));
+  // По раскладке недели (FT-788): одно занятие может стоять дважды, перенесённое — с пометкой
+  const items = weekItems(week);
+  const name = (it) => it.rows.map((r, i) => r.block.title + ((i === 0 ? it.done : r.left === 0) ? ' ✓' : '')).join(' + ')
+    + (it.from ? ` (перенесено из ${spanTiny(it.from)})` : '');
+  const planned = items.filter((it) => it.day).sort((a, b) => a.day - b.day || a.idx - b.idx);
+  const free = items.filter((it) => !it.day);
+  const now = week.current && planned.find((it) => addDays(week.start, it.day - 1) === today && !it.done);
   return (
     <p className="wk-today">
-      {now ? <><b>Сегодня по плану: {now.map((r) => r.block.title).join(' + ')}</b><br /></> : null}
-      {planned.map((g) => `${WEEKDAY_SHORT[g[0].day]} — ${name(g)}`).join(' · ')}
+      {now ? <><b>Сегодня по плану: {now.title}</b><br /></> : null}
+      {planned.map((it) => `${WEEKDAY_SHORT[it.day]} — ${name(it)}`).join(' · ')}
       {free.length ? ' · в любой день: ' + free.map(name).join(', ') : ''}
     </p>
   );
