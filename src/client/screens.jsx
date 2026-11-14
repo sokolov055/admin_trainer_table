@@ -48,6 +48,7 @@ import { useRights, isPro, can, gate } from '../rights.js';
 import { PlusBadge, openPlusOffer } from '../plus.jsx';
 import { useQuickRequest } from '../quick-actions.js';
 import { revealSoon } from '../reveal.js';
+import { takeStart } from './start-request.js';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
@@ -548,6 +549,16 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     revealSoon(() => field.closest('.wishes') || field);
     return true;
   }, quickHere && !clientRow);
+
+  // «▶ Начать тренировку» из записи «Расписания» (FT-788, этап 4): заявку
+  // забираем один раз, когда программа загрузилась и занятие не идёт
+  useEffect(() => {
+    if (loading || error || !data || workout || !clientRow) return;
+    if (sessions.some((x) => x.status === 'active' || x.status === 'paused')) return;
+    const id = takeStart(clientRow);
+    const block = id && [...(data.blocks || []), ...(data.programBlocks || [])].find((b) => b.id === id);
+    if (block) startBlock(block);
+  }, [loading, error, data, workout]);
 
   // Выход из журнала — перечитать и программу: тренер мог переименовать
   // занятие, и тренировка в программе переименовалась вместе с ним

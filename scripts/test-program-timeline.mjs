@@ -245,3 +245,8 @@ test('по записям: правка недели важнее записей
   const paused = weekOn({ ...byBook, bySchedule: 1, pauses: [{ from: '2026-11-19', to: '2026-11-19' }], bookings: [{ id: 'e1', at: local('2026-11-19', 18) }, { id: 'x', at: local('2026-11-25', 9) }] });
   assert.deepEqual(paused.booked, []);
 });
+test('по записям: записей больше, чем занятий, — лишняя запись берёт следующее занятие по очереди', () => {
+  const w = weekOn({ ...byBook, bySchedule: 1, bookings: ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19'].map((d, i) => ({ id: 'e' + i, at: local(d, 9) })) });
+  assert.equal(w.need, 4);
+  assert.deepEqual(w.layout.map((x) => [x.id, x.day]), [['a', 1], ['b', 2], ['c', 3], ['a', 4]]);
+});

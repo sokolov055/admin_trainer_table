@@ -9,6 +9,7 @@ import { haptic } from '../telegram.js';
 import { Panel, Note, Field, Options, ErrorState, BackButton, Sheet, useLeaveGuard } from '../ui.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { scheduledPlan, sessionQueue, dateKey as dayKey } from '../program-timeline.js';
+import { requestStart } from '../client/start-request.js';
 import { IconAlert, IconBack, IconCheck, IconChevron, IconCopy, IconMenu, IconPlus } from '../icons.jsx';
 import {
   addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
@@ -381,7 +382,23 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
     if (!a) return;
     setAsk(null);
     if (!change) { forget(a.event.id); haptic(); return; }
-    commitMove(a.event, a.next, change);
+    commitMove(a.event, a.next, change).then((ok) => {
+      // Клиент «по записям» (FT-788, этап 4): занятие уехало вместе с записью.
+      // «Вернуть» — оставить занятие на прежнем дне: правка той недели
+      const pinned = (a.event.sessions || []).filter((x) => x.id && x.edit);
+      if (!ok || !a.event.session || !pinned.length) return;
+      del.flush();
+      setUndo({ text: `Занятие «${a.event.session.short}» → ${whenShort(a.next)}`, onUndo: async () => {
+        try {
+          for (const x of pinned) {
+            await apiMutate('plan.week.edit', { clientRow: x.edit.row, month: x.edit.month, rev: x.edit.rev, notify: false,
+              weekEdits: { ...x.edit.edits, [x.edit.week]: x.edit.layout.map(({ id, day, from }) => ({ id, day, ...(from ? { from } : {}) })) } });
+          }
+          haptic('success');
+        } catch (err) { setFailure(err); }
+        setTick((t) => t + 1);
+      } });
+    });
   };
 
   const title = titleOf(view, anchor, start, days);
@@ -483,7 +500,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
             const u = undo;
             if (!u) return;
             setUndo(null);
-            commitMove(u.event, u.back);
+            if (u.onUndo) u.onUndo(); else commitMove(u.event, u.back);
           }}>Вернуть</button>
         </div>,
         document.body,
@@ -593,6 +610,53 @@ function Dumbbell() {
 }
 
 /**
+ * Строка «По программе» в окне записи (FT-788, этап 4): что за занятие,
+ * «▶ Начать» — сразу тренировка у клиента, «другое ▾» — провести в эту
+ * запись другое занятие или ничего (правка недели, как в редакторе недель)
+ */
+function SessionRow({ item, pair, onStart, onSaved }) {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState('');
+  const edit = item.edit;
+  const choose = async (id) => {
+    if (!edit || id === item.id) return;
+    const list = edit.layout.map((it) => ({ ...it }));
+    const here = list.find((it) => it.day === edit.day);
+    if (!id) { if (here) here.day = 0; } else {
+      // Выбранное уже стоит в неделе — меняются днями; нет — встаёт вместо
+      const there = list.find((it) => it.id === id && it !== here);
+      if (there) { const d = there.day; there.day = edit.day; if (here) here.day = d; }
+      else if (here) here.id = id;
+      else list.push({ id, day: edit.day });
+    }
+    setBusy(true); setFailure('');
+    try {
+      await apiMutate('plan.week.edit', { clientRow: edit.row, month: edit.month, rev: edit.rev, weekEdits: { ...edit.edits, [edit.week]: list.map(({ id: x, day, from }) => ({ id: x, day, ...(from ? { from } : {}) })) }, notify: false });
+      haptic('success');
+      onSaved(null);
+    } catch (err) { setFailure(err.message || 'Не сохранилось.'); } finally { setBusy(false); }
+  };
+  return (
+    <div className="schedule__session">
+      <span className={'schedule__session-ic' + (item.cardio ? ' is-cardio' : '')} aria-hidden="true">{item.cardio ? '♥' : <Dumbbell />}</span>
+      <span className="schedule__session-t">
+        <small>{pair && item.name ? item.name + ' · по программе' : 'По программе'}</small>
+        <b>{item.title || 'без занятия'}</b>
+        {edit && (
+          <select aria-label="Другое занятие на эту запись" value="" disabled={busy} onChange={(e) => choose(e.target.value === '-' ? '' : e.target.value)}>
+            <option value="">{busy ? 'сохраняю…' : 'другое ▾'}</option>
+            {edit.options.filter((o) => o.id !== item.id).map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+            {item.id && <option value="-">Без занятия программы</option>}
+          </select>
+        )}
+        {failure && <em>{failure}</em>}
+      </span>
+      {item.id && <button type="button" className="schedule__session-go" aria-label={'Начать тренировку ' + item.title} onClick={() => { haptic(); onStart(); }}>▶</button>}
+    </div>
+  );
+}
+
+/**
  * Подписать записи занятием программы (FT-788, этап 4): неделя клиента
  * раскладывается тем же расчётом, что на «Тренировках», а записи берутся
  * с экрана — перенесённая пальцем запись сразу показывает новое занятие
@@ -602,26 +666,43 @@ function withSessions(events, programs) {
   const last = events.reduce((m, e) => (e.startsAt > m ? e.startsAt : m), '');
   const plans = {};
   Object.entries(programs).forEach(([row, p]) => {
-    const mine = events.filter((e) => String(e.clientRow) === row && !e.cancelledCharged);
+    // Записи участника пары — и на его карточку, и на пару
+    const mine = events.filter((e) => (String(e.clientRow) === row || (p.pair && Number(e.clientRow) === Number(p.pair))) && !e.cancelledCharged);
     const shown = new Set(mine.map((e) => e.id));
     const bookings = [...(p.weeks.bookings || []).filter((b) => !shown.has(b.id)), ...mine.map((e) => ({ id: e.id, at: e.startsAt }))];
     try {
       const plan = scheduledPlan({ blocks: p.blocks, sessions: [], month: p.month, cfg: { ...p.weeks, bookings }, until: last ? dayKey(new Date(last)) : '' });
-      const groups = new Map(sessionQueue(p.blocks).map((g) => [g[0].id, g]));
+      const queue = sessionQueue(p.blocks);
+      const groups = new Map(queue.map((g) => [g[0].id, g]));
       (p.weeks.history || []).forEach((h) => sessionQueue(h.blocks || []).forEach((g) => { if (!groups.has(g[0].id)) groups.set(g[0].id, g); }));
-      plans[row] = { weeks: plan.weeks, groups };
+      plans[row] = { row: Number(row), p, weeks: plan.weeks, groups, options: queue.map((g) => ({ id: g[0].id, title: g.map((b) => b.title).join(' + ') })) };
     } catch (_) { /* программа не разложилась — запись без подписи */ }
   });
-  return events.map((e) => {
-    const plan = e.clientRow && plans[String(e.clientRow)];
-    if (!plan) return e;
+  // Занятие одного человека на запись: что по плану и чем править неделю
+  const sessionOf = (plan, e) => {
     const key = dayKey(new Date(e.startsAt));
     const week = plan.weeks.find((w) => w.start <= key && w.end >= key);
     const booked = week && (week.booked || []).find((b) => b.id === e.id);
+    if (!week) return null;
     const slot = booked && week.layout.find((it) => it.day === booked.day);
     const g = slot && plan.groups.get(slot.id);
-    if (!g) return { ...e, session: null, sessionNone: !!week };
-    return { ...e, session: { id: g[0].id, title: g.map((b) => b.title).join(' + '), short: g[0].title, cardio: g.every((b) => b.cardio) } };
+    const edit = booked && week.editable ? { row: plan.row, month: plan.p.month, rev: Number(plan.p.weeks.weekEditsRev) || 0, edits: plan.p.weeks.weekEdits || {},
+      week: week.start, layout: week.layout, day: booked.day, options: plan.options } : null;
+    return { id: g ? g[0].id : '', title: g ? g.map((b) => b.title).join(' + ') : '', short: g ? g[0].title : '', cardio: !!g && g.every((b) => b.cardio),
+      name: plan.p.name || '', row: plan.row, edit };
+  };
+  return events.map((e) => {
+    if (!e.clientRow) return e;
+    const own = plans[String(e.clientRow)] ? [plans[String(e.clientRow)]] : [];
+    const members = Object.values(plans).filter((x) => x.p.pair && Number(x.p.pair) === Number(e.clientRow));
+    const list = [...own, ...members].map((x) => sessionOf(x, e)).filter(Boolean);
+    if (!list.length) return e;
+    const found = list.filter((x) => x.id);
+    if (!found.length) return { ...e, session: null, sessions: list, sessionNone: true };
+    // На плитке одной строкой; у пары — «Олег: B · Света: A»
+    const pair = members.length > 0;
+    const short = pair ? found.map((x) => `${x.name}: ${x.short}`).join(' · ') : found[0].short;
+    return { ...e, session: { ...found[0], short, title: pair ? found.map((x) => `${x.name} — ${x.title}`).join(' · ') : found[0].title }, sessions: list };
   });
 }
 
@@ -1613,15 +1694,13 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
             const who = clients.find((c) => c.row === Number(event.clientRow));
             return who ? (
               <div className="schedule__client-links">
-                {/* Занятие программы на эту запись (FT-788, этап 4) — у клиента «по записям» */}
-                {event.session && (
-                  <button type="button" className="schedule__session" onClick={() => onOpenClient(who, 'plan')}>
-                    <span className={'schedule__session-ic' + (event.session.cardio ? ' is-cardio' : '')} aria-hidden="true">{event.session.cardio ? '♥' : <Dumbbell />}</span>
-                    <span><small>По программе</small><b>{event.session.title}</b></span>
-                    <IconChevron size={16} />
-                  </button>
-                )}
-                {!event.session && event.sessionNone && <p className="small muted" style={{ margin: 0 }}>На эту запись занятий программы не осталось — свободная тренировка.</p>}
+                {/* Занятие программы на эту запись (FT-788, этап 4) — у клиента «по записям»;
+                    у пары — по строке на участника */}
+                {(event.sessions || []).map((x) => (
+                  <SessionRow key={x.row} item={x} pair={(event.sessions || []).length > 1 || !!x.name}
+                    onStart={() => { const c = clients.find((cl) => cl.row === x.row) || who; requestStart(x.row, x.id); onOpenClient(c, 'plan'); }}
+                    onSaved={onDone} />
+                ))}
                 <button type="button" className="button" onClick={() => onOpenClient(who, 'plan')}>Программа клиента</button>
                 <button type="button" className="button button--ghost" onClick={() => onOpenClient(who, 'overview')}>Карточка</button>
               </div>

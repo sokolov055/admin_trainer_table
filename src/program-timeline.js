@@ -141,7 +141,7 @@ export function bookedDays(bookings, from, end, active = null) {
 /**
  * Занятия недели «по записям»: дни записей главные, остальные занятия — на
  * свободные дни программы, потом без дня; дни по порядку, занятия по
- * очереди. Записей больше, чем занятий, — лишние записи без занятия
+ * очереди. Лишние записи заранее получают занятия из очереди (scheduledPlan)
  */
 export function slotsByBookings(slots, booked, programDays, from, startDay = '') {
   const n = slots.length;
@@ -206,8 +206,16 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
     });
     // Записи «Расписания» (этап 4) — только у клиента «по записям»
     const booked = cfg.bySchedule && activeDays.length && !expired && !settings.legacyList ? bookedDays(cfg.bookings, from, end, activeDays) : [];
+    // Записей больше, чем занятий, — лишняя запись берёт следующее занятие по очереди
+    const queue = booked.length > laid.slots.length ? sessionQueue(v.blocks) : [];
+    const extraSlots = [];
+    if (queue.length) {
+      const last = laid.slots.length ? laid.slots[laid.slots.length - 1].g[0] : null;
+      let at = last ? queue.findIndex((g) => g[0] === last || (!!last.id && g[0].id === last.id)) : -1;
+      for (let i = laid.slots.length; i < booked.length; i += 1) { at = (at + 1) % queue.length; extraSlots.push({ g: queue[at], day: 0 }); }
+    }
     const planned = booked.length
-      ? slotsByBookings(laid.slots, booked, beat ? beat.days : settings.days, from, startDay > from && startDay <= end ? startDay : '')
+      ? slotsByBookings([...laid.slots, ...extraSlots], booked, beat ? beat.days : settings.days, from, startDay > from && startDay <= end ? startDay : '')
       : laid.slots;
     // Правка недели — её список занятий вместо раскладки программы
     const edit = activeDays.length && !expired && !settings.legacyList ? weekEditOf(cfg, from) : null;
