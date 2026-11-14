@@ -513,16 +513,6 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 .ws-legend .ws-legend--heavy::before { background: var(--warning); }
 
 /* Сроки: линия и паузы */
-.ws-line { position: relative; display: flex; justify-content: space-between; align-items: flex-start; min-height: 56px; }
-.ws-line__track { position: absolute; left: 22px; right: 22px; top: 16px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent) 60%, color-mix(in srgb, var(--accent) 25%, transparent)); }
-.ws-line__track i { position: absolute; left: 50%; top: -4px; height: 12px; width: 0; border-radius: 6px; background: repeating-linear-gradient(135deg, var(--warning) 0 4px, var(--warning-fill) 4px 8px); transition: width .45s var(--ease-out); }
-.ws-line.has-pause .ws-line__track i { width: 18%; }
-.ws-line__pt { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; padding: 0; border: 0; background: none; font: 650 var(--text-sm)/1.2 var(--font); color: var(--text); cursor: pointer; }
-.ws-line__pt label { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
-.ws-line__pt input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-.ws-line__dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--accent); background: var(--surface); color: var(--accent); display: grid; place-items: center; font-size: 17px; font-weight: 700; }
-.ws-line__dot--stop::before { content: ""; width: 11px; height: 11px; border-radius: 2px; background: var(--accent); }
-.ws-line__x { position: absolute; top: -4px; right: 6px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: var(--surface-sunken); color: var(--text-secondary); display: grid; place-items: center; cursor: pointer; z-index: 2; }
 .ws-chip--pause.is-on { background: var(--warning-fill); color: var(--warning-text); border-color: var(--warning-line); }
 .ws-chip--pause button { display: grid; place-items: center; width: 22px; height: 22px; margin-right: -6px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .06); color: inherit; cursor: pointer; }
 .ws-pause { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; animation: ws-rise .3s var(--ease-out) both; }
@@ -551,31 +541,43 @@ button.plan-weeks__kind { min-height: 36px; cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .ws-count__num b, .ws-bar, .ws-pause, .ws-when__panel, .ws-tile .is-miss { animation: none !important; }
-  .ws-day__dot svg, .ws-bar i, .ws-line__track i, .ws-eye__slash { transition: none; }
+  .ws-day__dot svg, .ws-bar i, .ws-eye__slash { transition: none; }
   .ws-chip:active, .ws-step:active, .ws-eye:active { transform: none; }
 }
 
-/* 14.11.2026, после проверки владельцем: подсказка глаза видна поверх
-   листа (шапка выше тела), кружки сроков тянутся пальцем */
+/* 14.11.2026, после проверки владельцем: подсказка глаза видна поверх листа */
 .ws-sheet .sheet__head { z-index: 4; }
 .ws-eye__toast { left: 46px; top: 50%; transform: translate(-4px, -50%); }
 .ws-eye__toast.is-shown { transform: translate(0, -50%); }
-.ws-drag { touch-action: none; cursor: grab; transition: transform .35s var(--ws-spring), box-shadow var(--dur-fast) var(--ease-out); }
-.ws-drag.is-dragging { transition: none; cursor: grabbing; box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent); }
-.ws-drag:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.ws-drag.is-locked { border-style: dashed; color: var(--text-muted); border-color: var(--border-strong); cursor: default; }
-.ws-line__date { position: relative; display: block; padding: 4px 6px; margin-top: -2px; border-radius: 8px; cursor: pointer; }
-.ws-line__date span { border-bottom: 1px dashed var(--border-strong); }
-.ws-line__date input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-.ws-line__pt--end .ws-line__x { right: -4px; }
-@media (prefers-reduced-motion: reduce) { .ws-drag { transition: none; } }
 
-/* 14.11.2026, видео владельца: лист съезжал вбок, когда кружок уходил за
-   край; крестик «без конца» лежал на кружке — теперь рядом с датой */
+/* Лист не прокручивается вбок ни при каком содержимом */
 .ws-sheet .sheet__body { overflow-x: hidden; }
-.ws-line__under { display: flex; align-items: center; gap: 2px; margin-right: -6px; }
-.ws-line__under .ws-line__x { position: static; flex: none; width: 24px; height: 24px; }
-.ws-line__under .ws-line__date { margin-top: 0; }
-.ws-line__pt { align-items: center; }
-.ws-line__pt--end { align-items: flex-end; }
-.ws-line__pt--end > .ws-drag { margin-right: 14px; }
+
+/* Сроки (вариант А, 14.11.2026): плитки дат, длительность кнопками, недели квадратиками */
+.ws-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ws-tile-date { position: relative; display: block; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); cursor: pointer; }
+.ws-tile-date small { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.ws-tile-date b { display: block; margin-top: 2px; font-size: 18px; font-weight: 740; animation: ws-flip .35s var(--ws-spring); }
+.ws-tile-date input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.ws-tile-date:active { transform: scale(.98); }
+.ws-tile-date.is-locked { background: var(--surface-sunken); cursor: default; }
+.ws-tile-date.is-locked input { pointer-events: none; }
+.ws-tile-date__lock { position: absolute; top: 10px; right: 10px; color: var(--text-muted); }
+@keyframes ws-flip { from { opacity: 0; transform: translateY(6px); } }
+.ws-len { display: flex; gap: 6px; margin-top: 10px; }
+.ws-len > * { flex: 1 1 0; min-width: 0; min-height: 42px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text-secondary); font: 650 var(--text-sm)/1 var(--font); cursor: pointer; transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.ws-len > .is-on { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-text); }
+.ws-len > button:active { transform: scale(.95); }
+.ws-len__inf { font-size: 19px; }
+.ws-len__own { display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 4px; }
+.ws-len__own input { width: 34px; min-width: 0; border: 0; border-bottom: 2px solid currentColor; background: transparent; color: inherit; font: 700 16px/1.2 var(--font); text-align: center; outline: none; -moz-appearance: textfield; }
+.ws-len__own input::placeholder { color: inherit; opacity: .5; }
+.ws-len__own input::-webkit-outer-spin-button, .ws-len__own input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.ws-weeks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+.ws-weeks i { width: 16px; height: 16px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 80%, var(--surface)); animation: ws-pop .3s var(--ws-spring) both; }
+.ws-weeks i.is-past { background: var(--good); }
+.ws-weeks i.is-now { outline: 2px solid var(--text); outline-offset: 1px; }
+.ws-weeks i.is-pause { background: repeating-linear-gradient(135deg, var(--warning) 0 3px, var(--warning-fill) 3px 6px); }
+.ws-weeks.is-open i:last-child { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 60%, var(--surface)), transparent); width: 40px; }
+@keyframes ws-pop { from { transform: scale(0); } }
+@media (prefers-reduced-motion: reduce) { .ws-tile-date b, .ws-weeks i { animation: none; } .ws-len > button:active, .ws-tile-date:active { transform: none; } }

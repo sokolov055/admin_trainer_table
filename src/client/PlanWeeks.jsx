@@ -877,76 +877,78 @@ function LockGlyph() {
   return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
 }
 
-/**
- * Точка на линии сроков, которую тянут пальцем: 8 px — один день, кружок
- * едет за пальцем (до 44 px) и пружинит обратно, дата меняется сразу.
- * Стрелки клавиатуры — ±1 день. Нажатие на дату под точкой — календарь
- */
-function DragDot({ value, onChange, min = '', max = '', disabled = false, onLocked = null, label, stop = false, room = [-44, 44], children }) {
-  const drag = useRef(null);
-  const [dx, setDx] = useState(0);
-  const clamp = (key) => (min && key < min ? min : max && key > max ? max : key);
-  const shift = (days) => { if (days) onChange(clamp(addDays(value, days))); };
+const PRESET_WEEKS = [4, 8, 12];
+const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5);
+
+/** Плитка с датой: нажатие — календарь телефона (невидимое поле поверх) */
+function DateTile({ title, value, empty, min, max, locked = false, onChange, onLocked }) {
   return (
-    <span role="slider" tabIndex={disabled ? -1 : 0} aria-label={label} aria-valuetext={ruShort(value)} aria-disabled={disabled || undefined}
-      className={'ws-line__dot ws-drag' + (stop ? ' ws-line__dot--stop' : '') + (disabled ? ' is-locked' : '') + (dx ? ' is-dragging' : '')}
-      style={dx ? { transform: `translateX(${dx}px) scale(1.12)` } : undefined}
-      onPointerDown={(e) => { if (disabled) { if (onLocked) onLocked(); return; } e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX, base: value, days: 0 }; }}
-      onPointerMove={(e) => {
-        const d = drag.current; if (!d) return;
-        const px = e.clientX - d.x;
-        setDx(Math.max(room[0], Math.min(room[1], px)) || 0.01);
-        const days = Math.round(px / 8);
-        if (days !== d.days) { d.days = days; haptic(); onChange(clamp(addDays(d.base, days))); }
-      }}
-      onPointerUp={() => { drag.current = null; setDx(0); }}
-      onPointerCancel={() => { drag.current = null; setDx(0); }}
-      onKeyDown={(e) => { if (disabled) return; if (e.key === 'ArrowLeft') { e.preventDefault(); shift(-1); } if (e.key === 'ArrowRight') { e.preventDefault(); shift(1); } }}>
-      {children}
-    </span>
+    <label className={'ws-tile-date' + (locked ? ' is-locked' : '')} onClick={locked ? onLocked : undefined}>
+      <small>{title}</small>
+      <b key={value || 'none'}>{value ? ruShort(value) : empty}</b>
+      {locked && <span className="ws-tile-date__lock"><LockGlyph /></span>}
+      <input type="date" aria-label={title} value={value || ''} min={min || undefined} max={max || undefined} disabled={locked}
+        onChange={(e) => e.target.value && onChange(e.target.value)} />
+    </label>
   );
 }
 
-/** «Сроки»: линия «старт → конец», паузы — полосатые плашки под ней */
+/**
+ * «Сроки» (макет program-dates-mockup.html, вариант А, 14.11.2026):
+ * плитки «Начало» и «Конец», длительность кнопками 4 · 8 · 12 · своё · ∞,
+ * ниже квадратик на каждую неделю — прошедшие, текущая, паузы
+ */
 function DatesBlock({ startsOn, endsOn, onStart, onEnd, startLocked, pauses, onPauses, onPauseFrom }) {
   const [adding, setAdding] = useState(false);
   const [from, setFrom] = useState(dateKey());
   const [to, setTo] = useState('');
   const [lockNote, setLockNote] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const [own, setOwn] = useState('');
   const today = dateKey();
+  const start = startsOn || today;
+  const span = endsOn ? dayDiff(start, endsOn) + 1 : 0;
+  const exact = span > 0 && span % 7 === 0 ? span / 7 : 0;
+  const weeksTotal = endsOn ? Math.max(1, Math.ceil(span / 7)) : 0;
+  const setWeeks = (w) => { haptic(); onEnd(w ? addDays(start, w * 7 - 1) : ''); };
+  const custom = exact && !PRESET_WEEKS.includes(exact);
+  const applyOwn = () => { const w = Math.round(Number(own)); if (w >= 1 && w <= 104) setWeeks(w); setTyping(false); };
+  // Квадратики: неделя k — дни start + 7k … +6
+  const elapsed = Math.floor(dayDiff(start, today) / 7);
+  const shown = endsOn ? Math.min(weeksTotal, 104) : Math.max(elapsed + 4, 8);
+  const pausedWeek = (k) => pauses.some((p) => { const a = addDays(start, k * 7); const b = addDays(a, 6); return p.from <= b && (!p.to || p.to >= a); });
+  const hint = dayDiff(today, start) > 0
+    ? `начнётся ${ruShort(start)}`
+    : `идёт ${elapsed + 1}-я неделя · ` + (endsOn ? (weeksTotal - elapsed - 1 > 0 ? `ещё ${weeksTotal - elapsed - 1} нед` : 'последняя') : 'без конца');
   return (
     <section className="ws-blk">
       <h3 className="ws-blk__h">Сроки</h3>
-      <div className={'ws-line' + (pauses.length ? ' has-pause' : '')}>
-        <span className="ws-line__track" aria-hidden="true"><i /></span>
-        {/* Кружок тянется пальцем — ±1 день на 8 px; дата под ним открывает календарь */}
-        <span className="ws-line__pt">
-          <DragDot value={startsOn} max={endsOn} onChange={onStart} disabled={startLocked} room={[-6, 44]} onLocked={() => { haptic(); setLockNote(true); }} label="Дата начала">
-            {startLocked ? <LockGlyph /> : <IconPlay size={14} />}
-          </DragDot>
-          <label className="ws-line__date" onClick={startLocked ? () => setLockNote(true) : undefined}>
-            <span>{ruShort(startsOn) || 'старт'}</span>
-            <input type="date" aria-label="Дата начала" value={startsOn} max={endsOn || undefined} disabled={startLocked} onChange={(e) => e.target.value && onStart(e.target.value)} />
-          </label>
-        </span>
-        {endsOn ? (
-          <span className="ws-line__pt ws-line__pt--end">
-            {/* Кружок у правого края едет только влево — за край карточки не уходит */}
-            <DragDot value={endsOn} min={startsOn} onChange={onEnd} label="Последний день программы" stop room={[-44, 6]} />
-            <span className="ws-line__under">
-              <button type="button" className="ws-line__x" aria-label="Без конца" onClick={() => { haptic(); onEnd(''); }}><IconClose size={12} /></button>
-              <label className="ws-line__date">
-                <span>{ruShort(endsOn)}</span>
-                <input type="date" aria-label="Последний день программы" min={startsOn} value={endsOn} onChange={(e) => e.target.value && onEnd(e.target.value)} />
-              </label>
-            </span>
+      <div className="ws-dates">
+        <DateTile title="Начало" value={startsOn} empty="—" max={endsOn} locked={startLocked} onChange={onStart} onLocked={() => { haptic(); setLockNote(true); }} />
+        <DateTile title="Конец" value={endsOn} empty="без конца" min={startsOn} onChange={onEnd} />
+      </div>
+      <div className="ws-len" role="group" aria-label="Длительность программы">
+        {PRESET_WEEKS.map((w) => (
+          <button key={w} type="button" aria-pressed={exact === w} className={exact === w ? 'is-on' : ''} onClick={() => setWeeks(w)}>{w} нед</button>
+        ))}
+        {typing ? (
+          <span className="ws-len__own is-on">
+            <input type="number" inputMode="numeric" min="1" max="104" autoFocus aria-label="Своё число недель" value={own} placeholder="6"
+              onChange={(e) => setOwn(e.target.value.replace(/\D/g, '').slice(0, 3))} onBlur={applyOwn} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+            <small>нед</small>
           </span>
         ) : (
-          <button type="button" className="ws-line__pt ws-line__pt--end" aria-label="Без конца — задать последний день" onClick={() => { haptic(); onEnd(addDays(startsOn || today, 27)); }}>
-            <span className="ws-line__dot">∞</span><span>без конца</span>
-          </button>
+          <button type="button" aria-pressed={!!custom} className={custom ? 'is-on' : ''} aria-label="Своё число недель" onClick={() => { haptic(); setOwn(custom ? String(exact) : ''); setTyping(true); }}>{custom ? `${exact} нед` : 'своё'}</button>
         )}
+        <button type="button" aria-pressed={!endsOn} className={'ws-len__inf' + (!endsOn ? ' is-on' : '')} aria-label="Без конца" onClick={() => setWeeks(0)}>∞</button>
       </div>
+      <div className={'ws-weeks' + (endsOn ? '' : ' is-open')} aria-hidden="true">
+        {Array.from({ length: shown }, (_, k) => (
+          <i key={k} style={{ animationDelay: Math.min(k, 20) * 20 + 'ms' }}
+            className={(k < elapsed ? 'is-past' : '') + (k === elapsed ? ' is-now' : '') + (pausedWeek(k) ? ' is-pause' : '')} />
+        ))}
+      </div>
+      <p className="ws-hint">{hint}</p>
       {/* Сервер не сдвигает начало программы, у которой уже есть версии
           (plan-weeks.js: history) — говорим об этом, а не молчим */}
       {lockNote && <p className="ws-hint">Начало закреплено: программа уже менялась. Изменения — строкой «с …» внизу.</p>}
