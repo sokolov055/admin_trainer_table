@@ -20,22 +20,22 @@ const INERT = new Set(['head', 'neck', 'knees']);
 
 /** Крупные группы — для «где пробел»: проработана, если есть основная нагрузка */
 const GROUPS = [
-  ['грудь', ['chest']],
+  ['грудь', ['chest', 'serratus']],
   ['спина', ['lats', 'trapezius', 'lower-back']],
-  ['плечи', ['front-deltoids', 'back-deltoids']],
+  ['плечи', ['front-deltoids', 'side-deltoids', 'back-deltoids', 'rotator-cuff']],
   ['руки', ['biceps', 'triceps']],
   ['пресс', ['abs', 'obliques']],
   ['ягодицы', ['glutes', 'abductors']],
-  ['ноги', ['quadriceps', 'hamstrings', 'adductors', 'calves']],
+  ['ноги', ['quadriceps', 'hamstrings', 'adductors', 'calves', 'hip-flexors']],
 ];
 
-/** Названия мышц по порядку; обе дельты — «плечи» */
+/** Названия мышц по порядку; передняя и задняя дельты вместе — «плечи» (средняя входит туда же) */
 export function namesOf(regions) {
   const list = [...regions];
   const both = list.includes('front-deltoids') && list.includes('back-deltoids');
   const out = [];
   list.forEach((r) => {
-    if (both && (r === 'front-deltoids' || r === 'back-deltoids')) {
+    if (both && (r === 'front-deltoids' || r === 'back-deltoids' || r === 'side-deltoids')) {
       if (!out.includes('Плечи')) out.push('Плечи');
       return;
     }

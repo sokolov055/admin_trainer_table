@@ -110,7 +110,7 @@ function Big({ text }) {
 }
 
 // Мышцы задней стороны тела; остальные — спереди
-const BACK = new Set(['back-deltoids', 'trapezius', 'lats', 'lower-back', 'glutes', 'hamstrings', 'calves', 'triceps']);
+const BACK = new Set(['back-deltoids', 'rotator-cuff', 'trapezius', 'lats', 'lower-back', 'glutes', 'hamstrings', 'calves', 'triceps']);
 /** Какую сторону фигуры показать в плитке: где больше основных мышц */
 function sideOf(primary) {
   const back = primary.filter((r) => BACK.has(r)).length;

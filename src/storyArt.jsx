@@ -900,7 +900,7 @@ export function ArtGoalPush() {
  */
 export function ArtMuscles() {
   const MAIN = new Set(['chest', 'lats', 'trapezius']);
-  const HELP = new Set(['triceps', 'biceps', 'front-deltoids', 'back-deltoids']);
+  const HELP = new Set(['triceps', 'biceps', 'front-deltoids', 'side-deltoids', 'back-deltoids']);
   const side = (shapes, x) => (
     <g transform={'translate(' + x + ' 6) scale(0.84)'} strokeWidth={STROKE / 0.84}>
       {shapes.map(([m, polys]) => polys.map((pts, i) => (
