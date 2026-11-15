@@ -85,6 +85,8 @@ button.pc-tile { cursor: pointer; transition: transform var(--dur-press) var(--e
 button.pc-tile:active { transform: scale(.94); }
 .pc-tile__ph { position: relative; display: block; width: 64px; height: 64px; border-radius: var(--radius-lg); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
 .pc-tile__ph .pc-thumb { position: absolute; inset: 0; }
+/* «Коротко» (FT-792): одна строка под картинкой, длиннее — «…» */
+.pc-tile__word { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; }
 .pc-tile__n {
   position: absolute; z-index: 2; left: 4px; top: 4px; width: 18px; height: 18px; display: grid; place-items: center;
   border-radius: 6px; background: rgba(10, 10, 14, .72); color: #fff; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;

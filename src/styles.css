@@ -6292,6 +6292,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 
 .library__title { font-size: 20px; line-height: 1.25; letter-spacing: -0.015em; margin-bottom: 6px; }
 .library__meta { margin: 0 0 var(--space-3); }
+/* «Коротко» (FT-792): счётчик знаков справа над полем */
+.library__chars { text-align: right; font-variant-numeric: tabular-nums; }
 .library__sub { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--text-muted); }
 
 /* Действия карточки — та же высота и кегль, что у действий списка */

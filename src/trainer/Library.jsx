@@ -1577,6 +1577,10 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
           <Field label="Название" inputMode="text" value={draft.name} onChange={(v) => set({ name: v })} />
           {actions({ name: (draft.name || '').trim() }, (draft.name || '').trim().length >= 2)}
         </>)}
+        {row('short', 'Коротко — в ленте программы', e.shortName, () => ({ shortName: e.shortName || '' }), () => <>
+          <ShortNameField value={draft.shortName} onChange={(v) => set({ shortName: v })} />
+          {actions({ shortName: (draft.shortName || '').trim() })}
+        </>, 'Не задано — в ленте только номер')}
         <div className="item__meta library__meta"><span>{e.mine ? 'своё' : 'общее'}</span></div>
         {!e.mine && <p className="small muted">Общее упражнение: сохранение любого поля создаст вашу версию с теми же тренажёрами и заменами — общая не изменится.</p>}
 
@@ -1675,6 +1679,21 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
         </div>
       </Panel>
     </>
+  );
+}
+
+/** Ключевое слово упражнения (FT-792): до 12 знаков — столько помещается под картинкой 64 px */
+const SHORT_MAX = 12;
+function ShortNameField({ value = '', onChange }) {
+  const count = Array.from(value).length;
+  return (
+    <label className="field">
+      {/* Подпись поля — над ним в карточке; здесь только счётчик знаков */}
+      <span className="field__label library__chars" aria-hidden="true">{count} / {SHORT_MAX}</span>
+      <input className="field__input" type="text" autoComplete="off" aria-label="Коротко — в ленте программы" value={value} placeholder="Пек-дек"
+        onChange={(ev) => onChange(Array.from(ev.target.value).slice(0, SHORT_MAX).join(''))} />
+      <span className="field__hint">Видно под картинкой в карточке тренировки. Пусто — только номер.</span>
+    </label>
   );
 }
 

@@ -209,9 +209,10 @@ export function ExerciseThumb({ ex, className = '' }) {
 /* ---------- Лента ---------- */
 
 /**
- * Лента картинок с номерами: видно всю тренировку, не раскрывая. Подписей
- * под картинками нет (15.11.2026): первое слово названия («Обратное»)
- * вводило в заблуждение; ключевое слово упражнения — отдельной задачей
+ * Лента картинок с номерами: видно всю тренировку, не раскрывая. Подпись
+ * под картинкой — ключевое слово упражнения из базы («Коротко», FT-792);
+ * не задано — только номер. Из названия не угадывается (15.11.2026):
+ * первое слово («Обратное») вводило в заблуждение
  */
 export function ExerciseStrip({ exercises, onOpen }) {
   if (!exercises.length) return null;
@@ -227,6 +228,7 @@ export function ExerciseStrip({ exercises, onOpen }) {
               <ExerciseThumb ex={ex} />
               <span className="pc-tile__n">{i + 1}</span>
             </span>
+            {ex.exercise && ex.exercise.shortName && <small className="pc-tile__word">{ex.exercise.shortName}</small>}
           </>
         );
         return (

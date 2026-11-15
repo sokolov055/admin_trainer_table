@@ -332,7 +332,9 @@ const PLAN_BLOCKS = [
       // Типы упражнений (track) — как их отдаёт сервер: дропсет, вес
       // одной гантели, свой вес с добавкой
       { name: 'Тяга штанги в наклоне', weight: '65', prevWeight: '62.5', sets: '4', reps: '10', rpe: '7', technique: 'dropset' },
-      { name: 'Жим гантелей сидя', weight: '24', prevWeight: '24', sets: '3', reps: '12', rpe: '8', track: { kind: 'strength', machine: '', unilateral: false, perSide: true } },
+      // Из базы, с ключевым словом «Коротко» (FT-792) — подпись в ленте карточки
+      { name: 'Жим гантелей сидя', weight: '24', prevWeight: '24', sets: '3', reps: '12', rpe: '8', track: { kind: 'strength', machine: '', unilateral: false, perSide: true },
+        exercise: { name: 'Жим гантелей сидя', shortName: 'Жим сидя', muscle: 'Плечи', equipment: 'Гантели', notes: '', media: null, machines: [], alternatives: [], noteKey: 'e:жим гантелей сидя', setup: '' } },
       { name: 'Подтягивания', weight: '+5', prevWeight: '0', sets: '4', reps: 'макс', rpe: '9', track: { kind: 'bodyweight', machine: '', unilateral: false, perSide: false } },
     ],
   },
@@ -352,7 +354,7 @@ const PLAN_BLOCKS = [
         // Тренажёры и замены (FT-478, FT-479): прошлый раз — на раме у окна
         machine: { uid: 'rack01', name: 'Силовая рама у окна' },
         notes: { 'm:rack01|приседания со штангой': 'Крюки на 4-й, упоры на 2-й' },
-        exercise: { name: 'Приседания со штангой', muscle: 'Ноги', equipment: 'Штанга', notes: '', media: { kind: 'animation', url: 'Barbell_Squat' },
+        exercise: { name: 'Приседания со штангой', shortName: 'Присед', muscle: 'Ноги', equipment: 'Штанга', notes: '', media: { kind: 'animation', url: 'Barbell_Squat' },
           machines: [
             { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' },
             { uid: 'smith1', name: 'Стойка у зеркала', photo: '', setup: '' },
@@ -1193,6 +1195,9 @@ let demoExercises = [
     ? { kind: 'bodyweight', machine: '', unilateral: false, perSide: false, auto: true }
     : { kind: 'strength', machine: '', unilateral: false, perSide: equipment === 'Гантели', auto: true },
 }));
+// «Коротко» (FT-792): у двух слово задано, у остальных — только номер
+Object.assign(demoExercises[1], { shortName: 'Тяга к груди' });
+Object.assign(demoExercises[4], { shortName: 'Махи' });
 Object.assign(demoExercises[7], { setup: 'Стойки — крюки чуть выше колена.\nОшибка: спина круглится внизу.' });
 // «Как настроить тренажёр»: одна проверенная инструкция и один черновик
 Object.assign(demoExercises[1], { setupOk: true, setup: 'Валик — плотно прижимает бёдра, стопы стоят на полу.\nСиденье — руки вверх дотягиваются до рукояти, чуть согнуты.\nХват — шире плеч, большой палец сверху.\nОшибка: раскачка корпусом назад.\nОшибка: тянуть за голову.' });
@@ -2546,7 +2551,7 @@ const MOCK = {
   }),
   'library.exercise.save': (params) => {
     const existing = demoExercises.find((e) => e.id === Number(params.id));
-    const extras = { mistakes: params.mistakes ?? existing?.mistakes ?? '', contentOk: params.contentOk ?? false, setup: params.setup ?? existing?.setup ?? '', setupOk: params.setupOk ?? existing?.setupOk ?? false, primaryEquipmentUid: params.primaryEquipmentUid ?? existing?.primaryEquipmentUid ?? null, track: params.track ?? existing?.track, muscles: params.muscles ?? existing?.muscles, musclesCustom: !!params.muscles, machines: params.machineUids ? params.machineUids.map(uid => demoMachines.find(m => m.uid === uid)).filter(Boolean) : existing?.machines || [] };
+    const extras = { shortName: params.shortName ?? existing?.shortName ?? '', mistakes: params.mistakes ?? existing?.mistakes ?? '', contentOk: params.contentOk ?? false, setup: params.setup ?? existing?.setup ?? '', setupOk: params.setupOk ?? existing?.setupOk ?? false, primaryEquipmentUid: params.primaryEquipmentUid ?? existing?.primaryEquipmentUid ?? null, track: params.track ?? existing?.track, muscles: params.muscles ?? existing?.muscles, musclesCustom: !!params.muscles, machines: params.machineUids ? params.machineUids.map(uid => demoMachines.find(m => m.uid === uid)).filter(Boolean) : existing?.machines || [] };
     if (existing && existing.mine) {
       Object.assign(existing, extras,
  { name: params.name, muscle: params.muscle, equipment: params.equipment, notes: params.notes, media: params.link ? { kind: 'link', url: params.link } : existing.media });

@@ -2047,6 +2047,57 @@ test('в карточке клиента тренировки выбираютс
 });
 
 
+// FT-792: ключевое слово упражнения («Коротко») — подпись под картинкой в
+// ленте; не задано — только номер, из названия не угадывается. Задаётся в
+// карточке упражнения библиотеки, до 12 знаков со счётчиком
+test('ключевое слово упражнения: подпись в ленте и поле в библиотеке', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin);
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin);
+    await phone.getByRole('button', { name: 'Тренировки', exact: true }).click({ timeout: 20000 });
+    const keep = phone.getByRole('button', { name: /Оставить в прошлой неделе/ });
+    if (await keep.waitFor({ timeout: 2500 }).then(() => true, () => false)) await keep.click();
+    const main = phone.locator('#root main:not([hidden])');
+    await main.locator('.pc-strip').first().waitFor({ timeout: 15000 });
+    const words = await main.locator('.pc-tile__word').allInnerTexts();
+    assert.ok(words.includes('Жим сидя'), 'слово из базы под картинкой: ' + words.join(', '));
+    assert.ok(!words.some((w) => /^(Жим|Тяга|Подтягивания)$/.test(w)), 'без угаданных подписей: ' + words.join(', '));
+    await context.close();
+
+    const coach = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+    const tab = await coach.newPage();
+    tab.on('pageerror', (error) => consoleErrors.push(String(error)));
+    try {
+      await tab.goto(origin + '/?mockRole=trainer');
+      await tab.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+      await tab.goto(origin + '/?mockRole=trainer');
+      await tab.getByRole('button', { name: 'Библиотека', exact: true }).click({ timeout: 20000 });
+      await tab.getByRole('tab', { name: 'Упражнения', exact: true }).click();
+      await tab.getByText('Махи гантелями в стороны', { exact: true }).first().click();
+      const field = tab.getByRole('button', { name: 'Изменить: Коротко — в ленте программы' });
+      await field.waitFor({ timeout: 5000 });
+      assert.match(await field.innerText(), /Махи/);
+      await field.click();
+      const input = tab.getByRole('textbox', { name: /Коротко — в ленте программы/ });
+      await input.fill('Махи в стороны стоя');
+      assert.equal(await input.inputValue(), 'Махи в сторо', 'не длиннее 12 знаков');
+      await tab.getByText('12 / 12').waitFor({ timeout: 2000 });
+      await input.fill('Махи вбок');
+      await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
+      await tab.getByRole('button', { name: 'Изменить: Коротко — в ленте программы' }).getByText('Махи вбок').waitFor({ timeout: 5000 });
+    } finally {
+      await coach.close();
+    }
+  } finally {
+    await context.close().catch(() => {});
+  }
+});
+
+
 // FT-791, 15.11.2026: листание ленты упражнений вбок во «Всей программе» не
 // выдвигает удаление тренировки — у ленты своя прокрутка (data-no-swipe)
 test('лента упражнений листается вбок без меню удаления', async () => {
