@@ -41,7 +41,7 @@
 .ts-pill:focus-visible, .ts-hero__stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Название ---------- */
-.ts-name { padding: var(--space-4) 2px 0; }
+.ts-name { padding: var(--space-4) 0 0; }
 .ts-name h3 { margin: 0; font-size: 24px; font-weight: 760; line-height: 1.15; letter-spacing: -0.02em; overflow-wrap: anywhere; }
 .ts-name p { margin: 4px 0 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.3; }
 
@@ -81,8 +81,6 @@
 @keyframes ts-pane { from { opacity: 0; transform: translateY(6px); } }
 .ts-item { animation: ts-rise 460ms var(--ease-out) both; animation-delay: calc(330ms + var(--i, 0) * 60ms); }
 .ts-pane--switched .ts-item { animation-delay: calc(60ms + var(--i, 0) * 45ms); }
-.ts-fold:not(.is-open) .ts-item { animation: none; }
-.ts-fold.is-open .ts-item { animation: ts-rise 380ms var(--ease-out) both; animation-delay: calc(80ms + var(--i, 0) * 40ms); }
 
 .ts-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .ts-steps li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; }
@@ -96,44 +94,37 @@
 .ts-nos span { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 12px 6px 6px; box-sizing: border-box; border-radius: 999px; background: var(--critical-fill); color: var(--critical-text); font-size: var(--text-sm); font-weight: 600; line-height: 1.25; }
 .ts-nos span::before { content: ''; flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--critical) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M6 6l6 6M12 6l-6 6' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 18px no-repeat; }
 
-.ts-swap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--space-4); color: var(--text-muted); font-size: var(--text-sm); }
-.ts-swap em { font-style: normal; padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); font-weight: 600; }
 .ts-empty { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
 
 /* ---------- Тренажёр ---------- */
 .ts-mach + .ts-mach { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border); }
-.ts-mach__row { all: unset; display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; box-sizing: border-box; border-radius: var(--radius-lg); background: var(--surface-sunken); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform var(--dur-press) var(--ease-out); }
-.ts-mach__row:disabled { cursor: default; }
-.ts-mach__row:not(:disabled):active { transform: scale(0.98); }
-.ts-mach__row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ts-mach__thumb { flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--surface); color: var(--text-muted); }
-.ts-mach__thumb img { width: 100%; height: 100%; object-fit: cover; }
-.ts-mach__tx { min-width: 0; display: grid; gap: 3px; }
-.ts-mach__tx b { font-size: var(--text-base); font-weight: 650; line-height: 1.25; }
-.ts-mach__tx span { color: var(--text-muted); font-size: 12.5px; }
-.ts-mach__big { display: grid; gap: 8px; margin-top: 8px; animation: ts-rise 320ms var(--ease-out) both; }
-.ts-mach__big img { display: block; width: 100%; max-height: 60vh; object-fit: contain; border-radius: var(--radius-lg); background: var(--surface-sunken); }
 .ts-pane > .ts-mine:first-child { margin: 0 0 var(--space-4); }
 .ts-mine { display: grid; gap: 2px; margin-top: 10px; padding: 10px 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--radius-lg); }
 .ts-mine i { font-style: normal; color: var(--text-muted); font-size: 12px; font-weight: 650; }
 .ts-mine b { font-size: var(--text-base); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 
-.ts-fold { margin-top: 10px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
-.ts-fold > button { all: unset; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 46px; padding: 0 14px; box-sizing: border-box; font-size: var(--text-base); font-weight: 650; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.ts-fold > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg); }
-.ts-fold > button svg { flex: none; color: var(--text-muted); transform: rotate(-90deg); transition: transform 360ms var(--ts-spring); }
-.ts-fold.is-open > button svg { transform: rotate(0deg); }
-.ts-fold__body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 380ms var(--ease-ios); }
-.ts-fold.is-open .ts-fold__body { grid-template-rows: 1fr; }
-.ts-fold__body > div { min-height: 0; overflow: hidden; }
-.ts-fold__body > div > :first-child { margin-top: 0; }
-.ts-fold__body .ts-rows { padding: 0 14px 14px; }
-.ts-fold__body .ts-avoid { margin: 0; padding: 0 14px 14px; }
+
+/* Тренажёр открыт сразу: фото крупно (несколько — лентой), название, настройка */
+.ts-mach__photos { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: var(--radius-lg); }
+.ts-mach__photos::-webkit-scrollbar { display: none; }
+.ts-mach__photos img { flex: 0 0 100%; width: 100%; height: auto; max-height: 46vh; max-height: 46dvh; object-fit: contain; border-radius: var(--radius-lg); background: var(--surface-sunken); scroll-snap-align: start; }
+.ts-mach__photos--many img { flex-basis: 86%; }
+.ts-mach__name { margin: 12px 0 0; font-size: var(--text-md); font-weight: 720; line-height: 1.25; }
+.ts-setup { margin-top: var(--space-4); }
+.ts-setup h5, .ts-swap h4 { margin: 0 0 10px; color: var(--text-muted); font-size: 12px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* Замены в занятии — кнопки: нажатие меняет упражнение */
+.ts-swap { margin-top: var(--space-5); }
+.ts-swap > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.ts-swap__btn { all: unset; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; box-sizing: border-box; border: 1.5px solid var(--accent); border-radius: 999px; color: var(--accent); font-size: var(--text-sm); font-weight: 700; cursor: pointer; transition: transform var(--dur-press) var(--ease-out), background-color var(--dur) var(--ease-out); -webkit-tap-highlight-color: transparent; }
+.ts-swap__btn:active { transform: scale(0.95); background: var(--accent-wash); color: var(--accent-ink); border-color: var(--accent-ink); }
+.ts-swap__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ts-swap-note { margin: var(--space-4) 0 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.35; }
 
 .ts-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
-.ts-rows li { display: grid; grid-template-columns: minmax(64px, 30%) minmax(0, 1fr); gap: 10px; font-size: var(--text-sm); line-height: 1.35; color: var(--text-secondary); }
+.ts-rows li { display: grid; grid-template-columns: minmax(72px, 30%) minmax(0, 1fr); gap: 10px; font-size: var(--text-sm); line-height: 1.35; color: var(--text-secondary); }
 .ts-rows b { color: var(--text); font-weight: 650; }
-.ts-rows__wide { grid-column: 1 / -1; }
+.ts-rows--plain li { grid-template-columns: minmax(0, 1fr); }
 
 @media (prefers-reduced-motion: reduce) {
   .tech-sheet .sheet__body *, .tech-sheet .sheet__body *::before { animation: none !important; transition: none !important; }

@@ -859,9 +859,9 @@ test('FT-570, вариант А: шаги одной нумерацией, ош�
 
     await act(async () => { tabs[1].props.onClick(); await delay(); });
     assert.ok(text(sheet()).includes('Technogym'), 'вкладка «Тренажёр»');
-    const fold = sheet().find(n => n.type === 'button' && n.props['aria-expanded'] !== undefined && text(n) === 'Как настроить');
-    await act(async () => { fold.props.onClick(); await delay(); });
-    assert.ok(text(sheet()).includes('Рычаг') && text(sheet()).includes('под сиденьем'), 'регулировки тренажёра');
+    // Тренажёр и настройка открыты сразу (владелец 15.11.2026)
+    assert.ok(text(sheet()).includes('Рычаг') && text(sheet()).includes('под сиденьем'), 'регулировки тренажёра — без раскрывашки');
+    assert.ok(sheet().findAllByType('img').length >= 1, 'фото тренажёра — сразу');
     assert.ok(text(sheet()).includes('не тяните рычаг под нагрузкой'), 'ошибка тренажёра — в его настройке');
   } finally {
     exerciseSetupResponse = null;
@@ -935,7 +935,7 @@ test('тренажёры закрепил тренер: выбора нет, п�
     const tab = sheet().findAll(n => n.props.role === 'tab')[1];
     assert.equal(text(tab), 'Оборудование');
     await act(async () => { tab.props.onClick(); await delay(); });
-    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mach__tx').map(n => text(n.findByType('b'))), ['Гриф', 'Скамья'], 'основной первым, скамья под ним');
+    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mach__name').map(text), ['Гриф', 'Скамья'], 'основной первым, скамья под ним');
     assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mine').map(text), ['Ваша настройкаХват 81'], 'настройка клиента — и в листе');
 
     const edit = plaques()[0];
@@ -976,7 +976,7 @@ test('тренажёры на выбор: закреплённый — одно�
     await act(async () => { chip.props.onClick(); await delay(); });
     const sheet = () => local.root.find(n => n.type === 'div' && n.props.className === 'tech-sheet');
     await act(async () => { sheet().findAll(n => n.props.role === 'tab')[1].props.onClick(); await delay(); });
-    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mach__tx').map(n => text(n.findByType('b'))), ['Рама у окна'], 'в листе — только закреплённая');
+    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mach__name').map(text), ['Рама у окна'], 'в листе — только закреплённая');
   } finally {
     exerciseSetupResponse = null;
     if (local) local.unmount();

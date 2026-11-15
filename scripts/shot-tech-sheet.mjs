@@ -72,8 +72,19 @@ function geometry() {
     const mid = line.top + line.height / 2;
     if (Math.abs(mid - (n.top + n.height / 2)) > 3) bad.push(`номер шага не по первой строке (${Math.round(mid - n.top - n.height / 2)})`);
   }
+  // Строки «что — как»: текст всех строк с одного края, и у строк без подписи
+  for (const list of sheet.querySelectorAll('.ts-rows:not(.ts-rows--plain)')) {
+    const lefts = [...list.querySelectorAll('li > span')].map((x) => Math.round(r(x).left));
+    if (new Set(lefts).size > 1) bad.push('строки настройки не выровнены: ' + lefts.join(','));
+  }
   const head = sheet.querySelector('.ts-name');
   if (hero && head && r(head).top < r(hero).bottom) bad.push('название наезжает на картинку');
+  // Левый край один: картинка, название, плитки, вкладки, содержимое
+  const edge = hero ? Math.round(r(hero).left) : null;
+  for (const sel of ['.ts-name h3', '.ts-stats', '.ts-seg', '.ts-steps', '.ts-mach__name', '.ts-mach__photos', '.ts-setup h5', '.ts-rows', '.ts-avoid h4', '.ts-swap h4']) {
+    const el = sheet.querySelector(sel);
+    if (edge !== null && el && Math.abs(Math.round(r(el).left) - edge) > 1) bad.push(`${sel} не по левому краю (${Math.round(r(el).left) - edge})`);
+  }
   return bad;
 }
 
@@ -126,11 +137,12 @@ async function run(label, width, dark) {
     await shot('3-machine');
     const g2 = await page.evaluate(geometry);
     check(label + ': «Тренажёр» ровно', !g2.length, g2.join('; '));
-    await sheet.getByRole('button', { name: 'Как настроить' }).first().click();
-    await page.waitForTimeout(700);
-    await sheet.locator('.ts-fold.is-open').scrollIntoViewIfNeeded();
-    await shot('4-fold');
-    check(label + ': «Как настроить» раскрылось', await sheet.locator('.ts-fold.is-open .ts-rows li').count() > 0);
+    // Тренажёр открыт сразу: фото и «Как настроить» без раскрывашки
+    check(label + ': фото тренажёра сразу', await sheet.locator('.ts-mach__photos img').count() > 0);
+    check(label + ': настройка открыта', await sheet.locator('.ts-setup .ts-rows li').count() > 0);
+    await sheet.locator('.ts-setup').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await shot('4-setup');
     await sheet.getByRole('tab', { name: 'Как делать' }).click();
     await page.waitForTimeout(650);
     const g3 = await page.evaluate(geometry);
@@ -149,8 +161,15 @@ async function run(label, width, dark) {
     const g4 = await page.evaluate(geometry);
     check(label + ': в занятии ровно', !g4.length, g4.join('; '));
     check(label + ': кнопки «Тренажёр» в занятии нет', await squat.locator('.workout__machine-btn').count() === 0);
-    await page.keyboard.press('Escape');
+    // Замена из листа: кнопка меняет упражнение и закрывает лист
+    const swapBtn = sheet.locator('.ts-swap__btn').first();
+    check(label + ': замена — кнопкой', await swapBtn.count() === 1);
+    await swapBtn.scrollIntoViewIfNeeded();
+    await shot('6-swap');
+    await swapBtn.click();
     await sheet.waitFor({ state: 'detached', timeout: 5000 });
+    await page.locator('.workout__exercise').filter({ hasText: 'Жим ногами' }).first().waitFor({ timeout: 5000 });
+    check(label + ': замена сработала', await page.locator('.workout__exercise').filter({ hasText: 'Присед со штангой' }).count() === 0);
     check(label + ': без ошибок', errors.length === 0, errors.join(' | '));
   } catch (e) {
     check(label + ': сценарий', false, String(e).split('\n')[0]);

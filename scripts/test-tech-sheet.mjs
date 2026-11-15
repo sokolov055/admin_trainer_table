@@ -38,7 +38,7 @@ test('модель: «Коротко» заголовком, тренажёр в
   assert.deepEqual(m.avoid, ['раскачивать корпус', 'пожимать плечами']);
   assert.deepEqual(m.machines[0].setup.map((r) => r.label), ['Спинка', 'Сиденье'], 'регулировки тренажёра, потом общий принцип');
   assert.deepEqual(m.machines[0].note, { text: 'Сиденье 4', by: 'trainer' });
-  assert.deepEqual(m.alternatives, ['Махи в наклоне']);
+  assert.deepEqual(m.alternatives, [{ id: 2, name: 'Махи в наклоне' }]);
   assert.equal(m.photo, '/m/1.jpg');
 });
 

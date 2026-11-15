@@ -103,7 +103,7 @@ export function techModel({ name = '', card = {}, muscles = null, notes = {}, ta
     tab: list.length ? (list.every((m) => m.kind === 'equipment') ? 'Оборудование' : 'Тренажёр') : prep.length ? 'Подготовка' : '',
     muscles: map && ((map.primary && map.primary.length) || (map.secondary && map.secondary.length)) ? map : null,
     muscleName: c.muscle || '',
-    alternatives: (c.alternatives || []).map((a) => a.name).filter(Boolean),
+    alternatives: (c.alternatives || []).filter((a) => a && a.name).map((a) => ({ id: a.id, name: a.name })),
     // Своя настройка у упражнения без тренажёра (lib/machine-notes.js)
     note: !list.length && c.noteKey ? noteText(notes[c.noteKey]) : null,
   };

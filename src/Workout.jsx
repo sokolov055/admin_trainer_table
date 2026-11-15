@@ -2211,7 +2211,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         {targets.slice(0, 1).map(noteCell)}
         {targets.slice(1).map((t, i) => noteCell(t, i + 1))}
         {/* Лист упражнения (15.11.2026): техника и тренажёр — вкладками */}
-        {info && <TechButton ex={ex} info={guideOf(ex, usedInfo)} notes={split ? {} : notes} trainer={!asClient} targetOf={(uid) => machineTarget(info, uid)} />}
+        {info && <TechButton ex={ex} info={guideOf(ex, usedInfo)} notes={split ? {} : notes} trainer={!asClient} targetOf={(uid) => machineTarget(info, uid)}
+          swaps={alts} onSwap={canSwap ? (a) => { setSwapping(null); replaceExercise(ei, { name: a.name, exerciseId: a.id }); } : null} />}
         {canSwap && <button type="button" className="workout__chip workout__alts-toggle" aria-expanded={swapping === ex.id}
           onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
           <IconRefresh size={16} aria-hidden="true" />{swapping === ex.id ? 'Не заменять' : 'Заменить'}

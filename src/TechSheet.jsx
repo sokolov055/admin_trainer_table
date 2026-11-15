@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Sheet } from './ui.jsx';
-import { IconPlay, IconRefresh, IconChevron } from './icons.jsx';
+import { IconPlay, IconRefresh } from './icons.jsx';
 import { haptic } from './telegram.js';
 import { Media } from './media.jsx';
 import { mediaUrl } from './library.js';
@@ -157,40 +157,35 @@ function Avoid({ items, title = 'Не делайте' }) {
   );
 }
 
+/**
+ * «Что — как» двумя столбцами. Строка без подписи встаёт в столбец текста,
+ * под остальными (владелец 15.11.2026: «строки не выровнены»); подписей нет
+ * ни у одной — список в один столбец
+ */
 function Rows({ rows }) {
-  return <ul className="ts-rows">{rows.map((r, i) => (
-    <li key={i} className="ts-item" style={{ '--i': i }}>{r.label ? <><b>{r.label}</b><span>{r.text}</span></> : <span className="ts-rows__wide">{r.text}</span>}</li>
+  const labeled = rows.some((r) => r.label);
+  return <ul className={'ts-rows' + (labeled ? '' : ' ts-rows--plain')}>{rows.map((r, i) => (
+    <li key={i} className="ts-item" style={{ '--i': i }}>{labeled && <b>{r.label}</b>}<span>{r.text}</span></li>
   ))}</ul>;
 }
 
-/** Раскрывашка: высота едет сеткой 0fr → 1fr, стрелка поворачивается */
-function Fold({ title, children }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className={'ts-fold' + (open ? ' is-open' : '')}>
-      <button type="button" aria-expanded={open} onClick={() => { haptic(); setOpen(!open); }}>
-        {title}<IconChevron size={16} aria-hidden="true" />
-      </button>
-      {/* Содержимое на месте и закрытым — иначе сворачивание было бы рывком */}
-      <div className="ts-fold__body" inert={open ? undefined : ''}><div>{children}</div></div>
-    </div>
-  );
-}
-
+/**
+ * Тренажёр открыт сразу (владелец 15.11.2026: «свёрнуто» — не нужно): фото
+ * крупно, название, своя настройка, как настроить — списком
+ */
 function Machine({ m, trainer }) {
-  const [big, setBig] = useState(false);
-  const photo = m.photos[0];
   return (
     <section className="ts-mach">
-      <button type="button" className="ts-mach__row" disabled={!photo} aria-expanded={photo ? big : undefined}
-        onClick={() => { haptic(); setBig(!big); }}>
-        <span className="ts-mach__thumb">{photo ? <img src={mediaUrl(photo)} alt="" loading="lazy" draggable="false" /> : <Dumbbell />}</span>
-        <span className="ts-mach__tx"><b>{m.name}</b>{photo && <span>{big ? 'Свернуть фото' : 'Фото — нажмите, чтобы увеличить'}</span>}</span>
-      </button>
-      {big && <div className="ts-mach__big">{m.photos.map((u) => <img key={u} src={mediaUrl(u)} alt={'Тренажёр «' + m.name + '»'} loading="lazy" draggable="false" />)}</div>}
+      {m.photos.length > 0 && <div className={'ts-mach__photos' + (m.photos.length > 1 ? ' ts-mach__photos--many' : '')}>
+        {m.photos.map((u) => <img key={u} src={mediaUrl(u)} alt={(m.kind === 'equipment' ? 'Оборудование «' : 'Тренажёр «') + m.name + '»'} loading="lazy" draggable="false" />)}
+      </div>}
+      <h4 className="ts-mach__name">{m.name}</h4>
       <Mine note={m.note} trainer={trainer} />
-      {m.setup.length > 0 && <Fold title={m.kind === 'equipment' ? 'Как подготовить' : 'Как настроить'}><Rows rows={m.setup} /><Avoid items={m.avoid} title="Не делайте" /></Fold>}
-      {!m.setup.length && m.avoid.length > 0 && <Avoid items={m.avoid} />}
+      {m.setup.length > 0 && <section className="ts-setup">
+        <h5>{m.kind === 'equipment' ? 'Как подготовить' : 'Как настроить'}</h5>
+        <Rows rows={m.setup} />
+      </section>}
+      <Avoid items={m.avoid} />
     </section>
   );
 }
@@ -205,7 +200,26 @@ function Mine({ note, trainer }) {
   );
 }
 
-function HowPane({ m, trainer }) {
+/**
+ * Замены: в занятии до первого подхода — кнопки, нажатие меняет упражнение
+ * (как «Заменить»); в карточке тренировки — подсказкой, менять там нечего
+ */
+function Swaps({ items, onSwap }) {
+  if (!items.length) return null;
+  if (!onSwap) return <p className="ts-swap-note">Занято — в тренировке можно заменить на {items.map((a) => a.name).join(', ')}</p>;
+  return (
+    <section className="ts-swap">
+      <h4>Занято? Заменить на</h4>
+      <div>{items.map((a) => (
+        <button key={a.id || a.name} type="button" className="ts-swap__btn" onClick={() => onSwap(a)}>
+          <IconRefresh size={14} aria-hidden="true" />{a.name}
+        </button>
+      ))}</div>
+    </section>
+  );
+}
+
+function HowPane({ m, trainer, swaps, onSwap }) {
   if (!m.steps.length && !m.avoid.length) return <><Mine note={m.note} trainer={trainer} /><p className="ts-empty">Техника к этому упражнению пока не записана.</p></>;
   return <>
     <Mine note={m.note} trainer={trainer} />
@@ -216,7 +230,7 @@ function HowPane({ m, trainer }) {
       </li>
     ))}</ol>}
     <Avoid items={m.avoid} />
-    {m.alternatives.length > 0 && <div className="ts-swap"><span>Занято?</span>{m.alternatives.map((a) => <em key={a}>{a}</em>)}</div>}
+    <Swaps items={swaps || m.alternatives} onSwap={onSwap} />
   </>;
 }
 
@@ -230,7 +244,7 @@ function Inline({ children }) {
  * тот же лист, что в карточке тренировки, плюс «Сейчас · подход N из M».
  * Тренажёр — вкладкой листа (отдельной кнопки больше нет)
  */
-export function TechButton({ ex, info, notes = {}, trainer = false, targetOf }) {
+export function TechButton({ ex, info, notes = {}, trainer = false, targetOf, swaps = null, onSwap = null }) {
   const [open, setOpen] = useState(false);
   const m = open ? techModel({ name: ex.name, card: info, notes, targetOf }) : null;
   const steps = info ? instructionParts(info.notes || '', info.mistakes || '').steps.length : 0;
@@ -240,7 +254,7 @@ export function TechButton({ ex, info, notes = {}, trainer = false, targetOf }) 
       aria-label={'Техника' + (meta ? ': ' + meta : '')} onClick={() => { haptic(); setOpen(true); }}>
       <IconPlay size={16} aria-hidden="true" />Техника
     </button>
-    {open && <TechSheet m={m} plan={workoutPlan(ex.sets)} last={workoutLast(ex)} now={workoutNow(ex.sets)} trainer={trainer} onClose={() => setOpen(false)} />}
+    {open && <TechSheet m={m} plan={workoutPlan(ex.sets)} last={workoutLast(ex)} now={workoutNow(ex.sets)} trainer={trainer} swaps={swaps} onSwap={onSwap} onClose={() => setOpen(false)} />}
   </>;
 }
 
@@ -248,7 +262,10 @@ export function TechButton({ ex, info, notes = {}, trainer = false, targetOf }) 
  * m — techModel; plan, last — строки плиток; now — { set, of, value }
  * внутри занятия; trainer — подписи для тренера
  */
-export default function TechSheet({ m, plan = '', last = '', now = null, trainer = false, onClose }) {
+export default function TechSheet({ m, plan = '', last = '', now = null, trainer = false, swaps = null, onSwap = null, onClose }) {
+  const closeRef = useRef(null);
+  // Замена: упражнение меняется сразу, лист уезжает своей анимацией
+  const swap = onSwap ? (a) => { haptic('success'); onSwap(a); if (closeRef.current) closeRef.current(); else onClose(); } : null;
   const tabs = m.tab ? ['Как делать', m.tab] : [];
   const [tab, setTab] = useState('Как делать');
   const [switched, setSwitched] = useState(false);
@@ -257,7 +274,7 @@ export default function TechSheet({ m, plan = '', last = '', now = null, trainer
   const dom = typeof document !== 'undefined' && !!document.body && document.body.nodeType === 1;
   const Frame = dom ? Sheet : Inline;
   return (
-    <Frame title={m.title} onClose={onClose} className="tech-sheet">
+    <Frame title={m.title} onClose={onClose} className="tech-sheet" closeRef={closeRef}>
       <Hero media={m.media} photo={m.photo} />
       <div className="ts-name ts-rise" style={{ '--i': 1 }}>
         <h3>{m.title}</h3>
@@ -267,7 +284,7 @@ export default function TechSheet({ m, plan = '', last = '', now = null, trainer
       <Stats plan={plan} last={last} m={m} />
       {tabs.length > 0 && <Tabs items={tabs} value={tab} onChange={pick} />}
       <div key={tab} className={'ts-pane' + (switched ? ' ts-pane--switched' : '')} role={tabs.length ? 'tabpanel' : undefined}>
-        {tab === 'Как делать' && <HowPane m={m} trainer={trainer} />}
+        {tab === 'Как делать' && <HowPane m={m} trainer={trainer} swaps={swaps} onSwap={swap} />}
         {tab !== 'Как делать' && m.machines.map((x) => <Machine key={x.uid} m={x} trainer={trainer} />)}
         {tab !== 'Как делать' && !m.machines.length && <Rows rows={m.prep} />}
       </div>
