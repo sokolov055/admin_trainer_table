@@ -56,13 +56,32 @@
 .ts-stat i, .ts-stat--mus i { font-style: normal; font-size: 11.5px; white-space: nowrap; font-weight: 650; color: var(--text-muted); line-height: 1.2; }
 .ts-stat__v { font-size: 24px; font-weight: 760; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ts-stat__v small { font-size: 14px; font-weight: 650; color: var(--text-secondary); letter-spacing: 0; }
-.ts-stat--mus { flex: 1.3 1 0; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 8px 10px 8px 8px; }
 /* Фигура — одной стороной, где больше основной нагрузки (TechSheet.jsx, sideOf) */
 .ts-stat--mus .muscles__figure { flex-direction: row; flex-wrap: nowrap; gap: 0; }
 .ts-stat--front .muscles__view + .muscles__view, .ts-stat--back .muscles__view:first-child { display: none; }
 .ts-stat--mus .muscles__side { width: 30px; height: 60px; }
-.ts-stat--mus > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.ts-stat--mus b { font-size: 13px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
+.ts-stat--mus { -webkit-appearance: none; appearance: none; margin: 0; border: 0; font: inherit; color: inherit; text-align: left; position: relative; flex: 1.3 1 0; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 8px 22px 8px 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform var(--dur-press) var(--ease-out), background-color var(--dur) var(--ease-out); }
+.ts-stat--mus:disabled { cursor: default; padding-right: 10px; }
+.ts-stat--mus:not(:disabled):active { transform: scale(0.97); }
+.ts-stat--mus.is-open { background: var(--accent-wash); }
+.ts-stat--mus:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ts-stat__mus { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ts-stat__more { position: absolute; right: 8px; top: 50%; margin-top: -7px; color: var(--text-muted); transition: transform 360ms var(--ts-spring); }
+.ts-stat--mus.is-open .ts-stat__more { transform: rotate(180deg); }
+
+/* Мышцы целиком: фигура спереди и сзади, основные — заливкой, помогающие — пунктиром */
+.ts-muscles { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 400ms var(--ease-ios); }
+.ts-muscles.is-open { grid-template-rows: 1fr; }
+.ts-muscles > div { min-height: 0; overflow: hidden; }
+.ts-muscles__in { display: grid; gap: 12px; margin-top: 8px; padding: 14px; border-radius: var(--radius-lg); background: var(--surface-sunken); opacity: 0; transform: translateY(-6px); transition: opacity 280ms var(--ease-out), transform 360ms var(--ease-out); }
+.ts-muscles.is-open .ts-muscles__in { opacity: 1; transform: none; transition-delay: 80ms; }
+.ts-muscles__in .muscles__figure { justify-self: center; }
+.ts-muscles__group { display: grid; gap: 6px; }
+.ts-muscles__group i { font-style: normal; color: var(--text-muted); font-size: 12px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; }
+.ts-muscles__group > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.ts-mchip { padding: 5px 11px; border-radius: 999px; background: var(--accent-wash); color: var(--accent-ink); font-size: var(--text-sm); font-weight: 650; }
+.ts-mchip--help { background: none; border: 1.5px dashed var(--border-strong); color: var(--text-secondary); padding: 3.5px 10px; }
+.ts-stat--mus b { display: block; font-size: 13px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
 .ts-stat--mus b small { font-weight: 650; color: var(--text-muted); }
 /* Основные мышцы «дышат» — в такт движению, мягко */
 .ts-stat--mus .muscles__part--primary { animation: ts-breathe 2.2s var(--ease-in-out) 700ms infinite; }

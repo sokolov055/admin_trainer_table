@@ -103,6 +103,9 @@ export function techModel({ name = '', card = {}, muscles = null, notes = {}, ta
     tab: list.length ? (list.every((m) => m.kind === 'equipment') ? 'Оборудование' : 'Тренажёр') : prep.length ? 'Подготовка' : '',
     muscles: map && ((map.primary && map.primary.length) || (map.secondary && map.secondary.length)) ? map : null,
     muscleName: c.muscle || '',
+    // Тренер отметил мышцы сам — показываем названия; нет — это группа
+    // целиком («Ноги» = пять мышц), и честнее назвать группу
+    musclesCustom: !!c.musclesCustom,
     alternatives: (c.alternatives || []).filter((a) => a && a.name).map((a) => ({ id: a.id, name: a.name })),
     // Своя настройка у упражнения без тренажёра (lib/machine-notes.js)
     note: !list.length && c.noteKey ? noteText(notes[c.noteKey]) : null,
@@ -136,4 +139,16 @@ export function workoutNow(sets) {
   const r = String(s.reps || '').trim();
   const value = [w ? w.replace('.', ',') + ' кг' : '', r ? (w ? '× ' : '') + r : ''].filter(Boolean).join(' ');
   return { set: i + 1, of: work.length, value };
+}
+
+/**
+ * Подпись плитки «Мышцы» (владелец 15.11.2026: «Квадрицепс +4» непонятно):
+ * размечено тренером — до двух названий или «X и ещё N»; по группе — группа
+ */
+export function muscleLine(names, group, custom) {
+  if (!custom && group) return group;
+  if (!names.length) return group || '';
+  if (names.length <= 2) return names.join(', ');
+  const n = names.length - 1;
+  return names[0] + ' и ещё ' + n;
 }

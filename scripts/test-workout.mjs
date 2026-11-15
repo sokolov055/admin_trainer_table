@@ -849,7 +849,10 @@ test('FT-570, вариант А: шаги одной нумерацией, ош�
     const sheet = () => local.root.find(n => n.type === 'div' && n.props.className === 'tech-sheet');
     const tabs = sheet().findAll(n => n.props.role === 'tab');
     assert.deepEqual(tabs.map(text), ['Как делать', 'Тренажёр']);
-    assert.equal(sheet().findAll(n => String(n.props.className || '').startsWith('muscles__figure')).length, 1, 'фигура мышц — в плитке');
+    const musTile = sheet().find(n => n.type === 'button' && String(n.props.className || '').includes('ts-stat--mus'));
+    assert.equal(musTile.findAll(n => String(n.props.className || '').startsWith('muscles__figure')).length, 1, 'фигура мышц — в плитке');
+    assert.ok(!/\+\d/.test(text(musTile)), 'без «+N»: названия или группа');
+    assert.equal(musTile.props['aria-expanded'], false, 'плитка мышц раскрывается');
     assert.equal(sheet().findAll(n => String(n.props.className || '').startsWith('ts-now')).length, 1, 'в занятии — какой подход сейчас');
     assert.ok(text(sheet()).includes('Прижмите спину к спинке'), 'шаги техники');
     assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-nos').map(n => n.findAllByType('span').map(text)), [['не раскачивайтесь', 'не отрывайте спину от спинки']], 'ошибки метками, без повторов');

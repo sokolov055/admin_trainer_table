@@ -11,13 +11,13 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Sheet } from './ui.jsx';
-import { IconPlay, IconRefresh } from './icons.jsx';
+import { IconPlay, IconRefresh, IconChevron } from './icons.jsx';
 import { haptic } from './telegram.js';
 import { Media } from './media.jsx';
 import { mediaUrl } from './library.js';
 import { MuscleFigure, namesOf } from './muscles/MuscleMap.jsx';
 import { instructionParts } from './equipment-guidance.js';
-import { techModel, workoutPlan, workoutLast, workoutNow } from './tech-sheet-model.js';
+import { techModel, workoutPlan, workoutLast, workoutNow, muscleLine } from './tech-sheet-model.js';
 import './tech-sheet.css';
 
 const ANIM_ID = /^[\w-]+$/;
@@ -117,20 +117,44 @@ function sideOf(primary) {
   return back > primary.length - back ? 'back' : 'front';
 }
 
+/**
+ * Плитки «План / Прошлый раз / Мышцы». Мышцы — кнопкой: под плитками
+ * раскрывается фигура спереди и сзади и полный список — основные и
+ * помогающие (владелец 15.11.2026: «+4» непонятно — раскрывать)
+ */
 function Stats({ plan, last, m }) {
+  const [open, setOpen] = useState(false);
   const main = m.muscles ? namesOf(m.muscles.primary || []) : [];
-  const muscle = main[0] || m.muscleName || '';
-  const more = main.length > 1 ? ' +' + (main.length - 1) : '';
+  const help = m.muscles ? namesOf((m.muscles.secondary || []).filter((r) => !(m.muscles.primary || []).includes(r))) : [];
+  const line = muscleLine(main, m.muscleName, m.musclesCustom || !m.muscleName);
+  const canOpen = !!m.muscles && (main.length + help.length) > 0;
   const tiles = [
     plan && <div key="plan" className="ts-stat"><i>План</i><Big text={plan} /></div>,
     last && <div key="last" className="ts-stat"><i>Прошлый раз</i><Big text={last} /></div>,
-    (m.muscles || muscle) && <div key="mus" className={'ts-stat ts-stat--mus ts-stat--' + sideOf((m.muscles && m.muscles.primary) || [])}>
-      {m.muscles && <MuscleFigure primary={m.muscles.primary || []} secondary={m.muscles.secondary || []} size="sm" />}
-      <div><i>Мышцы</i><b>{muscle}{more && <small>{more}</small>}</b></div>
-    </div>,
+    (m.muscles || line) && (
+      <button key="mus" type="button" className={'ts-stat ts-stat--mus ts-stat--' + sideOf((m.muscles && m.muscles.primary) || []) + (open ? ' is-open' : '')}
+        disabled={!canOpen} aria-expanded={canOpen ? open : undefined} onClick={() => { haptic(); setOpen(!open); }}>
+        {m.muscles && <MuscleFigure primary={m.muscles.primary || []} secondary={m.muscles.secondary || []} size="sm" />}
+        <span className="ts-stat__mus"><i>Мышцы</i><b>{line}</b></span>
+        {canOpen && <IconChevron size={14} aria-hidden="true" className="ts-stat__more" />}
+      </button>
+    ),
   ].filter(Boolean);
   if (!tiles.length) return null;
-  return <div className="ts-stats">{tiles.map((t, i) => React.cloneElement(t, { className: t.props.className + ' ts-rise', style: { '--i': 2 + i } }))}</div>;
+  return <>
+    <div className="ts-stats">{tiles.map((t, i) => React.cloneElement(t, { className: t.props.className + ' ts-rise', style: { '--i': 2 + i } }))}</div>
+    {canOpen && (
+      <div className={'ts-muscles' + (open ? ' is-open' : '')} inert={open ? undefined : ''}>
+        <div>
+          <div className="ts-muscles__in">
+            <MuscleFigure primary={m.muscles.primary || []} secondary={m.muscles.secondary || []} size="md" captions />
+            {main.length > 0 && <div className="ts-muscles__group"><i>Основные</i><div>{main.map((n) => <span key={n} className="ts-mchip">{n}</span>)}</div></div>}
+            {help.length > 0 && <div className="ts-muscles__group"><i>Помогают</i><div>{help.map((n) => <span key={n} className="ts-mchip ts-mchip--help">{n}</span>)}</div></div>}
+          </div>
+        </div>
+      </div>
+    )}
+  </>;
 }
 
 /** Две вкладки, подложка переезжает пружиной */

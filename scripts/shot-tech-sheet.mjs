@@ -81,7 +81,7 @@ function geometry() {
   if (hero && head && r(head).top < r(hero).bottom) bad.push('название наезжает на картинку');
   // Левый край один: картинка, название, плитки, вкладки, содержимое
   const edge = hero ? Math.round(r(hero).left) : null;
-  for (const sel of ['.ts-name h3', '.ts-stats', '.ts-seg', '.ts-steps', '.ts-mach__name', '.ts-mach__photos', '.ts-setup h5', '.ts-rows', '.ts-avoid h4', '.ts-swap h4']) {
+  for (const sel of ['.ts-name h3', '.ts-stats', '.ts-muscles__in', '.ts-seg', '.ts-steps', '.ts-mach__name', '.ts-mach__photos', '.ts-setup h5', '.ts-rows', '.ts-avoid h4', '.ts-swap h4']) {
     const el = sheet.querySelector(sel);
     if (edge !== null && el && Math.abs(Math.round(r(el).left) - edge) > 1) bad.push(`${sel} не по левому краю (${Math.round(r(el).left) - edge})`);
   }
@@ -119,6 +119,17 @@ async function run(label, width, dark) {
     check(label + ': «Как делать» ровно', !g1.length, g1.join('; '));
     check(label + ': «Коротко» заголовком', (await sheet.locator('.ts-name h3').innerText()) === 'Жим гантелей сидя');
     check(label + ': ошибки метками', await sheet.locator('.ts-nos span').count() === 3, String(await sheet.locator('.ts-nos span').count()));
+    // Мышцы: плитка раскрывает фигуру и полный список (без «+4»)
+    const mus = sheet.locator('.ts-stat--mus');
+    check(label + ': в плитке мышц нет «+N»', !/\+\d/.test(await mus.innerText()), await mus.innerText());
+    await mus.click();
+    await page.waitForTimeout(650);
+    await shot('1b-muscles');
+    check(label + ': мышцы раскрылись', await sheet.locator('.ts-muscles.is-open .ts-mchip').count() > 0);
+    const gm = await page.evaluate(geometry);
+    check(label + ': раскрытые мышцы ровно', !gm.length, gm.join('; '));
+    await mus.click();
+    await page.waitForTimeout(500);
     await sheet.getByRole('button', { name: '0,5×' }).click();
     check(label + ': 0,5× нажата', (await sheet.getByRole('button', { name: '0,5×' }).getAttribute('aria-pressed')) === 'true');
     await page.keyboard.press('Escape');

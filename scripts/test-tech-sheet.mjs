@@ -2,7 +2,7 @@
 // пояснение шага, ошибки метками, тренажёр второй вкладкой, «Сейчас» в занятии
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitStep, mistakeChips, setupRows, techModel, workoutPlan, workoutLast, workoutNow } from '../src/tech-sheet-model.js';
+import { splitStep, mistakeChips, setupRows, techModel, workoutPlan, workoutLast, workoutNow, muscleLine } from '../src/tech-sheet-model.js';
 
 test('шаг делится по «;» на главное и пояснение, без точки в конце', () => {
   assert.deepEqual(splitStep('1. Грудь у опоры, корпус неподвижен; руки на уровне плеч, локти слегка согнуты.'),
@@ -62,4 +62,12 @@ test('в занятии: план, прошлый раз и «Сейчас · п
   assert.equal(workoutLast({ lastRun: { weights: ['17.5', '20', '20'] } }), '20 кг');
   assert.equal(workoutLast({ prevWeight: '12,5' }), '12,5 кг');
   assert.equal(workoutLast({}), '');
+});
+
+test('плитка «Мышцы»: без «+4» — группа, если тренер не размечал, иначе названия', () => {
+  const legs = ['Квадрицепс', 'Бицепс бедра', 'Приводящие', 'Отводящие', 'Икры'];
+  assert.equal(muscleLine(legs, 'Ноги', false), 'Ноги');
+  assert.equal(muscleLine(legs, 'Ноги', true), 'Квадрицепс и ещё 4');
+  assert.equal(muscleLine(['Икры'], 'Ноги', true), 'Икры');
+  assert.equal(muscleLine(['Грудь', 'Трицепс'], '', false), 'Грудь, Трицепс');
 });
