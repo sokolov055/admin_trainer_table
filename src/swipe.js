@@ -95,6 +95,10 @@ export function useSwipe({ width = 88, disabled = false, onFull = null } = {}) {
 
   const onPointerDown = (e) => {
     if (disabled || (e.button !== undefined && e.button !== 0)) return;
+    // Внутри строки своё листание вбок (лента упражнений, FT-791): пока ей
+    // есть куда листаться, движение вбок — её, а не смахивание строки
+    const own = e.target && e.target.closest && e.target.closest('[data-scroll-x]');
+    if (own && own.scrollWidth > own.clientWidth + 1) return;
     // Касание другой строки закрывает открытую
     if (closeOpen && closeOpen !== self.current) closeOpen();
     const rowWidth = e.currentTarget.offsetWidth || 320;

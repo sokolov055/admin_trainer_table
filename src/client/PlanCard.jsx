@@ -18,7 +18,7 @@ import { mediaUrl } from '../library.js';
 import { MuscleFigure, namesOf, splitTally, tallyExercises } from '../muscles/MuscleMap.jsx';
 import { supersets } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
-import { planSets, planMinutes, lastWeightOf, shortName, doneShare } from '../plan-card-model.js';
+import { planSets, planMinutes, lastWeightOf, doneShare } from '../plan-card-model.js';
 import './plan-card.css';
 
 const ANIM_ID = /^[\w-]+$/;
@@ -50,7 +50,7 @@ export function PlanTabs({ items, value, onChange }) {
           className={'chip' + (item.value === value ? ' chip--active' : '')}
           onClick={() => { if (item.value !== value) haptic(); onChange(item.value); }}
         >
-          {item.label}
+          <span>{item.label}</span>
           {item.count > 0 && <span className={'pc-tabs__n' + (item.tone === 'good' ? ' pc-tabs__n--good' : '')}>{item.count}</span>}
         </button>
       ))}
@@ -171,34 +171,54 @@ function useInView(ref) {
 }
 
 /**
- * Два кадра техники (public/anim/<id>/), плавной сменой, пока видна. Нет
- * анимации — фото тренажёра, нет и его — гантель
+ * Картинка упражнения (15.11.2026, владелец): в приоритете движение —
+ * 3D-ролик техники, затем два кадра (public/anim/<id>/); фото тренажёра —
+ * только если движения нет (тренажёр виден в листе техники); нет ничего —
+ * гантель. Ролик и кадры идут, только пока картинка на экране; при
+ * «Уменьшить движение» — первый кадр
  */
 export function ExerciseThumb({ ex, className = '' }) {
   const ref = useRef(null);
+  const video = useRef(null);
   const live = useInView(ref);
   const card = ex && ex.exercise;
   const media = card && card.media;
-  const anim = media && media.kind === 'animation' && ANIM_ID.test(media.url || '') ? media.url : '';
-  const machine = !anim && card && (card.machines || []).find((m) => (m.photos && m.photos.length) || m.photo);
+  const clip = media && media.kind === 'clip' && media.url ? mediaUrl(media.url) : '';
+  const anim = !clip && media && media.kind === 'animation' && ANIM_ID.test(media.url || '') ? media.url : '';
+  const machine = !clip && !anim && card && (card.machines || []).find((m) => (m.photos && m.photos.length) || m.photo);
   const photo = machine ? (machine.photos && machine.photos[0]) || machine.photo : '';
+  const still = reducedMotion();
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    if (live && !still) v.play().catch(() => {}); else v.pause();
+  }, [live, clip, still]);
+  const kind = clip ? 'clip' : anim ? 'anim' : photo ? 'photo' : 'icon';
   return (
-    <span ref={ref} className={'pc-thumb' + (anim ? ' pc-thumb--anim' : photo ? ' pc-thumb--photo' : ' pc-thumb--icon') + (anim && live ? ' is-live' : '') + (className ? ' ' + className : '')} aria-hidden="true">
+    <span ref={ref} className={'pc-thumb pc-thumb--' + kind + (anim && live ? ' is-live' : '') + (className ? ' ' + className : '')} aria-hidden="true">
+      {/* #t=0.1 — первый кадр виден и до запуска (Safari иначе рисует пусто) */}
+      {clip && <video ref={video} src={clip + '#t=0.1'} muted loop playsInline preload="metadata" disablePictureInPicture tabIndex={-1} />}
       {anim && <img src={animSrc(anim, 0)} alt="" loading="lazy" draggable="false" />}
       {anim && live && <img src={animSrc(anim, 1)} alt="" loading="lazy" draggable="false" className="pc-thumb__b" />}
-      {!anim && photo && <img src={mediaUrl(photo)} alt="" loading="lazy" draggable="false" />}
-      {!anim && !photo && <IconDumbbell size={24} />}
+      {photo && <img src={mediaUrl(photo)} alt="" loading="lazy" draggable="false" />}
+      {kind === 'icon' && <IconDumbbell size={24} />}
     </span>
   );
 }
 
 /* ---------- Лента ---------- */
 
-/** Лента картинок с номерами: видно всю тренировку, не раскрывая */
+/**
+ * Лента картинок с номерами: видно всю тренировку, не раскрывая. Подписей
+ * под картинками нет (15.11.2026): первое слово названия («Обратное»)
+ * вводило в заблуждение; ключевое слово упражнения — отдельной задачей
+ */
 export function ExerciseStrip({ exercises, onOpen }) {
   if (!exercises.length) return null;
   return (
-    <div className="pc-strip" role="list" aria-label="Упражнения по порядку">
+    // data-scroll-x: пока ленте есть куда листаться, движение вбок — её, а
+    // не смахивание карточки (удаление); жест «назад» решает так же
+    <div className="pc-strip" role="list" aria-label="Упражнения по порядку" data-scroll-x="">
       {exercises.map((ex, i) => {
         const can = !!(ex.exercise && onOpen);
         const body = (
@@ -207,7 +227,6 @@ export function ExerciseStrip({ exercises, onOpen }) {
               <ExerciseThumb ex={ex} />
               <span className="pc-tile__n">{i + 1}</span>
             </span>
-            <small>{shortName(ex.name)}</small>
           </>
         );
         return (

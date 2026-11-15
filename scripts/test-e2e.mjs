@@ -2047,6 +2047,36 @@ test('в карточке клиента тренировки выбираютс
 });
 
 
+// FT-791, 15.11.2026: листание ленты упражнений вбок во «Всей программе» не
+// выдвигает удаление тренировки — у ленты своя прокрутка (data-no-swipe)
+test('лента упражнений листается вбок без меню удаления', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    await phone.getByRole('tab', { name: /^Вся программа/ }).click();
+    const block = phone.locator('#root main:not([hidden]) .plan__block-swipe').nth(1);
+    const strip = block.locator('.pc-strip');
+    await strip.waitFor({ timeout: 10000 });
+    const box = await strip.boundingBox();
+    await phone.mouse.move(box.x + box.width - 20, box.y + box.height / 2);
+    await phone.mouse.down();
+    await phone.mouse.move(box.x + 20, box.y + box.height / 2, { steps: 10 });
+    await phone.mouse.up();
+    await phone.waitForTimeout(400);
+    const shift = await block.locator('.swipe__content').evaluate((el) => el.style.transform || '');
+    assert.ok(!/translate/.test(shift) || /\(0px/.test(shift), 'карточка не сдвинута: ' + shift);
+    assert.equal(await phone.getByRole('button', { name: 'Вернуть', exact: true }).count(), 0, 'не удалена');
+  } finally {
+    await context.close();
+  }
+});
+
 test('FT-775: программа по датам переживает reload, пауза сохраняется одним действием', async () => {
   const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', isMobile: true, hasTouch: true });
   const phone = await context.newPage();
