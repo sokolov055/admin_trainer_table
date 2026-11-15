@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { focusOf, nextInfo, nextText, supersetMark, unitsOf, setsWord, planText } from '../src/workout-view.js';
+import { foldLine, focusOf, nextInfo, nextText, supersetMark, unitsOf, setsWord, planText } from '../src/workout-view.js';
 
 const set = (state, weight = '', reps = '10') => ({ state, weight, reps, kind: 'work' });
 
@@ -72,4 +72,14 @@ test('подписи: подходы словом, план без RPE', () => {
   assert.equal(setsWord(3), '3 подхода');
   assert.equal(setsWord(11), '11 подходов');
   assert.equal(planText('3 × 12 · RPE 8 · 20 кг'), '3 × 12 · 20 кг');
+});
+
+test('foldLine: свёрнутое упражнение одной строкой (15.11.2026)', () => {
+  const set = (weight, reps, state = 'pending', kind = 'work') => ({ weight, reps, state, kind });
+  assert.equal(foldLine({ sets: [set('4', '15'), set('4', '15'), set('5', '15'), set('6', '15')] }), '4 × 15 · 4–6 кг');
+  assert.equal(foldLine({ sets: [set('20', '10', 'done', 'warmup'), set('60', '12', 'done'), set('60', '10')] }), '1 из 2 · 2 подхода · 60 кг', 'разминка не считается');
+  assert.equal(foldLine({ sets: [set('7,5', '12', 'done'), set('7,5', '12', 'skipped')] }), '✓ 2 × 12 · 7,5 кг');
+  assert.equal(foldLine({ sets: [set('', '15'), set('', '15')] }), '2 × 15', 'свой вес — без кг');
+  assert.equal(foldLine({ sets: [{ time: '10:00', state: 'pending' }] }), '1 отрезок');
+  assert.equal(foldLine({ sets: [] }), 'Нет подходов');
 });

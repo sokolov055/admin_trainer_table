@@ -10,7 +10,7 @@ import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, withoutSet, cloneSet, editSetField } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh, IconPlay } from './icons.jsx';
 import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
 import { BackButton } from './ui.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -106,7 +106,7 @@ import { usePlankAccess } from './plank-access.js';
 import { restHere, setRestHere, workoutScreenOpen, restClosed } from './rest-here.js';
 import { askReviewAt, noteWorkoutDone } from './native-review.js';
 import { useReveal } from './reveal.js';
-import { setsWord, planText, supersetMark, focusOf, nextText, nextInfo, unitsOf as units } from './workout-view.js';
+import { setsWord, foldLine, planText, supersetMark, focusOf, nextText, nextInfo, unitsOf as units } from './workout-view.js';
 import { EffortChooser, EffortFix } from './EffortButtons.jsx';
 import RestChips from './RestChips.jsx';
 import LastRunHint from './LastRunHint.jsx';
@@ -114,6 +114,40 @@ import LastRunHint from './LastRunHint.jsx';
 const labels = { active: 'Идёт', paused: 'На паузе', completed: 'Завершена', cancelled: 'Отменена' };
 
 // backLabel — куда ведёт «назад»: из программы — к ней, из меню — к списку клиентов
+/**
+ * Отрезки полосы в шапке (15.11.2026): по одному на упражнение, суперсет —
+ * одним отрезком. Пропущенный подход считается пройденным: ждать нечего
+ */
+export function progressParts(exercises) {
+  const parts = [];
+  const byGroup = new Map();
+  (exercises || []).forEach((ex) => {
+    const sets = ex.sets || [];
+    const done = sets.filter((x) => x.state !== 'pending').length;
+    const group = ex.supersetGroup;
+    if (group && byGroup.has(group)) { const part = byGroup.get(group); part.done += done; part.total += sets.length; return; }
+    const part = { key: group ? 'g' + group : String(ex.id), done, total: sets.length };
+    if (group) byGroup.set(group, part);
+    parts.push(part);
+  });
+  return parts;
+}
+
+/**
+ * Кольцо «сделано из» у названия упражнения (15.11.2026, вместо «0/4»):
+ * заполняется с каждым отмеченным подходом; всё сделано — галочка
+ */
+function ExRing({ done, total, partial = false }) {
+  const r = 15, len = 2 * Math.PI * r;
+  const all = total > 0 && done === total;
+  return (
+    <span className={'workout__ex-count workout__ring' + (partial ? ' workout__ex-count--partial' : '') + (all ? ' workout__ring--all' : '')} aria-label={`Сделано ${done} из ${total}`}>
+      <svg viewBox="0 0 38 38" aria-hidden="true"><circle className="workout__ring-bg" cx="19" cy="19" r={r} /><circle className="workout__ring-fg" cx="19" cy="19" r={r} strokeDasharray={len} strokeDashoffset={len * (1 - (total ? done / total : 0))} /></svg>
+      <span aria-hidden="true">{all ? <IconCheck size={16} /> : done + '/' + total}</span>
+    </span>
+  );
+}
+
 export default function WorkoutJournal({ clientRow, clientView = false, launch, onClose, backLabel = 'К программе' }) {
   const plankEnabled = usePlankAccess();
   const openGames = useContext(GamesNav);
@@ -740,6 +774,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const lastMarked = useRef('');
   // Перерисовать, когда текущим стало другое упражнение (pickExercise)
   const [, setFocusPick] = useState('');
+  // Упражнения, раскрытые руками (15.11.2026: свёрнуто всё, кроме текущего)
+  const [opened, setOpened] = useState(() => new Set());
   const restStartOf = (until) => {
     if (restStart.current.until === until && restStart.current.start) return restStart.current.start;
     return until - ((state.current && state.current.session.restSeconds) || 90) * 1000;
@@ -989,12 +1025,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // остальных — только если отличается: 16 одинаковых флажков на экране
     // (QA 20.10.2026) читались как шум
     const firstOwn = ex.sets.findIndex(x => (x.who || '') === (set.who || ''));
-    const sideHere = track.kind === 'strength' && (si === firstOwn || setOneSide(set, track) !== setOneSide(ex.sets[firstOwn], track));
+    // Без пары «на сторону» переключается в заголовке колонки веса
+    // (15.11.2026); здесь — только подход, который отличается от первого
+    const split = ex.sets.some(x => x.who);
+    const sideHere = track.kind === 'strength' && ((split && si === firstOwn) || setOneSide(set, track) !== setOneSide(ex.sets[firstOwn], track));
     const removeSet = () => { const before = ex.sets; setUndo('Подход удалён', v => putSetBack(v, ex.id, si, before)); setOpenSet(''); updateExercise(ei, ex => withoutSet(ex, si)); };
     // Под номером — состояние словом: «Разминка» (было «1 · Р»), у сделанного
     // — оценка, как на кнопке; цвет строки — второй канал (аудит 24.10.2026)
     const sub = set.kind === 'warmup' ? 'Разминка' : set.state === 'done' ? effortLabel(set.effort) : '';
-    return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
+    return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' + (set.effort ? ' workout__set--e-' + set.effort : '') : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
             <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '') + (inRound ? ' workout__set-row--round' : '')} style={{ '--cols': fields.length }}>
               {inRound
@@ -1003,16 +1042,22 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   <span className="workout__set-label">{label}{set.state === 'done' ? <IconCheck size={12} aria-hidden="true" /> : <IconSliders size={12} aria-hidden="true" />}</span>
                   {sub && <span className="workout__set-sub">{sub}</span>}
                 </button>}
-              {fields.map(f => (
-                <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} value={shown(f, set[f.key])} maxLength={f.max} onChange={e => edit(f.key, typed(f, e.target.value))} />
-              ))}
+              {fields.map((f, fi) => {
+                const input = <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} value={shown(f, set[f.key])} maxLength={f.max} onChange={e => edit(f.key, typed(f, e.target.value))} />;
+                // «Было» — мелко внутри первой клетки (вес или помощь),
+                // а не строкой под подходом (15.11.2026): по подходам видно
+                // по-прежнему (03.10.2026), строк вдвое меньше
+                return was && fi === 0
+                  ? <span key={f.key} className="workout__cell">{input}<span className="workout__cell-was" aria-hidden="true">было {was.assist !== undefined ? was.assist : was.weight}</span></span>
+                  : input;
+              })}
             </div>
             {/* Под строкой, под колонкой веса — одной строкой: вес на одну
                 сторону (у каждого подхода; в первом — переносится на все,
                 дальше любую можно снять, владелец 07.10.2026) и «было» */}
             {/* Тот же подход в прошлый раз — у каждого подхода свой
                 (владелец, 03.10.2026: «было» на всё упражнение бесполезно) */}
-            {(sideHere || was) && <div className="workout__set-meta">
+            {sideHere && <div className="workout__set-meta">
               {sideHere && <label className="workout__side">
                 <input type="checkbox" checked={setOneSide(set, track)} disabled={!editable} onChange={e => {
                   const side = e.target.checked ? 'one' : 'two';
@@ -1024,8 +1069,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                 }} />
                 Вес на одну сторону
               </label>}
-              {was && <span className="workout__was">было {was.assist !== undefined ? 'помощь ' + was.assist : was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
+              {/* Для чтения вслух — «было» целиком; на экране оно в клетке веса */}
+              {was && <span className="workout__sr">было {was.assist !== undefined ? 'помощь ' + was.assist : was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
             </div>}
+            {!sideHere && was && <span className="workout__sr">было {was.assist !== undefined ? 'помощь ' + was.assist : was.weight} кг{was.reps ? ' × ' + was.reps : ''}</span>}
             {/* Диапазон «8–12»: сколько не хватило до верхней границы (19.10.2026) */}
             {repsLeftText(ex, set) && <p className="workout__goal-left">{repsLeftText(ex, set)}</p>}
             {/* Галочки нет (03.10.2026): под ближайшим подходом упражнения —
@@ -2155,6 +2202,27 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * отдых, «делали под другим названием», удалить. Раньше всё это стояло
    * восемью строками ссылок над подходами
    */
+  /**
+   * Заголовок колонок подходов. «Вес на одну сторону» — здесь, касанием
+   * по «кг на сторону ⇄ / кг всего ⇄» (15.11.2026, макет v2): галочка у
+   * подхода стояла каждый раз и читалась как шум. Касание меняет все
+   * подходы; отдельный подход по-другому — галочкой у него (как раньше)
+   */
+  const setHead = (ex, ei) => {
+    const track = trackOf(ex);
+    const fields = rowFields(track);
+    const split = ex.sets.some(x => x.who);
+    const toggle = track.kind === 'strength' && !split && ex.sets.length > 0;
+    const one = toggle && setOneSide(ex.sets[0], track);
+    const flip = () => updateExercise(ei, x => ({ ...x, sets: x.sets.map(s => ({ ...s, side: one ? 'two' : 'one' })) }));
+    return <div className={'workout__set-head' + (split ? ' workout__set-head--who' : '')} style={{ '--cols': fields.length }}>
+      <span aria-hidden="true">Подход</span>
+      {fields.map((f, fi) => toggle && fi === 0 && f.key === 'weight'
+        ? <button key={f.key} type="button" className="workout__side-head" disabled={!editable} aria-pressed={one} aria-label={'Вес на одну сторону' + (one ? ': включено' : ': выключено')} onClick={() => { haptic(); flip(); }}>{one ? 'кг на сторону' : 'кг всего'} ⇄</button>
+        : <span key={f.key} aria-hidden="true">{f.head}</span>)}
+    </div>;
+  };
+
   const toolsRow = (ex, ei) => {
     const info = ex.exerciseId ? setups[ex.exerciseId] : null;
     const split = ex.sets.some((x) => x.who);
@@ -2218,9 +2286,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <IconRefresh size={16} aria-hidden="true" />{swapping === ex.id ? 'Не заменять' : 'Заменить'}
         </button>}
         {more.length > 0 && <div className="workout__tools-more">
-          <button type="button" className="workout__chip" aria-label={ex.name + ': ещё'} aria-haspopup="menu" aria-expanded={menuOpen}
+          <button type="button" className="workout__chip workout__chip--more" aria-label={ex.name + ': ещё'} aria-haspopup="menu" aria-expanded={menuOpen}
             onClick={() => { haptic(); setExMenu(menuOpen ? null : ex.id); }}>
-            Ещё<IconChevron size={14} aria-hidden="true" className={menuOpen ? 'workout__chip-up' : undefined} />
+            {/* «⋯» вместо «Ещё ⌄» (15.11.2026): ряд таблеток в одну строку */}
+            <IconMore size={18} aria-hidden="true" />
           </button>
           {menuOpen && <>
             <div className="workout__more-scrim" onClick={() => setExMenu(null)} aria-hidden="true" />
@@ -2307,6 +2376,17 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         <button type="button" className="icon-button workout__alert-close" aria-label="Скрыть сообщение" onClick={() => setMessageState(null)}><IconClose size={18} /></button>
       </div>}
     </div>);
+  // Меню ⋯ шапки: только то, чего нет на экране («Завершить» — в шапке, отдых — у полосы)
+  const moreMenu = <div className="workout__more">
+                <button type="button" ref={moreBtn} className="icon-button workout__more-btn" aria-label="Ещё" aria-haspopup="menu" aria-expanded={moreOpen && !moreLeaving} onClick={() => { if (moreOpen && !moreLeaving) closeMore(); else { clearTimeout(moreTimer.current); setMoreLeaving(false); setMoreOpen(true); } haptic(); }}><IconMore size={22} /></button>
+                {moreOpen && <>
+                  <div className="workout__more-scrim" onClick={closeMore} aria-hidden="true" />
+                  <div className={'workout__menu' + (moreLeaving ? ' workout__menu--leaving' : '')} role="menu" aria-label="Ещё">
+                    {!asClient && <button type="button" role="menuitem" className="workout__menu-item" onClick={() => { closeMore(); pickFromButton(); }}>Выбрать упражнения</button>}
+                    <button type="button" role="menuitem" className="workout__menu-item workout__menu-item--critical" onClick={() => { closeMore(); setConfirm('cancel'); }}>Отменить занятие</button>
+                  </div>
+                </>}
+</div>;
   return <div className={'workout' + (s || launch ? ' workout--session' : '') + (editable ? ' workout--live' : '')}>
     {/* В списке журнала — кнопка, куда вернёт: к программе или к списку клиентов */}
     {!s && <BackButton label={backLabel} onClick={close} />}
@@ -2323,17 +2403,32 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             внизу под упражнениями — владелец, 03.10.2026); название;
             время · подходы · отдых · пауза · ⋯. Редкое — «Выбрать» и
             «Отменить занятие» — в меню ⋯ */}
-        <div className="workout__head-row">
+        {/* Шапка в одну строку (15.11.2026, макет «Экран тренировки» v2):
+            «назад» значком, название и под ним время · подходы, пауза и ⋯
+            значками, «Завершить» — серая, пока есть несделанные подходы, и
+            синяя, когда отмечены все (её реже нажимают по ошибке). Ниже —
+            полоса по отрезку на упражнение и длительность отдыха */}
+        <div className="workout__head-row workout__head-row--one">
           <BackButton label={backLabel === 'К программе' ? 'Программа' : backLabel} onClick={close} />
-          {editable && !confirm && <button type="button" className="button button--primary workout__finish-btn" onClick={() => setConfirm('complete')}>Завершить</button>}
+          <div className="workout__head-main">
+          {/* Название — касанием: переименовывает только тренер (07.10.2026), сервер это же проверяет */}
+          {renamingTitle && clientRow && !clientView
+            ? <input className="workout__title-input" aria-label="Название занятия" autoFocus value={s.title} maxLength={160} onChange={e => change(v => ({ ...v, title: e.target.value }))} onBlur={() => setRenamingTitle(false)} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingTitle(false); }} />
+            : <div className="workout__title-row"><h2>{editable && clientRow && !clientView ? <button type="button" className="workout__title-tap" onClick={() => setRenamingTitle(true)}>{s.title}</button> : s.title}</h2>{/* Месяц и «Идёт» убраны (владелец, 24.10.2026): идёт занятие и так
+                видно, пауза — по кнопке «Продолжить». Остаётся только итог
+                закрытого занятия */}{(s.status === 'completed' || s.status === 'cancelled') && <p className="workout__title-meta">{labels[s.status]}</p>}</div>}
+            <span className="workout__metrics" aria-label={`Время ${clock(elapsed)}, подходы ${stats.done} из ${stats.total}`}><strong>{clock(elapsed)}</strong><span aria-hidden="true"> · </span><b>{stats.done}/{stats.total}</b></span>
+          </div>
+          {editable && !confirm && <>
+            {/* aria-label — «Пауза» / «Продолжить»: значок без слов */}
+            <button type="button" className="icon-button workout__pause" aria-label={s.status === 'active' ? 'Пауза' : 'Продолжить'} onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}>{s.status === 'active' ? <span className="workout__pause-icon" aria-hidden="true" /> : <IconPlay size={18} aria-hidden="true" />}</button>
+            {picking
+              ? <button type="button" className="button workout__pick-toggle is-on" aria-pressed onClick={endPick}>Готово</button>
+              : moreMenu}
+            <button type="button" className={'button workout__finish-btn' + (stats.total && !stats.pending ? ' button--primary workout__finish-btn--ready' : ' button--ghost')} onClick={() => setConfirm('complete')}>Завершить</button>
+          </>}
           {!editable && <button type="button" className="button button--primary workout__finish-btn" disabled={busy || !!conflict} onClick={resume}>Продолжить</button>}
         </div>
-        {/* Название — касанием: переименовывает только тренер (07.10.2026), сервер это же проверяет */}
-        {renamingTitle && clientRow && !clientView
-          ? <input className="workout__title-input" aria-label="Название занятия" autoFocus value={s.title} maxLength={160} onChange={e => change(v => ({ ...v, title: e.target.value }))} onBlur={() => setRenamingTitle(false)} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingTitle(false); }} />
-          : <div className="workout__title-row"><h2>{editable && clientRow && !clientView ? <button type="button" className="workout__title-tap" onClick={() => setRenamingTitle(true)}>{s.title}</button> : s.title}</h2>{/* Месяц и «Идёт» убраны (владелец, 24.10.2026): идёт занятие и так
-              видно, пауза — по кнопке «Продолжить». Остаётся только итог
-              закрытого занятия */}{(s.status === 'completed' || s.status === 'cancelled') && <p className="workout__title-meta">{labels[s.status]}</p>}</div>}
         {editable && confirm && <div className="workout__confirm" role="alertdialog" aria-label={confirm === 'complete' ? 'Завершить тренировку' : 'Отменить занятие'}>
           <p>{confirmText}</p>
           <div className="workout__confirm-actions">
@@ -2343,45 +2438,15 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <button type="button" className="button button--ghost" onClick={() => setConfirm('')}>{confirm === 'complete' ? (stats.pending ? 'Продолжить' : 'Ещё не всё') : 'Не отменять'}</button>
           </div>
         </div>}
-        {/* Пауза и отдых — в шапке, что едет за прокруткой (владелец, 09.10.2026).
-            Длительность не только запускает отдых, но и запоминается: дальше
-            он стартует сам после каждого отмеченного подхода */}
-        <div className="workout__line">
-          <span className="workout__metrics" aria-label={`Время ${clock(elapsed)}, подходы ${stats.done} из ${stats.total}`}><strong>{clock(elapsed)}</strong><span aria-hidden="true"> · </span><b>{stats.done} / {stats.total}</b></span>
-          {editable && !confirm && <>
-            {/* Слово «Отдых» на узком экране уходит (workout.css), у списка
-                остаётся подпись для чтения вслух (аудит 24.10.2026) */}
-            <label className="workout__rest-pick"><span className="workout__rest-word">Отдых</span><select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>
-            {/* Ширина постоянная — под «Продолжить» (workout.css): «Пауза ↔
-                Продолжить» больше не двигает соседей (аудит 24.10.2026).
-                aria-label — чтобы скрытое «Продолжить» не читалось вслух */}
-            <button type="button" className="button button--ghost workout__pause" aria-label={s.status === 'active' ? 'Пауза' : 'Продолжить'} onClick={() => change(s => ({ ...s, status: s.status === 'active' ? 'paused' : 'active', restUntil: 0 }))}><span>{s.status === 'active' ? 'Пауза' : 'Продолжить'}</span></button>
-            {picking
-              ? <button type="button" className="button workout__pick-toggle is-on" aria-pressed onClick={endPick}>Готово</button>
-              : <div className="workout__more">
-                <button type="button" ref={moreBtn} className="icon-button workout__more-btn" aria-label="Ещё" aria-haspopup="menu" aria-expanded={moreOpen && !moreLeaving} onClick={() => { if (moreOpen && !moreLeaving) closeMore(); else { clearTimeout(moreTimer.current); setMoreLeaving(false); setMoreOpen(true); } haptic(); }}><IconMore size={22} /></button>
-                {moreOpen && <>
-                  <div className="workout__more-scrim" onClick={closeMore} aria-hidden="true" />
-                  <div className={'workout__menu' + (moreLeaving ? ' workout__menu--leaving' : '')} role="menu" aria-label="Ещё">
-                    {!asClient && <button type="button" role="menuitem" className="workout__menu-item" onClick={() => { closeMore(); pickFromButton(); }}>Выбрать упражнения</button>}
-                    <button type="button" role="menuitem" className="workout__menu-item workout__menu-item--critical" onClick={() => { closeMore(); setConfirm('cancel'); }}>Отменить занятие</button>
-                  </div>
-                </>}
-              </div>}
-          </>}
-        </div>
-        {/* Полоса своя, а не браузерный progress: системный выглядит
-            по-разному в каждом движке и ни в одной теме не совпадает с
-            палитрой приложения. Значение дублируется для чтения вслух. */}
-        <div
-          className="workout__bar"
-          role="progressbar"
-          aria-label="Выполненные подходы"
-          aria-valuemin={0}
-          aria-valuemax={stats.total || 1}
-          aria-valuenow={stats.done}
-        >
-          <span style={{ transform: `scaleX(${stats.done / (stats.total || 1)})` }} />
+        {/* Полоса — по отрезку на упражнение (суперсет — один отрезок): видно,
+            сколько упражнений осталось. Своя, а не браузерный progress:
+            системный в каждом движке разный. Справа — длительность отдыха
+            (владелец, 09.10.2026: в шапке, что едет за прокруткой) */}
+        <div className="workout__progress">
+          <div className="workout__bar" role="progressbar" aria-label="Выполненные подходы" aria-valuemin={0} aria-valuemax={stats.total || 1} aria-valuenow={stats.done}>
+            {progressParts(s.exercises).map((part) => <span key={part.key} className="workout__bar-part"><span style={{ transform: `scaleX(${part.total ? part.done / part.total : 0})` }} /></span>)}
+          </div>
+          {editable && !confirm && <label className="workout__rest-pick"><span className="workout__rest-word" aria-hidden="true">⏱</span><select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>}
         </div>
         {/* «Сохранено в облаке» убрано (владелец, 09.10.2026): строка
             менялась на каждую правку, и экран прыгал. Не сохранилось —
@@ -2423,6 +2488,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const finished = ex.sets.every(x => x.state !== 'pending');
           const allMade = doneSets === ex.sets.length;
           const compact = picking || !!reorder;
+          // Свёрнуто: не текущее и не раскрыто руками; закрытое занятие — всё на виду
+          const folded = editable && !compact && focus.ex !== ex.id && !opened.has(ex.id);
           return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section onFocus={pickExercise(ex.id)} className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable || asClient} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { const snapshot = s.exercises; setUndo('Упражнение удалено', v => putExercisesBack(v, snapshot, new Set([ex.id]))); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
@@ -2433,13 +2500,20 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               // Название — касанием: из базы или новое прямо здесь
               : asClient ? (ex.name || 'Новое упражнение')
                 : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id)}>{ex.name || 'Новое упражнение'}</button>}</h3>
-            <span className={'workout__ex-count' + (finished && !allMade ? ' workout__ex-count--partial' : '')} aria-label={`Сделано ${doneSets} из ${ex.sets.length}`}>{allMade ? <IconCheck size={16} /> : null}{doneSets}/{ex.sets.length}</span>
+            <ExRing done={doneSets} total={ex.sets.length} partial={finished && !allMade} />
           </div>
           </SwipeRow>
           {/* Режим выбора — свёрнутый: одна строка на упражнение, чтобы
               выделять, удалять и собирать суперсет, не листая подходы */}
           {!compact && renaming === ex.id && nameEditor(ex, ei, ex.id)}
-          {!compact && <>
+          {/* Свёрнуто всё, кроме текущего (15.11.2026, макет v2): одной
+              строкой «4 × 12 · 80 кг», касание раскрывает. Содержимое не
+              убирается из разметки — прячется (inert) и раскрывается
+              высотой, поэтому ввод и черновик не теряются */}
+          {!compact && editable && (folded || opened.has(ex.id)) && <button type="button" className="workout__ex-fold" aria-expanded={!folded} onClick={() => { haptic(); setOpened((v) => { const next = new Set(v); if (next.has(ex.id)) next.delete(ex.id); else next.add(ex.id); return next; }); }}>
+            <span>{foldLine(ex)}</span><IconChevron size={16} aria-hidden="true" className={folded ? undefined : 'workout__chip-up'} />
+          </button>}
+          {!compact && <div className={'workout__ex-body' + (folded ? ' is-folded' : '')} {...(folded ? { inert: '' } : {})}><div className="workout__ex-body-in">
           {supersetMark(s.exercises, ei) && <p className="workout__superset">{supersetMark(s.exercises, ei)}</p>}
           {ex.exerciseId && setups[ex.exerciseId] ? extrasView(ex, ei, setups[ex.exerciseId]) : setupWait(ex) && <div className="workout__extras-wait" aria-hidden="true"><span className="skeleton" /><span className="skeleton" /></div>}
           {/* «4 × 12» крупно убрано (владелец, 09.10.2026): подходы и повторы
@@ -2451,7 +2525,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {/* Цель диапазона — к ней клиент стремится (19.10.2026) */}
           {repsGoalText(ex) && <p className="workout__goal">{repsGoalText(ex)}</p>}
           <LastRunHint last={ex.lastRun} tired={ex.tired} sets={ex.sets} />
-          {trackOf(ex).kind !== 'cardio' && <div className={'workout__set-head' + (ex.sets.some(x => x.who) ? ' workout__set-head--who' : '')} style={{ '--cols': rowFields(trackOf(ex)).length }} aria-hidden="true"><span>{trackOf(ex).kind === 'cardio' ? 'Отрезок' : 'Подход'}</span>{rowFields(trackOf(ex)).map(f => <span key={f.key}>{f.head}</span>)}</div>}
+          {trackOf(ex).kind !== 'cardio' && setHead(ex, ei)}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
           {trackOf(ex).kind === 'cardio' && !isFunctional(ex) && metricAdd(ex, ei)}
           {/* У пары подход добавляется кругом — по одному каждому, кто
@@ -2479,7 +2553,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             <summary>{ex.note ? 'Заметка' : 'Добавить заметку'}</summary>
             <textarea aria-label="Заметка к упражнению" value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} />
           </details>
-          </>}
+          </div></div>}
         </section></React.Fragment>;
         })}
         {/* Та же плашка, что в списках (pendingDelete.jsx): закреплена над

@@ -595,6 +595,8 @@ test('в активной тренировке один раздел: настр
   await page.getByRole('heading', { name: 'Тренировка 2 — низ' }).first().waitFor({ timeout: 20000 });
 
   const squat = page.locator('.workout__exercise').filter({ hasText: 'Присед со штангой' });
+  // 15.11.2026: развёрнуто только текущее (беговая дорожка) — присед раскрываем строкой-сводкой
+  await squat.locator('.workout__ex-fold').click();
   const chip = squat.locator('.workout__about');
   await chip.first().waitFor({ timeout: 10000 });
   assert.equal(await chip.count(), 1, 'справка — одной кнопкой');
@@ -1769,6 +1771,8 @@ test('смахнуть подход и нажать корзину пальце�
     const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });
     await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
     const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
+    // 15.11.2026: второе упражнение свёрнуто — раскрываем строкой-сводкой
+    await c.locator('.workout__exercise').nth(1).locator('.workout__ex-fold').tap();
     await rows.nth(1).waitFor({ timeout: 20000 });
     // FT-570: инструкции упражнений раскрыты и приходят после открытия — ждём их, иначе подходы съезжают
     await c.locator('.workout__about').first().waitFor({ timeout: 10000 });
@@ -1812,19 +1816,21 @@ test('протянуть подход далеко влево и отпусти�
     const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });
     await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
     const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
+    // 15.11.2026: второе упражнение свёрнуто — раскрываем строкой-сводкой
+    await c.locator('.workout__exercise').nth(1).locator('.workout__ex-fold').tap();
     await rows.nth(1).waitFor({ timeout: 20000 });
     // FT-570: инструкции упражнений раскрыты и приходят после открытия — ждём их, иначе подходы съезжают
     await c.locator('.workout__about').first().waitFor({ timeout: 10000 });
     await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await c.waitForTimeout(300);
-    // Одинаковая отметка показывается только у первого подхода (QA 20.10).
-    // Проверяем касание подписи и сохранение настройки для всех подходов.
-    const sides = c.locator('.workout__exercise').nth(1).locator('.workout__side input');
-    assert.equal(await sides.count(), 1, 'одна общая отметка вместо повторов');
-    const sideLabel = sides.first().locator('..');
-    await sideLabel.evaluate(el => el.scrollIntoView({ block: 'center' }));
-    await sideLabel.tap();
-    assert.equal(await sides.first().isChecked(), true);
+    // «На сторону» — в заголовке колонки веса (15.11.2026), галочек у
+    // подходов нет; касание переключает все подходы упражнения
+    const ex2 = c.locator('.workout__exercise').nth(1);
+    assert.equal(await ex2.locator('.workout__side input').count(), 0, 'галочек у подходов нет');
+    const sideHead = ex2.locator('.workout__side-head');
+    await sideHead.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await sideHead.tap();
+    assert.equal(await sideHead.getAttribute('aria-pressed'), 'true');
     await c.waitForFunction(() => {
       const sessions = JSON.parse(localStorage.getItem('workout_demo_server:3') || '[]');
       const session = sessions.find(s => s.status === 'active');

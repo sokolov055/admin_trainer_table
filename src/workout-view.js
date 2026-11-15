@@ -136,3 +136,38 @@ export function nextInfo(s, focus) {
   return { name: ex.name, part, load, change: changeOf(ex, set, own) };
 }
 
+
+/** Число со словом: 1 подход, 2 подхода, 5 подходов */
+const wordFor = (n, one, few, many) => { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many; };
+
+/**
+ * Свёрнутое упражнение занятия одной строкой (15.11.2026, макет v2):
+ * «4 × 15 · 4–6 кг», сделанное — «✓ 4 × 15 · 4–6 кг», начатое —
+ * «2 из 4 · …». По подходам занятия, а не по плану: их могли поменять.
+ * Разминка не считается; у кардио — число отрезков
+ */
+export function foldLine(ex) {
+  const sets = (ex && ex.sets) || [];
+  const work = sets.filter((x) => x.kind !== 'warmup');
+  const list = work.length ? work : sets;
+  if (!list.length) return 'Нет подходов';
+  const done = list.filter((x) => x.state === 'done').length;
+  const over = list.every((x) => x.state !== 'pending');
+  const n = list.length;
+  const cardio = list.some((x) => x.time !== undefined || x.distance !== undefined) && !list.some((x) => String(x.weight || '').trim() || String(x.reps || '').trim());
+  const parts = [];
+  if (cardio) parts.push(n + ' ' + wordFor(n, 'отрезок', 'отрезка', 'отрезков'));
+  else {
+    const reps = [...new Set(list.map((x) => String(x.reps || '').trim()).filter(Boolean))];
+    parts.push(reps.length === 1 ? n + ' × ' + reps[0] : n + ' ' + wordFor(n, 'подход', 'подхода', 'подходов'));
+    const kg = list.map((x) => Number(String(x.weight ?? '').replace(',', '.'))).filter((v) => Number.isFinite(v) && v > 0);
+    if (kg.length) {
+      const lo = Math.min(...kg), hi = Math.max(...kg);
+      const f = (v) => String(v).replace('.', ',');
+      parts.push((lo === hi ? f(lo) : f(lo) + '–' + f(hi)) + ' кг');
+    }
+  }
+  const line = parts.join(' · ');
+  if (over) return '✓ ' + line;
+  return done ? done + ' из ' + n + ' · ' + line : line;
+}

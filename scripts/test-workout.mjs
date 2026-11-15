@@ -83,7 +83,8 @@ let tree;
 const block = { title: 'Тренировка тест', exercises: [{ name: 'Присед', sets: 2, reps: '8', weight: '40' }] };
 const delay = () => new Promise(resolve => setTimeout(resolve, 30));
 const text = node => typeof node === 'string' ? node : (node.children || []).map(text).join('');
-const button = label => tree.root.findAllByType('button').find(b => text(b) === label);
+// Пауза — значком (15.11.2026): ищем и по подписи для чтения вслух
+const button = label => tree.root.findAllByType('button').find(b => text(b) === label || b.props['aria-label'] === label);
 async function click(label) { const b = button(label); assert.ok(b, label); assert.ok(!b.props.disabled, 'Кнопка доступна: ' + label); await act(async () => { await b.props.onClick(); await delay(); }); }
 // Меню ⋯ в шапке (QA 20.10.2026): «Выбрать упражнения», «Отменить занятие»
 async function openMore(root = tree.root) { const b = root.findAllByType('button').find(x => x.props['aria-label'] === 'Ещё'); assert.ok(b, 'кнопка ⋯'); await act(async () => { b.props.onClick(); await delay(); }); }
@@ -1310,8 +1311,11 @@ test('«было» у каждого подхода: тот же подход п
     lastRun: { date: '2026-10-01', weights: ['6', '8'], reps: ['10', '8'], planReps: '5', effort: 'ok', streak: 0, action: 'scaled', step: 0 } };
   if (tree) tree.unmount();
   await act(async () => { tree = renderer.create(React.createElement(Workout, { launch: { block: { title: 'Было', exercises: [ex] }, month: 'Октябрь 2026' }, onClose() {} })); await delay(); });
-  const hints = tree.root.findAll(n => n.props && n.props.className === 'workout__was').map(text);
+  // 15.11.2026: на экране — коротко в клетке веса, для чтения вслух — целиком
+  const hints = tree.root.findAll(n => n.type === 'span' && n.props.className === 'workout__sr').map(text);
   assert.deepEqual(hints, ['было 6 кг × 10', 'было 8 кг × 8'], 'у третьего прошлого раза нет');
+  const cells = tree.root.findAll(n => n.type === 'span' && n.props.className === 'workout__cell-was').map(text);
+  assert.deepEqual(cells, ['было 6', 'было 8']);
   const input = (si, what) => tree.root.findAllByType('input').find(n => new RegExp('подход ' + (si + 1) + ', ' + what).test(n.props['aria-label'] || ''));
   // Сегодня в первом подходе 10 повторов, как тогда, — вес тот же, 6
   await act(async () => input(0, 'повторы').props.onChange({ target: { value: '10' } }));

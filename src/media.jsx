@@ -243,7 +243,7 @@ export function MachineNote({ target, label = '', note, trainer, params, onSaved
     // чья настройка и кто записал — в листе «Тренажёр»
     const whose = trainer ? 'Настройка клиента' : 'Моя настройка';
     const head = (label || whose) + (note && note.shared ? ' · для тренажёра' : '') + (note && note.local ? ' · не отправлена' : '');
-    return <button type="button" className={'workout__plaque' + (note ? '' : ' workout__plaque--empty')}
+    return <button type="button" className={'workout__plaque' + (note ? '' : ' workout__plaque--empty') + (label ? ' workout__plaque--labeled' : '')}
       aria-label={whose + (label ? ' · ' + label : '') + (note ? ': ' + summary + '. Изменить' : ': не записана. Записать')}
       onClick={() => setEditing(true)}>
       <span className="workout__plaque-head">{head}</span>

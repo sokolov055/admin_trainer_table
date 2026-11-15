@@ -1057,3 +1057,143 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__add-row { display: flex; gap: var(--space-2); }
 .workout__add-row > .button--block { flex: 1; width: auto; }
 .workout__exercise .workout__add-row .workout__add--warmup { flex: none; width: auto; padding: 0 14px; background: none; color: var(--accent); }
+
+/* ---- 15.11.2026: шапка в одну строку (макет «Экран тренировки» v2) ------ */
+/* «назад» значком; название и под ним время · подходы; пауза и ⋯ —
+   круглыми значками; «Завершить» серая, пока есть несделанные подходы,
+   и синяя с отскоком, когда отмечены все. Второй строкой — полоса по
+   отрезку на упражнение и длительность отдыха */
+.workout__head-row--one { justify-content: flex-start; gap: 6px; margin-top: 0; }
+.workout__head-row--one .app__back { flex: none; min-width: 32px; padding: 0 2px; gap: 0; font-size: 0; margin-left: -6px; }
+.workout__head-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; }
+.workout__head-main .workout__title-row h2 { font-size: var(--text-lg); line-height: 1.2; }
+.workout__head-main .workout__title-input { margin: 0; }
+.workout__head-main .workout__metrics { display: block; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--text-secondary); }
+.workout__head-main .workout__metrics strong { display: inline; margin: 0; font-size: inherit; font-weight: 600; letter-spacing: 0; color: var(--text-secondary); }
+.workout__head-main .workout__metrics b { font-weight: 600; color: var(--text-secondary); }
+.workout__head-row--one .workout__pause { flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-sunken); color: var(--text); }
+.workout__head-row--one .workout__pause::after { content: none; }
+.workout__pause-icon { width: 12px; height: 14px; border-left: 4px solid currentColor; border-right: 4px solid currentColor; box-sizing: border-box; }
+.workout__head-row--one .workout__more-btn { width: 40px; height: 40px; border: 0; border-radius: 50%; }
+.workout__head-row--one .workout__pick-toggle { height: 40px; min-height: 0; padding: 0 10px; border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.workout__head-row--one .workout__finish-btn { flex: none; height: 40px; padding: 0 12px; }
+.workout__finish-btn.button--ghost { background: var(--surface-sunken); border-color: transparent; color: var(--text-secondary); }
+.workout__finish-btn--ready { animation: workout-finish-ready 0.5s var(--ease-spring, cubic-bezier(.32,1.25,.5,1)) both; }
+@keyframes workout-finish-ready { 0% { transform: scale(0.85); } 100% { transform: none; } }
+.workout__progress { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.workout__progress .workout__bar { flex: 1 1 auto; display: flex; gap: 3px; height: 4px; margin: 0; background: none; border-radius: 0; overflow: visible; }
+.workout__bar-part { position: relative; flex: 1 1 0; height: 100%; border-radius: 2px; background: var(--surface-active); overflow: hidden; }
+.workout__bar .workout__bar-part > span { position: absolute; inset: 0; display: block; background: var(--accent); transform-origin: left; transition: transform 0.5s var(--ease-out); }
+.workout__progress .workout__rest-pick { flex: none; height: 28px; padding: 0 2px 0 8px; border: 0; border-radius: 999px; background: var(--surface-sunken); color: var(--accent-ink); }
+.workout__progress .workout__rest-word { display: inline; font-size: 13px; }
+.workout__progress .workout__rest-pick select { font-size: 14px; color: var(--accent-ink); }
+@media (prefers-reduced-motion: reduce) {
+  .workout__finish-btn--ready { animation: none; }
+  .workout__bar .workout__bar-part > span { transition: none; }
+}
+
+/* ---- 15.11.2026: ряд таблеток «▷ Техника · Настройка · ⋯» -------------- */
+/* Вместо сетки из плашки на две колонки и кнопок по 48 px — одна строка
+   таблеток по 36 px; форма настройки, когда её правят, — на всю ширину.
+   Настройка записана — в таблетке её значение, нет — «＋ Моя настройка»
+   пунктиром. Тексты кнопок прежние, меняется только вид */
+.workout__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: var(--space-2) 0 var(--space-1); }
+.workout__tools .workout__about { order: -1; }
+.workout__head-note, .workout__head-note--wide { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.workout__head-note:has(.workout__note-form) { flex-basis: 100%; }
+.workout__tools .workout__chip { min-height: 36px; padding: 0 12px; border-radius: 999px; flex: none; }
+.workout__tools .workout__chip--more { width: 36px; padding: 0; }
+.workout__tools-more { display: block; flex: none; }
+.workout__plaque { display: flex; align-items: center; gap: 4px; min-height: 36px; max-width: 100%; padding: 0 12px; border-radius: 999px; white-space: nowrap; overflow: hidden; }
+.workout__plaque-head, .workout__plaque-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+.workout__plaque-head { font-size: var(--text-sm); flex: none; }
+.workout__plaque-value { font-size: var(--text-sm); }
+.workout__plaque--labeled .workout__plaque-head::after { content: ':'; }
+.workout__plaque:not(.workout__plaque--empty):not(.workout__plaque--labeled) .workout__plaque-head { display: none; }
+.workout__plaque--empty .workout__plaque-value { display: none; }
+.workout__plaque--empty .workout__plaque-head { color: var(--accent); font-weight: 600; }
+.workout__plaque--empty .workout__plaque-head::before { content: '＋ '; }
+.workout__plaque--empty.workout__plaque--labeled .workout__plaque-head::after { content: none; }
+
+/* ---- 15.11.2026: «Сегодня…» одной плашкой, прошлый раз — касанием ------ */
+.workout__last--fold { display: block; margin: var(--space-2) 0; padding: 0; border-radius: var(--radius-md, 12px); background: var(--surface-sunken); max-width: none; }
+.workout__last-toggle { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; min-height: 40px; padding: 8px 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.workout__last-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: inherit; }
+.workout__last-toggle .workout__last-today { flex: 1 1 auto; min-width: 0; display: block; font-size: 13.5px; line-height: 1.35; }
+.workout__last-toggle .workout__last-today svg { vertical-align: -2px; margin-right: 4px; }
+.workout__last-chev { flex: none; color: var(--text-muted); transform: rotate(-90deg); transition: transform var(--dur-fast, 160ms) var(--ease-out, ease-out); }
+.workout__last--fold.is-open .workout__last-chev { transform: none; }
+/* Раскрытие высотой через grid 0fr → 1fr: плавно и без измерений */
+.workout__last-more { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s var(--ease-out, ease-out); }
+.workout__last-more > div { overflow: hidden; }
+.workout__last--fold.is-open .workout__last-more { grid-template-rows: 1fr; }
+.workout__last-more .workout__last-was { padding: 0 10px 9px; }
+@media (prefers-reduced-motion: reduce) { .workout__last-more, .workout__last-chev { transition: none; } }
+
+/* ---- 15.11.2026: подход — «было» в клетке, «на сторону» в заголовке ----- */
+.workout__sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.workout__cell { position: relative; display: block; min-width: 0; }
+.workout__cell input { padding-bottom: 12px; }
+.workout__cell-was { position: absolute; left: 0; right: 0; bottom: 6px; font-size: 10.5px; line-height: 1; font-weight: 500; text-align: center; color: var(--text-muted); pointer-events: none; font-variant-numeric: tabular-nums; }
+.workout__side-head { all: unset; justify-self: center; padding: 2px 6px; border-radius: 6px; color: var(--accent-ink); font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+.workout__side-head:focus-visible { outline: 2px solid var(--accent); }
+.workout__side-head:active { background: var(--accent-wash); }
+.workout__side-head:disabled { color: var(--text-muted); cursor: default; }
+
+/* Оценка: «Норм» — обычный ответ, залит; «Легко» и «Тяжело» — тоном своего
+   цвета. Нажатие — короткое «вдавливание» */
+.workout__effort:not(.workout__effort--quiet) .workout__effort-btn--easy,
+.workout__effort:not(.workout__effort--quiet) .workout__effort-btn--hard { background: color-mix(in srgb, var(--c) 14%, var(--surface)); color: var(--c); }
+.workout__effort-btn { transition: transform 0.12s var(--ease-out, ease-out); }
+.workout__effort-btn:active { transform: scale(0.94); }
+.workout__effort { animation: workout-effort-in 0.32s var(--ease-out, ease-out) both; }
+@keyframes workout-effort-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* Сделанный подход сжимается: цифры без рамок и ниже, номер — цветным
+   кружком оценки, слово оценки под ним. Высота и рамки — с переходом */
+.workout__set-row input { transition: height 0.32s var(--ease-out, ease-out), font-size 0.32s var(--ease-out, ease-out), border-color 0.25s, background-color 0.25s; }
+.workout__set--done .workout__set-row input { height: 34px; font-size: 17px; border-color: transparent; background: transparent; }
+.workout__set--done .workout__cell input { padding-bottom: 0; }
+.workout__set--done .workout__set-label { display: inline-grid; place-items: center; min-width: 26px; height: 26px; border-radius: 50%; background: var(--good-text); color: #fff; font-size: 13px; animation: workout-done-pop 0.45s var(--ease-spring, cubic-bezier(.32,1.25,.5,1)) both; }
+.workout__set--done .workout__set-label svg { display: none; }
+.workout__set--e-easy .workout__set-label { background: var(--effort-easy); }
+.workout__set--e-ok .workout__set-label { background: var(--effort-ok); }
+.workout__set--e-hard .workout__set-label { background: var(--effort-hard); }
+.workout__set--e-easy .workout__set-sub { color: var(--effort-easy); }
+.workout__set--e-ok .workout__set-sub { color: var(--effort-ok); }
+.workout__set--e-hard .workout__set-sub { color: var(--effort-hard); }
+@keyframes workout-done-pop { 0% { transform: scale(0.4); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .workout__set-row input, .workout__effort-btn { transition: none; }
+  .workout__effort, .workout__set--done .workout__set-label { animation: none; }
+}
+
+/* ---- 15.11.2026: свёрнуто всё, кроме текущего упражнения ---------------- */
+.workout__ex-fold { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; min-height: 36px; padding: 2px 0 4px; color: var(--text-secondary); font-size: var(--text-sm); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.workout__ex-fold > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.workout__ex-fold svg { flex: none; color: var(--text-muted); transition: transform var(--dur-fast, 160ms) var(--ease-out, ease-out); }
+.workout__ex-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+/* Раскрытие высотой: grid 0fr ↔ 1fr, без измерений; свёрнутое — прозрачнее */
+.workout__ex-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.4s var(--ease-out, cubic-bezier(.2,.8,.2,1)), opacity 0.3s; }
+.workout__ex-body-in { min-height: 0; overflow: hidden; }
+.workout__ex-body.is-folded { grid-template-rows: 0fr; opacity: 0; }
+/* Карточка свёрнутого — ниже и тише, текущая — с тенью акцента */
+.workout__exercise:has(> .workout__ex-body.is-folded) { padding-bottom: var(--space-2); }
+.workout__exercise--done:has(> .workout__ex-body.is-folded) .workout__ex-fold { color: var(--good-text); }
+@media (prefers-reduced-motion: reduce) { .workout__ex-body, .workout__ex-fold svg { transition: none; } }
+
+/* Отрезки полосы: старое правило `.workout__bar span` красило и сам отрезок */
+.workout__progress .workout__bar > .workout__bar-part { display: block; background: var(--surface-active); transform: none; }
+/* Кольцо «сделано из» у названия (вместо «0/4») */
+.workout__ex-count.workout__ring { position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; margin-top: 0; padding: 0; border-radius: 50%; background: none; font-size: 11px; }
+.workout__ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.workout__ring circle { fill: none; stroke-width: 4; }
+.workout__ring-bg { stroke: var(--surface-active); }
+.workout__ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.6s var(--ease-out, ease-out); }
+.workout__ring > span { position: relative; font-weight: 700; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.workout__ring--all .workout__ring-fg { stroke: var(--good-text); }
+.workout__ring--all > span { color: var(--good-text); }
+.workout__exercise--done .workout__ex-count.workout__ring { background: none; }
+@media (prefers-reduced-motion: reduce) { .workout__ring-fg { transition: none; } }
+.workout__head-row--one .workout__more { margin-left: 2px; }
+.workout__head-row--one .workout__pause, .workout__head-row--one .workout__finish-btn { margin: 0; }

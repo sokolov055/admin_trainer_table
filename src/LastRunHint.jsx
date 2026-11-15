@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { lastRunParts, tiredToday } from './effort.js';
-import { IconDelta } from './icons.jsx';
+import { IconDelta, IconChevron } from './icons.jsx';
 
 /**
  * «Прошлый раз» над подходами (20.10.2026): две короткие строки вместо
@@ -12,6 +12,7 @@ import { IconDelta } from './icons.jsx';
  * sets — подходы занятия: повторы в них поменяли — «сегодня» по ним
  */
 export default function LastRunHint({ last, name = '', tired = null, sets = null }) {
+  const [open, setOpen] = useState(false);
   const p = lastRunParts(last, sets);
   if (!p) return null;
   // Сегодня после упражнения на те же мышцы (FT-754) — одна строка с весом
@@ -21,18 +22,26 @@ export default function LastRunHint({ last, name = '', tired = null, sets = null
   const down = !!tiredLine || p.action === 'down' || p.action === 'scaled';
   const line = tiredLine || p.today;
   const today = line ? line.charAt(0).toUpperCase() + line.slice(1) : '';
+  // Есть вывод «сегодня» (15.11.2026, макет «Экран тренировки» v2) —
+  // одна плашка с ним, прошлый раз — касанием: две строки над подходами
+  // читались как отчёт, а нужен вывод. Вывода нет — прошлый раз как был
+  const wasLine = (
+    <p className="workout__last-was">
+      <span className="workout__last-label">{name ? name + ' · ' : ''}Прошлый раз{p.date ? ' ' + p.date : ''}</span>
+      {p.was}
+    </p>
+  );
+  if (!today) return <div className="workout__last" role="note">{wasLine}</div>;
   return (
-    <div className="workout__last" role="note">
-      <p className="workout__last-was">
-        <span className="workout__last-label">{name ? name + ' · ' : ''}Прошлый раз{p.date ? ' ' + p.date : ''}</span>
-        {p.was}
-      </p>
-      {today && (
-        <p className={'workout__last-today' + (up ? ' workout__last-today--up' : down ? ' workout__last-today--down' : '')}>
+    <div className={'workout__last workout__last--fold' + (open ? ' is-open' : '')} role="note">
+      <button type="button" className="workout__last-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className={'workout__last-today' + (up ? ' workout__last-today--up' : down ? ' workout__last-today--down' : '')}>
           {(up || down) && <IconDelta value={up ? 1 : -1} />}
-          {today}
-        </p>
-      )}
+          {name ? name + ' · ' : ''}{today}
+        </span>
+        <IconChevron size={16} aria-hidden="true" className="workout__last-chev" />
+      </button>
+      <div className="workout__last-more" aria-hidden={!open}><div>{wasLine}</div></div>
     </div>
   );
 }
