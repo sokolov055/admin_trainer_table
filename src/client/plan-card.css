@@ -85,8 +85,15 @@ button.pc-tile { cursor: pointer; transition: transform var(--dur-press) var(--e
 button.pc-tile:active { transform: scale(.94); }
 .pc-tile__ph { position: relative; display: block; width: 64px; height: 64px; border-radius: var(--radius-lg); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
 .pc-tile__ph .pc-thumb { position: absolute; inset: 0; }
-/* «Коротко» (FT-792): одна строка под картинкой, длиннее — «…» */
-.pc-tile__word { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; }
+/* «Коротко» (FT-792): до 20 знаков — до двух строк под картинкой, перенос
+   только по пробелам; не влезло — «…». Колонка 80 px, картинка 64 по центру */
+.pc-strip--words { gap: 2px; } /* 4 × 80 + 3 × 2 — четыре упражнения без прокрутки на 390 px */
+.pc-strip--words .pc-tile { width: 80px; }
+.pc-strip--words .pc-tile__ph { margin: 0 auto; }
+.pc-tile__word {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word;
+  margin-top: 4px; font-size: 11px; font-weight: 650; line-height: 13px;
+}
 .pc-tile__n {
   position: absolute; z-index: 2; left: 4px; top: 4px; width: 18px; height: 18px; display: grid; place-items: center;
   border-radius: 6px; background: rgba(10, 10, 14, .72); color: #fff; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;

@@ -2049,7 +2049,7 @@ test('в карточке клиента тренировки выбираютс
 
 // FT-792: ключевое слово упражнения («Коротко») — подпись под картинкой в
 // ленте; не задано — только номер, из названия не угадывается. Задаётся в
-// карточке упражнения библиотеки, до 12 знаков со счётчиком
+// карточке упражнения библиотеки, до 20 знаков со счётчиком
 test('ключевое слово упражнения: подпись в ленте и поле в библиотеке', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
   const phone = await context.newPage();
@@ -2064,8 +2064,13 @@ test('ключевое слово упражнения: подпись в лен
     const main = phone.locator('#root main:not([hidden])');
     await main.locator('.pc-strip').first().waitFor({ timeout: 15000 });
     const words = await main.locator('.pc-tile__word').allInnerTexts();
-    assert.ok(words.includes('Жим сидя'), 'слово из базы под картинкой: ' + words.join(', '));
+    assert.ok(words.includes('Жим гантелей сидя'), 'слово из базы под картинкой: ' + words.join(', '));
     assert.ok(!words.some((w) => /^(Жим|Тяга|Подтягивания)$/.test(w)), 'без угаданных подписей: ' + words.join(', '));
+    // Есть слова — колонки 80 px, картинка прежняя (64 px)
+    const tile = await main.locator('.pc-strip--words .pc-tile').first().boundingBox();
+    const thumb = await main.locator('.pc-strip--words .pc-tile__ph').first().boundingBox();
+    assert.equal(Math.round(tile.width), 80);
+    assert.equal(Math.round(thumb.width), 64);
     await context.close();
 
     const coach = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true });
@@ -2083,9 +2088,9 @@ test('ключевое слово упражнения: подпись в лен
       assert.match(await field.innerText(), /Махи/);
       await field.click();
       const input = tab.getByRole('textbox', { name: /Коротко — в ленте программы/ });
-      await input.fill('Махи в стороны стоя');
-      assert.equal(await input.inputValue(), 'Махи в сторо', 'не длиннее 12 знаков');
-      await tab.getByText('12 / 12').waitFor({ timeout: 2000 });
+      await input.fill('Махи гантелями в стороны стоя');
+      assert.equal(await input.inputValue(), 'Махи гантелями в сто', 'не длиннее 20 знаков');
+      await tab.getByText('20 / 20').waitFor({ timeout: 2000 });
       await input.fill('Махи вбок');
       await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
       await tab.getByRole('button', { name: 'Изменить: Коротко — в ленте программы' }).getByText('Махи вбок').waitFor({ timeout: 5000 });

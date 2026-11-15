@@ -210,16 +210,20 @@ export function ExerciseThumb({ ex, className = '' }) {
 
 /**
  * Лента картинок с номерами: видно всю тренировку, не раскрывая. Подпись
- * под картинкой — ключевое слово упражнения из базы («Коротко», FT-792);
+ * под картинкой — ключевое слово упражнения из базы («Коротко», FT-792, до
+ * 20 знаков, до двух строк);
  * не задано — только номер. Из названия не угадывается (15.11.2026):
  * первое слово («Обратное») вводило в заблуждение
  */
 export function ExerciseStrip({ exercises, onOpen }) {
   if (!exercises.length) return null;
+  // Есть хоть одно слово — колонки 80 px под две строки подписи (до 20
+  // знаков, макет exercise-keyword-20-mockup.html, вариант А); картинка та же
+  const words = exercises.some((ex) => ex.exercise && ex.exercise.shortName);
   return (
     // data-scroll-x: пока ленте есть куда листаться, движение вбок — её, а
     // не смахивание карточки (удаление); жест «назад» решает так же
-    <div className="pc-strip" role="list" aria-label="Упражнения по порядку" data-scroll-x="">
+    <div className={'pc-strip' + (words ? ' pc-strip--words' : '')} role="list" aria-label="Упражнения по порядку" data-scroll-x="">
       {exercises.map((ex, i) => {
         const can = !!(ex.exercise && onOpen);
         const body = (

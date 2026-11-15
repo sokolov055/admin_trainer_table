@@ -1682,8 +1682,8 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
   );
 }
 
-/** Ключевое слово упражнения (FT-792): до 12 знаков — столько помещается под картинкой 64 px */
-const SHORT_MAX = 12;
+/** Ключевое слово упражнения (FT-792): до 20 знаков — две строки под картинкой в ленте (владелец 15.11.2026) */
+const SHORT_MAX = 20;
 function ShortNameField({ value = '', onChange }) {
   const count = Array.from(value).length;
   return (
