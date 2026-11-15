@@ -600,20 +600,17 @@ test('в активной тренировке один раздел: настр
   assert.equal(await chip.count(), 1, 'справка — одной кнопкой');
   await squat.getByRole('button', { name: /Крюки на 4-й · Упоры на 2-й/ }).waitFor({ timeout: 5000 });
   await chip.first().click();
-  const about = page.locator('.guide-sheet');
-  // А3 (24.10.2026): в «Технике» — анимация, схема мышц и шаги; тренажёр и
-  // как его настроить — своей кнопкой «Тренажёр»
-  await about.locator('.guide__steps').waitFor({ timeout: 5000 });
-  assert.equal(await about.locator('.muscles__figure').count(), 1, 'схема мышц — сразу');
-  assert.equal(await about.locator('.guide__avoid').count(), 1, 'ошибки — одним блоком');
-  const text = await about.evaluate((d) => d.textContent);
-  assert.ok(!text.includes('Подготовка') && !text.includes('Силовая рама'), 'тренажёра в технике нет');
-  await page.keyboard.press('Escape');
-  await about.waitFor({ state: 'detached', timeout: 5000 });
-  await squat.locator('.workout__machine-btn').click();
-  await about.getByRole('heading', { name: 'Тренажёр', exact: true }).waitFor({ timeout: 5000 });
-  const machine = await about.evaluate((d) => d.textContent);
-  assert.ok(machine.includes('Силовая рама у окна') && machine.includes('Крюки на 4-й, упоры на 2-й'), 'тренажёр, фото и настройка клиента');
+  // Лист упражнения (15.11.2026): техника и тренажёр — вкладками одного листа
+  const about = page.locator('.tech-sheet');
+  await about.locator('.ts-steps, .ts-empty').first().waitFor({ timeout: 5000 });
+  assert.equal(await about.locator('.ts-stat--mus .muscles__figure').count(), 1, 'мышцы — фигурой в плитке');
+  assert.equal(await about.locator('.ts-now').count(), 1, 'какой подход сейчас');
+  let text = await about.evaluate((d) => d.textContent);
+  assert.ok(!text.includes('Силовая рама'), 'тренажёр — на своей вкладке');
+  assert.equal(await squat.locator('.workout__machine-btn').count(), 0, 'отдельной кнопки «Тренажёр» нет');
+  await about.getByRole('tab', { name: 'Тренажёр' }).click();
+  text = await about.evaluate((d) => d.textContent);
+  assert.ok(text.includes('Силовая рама у окна') && text.includes('Крюки на 4-й, упоры на 2-й'), 'тренажёр и настройка клиента');
   await page.keyboard.press('Escape');
   await about.waitFor({ state: 'detached', timeout: 5000 });
   assert.equal(await squat.getByRole('button', { name: /Крюки на 4-й · Упоры на 2-й/ }).isVisible(), true, 'своя настройка на виду');

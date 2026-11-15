@@ -334,7 +334,10 @@ const PLAN_BLOCKS = [
       { name: 'Тяга штанги в наклоне', weight: '65', prevWeight: '62.5', sets: '4', reps: '10', rpe: '7', technique: 'dropset' },
       // Из базы, с ключевым словом «Коротко» (FT-792) — подпись в ленте карточки
       { name: 'Жим гантелей сидя', weight: '24', prevWeight: '24', sets: '3', reps: '12', rpe: '8', track: { kind: 'strength', machine: '', unilateral: false, perSide: true },
-        exercise: { name: 'Жим гантелей сидя', shortName: 'Жим гантелей сидя', muscle: 'Плечи', equipment: 'Гантели', notes: '', media: null, machines: [], alternatives: [], noteKey: 'e:жим гантелей сидя', setup: '' } },
+        exercise: { name: 'Жим гантелей сидя', shortName: 'Жим гантелей сидя', muscle: 'Плечи', equipment: 'Гантели', media: { kind: 'animation', url: 'Dumbbell_Shoulder_Press' },
+          // Лист упражнения (15.11.2026): шаг с пояснением после «;», ошибки — метками
+          notes: 'Спина прижата к спинке; гантели на уровне ушей, локти под кистями.\nВыжимайте вверх до почти прямых рук; внизу — без паузы.\nОшибка: прогибать поясницу, сводить гантели со стуком или опускать локти ниже плеч.',
+          muscles: { primary: ['front-deltoids'], secondary: ['triceps'] }, machines: [], alternatives: [], noteKey: 'e:жим гантелей сидя', setup: '' } },
       { name: 'Подтягивания', weight: '+5', prevWeight: '0', sets: '4', reps: 'макс', rpe: '9', track: { kind: 'bodyweight', machine: '', unilateral: false, perSide: false } },
     ],
   },
@@ -354,7 +357,8 @@ const PLAN_BLOCKS = [
         // Тренажёры и замены (FT-478, FT-479): прошлый раз — на раме у окна
         machine: { uid: 'rack01', name: 'Силовая рама у окна' },
         notes: { 'm:rack01|приседания со штангой': 'Крюки на 4-й, упоры на 2-й' },
-        exercise: { name: 'Приседания со штангой', shortName: 'Присед со штангой', muscle: 'Ноги', equipment: 'Штанга', notes: '', media: { kind: 'animation', url: 'Barbell_Squat' },
+        exercise: { name: 'Приседания со штангой', shortName: 'Присед со штангой', muscle: 'Ноги', equipment: 'Штанга', media: { kind: 'animation', url: 'Barbell_Squat' },
+          notes: 'Гриф на верх трапеций; лопатки сведены, взгляд вперёд.\nВниз — таз назад, колени по линии носков; вверх — на выдохе.\nОшибка: колени заваливаются внутрь, пятки отрываются от пола.',
           machines: [
             { uid: 'rack01', name: 'Силовая рама у окна', photo: `${(import.meta.env && import.meta.env.BASE_URL) || '/'}anim/Barbell_Squat/0.jpg`, setup: 'Крюки — переставляются по отметкам на стойках.\nСтраховочные упоры — штыри, вынимаются наружу.' },
             { uid: 'smith1', name: 'Стойка у зеркала', photo: '', setup: '' },

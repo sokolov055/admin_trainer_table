@@ -835,39 +835,34 @@ test('FT-570, вариант А: шаги одной нумерацией, ош�
       await delay();
     });
 
-    // Вариант А3 (24.10.2026): «Техника» — анимация, мышцы и техника листом;
-    // тренажёр и его настройка — своей кнопкой рядом с настройкой клиента
+    // Лист упражнения (15.11.2026): «Техника» — один лист, тренажёр — его
+    // вкладкой; отдельной кнопки «Тренажёр» нет
     const chip = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__about'));
     assert.equal(text(chip), 'Техника');
     assert.equal(chip.props['aria-label'], 'Техника: 1 шаг · видео', 'закрыто: что внутри — для чтения вслух');
-    assert.equal(local.root.findAll(n => n.props && n.props.className === 'guide-sheet').length, 0, 'лист закрыт — медиа не смонтированы');
-    const machineBtn = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn'));
-    assert.equal(text(machineBtn), 'Тренажёр');
-    assert.equal(machineBtn.props['aria-label'], 'Тренажёр: Technogym');
+    assert.equal(local.root.findAll(n => n.props && n.props.className === 'tech-sheet').length, 0, 'лист закрыт — медиа не смонтированы');
+    assert.equal(local.root.findAll(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn')).length, 0, 'кнопки «Тренажёр» нет');
     const weights = () => local.root.findAllByType('input').filter(n => /подход [123], вес в кг/.test(n.props['aria-label'] || ''));
     await act(async () => { weights()[0].props.onChange({ target: { value: '37' } }); await delay(); });
     const before = weights().map(n => n.props.value);
     await act(async () => { chip.props.onClick(); await delay(); });
-    const about = local.root.find(n => n.type === 'div' && n.props.className === 'guide-sheet');
-    assert.equal(about.findAll(n => n.props.className === 'guide__machine-name').length, 0, 'тренажёра в технике нет');
-    assert.deepEqual(about.findAll(n => n.props.className === 'guide__h').map(text), ['Чего избегать']);
-    assert.equal(about.findAll(n => String(n.props.className || '').startsWith('muscles__figure')).length, 1, 'схема мышц — сразу, без кнопки');
-    assert.equal(about.findAllByType('details').length, 0, 'мышцы — без вложенной раскрывашки');
-    assert.ok(!text(about).includes('рукоятки на уровне плеч'), 'резервная инструкция не показана');
-    assert.ok(!text(about).includes('Рычаг'), 'подготовка тренажёра — в его листе');
-    assert.equal(about.findAll(n => n.props.className === 'guide__steps').length, 1);
-    assert.equal(text(about).split('Не раскачивайтесь.').length - 1, 1, 'ошибка не дублируется');
-    assert.ok(about.findAllByType('img').length >= 2, 'анимация в технике');
+    const sheet = () => local.root.find(n => n.type === 'div' && n.props.className === 'tech-sheet');
+    const tabs = sheet().findAll(n => n.props.role === 'tab');
+    assert.deepEqual(tabs.map(text), ['Как делать', 'Тренажёр']);
+    assert.equal(sheet().findAll(n => String(n.props.className || '').startsWith('muscles__figure')).length, 1, 'фигура мышц — в плитке');
+    assert.equal(sheet().findAll(n => String(n.props.className || '').startsWith('ts-now')).length, 1, 'в занятии — какой подход сейчас');
+    assert.ok(text(sheet()).includes('Прижмите спину к спинке'), 'шаги техники');
+    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-nos').map(n => n.findAllByType('span').map(text)), [['не раскачивайтесь', 'не отрывайте спину от спинки']], 'ошибки метками, без повторов');
+    assert.ok(!text(sheet()).includes('Technogym'), 'тренажёр — на своей вкладке');
+    assert.ok(sheet().findAllByType('img').length >= 2, 'анимация сверху');
     assert.deepEqual(weights().map(n => n.props.value), before, 'введённые веса сохраняются при открытии');
 
-    await act(async () => { machineBtn.props.onClick(); await delay(); });
-    const sheets = local.root.findAll(n => n.type === 'div' && n.props.className === 'guide-sheet');
-    // Лист «Тренажёр» — рядом со своей кнопкой, она в сетке раньше «Техники»
-    const machineSheet = sheets.find((n) => n !== about);
-    assert.deepEqual(machineSheet.findAll(n => n.props.className === 'guide__machine-name').map(text), ['Technogym']);
-    assert.deepEqual(machineSheet.findAll(n => n.props.className === 'guide__h').map(text), ['Как настроить', 'Чего избегать']);
-    assert.ok(text(machineSheet).includes('Не тяните рычаг под нагрузкой.'), 'ошибка тренажёра — в его листе');
-    assert.ok(machineSheet.findAllByType('img').length >= 1, 'фото тренажёра');
+    await act(async () => { tabs[1].props.onClick(); await delay(); });
+    assert.ok(text(sheet()).includes('Technogym'), 'вкладка «Тренажёр»');
+    const fold = sheet().find(n => n.type === 'button' && n.props['aria-expanded'] !== undefined && text(n) === 'Как настроить');
+    await act(async () => { fold.props.onClick(); await delay(); });
+    assert.ok(text(sheet()).includes('Рычаг') && text(sheet()).includes('под сиденьем'), 'регулировки тренажёра');
+    assert.ok(text(sheet()).includes('не тяните рычаг под нагрузкой'), 'ошибка тренажёра — в его настройке');
   } finally {
     exerciseSetupResponse = null;
     if (local) local.unmount();
@@ -934,11 +929,14 @@ test('тренажёры закрепил тренер: выбора нет, п�
     // Плашками в шапке (вариант А3): у каждого тренажёра своя
     const plaques = () => local.root.findAll(n => n.type === 'button' && String(n.props.className || '').startsWith('workout__plaque'));
     assert.deepEqual(plaques().map(text), ['ГрифХват 81', 'Скамья+ Записать настройку'], 'у скамьи своя — плашкой «+ Записать»');
-    const machineBtn = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn'));
-    await act(async () => { machineBtn.props.onClick(); await delay(); });
-    const sheet = local.root.find(n => n.type === 'div' && n.props.className === 'guide-sheet');
-    assert.deepEqual(sheet.findAll(n => n.props.className === 'guide__machine-name').map(text), ['Гриф', 'Скамья'], 'основной первым, скамья под ним');
-    assert.deepEqual(sheet.findAll(n => n.props.className === 'machine__note').map(text), ['Ваша настройкаХват 81'], 'настройка клиента — и в листе');
+    const chip = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__about'));
+    await act(async () => { chip.props.onClick(); await delay(); });
+    const sheet = () => local.root.find(n => n.type === 'div' && n.props.className === 'tech-sheet');
+    const tab = sheet().findAll(n => n.props.role === 'tab')[1];
+    assert.equal(text(tab), 'Оборудование');
+    await act(async () => { tab.props.onClick(); await delay(); });
+    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mach__tx').map(n => text(n.findByType('b'))), ['Гриф', 'Скамья'], 'основной первым, скамья под ним');
+    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mine').map(text), ['Ваша настройкаХват 81'], 'настройка клиента — и в листе');
 
     const edit = plaques()[0];
     await act(async () => { edit.props.onClick(); await delay(); });
@@ -974,8 +972,11 @@ test('тренажёры на выбор: закреплённый — одно�
     });
     const plaques = local.root.findAll(n => n.type === 'button' && String(n.props.className || '').startsWith('workout__plaque'));
     assert.deepEqual(plaques.map(text), ['Моя настройка · для тренажёраКрюки на 4‑й']);
-    const machineBtn = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__machine-btn'));
-    assert.equal(machineBtn.props['aria-label'], 'Тренажёр: Рама у окна');
+    const chip = local.root.find(n => n.type === 'button' && String(n.props.className || '').includes('workout__about'));
+    await act(async () => { chip.props.onClick(); await delay(); });
+    const sheet = () => local.root.find(n => n.type === 'div' && n.props.className === 'tech-sheet');
+    await act(async () => { sheet().findAll(n => n.props.role === 'tab')[1].props.onClick(); await delay(); });
+    assert.deepEqual(sheet().findAll(n => n.props.className === 'ts-mach__tx').map(n => text(n.findByType('b'))), ['Рама у окна'], 'в листе — только закреплённая');
   } finally {
     exerciseSetupResponse = null;
     if (local) local.unmount();

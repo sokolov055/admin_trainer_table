@@ -1,5 +1,6 @@
 import { primaryEquipment } from './equipment-guidance.js';
-import WorkoutGuidance, { MachineGuide } from './WorkoutGuidance.jsx';
+import WorkoutGuidance from './WorkoutGuidance.jsx';
+import { TechButton } from './TechSheet.jsx';
 import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GamesNav } from './client/GamesHub.jsx';
 import { flushSync, createPortal } from 'react-dom';
@@ -2195,7 +2196,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const usedInfo = info && used.length !== machines.length ? { ...info, machines: used } : info;
     const targets = usedInfo && !split ? noteTargetsOf(usedInfo) : [];
     const noteCell = ({ target, label, fields }, i) => (
-      <div key={target} className={'workout__head-note' + (i === 0 && machines.length ? '' : ' workout__head-note--wide')}>
+      <div key={target} className="workout__head-note workout__head-note--wide">
         <MachineNote plaque target={target} label={label} fields={fields} note={notes[target]} trainer={!asClient} params={params}
           onSaved={(n) => setNotes((v) => {
             const next = { ...v };
@@ -2208,9 +2209,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     return <>
       <div className="workout__tools">
         {targets.slice(0, 1).map(noteCell)}
-        {machines.length > 0 && <MachineGuide info={guideOf(ex, usedInfo)} notes={split ? {} : notes} trainer={!asClient} />}
         {targets.slice(1).map((t, i) => noteCell(t, i + 1))}
-        {info && <WorkoutGuidance info={guideOf(ex, info)} trainer={!asClient} chip />}
+        {/* Лист упражнения (15.11.2026): техника и тренажёр — вкладками */}
+        {info && <TechButton ex={ex} info={guideOf(ex, usedInfo)} notes={split ? {} : notes} trainer={!asClient} targetOf={(uid) => machineTarget(info, uid)} />}
         {canSwap && <button type="button" className="workout__chip workout__alts-toggle" aria-expanded={swapping === ex.id}
           onClick={() => { haptic(); setSwapping(swapping === ex.id ? null : ex.id); }}>
           <IconRefresh size={16} aria-hidden="true" />{swapping === ex.id ? 'Не заменять' : 'Заменить'}

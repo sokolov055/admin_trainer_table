@@ -13,7 +13,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Sheet, plural } from '../ui.jsx';
 import { IconCheck, IconChevron, IconMore, IconCopy, IconTrash } from '../icons.jsx';
 import { haptic } from '../telegram.js';
-import { Media, SetupText, MachineList, PersonalNote } from '../media.jsx';
+import { machineTarget } from '../media.jsx';
+import TechSheet from '../TechSheet.jsx';
+import { techModel } from '../tech-sheet-model.js';
 import { mediaUrl } from '../library.js';
 import { MuscleFigure, namesOf, splitTally, tallyExercises } from '../muscles/MuscleMap.jsx';
 import { supersets } from '../plan-model.js';
@@ -419,58 +421,16 @@ export function CardExercises({ exercises, members, me, onOpen }) {
 
 /* ---------- Лист техники ---------- */
 
-/** «1. Сядьте ровно… 2. Поднимайте…» — по строкам; одна строка — абзацем */
-function NotesText({ text }) {
-  const lines = String(text || '').split(/\n+/).map((l) => l.replace(/^\s*(\d+[.)]|[-•–])\s*/, '').trim()).filter(Boolean);
-  if (lines.length < 2) return <p className="small pc-sheet__p">{lines[0] || ''}</p>;
-  return (
-    <ol className="pc-steps">
-      {lines.map((l, i) => <li key={i}><b>{i + 1}</b><span>{l}</span></li>)}
-    </ol>
-  );
-}
-
 /**
- * Лист снизу: большая анимация или ролик, «План / Прошлый раз / Мышцы»,
- * техника, тренажёры со своей настройкой, «Как настроить», замены.
- * Закрывается смахиванием вниз и касанием фона (Sheet)
+ * Лист упражнения (15.11.2026, макет exercise-sheet-mockup.html): тот же,
+ * что «Техника» в занятии — TechSheet. Закрывается смахиванием вниз,
+ * касанием фона и крестиком
  */
 export function ExerciseSheet({ ex, onClose }) {
   const card = ex.exercise || {};
   const w = lastWeightOf(ex);
-  const muscles = card.muscle || (ex.muscles && namesOf(ex.muscles.primary || []).join(', ')) || '';
-  const scheme = planScheme(ex) || '';
-  const machines = card.machines || [];
-  return (
-    <Sheet title={ex.name} onClose={onClose} className="pc-sheet">
-      {card.media && <div className="pc-sheet__media"><Media media={card.media} /></div>}
-      <div className="pc-kv">
-        {scheme && <span>План <b>{scheme}</b></span>}
-        {w && <span>Прошлый раз <b>{w.last}</b></span>}
-        {muscles && <span>Мышцы <b>{lower(muscles)}</b></span>}
-        {card.equipment && <span>Снаряд <b>{lower(card.equipment)}</b></span>}
-      </div>
-      {card.notes
-        ? <NotesText text={card.notes} />
-        : !card.media && !card.setup && !machines.length && <p className="small muted pc-sheet__p">Техника к этому упражнению пока не записана.</p>}
-      {/* Тренажёры (FT-478): у каждого фото и своя настройка */}
-      <MachineList machines={machines} notes={ex.notes || {}} noteKey={card.noteKey} />
-      {!machines.length && card.noteKey && ex.notes && <PersonalNote text={ex.notes[card.noteKey]} />}
-      {card.setup && (
-        <>
-          <h4 className="setup__title">{machines.length ? 'Общий принцип настройки' : 'Как настроить тренажёр'}</h4>
-          <SetupText text={card.setup} />
-        </>
-      )}
-      {/* Замены (FT-479): в занятии меняются одним касанием */}
-      {card.alternatives && card.alternatives.length > 0 && (
-        <div className="pc-swap">
-          <span>Занято? Можно заменить</span>
-          <b>{card.alternatives.map((a) => a.name).join(', ')}</b>
-        </div>
-      )}
-    </Sheet>
-  );
+  const m = techModel({ name: ex.name, card, muscles: ex.muscles, notes: ex.notes || {}, targetOf: (uid) => machineTarget(card, uid) });
+  return <TechSheet m={m} plan={planScheme(ex) || ''} last={w ? w.last : ''} onClose={onClose} />;
 }
 
 /* ---------- «⋯» тренера ---------- */

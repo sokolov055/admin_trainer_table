@@ -1,0 +1,140 @@
+/* Лист упражнения (TechSheet.jsx, макет exercise-sheet-mockup.html, 15.11.2026).
+   Значения — токены DESIGN-APP.md; своё здесь только движение. */
+
+.tech-sheet {
+  --ts-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+  --ts-gap: 12px;
+}
+
+/* Шапка листа: заголовок — для чтения вслух, крестик — поверх картинки */
+.tech-sheet .sheet__head { position: absolute; z-index: 3; top: 25px; right: 26px; width: 44px; min-height: 44px; padding: 0; }
+.tech-sheet .sheet__head h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tech-sheet .sheet__close { position: static; transform: none; }
+.tech-sheet .sheet__close::before { background: color-mix(in srgb, var(--surface) 82%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: var(--shadow-sm); }
+.tech-sheet .sheet__close:active { transform: scale(0.92); }
+.tech-sheet .sheet__body { padding-bottom: var(--space-4); }
+
+/* Появление: блоки по очереди, после того как лист доехал наполовину */
+.ts-rise { animation: ts-rise 520ms var(--ease-out) both; animation-delay: calc(90ms + var(--i, 0) * 50ms); }
+@keyframes ts-rise { from { opacity: 0; transform: translateY(12px); } }
+
+/* ---------- Движение ---------- */
+.ts-hero { position: relative; border-radius: 22px; overflow: hidden; background: radial-gradient(120% 90% at 50% 28%, var(--surface), var(--surface-sunken)); box-shadow: inset 0 0 0 1px var(--border); }
+.ts-hero.ts-rise { animation-name: ts-hero; }
+@keyframes ts-hero { from { opacity: 0; transform: scale(0.965); } }
+.ts-hero--plain { padding: var(--space-3); }
+.ts-hero__stage { all: unset; position: relative; display: block; width: 100%; aspect-ratio: var(--ratio, 4 / 3); transition: aspect-ratio var(--dur) var(--ease-out); max-height: 42vh; max-height: 42dvh; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ts-hero__stage:disabled { cursor: default; }
+.ts-hero__stage img, .ts-hero__stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.ts-hero__stage video { background: transparent; }
+.ts-hero__b { opacity: 0; transition: opacity 420ms var(--ease-in-out); }
+.ts-hero__b.is-on { opacity: 1; }
+.ts-hero__photo { padding: 10px; box-sizing: border-box; }
+.ts-hero__empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); }
+.ts-hero__play { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: color-mix(in srgb, var(--surface) 86%, transparent); color: var(--text); box-shadow: var(--shadow-md); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); animation: ts-pop 280ms var(--ts-spring) both; }
+.ts-hero__play svg { margin-left: 3px; }
+@keyframes ts-pop { from { opacity: 0; transform: scale(0.7); } }
+.ts-hero__ctl { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; }
+.ts-pill { all: unset; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; box-sizing: border-box; border-radius: 999px; background: color-mix(in srgb, var(--surface) 86%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: var(--shadow-sm); color: var(--text-secondary); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out), transform var(--dur-press) var(--ease-out); -webkit-tap-highlight-color: transparent; }
+.ts-pill:active { transform: scale(0.94); }
+.ts-pill.is-on { background: var(--text); color: var(--surface); }
+.ts-pill:focus-visible, .ts-hero__stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Название ---------- */
+.ts-name { padding: var(--space-4) 2px 0; }
+.ts-name h3 { margin: 0; font-size: 24px; font-weight: 760; line-height: 1.15; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.ts-name p { margin: 4px 0 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.3; }
+
+/* Внутри занятия: какой подход сейчас */
+.ts-now { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--ts-gap); padding: 10px 14px; border-radius: var(--radius); background: var(--accent-wash); color: var(--text-secondary); font-size: var(--text-sm); }
+.ts-now > b { color: var(--accent-ink); font-size: var(--text-base); font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ts-now span b { color: var(--text); }
+
+/* ---------- Плитки ---------- */
+.ts-stats { display: flex; gap: 8px; margin-top: var(--ts-gap); }
+.ts-stat { flex: 1 1 0; min-width: 0; min-height: 76px; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; padding: 10px; box-sizing: border-box; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.ts-stat i, .ts-stat--mus i { font-style: normal; font-size: 11.5px; white-space: nowrap; font-weight: 650; color: var(--text-muted); line-height: 1.2; }
+.ts-stat__v { font-size: 24px; font-weight: 760; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ts-stat__v small { font-size: 14px; font-weight: 650; color: var(--text-secondary); letter-spacing: 0; }
+.ts-stat--mus { flex: 1.3 1 0; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 8px 10px 8px 8px; }
+/* Фигура — одной стороной, где больше основной нагрузки (TechSheet.jsx, sideOf) */
+.ts-stat--mus .muscles__figure { flex-direction: row; flex-wrap: nowrap; gap: 0; }
+.ts-stat--front .muscles__view + .muscles__view, .ts-stat--back .muscles__view:first-child { display: none; }
+.ts-stat--mus .muscles__side { width: 30px; height: 60px; }
+.ts-stat--mus > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ts-stat--mus b { font-size: 13px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
+.ts-stat--mus b small { font-weight: 650; color: var(--text-muted); }
+/* Основные мышцы «дышат» — в такт движению, мягко */
+.ts-stat--mus .muscles__part--primary { animation: ts-breathe 2.2s var(--ease-in-out) 700ms infinite; }
+@keyframes ts-breathe { 50% { opacity: 0.55; } }
+
+/* ---------- Вкладки ---------- */
+.ts-seg { position: relative; display: flex; margin-top: var(--space-4); padding: 3px; border-radius: 14px; background: var(--surface-sunken); }
+.ts-seg__pill { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n, 2)); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow-sm); transition: transform 420ms var(--ts-spring); }
+.ts-seg button { all: unset; position: relative; z-index: 1; flex: 1 1 0; min-height: 38px; display: grid; place-items: center; box-sizing: border-box; border-radius: 11px; color: var(--text-secondary); font-size: var(--text-sm); font-weight: 650; text-align: center; cursor: pointer; transition: color var(--dur) var(--ease-out); -webkit-tap-highlight-color: transparent; }
+.ts-seg button.is-on { color: var(--text); }
+.ts-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ---------- Содержимое вкладки ---------- */
+.ts-pane { padding-top: var(--space-4); }
+.ts-pane--switched { animation: ts-pane 300ms var(--ease-out) both; }
+@keyframes ts-pane { from { opacity: 0; transform: translateY(6px); } }
+.ts-item { animation: ts-rise 460ms var(--ease-out) both; animation-delay: calc(330ms + var(--i, 0) * 60ms); }
+.ts-pane--switched .ts-item { animation-delay: calc(60ms + var(--i, 0) * 45ms); }
+.ts-fold:not(.is-open) .ts-item { animation: none; }
+.ts-fold.is-open .ts-item { animation: ts-rise 380ms var(--ease-out) both; animation-delay: calc(80ms + var(--i, 0) * 40ms); }
+
+.ts-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.ts-steps li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; }
+.ts-steps__n { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: var(--accent-wash); color: var(--accent-ink); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ts-steps b { display: block; padding-top: 4px; font-size: var(--text-base); font-weight: 650; line-height: 1.32; }
+.ts-steps li span:not(.ts-steps__n) { display: block; margin-top: 2px; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.35; }
+
+.ts-avoid { margin-top: var(--space-5); }
+.ts-avoid h4 { margin: 0 0 8px; color: var(--critical-text); font-size: 12px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; }
+.ts-nos { display: flex; flex-wrap: wrap; gap: 6px; }
+.ts-nos span { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 12px 6px 6px; box-sizing: border-box; border-radius: 999px; background: var(--critical-fill); color: var(--critical-text); font-size: var(--text-sm); font-weight: 600; line-height: 1.25; }
+.ts-nos span::before { content: ''; flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--critical) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M6 6l6 6M12 6l-6 6' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 18px no-repeat; }
+
+.ts-swap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--space-4); color: var(--text-muted); font-size: var(--text-sm); }
+.ts-swap em { font-style: normal; padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); font-weight: 600; }
+.ts-empty { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+
+/* ---------- Тренажёр ---------- */
+.ts-mach + .ts-mach { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.ts-mach__row { all: unset; display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; box-sizing: border-box; border-radius: var(--radius-lg); background: var(--surface-sunken); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform var(--dur-press) var(--ease-out); }
+.ts-mach__row:disabled { cursor: default; }
+.ts-mach__row:not(:disabled):active { transform: scale(0.98); }
+.ts-mach__row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ts-mach__thumb { flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--surface); color: var(--text-muted); }
+.ts-mach__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ts-mach__tx { min-width: 0; display: grid; gap: 3px; }
+.ts-mach__tx b { font-size: var(--text-base); font-weight: 650; line-height: 1.25; }
+.ts-mach__tx span { color: var(--text-muted); font-size: 12.5px; }
+.ts-mach__big { display: grid; gap: 8px; margin-top: 8px; animation: ts-rise 320ms var(--ease-out) both; }
+.ts-mach__big img { display: block; width: 100%; max-height: 60vh; object-fit: contain; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.ts-pane > .ts-mine:first-child { margin: 0 0 var(--space-4); }
+.ts-mine { display: grid; gap: 2px; margin-top: 10px; padding: 10px 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--radius-lg); }
+.ts-mine i { font-style: normal; color: var(--text-muted); font-size: 12px; font-weight: 650; }
+.ts-mine b { font-size: var(--text-base); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+
+.ts-fold { margin-top: 10px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.ts-fold > button { all: unset; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 46px; padding: 0 14px; box-sizing: border-box; font-size: var(--text-base); font-weight: 650; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ts-fold > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg); }
+.ts-fold > button svg { flex: none; color: var(--text-muted); transform: rotate(-90deg); transition: transform 360ms var(--ts-spring); }
+.ts-fold.is-open > button svg { transform: rotate(0deg); }
+.ts-fold__body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 380ms var(--ease-ios); }
+.ts-fold.is-open .ts-fold__body { grid-template-rows: 1fr; }
+.ts-fold__body > div { min-height: 0; overflow: hidden; }
+.ts-fold__body > div > :first-child { margin-top: 0; }
+.ts-fold__body .ts-rows { padding: 0 14px 14px; }
+.ts-fold__body .ts-avoid { margin: 0; padding: 0 14px 14px; }
+
+.ts-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.ts-rows li { display: grid; grid-template-columns: minmax(64px, 30%) minmax(0, 1fr); gap: 10px; font-size: var(--text-sm); line-height: 1.35; color: var(--text-secondary); }
+.ts-rows b { color: var(--text); font-weight: 650; }
+.ts-rows__wide { grid-column: 1 / -1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tech-sheet .sheet__body *, .tech-sheet .sheet__body *::before { animation: none !important; transition: none !important; }
+}
