@@ -12,7 +12,7 @@ import React, { useState } from 'react';
 import { haptic } from './telegram.js';
 import { mediaUrl } from './library.js';
 import { splitStep } from './tech-sheet-model.js';
-import { Sticker, stickerFor } from './setup-stickers.jsx';
+import { Sticker, stickerFor, stickerById, useStickerPack } from './setup-stickers.jsx';
 import './setup-steps.css';
 
 const word = (n, one, few, many) => {
@@ -39,10 +39,11 @@ export default function SetupSteps({ photos = [], rows = [], meta = [], kind = '
   const [open, setOpen] = useState(-1);
   const [done, setDone] = useState([]);
   const [plays, setPlays] = useState({});
+  useStickerPack();
   const steps = rows.map((r, k) => {
     const { main, rest } = splitStep(r.text);
     const m = meta[k] || {};
-    return { k, label: r.label, main: main ? main.charAt(0).toLocaleUpperCase('ru') + main.slice(1) : '', rest, sticker: m.s || stickerFor(r.label, r.text), pin: Array.isArray(m.p) ? m.p : null };
+    return { k, label: r.label, main: main ? main.charAt(0).toLocaleUpperCase('ru') + main.slice(1) : '', rest, sticker: (m.s && stickerById(m.s) ? m.s : '') || stickerFor(r.label, r.text), pin: Array.isArray(m.p) ? m.p : null };
   });
   const pins = steps.filter((s) => s.pin).map((s) => ({ k: s.k, p: s.pin }));
   const focus = (k, from) => {

@@ -16,6 +16,7 @@ import { PlusOffer, usePlusLink } from './plus.jsx';
 import { refreshThemes } from './remote-themes.js';
 import { setStandardLook } from './palettes.js';
 import { refreshGamePacks } from './remote-games.js';
+import { refreshStickers } from './remote-stickers.js';
 
 // Кабинеты и экраны входа — по требованию (lazy.js): клиенту не нужен
 // кабинет тренера, вошедшему — экраны входа
@@ -101,6 +102,7 @@ export default function App() {
   useEffect(() => { if (role) refreshThemes(); }, [role]);
   // Наборы для игр — вопросы и уровни из «Управление → Игры» (remote-games.js)
   useEffect(() => { if (role) refreshGamePacks(); }, [role]);
+  useEffect(() => { if (role) refreshStickers(); }, [role]);
 
   // Работа без сети (FT-566): чьи данные на телефоне — сразу, как известно,
   // кто вошёл; отправка неотправленных занятий и запас программы — чуть

@@ -1,0 +1,15 @@
+/* «Управление → Контент → Стикеры» (16.11.2026, макет stickers-upload-mockup-v2.html) */
+.ast-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 36px; margin-bottom: var(--space-2); }
+.ast-tip { color: var(--text-muted); font-size: var(--text-xs); }
+.ast-done { min-height: 32px; padding: 0 12px; }
+.ast-grid { margin-top: var(--space-3); }
+.ast-st { position: relative; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; transition: transform .16s cubic-bezier(.22,1,.36,1); }
+.ast-grid.is-sel .ast-st { transform: scale(.95); }
+.ast-grid.is-sel .ast-st.is-on { transform: scale(1); }
+.ast-ck { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; box-sizing: border-box; border: 2px solid var(--border-strong, #c7c7cc); border-radius: 50%; background: var(--surface); color: #fff; font-size: 12px; font-style: normal; font-weight: 800; line-height: 16px; text-align: center; }
+.ast-st.is-on .ast-ck { border-color: var(--accent); background: var(--accent); }
+.ast-pk { color: var(--accent); font-size: 10px; font-style: normal; font-weight: 700; }
+.ast-pk.is-old { color: var(--text-muted); }
+.ast-bar { position: sticky; bottom: calc(var(--space-2) + env(safe-area-inset-bottom)); z-index: 2; margin-top: var(--space-3); padding: var(--space-3); border-radius: 16px; background: var(--surface); box-shadow: 0 6px 24px rgba(0,0,0,.16); }
+.ast-del { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .ast-st { transition: none; } }

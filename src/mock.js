@@ -15,6 +15,7 @@
  * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
+import { BUILTIN_IDS } from './setup-stickers-search.js';
 import { dateKey, nextMonday, versionAt, addDays, monday } from './program-timeline.js';
 import { withLength, monthWeeks } from './plan-weeks.js';
 import { RECIPES as RECIPES_DEMO, FOOD as FOOD_DEMO } from './nutrition/recipes.js';
@@ -233,6 +234,9 @@ const mockThemeDoc = () => {
 };
 const mockThemesState = () => ({ ...mockThemeDoc(), max: 20, history: mockThemes.history });
 const mockThemeLog = (text) => mockThemes.history.unshift({ at: new Date().toISOString(), text: text + ' · owner@fittrack.demo' });
+// Стикерпак настройки тренажёров (16.11.2026)
+const mockStickers = { list: [], hidden: [] };
+const mockStickersState = () => ({ stickers: mockStickers.list, hidden: mockStickers.hidden, usage: {}, builtin: [...BUILTIN_IDS] });
 // Наборы для игр (22.10.2026): как на сервере, демо-тренер — владелец
 const mockPacks = { history: [] };
 const mockPackDoc = () => {
@@ -1569,6 +1573,32 @@ const MOCK = {
     doc.themes = doc.themes.filter((t) => t !== own);
     mockThemeLog(`Удалена «${own.name}» (${own.id})`);
     return mockThemesState();
+  },
+  // Стикерпак (16.11.2026): как на сервере, без записи на сервер; демо-проверка проще серверной
+  'app.stickers': () => ({ stickers: mockStickers.list, hidden: mockStickers.hidden }),
+  'owner.stickers': () => mockStickersState(),
+  'owner.stickers.upload': (p) => {
+    const f = p.file || {};
+    if (f.format !== 'fittrack-stickers' || !Array.isArray(f.stickers) || !f.stickers.length) throw new Error('Это не файл стикеров (format: fittrack-stickers).');
+    const added = []; const restored = []; const skipped = []; const preview = [];
+    for (const s of f.stickers) {
+      if (!s || !/^[a-z][A-Za-z0-9]{1,31}$/.test(String(s.id)) || typeof s.svg !== 'string' || /<\/?(script|image|foreignObject|use|a)\b|\son\w+=|href|url\(|javascript:/i.test(s.svg + (s.css || ''))) throw new Error(`Стикер ${s && s.id}: не прошёл проверку.`);
+      const one = { id: s.id, name: String(s.name || s.id), group: s.group || 'machine', kw: String(s.kw || ''), re: String(s.re || ''), svg: s.svg, css: String(s.css || ''), pack: String(f.name || '') };
+      preview.push(one);
+      if (mockStickers.hidden.includes(s.id)) restored.push(s.id);
+      else if (BUILTIN_IDS.has(s.id) || mockStickers.list.some((x) => x.id === s.id)) skipped.push({ id: s.id, name: one.name });
+      else added.push(one);
+    }
+    if (p.dryRun) return { added: added.map((s) => s.id), restored, skipped, preview, name: String(f.name || '') };
+    mockStickers.list.push(...added);
+    mockStickers.hidden = mockStickers.hidden.filter((id) => !restored.includes(id));
+    return { added: added.map((s) => s.id), restored, skipped, ...mockStickersState() };
+  },
+  'owner.stickers.remove': (p) => {
+    const ids = (p.ids || []).map(String);
+    for (const id of ids) if (BUILTIN_IDS.has(id) && !mockStickers.hidden.includes(id)) mockStickers.hidden.push(id);
+    mockStickers.list = mockStickers.list.filter((s) => !ids.includes(s.id));
+    return mockStickersState();
   },
   'app.gamepacks': () => ({ packs: mockPackDoc().map(({ at, by, closed, ...p }) => (closed ? { ...p, closed: true } : p)), trial: true }),
   // Загрузка каталога таблицей (AdminImport.jsx): в демо — без записи

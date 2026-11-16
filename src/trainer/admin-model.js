@@ -15,6 +15,8 @@ export const ADMIN_PANES = [
   { value: 'trainers', label: 'Тренеры' },
   { value: 'tariffs', label: 'Тарифы' },
   { value: 'games', label: 'Игры' },
+  // Стикерпак настройки тренажёров файлом — добавить, удалить (16.11.2026)
+  { value: 'stickers', label: 'Стикеры' },
   // «Что нового» и «Инструкция» у всех пользователей — без сборки (FT-615)
   { value: 'stories', label: 'Истории' },
   // Темы оформления файлом — загрузить, закрыть (22.10.2026)
@@ -38,7 +40,7 @@ export const ADMIN_PANES = [
 export const ADMIN_GROUPS = [
   { value: 'analytics', label: 'Аналитика', panes: ['stats', 'ai'] },
   { value: 'people', label: 'Тренеры и тарифы', panes: ['trainers', 'tariffs'] },
-  { value: 'content', label: 'Контент', panes: ['games', 'stories', 'look', 'import'] },
+  { value: 'content', label: 'Контент', panes: ['games', 'stickers', 'stories', 'look', 'import'] },
   { value: 'system', label: 'Система', panes: ['flags', 'versions', 'logs', 'export'] },
 ];
 

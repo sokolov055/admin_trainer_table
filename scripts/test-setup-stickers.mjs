@@ -3,7 +3,8 @@
 // текст настройки ↔ шаги без потерь
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STICKERS, searchStickers, stickerFor, stickerById, oneTypo } from '../src/setup-stickers-search.js';
+import * as pack from '../src/setup-stickers-search.js';
+import { STICKERS, searchStickers, stickerFor, stickerById, oneTypo, setStickerPack } from '../src/setup-stickers-search.js';
 import { parseSetup, buildSetup } from '../src/trainer/setup-text.js';
 
 const names = (q) => (searchStickers(q) || []).map((s) => s.name);
@@ -51,4 +52,27 @@ test('текст настройки ↔ шаги: подпись, главное
   const odd = buildSetup([{ label: 'Сиденье — высота', main: 'выше; ниже', rest: '', sticker: '', pin: null }, { label: '', main: '', rest: '', sticker: 'seat', pin: null }], []);
   assert.equal(odd.setup, 'Сиденье высота — выше, ниже');
   assert.deepEqual(odd.meta, []);
+});
+
+test('загруженные файлом стикеры и скрытые встроенные (16.11.2026)', () => {
+  const before = pack.STICKERS.length;
+  setStickerPack({
+    stickers: [
+      { id: 'hipBelt', name: 'Пояс на бёдра', group: 'machine', kw: 'пояс ремень хипбелт', re: 'хипбелт', svg: '<rect class="a f" x="8" y="20" width="32" height="6"/>', css: '', pack: 'Ноги' },
+      { id: 'seat', name: 'Подмена встроенного', svg: '<rect/>' },
+      { id: 'bad', name: 'Плохое выражение', re: '(', svg: '<rect/>' },
+    ],
+    hidden: ['platform'],
+  });
+  assert.equal(pack.STICKERS.length, before - 1 + 2, 'встроенный не подменяется, скрытый ушёл');
+  assert.equal(stickerById('seat').name, 'Сиденье');
+  assert.equal(stickerById('platform'), null);
+  assert.equal(stickerById('hipBelt').custom, true);
+  assert.ok((searchStickers('ремен') || []).some((s) => s.id === 'hipBelt'));
+  assert.deepEqual((searchStickers('хипбел') || []).map((s) => s.id), ['hipBelt']);
+  assert.equal(stickerFor('Хипбелт', ''), 'hipBelt');
+  assert.notEqual(stickerFor('Платформа', 'потяните ручку'), 'platform');
+  setStickerPack({ stickers: [], hidden: [] });
+  assert.equal(pack.STICKERS.length, before);
+  assert.equal(stickerFor('Платформа', 'потяните ручку'), 'platform');
 });

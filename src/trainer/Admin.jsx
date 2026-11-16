@@ -12,6 +12,7 @@ import { haptic } from '../telegram.js';
 import Trainers from './Trainers.jsx';
 import Games from './Games.jsx';
 import AdminStories from './AdminStories.jsx';
+import AdminStickers from './AdminStickers.jsx';
 import AdminLook from './AdminLook.jsx';
 import AdminVersions from './AdminVersions.jsx';
 import AdminAiScan from './AdminAiScan.jsx';
@@ -43,6 +44,7 @@ export default function Admin({ pane }) {
   if (pane === 'trainers') return <Trainers />;
   if (pane === 'tariffs') return <Tariffs />;
   if (pane === 'games') return <Games />;
+  if (pane === 'stickers') return <AdminStickers />;
   if (pane === 'flags') return <Flags />;
   if (pane === 'stories') return <AdminStories />;
   if (pane === 'look') return <AdminLook />;

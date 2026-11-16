@@ -12,7 +12,7 @@ import { Sheet } from '../ui.jsx';
 import { IconClose, IconSearch, IconTrash, IconArrowUp, IconArrowDown, IconPlus } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { parseSetup, buildSetup, clean } from './setup-text.js';
-import { Sticker, stickerFor, searchStickers, normQuery, STICKERS, STICKER_GROUPS, stickerById } from '../setup-stickers.jsx';
+import { Sticker, stickerFor, searchStickers, normQuery, STICKERS, STICKER_GROUPS, stickerById, useStickerPack } from '../setup-stickers.jsx';
 import SetupSteps from '../SetupSteps.jsx';
 import '../tech-sheet.css';
 import './setup-editor.css';
@@ -30,6 +30,7 @@ const pct = (e, el) => {
 function StickerSheet({ step, index, onPick, onClose }) {
   const [q, setQ] = useState('');
   const [group, setGroup] = useState('');
+  useStickerPack();
   const found = searchStickers(q);
   const inGroup = (s) => !group || s.group === group;
   const suggest = useMemo(() => (searchStickers(step.label || '') || []).slice(0, 6), [step.label]);
@@ -130,14 +131,15 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
       ) : <p className="field__hint">Добавьте фото — на нём можно будет отметить цифрами, где каждая регулировка.</p>}
 
       {steps.map((s, k) => {
-        const auto = s.sticker ? '' : stickerFor(s.label, s.main + ' ' + s.rest);
+        const own = s.sticker && stickerById(s.sticker) ? s.sticker : '';
+        const auto = own ? '' : stickerFor(s.label, s.main + ' ' + s.rest);
         const words = s.label.trim() ? s.label.trim().split(/\s+/).length : 0;
         return (
           <div key={k} className={'sed-row' + (placing === k ? ' is-on' : '')}>
             <div className="sed-top">
-              <button type="button" className={'sed-stk' + (s.sticker ? ' has' : '')} onClick={() => setPicking(k)} aria-label={'Стикер шага ' + (k + 1) + (s.sticker ? ': ' + stickerById(s.sticker)?.name : '')}>
+              <button type="button" className={'sed-stk' + (own ? ' has' : '')} onClick={() => setPicking(k)} aria-label={'Стикер шага ' + (k + 1) + (own ? ': ' + stickerById(own).name : '')}>
                 <span className="ss-n">{k + 1}</span>
-                {s.sticker ? <Sticker id={s.sticker} /> : auto ? <span className="sed-auto"><Sticker id={auto} /></span> : <em>+<br />стикер</em>}
+                {own ? <Sticker id={own} /> : auto ? <span className="sed-auto"><Sticker id={auto} /></span> : <em>+<br />стикер</em>}
               </button>
               <div className="sed-fields">
                 <input className="field__input" value={s.label} maxLength={30} placeholder="Подпись: Сиденье, Платформа…" aria-label={'Подпись шага ' + (k + 1)}

@@ -2,7 +2,7 @@
  * Стикерпак настройки: поиск и подбор стикера к шагу (16.11.2026) — без
  * React, чтобы проверялось тестом (scripts/test-setup-stickers.mjs).
  */
-import { STICKERS, STICKER_RULES } from './setup-stickers-data.js';
+import { STICKERS as BUILTIN, STICKER_RULES } from './setup-stickers-data.js';
 
 export const STICKER_GROUPS = [
   { id: '', name: 'Все' },
@@ -12,7 +12,19 @@ export const STICKER_GROUPS = [
   { id: 'action', name: 'Действие' },
 ];
 
-const BY_ID = new Map(STICKERS.map((s) => [s.id, s]));
+/**
+ * Пак = встроенные (код) − скрытые владельцем + загруженные файлом
+ * («Управление → Контент → Стикеры», 16.11.2026, remote-stickers.js).
+ * STICKERS — живая привязка: после setStickerPack у импортёров новый список.
+ */
+export const BUILTIN_IDS = new Set(BUILTIN.map((s) => s.id));
+export let STICKERS = BUILTIN;
+let BY_ID = new Map();
+let WORDS = new Map();
+let RES = [];
+let version = 0;
+const subs = new Set();
+
 export const stickerById = (id) => BY_ID.get(String(id || '')) || null;
 
 /** Строка поиска → нормальная форма: регистр, ё/е, знаки не важны */
@@ -41,7 +53,6 @@ export function oneTypo(a, b) {
   return false;
 }
 
-const WORDS = new Map(STICKERS.map((s) => [s.id, { name: normQuery(s.name).split(' '), kw: s.kw.split(' ') }]));
 
 /**
  * Поиск по паку: каждое слово запроса — началом слова в названии (сильнее)
@@ -53,7 +64,7 @@ export function searchStickers(q, list = STICKERS) {
   if (!toks.length) return null;
   const out = [];
   for (const s of list) {
-    const { name, kw } = WORDS.get(s.id);
+    const { name, kw } = WORDS.get(s.id) || { name: normQuery(s.name).split(' '), kw: String(s.kw || '').split(' ') };
     let score = 0;
     let ok = true;
     for (const t of toks) {
@@ -73,7 +84,29 @@ export function searchStickers(q, list = STICKERS) {
 }
 
 const RULES = STICKER_RULES.map(([l, m, id]) => [new RegExp(l), new RegExp(m), id]);
-const RES = STICKERS.filter((s) => s.re).map((s) => [new RegExp(s.re, 'i'), s.id]);
+const safeRe = (re) => { try { return new RegExp(re, 'i'); } catch (_) { return null; } };
+
+function rebuild() {
+  BY_ID = new Map(STICKERS.map((s) => [s.id, s]));
+  WORDS = new Map(STICKERS.map((s) => [s.id, { name: normQuery(s.name).split(' '), kw: String(s.kw || '').split(' ') }]));
+  RES = STICKERS.filter((s) => s.re).map((s) => [safeRe(s.re), s.id]).filter(([re]) => re);
+}
+rebuild();
+
+/** Загруженные стикеры и скрытые встроенные (ответ app.stickers) */
+export function setStickerPack(doc) {
+  const hidden = new Set(Array.isArray(doc && doc.hidden) ? doc.hidden : []);
+  const extra = (Array.isArray(doc && doc.stickers) ? doc.stickers : [])
+    .filter((s) => s && typeof s.id === 'string' && typeof s.svg === 'string' && !BUILTIN_IDS.has(s.id))
+    .map((s) => ({ id: s.id, name: String(s.name || s.id), group: s.group || 'machine', kw: String(s.kw || ''), re: String(s.re || ''), svg: s.svg, css: String(s.css || ''), pack: s.pack || '', custom: true }));
+  STICKERS = [...BUILTIN.filter((s) => !hidden.has(s.id)), ...extra];
+  rebuild();
+  version++;
+  subs.forEach((fn) => { try { fn(); } catch (_) { /* подписчик ушёл */ } });
+}
+export const stickerPackVersion = () => version;
+export function onStickerPack(fn) { subs.add(fn); return () => subs.delete(fn); }
+export const customStickerCss = () => STICKERS.filter((s) => s.custom && s.css).map((s) => s.css).join('');
 
 /** Стикер к шагу, если тренер не выбрал: по подписи и тексту шага */
 export function stickerFor(label, text = '') {
@@ -85,4 +118,3 @@ export function stickerFor(label, text = '') {
   return '';
 }
 
-export { STICKERS };
