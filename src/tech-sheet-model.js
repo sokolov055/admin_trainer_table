@@ -84,6 +84,9 @@ export function techModel({ name = '', card = {}, muscles = null, notes = {}, ta
       photos,
       note: targetOf ? noteText(notes[targetOf(m.uid)]) : null,
       setup: setupRows([...own.steps, ...extra]),
+      // Стикеры и цифры на фото (16.11.2026): по одному на свою строку
+      // настройки; общий принцип упражнения (extra) идёт после — без них
+      meta: own.steps.map((_, k) => (Array.isArray(m.steps) && m.steps[k]) || {}),
       avoid: mistakeChips(own.mistakes),
     };
   });

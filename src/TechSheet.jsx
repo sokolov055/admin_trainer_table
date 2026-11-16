@@ -18,6 +18,7 @@ import { mediaUrl } from './library.js';
 import { MuscleFigure, namesOf } from './muscles/MuscleMap.jsx';
 import { instructionParts } from './equipment-guidance.js';
 import { techModel, workoutPlan, workoutLast, workoutNow, muscleLine } from './tech-sheet-model.js';
+import SetupSteps from './SetupSteps.jsx';
 import './tech-sheet.css';
 
 const ANIM_ID = /^[\w-]+$/;
@@ -195,20 +196,17 @@ function Rows({ rows }) {
 
 /**
  * Тренажёр открыт сразу (владелец 15.11.2026: «свёрнуто» — не нужно): фото
- * крупно, название, своя настройка, как настроить — списком
+ * с цифрами на деталях, название, своя настройка, шаги карточками со
+ * стикерами и галочками (16.11.2026, trainer-final-mockup.html)
  */
 function Machine({ m, trainer }) {
   return (
     <section className="ts-mach">
-      {m.photos.length > 0 && <div className={'ts-mach__photos' + (m.photos.length > 1 ? ' ts-mach__photos--many' : '')}>
-        {m.photos.map((u) => <img key={u} src={mediaUrl(u)} alt={(m.kind === 'equipment' ? 'Оборудование «' : 'Тренажёр «') + m.name + '»'} loading="lazy" draggable="false" />)}
-      </div>}
-      <h4 className="ts-mach__name">{m.name}</h4>
-      <Mine note={m.note} trainer={trainer} />
-      {m.setup.length > 0 && <section className="ts-setup">
-        <h5>{m.kind === 'equipment' ? 'Как подготовить' : 'Как настроить'}</h5>
-        <Rows rows={m.setup} />
-      </section>}
+      <SetupSteps photos={m.photos} rows={m.setup} meta={m.meta || []} kind={m.kind}
+        alt={(m.kind === 'equipment' ? 'Оборудование «' : 'Тренажёр «') + m.name + '»'}>
+        <h4 className="ts-mach__name">{m.name}</h4>
+        <Mine note={m.note} trainer={trainer} />
+      </SetupSteps>
       <Avoid items={m.avoid} />
     </section>
   );

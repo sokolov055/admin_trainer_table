@@ -864,7 +864,8 @@ test('FT-570, вариант А: шаги одной нумерацией, ош�
     await act(async () => { tabs[1].props.onClick(); await delay(); });
     assert.ok(text(sheet()).includes('Technogym'), 'вкладка «Тренажёр»');
     // Тренажёр и настройка открыты сразу (владелец 15.11.2026)
-    assert.ok(text(sheet()).includes('Рычаг') && text(sheet()).includes('под сиденьем'), 'регулировки тренажёра — без раскрывашки');
+    // Шаги карточками (16.11.2026): подпись, главное с большой буквы
+    assert.ok(text(sheet()).includes('Рычаг') && /под сиденьем/i.test(text(sheet())), 'регулировки тренажёра — без раскрывашки');
     assert.ok(sheet().findAllByType('img').length >= 1, 'фото тренажёра — сразу');
     assert.ok(text(sheet()).includes('не тяните рычаг под нагрузкой'), 'ошибка тренажёра — в его настройке');
   } finally {

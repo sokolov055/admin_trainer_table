@@ -7,6 +7,7 @@ import { shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
 import { Confirm, Loading, Segmented, Note, Search } from '../ui.jsx';
 import { IconAlert, IconClose } from '../icons.jsx';
 import { useReveal } from '../reveal.js';
+import SetupStepsEditor from './SetupStepsEditor.jsx';
 
 /*
  * Тренажёры и оборудование упражнения — редактор. Живёт отдельно от
@@ -102,6 +103,8 @@ export function MachinesEditor({ exercise, owner, onChanged }) {
 export function MachineForm({ exercise = null, machine, onDone, canDelete = true }) {
   const [name, setName] = useState(machine ? machine.name : '');
   const [setup, setSetup] = useState(machine ? machine.setup : '');
+  // Стикеры и цифры на фото у шагов (16.11.2026)
+  const [meta, setMeta] = useState(machine?.steps || []);
   const [originalName, setOriginalName] = useState(machine?.originalName || '');
   const [brand, setBrand] = useState(machine?.brand || '');
   const [muscleGroups, setMuscleGroups] = useState(machine?.muscleGroups || []);
@@ -151,6 +154,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       const r = await apiMutate(exercise ? 'library.exercise.machine.save' : 'library.machine.save', {
         ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind, originalName, brand, muscleGroups, setupOk, weightStep,
         setupFields: setupFields.map((f) => f.trim()).filter(Boolean),
+        setupMeta: meta,
         ...(dropped.length ? { removePhotoUrls: dropped } : {}),
       });
       result = exercise ? r.exercise : r.machine;
@@ -252,13 +256,13 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         )}
         <span className="field__hint">Первое фото — главное. Снимайте без людей в кадре — фото увидят клиенты.</span>
       </div>
-      <label className="field">
-        <span className="field__label">Настройка</span>
-        <textarea className="field__input library__textarea" value={setup} maxLength={1500} rows={4}
-          onChange={(ev) => { setSetup(ev.target.value); setSetupOk(false); }}
-          placeholder={kind === 'equipment' ? 'Где лежит, что взять для разминки…' : 'Спинка — рычаг справа под сиденьем.\nВалик — кнопка слева, тянуть на себя.'} />
-        <span className="field__hint">Без цифр: настройка у каждого клиента своя — её записывают в занятии. Каждый шаг — с новой строки.</span>
-      </label>
+      <div className="field">
+        <span className="field__label">Как настроить</span>
+        <SetupStepsEditor value={setup} meta={meta} kind={kind} name={name}
+          photo={kept.length ? mediaUrl(kept[0]) : added.length ? added[0].url : ''}
+          onChange={(text, m) => { if (text !== setup) setSetupOk(false); setSetup(text); setMeta(m); }} />
+        <span className="field__hint">Без цифр в тексте: настройка у каждого клиента своя — её записывают в занятии. Стикер подбирается по подписи сам, если не выбрать.</span>
+      </div>
       <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Инструкция оборудования проверена</label>
       <fieldset className="field library__setup-fields">
         <legend className="field__label">Регулировки</legend>

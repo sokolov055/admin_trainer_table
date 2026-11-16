@@ -1625,7 +1625,9 @@ test('оборудование создаётся без упражнения и
     await phone.getByRole('button', { name: 'Новый тренажёр', exact: true }).click();
     await phone.getByRole('radio', { name: 'Оборудование', exact: true }).click();
     await phone.getByLabel('Название для клиента').fill('Разборные гантели');
-    await phone.getByLabel('Настройка').fill('Стойка у окна.');
+    // Шаги настройки (16.11.2026): подпись и главное у шага, а не одно поле
+    await phone.getByLabel('Подпись шага 1').fill('Где');
+    await phone.getByLabel('Главное шага 1').fill('Стойка у окна');
     await phone.getByRole('button', { name: 'Сохранить', exact: true }).click();
 
     const card = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Разборные гантели' });

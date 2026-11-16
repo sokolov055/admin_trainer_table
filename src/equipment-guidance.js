@@ -50,8 +50,12 @@ export function guideSteps(g) {
   return { prep: setup.steps, move, mistakes };
 }
 
-/** «Сиденье — на уровне плеч»: короткое слово до тире — метка шага */
+/**
+ * «Сиденье — на уровне плеч» или «Сиденье: на уровне плеч»: короткая подпись
+ * до тире или двоеточия — метка шага (двоеточие — 16.11.2026: у 60 из 95
+ * строк тренажёров подпись через него, и столбец подписи пустовал)
+ */
 export function stepLabel(line) {
-  const m = String(line).match(/^([^—–]{2,30}?)\s[—–]\s([\s\S]+)$/);
+  const m = String(line).match(/^([^—–:]{2,30}?)(?:\s[—–]|:)\s([\s\S]+)$/);
   return m && m[1].trim().split(/\s+/).length <= 2 ? { label: m[1].trim(), text: m[2] } : { label: '', text: line };
 }
