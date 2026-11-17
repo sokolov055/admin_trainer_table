@@ -7,6 +7,7 @@ import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
+import ProgramList from './ProgramList.jsx';
 import ExerciseKind from '../ExerciseKind.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
@@ -167,7 +168,7 @@ function Templates({ kind, owner }) {
   }
 
   if (assigning) {
-    return <AssignToClient template={assigning} owner={owner} onDone={() => setAssigning(null)} onCancel={() => setAssigning(null)} />;
+    return <AssignToClient template={assigning} owner={owner} backText={open ? 'К шаблону' : 'Программы'} onDone={() => setAssigning(null)} onCancel={() => setAssigning(null)} />;
   }
 
   if (open) {
@@ -180,6 +181,26 @@ function Templates({ kind, owner }) {
         onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
         onDeleted={(t) => { setOpen(null); remove(t); }}
         onSavedWorkout={() => list.reload()}
+      />
+    );
+  }
+
+  // Программы — новым списком (согласован 17.11.2026, ProgramList.jsx):
+  // смахнуть — «Назначить» и «Удалить», «+» — лист «Новая программа»
+  if (kind === 'program') {
+    return (
+      <ProgramList
+        list={list}
+        scope={scope}
+        onScope={setScope}
+        failure={failure}
+        onOpen={(t) => setOpen(t.id)}
+        onAssign={(t) => setAssigning(t)}
+        onRemove={remove}
+        hidden={del.hidden}
+        bar={del.bar}
+        onBlank={() => setEditing({ new: true })}
+        onCreated={(t) => { setScope('mine'); list.reload(); setOpen(t.id); }}
       />
     );
   }
@@ -835,7 +856,7 @@ function nextMonthLabel(label) {
   return p ? monthLabelOf(p.year, p.month + 1) : '';
 }
 
-function AssignToClient({ template, owner, onDone, onCancel }) {
+function AssignToClient({ template, owner, onDone, onCancel, backText = 'К шаблону' }) {
   const clients = useData('trainer.clients', {}, []);
   // Себя («Мои тренировки») — первым, как в журнале: в trainer.clients
   // карточки тренера нет, и шаблон себе было не назначить
@@ -847,7 +868,7 @@ function AssignToClient({ template, owner, onDone, onCancel }) {
   if (done) {
     return (
       <>
-        <Back onClick={onDone}>К шаблону</Back>
+        <Back onClick={onDone}>{backText}</Back>
         <Empty
           icon={IconCheck}
           title="Назначено"
@@ -861,7 +882,7 @@ function AssignToClient({ template, owner, onDone, onCancel }) {
 
   return (
     <>
-      <Back onClick={client ? () => setClient(null) : onCancel}>{client ? 'Другой клиент' : 'К шаблону'}</Back>
+      <Back onClick={client ? () => setClient(null) : onCancel}>{client ? 'Другой клиент' : backText}</Back>
       <Section title={client ? client.name : 'Кому назначить'} note={`«${template.title}»`}>
         {client ? (
           <Panel pad>

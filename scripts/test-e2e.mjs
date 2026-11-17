@@ -1515,7 +1515,9 @@ test('новый шаблон тренировки — без уровня, у �
     await tab.getByRole('button', { name: 'К шаблонам' }).first().click();
 
     await tab.getByRole('tab', { name: 'Программы', exact: true }).click();
-    await tab.getByRole('button', { name: 'Новый шаблон программы' }).click();
+    // Список программ с 17.11.2026: «+» — лист «Новая программа» → «С нуля»
+    await tab.getByRole('button', { name: 'Новая программа' }).click();
+    await tab.getByRole('button', { name: /С нуля/ }).click();
     await tab.getByRole('heading', { name: 'Тренировки' }).waitFor({ timeout: 5000 });
     assert.equal(await level(), 1, 'у программы уровень есть');
   } finally { await context.close(); }
@@ -1540,8 +1542,8 @@ test('шаблон назначается клиенту, общий копир�
     await tab.goto(origin + '/?mockRole=trainer');
 
     await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
-    await visible('.item', { hasText: 'Похудение, 3 раза в неделю' }).first().waitFor({ timeout: 10000 });
-    await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).click();
+    await visible('.plib-card', { hasText: 'Похудение, 3 раза в неделю' }).first().waitFor({ timeout: 10000 });
+    await visible('.plib-card').filter({ hasText: 'Похудение, 3 раза в неделю' }).click();
 
     await tab.getByRole('button', { name: 'Назначить клиенту' }).click();
     await visible('.item').first().click();
@@ -1556,8 +1558,8 @@ test('шаблон назначается клиенту, общий копир�
     // Общий шаблон другого тренера — к себе
     await tab.getByRole('button', { name: 'К шаблону' }).click();
     await tab.getByRole('button', { name: 'Назад' }).click();
-    await tab.getByRole('radio', { name: 'Общие' }).click();
-    await visible('.item').filter({ hasText: 'Сила: база 5×5' }).click();
+    await tab.getByRole('radio', { name: /^Общие/ }).click();
+    await visible('.plib-card').filter({ hasText: 'Сила: база 5×5' }).click();
     await tab.getByText('автор: Мария').waitFor({ timeout: 5000 });
     await tab.getByRole('button', { name: 'Скопировать к себе' }).click();
     await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить' }).waitFor({ timeout: 5000 }), 'копия своя — её можно править');
@@ -1677,7 +1679,7 @@ test('тренировки программы переставляются пе�
     await tab.goto(origin + '/?mockRole=trainer');
 
     await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
-    await visible('.item').filter({ hasText: 'Похудение, 3 раза в неделю' }).first().click();
+    await visible('.plib-card').filter({ hasText: 'Похудение, 3 раза в неделю' }).first().click();
     await tab.getByRole('button', { name: 'Изменить' }).click();
     await tab.getByRole('button', { name: 'Свернуть тренировки' }).click();
     // Свёрнутый список плавно подъезжает к экрану — ждём, пока встанет

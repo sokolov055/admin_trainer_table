@@ -16,10 +16,13 @@ import { IconTrash } from './icons.jsx';
  * contentClassName — разметка самой строки (сетка, отступы): она должна
  * ехать вместе с содержимым, а не стоять на месте поверх корзины.
  * actionText — подпись на кнопке: «Удалить», «Убрать».
+ * extra — второе действие левее корзины (список программ, 17.11.2026:
+ * «Назначить» и «Удалить»): { text, label, icon, onClick }. Полное
+ * смахивание по-прежнему удаляет — как в «Почте» iPhone, крайнее действие.
  */
 export default function SwipeRow({
   className = '', contentClassName = '', children, onDelete, label, actionText = 'Удалить',
-  disabled = false, removeClosest = '', removeWith = null, ...rest
+  disabled = false, removeClosest = '', removeWith = null, extra = null, ...rest
 }) {
   const root = useRef(null);
   const firing = useRef(false);
@@ -32,11 +35,25 @@ export default function SwipeRow({
     vanish(el, () => { onDelete(); sw.reset(); }, removeWith ? removeWith(el) : []).then(() => { firing.current = false; });
   };
   // Полное смахивание — то же, что кнопка
-  const sw = useSwipe({ disabled, onFull: () => fire() });
+  const sw = useSwipe({ disabled, onFull: () => fire(), ...(extra ? { width: 176 } : {}) });
   return (
     <div className={'swipe ' + className} ref={root} {...(disabled ? {} : sw.bind)} {...rest}>
       {!disabled && (
-        <div className="swipe__action" ref={sw.action} style={{ visibility: 'hidden' }}>
+        <div className={'swipe__action' + (extra ? ' swipe__action--two' : '')} ref={sw.action} style={{ visibility: 'hidden' }}>
+          {extra && (
+            <button
+              type="button"
+              className="swipe__extra"
+              aria-label={extra.label || extra.text}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); sw.reset(); extra.onClick(); }}
+            >
+              <span className="swipe__label">
+                {extra.icon}
+                <span>{extra.text}</span>
+              </span>
+            </button>
+          )}
           <button
             type="button"
             className="swipe__trash"

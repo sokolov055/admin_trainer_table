@@ -49,8 +49,12 @@ export function paintSwipe(content, action, x, { width, animate = false, armed =
   action.style.width = w + 'px';
   action.style.opacity = String(Math.min(1, Math.abs(x) / width));
   action.style.visibility = x ? 'visible' : 'hidden';
-  const label = action.firstElementChild && action.firstElementChild.firstElementChild;
-  if (label) label.style.transform = armed ? `translate3d(${width - w}px, 0, 0)` : '';
+  // Подпись корзины (88 px у правого края) при полном смахивании едет к
+  // пальцу; второе действие (SwipeRow extra) в этот момент складывается
+  const trash = action.querySelector('.swipe__trash') || action.firstElementChild;
+  const label = trash && trash.firstElementChild;
+  if (label) label.style.transform = armed ? `translate3d(${88 - w}px, 0, 0)` : '';
+  if (action.classList) action.classList.toggle('is-armed', !!armed);
 }
 
 /** Сдвиг за пальцем: вправо — сопротивление; влево — до края строки, дальше тоже */

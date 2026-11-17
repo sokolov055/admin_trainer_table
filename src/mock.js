@@ -1280,11 +1280,21 @@ let demoTemplates = [
 const demoShowcaseAsked = new Map();
 
 let demoTemplateSeq = 10;
+const DEMO_TEMPLATE_USERS = {
+  1: [{ row: 2, name: 'Анна Ковалёва', endsOn: '' }, { row: 3, name: 'Мария Смирнова', endsOn: '' }, { row: 4, name: 'Елена Волкова', endsOn: '' }],
+  4: [{ row: 5, name: 'Дмитрий Орлов', endsOn: '' }],
+};
 let demoExerciseSeq = 100;
 
 function demoTemplateCard(t, withBlocks) {
   const exercises = t.blocks.reduce((s, b) => s + b.exercises.length, 0);
-  const card = { ...t, workouts: t.blocks.length, exercises };
+  // Занятий по неделям и кто идёт сейчас (список программ, 17.11.2026)
+  const length = Math.max(0, ...t.blocks.map((b) => Number(b.week) || 0));
+  const sessions = (bs) => bs.filter((b, i) => i === 0 || !/кардио/i.test(b.title)).length;
+  const weekSessions = length
+    ? Array.from({ length }, (_, w) => sessions(t.blocks.filter((b) => (Number(b.week) || 1) === w + 1)))
+    : [t.blocks.length];
+  const card = { ...t, workouts: t.blocks.length, exercises, weekSessions, ...(t.mine && t.kind === 'program' ? { clients: DEMO_TEMPLATE_USERS[t.id] || [] } : {}) };
   if (!withBlocks) delete card.blocks;
   return card;
 }
@@ -1295,7 +1305,9 @@ function demoTemplatesList(params) {
     .filter((t) => (scope === 'public' ? !t.mine && t.isPublic : t.mine))
     .filter((t) => !params.kind || t.kind === params.kind)
     .map((t) => demoTemplateCard(t, false));
-  return { scope, templates: list, goals: [...new Set(list.map((t) => t.goal).filter(Boolean))] };
+  const of = (fn) => demoTemplates.filter(fn).filter((t) => !params.kind || t.kind === params.kind).length;
+  return { scope, templates: list, goals: [...new Set(list.map((t) => t.goal).filter(Boolean))],
+    counts: { mine: of((t) => t.mine), public: of((t) => !t.mine && t.isPublic) } };
 }
 
 function demoTemplate(id) {

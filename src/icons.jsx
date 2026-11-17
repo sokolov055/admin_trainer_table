@@ -500,3 +500,66 @@ export const IconMore = (p) => (
     <circle cx="19" cy="12" r="0.9" fill="currentColor" />
   </Icon>
 );
+
+/* Цели и факты программ в «Библиотеке» (17.11.2026) */
+
+export const IconClock = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Icon>
+);
+
+export const IconFlame = (p) => (
+  <Icon {...p}>
+    <path d="M12 21a6.5 6.5 0 0 0 6.5-6.5c0-4.5-4-6.5-4.5-10.5-2 1.5-3 3.5-3 5.5-1-.5-2-1.5-2.3-3C6.6 8.3 5.5 11 5.5 14.5A6.5 6.5 0 0 0 12 21Z" />
+    <path d="M12 21a2.8 2.8 0 0 1-2.8-2.8c0-2 2.8-3.7 2.8-3.7s2.8 1.7 2.8 3.7A2.8 2.8 0 0 1 12 21Z" />
+  </Icon>
+);
+
+export const IconDumbbell = (p) => (
+  <Icon {...p}>
+    <path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11" />
+  </Icon>
+);
+
+export const IconBolt = (p) => (
+  <Icon {...p}>
+    <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z" />
+  </Icon>
+);
+
+export const IconWave = (p) => (
+  <Icon {...p}>
+    <path d="M2.5 12c2.3-4.5 4.5-4.5 6.5 0s4.2 4.5 6.5 0 4.2-4.5 6.5 0" />
+  </Icon>
+);
+
+export const IconGem = (p) => (
+  <Icon {...p}>
+    <path d="M7 4h10l4 5.5L12 20.5 3 9.5z" />
+    <path d="M3 9.5h18M9.5 4 12 9.5 14.5 4M12 9.5v11" />
+  </Icon>
+);
+
+export const IconSpine = (p) => (
+  <Icon {...p}>
+    <rect x="9" y="2.5" width="6" height="3.5" rx="1.5" />
+    <rect x="8.5" y="7.5" width="7" height="3.5" rx="1.5" />
+    <rect x="8.5" y="12.5" width="7" height="3.5" rx="1.5" />
+    <rect x="9" y="17.5" width="6" height="4" rx="1.5" />
+  </Icon>
+);
+
+export const IconBandage = (p) => (
+  <Icon {...p}>
+    <rect x="2.5" y="8" width="19" height="8" rx="4" transform="rotate(-45 12 12)" />
+    <path d="M10.5 10.5h.01M13.5 13.5h.01M13.5 10.5h.01M10.5 13.5h.01" />
+  </Icon>
+);
+
+export const IconBench = (p) => (
+  <Icon {...p}>
+    <path d="M3 13h18M6 13v6M18 13v6M7 9.5h10M3.5 6.5v6M20.5 6.5v6" />
+  </Icon>
+);
