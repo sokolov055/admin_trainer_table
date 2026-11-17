@@ -1547,13 +1547,22 @@ test('шаблон назначается клиенту, общий копир�
     await visible('.plib-card').filter({ hasText: 'Похудение, 3 раза в неделю' }).click();
 
     await tab.getByRole('button', { name: 'Назначить клиенту' }).click();
-    await visible('.item').first().click();
-    // Форма «Назначить» (FT-775): месяц чипами, «как клиент пойдёт» с предпросмотром по циклам
-    await tab.getByRole('radio', { name: 'Одна неделя по кругу' }).waitFor({ timeout: 5000 });
-    assert.equal(await tab.getByRole('radio', { name: 'Одна неделя по кругу' }).getAttribute('aria-checked'), 'true', '3 тренировки — по умолчанию по кругу');
-    await tab.getByRole('radio', { name: 'Разложить на недели' }).click();
-    assert.ok((await tab.locator('.wk-prev').textContent()).includes('Тренировка 1'), 'предпросмотр по циклам показывает тренировки');
-    await tab.getByRole('button', { name: /^Назначить/ }).click();
+    // «Назначить клиенту» (этап 4, 17.11.2026): клиенты со статусом, фильтры
+    await visible('.plib-cl').first().waitFor({ timeout: 5000 });
+    assert.ok(await visible('.plib-tag--end').count() >= 1, 'у кого программа скоро кончится — видно');
+    await tab.getByRole('radio', { name: /^Свободны/ }).click();
+    assert.equal(await visible('.plib-tag--busy').count(), 0, 'фильтр «Свободны»');
+    await visible('.plib-cl').first().click();
+    // Без недель: 3 тренировки — по умолчанию «Неделя по кругу», календарь сверху
+    await tab.getByRole('radio', { name: 'Неделя по кругу' }).waitFor({ timeout: 5000 });
+    assert.equal(await tab.getByRole('radio', { name: 'Неделя по кругу' }).getAttribute('aria-checked'), 'true', '3 тренировки — по умолчанию по кругу');
+    assert.ok(await visible('.plib-cal__free i').count() >= 3, 'дни не отмечены — занятия в «любой день»');
+    await tab.getByRole('button', { name: 'Вт', exact: true }).click();
+    await visible('.plib-cal__cell.is-s').first().waitFor({ timeout: 5000 });
+    await tab.getByRole('radio', { name: 'По неделям' }).click();
+    assert.ok((await visible('.plib-lgd').textContent()).includes('Тренировка 1'), 'календарь показывает тренировки');
+    await tab.getByRole('radio', { name: 'Доделать' }).click();
+    await tab.getByRole('button', { name: /^Назначить .+ · / }).click();
     await assert.doesNotReject(tab.getByText('Назначено').waitFor({ timeout: 5000 }), 'шаблон назначен');
 
     // Общий шаблон другого тренера — к себе

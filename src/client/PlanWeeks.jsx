@@ -839,7 +839,7 @@ function SoloPicker({ sessions, value, onChange }) {
  * число растёт; убавил число ниже числа дней — лишние дни снимаются.
  * Число, равное неделе программы, — это «как в программе» (rhythm: [])
  */
-function WeekBlock({ beat, setBeat, days, setDays, count, sessions, source = null }) {
+export function WeekBlock({ beat, setBeat, days, setDays, count, sessions, source = null }) {
   const [ab, setAb] = useState(0);
   const rhythm = beat.rhythm || [];
   const rDays = beat.rhythmDays || [];
@@ -1031,7 +1031,7 @@ function DatesBlock({ startsOn, endsOn, onStart, onEnd, startLocked, pauses, onP
 }
 
 /** «Пропуск»: красная точка на плитке показывает, что с ней будет */
-function RuleBlock({ value, onChange }) {
+export function RuleBlock({ value, onChange }) {
   return (
     <section className="ws-blk">
       <h3 className="ws-blk__h">Пропуск</h3>

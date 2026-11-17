@@ -1285,6 +1285,14 @@ let demoTemplates = [
 const demoShowcaseAsked = new Map();
 
 let demoTemplateSeq = 10;
+const DEMO_PROGRAM_NOW = () => {
+  const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  return {
+    3: { month: '', templateId: '4', title: 'UL [4]', startsOn: day(-8), endsOn: '', week: 2, length: 2 },
+    5: { month: '', templateId: '6', title: 'Сила + кардио', startsOn: day(-24), endsOn: day(4), week: 4, length: 4 },
+    7: { month: '', templateId: '', title: '', startsOn: day(-3), endsOn: '', week: 1, length: 0 },
+  };
+};
 const DEMO_TEMPLATE_USERS = {
   1: [{ row: 2, name: 'Анна Ковалёва', endsOn: '', week: 2 }, { row: 3, name: 'Мария Смирнова', endsOn: '', week: 3 }, { row: 4, name: 'Елена Волкова', endsOn: '', week: 2 }],
   4: [{ row: 5, name: 'Дмитрий Орлов', endsOn: '', week: 1 }],
@@ -2299,7 +2307,9 @@ const MOCK = {
   },
 
   'trainer.clients': () => ({
-    clients: CLIENTS,
+    // Программа сейчас («Назначить клиенту», 17.11.2026): эта же, скоро конец, занята; остальные свободны
+    // Те же объекты, не копии: правки карточки (client.update) видны по ссылке
+    clients: CLIENTS.map((c) => { if (!('programNow' in c)) c.programNow = DEMO_PROGRAM_NOW()[c.row] || null; return c; }),
     summary: {
       count: CLIENTS.length,
       totalTrainings: 26,

@@ -412,3 +412,110 @@
   .plib-coach { animation-duration: 0.01s; animation-delay: 0s; opacity: 1; }
   .plib-pchip:active, .plib-addw:active, .plib-etop__s:active { transform: none; }
 }
+
+/* ==========================================================================
+ * «Назначить клиенту» (этап 4 макета, 17.11.2026, ProgramAssign.jsx).
+ * Буквы занятий в календаре — цвета целей (данные, от темы не зависят)
+ * ========================================================================== */
+.plib-h { margin: 0 0 var(--space-2); font-size: var(--text-xl); font-weight: 760; letter-spacing: -0.01em; }
+.plib-pmini { display: flex; align-items: center; gap: var(--space-2); padding: 8px; margin-bottom: var(--space-3); border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.plib-pmini__cover { width: 36px; height: 36px; border-radius: 10px; flex: none; display: grid; place-items: center; color: #fff; background: linear-gradient(140deg, var(--g), var(--g2)); }
+.plib-pmini b { display: block; font-size: var(--text-sm); line-height: 1.25; }
+.plib-pmini small { display: block; font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); }
+.plib-asf { margin: var(--space-2) 0 var(--space-3); }
+.plib-cls { display: flex; flex-direction: column; gap: var(--space-2); }
+.plib-cl {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  animation: plib-in var(--dur) var(--ease-out) both; transition: transform var(--dur-press) var(--ease-out);
+}
+.plib-cl:active { transform: scale(0.98); }
+.plib-cl b { display: block; font-size: var(--text-base); }
+.plib-cl small { display: block; font-size: var(--text-sm); color: var(--text-secondary); }
+.plib-cl__ava {
+  position: relative; width: 42px; height: 42px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  color: #fff; font-size: 14px; font-weight: 800; letter-spacing: -0.02em;
+}
+.plib-cl__dot { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid var(--surface); }
+.plib-st--free { background: var(--good); }
+.plib-st--end { background: var(--warning); }
+.plib-st--same { background: var(--accent); }
+.plib-st--busy { background: var(--text-muted); }
+.plib-tag { flex: none; margin-left: auto; padding: 4px 8px; border-radius: 999px; font-size: var(--text-xs); font-weight: 750; white-space: nowrap; }
+.plib-tag--free { background: var(--good-fill); color: var(--good-text); }
+.plib-tag--end { background: var(--warning-fill); color: var(--warning-text); }
+.plib-tag--same { background: var(--accent-wash); color: var(--accent-ink); }
+.plib-tag--busy { background: var(--surface-sunken); color: var(--text-muted); }
+
+.plib-aswho { display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-3); }
+.plib-aswho .plib-cl__ava { width: 46px; height: 46px; }
+.plib-aswho b { display: block; font-size: var(--text-lg); }
+.plib-aswho small { display: block; font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); }
+.plib-conf { padding: 12px; margin-bottom: var(--space-3); border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); animation: plib-in var(--dur) var(--ease-out) both; }
+.plib-conf p { margin: 0 0 10px; font-size: var(--text-sm); color: var(--text-secondary); }
+.plib-conf p b { color: var(--text); }
+.plib-sseg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-sunken); }
+.plib-sseg button { min-height: 38px; border: 0; border-radius: 9px; background: none; color: var(--text-secondary); font: 650 var(--text-sm)/1.1 var(--font); cursor: pointer; }
+.plib-sseg button.is-on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.12)); }
+.plib-cont { display: flex; align-items: center; gap: 4px; margin: 0 0 10px; }
+.plib-cont em { font-style: normal; font-size: var(--text-xs); font-weight: 700; color: var(--text-muted); margin-right: 4px; }
+.plib-cont i { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-style: normal; font-size: var(--text-xs); font-weight: 800; background: var(--accent-wash); color: var(--accent-ink); }
+
+.plib-cal { margin-bottom: var(--space-3); }
+.plib-cal__sum { margin: -4px 0 10px; font-size: var(--text-sm); font-weight: 650; color: var(--text-secondary); }
+.plib-cal__grid { display: grid; grid-template-columns: 46px repeat(7, minmax(0, 1fr)) 26px; gap: 4px; align-items: center; }
+.plib-cal__dh { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-align: center; }
+.plib-cal__wl { font-size: 10.5px; font-weight: 700; line-height: 1.15; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.plib-cal__wl em { display: block; font-style: normal; font-size: 10px; color: var(--accent-ink, var(--accent)); }
+.plib-cal__cell { aspect-ratio: 1; border-radius: 9px; background: var(--surface-sunken); display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; }
+.plib-cal__cell.is-before { background: repeating-linear-gradient(-45deg, var(--surface-sunken) 0 4px, transparent 4px 8px); }
+.plib-cal__cell.is-after { background: none; box-shadow: inset 0 0 0 1px var(--border); }
+.plib-cal__cell.is-s { animation: plib-pop 0.35s var(--ease-out) both; }
+.plib-cal__free { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.plib-cal__free i, .plib-lgd i { font-style: normal; font-size: 10px; font-weight: 800; color: #fff; border-radius: 6px; padding: 1px 4px; }
+.plib-cal__over { grid-column: 2 / -1; margin: -2px 0 2px; font-size: var(--text-xs); font-weight: 700; color: var(--warning-text); }
+.plib-cal__foot { margin: 8px 0 0; font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); }
+.plib-cal--0 { background: var(--goal-lose); } .plib-cal--1 { background: var(--goal-mass); } .plib-cal--2 { background: var(--goal-tone); }
+.plib-cal--3 { background: var(--goal-cut); } .plib-cal--4 { background: var(--goal-endurance); } .plib-cal--5 { background: var(--goal-back); }
+.plib-cal--more { background: var(--text-muted); }
+.plib-lgd { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: var(--text-xs); font-weight: 650; color: var(--text-secondary); }
+.plib-lgd span { display: inline-flex; align-items: center; gap: 5px; }
+.plib-lgd i { min-width: 16px; height: 16px; padding: 0 3px; display: inline-grid; place-items: center; border-radius: 5px; }
+
+.plib-asws { margin-bottom: var(--space-2); }
+.plib-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.plib-dt {
+  position: relative; padding: 8px 4px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface);
+  text-align: center; font: 650 var(--text-xs)/1.2 var(--font); color: var(--text-muted); cursor: pointer;
+}
+.plib-dt b { display: block; margin-top: 2px; font-size: var(--text-base); color: var(--text); }
+.plib-dt.is-on { border-color: var(--accent); background: var(--accent-wash); }
+.plib-dt.is-on b { color: var(--accent-ink); }
+.plib-dt input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+.plib-first { margin-top: 12px; animation: plib-in var(--dur) var(--ease-out) both; }
+.plib-first h4 { margin: 0 0 8px; font-size: var(--text-xs); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.plib-first .ws-tile:disabled { opacity: 0.4; cursor: default; }
+.plib-more { display: block; margin: 2px 0 6px; padding: 6px 0; border: 0; background: none; color: var(--accent-ink, var(--accent)); font: 650 var(--text-sm)/1 var(--font); cursor: pointer; }
+.plib-morep { display: grid; gap: 6px; margin-bottom: var(--space-2); animation: plib-in var(--dur) var(--ease-out) both; }
+.plib-morep__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface-sunken); font-size: var(--text-sm); color: var(--text-secondary); }
+.plib-morep__row .chips { margin: 0; }
+.plib-morep__row b { color: var(--text); }
+.plib-ok { color: var(--good-text) !important; }
+
+.plib-done { display: flex; flex-direction: column; align-items: center; padding: var(--space-5, 24px) var(--space-2); text-align: center; animation: plib-in var(--dur) var(--ease-out) both; }
+.plib-done h3 { margin: 14px 0 4px; font-size: var(--text-xl); }
+.plib-done > p { margin: 0 0 16px; font-size: var(--text-sm); color: var(--text-secondary); }
+.plib-done__ring { width: 96px; height: 96px; }
+.plib-done__ring circle { fill: none; stroke: var(--good); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 283; stroke-dashoffset: 283; animation: plib-draw 0.6s var(--ease-out) forwards; }
+.plib-done__ring path { fill: none; stroke: var(--good); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 60; stroke-dashoffset: 60; animation: plib-draw 0.4s var(--ease-out) 0.45s forwards; }
+@keyframes plib-draw { to { stroke-dashoffset: 0; } }
+.plib-sum { display: grid; gap: 8px; width: 100%; padding: 12px; margin-bottom: 16px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); text-align: left; font-size: var(--text-sm); }
+.plib-sum span { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
+.plib-sum svg { flex: none; color: var(--accent); }
+.plib-ghost { margin-top: 8px; min-height: 44px; border: 0; background: none; color: var(--accent-ink, var(--accent)); font: 700 var(--text-base)/1 var(--font); cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .plib-cl, .plib-conf, .plib-first, .plib-morep, .plib-done, .plib-cal__cell.is-s { animation: none; }
+  .plib-done__ring circle, .plib-done__ring path { animation: none; stroke-dashoffset: 0; }
+  .plib-cl:active { transform: none; }
+}

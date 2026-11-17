@@ -10,6 +10,7 @@ import PlanEditor from './PlanEditor.jsx';
 import ProgramList from './ProgramList.jsx';
 import ProgramView from './ProgramView.jsx';
 import ProgramEditor from './ProgramEditor.jsx';
+import ProgramAssign from './ProgramAssign.jsx';
 import ExerciseKind from '../ExerciseKind.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
@@ -181,6 +182,13 @@ function Templates({ kind, owner, onOpenClient }) {
         onSaved={(saved) => { closeEditor(); setOpen(saved.id); setScope('mine'); list.reload(); }}
       />
     );
+  }
+
+  // Программа — новым «Назначить клиенту» (этап 4 макета, 17.11.2026, ProgramAssign.jsx);
+  // шаблон одной тренировки — прежним AssignToClient
+  if (assigning && kind === 'program') {
+    return <ProgramAssign template={assigning} owner={owner} backText={open ? 'К программе' : 'Программы'} onBack={() => setAssigning(null)}
+      onOpenClient={onOpenClient ? (c) => onOpenClient(c, 'plan') : null} />;
   }
 
   if (assigning) {
