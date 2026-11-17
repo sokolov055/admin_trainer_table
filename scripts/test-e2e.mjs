@@ -1556,8 +1556,19 @@ test('шаблон назначается клиенту, общий копир�
     await assert.doesNotReject(tab.getByText('Назначено').waitFor({ timeout: 5000 }), 'шаблон назначен');
 
     // Общий шаблон другого тренера — к себе
-    await tab.getByRole('button', { name: 'К шаблону' }).click();
-    await tab.getByRole('button', { name: 'Назад' }).click();
+    await tab.getByRole('button', { name: 'К программе' }).click();
+    // Экран программы (этап 2, 17.11.2026): кто идёт сейчас, мышцы, недели
+    await tab.getByText('Сейчас у клиентов').waitFor({ timeout: 5000 });
+    await tab.getByText('Нагрузка на мышцы').waitFor({ timeout: 5000 });
+    assert.equal(await visible('.plib-wk.is-open').count(), 1, 'первая тренировка раскрыта');
+    await visible('.plib-wk__head').nth(1).click();
+    await visible('.plib-wk.is-open').nth(1).waitFor({ timeout: 5000 });
+    // «Видят клиенты» — переключатель прямо на экране
+    const eye = tab.getByRole('switch', { name: 'Видят клиенты' });
+    assert.equal(await eye.getAttribute('aria-checked'), 'true');
+    await eye.click();
+    await tab.waitForFunction(() => document.querySelector('[role=switch][aria-checked=false]'), null, { timeout: 5000 });
+    await tab.getByRole('button', { name: 'Программы' }).click();
     await tab.getByRole('radio', { name: /^Общие/ }).click();
     await visible('.plib-card').filter({ hasText: 'Сила: база 5×5' }).click();
     await tab.getByText('автор: Мария').waitFor({ timeout: 5000 });
@@ -1565,9 +1576,11 @@ test('шаблон назначается клиенту, общий копир�
     await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить' }).waitFor({ timeout: 5000 }), 'копия своя — её можно править');
 
     // Тренировку из программы — отдельным шаблоном в «Тренировки»
-    await tab.getByRole('button', { name: 'В «Тренировки»' }).first().click();
-    await tab.getByText('В «Тренировках»').first().waitFor({ timeout: 5000 });
-    await tab.getByRole('button', { name: 'Назад' }).click();
+    await tab.getByRole('button', { name: 'Ещё' }).click();
+    await tab.getByRole('button', { name: /Тренировку — в «Тренировки»/ }).click();
+    await tab.locator('.plib-menu__item', { hasText: 'Тренировка 1 — верх' }).click();
+    await tab.getByText('в «Тренировках»').first().waitFor({ timeout: 5000 });
+    await tab.getByRole('button', { name: 'Программы' }).click();
     await tab.getByRole('tab', { name: 'Тренировки', exact: true }).click();
     await assert.doesNotReject(
       visible('.item').filter({ hasText: 'Тренировка 1 — верх' }).first().waitFor({ timeout: 5000 }),

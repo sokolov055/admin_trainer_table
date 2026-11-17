@@ -475,7 +475,7 @@ export default function TrainerApp({ me }) {
           data-kept={tabs.kept('library') ? '' : undefined}
         >
           <div key={libPane}>
-            <Library pane={libPane} owner={owner} />
+            <Library pane={libPane} owner={owner} onOpenClient={(client, at) => openCard(client, at, 'К программе')} />
           </div>
         </main>
       )}

@@ -563,3 +563,19 @@ export const IconBench = (p) => (
     <path d="M3 13h18M6 13v6M18 13v6M7 9.5h10M3.5 6.5v6M20.5 6.5v6" />
   </Icon>
 );
+
+/** Править — карандаш (экран программы, 17.11.2026) */
+export const IconPen = (p) => (
+  <Icon {...p}>
+    <path d="M4 20h4L19 9l-4-4L4 16v4z" />
+    <path d="M13.5 6.5l4 4" />
+  </Icon>
+);
+
+/** Список — тренировку из программы в «Тренировки» */
+export const IconList = (p) => (
+  <Icon {...p}>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <circle cx="4.5" cy="6" r="1" /><circle cx="4.5" cy="12" r="1" /><circle cx="4.5" cy="18" r="1" />
+  </Icon>
+);

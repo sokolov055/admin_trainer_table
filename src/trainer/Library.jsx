@@ -8,6 +8,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
 import ProgramList from './ProgramList.jsx';
+import ProgramView from './ProgramView.jsx';
 import ExerciseKind from '../ExerciseKind.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
@@ -109,18 +110,18 @@ function cardLine(t) {
   return [PLACES[t.place] && PLACES[t.place].toLowerCase(), t.days && timesText(t), minutesText(t)].filter(Boolean).join(' · ');
 }
 
-export default function Library({ pane, owner = false }) {
+export default function Library({ pane, owner = false, onOpenClient = null }) {
   if (pane === 'foods') return owner ? <FoodCatalog /> : <Note>Общий справочник проверяет владелец сервиса.</Note>;
   if (pane === 'dishes') return <Dishes />;
   if (pane === 'machines') return <Machines />;
-  return pane === 'exercises' ? <Exercises /> : <Templates key={pane} kind={pane} owner={owner} />;
+  return pane === 'exercises' ? <Exercises /> : <Templates key={pane} kind={pane} owner={owner} onOpenClient={onOpenClient} />;
 }
 
 /* ==========================================================================
  * Шаблоны
  * ========================================================================== */
 
-function Templates({ kind, owner }) {
+function Templates({ kind, owner, onOpenClient }) {
   const [scope, setScope] = useState('mine');
   const [q, setQ] = useState('');
   const [goal, setGoal] = useState('');
@@ -168,7 +169,23 @@ function Templates({ kind, owner }) {
   }
 
   if (assigning) {
-    return <AssignToClient template={assigning} owner={owner} backText={open ? 'К шаблону' : 'Программы'} onDone={() => setAssigning(null)} onCancel={() => setAssigning(null)} />;
+    return <AssignToClient template={assigning} owner={owner} backText={open ? (kind === 'program' ? 'К программе' : 'К шаблону') : 'Программы'} onDone={() => setAssigning(null)} onCancel={() => setAssigning(null)} />;
+  }
+
+  // Программа — новым экраном (этап 2 макета, 17.11.2026, ProgramView.jsx)
+  if (open && kind === 'program') {
+    return (
+      <ProgramView
+        id={open}
+        onBack={() => setOpen(null)}
+        onEdit={(t) => setEditing(t)}
+        onAssign={(t) => setAssigning(t)}
+        onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
+        onDeleted={(t) => { setOpen(null); remove(t); }}
+        onSavedWorkout={() => list.reload()}
+        onOpenClient={onOpenClient ? (c) => onOpenClient(c, 'plan') : null}
+      />
+    );
   }
 
   if (open) {

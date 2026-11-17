@@ -1261,7 +1261,12 @@ let demoTemplates = [
     place: 'gym', days: 3, minutes: 60, minutesAuto: false, forClients: false },
   { id: 3, kind: 'workout', title: 'Ноги и ягодицы', goal: 'Тонус', level: '', description: '', isPublic: false, mine: true, author: 'Константин', blocks: [demoBlocks[1]], uses: 0 },
   // «Программы тренера» (FT-497): показаны клиентам, в демо — с ?mockShowcase=1
-  { id: 4, kind: 'program', title: 'UL [4]', goal: 'Сила', level: 'Опытный', description: 'Верх и низ по очереди, четыре тренировки в неделю.', isPublic: false, mine: true, author: 'Константин', blocks: demoBlocks, uses: 0,
+  // По неделям, вторая тяжелее, с суперсетом — экран программы (этап 2, 17.11.2026)
+  { id: 4, kind: 'program', title: 'UL [4]', goal: 'Сила', level: 'Опытный', description: 'Верх и низ по очереди, четыре тренировки в неделю.', isPublic: false, mine: true, author: 'Константин', uses: 0, weekLength: 2,
+    blocks: [1, 2].flatMap((week) => demoBlocks.map((b, i) => ({
+      ...b, week, ...(week === 2 ? { load: 'heavy' } : {}),
+      exercises: b.exercises.map((e) => ({ ...e, weight: week === 2 ? (i ? '50' : '14') : (i ? '40' : '12'), supersetGroup: i === 0 ? 'A' : '' })),
+    }))),
     place: 'gym', days: 4, minutes: 25, minutesAuto: true, forClients: true },
   { id: 5, kind: 'program', title: 'Ягодицы с нуля дома', goal: 'Тонус', level: 'Новичок', description: 'Резинка и гантели, по 40 минут.', isPublic: false, mine: true, author: 'Константин', blocks: [demoBlocks[1]], uses: 0,
     place: 'home', days: 2, minutes: 40, minutesAuto: false, forClients: true },
@@ -1281,8 +1286,8 @@ const demoShowcaseAsked = new Map();
 
 let demoTemplateSeq = 10;
 const DEMO_TEMPLATE_USERS = {
-  1: [{ row: 2, name: 'Анна Ковалёва', endsOn: '' }, { row: 3, name: 'Мария Смирнова', endsOn: '' }, { row: 4, name: 'Елена Волкова', endsOn: '' }],
-  4: [{ row: 5, name: 'Дмитрий Орлов', endsOn: '' }],
+  1: [{ row: 2, name: 'Анна Ковалёва', endsOn: '', week: 2 }, { row: 3, name: 'Мария Смирнова', endsOn: '', week: 3 }, { row: 4, name: 'Елена Волкова', endsOn: '', week: 2 }],
+  4: [{ row: 5, name: 'Дмитрий Орлов', endsOn: '', week: 1 }],
 };
 let demoExerciseSeq = 100;
 
@@ -2655,11 +2660,26 @@ const MOCK = {
     return { plans: 3, templates: 1, sessions: 4, removed: 1, hidden: 0, keep: { id: 9001, name: 'Жим лёжа' } };
   },
   'library.templates': (params) => demoTemplatesList(params),
-  'library.template.get': (params) => demoTemplateCard(demoTemplate(params.id), true),
+  // Как сервер (templateGet): у упражнения — картинка и мышцы из базы
+  'library.template.get': (params) => {
+    const card = demoTemplateCard(demoTemplate(params.id), true);
+    const byName = (name) => demoExercises.find((e) => e.name.toLowerCase() === String(name || '').toLowerCase());
+    card.blocks = card.blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => {
+      const base = byName(e.name);
+      return { ...e, ...demoMuscles(e.name), ...(base ? { exercise: { id: base.id, shortName: base.shortName || '', media: base.media || null, machines: base.machines || [] } } : {}) };
+    }) }));
+    return card;
+  },
   'library.template.save': (params) => demoTemplateSave(params),
   'library.template.delete': (params) => {
     demoTemplates = demoTemplates.filter((t) => t.id !== Number(params.id));
     return { deleted: true };
+  },
+  'library.template.flags': (params) => {
+    const t = demoTemplate(params.id);
+    if (params.forClients !== undefined) t.forClients = !!params.forClients;
+    if (params.isPublic !== undefined) t.isPublic = !!params.isPublic;
+    return { id: t.id, forClients: !!t.forClients, isPublic: !!t.isPublic };
   },
   'library.template.copy': (params) => {
     const source = demoTemplate(params.id);
