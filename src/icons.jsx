@@ -443,6 +443,62 @@ export const IconLinkPair = (p) => (
   </Icon>
 );
 
+/* ---------- Кардиотренажёры (карточка кардио, 17.11.2026) ---------- */
+
+export const IconTreadmill = (p) => (
+  <Icon {...p}>
+    <path d="M3 17h13.5l3.5-2.5M5 17l-1.5 3M16 17l1.5 3M15.5 17V7.5L19 5" />
+  </Icon>
+);
+
+export const IconSkillmill = (p) => (
+  <Icon {...p}>
+    <path d="M3 13.5c3.5 4 12.5 4 16 0M15.5 15.6V7.5L19 5M6 16.4 4.5 20M13 17l1 3" />
+  </Icon>
+);
+
+export const IconRower = (p) => (
+  <Icon {...p}>
+    <path d="M2.5 18h19M6 18l3.5-5.5h6.5M19 18v-7M17 11h4" />
+    <circle cx="13" cy="8" r="1.75" />
+  </Icon>
+);
+
+export const IconElliptical = (p) => (
+  <Icon {...p}>
+    <ellipse cx="11" cy="16.5" rx="7" ry="2.5" />
+    <path d="M14 14.2V5.5l3-2M11 14V9h-3" />
+  </Icon>
+);
+
+export const IconBike = (p) => (
+  <Icon {...p}>
+    <circle cx="6" cy="16" r="3.5" />
+    <circle cx="18" cy="16" r="3.5" />
+    <path d="M6 16l4-7h5l3 7M10 9 8.5 6H6.5M15 9l1.5-3h2" />
+  </Icon>
+);
+
+export const IconStepper = (p) => (
+  <Icon {...p}>
+    <path d="M3 20h5v-5h5v-5h5V5h3" />
+  </Icon>
+);
+
+/** Выйти из суперсета: звено разорвано (редактор упражнений, 17.11.2026) */
+export const IconUnlink = (p) => (
+  <Icon {...p}>
+    <path d="M13.5 6.5l1-1a3.5 3.5 0 0 1 5 5l-1 1M10.5 17.5l-1 1a3.5 3.5 0 0 1-5-5l1-1M4 4l16 16" />
+  </Icon>
+);
+
+/** Заменить: две встречные стрелки */
+export const IconSwap = (p) => (
+  <Icon {...p}>
+    <path d="M7 4L4 7l3 3M4 7h12M17 20l3-3-3-3M20 17H8" />
+  </Icon>
+);
+
 export const IconTrash = (p) => (
   <Icon {...p}>
     <path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5" />

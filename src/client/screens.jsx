@@ -430,6 +430,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const [saveState, setSaveState] = useState(''); // '' | 'saving' | 'error'
   const editSeq = useRef(0);
   const saveTimer = useRef(null);
+  // Новая тренировка получает id только после сохранения. Ключ строки при
+  // этом не должен меняться: иначе правка пересоздаётся и закрывает открытую
+  // карточку упражнения (этап 5, 17.11.2026)
+  const keyAlias = useRef({});
   const blocksRef = useRef(null);
 
   // Шаблоны: взять готовую программу из библиотеки или сохранить эту как
@@ -712,6 +716,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           }))
           .filter((b) => b.exercises.length),
       });
+      if (saved && Array.isArray(saved.blocks)) {
+        list.filter((b) => b.exercises.some((e) => String(e.name || '').trim())).forEach((b, k) => {
+          const got = saved.blocks[k];
+          if (!b.id && got && got.id) keyAlias.current[got.id] = 'new' + list.indexOf(b);
+        });
+      }
       if (editSeq.current !== seq) return;
       setSaveState('');
       // plan.save возвращает тот же снимок истории, что client.plan.
@@ -1310,7 +1320,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         // Тренировку — удержанием вверх или вниз (владелец, 03.10.2026).
         // Не из правки упражнений внутри: там своё перетаскивание
         <PlanBlockSwipe
-          key={block.id || 'new' + bi}
+          key={(block.id && keyAlias.current[block.id]) || block.id || 'new' + bi}
           enabled={canEdit && !selectingBlocks && shownBlocks.length > 1}
           block={block}
           index={bi}

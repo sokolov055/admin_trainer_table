@@ -1296,48 +1296,66 @@ test('мои тренировки: программа, прогресс, пит�
     await phone.getByRole('button', { name: 'Новый месяц' }).waitFor({ timeout: 10000 });
     if (process.env.SHOT_MY) await phone.screenshot({ path: process.env.SHOT_MY });
 
-    // «Править» в карточке (FT-791: правка — только кнопкой): тап по
-    // схеме — подходы; «Разминочный в начало» — схема становится «1 разм. + …»
+    // «Править» в карточке (FT-791: правка — только кнопкой). С 17.11.2026
+    // (этап 5): нажали упражнение — снизу карточка; «Разминка +» — в строке
+    // схема «1 разм. + …», подходы столбиками
     const firstBlock = phone.locator('#root main:not([hidden]) .plan-card').first();
     await firstBlock.getByRole('button', { name: 'Править' }).click();
-    const scheme = firstBlock.locator('.plan-inline__scheme').first();
-    await scheme.waitFor({ timeout: 10000 });
-    await scheme.click();
-    await firstBlock.getByRole('button', { name: 'Разминочный в начало' }).click();
-    await assert.doesNotReject(firstBlock.locator('.plan-inline__scheme strong', { hasText: '1 разм. +' }).first().waitFor({ timeout: 5000 }), 'разминка в схеме');
-    // FT-761: крестик удаления не должен накрывать середину подхода — иначе
-    // тап по подходу попадает в него и удаляет подход вместо выбора
-    const setsBefore = await firstBlock.locator('.plan-inline__set').count();
-    await firstBlock.locator('.plan-inline__set').first().click();
-    await firstBlock.getByRole('button', { name: 'Удалить выбранный подход' }).waitFor({ timeout: 5000 });
-    assert.equal(await firstBlock.locator('.plan-inline__set').count(), setsBefore, 'тап по подходу выбирает его, а не удаляет');
+    const row = firstBlock.locator('.exr').first();
+    await row.waitFor({ timeout: 10000 });
+    await row.click();
+    const card = phone.locator('.exc-sheet .sheet__panel');
+    await card.waitFor({ timeout: 5000 });
+    await card.getByRole('button', { name: 'Разминка: больше' }).click();
+    await assert.doesNotReject(firstBlock.locator('.exr__meta', { hasText: '1 разм. +' }).first().waitFor({ timeout: 5000 }), 'разминка в схеме');
+    const bars = await card.locator('.exc-bar').count();
+    await card.getByRole('button', { name: 'Подходы: больше' }).click();
+    assert.equal(await card.locator('.exc-bar').count(), bars + 1, 'подход добавился столбиком');
+    // Вес «− / +» шагом 2,5 кг; нажать на число — вписать своё
+    await card.getByRole('button', { name: /^Вес, кг: .+ Вписать своё$/ }).click();
+    await card.getByRole('textbox', { name: 'Вес, кг' }).fill('80');
+    await card.getByRole('button', { name: 'Вес, кг: больше' }).click();
+    await assert.doesNotReject(firstBlock.locator('.exr__meta', { hasText: '82,5' }).first().waitFor({ timeout: 5000 }), 'вес +2,5 кг');
+    // Правка сама уходит на сервер через 0,7 с — карточка при этом не закрывается
+    await phone.waitForTimeout(1500);
+    assert.ok(await card.isVisible(), 'карточка открыта после сохранения');
+    // «‹ 1 из N ›» — к следующему упражнению
+    await card.getByRole('button', { name: 'Следующее упражнение' }).click();
+    await assert.doesNotReject(card.locator('.exc-nav', { hasText: /^2 из / }).waitFor({ timeout: 3000 }));
     if (process.env.SHOT_INLINE) await phone.screenshot({ path: process.env.SHOT_INLINE });
-    await firstBlock.getByRole('button', { name: 'Готово' }).click();
+    // Удалить из карточки — с «Вернуть»
+    const rowsBefore = await firstBlock.locator('.exr').count();
+    await card.getByRole('button', { name: 'Удалить упражнение' }).click();
+    await firstBlock.getByRole('button', { name: 'Вернуть' }).click();
+    assert.equal(await firstBlock.locator('.exr').count(), rowsBefore, 'удалённое вернулось');
 
-    // Суперсет (07.10.2026): обычный вид — схемы и число кругов; тап по
-    // любой схеме — правка всего суперсета: поля у каждого упражнения и
-    // общая колонка кругов. Добавленный круг — у всех сразу
+    // Суперсет: круги справа от скобки; нажать — карточка с общим для круга.
+    // Добавленный круг — у всех сразу
     const secondBlock = phone.locator('#root main:not([hidden]) .plan-card').nth(1);
     await secondBlock.getByRole('button', { name: 'Править' }).click();
     const superset = secondBlock.locator('.plan-inline__unit--superset').first();
-    await superset.locator('.plan-inline__scheme').first().click();
-    assert.equal(await superset.locator('.plan-inline__field--reps').count(), await superset.locator('.plan-inline__row').count(), 'поля у каждого упражнения суперсета');
-    const rounds = superset.locator('.plan-inline__rounds-col--edit .plan-inline__set');
-    const before = await rounds.count();
-    await superset.getByRole('button', { name: 'Круг', exact: true }).click();
-    assert.equal(await rounds.count(), before + 1, 'круг добавился');
-    // Выйти из суперсета — у каждого упражнения (FT-473, FT-486)
-    assert.equal(await superset.getByRole('button', { name: 'Выйти из суперсета' }).count(), await superset.locator('.plan-inline__row').count(), 'выход из суперсета у каждого упражнения');
-    if (process.env.SHOT_SUPERSET) await phone.screenshot({ path: process.env.SHOT_SUPERSET, fullPage: true });
-    await superset.getByRole('button', { name: 'Готово' }).click();
+    const before = Number(await superset.locator('.plan-inline__rounds-sum strong').innerText());
+    await superset.locator('.plan-inline__rounds-sum').click();
+    await card.getByText('Суперсет · общее для круга').waitFor({ timeout: 5000 });
+    await card.getByRole('button', { name: 'Круги: больше' }).click();
+    // Выйти из суперсета — у каждого упражнения (FT-473, FT-486): кнопкой в карточке
+    assert.equal(await card.getByRole('button', { name: 'Выйти из суперсета' }).count(), 1, 'выход из суперсета в карточке');
+    if (process.env.SHOT_SUPERSET) await phone.screenshot({ path: process.env.SHOT_SUPERSET });
+    await card.getByRole('button', { name: 'Готово', exact: true }).click();
+    await card.waitFor({ state: 'detached', timeout: 5000 });
     assert.equal(await superset.locator('.plan-inline__rounds-sum strong').innerText(), String(before + 1), 'число кругов в обычном виде');
 
-    // Тап по названию — вид упражнения, как в занятии; уходит в базу
-    await superset.locator('.plan-inline__name').first().click();
-    await secondBlock.getByRole('radio', { name: 'Собственный вес' }).click();
-    await secondBlock.getByRole('radio', { name: 'Собственный вес', checked: true }).waitFor({ timeout: 5000 });
-    if (process.env.SHOT_KIND) await phone.screenshot({ path: process.env.SHOT_KIND, fullPage: true });
-    await secondBlock.getByRole('button', { name: 'Готово' }).click();
+    // «Об упражнении» — вид упражнения, как в занятии; уходит в базу
+    await superset.locator('.exr').first().click();
+    await card.getByRole('button', { name: /Об упражнении/ }).click();
+    await card.getByRole('radio', { name: 'Собственный вес' }).click();
+    await card.getByRole('radio', { name: 'Собственный вес', checked: true }).waitFor({ timeout: 5000 });
+    if (process.env.SHOT_KIND) await phone.screenshot({ path: process.env.SHOT_KIND });
+    // «Заменить» — тот же поиск, что раньше по нажатию на название
+    await card.getByRole('button', { name: 'Заменить' }).click();
+    await assert.doesNotReject(card.locator('input').first().waitFor({ timeout: 5000 }), 'поиск упражнения');
+    await card.getByRole('button', { name: 'Закрыть' }).click();
+    await card.waitFor({ state: 'detached', timeout: 5000 });
     for (const tab of ['Прогресс', 'Питание']) {
       await phone.getByRole('tab', { name: tab, exact: true }).click();
       await phone.locator(`.card-section[data-view]:not([hidden])`).waitFor({ timeout: 5000 });
@@ -1392,8 +1410,10 @@ test('карта мышц: тренировка, программа, итоги 
     // трицепсу дважды — снят
     const block = phone.locator('#root main:not([hidden]) .plan__block').first();
     await block.getByRole('button', { name: 'Править' }).click();
-    await block.locator('.plan-inline__name').first().click();
-    const edit = block.locator('.muscle-edit').first();
+    await block.locator('.exr').first().click();
+    const sheet = phone.locator('.exc-sheet .sheet__panel');
+    await sheet.getByRole('button', { name: /Об упражнении/ }).click();
+    const edit = sheet.locator('.muscle-edit').first();
     await edit.getByRole('button', { name: 'Изменить' }).click();
     const triceps = () => edit.getByRole('button', { name: /^Трицепс:/ });
     assert.match(await triceps().getAttribute('aria-label'), /синергист/);
@@ -1404,6 +1424,8 @@ test('карта мышц: тренировка, программа, итоги 
     await assert.doesNotReject(edit.getByRole('button', { name: 'Как было' }).waitFor({ timeout: 5000 }));
     await edit.getByRole('button', { name: 'Готово' }).click();
     await assert.doesNotReject(edit.getByText(/Грудь, трицепс/).waitFor({ timeout: 5000 }), 'в свёрнутой строке — новая основная группа');
+    await sheet.locator('.exc-foot__ok').click();
+    await sheet.waitFor({ state: 'detached', timeout: 5000 });
 
     await phone.getByRole('tab', { name: 'Прогресс', exact: true }).click();
     // Итоги с картой мышц — во вкладке «Сила» (11.11.2026)
