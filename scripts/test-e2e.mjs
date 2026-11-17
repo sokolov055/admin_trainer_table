@@ -1518,8 +1518,9 @@ test('новый шаблон тренировки — без уровня, у �
     // Список программ с 17.11.2026: «+» — лист «Новая программа» → «С нуля»
     await tab.getByRole('button', { name: 'Новая программа' }).click();
     await tab.getByRole('button', { name: /С нуля/ }).click();
-    await tab.getByRole('heading', { name: 'Тренировки' }).waitFor({ timeout: 5000 });
-    assert.equal(await level(), 1, 'у программы уровень есть');
+    // Редактор программы с 17.11.2026 (этап 3): уровень — чипом «паспорта»
+    await tab.locator('.plib-etop').waitFor({ timeout: 5000 });
+    assert.equal(await tab.getByRole('button', { name: 'Уровень', exact: true }).count(), 1, 'у программы уровень есть');
   } finally { await context.close(); }
 });
 
@@ -1677,14 +1678,17 @@ test('оборудование создаётся без упражнения и
 });
 
 /**
- * Порядок тренировок в редакторе — перетаскиванием в свёрнутом списке:
- * развёрнутая тренировка выше экрана, тащить её целиком нельзя.
+ * Редактор программы (этап 3, 17.11.2026): тренировки свёрнуты — держать
+ * (или тянуть за ручку) — перетащить, нажать — раскрыть BlockEdit. Удалить —
+ * с «Вернуть», копия — из листа «+ Тренировка», выйти с несохранённым —
+ * только через «Выйти без сохранения?».
  */
-test('тренировки программы переставляются перетаскиванием', async () => {
+test('редактор программы: перетащить, удалить с «Вернуть», копия, выход без сохранения', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
   const tab = await context.newPage();
   tab.on('pageerror', (error) => consoleErrors.push(String(error)));
   const visible = (sel) => tab.locator('#root main:not([hidden]) ' + sel);
+  const titles = () => visible('.plib-ewk__head b').evaluateAll((els) => els.map((el) => el.textContent));
 
   try {
     await tab.goto(origin + '/?mockRole=trainer');
@@ -1694,74 +1698,51 @@ test('тренировки программы переставляются пе�
     await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await visible('.plib-card').filter({ hasText: 'Похудение, 3 раза в неделю' }).first().click();
     await tab.getByRole('button', { name: 'Изменить' }).click();
-    await tab.getByRole('button', { name: 'Свернуть тренировки' }).click();
-    // Свёрнутый список плавно подъезжает к экрану — ждём, пока встанет
-    await tab.waitForTimeout(700);
-
-    const rows = tab.locator('.block-order__row');
+    const rows = visible('.plib-ewk');
     await rows.first().waitFor({ timeout: 5000 });
-    // Тащат за ручку справа — остальная строка листает страницу
-    const a = await rows.nth(0).locator('.block-order__handle').boundingBox();
-    const b = await rows.nth(1).boundingBox();
+    await tab.waitForTimeout(500);
+    const before = await titles();
+    assert.equal(await visible('.plib-ewk.is-open').count(), 0, 'тренировки свёрнуты');
+    assert.equal(await tab.getByText('Пустые строки не сохраняются').count(), 0, 'служебной подсказки нет');
+
+    // Тянут за ручку — строка едет сразу, без ожидания
+    const g = await rows.nth(0).locator('.plib-ewk__grip').boundingBox();
+    const r1 = await rows.nth(1).boundingBox();
     const r0 = await rows.nth(0).boundingBox();
-    await tab.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await tab.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
     await tab.mouse.down();
-    for (let i = 1; i <= 8; i += 1) {
-      await tab.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + ((b.y - r0.y + 10) * i) / 8);
-    }
+    for (let i = 1; i <= 8; i += 1) await tab.mouse.move(g.x + g.width / 2, g.y + g.height / 2 + ((r1.y - r0.y + 20) * i) / 8);
     await tab.mouse.up();
+    await assert.doesNotReject(tab.waitForFunction((name) => {
+      const first = document.querySelector('#root main:not([hidden]) .plib-ewk__head b');
+      return first && first.textContent === name;
+    }, before[1], { timeout: 5000 }), 'первой стала вторая тренировка');
+    assert.ok(await tab.getByRole('button', { name: 'Сохранить — есть несохранённое' }).isVisible(), 'точка — есть несохранённое');
 
-    await assert.doesNotReject(
-      tab.waitForFunction(() => {
-        const first = document.querySelector('.block-order__title');
-        return first && first.textContent === 'Тренировка 2 — низ';
-      }, null, { timeout: 5000 }),
-      'первой стала вторая тренировка',
-    );
-
-    // Смахнуть влево — выезжает корзина; удаление без подтверждения, но с «Вернуть»
-    const before = await rows.count();
-    const r = await rows.nth(1).boundingBox();
-    await tab.mouse.move(r.x + r.width - 30, r.y + r.height / 2);
-    await tab.mouse.down();
-    for (let i = 1; i <= 6; i += 1) await tab.mouse.move(r.x + r.width - 30 - i * 25, r.y + r.height / 2 + 1);
-    await tab.mouse.up();
-    const trash = rows.nth(1).locator('.block-order__trash');
-    await tab.waitForFunction(() => {
-      const s = document.querySelectorAll('.block-order__swipe')[1];
-      return s && Number(getComputedStyle(s).opacity) > 0.9;
-    }, null, { timeout: 3000 });
-    await trash.click();
-    await tab.waitForFunction((n) => document.querySelectorAll('.block-order__row').length === n - 1, before, { timeout: 3000 });
+    // Нажать — раскрывается тот же редактор упражнений; удалить — с «Вернуть»
+    await rows.nth(1).locator('.plib-ewk__head').click();
+    await visible('.plib-ewk.is-open .plan-inline__remove-link').click();
+    await visible('.plib-ewk.is-open .plan-inline__remove').getByRole('button', { name: 'Удалить', exact: true }).click();
+    await tab.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .plib-ewk').length === n - 1, before.length, { timeout: 3000 });
     await tab.getByRole('button', { name: 'Вернуть' }).click();
-    assert.equal(await rows.count(), before, 'удалённое вернулось');
+    assert.equal(await rows.count(), before.length, 'удалённое вернулось');
 
-    // Выбрать две тренировки и скопировать разом
-    await tab.getByRole('button', { name: 'Выбрать', exact: true }).click();
-    await rows.nth(0).click();
-    await rows.nth(1).click();
-    await assert.doesNotReject(tab.getByText('Выбрано 2').waitFor({ timeout: 3000 }));
-    const originalTitles = await rows.locator('.block-order__title').evaluateAll((titles) => titles.map((title) => title.textContent));
-    const selectedTitles = originalTitles.slice(0, 2);
-    await tab.locator('.block-order__actions').getByRole('button', { name: 'Копировать' }).click();
-    assert.equal(await rows.count(), before + 2, 'скопированы обе');
-    assert.deepEqual(
-      await rows.locator('.block-order__title').evaluateAll((titles) => titles.map((title) => title.textContent)),
-      originalTitles.concat(selectedTitles),
-      'копии без подписи идут после всех оригиналов в их порядке',
-    );
+    // «+ Тренировка» → копия тренировки этой программы — встаёт последней и раскрыта
+    await visible('.plib-addw').click();
+    await tab.getByRole('button', { name: /Копия тренировки этой программы/ }).click();
+    await tab.locator('.sheet__panel .plib-menu__item').first().click();
+    await tab.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .plib-ewk').length === n + 1, before.length, { timeout: 3000 });
+    assert.equal((await titles()).at(-1), before[1], 'копия первой (после перестановки) тренировки');
+    assert.ok(await rows.last().evaluate((el) => el.classList.contains('is-open')), 'копия раскрыта');
 
-    await tab.locator('.plan-edit__order-bar').getByRole('button', { name: 'Развернуть' }).click();
-    const firstTitle = await tab.locator('.plan-edit__title').first().inputValue();
-    assert.equal(firstTitle, 'Тренировка 2 — низ', 'порядок сохранился и в развёрнутом редакторе');
-
-    // Панель «Сохранить шаблон» — только на вкладке шаблонов: она вынесена
-    // в body и раньше ездила по всем разделам (09.10.2026)
-    await tab.locator('.plan-edit__float').waitFor({ timeout: 3000 });
-    await tab.getByRole('button', { name: 'Клиенты', exact: true }).click();
-    await assert.doesNotReject(tab.waitForFunction(() => !document.querySelector('.plan-edit__float'), null, { timeout: 3000 }), 'в «Клиентах» панели шаблона нет');
-    await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
-    await assert.doesNotReject(tab.locator('.plan-edit__float').waitFor({ timeout: 3000 }), 'вернулись — панель снова на месте');
+    // Отмена с несохранённым — спрашивает; «Остаться» оставляет правку
+    await visible('.plib-etop__c').click();
+    await tab.getByRole('alertdialog', { name: 'Выйти без сохранения?' }).waitFor({ timeout: 3000 });
+    await tab.getByRole('button', { name: 'Остаться' }).click();
+    assert.equal(await rows.count(), before.length + 1, 'правка на месте');
+    await visible('.plib-etop__c').click();
+    await tab.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await visible('.plib-hero').waitFor({ timeout: 5000 });
   } finally {
     await context.close();
   }

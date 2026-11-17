@@ -9,6 +9,7 @@ import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
 import ProgramList from './ProgramList.jsx';
 import ProgramView from './ProgramView.jsx';
+import ProgramEditor from './ProgramEditor.jsx';
 import ExerciseKind from '../ExerciseKind.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
@@ -154,6 +155,20 @@ function Templates({ kind, owner, onOpenClient }) {
   useBackGesture(() => setOpen(null), !editing && !assigning && !!open);
   // Из карточки шаблона — обратно на то же место списка
   useReturnScroll(!!(editing || assigning || open));
+
+  // Программа — новым редактором (этап 3 макета, 17.11.2026, ProgramEditor.jsx);
+  // шаблон одной тренировки — прежним TemplateEditor
+  if (editing && kind === 'program') {
+    return (
+      <ProgramEditor
+        template={editing.new ? null : editing}
+        onCancel={editorGuard.leave}
+        confirm={editorGuard.confirm}
+        onDirty={setEditorDirty}
+        onSaved={(saved) => { closeEditor(); setOpen(saved.id); setScope('mine'); list.reload(); }}
+      />
+    );
+  }
 
   if (editing) {
     return (
