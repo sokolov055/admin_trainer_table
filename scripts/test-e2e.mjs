@@ -22,7 +22,8 @@ test('FT-565: предложенное время статики принима�
     await phone.reload();
     await phone.getByRole('button', { name: 'Тренировки', exact: true }).click();
     await phone.getByRole('button', { name: /Вернуться к тренировке/ }).click();
-    const times = phone.getByRole('textbox', { name: /подход [12], время, с$/ });
+    // FT-802: на виду один круг — поля остальных в разметке, но спрятаны
+    const times = phone.locator('input[aria-label$="время, с"]');
     await times.first().waitFor();
     assert.equal(await times.count(), 4);
     for (let i = 0; i < 4; i++) assert.equal(await times.nth(i).inputValue(), '60');

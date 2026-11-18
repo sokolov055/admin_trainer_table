@@ -15,7 +15,7 @@ import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
 import { BackButton, Sheet } from './ui.jsx';
 import { ExerciseThumb } from './client/PlanCard.jsx';
 import MuscleEdit from './muscles/MuscleEdit.jsx';
-import { shownSetOf, viewSet, stripOf, stepValue } from './workout-strip.js';
+import { shownSetOf, viewSet, stripOf, stepValue, shownRoundOf, viewRound, roundsOf } from './workout-strip.js';
 import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete, UndoBar, UNDO_MS } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
@@ -1407,12 +1407,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // читались как шесть равных (QA 20.10.2026). У следующих — подпись,
     // их ряд появится, когда очередь дойдёт
     if (!(waiting[0] && waiting[0].ex.id === ex.id)) {
-      return <p className="workout__effort-next">Следом, без отдыха — после «{waiting[0].ex.name}»</p>;
+      // Бегущие стрелки вместо фразы «после …» (FT-802)
+      return <p className="workout__effort-next wk-flow">Следом, без отдыха<i aria-hidden="true" /><i aria-hidden="true" /><i aria-hidden="true" /></p>;
     }
     return <>
       {effortChooser(pick, true)}
       {/* Подпись — по порядку круга: последнее упражнение запускает отдых */}
-      <p className="workout__effort-next">{last || !after ? 'Последнее в круге — запустит отдых' : 'Без отдыха → ' + after.ex.name}</p>
+      <p className="workout__effort-next">{last || !after ? 'Затем — отдых' : 'Без отдыха → ' + String.fromCharCode(65 + members.indexOf(after))}</p>
     </>;
   };
 
@@ -1560,22 +1561,61 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         : e)),
     }));
     const currentHere = members.some(({ ex }) => ex.id === focus.ex);
-    return <section onFocus={pickExercise(members[0].ex.id)} className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '')} key={'g' + group} data-unit={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
+    // Один круг на виду (FT-802, этап 3): квадратики кругов в шапке, нажать —
+    // открыть круг; остальные круги в разметке, но спрятаны (ввод не теряется)
+    const list = members.map(({ ex }) => ex);
+    const roundView = setView['g' + group] || null;
+    const squares = roundsOf(list, roundView);
+    const shownRound = editable ? shownRoundOf(list, roundView) : -1;
+    const menuKey = 'g' + group;
+    const menuOpen = exMenu === menuKey;
+    const word = rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов';
+    return <section onFocus={pickExercise(members[0].ex.id)} className={'workout__exercise workout__rounds' + (currentHere ? ' workout__exercise--current' : '') + (editable ? ' wk-ss' : '')} key={'g' + group} data-unit={'g' + group} data-flip-enter="" data-flip-scope={'sec:g' + group}>
       <div className="workout__rounds-head" onPointerDown={holdToMove('g' + group)}>
-        <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {rounds % 10 === 1 && rounds % 100 !== 11 ? 'круг' : [2, 3, 4].includes(rounds % 10) && ![12, 13, 14].includes(rounds % 100) ? 'круга' : 'кругов'}</h3>
-        {!asClient && <button className="button button--ghost" onClick={split}>Разъединить</button>}
+        <IconLinkPair size={18} aria-hidden="true" className="wk-ss__icon" />
+        <h3 data-flip={'name:' + members[0].ex.id}>Суперсет · {rounds} {word}</h3>
+        {/* «Разъединить» и «Добавить круг» — в «⋯» (владелец, 18.11.2026) */}
+        {!asClient && editable && <div className="workout__tools-more wk-ss__more">
+          <button type="button" className="workout__chip workout__chip--more" aria-label="Суперсет: ещё" aria-haspopup="menu" aria-expanded={menuOpen}
+            onClick={() => { haptic(); setExMenu(menuOpen ? null : menuKey); }}><IconMore size={18} aria-hidden="true" /></button>
+          {menuOpen && <>
+            <div className="workout__more-scrim" onClick={() => setExMenu(null)} aria-hidden="true" />
+            <div className="workout__menu workout__menu--tools" role="menu" aria-label="Суперсет: ещё">
+              <button type="button" role="menuitem" className="workout__menu-item" disabled={members.some(({ ex }) => ex.sets.length >= 20)} onClick={() => { setExMenu(null); addRound(); }}>Добавить круг</button>
+              <button type="button" role="menuitem" className="workout__menu-item" onClick={() => { setExMenu(null); split(); }}>Разъединить</button>
+            </div>
+          </>}
+        </div>}
+        {!asClient && !editable && <button className="button button--ghost" onClick={split}>Разъединить</button>}
       </div>
-      <p className="small muted">Упражнения подряд, без отдыха; отдых — после круга.{editable && !asClient ? ' Порядок внутри — подержите название и перетащите.' : ''}</p>
-      {members.some(({ ex }) => planText(ex.prescription)) && (
-        <p className="small muted">{members.map(({ ex }) => ex.name + (planText(ex.prescription) ? ': ' + planText(ex.prescription) : '')).join('; ')}</p>
-      )}
+      {editable && <div className="wk-rounds" role="group" aria-label="Круги">
+        {squares.map((q) => (
+          <button type="button" key={q.r} className={'wk-round' + (q.done ? ' is-done' : '') + (q.next ? ' is-next' : '') + (q.shown ? ' is-shown' : '')}
+            aria-pressed={q.shown} aria-label={'Круг ' + q.label + (q.done ? ', сделан' : '')}
+            onClick={() => { haptic('light'); setSetView((v) => ({ ...v, ['g' + group]: viewRound(list, q.r) })); }}>
+            {q.done ? <IconCheck size={14} aria-hidden="true" /> : q.label}
+          </button>
+        ))}
+      </div>}
+      {/* Мини-карточки A, B (FT-802): картинка, план; нажать — техника */}
+      <div className="wk-ssm">
+        {members.map(({ ex }, k) => {
+          const info = ex.exerciseId ? setups[ex.exerciseId] : null;
+          const on = editable && focus.ex === ex.id && focus.set === shownRound;
+          const inner = <>
+            <ExerciseThumb ex={{ ...ex, exercise: info }} className="wk-ssm__pic" />
+            <span className="wk-ssm__text"><b>{ex.name}</b><small>{String.fromCharCode(65 + k)}{planText(ex.prescription) ? ' · ' + planText(ex.prescription) : ''}</small></span>
+          </>;
+          const cls = 'wk-ssm__card' + (on ? ' is-on' : '');
+          return info
+            ? <TechButton key={ex.id} className={cls} ex={ex} info={guideOf(ex, info)} notes={notes} trainer={!asClient} targetOf={(uid) => machineTarget(info, uid)}>{inner}</TechButton>
+            : <div key={ex.id} className={cls}>{inner}</div>;
+        })}
+      </div>
       {members.map(({ ex }) => <LastRunHint key={'last' + ex.id} last={ex.lastRun} name={ex.name} tired={ex.tired} sets={ex.sets} />)}
       {/* Таймера интервалов нет (владелец, 09.10.2026): их запускают на самом тренажёре */}
-      {members.map(({ ex }) => ex.exerciseId && setups[ex.exerciseId]
-        ? <WorkoutGuidance key={'about' + ex.id} info={setups[ex.exerciseId]} trainer={!asClient} title={ex.name} />
-        : setupWait(ex) ? <div key={'about' + ex.id} className="workout__extras-wait workout__extras-wait--one" aria-hidden="true"><span className="skeleton" /></div> : null)}
       {Array.from({ length: rounds }, (_, r) => (
-        <div className="workout__round" key={r}>
+        <div className="workout__round" key={r} data-shown={r === shownRound ? '' : undefined}>
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
             <div className="workout__round-item" key={ex.id} data-member={ex.id} data-anchor={ex.id + ':' + r}>
@@ -1593,7 +1633,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   </span>}
                 </div>
               {tuning === ex.id + ':' + r && tuneEditor(ex, ei, ex.id + ':' + r, true)}
-              {setRow(ex, ei, r, '', k === members.length - 1, true)}
+              {setRow(ex, ei, r, '', k === members.length - 1, true, editable && r === shownRound)}
               {memberEffort(members, k, r)}
             </div>
           ))}
@@ -1601,7 +1641,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {roundOptions(members, r)}
         </div>
       ))}
-      <button className="button button--block" disabled={members.some(({ ex }) => ex.sets.length >= 20)} onClick={addRound}>Добавить круг</button>
+      {!editable && <button className="button button--block" disabled={members.some(({ ex }) => ex.sets.length >= 20)} onClick={addRound}>Добавить круг</button>}
     </section>;
   };
 

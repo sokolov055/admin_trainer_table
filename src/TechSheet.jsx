@@ -270,16 +270,20 @@ function Inline({ children }) {
  * тот же лист, что в карточке тренировки, плюс «Сейчас · подход N из M».
  * Тренажёр — вкладкой листа (отдельной кнопки больше нет)
  */
-export function TechButton({ ex, info, notes = {}, trainer = false, targetOf, swaps = null, onSwap = null }) {
+export function TechButton({ ex, info, notes = {}, trainer = false, targetOf, swaps = null, onSwap = null, className = '', children = null }) {
   const [open, setOpen] = useState(false);
   const m = open ? techModel({ name: ex.name, card: info, notes, targetOf }) : null;
   const steps = info ? instructionParts(info.notes || '', info.mistakes || '').steps.length : 0;
   const meta = [steps ? steps + ' ' + (steps % 10 === 1 && steps % 100 !== 11 ? 'шаг' : steps % 10 >= 2 && steps % 10 <= 4 && (steps % 100 < 12 || steps % 100 > 14) ? 'шага' : 'шагов') : '', info && info.media ? 'видео' : ''].filter(Boolean).join(' · ');
   return <>
-    <button type="button" className="workout__chip workout__about" aria-haspopup="dialog" aria-expanded={open}
-      aria-label={'Техника' + (meta ? ': ' + meta : '')} onClick={() => { haptic(); setOpen(true); }}>
-      <IconPlay size={16} aria-hidden="true" />Техника
-    </button>
+    {/* Своё содержимое — мини-карточка упражнения суперсета (FT-802, этап 3) */}
+    {children
+      ? <button type="button" className={className} aria-haspopup="dialog" aria-expanded={open}
+        aria-label={ex.name + ': техника' + (meta ? ', ' + meta : '')} onClick={() => { haptic(); setOpen(true); }}>{children}</button>
+      : <button type="button" className="workout__chip workout__about" aria-haspopup="dialog" aria-expanded={open}
+        aria-label={'Техника' + (meta ? ': ' + meta : '')} onClick={() => { haptic(); setOpen(true); }}>
+        <IconPlay size={16} aria-hidden="true" />Техника
+      </button>}
     {open && <TechSheet m={m} plan={workoutPlan(ex.sets)} last={workoutLast(ex)} now={workoutNow(ex.sets)} trainer={trainer} swaps={swaps} onSwap={onSwap} onClose={() => setOpen(false)} />}
   </>;
 }

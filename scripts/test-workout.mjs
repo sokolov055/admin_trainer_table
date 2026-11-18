@@ -488,6 +488,8 @@ test('суперсет из программы виден в занятии', as
 
     // Разъединили — два отдельных упражнения, подходов у каждого столько,
     // сколько было кругов
+    // «Разъединить» — в «⋯» суперсета (FT-802, этап 3)
+    await act(async () => { local.root.findAllByType('button').find(x => x.props['aria-label'] === 'Суперсет: ещё').props.onClick(); await delay(); });
     await press('Разъединить');
     assert.deepEqual(heads(), ['Подтягивания', 'Тяга блока', 'Планка']);
     assert.equal(local.root.findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set')).length, 9);
@@ -891,9 +893,10 @@ test('суперсет из упражнений базы с техникой о
       ] }, month: 'Октябрь 2026' }, onClose() {} }));
       await delay();
     });
-    const about = local.root.findAll(n => n.type === 'details' && n.props.className === 'workout__setup workout__about');
-    assert.deepEqual(about.map(n => text(n.findByType('summary').findAllByType('span')[0])),
-      ['Гиперэкстензия: техника выполнения', 'Отжимания от пола: техника выполнения']);
+    // Мини-карточки A, B (FT-802, этап 3): нажать — лист «Техника» своего упражнения
+    const about = local.root.findAll(n => n.type === 'button' && /^wk-ssm__card/.test(n.props.className || ''));
+    assert.deepEqual(about.map(n => n.props['aria-label'].split(',')[0]),
+      ['Гиперэкстензия: техника', 'Отжимания от пола: техника']);
     assert.ok(local.root.findAllByType('button').some(b => text(b) === 'Завершить'), 'экран занятия на месте');
   } finally {
     exerciseSetupResponse = null;
@@ -1350,7 +1353,8 @@ test('кардио без интервалов в плане — интерва�
     await press(button('Аэробайк'));
     assert.ok(button('Кардио'), 'вид — в панели названия');
     await press(button('Функциональное кардио'));
-    assert.ok(local.root.findAllByType('p').some(p => /Аэробайк: интервалы 6 × ускорение 1:00/.test(text(p))), 'план — по интервалам');
+    // План — в мини-карточке суперсета (FT-802): «A · интервалы 6 × …»
+    assert.ok(local.root.findAllByType('small').some(p => /интервалы 6 × ускорение 1:00/.test(text(p))), 'план — по интервалам');
     // В круге — круги и интервалы аэробайка вместо времени и скорости
     assert.equal(local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Аэробайк, отрезок 1, кругов').props.value, '6');
     await press(button('Готово'));

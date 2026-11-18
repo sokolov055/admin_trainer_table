@@ -91,3 +91,37 @@ export function stepValue(ex, key, value, dir) {
   const next = Math.max(0, round(base));
   return key === 'reps' ? String(Math.round(next)) : String(next);
 }
+
+/**
+ * Суперсет (FT-802, этап 3): на виду — один круг. Ближайший — первый, где
+ * у кого-то подход не отмечен; нажали квадратик — этот, пока не отметили
+ * следующий подход (view.done — сколько отмечено во всём суперсете)
+ */
+const roundCount = (list) => Math.max(0, ...list.map((e) => ((e && e.sets) || []).length));
+const doneIn = (list) => list.reduce((n, e) => n + ((e && e.sets) || []).filter(isDone).length, 0);
+
+export function shownRoundOf(list, view = null) {
+  const rounds = roundCount(list);
+  if (!rounds) return -1;
+  if (view && view.done === doneIn(list) && view.r >= 0 && view.r < rounds) return view.r;
+  for (let r = 0; r < rounds; r += 1) {
+    if (list.some((e) => e.sets[r] && e.sets[r].state === 'pending')) return r;
+  }
+  return rounds - 1;
+}
+
+export function viewRound(list, r) {
+  return { r, done: doneIn(list) };
+}
+
+/** Квадратики кругов: сделан (все отмечены или пропущены), ближайший, на виду */
+export function roundsOf(list, view = null) {
+  const rounds = roundCount(list);
+  const shown = shownRoundOf(list, view);
+  const next = shownRoundOf(list, null);
+  return Array.from({ length: rounds }, (_, r) => {
+    const sets = list.map((e) => e.sets[r]).filter(Boolean);
+    const done = sets.length > 0 && sets.every((x) => x.state !== 'pending') && sets.some(isDone);
+    return { r, label: String(r + 1), done, next: !done && r === next, shown: r === shown };
+  });
+}

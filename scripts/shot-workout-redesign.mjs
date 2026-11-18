@@ -155,6 +155,47 @@ try {
     await page.waitForTimeout(400);
     await shot('16-ex-note');
   }
+
+  if (want('ss')) {
+    // Суперсет: клиент, «Тренировка 2 — низ» (выпады + подъём на носки)
+    await page.goto(origin + '/');
+    await page.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    await page.locator('.section', { has: page.getByRole('heading', { name: 'Тренировка 2 — низ' }) }).getByRole('button', { name: 'Начать тренировку' }).click();
+    await page.locator('.wk-ss').first().waitFor({ timeout: 15000 });
+    await page.waitForTimeout(800);
+    const ss = page.locator('.wk-ss').first();
+    await ss.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => window.scrollBy(0, -150));
+    await page.waitForTimeout(600);
+    await shot('17-ss');
+    console.log('ss overflow', JSON.stringify(await overflow('.wk-ss')));
+    // Касание поля суперсета делает его текущим — появляются оценки
+    await ss.locator('.workout__round[data-shown] input').first().click();
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape').catch(() => {});
+    await shot('17b-ss-current');
+    await ss.getByRole('button', { name: 'Норм', exact: true }).first().click().catch((e) => console.log('norm1', e.message.split('\n')[0]));
+    await page.waitForTimeout(150);
+    await shot('18-ss-a-done-anim');
+    await page.waitForTimeout(700);
+    await shot('19-ss-b');
+    await ss.getByRole('button', { name: 'Норм', exact: true }).first().click().catch((e) => console.log('norm2', e.message.split('\n')[0]));
+    await page.waitForTimeout(900);
+    await page.getByRole('button', { name: 'Закончить отдых' }).click().catch(() => {});
+    await page.waitForTimeout(700);
+    await ss.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => window.scrollBy(0, -150));
+    await page.waitForTimeout(300);
+    await shot('20-ss-round2');
+    await ss.getByRole('button', { name: /^Круг 1/ }).click();
+    await page.waitForTimeout(500);
+    await shot('21-ss-round1-back');
+    if (await ss.getByRole('button', { name: 'Суперсет: ещё' }).count()) {
+      await ss.getByRole('button', { name: 'Суперсет: ещё' }).click();
+      await page.waitForTimeout(300);
+      await shot('22-ss-menu');
+    }
+  }
 } catch (e) {
   errors.push('СЦЕНАРИЙ: ' + e.message.split('\n').slice(0, 12).join(' | '));
   await shot('error');

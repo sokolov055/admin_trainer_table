@@ -63,3 +63,19 @@ test('время: секундами и «м:сс»', () => {
   assert.equal(stepValue(curl, 'time', '1:00', -1), '0:55');
   assert.equal(stepValue(curl, 'time', '0:03', -1), '0:00');
 });
+
+test('суперсет: на виду ближайший круг, нажатый — до следующей отметки; квадратики кругов', async () => {
+  const { shownRoundOf, viewRound, roundsOf } = await import('../src/workout-strip.js');
+  const a = { sets: [set('done'), set(), set()] };
+  const b = { sets: [set('done'), set('done'), set()] };
+  assert.equal(shownRoundOf([a, b]), 1, 'во втором круге A не отмечено');
+  const view = viewRound([a, b], 0);
+  assert.equal(shownRoundOf([a, b], view), 0);
+  const a2 = { sets: [set('done'), set('done'), set()] };
+  assert.equal(shownRoundOf([a2, b], view), 2, 'отметили — ближайший');
+  const rounds = roundsOf([a, b]);
+  assert.deepEqual(rounds.map((x) => [x.done, x.next, x.shown]), [[true, false, false], [false, true, true], [false, false, false]]);
+  const all = { sets: [set('done'), set('skipped')] };
+  assert.deepEqual(roundsOf([all, { sets: [set('done'), set('done')] }]).map((x) => x.done), [true, true]);
+  assert.equal(shownRoundOf([all, { sets: [set('done'), set('done')] }]), 1, 'всё сделано — последний');
+});
