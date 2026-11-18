@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { haptic } from '../telegram.js';
 import { IconMinus, IconPlus, IconCheck } from '../icons.jsx';
 import { perRoundOf } from '../round-plan.js';
 import {
   roundFields, varies, roundValues, withCell, withLadder, ladderStep, stepCell, toggleField, flatField,
   withCardioKey, fieldMeta, CARDIO_GOALS, CARDIO_LOADS,
+  pickedFields, pickedValue, setPicked, stepPicked, toggleCells,
 } from './exercise-card-model.js';
 
 /**
@@ -15,6 +16,11 @@ import {
  * У каждого упражнения своё «что меняется»: у силовых — повторы и/или вес,
  * у кардио — цель (ускорения, ккал, время, дистанция) и/или нагрузка
  * (скорость, уровень). Хранение — round-plan.js.
+ *
+ * Несколько клеток сразу (владелец, 18.11.2026, макет
+ * rounds-multiselect-2026-11-18): «Выбрать» или подержать клетку →
+ * отметить клетки, «Круг N» (весь круг), название (всё упражнение) →
+ * панель снизу: вписать число во все, «− / +» — каждая на шаг от своего.
  */
 
 const short = (name) => String(name || '').trim().split(/\s+/)[0] || 'Упражнение';
@@ -85,8 +91,66 @@ function StepRow({ ex, field, n, col, edit, onEdit, onPatch }) {
   );
 }
 
-export default function RoundsTable({ list, idx, index, n, col, onCol, onIndex, onPatch }) {
+const ROW_LABEL = { reps: 'Повторы', weight: 'Вес', goal: 'Цель', load: 'Нагрузка' };
+
+/** Панель выбранных клеток: «Выбрано 8 · Снять», строка на каждое поле */
+function PickedBar({ list, cells, n, onPatchAll, onClear }) {
   const [edit, setEdit] = useState(null);
+  const [typed, setTyped] = useState(null);
+  const rows = pickedFields(list, cells);
+  return (
+    <div className="rt-bar" role="group" aria-label={'Выбрано клеток: ' + cells.length}>
+      <div className="rt-bar__top">
+        <span>Выбрано {cells.length}</span>
+        <button type="button" onClick={onClear}>Снять</button>
+      </div>
+      {rows.map(({ field, count }) => {
+        const { same, value } = pickedValue(list, cells, field, n);
+        const label = ROW_LABEL[field];
+        const step = (dir) => { const ch = stepPicked(list, cells, field, n, dir); if (ch.length) { onPatchAll(ch); haptic('light'); } };
+        return (
+          <div className="rt-bar__row" key={field}>
+            <span className="rt-bar__k"><b>{label}</b> · {count} кл.</span>
+            <button type="button" aria-label={label + ': каждой меньше'} onClick={() => step(-1)}><IconMinus size={16} /></button>
+            {edit === field
+              ? (
+                <input
+                  className="rt-step__input"
+                  aria-label={label + ': во все выбранные'}
+                  autoFocus
+                  inputMode={field === 'reps' ? 'text' : 'decimal'}
+                  enterKeyHint="done"
+                  maxLength={12}
+                  value={typed ?? (same ? value : '')}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => { setTyped(e.target.value); onPatchAll(setPicked(list, cells, field, n, e.target.value)); }}
+                  onBlur={() => { setTyped(null); setEdit(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                />
+              )
+              : (
+                <button type="button" className={'rt-bar__v' + (same ? '' : ' is-mix')} aria-label={label + ': ' + (same ? shown(value) : 'разное') + '. Вписать во все'} onClick={() => setEdit(field)}>
+                  {same ? shown(value) : 'разное'}
+                </button>
+              )}
+            <button type="button" aria-label={label + ': каждой больше'} onClick={() => step(1)}><IconPlus size={16} /></button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function RoundsTable({ list, idx, index, n, col, onCol, onIndex, onPatch, onPatchAll }) {
+  const [edit, setEdit] = useState(null);
+  // Выбор нескольких клеток: режим и отмеченные «i:k»
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState(() => new Set());
+  const press = useRef(null);
+  // До какого времени глотать «нажатие» (после удержания)
+  const swallow = useRef(0);
+  // Кругов стало меньше — убранные круги из выбора долой
+  useEffect(() => { setPicked((p) => new Set([...p].filter((key) => Number(key.split(':')[1]) < n))); }, [n]);
   const ex = list[index];
   const c = Math.min(col, n - 1);
   useEffect(() => { setEdit(null); }, [index, c]);
@@ -97,7 +161,43 @@ export default function RoundsTable({ list, idx, index, n, col, onCol, onIndex, 
   const pr = cardio ? perRoundOf(ex.cardio) : null;
   const patch = (values) => onPatch(index, values);
 
+  const startPick = (keys = []) => { setPicking(true); setPicked(new Set(keys)); setEdit(null); haptic('medium'); };
+  const stopPick = () => { setPicking(false); setPicked(new Set()); haptic('light'); };
+  const pickAll = (keys) => { setPicked((p) => toggleCells(p, keys)); haptic('light'); };
+  const cells = [...picked];
+  const rowAll = (i) => picking && Array.from({ length: n }, (_, k) => i + ':' + k).every((key) => picked.has(key));
+  const patchAll = (changes) => (onPatchAll ? onPatchAll(changes) : changes.forEach(([i, v]) => onPatch(i, v)));
+
+  /** Подержать клетку — режим выбора с ней (как выбор фото на iPhone) */
+  const hold = (key) => (e) => {
+    if (picking || (e.button !== undefined && e.button !== 0)) return;
+    const x0 = e.clientX; const y0 = e.clientY;
+    const off = () => { clearTimeout(press.current); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', off); window.removeEventListener('pointercancel', off); };
+    const move = (ev) => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) off(); };
+    // Отпустили палец после удержания: мышь сразу присылает ещё «нажатие» —
+    // его глотаем (80 мс), а касание на телефоне его не присылает — и
+    // следующее касание клетки не должно потеряться
+    const release = () => {
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+      swallow.current = Date.now() + 80;
+    };
+    press.current = setTimeout(() => {
+      off();
+      swallow.current = Infinity;
+      window.addEventListener('pointerup', release);
+      window.addEventListener('pointercancel', release);
+      startPick([key]);
+    }, 450);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', off);
+    window.addEventListener('pointercancel', off);
+  };
+
   const tap = (i, k) => {
+    // Отпустили после удержания — это не нажатие
+    if (Date.now() < swallow.current) { swallow.current = 0; return; }
+    if (picking) { pickAll([i + ':' + k]); return; }
     if (i === index && k === c) { setEdit(on[0] || fields[0]); return; }
     if (k !== c) onCol(k);
     if (i !== index) onIndex(i);
@@ -105,29 +205,49 @@ export default function RoundsTable({ list, idx, index, n, col, onCol, onIndex, 
   };
 
   return (
-    <div className="rt">
+    <div className={'rt' + (picking ? ' is-picking' : '')}>
+      <div className="rt-head">
+        <span>{picking ? (cells.length ? 'Нажмите клетку, «Круг» или название' : 'Отметьте клетки, круг или упражнение') : 'Подержите клетку — выбрать несколько'}</span>
+        <button type="button" className={'rt-pick' + (picking ? ' is-on' : '')} aria-pressed={picking} onClick={() => (picking ? stopPick() : startPick())}>{picking ? 'Готово' : 'Выбрать'}</button>
+      </div>
       <div className="rt-scroll">
         <table className="rt-tab" style={{ '--n': n }}>
           <thead>
-            <tr><th aria-label="Упражнение" />{Array.from({ length: n }, (_, k) => <th key={k} className={k === c ? 'is-col' : ''}>Круг {k + 1}</th>)}</tr>
+            <tr><th aria-label="Упражнение" />{Array.from({ length: n }, (_, k) => {
+              const keys = idx.map((i) => i + ':' + k);
+              const all = picking && keys.every((key) => picked.has(key));
+              return (
+                <th key={k} className={(!picking && k === c ? 'is-col' : '') + (all ? ' is-picked' : '')}>
+                  {picking
+                    ? <button type="button" className="rt-colpick" aria-pressed={all} aria-label={'Круг ' + (k + 1) + ': ' + (all ? 'снять' : 'выбрать весь')} onClick={() => pickAll(keys)}>Круг {k + 1}</button>
+                    : 'Круг ' + (k + 1)}
+                </th>
+              );
+            })}</tr>
           </thead>
           <tbody>
             {idx.map((i) => {
               const e = list[i];
               const isCardio = roundFields(e)[0] === 'goal';
               return (
-                <tr key={i} className={(i === index ? 'is-row' : '') + (isCardio ? ' is-cardio' : '')}>
-                  <th scope="row">
-                    <button type="button" className="rt-name" onClick={() => { if (i !== index) { onIndex(i); haptic('light'); } }}>{e.name || 'Без названия'}</button>
+                <tr key={i} className={(!picking && i === index ? 'is-row' : '') + (isCardio ? ' is-cardio' : '')}>
+                  <th scope="row" className={rowAll(i) ? 'is-picked' : ''}>
+                    <button type="button" className="rt-name" aria-pressed={picking ? rowAll(i) : undefined}
+                      onClick={() => {
+                        if (picking) { pickAll(Array.from({ length: n }, (_, k) => i + ':' + k)); return; }
+                        if (i !== index) { onIndex(i); haptic('light'); }
+                      }}>{e.name || 'Без названия'}</button>
                     {isCardio && <small>{fieldMeta(e, 'goal').label.toLowerCase()} · {fieldMeta(e, 'load').label.toLowerCase()}</small>}
                   </th>
                   {Array.from({ length: n }, (_, k) => {
                     const parts = cellParts(e, n, k);
-                    const sel = i === index && k === c;
+                    const key = i + ':' + k;
+                    const sel = picking ? picked.has(key) : i === index && k === c;
                     const label = `${e.name || 'Упражнение'}, круг ${k + 1}: ` + parts.map((p) => shown(p.v) + ' ' + p.meta.unit).join(', ');
                     return (
                       <td key={k}>
-                        <button type="button" className={'rt-cell' + (sel ? ' is-on' : '') + (parts.some((p) => p.on) ? '' : ' is-flat')} aria-label={label} aria-pressed={sel} onClick={() => tap(i, k)}>
+                        <button type="button" className={'rt-cell' + (sel ? (picking ? ' is-picked' : ' is-on') : '') + (parts.some((p) => p.on) ? '' : ' is-flat')} aria-label={label} aria-pressed={sel} onPointerDown={hold(key)} onClick={() => tap(i, k)}
+                          onContextMenu={(ev) => ev.preventDefault()}>
                           <b key={parts[0].v}>{shown(parts[0].v)}</b>
                           <small>{parts[1] ? second(parts[1]) : parts[0].meta.short}</small>
                         </button>
@@ -141,6 +261,8 @@ export default function RoundsTable({ list, idx, index, n, col, onCol, onIndex, 
         </table>
       </div>
 
+      {picking && cells.length > 0 && <PickedBar list={list} cells={cells} n={n} onPatchAll={patchAll} onClear={() => setPicked(new Set())} />}
+      {!picking && (<>
       <div className="rt-kinds" role="group" aria-label={short(ex.name) + ': по кругам меняется'}>
         <span className="rt-kinds__lab">{short(ex.name)} · по кругам меняется:</span>
         {fields.map((f) => {
@@ -184,6 +306,7 @@ export default function RoundsTable({ list, idx, index, n, col, onCol, onIndex, 
         )
         : <p className="rt-hint">Отметьте, что у «{short(ex.name)}» меняется от круга к кругу.</p>}
       <p className="rt-hint">Нажмите клетку ещё раз — клавиатура (свой вес, «8–12»). «+» у «Круги» дописывает круг с тем же шагом.</p>
+      </>)}
     </div>
   );
 }

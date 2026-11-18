@@ -351,3 +351,72 @@ export function groupVaries(list, idx) {
 }
 
 export { MAX_ROUNDS };
+
+/* ==========================================================================
+ * Несколько клеток сразу (владелец, 18.11.2026; макет
+ * rounds-multiselect-2026-11-18): отметили клетки, круг или упражнение —
+ * одно число во все или «− / +» каждой на шаг от своего значения
+ * ========================================================================== */
+
+/** Клетки «i:k» → [номер упражнения, круг] */
+const cellOf = (key) => key.split(':').map(Number);
+
+/** Какие поля править у отмеченных: силовые — повторы и вес, кардио — цель и нагрузка */
+export function pickedFields(list, cells) {
+  const out = [];
+  ['reps', 'weight', 'goal', 'load'].forEach((f) => {
+    const count = cells.filter((key) => { const e = list[cellOf(key)[0]]; return e && roundFields(e).includes(f); }).length;
+    if (count) out.push({ field: f, count });
+  });
+  return out;
+}
+
+/** Значение поля у отмеченных: одинаковое у всех — оно, разное — same: false */
+export function pickedValue(list, cells, field, n) {
+  const vals = cells
+    .map(cellOf)
+    .filter(([i]) => list[i] && roundFields(list[i]).includes(field))
+    .map(([i, k]) => roundValues(list[i], field, Math.max(2, n))[k]);
+  return { same: vals.every((v) => v === vals[0]), value: vals[0] ?? '' };
+}
+
+/**
+ * Правки для onPatchAll: у каждого упражнения — его отмеченные круги.
+ * fn(значение, упражнение) → новое значение или null (клетку не трогать).
+ * Поле, которое не менялось по кругам, становится «по кругам»
+ */
+export function withPicked(list, cells, field, n, fn) {
+  const byEx = new Map();
+  cells.map(cellOf).forEach(([i, k]) => {
+    if (!list[i] || !roundFields(list[i]).includes(field) || k >= n) return;
+    byEx.set(i, [...(byEx.get(i) || []), k]);
+  });
+  const changes = [];
+  byEx.forEach((ks, i) => {
+    const ex = list[i];
+    const values = roundValues(ex, field, Math.max(2, n));
+    let changed = false;
+    ks.forEach((k) => {
+      const next = fn(values[k], ex);
+      if (next === null || next === undefined) return;
+      const v = oneValue(field, next);
+      if (v !== values[k]) { values[k] = v; changed = true; }
+    });
+    if (changed) changes.push([i, withRoundValues(ex, field, values)]);
+  });
+  return changes;
+}
+
+/** Вписали число — во все отмеченные */
+export const setPicked = (list, cells, field, n, value) => withPicked(list, cells, field, n, () => value);
+
+/** «− / +» — каждая клетка на шаг от своего значения */
+export const stepPicked = (list, cells, field, n, dir) => withPicked(list, cells, field, n, (v, ex) => stepCell(ex, field, v, dir));
+
+/** Отметить или снять весь круг k / всё упражнение i (всё уже отмечено — снять) */
+export function toggleCells(picked, keys) {
+  const next = new Set(picked);
+  const all = keys.every((key) => next.has(key));
+  keys.forEach((key) => (all ? next.delete(key) : next.add(key)));
+  return next;
+}

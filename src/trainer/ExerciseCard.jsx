@@ -242,7 +242,7 @@ export default function ExerciseCard({
               ))}
             </div>
             {rounds
-              ? <RoundsTable list={list} idx={members_} index={index} n={work} col={col} onCol={setCol} onIndex={onIndex} onPatch={onPatch} />
+              ? <RoundsTable list={list} idx={members_} index={index} n={work} col={col} onCol={setCol} onIndex={onIndex} onPatch={onPatch} onPatchAll={onPatchAll} />
               : <p className="exc-ss__hint">Все круги одинаковые: повторы, вес и кардио — у каждого упражнения ниже.</p>}
           </div>
         )}

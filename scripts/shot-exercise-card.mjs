@@ -92,6 +92,29 @@ try {
     await sheet.getByRole('tab').nth(1).click();
     await page.waitForTimeout(500);
     await shot('6d-rounds-a2');
+    // Несколько клеток сразу: подержать клетку → ещё две → панель
+    const cellA = sheet.locator('.rt-tab tbody tr').nth(0).locator('.rt-cell').nth(0);
+    // Удержание — касанием (CDP): мышью в мобильном режиме Chromium глотает клики после него
+    const cdp = await page.context().newCDPSession(page);
+    const box = await cellA.boundingBox();
+    const pt = [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt });
+    await page.waitForTimeout(650);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForTimeout(700);
+    await sheet.locator('.rt-tab tbody tr').nth(1).locator('.rt-cell').nth(0).click();
+    await sheet.locator('.rt-tab tbody tr').nth(1).locator('.rt-cell').nth(1).click();
+    await page.waitForTimeout(400);
+    await sheet.locator('.rt-head').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(300);
+    await shot('6i-pick');
+    await sheet.getByRole('button', { name: /^Повторы: .+ Вписать во все$/ }).click();
+    await sheet.getByRole('textbox', { name: 'Повторы: во все выбранные' }).fill('20');
+    await sheet.getByRole('textbox', { name: 'Повторы: во все выбранные' }).blur();
+    await sheet.getByRole('button', { name: 'Круг 3: выбрать весь' }).click();
+    await page.waitForTimeout(300);
+    await shot('6j-pick-set');
+    await sheet.getByRole('button', { name: 'Готово', exact: true }).first().click();
     await closeSheet();
     await ss.scrollIntoViewIfNeeded();
     await shot('6e-superset-list-rounds');

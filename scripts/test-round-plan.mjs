@@ -4,7 +4,7 @@ import { roundList, roundValue, topWeight, withRounds, resizeList, cardioRound, 
 import { planText, planScheme } from '../src/exercise-track.js';
 import {
   splitGroupAt, groupLetter, groupMembers, varies, roundValues, toggleField, withLadder, withCell, stepCell, ladderStep,
-  flatField, withCardioKey, groupVaries,
+  flatField, withCardioKey, groupVaries, pickedFields, pickedValue, setPicked, stepPicked, toggleCells,
 } from '../src/trainer/exercise-card-model.js';
 import { patchPlanExercise } from '../src/plan-block-actions.js';
 import { fromPlan } from '../src/workout-model.js';
@@ -235,4 +235,36 @@ test('случайные цепочки правок: строка не раст
       }
     }
   }
+});
+
+test('несколько клеток сразу: примеры владельца 18.11.2026', () => {
+  const st = (name, reps) => ({ name, sets: '3', reps, weight: '', supersetGroup: 'g', track: { kind: 'bodyweight' } });
+  const row = { name: 'Гребной тренажёр', sets: '3', supersetGroup: 'g', track: { kind: 'cardio', machine: 'rower' },
+    cardio: { machine: 'rower', goal: 'kcal', metrics: ['kcal'], targets: { kcal: '30' }, settings: {}, perRound: { goal: 'kcal', goals: '30, 50, 70', load: 'speed', loads: '' } } };
+  let list = [st('Приседы', ''), st('Подтягивания', '12, 15, 20'), st('Отжимания', '12, 15, 20'), st('Ролик', '12, 15, 20'), row];
+  const apply = (changes) => { changes.forEach(([i, v]) => { list = patchPlanExercise(list, i, v); }); };
+  // «В первом круге во всех, кроме последнего, по 12»: круг 1 целиком, снять последнее
+  let picked = toggleCells(new Set(), list.map((_, i) => i + ':0'));
+  picked = toggleCells(picked, ['4:0']);
+  assert.deepEqual(pickedFields(list, [...picked]).map((f) => f.field), ['reps', 'weight']);
+  apply(setPicked(list, [...picked], 'reps', 3, '10'));
+  assert.deepEqual(list.slice(0, 4).map((e) => roundValues(e, 'reps', 3)[0]), ['10', '10', '10', '10']);
+  assert.equal(list[0].reps, '10, , ', 'приседы стали «по кругам»');
+  assert.equal(list[4].cardio.perRound.goals, '30, 50, 70', 'кардио не тронуто');
+  // «В первом и втором у второго и третьего по 20»
+  const four = ['1:0', '1:1', '2:0', '2:1'];
+  apply(setPicked(list, four, 'reps', 3, '20'));
+  assert.equal(list[1].reps, '20, 20, 20');
+  assert.equal(list[2].reps, '20, 20, 20');
+  assert.deepEqual(pickedValue(list, four, 'reps', 3), { same: true, value: '20' });
+  // «− / +» — каждая на шаг от своего
+  apply(stepPicked(list, ['3:0', '3:1', '3:2'], 'reps', 3, 1));
+  assert.equal(list[3].reps, '11, 16, 21');
+  assert.equal(pickedValue(list, ['3:0', '3:1'], 'reps', 3).same, false);
+  // Кардио — своя строка «Цель», шаг 5 ккал
+  apply(stepPicked(list, ['4:0', '4:2', '0:0'], 'goal', 3, 1));
+  assert.equal(list[4].cardio.perRound.goals, '35, 50, 75');
+  assert.equal(list[0].reps, '10, , ', 'у силового «Цели» нет — не тронуто');
+  // Весь круг ещё раз — снять
+  assert.equal(toggleCells(new Set(['0:1', '1:1']), ['0:1', '1:1']).size, 0);
 });

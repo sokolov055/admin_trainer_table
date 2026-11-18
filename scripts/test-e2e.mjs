@@ -1363,6 +1363,19 @@ test('мои тренировки: программа, прогресс, пит�
     await card.getByRole('button', { name: 'Повторы: шаг больше' }).click();
     const reps = (await card.locator('.rt-tab tr.is-row .rt-cell b').allInnerTexts()).map(Number);
     assert.equal(reps[1] - reps[0], 2, 'шаг лесенкой');
+    // Несколько клеток сразу (18.11.2026): «Выбрать» → весь «Круг 1» → вписать 9 во все
+    await card.getByRole('button', { name: 'Выбрать', exact: true }).click();
+    await card.getByRole('button', { name: 'Круг 1: выбрать весь' }).click();
+    await card.getByRole('button', { name: /^Повторы: .+ Вписать во все$/ }).click();
+    await card.getByRole('textbox', { name: 'Повторы: во все выбранные' }).fill('9');
+    await card.getByRole('textbox', { name: 'Повторы: во все выбранные' }).press('Enter');
+    const firstRound = await card.locator('.rt-tab tbody tr').evaluateAll((rows) => rows.map((r) => r.querySelectorAll('.rt-cell b')[0].textContent));
+    assert.ok(firstRound.every((v) => v === '9'), 'круг 1 у всех — 9: ' + firstRound.join(','));
+    // «+» — каждая на шаг от своего
+    await card.getByRole('button', { name: 'Повторы: каждой больше' }).click();
+    assert.ok((await card.locator('.rt-tab tbody tr .rt-cell.is-picked b').allInnerTexts()).every((v) => v === '10'), 'каждой +1');
+    await card.getByRole('button', { name: 'Готово', exact: true }).first().click();
+    await card.getByRole('button', { name: 'Выбрать', exact: true }).waitFor({ timeout: 3000 });
     if (process.env.SHOT_SUPERSET) await phone.screenshot({ path: process.env.SHOT_SUPERSET });
     await card.getByRole('button', { name: 'Готово', exact: true }).click();
     await card.waitFor({ state: 'detached', timeout: 5000 });
