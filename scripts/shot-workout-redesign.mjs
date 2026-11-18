@@ -108,6 +108,19 @@ try {
     await sh.getByRole('button', { name: 'Готово', exact: true }).click();
     await page.waitForTimeout(700);
     await shot('8-after-close');
+    // Панель «Подходы, вес и отдых» (тренер) — карточками «− / +»
+    const cur = page.locator('.workout__exercise--current').first();
+    await cur.getByRole('button', { name: /: ещё$/ }).click();
+    await page.getByRole('menuitem', { name: 'Подходы, вес и отдых' }).click();
+    await page.waitForTimeout(500);
+    await cur.locator('.wk-tune').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => window.scrollBy(0, -170));
+    await page.waitForTimeout(300);
+    await shot('8b-tune');
+    console.log('tune overflow', JSON.stringify(await overflow('.workout__panel')));
+    await cur.getByRole('button', { name: 'Вес, кг, всем: больше' }).click();
+    await page.waitForTimeout(300);
+    await shot('8c-tune-plus');
   }
 
   if (want('ex')) {
@@ -154,6 +167,13 @@ try {
     await page.getByRole('menuitem', { name: 'Заметка' }).click().catch(() => {});
     await page.waitForTimeout(400);
     await shot('16-ex-note');
+    await page.keyboard.press('Escape').catch(() => {});
+    // Корзина в углу крупного подхода: удалить → «Вернуть»
+    const sets0 = await card.locator('.wk-bar:not(.wk-bar--add)').count();
+    await card.locator('.wk-set.is-shown .wk-set-del').click();
+    await page.waitForTimeout(600);
+    console.log('bars before/after delete', sets0, await card.locator('.wk-bar:not(.wk-bar--add)').count());
+    await shot('16c-ex-deleted');
   }
 
   if (want('ss')) {

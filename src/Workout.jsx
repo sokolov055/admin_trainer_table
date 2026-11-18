@@ -10,7 +10,7 @@ import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, withoutSet, cloneSet, editSetField } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh, IconPlay, IconSearch } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh, IconPlay, IconSearch, IconTrash } from './icons.jsx';
 import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
 import { BackButton, Sheet } from './ui.jsx';
 import { ExerciseThumb } from './client/PlanCard.jsx';
@@ -1052,6 +1052,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   <span className="workout__set-label">{big ? (set.kind === 'warmup' ? 'Разминка' : 'Подход ' + label) : label}{set.state === 'done' ? <IconCheck size={12} aria-hidden="true" /> : <IconSliders size={12} aria-hidden="true" />}</span>
                   {sub && !(big && set.kind === 'warmup') && <span className="workout__set-sub">{sub}</span>}
                 </button>}
+              {/* Удалить — рядом, в углу крупного подхода (владелец, 18.11.2026:
+                  «удалить подход далеко»); с «Вернуть», как смахиванием */}
+              {big && !inRound && editable && <button type="button" className="wk-set-del" aria-label={`Удалить подход ${si + 1}`} disabled={ex.sets.length === 1} onClick={() => { haptic(); removeSet(); }}><IconTrash size={18} aria-hidden="true" /></button>}
               {fields.map((f, fi) => {
                 const input = <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} value={shown(f, set[f.key])} maxLength={f.max} onChange={e => edit(f.key, typed(f, e.target.value))} />;
                 // Крупно (FT-802, этап 2): подпись, «− число +», под ним «было».
@@ -1593,7 +1596,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <button type="button" key={q.r} className={'wk-round' + (q.done ? ' is-done' : '') + (q.next ? ' is-next' : '') + (q.shown ? ' is-shown' : '')}
             aria-pressed={q.shown} aria-label={'Круг ' + q.label + (q.done ? ', сделан' : '')}
             onClick={() => { haptic('light'); setSetView((v) => ({ ...v, ['g' + group]: viewRound(list, q.r) })); }}>
-            {q.done ? <IconCheck size={14} aria-hidden="true" /> : q.label}
+            {q.label}
           </button>
         ))}
       </div>}
@@ -1743,7 +1746,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     // Отдых после подхода этого упражнения (20.10.2026) — только в этом
     // занятии; «Общий» — отдых занятия из шапки. У круга — самый долгий из своих
     const rest = <RestChips value={ex.rest || 0} fallback={(state.current && state.current.session.restSeconds) || 90}
-      onChange={(seconds) => updateExercise(ei, ({ rest: _r, ...x }) => (seconds ? { ...x, rest: seconds } : x))} hint={!inRound} />;
+      onChange={(seconds) => updateExercise(ei, ({ rest: _r, ...x }) => (seconds ? { ...x, rest: seconds } : x))} hint={false} />;
     const done = <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>;
     if (track.kind === 'cardio') {
       const c = cardioOf(ex);
@@ -1774,18 +1777,29 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const addSet = () => updateExercise(ei, withSet);
     const dropSet = () => { const before = ex.sets; setUndo('Подход удалён', v => putSetBack(v, ex.id, before.length - 1, before)); updateExercise(ei, x => ({ ...x, sets: x.sets.slice(0, -1) })); };
     return <div className="workout__panel" key={'tune-' + id}>
-      {!inRound && <div className="workout__tune-count">
-        <span>Подходов</span>
-        <button type="button" className="button" aria-label="Убрать подход" disabled={ex.sets.length <= 1 || last.state !== 'pending'} onClick={dropSet}>−</button>
-        <strong>{ex.sets.length}</strong>
-        <button type="button" className="button" aria-label="Добавить подход" disabled={ex.sets.length >= 20} onClick={addSet}>+</button>
-      </div>}
-      {open.length > 0 && <div className="workout__tune-fields">
-        {rowFields(track).map(f => (
-          <label key={f.key}><span>{f.head}</span><input className="field__input" aria-label={ex.name + ': ' + f.head.toLowerCase() + ', всем подходам'} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={shown(f, sample[f.key])} onChange={e => editAll(f.key, typed(f, e.target.value))} /></label>
+      {/* Карточками «− число +», как крупный подход (владелец, 18.11.2026:
+          меню подхода — так же); число вписывается и с клавиатуры */}
+      <div className="wk-tune">
+        {!inRound && <div className="wk-val wk-tune__count">
+          <span className="wk-val__label">Подходов</span>
+          <span className="wk-val__row">
+            <button type="button" className="wk-val__step" aria-label="Убрать подход" disabled={ex.sets.length <= 1 || last.state !== 'pending'} onClick={() => { haptic('light'); dropSet(); }}>−</button>
+            <strong className="wk-tune__n">{ex.sets.length}</strong>
+            <button type="button" className="wk-val__step" aria-label="Добавить подход" disabled={ex.sets.length >= 20} onClick={() => { haptic('light'); addSet(); }}>+</button>
+          </span>
+        </div>}
+        {open.length > 0 && rowFields(track).map(f => (
+          <div key={f.key} className="wk-val">
+            <span className="wk-val__label">{f.head}</span>
+            <span className="wk-val__row">
+              <button type="button" className="wk-val__step" aria-label={f.head + ', всем: меньше'} onClick={() => { haptic('light'); editAll(f.key, stepValue(ex, f.key, sample[f.key], -1)); }}>−</button>
+              <input className="field__input" aria-label={ex.name + ': ' + f.head.toLowerCase() + ', всем подходам'} inputMode={f.mode} placeholder={f.placeholder || ''} maxLength={f.max} value={shown(f, sample[f.key])} onChange={e => editAll(f.key, typed(f, e.target.value))} />
+              <button type="button" className="wk-val__step" aria-label={f.head + ', всем: больше'} onClick={() => { haptic('light'); editAll(f.key, stepValue(ex, f.key, sample[f.key], 1)); }}>+</button>
+            </span>
+          </div>
         ))}
-      </div>}
-      {open.length > 0 && <p className="small muted">{open.length === ex.sets.length ? 'Меняется во всех подходах.' : 'Меняется в неотмеченных подходах.'}</p>}
+      </div>
+      {open.length > 0 && <p className="wk-tune__note">{open.length === ex.sets.length ? 'Меняется во всех подходах' : 'Меняется в неотмеченных подходах'}</p>}
       {rest}
       {note}
       {done}
@@ -2341,7 +2355,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       // Как раньше ссылка — только пока у клиента нет истории этого упражнения
       canRename && !ex.prevWeight && !ex.lastRun && { key: 'rename', text: 'Делали под другим названием', act: () => setHistoryPick(ex.id) },
       // Заметка — в «⋯» (FT-802, владелец 18.11.2026): поле не висит под каждым
-      editable && !ex.note && !noteOpen.has(ex.id) && { key: 'note', text: 'Заметка', act: () => setNoteOpen((v) => new Set(v).add(ex.id)) },
+      // Пункт остаётся и после открытия: иначе у упражнения без других
+      // пунктов пропадал весь ряд с «⋯», и экран прыгал
+      editable && { key: 'note', text: 'Заметка', act: () => setNoteOpen((v) => new Set(v).add(ex.id)) },
       canDelete && { key: 'delete', text: 'Удалить упражнение', critical: true, act: removeExercise },
     ].filter(Boolean);
     const menuOpen = exMenu === ex.id;
@@ -2648,7 +2664,6 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   <button type="button" key={b.si} className={'wk-bar' + (b.warmup ? ' is-warm' : '') + (b.state === 'done' ? ' is-done is-' + b.effort : '') + (b.state === 'skipped' ? ' is-skipped' : '') + (b.next ? ' is-next' : '') + (b.shown ? ' is-shown' : '')}
                     aria-pressed={b.shown} aria-label={(b.warmup ? 'Разминка' : 'Подход ' + b.label) + (b.state === 'done' ? ', сделан: ' + effortLabel(b.effort).toLowerCase() : b.state === 'skipped' ? ', пропущен' : '')}
                     onClick={() => { haptic('light'); setSetView((v) => ({ ...v, [ex.id]: viewSet(ex, b.si) })); }}>
-                    {b.state === 'done' && <IconCheck size={14} aria-hidden="true" />}
                     <span>{b.label}</span>
                   </button>
                 ))}

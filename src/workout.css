@@ -1239,26 +1239,28 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
    с галочкой, разминка ниже; «+» — подход или разминка */
 .wk-strip { display: flex; align-items: flex-end; gap: 5px; height: 60px; margin: var(--space-2) 0 0; padding: 6px; border-radius: var(--radius); background: var(--surface-sunken); }
 .wk-bar {
-  position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; padding: 0 0 5px;
-  border: 0; border-radius: 9px; background: var(--surface-active); color: var(--text-secondary);
+  position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0; overflow: hidden;
+  border: 0; border-radius: 9px; background: var(--accent-wash); color: var(--accent-ink);
   font: inherit; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; -webkit-tap-highlight-color: transparent;
   transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out), transform var(--dur) var(--ease-spring, cubic-bezier(.32,1.25,.5,1)), box-shadow var(--dur) var(--ease-out);
 }
 .wk-bar.is-warm { height: 64%; }
 .wk-bar:active { transform: scale(0.94); }
 .wk-bar.is-next { background: var(--accent-fill); color: var(--accent-text); }
-.wk-bar.is-next::after { content: ''; position: absolute; inset: -3px; border: 2px solid var(--accent); border-radius: 11px; opacity: 0.45; animation: wk-ping 1.6s ease-out infinite; pointer-events: none; }
-@keyframes wk-ping { to { inset: -8px; opacity: 0; } }
+/* «Дышит» внутри своего столбика — за рамку полосы не выходит (владелец, 18.11.2026) */
+.wk-bar.is-next::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0.55); animation: wk-ping 1.6s ease-out infinite; pointer-events: none; }
+@keyframes wk-ping { to { box-shadow: inset 0 0 0 10px rgba(255, 255, 255, 0); } }
 .wk-bar.is-done { color: #fff; background: var(--effort-easy); }
 /* Сделан — зелёным (синий — у ближайшего), оттенок — по оценке */
 .wk-bar.is-done.is-easy { background: var(--good); }
 .wk-bar.is-done.is-hard { background: var(--effort-hard); }
-.wk-bar.is-done svg { animation: wk-check 0.45s var(--ease-spring, cubic-bezier(.32,1.25,.5,1)); }
-@keyframes wk-check { from { transform: scale(0); } }
+.wk-bar.is-done > span { animation: wk-check 0.45s var(--ease-spring, cubic-bezier(.32,1.25,.5,1)); }
+@keyframes wk-check { from { transform: scale(0.4); } }
 .wk-bar.is-skipped { background: none; box-shadow: inset 0 0 0 1.5px var(--border-strong); color: var(--text-muted); text-decoration: line-through; }
 /* На виду — приподнят и с тенью: видно, какой открыт */
-.wk-bar.is-shown { transform: translateY(-3px); box-shadow: 0 6px 12px -6px rgba(0, 0, 0, 0.45); }
-.wk-bar--add { flex: none; width: 40px; max-width: none; justify-content: center; padding: 0; background: none; color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+.wk-bar.is-shown { box-shadow: inset 0 0 0 2px var(--surface), 0 0 0 2px var(--accent); }
+.wk-bar.is-done.is-shown { box-shadow: inset 0 0 0 2px var(--surface), 0 0 0 2px var(--effort-easy); }
+.wk-bar--add { flex: none; width: 40px; max-width: none; justify-content: center; padding: 0; background: none; color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); overflow: visible; }
 .wk-bar--add svg { transition: transform var(--dur) var(--ease-out); }
 .wk-bar--add.is-open svg { transform: rotate(45deg); }
 .wk-bar:disabled { opacity: 0.45; cursor: default; }
@@ -1296,7 +1298,7 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .wk-val__was { justify-self: center; color: var(--text-muted); font-size: 11px; font-weight: 600; line-height: 14px; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   .wk-bar, .wk-bar--add svg, .wk-val__step { transition: none; }
-  .wk-bar.is-next::after, .wk-bar.is-done svg, .wk-set.is-shown, .wk-add { animation: none; }
+  .wk-bar.is-next::after, .wk-bar.is-done > span, .wk-set.is-shown, .wk-add { animation: none; }
 }
 
 /* У крупного подхода номер — словом «Подход 2 ✓», без кружка оценки */
@@ -1324,8 +1326,9 @@ details.workout__note > textarea { display: block; box-sizing: border-box; }
 .wk-round:active { transform: scale(0.92); }
 .wk-round.is-next { background: var(--accent-fill); color: var(--accent-text); }
 .wk-round.is-done { background: var(--effort-easy); color: #fff; }
-.wk-round.is-done svg { animation: wk-check 0.45s var(--ease-spring, cubic-bezier(.32,1.25,.5,1)); }
-.wk-round.is-shown { transform: translateY(-2px); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.wk-round { background: var(--accent-wash); color: var(--accent-ink); }
+.wk-round.is-shown { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.wk-round.is-done.is-shown { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--effort-easy); }
 .wk-round:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Мини-карточки A, B: картинка, название в две строки, буква и план */
 .wk-ssm { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: var(--space-2); margin: var(--space-3) 0 var(--space-1); }
@@ -1354,6 +1357,32 @@ button.wk-ssm__card:active { transform: scale(0.97); }
 @keyframes wk-flow { 40% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .wk-round { transition: none; }
-  .wk-round.is-done svg, .wk-ss .workout__round[data-shown], .wk-flow i { animation: none; }
+  .wk-ss .workout__round[data-shown], .wk-flow i { animation: none; }
   .wk-flow i { opacity: 1; }
 }
+
+/* ---- 18.11.2026 (FT-802, по видео владельца) --------------------------- */
+/* Корзина в углу крупного подхода — удалить рядом, а не через «⋯» */
+.workout__set-row--big { position: relative; }
+.wk-set-del {
+  position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 50%; background: none; color: var(--text-muted); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
+}
+.wk-set-del::before { content: ''; position: absolute; inset: -6px; }
+.wk-set-del:active { transform: scale(0.9); background: var(--critical-fill); color: var(--critical-text); }
+.wk-set-del:disabled { opacity: 0.35; }
+/* Панель «Подходы, вес и отдых» — карточками «− число +» */
+.wk-tune { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-2); }
+.wk-tune .wk-val input { height: 40px; padding: 0 2px; border-color: transparent; background: none; text-align: center; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: none; }
+.wk-tune .wk-val input:focus { border-color: var(--accent); background: var(--surface); }
+.wk-tune__n { display: grid; place-items: center; height: 40px; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+.wk-tune__count { grid-column: 1 / -1; }
+.wk-tune__count .wk-val__row { grid-template-columns: 34px 1fr 34px; }
+.wk-tune__note { margin: 0; text-align: center; color: var(--text-muted); font-size: var(--text-xs); }
+/* Отдых — одной строкой, листается вбок */
+.workout__panel .rest-chips__row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--space-3) * -1); padding: 2px var(--space-3); }
+.workout__panel .rest-chips__row::-webkit-scrollbar { display: none; }
+.workout__panel .rest-chips__row .chip { flex: none; }
+.workout__panel .workout__panel-actions .button { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .wk-set-del { transition: none; } }
