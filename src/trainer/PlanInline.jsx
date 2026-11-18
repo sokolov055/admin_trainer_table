@@ -6,6 +6,7 @@ import ClientSetup from './ClientSetup.jsx';
 import { ExerciseMachines } from './MachinesEditor.jsx';
 import { MACHINE_NAMES, newCardio } from './CardioPlan.jsx';
 import ExerciseCard from './ExerciseCard.jsx';
+import ExerciseAdd from './ExerciseAdd.jsx';
 import { ExerciseThumb } from '../client/PlanCard.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { haptic } from '../telegram.js';
@@ -75,6 +76,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   // Открытая карточка упражнения (номер в списке) и поиск «Заменить» в ней
   const [card, setCard] = useState(null);
   const [picking, setPicking] = useState(false);
+  // Лист «＋ Упражнения» сеткой (шаг 3, 18.11.2026)
+  const [adding, setAdding] = useState(false);
   const [sure, setSure] = useState(false);
   const root = useRef(null);
   const drag = useRef(null);
@@ -204,6 +207,14 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     set((next) => { next.push(make()); });
     setPicking(false);
     setCard(at);
+  };
+
+  /** Отмеченные в листе «＋ Упражнения» — в конец тренировки, карточку не открываем: схема уже 3 × 12 */
+  const addMany = (rows) => {
+    if (!rows.length) return;
+    const next = latest.current.map((e) => ({ ...e })).concat(rows);
+    latest.current = next;
+    onChange(next);
   };
 
   /** Карточку закрыли: передумали с новым упражнением без названия — строки нет (QA 20.10.2026) */
@@ -470,7 +481,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       )}
       {list.length > 1 && <p className="plan-inline__hint">{split ? '' : '⛓ между упражнениями — суперсет. '}Подержите упражнение, чтобы перетащить. Смахните влево — удалить.</p>}
       <div className="plan-inline__add">
-        <button type="button" className="button" onClick={() => add(blankExercise)}><IconPlus size={16} />Упражнение</button>
+        <button type="button" className="button" onClick={() => { setCard(null); setAdding(true); haptic('light'); }}><IconPlus size={16} />Упражнения</button>
         <button type="button" className="button button--ghost" onClick={() => add(() => cardioExercise())}><IconPlus size={16} />Кардио</button>
       </div>
       {canRemove && (sure
@@ -482,6 +493,16 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
           </div>
         )
         : <button type="button" className="plan-inline__remove-link" onClick={() => setSure(true)}>Удалить тренировку</button>)}
+      {adding && (
+        <ExerciseAdd
+          base={base}
+          loading={library.loading}
+          make={{ blank: blankExercise, cardio: newCardio }}
+          onAdd={addMany}
+          onAdded={(saved) => setExtra((prev) => [...prev, saved])}
+          onClose={() => setAdding(false)}
+        />
+      )}
       {card !== null && list[card] && (
         <ExerciseCard
           list={list}

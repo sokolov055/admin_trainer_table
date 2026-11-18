@@ -1182,6 +1182,7 @@ function demoSeries(params) {
 
 const DEMO_MUSCLES = ['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Предплечье', 'Пресс', 'Всё тело', 'Кардио'];
 
+const DEMO_USES = { 1: 9, 2: 7, 3: 6, 8: 4, 5: 3, 4: 2 };
 let demoExercises = [
   ['Жим гантелей лёжа', 'Грудь', 'Гантели', 'Dumbbell_Bench_Press'],
   ['Тяга верхнего блока к груди', 'Спина', 'Блок', 'Wide-Grip_Lat_Pulldown'],
@@ -2605,7 +2606,8 @@ const MOCK = {
     return { exercise: { ...e } };
   },
   'library.exercises': (params = {}) => ({
-    exercises: demoExercises.filter((e) => demoHidden.has(e.id) === !!params.hidden).map((e) => ({ ...e, ...demoMuscles(e.name) })),
+    // uses — сколько раз тренер ставил (лист «＋ Упражнения», «Недавние»)
+    exercises: demoExercises.filter((e) => demoHidden.has(e.id) === !!params.hidden).map((e) => ({ uses: DEMO_USES[e.id] || 0, ...e, ...demoMuscles(e.name) })),
     muscles: DEMO_MUSCLES,
     hiddenCount: demoHidden.size,
     owner: true,

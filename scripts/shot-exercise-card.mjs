@@ -31,12 +31,50 @@ const only = (process.env.ONLY || '').split(',').filter(Boolean);
 const want = (k) => !only.length || only.includes(k);
 const sheet = page.locator('.exc-sheet .sheet__panel');
 const closeSheet = async () => { await sheet.getByRole('button', { name: 'Готово', exact: true }).click(); await page.waitForTimeout(500); };
+// «＋ Упражнения» сеткой (шаг 3, 18.11.2026): открыть, отметить три, «＋ Новое», добавить
+const addSheet = page.locator('.exa-sheet .sheet__panel');
+const addFlow = async (scope, name, full = false) => {
+  await scope.getByRole('button', { name: 'Упражнения', exact: true }).first().click();
+  await addSheet.waitFor({ timeout: 5000 });
+  await page.waitForTimeout(800);
+  await shot(name + '-add');
+  if (!full) { await addSheet.getByRole('button', { name: 'Закрыть' }).click(); await page.waitForTimeout(500); return; }
+  const tiles = addSheet.locator('.exa-tile');
+  for (const k of [2, 0, 4]) await tiles.nth(k).click();
+  await page.waitForTimeout(400);
+  await shot(name + '-add-picked');
+  await addSheet.getByRole('radio', { name: 'Ноги', exact: true }).click();
+  await page.waitForTimeout(400);
+  await shot(name + '-add-legs');
+  await addSheet.getByRole('searchbox').fill('Тяга т-грифа');
+  await page.waitForTimeout(400);
+  await shot(name + '-add-new');
+  await addSheet.getByRole('button', { name: /^Новое:/ }).click();
+  await page.waitForTimeout(600);
+  await addSheet.getByRole('button', { name: /^Добавить \d/ }).click();
+  await page.waitForTimeout(800);
+  await scope.locator('.plan-inline').first().evaluate((el) => el.scrollIntoView({ block: 'end' }));
+  await page.waitForTimeout(300);
+  await shot(name + '-add-done');
+};
 try {
   await page.goto(origin + '/?mockRole=trainer');
   await page.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
   await page.goto(origin + '/?mockRole=trainer');
   if (process.env.DARK === '1') await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
   const main = page.locator('#root main:not([hidden])');
+
+  if (want('add')) {
+    await page.getByRole('button', { name: 'Меню', exact: true }).click();
+    await page.getByRole('button', { name: /Мои тренировки/ }).click();
+    const first = main.locator('.plan-card').first();
+    await first.getByRole('button', { name: 'Править' }).click();
+    await first.locator('.exr').first().waitFor({ timeout: 10000 });
+    await page.waitForTimeout(600);
+    await addFlow(first, '12-client', true);
+    await page.goto(origin + '/?mockRole=trainer');
+    if (process.env.DARK === '1') await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  }
 
   if (want('client')) {
     // Программа клиента: «Мои тренировки» → «Править»
@@ -172,6 +210,7 @@ try {
     await page.waitForTimeout(800);
     await shot('9-program-card');
     await closeSheet();
+    await addFlow(main.locator('.plib-ewk.is-open'), '13-program');
   }
 
   if (want('workout')) {
@@ -192,6 +231,7 @@ try {
     await page.waitForTimeout(800);
     await shot('11-workout-card');
     await closeSheet();
+    await addFlow(main, '14-workout');
   }
 } finally {
   if (errors.length) console.log('ОШИБКИ:', errors.join('\n'));
