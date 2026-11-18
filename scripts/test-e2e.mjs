@@ -662,6 +662,8 @@ test('тренировку можно провести, и блок станов
 
   // FT-565: повторы могут стереть уже после отметки подхода. Завершение
   // должно назвать проблемную строку и оставить занятие доступным для правки.
+  // FT-802: на виду — следующий подход; отмеченный открывается своим столбиком
+  await firstExercise.getByRole('button', { name: /^Подход 1, сделан/ }).click();
   await first.getByRole('textbox').nth(1).fill('');
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();
   await page.locator('.workout__confirm').getByRole('button', { name: 'Завершить', exact: true }).click();
@@ -1877,23 +1879,24 @@ test('смахнуть подход и нажать корзину пальце�
     await c.getByRole('button', { name: 'Тренировки', exact: true }).tap();
     const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });
     await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
-    const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
+    // FT-802: на виду — один подход крупно (остальные — столбиками); смахивают его
+    const rows = c.locator('.workout__exercise').nth(1).locator('.wk-set.is-shown > .workout__set');
     // 15.11.2026: второе упражнение свёрнуто — раскрываем строкой-сводкой
     await c.locator('.workout__exercise').nth(1).locator('.workout__ex-fold').tap();
-    await rows.nth(1).waitFor({ timeout: 20000 });
+    await rows.nth(0).waitFor({ timeout: 20000 });
     // FT-570: инструкции упражнений раскрыты и приходят после открытия — ждём их, иначе подходы съезжают
     await c.locator('.workout__about').first().waitFor({ timeout: 10000 });
-    await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await rows.nth(0).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await c.waitForTimeout(300);
-    const before = await rows.count();
-    const b = await rows.nth(1).boundingBox();
+    const before = await c.locator('.workout__exercise').nth(1).locator('.workout__set').count();
+    const b = await rows.nth(0).boundingBox();
     const x0 = b.x + b.width - 60;
     const y = b.y + 10;
     await touch('touchStart', x0, y);
     for (let i = 1; i <= 10; i += 1) { await touch('touchMove', x0 - i * 18, y); await c.waitForTimeout(16); }
     await touch('touchEnd', 0, 0);
     await c.waitForTimeout(400);
-    const trash = await rows.nth(1).locator('.swipe__trash').boundingBox();
+    const trash = await rows.nth(0).locator('.swipe__trash').boundingBox();
     await touch('touchStart', trash.x + trash.width / 2, trash.y + trash.height / 2);
     await c.waitForTimeout(60);
     await touch('touchEnd', 0, 0);
@@ -1922,19 +1925,21 @@ test('протянуть подход далеко влево и отпусти�
     await c.getByRole('button', { name: 'Тренировки', exact: true }).tap();
     const sec = c.locator('.section', { has: c.getByRole('heading', { name: 'Тренировка 2 — низ' }) });
     await sec.getByRole('button', { name: 'Начать тренировку' }).tap();
-    const rows = c.locator('.workout__exercise').nth(1).locator('.workout__set');
+    // FT-802: на виду — один подход крупно (остальные — столбиками); смахивают его
+    const rows = c.locator('.workout__exercise').nth(1).locator('.wk-set.is-shown > .workout__set');
     // 15.11.2026: второе упражнение свёрнуто — раскрываем строкой-сводкой
     await c.locator('.workout__exercise').nth(1).locator('.workout__ex-fold').tap();
-    await rows.nth(1).waitFor({ timeout: 20000 });
+    await rows.nth(0).waitFor({ timeout: 20000 });
     // FT-570: инструкции упражнений раскрыты и приходят после открытия — ждём их, иначе подходы съезжают
     await c.locator('.workout__about').first().waitFor({ timeout: 10000 });
-    await rows.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await rows.nth(0).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await c.waitForTimeout(300);
     // «На сторону» — в заголовке колонки веса (15.11.2026), галочек у
     // подходов нет; касание переключает все подходы упражнения
     const ex2 = c.locator('.workout__exercise').nth(1);
     assert.equal(await ex2.locator('.workout__side input').count(), 0, 'галочек у подходов нет');
-    const sideHead = ex2.locator('.workout__side-head');
+    // FT-802: у крупного подхода — подписью над весом
+    const sideHead = ex2.locator('.workout__side-head, .wk-val__label--flip').first();
     await sideHead.evaluate(el => el.scrollIntoView({ block: 'center' }));
     await sideHead.tap();
     assert.equal(await sideHead.getAttribute('aria-pressed'), 'true');
@@ -1944,15 +1949,15 @@ test('протянуть подход далеко влево и отпусти�
       return session?.exercises[1].sets.every(s => s.side === 'one');
     });
     if (process.env.SHOT_SIDE) await c.screenshot({ path: process.env.SHOT_SIDE });
-    const before = await rows.count();
-    await rows.nth(1).evaluate(el => el.scrollIntoView({ block: 'center' }));
-    const b = await rows.nth(1).boundingBox();
+    const before = await c.locator('.workout__exercise').nth(1).locator('.workout__set').count();
+    await rows.nth(0).evaluate(el => el.scrollIntoView({ block: 'center' }));
+    const b = await rows.nth(0).boundingBox();
     const x0 = b.x + b.width - 20;
     const y = b.y + 10;
     await touch('touchStart', x0, y);
     for (let i = 1; i <= 16; i += 1) { await touch('touchMove', x0 - i * 18, y); await c.waitForTimeout(16); }
     // За порогом подпись «Удалить» переехала к пальцу
-    const shift = await rows.nth(1).locator('.swipe__label').evaluate((el) => el.style.transform);
+    const shift = await rows.nth(0).locator('.swipe__label').evaluate((el) => el.style.transform);
     assert.match(shift, /translate3d\(-/, 'за порогом подпись едет к пальцу');
     if (process.env.SHOT_FULL) await c.screenshot({ path: process.env.SHOT_FULL });
     await touch('touchEnd', 0, 0);

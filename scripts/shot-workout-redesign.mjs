@@ -109,6 +109,52 @@ try {
     await page.waitForTimeout(700);
     await shot('8-after-close');
   }
+
+  if (want('ex')) {
+    // Клиент: «Тренировка 1 — верх» → текущее упражнение полосой
+    await page.goto(origin + '/');
+    const cur = page.locator('.workout__exercise--current').first();
+    await page.getByRole('button', { name: 'Тренировки', exact: true }).click();
+    await page.locator('.section', { has: page.getByRole('heading', { name: 'Тренировка 1 — верх' }) }).getByRole('button', { name: 'Начать тренировку' }).click();
+    await cur.waitFor({ timeout: 15000 });
+    await page.waitForTimeout(1200);
+    await shot('9-ex');
+    console.log('ex overflow', JSON.stringify(await overflow('.workout__exercise--current')));
+    const geo = await cur.evaluate((c) => {
+      const r = (el) => { const b = el.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.right), Math.round(b.top), Math.round(b.height)]; };
+      return { vals: [...c.querySelectorAll('.wk-set.is-shown .wk-val')].map(r), bars: [...c.querySelectorAll('.wk-bar')].map(r) };
+    });
+    console.log('geo', JSON.stringify(geo));
+    await cur.getByRole('button', { name: /: больше$/ }).first().click();
+    await cur.getByRole('button', { name: /: больше$/ }).first().click();
+    await page.waitForTimeout(200);
+    await shot('10-ex-plus');
+    const top0 = await page.evaluate(() => document.querySelector('.workout__exercise--current').getBoundingClientRect().height);
+    await cur.getByRole('button', { name: 'Норм', exact: true }).click();
+    await page.waitForTimeout(150);
+    await shot('11-ex-rated-anim');
+    await page.waitForTimeout(900);
+    const top1 = await page.evaluate(() => document.querySelector('.workout__exercise--current') && document.querySelector('.workout__exercise--current').getBoundingClientRect().height);
+    console.log('card height before/after rating', top0, top1);
+    await shot('12-ex-rated');
+    await page.getByRole('button', { name: 'Закончить отдых' }).click().catch(() => {});
+    await page.waitForTimeout(700);
+    await shot('12b-ex-after-rest');
+    // Нажать первый, сделанный столбик — он на виду
+    const card = page.locator('.workout__exercise').filter({ has: page.locator('.wk-bar.is-done') }).first();
+    await card.locator('.wk-bar.is-done').first().click();
+    await page.waitForTimeout(500);
+    await shot('13-ex-done-bar');
+    await card.getByRole('button', { name: 'Добавить подход или разминку' }).click();
+    await page.waitForTimeout(400);
+    await shot('14-ex-add');
+    await card.getByRole('button', { name: /: ещё$/ }).click();
+    await page.waitForTimeout(300);
+    await shot('15-ex-menu');
+    await page.getByRole('menuitem', { name: 'Заметка' }).click().catch(() => {});
+    await page.waitForTimeout(400);
+    await shot('16-ex-note');
+  }
 } catch (e) {
   errors.push('СЦЕНАРИЙ: ' + e.message.split('\n').slice(0, 12).join(' | '));
   await shot('error');

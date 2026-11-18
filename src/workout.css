@@ -1226,3 +1226,84 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .wk-swap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .wk-name-sheet .workout__track { margin: 0; gap: 0; }
 @media (prefers-reduced-motion: reduce) { .wk-swap { transition: none; } }
+
+/* ---- 18.11.2026 (FT-802, этап 2): упражнение полосой столбиков ---------- */
+/* Шапка: картинка вместо номера, под названием — план «4 × 12 · 20 кг» */
+.workout__ex-head { align-items: center; }
+.wk-ex-pic.pc-thumb { flex: none; width: 44px; height: 44px; border-radius: var(--radius); box-shadow: inset 0 0 0 1px var(--border); }
+.wk-ex-pic.pc-thumb--icon svg { width: 22px; height: 22px; }
+.wk-ex-title { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.wk-ex-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Полоса: столбик на подход; ближайший «дышит», сделанный — цветом оценки
+   с галочкой, разминка ниже; «+» — подход или разминка */
+.wk-strip { display: flex; align-items: flex-end; gap: 5px; height: 60px; margin: var(--space-2) 0 0; padding: 6px; border-radius: var(--radius); background: var(--surface-sunken); }
+.wk-bar {
+  position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; padding: 0 0 5px;
+  border: 0; border-radius: 9px; background: var(--surface-active); color: var(--text-secondary);
+  font: inherit; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out), transform var(--dur) var(--ease-spring, cubic-bezier(.32,1.25,.5,1)), box-shadow var(--dur) var(--ease-out);
+}
+.wk-bar.is-warm { height: 64%; }
+.wk-bar:active { transform: scale(0.94); }
+.wk-bar.is-next { background: var(--accent-fill); color: var(--accent-text); }
+.wk-bar.is-next::after { content: ''; position: absolute; inset: -3px; border: 2px solid var(--accent); border-radius: 11px; opacity: 0.45; animation: wk-ping 1.6s ease-out infinite; pointer-events: none; }
+@keyframes wk-ping { to { inset: -8px; opacity: 0; } }
+.wk-bar.is-done { color: #fff; background: var(--effort-easy); }
+/* Сделан — зелёным (синий — у ближайшего), оттенок — по оценке */
+.wk-bar.is-done.is-easy { background: var(--good); }
+.wk-bar.is-done.is-hard { background: var(--effort-hard); }
+.wk-bar.is-done svg { animation: wk-check 0.45s var(--ease-spring, cubic-bezier(.32,1.25,.5,1)); }
+@keyframes wk-check { from { transform: scale(0); } }
+.wk-bar.is-skipped { background: none; box-shadow: inset 0 0 0 1.5px var(--border-strong); color: var(--text-muted); text-decoration: line-through; }
+/* На виду — приподнят и с тенью: видно, какой открыт */
+.wk-bar.is-shown { transform: translateY(-3px); box-shadow: 0 6px 12px -6px rgba(0, 0, 0, 0.45); }
+.wk-bar--add { flex: none; width: 40px; max-width: none; justify-content: center; padding: 0; background: none; color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+.wk-bar--add svg { transition: transform var(--dur) var(--ease-out); }
+.wk-bar--add.is-open svg { transform: rotate(45deg); }
+.wk-bar:disabled { opacity: 0.45; cursor: default; }
+.wk-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wk-add { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-2); animation: wk-in var(--dur) var(--ease-out); }
+.wk-add .button { min-height: 44px; }
+
+/* Один подход на виду; остальные — в разметке, но спрятаны */
+.wk-set:not(.is-shown) { display: none; }
+.wk-set.is-shown { margin-top: var(--space-2); animation: wk-in 0.36s var(--ease-out); }
+@keyframes wk-in { from { opacity: 0; transform: translateY(8px); } }
+.wk-set > .workout__set { margin: 0; border-top: 0; border-radius: var(--radius-lg); }
+.wk-set > .workout__set > .swipe__content { padding: 10px; border-radius: var(--radius-lg); }
+.wk-set > .workout__set:not(.workout__set--current):not(.workout__set--done) > .swipe__content { background: var(--surface-sunken); }
+
+/* Крупный подход: «Подход 2 ≑» строкой сверху, под ним — вес и повторы
+   карточками «− число +», под числом «было» (ровно по центру) */
+.workout__set-row--big { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); row-gap: var(--space-2); }
+.workout__set-row--big > .workout__set-num { grid-column: 1 / -1; justify-self: start; flex-direction: row; gap: 6px; min-height: 32px; padding: 0 6px; color: var(--accent-ink); font-size: var(--text-sm); font-weight: 700; }
+.workout__set-row--big > .workout__set-num .workout__set-label { gap: 6px; }
+.workout__set-row--big > .workout__set-num .workout__set-sub { font-weight: 600; }
+.wk-val { display: grid; justify-items: stretch; gap: 2px; min-width: 0; padding: 6px 6px 4px; border-radius: var(--radius); background: var(--surface); }
+.wk-val__label { justify-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: var(--text-xs); font-weight: 700; line-height: 18px; }
+.wk-val__label--flip { padding: 0 4px; border: 0; border-radius: var(--radius-xs); background: none; color: var(--accent); font: inherit; font-size: var(--text-xs); font-weight: 700; line-height: 18px; cursor: pointer; }
+.wk-val__row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; gap: 4px; }
+.wk-val__step {
+  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px;
+  background: var(--surface-sunken); color: var(--text); font: inherit; font-size: 20px; font-weight: 700; line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+.wk-val__step:active { transform: scale(0.9); background: var(--surface-active); }
+.wk-val__step:disabled { opacity: 0.4; }
+.workout__set-row--big .wk-val input { height: 44px; padding: 0 2px; border-color: transparent; background: none; font-size: 26px; font-weight: 800; box-shadow: none; }
+.workout__set-row--big .wk-val input:focus { border-color: var(--accent); background: var(--surface); }
+.wk-val__was { justify-self: center; color: var(--text-muted); font-size: 11px; font-weight: 600; line-height: 14px; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .wk-bar, .wk-bar--add svg, .wk-val__step { transition: none; }
+  .wk-bar.is-next::after, .wk-bar.is-done svg, .wk-set.is-shown, .wk-add { animation: none; }
+}
+
+/* У крупного подхода номер — словом «Подход 2 ✓», без кружка оценки */
+.workout__set-row--big .workout__set-label { display: inline-flex; min-width: 0; height: auto; padding: 0; border-radius: 0; background: none !important; color: inherit; font-size: inherit; animation: none; }
+.workout__set--done .workout__set-row--big .workout__set-label svg { display: inline; color: var(--good-text); }
+.workout__set--done .workout__set-row--big > .workout__set-num { color: var(--good-text); }
+/* Заметка к упражнению — поле под подписью, а не рядом (класс общий с
+   записанной настройкой тренажёра, у той — две колонки) */
+details.workout__note { display: block; margin: var(--space-2) 0 0; }
+details.workout__note > textarea { display: block; box-sizing: border-box; }

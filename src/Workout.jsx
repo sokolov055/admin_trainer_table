@@ -15,6 +15,7 @@ import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
 import { BackButton, Sheet } from './ui.jsx';
 import { ExerciseThumb } from './client/PlanCard.jsx';
 import MuscleEdit from './muscles/MuscleEdit.jsx';
+import { shownSetOf, viewSet, stripOf, stepValue } from './workout-strip.js';
 import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete, UndoBar, UNDO_MS } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
@@ -261,6 +262,11 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [renaming, setRenaming] = useState('');
   // В листе упражнения открыт поиск «Другое упражнение» (FT-802)
   const [namePick, setNamePick] = useState(false);
+  // Упражнение полосой столбиков (FT-802, этап 2): какой подход нажали
+  // столбиком ({ [exId]: viewSet }), где открыт «+» и заметка из «⋯»
+  const [setView, setSetView] = useState({});
+  const [addOpen, setAddOpen] = useState('');
+  const [noteOpen, setNoteOpen] = useState(() => new Set());
   // Клиент (и тренер в режиме «смотрите как клиент») название и вид не меняет
   // (владелец, 09.10.2026): это решает тренер. С 10.10.2026 (FT-531) и состав
   // занятия тоже: нет «Выбрать», настроек под названием, перестановки
@@ -1001,7 +1007,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * отметке: в суперсете отдыхают после круга, а не после каждого
    * упражнения.
    */
-  const setRow = (ex, ei, si, label, restAfter = true, inRound = false) => {
+  const setRow = (ex, ei, si, label, restAfter = true, inRound = false, big = false) => {
     if (trackOf(ex).kind === 'cardio') return cardioSet(ex, ei, si, label, restAfter, inRound);
     const set = ex.sets[si];
     const track = trackOf(ex);
@@ -1039,15 +1045,34 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
     const sub = set.kind === 'warmup' ? 'Разминка' : set.state === 'done' ? effortLabel(set.effort) : '';
     return <SwipeRow className={'workout__set' + (set.state === 'done' ? ' workout__set--done' + (set.effort ? ' workout__set--e-' + set.effort : '') : '') + (set.state === 'skipped' ? ' workout__set--skipped' : '') + (current ? ' workout__set--current' : '')} key={si} data-flip={key} data-flip-delay={si * 90}
       disabled={inRound || ex.sets.length === 1 || !editable} label={`Удалить подход ${si + 1}`} onDelete={removeSet}>
-            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '') + (inRound ? ' workout__set-row--round' : '')} style={{ '--cols': fields.length }}>
+            <div className={'workout__set-row' + (set.who ? ' workout__set-row--who' : '') + (inRound ? ' workout__set-row--round' : '') + (big ? ' workout__set-row--big' : '')} style={{ '--cols': fields.length }}>
               {inRound
                 ? <span>{label}</span>
                 : <button type="button" className="workout__set-num" aria-expanded={openSet === key} aria-label={`${ex.name}, подход ${si + 1}: настройки`} onClick={() => setOpenSet(openSet === key ? '' : key)}>
-                  <span className="workout__set-label">{label}{set.state === 'done' ? <IconCheck size={12} aria-hidden="true" /> : <IconSliders size={12} aria-hidden="true" />}</span>
-                  {sub && <span className="workout__set-sub">{sub}</span>}
+                  <span className="workout__set-label">{big ? (set.kind === 'warmup' ? 'Разминка' : 'Подход ' + label) : label}{set.state === 'done' ? <IconCheck size={12} aria-hidden="true" /> : <IconSliders size={12} aria-hidden="true" />}</span>
+                  {sub && !(big && set.kind === 'warmup') && <span className="workout__set-sub">{sub}</span>}
                 </button>}
               {fields.map((f, fi) => {
                 const input = <input key={f.key} aria-label={`${ex.name}, подход ${si + 1}, ${f.key === 'weight' ? 'вес в кг' : f.key === 'reps' ? 'повторы' : f.head.toLowerCase()}`} data-field={key + ':' + f.key} inputMode={f.mode} placeholder={f.placeholder || ''} value={shown(f, set[f.key])} maxLength={f.max} onChange={e => edit(f.key, typed(f, e.target.value))} />;
+                // Крупно (FT-802, этап 2): подпись, «− число +», под ним «было».
+                // Число по-прежнему вписывается с клавиатуры (владелец, 18.11.2026)
+                if (big) {
+                  const step = (dir) => { haptic('light'); edit(f.key, stepValue(ex, f.key, set[f.key], dir)); };
+                  const flip = fi === 0 && f.key === 'weight' && track.kind === 'strength';
+                  const one = flip && setOneSide(ex.sets[0], track);
+                  return <span key={f.key} className="wk-val">
+                    {flip
+                      ? <button type="button" className="wk-val__label wk-val__label--flip" disabled={!editable} aria-pressed={one} aria-label={'Вес на одну сторону' + (one ? ': включено' : ': выключено')}
+                        onClick={() => { haptic(); updateExercise(ei, x => ({ ...x, sets: x.sets.map(z => ({ ...z, side: one ? 'two' : 'one' })) })); }}>{one ? 'кг на сторону' : 'кг всего'} ⇄</button>
+                      : <span className="wk-val__label">{f.head}</span>}
+                    <span className="wk-val__row">
+                      <button type="button" className="wk-val__step" aria-label={`${f.head}: меньше`} disabled={!editable} onClick={() => step(-1)}>−</button>
+                      {input}
+                      <button type="button" className="wk-val__step" aria-label={`${f.head}: больше`} disabled={!editable} onClick={() => step(1)}>+</button>
+                    </span>
+                    <span className="wk-val__was" aria-hidden="true">{was && fi === 0 ? 'было ' + (was.assist !== undefined ? was.assist : was.weight) : was && fi === 1 && was.reps ? 'было ' + was.reps : '\u00a0'}</span>
+                  </span>;
+                }
                 // «Было» — мелко внутри первой клетки (вес или помощь),
                 // а не строкой под подходом (15.11.2026): по подходам видно
                 // по-прежнему (03.10.2026), строк вдвое меньше
@@ -2240,6 +2265,9 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
    * подхода стояла каждый раз и читалась как шум. Касание меняет все
    * подходы; отдельный подход по-другому — галочкой у него (как раньше)
    */
+  /** Полосой столбиков — силовые, свой вес и на время, без пары, в идущем занятии */
+  const stripMode = (ex) => !!editable && trackOf(ex).kind !== 'cardio' && !ex.sets.some(x => x.who) && ex.sets.length > 0;
+
   const setHead = (ex, ei) => {
     const track = trackOf(ex);
     const fields = rowFields(track);
@@ -2272,6 +2300,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       canTune && { key: 'tune', text: isFunctional(ex) ? 'Интервалы' : trackOf(ex).kind === 'cardio' ? 'Цели и настройки' : 'Подходы, вес и отдых', act: () => startTune(ex.id) },
       // Как раньше ссылка — только пока у клиента нет истории этого упражнения
       canRename && !ex.prevWeight && !ex.lastRun && { key: 'rename', text: 'Делали под другим названием', act: () => setHistoryPick(ex.id) },
+      // Заметка — в «⋯» (FT-802, владелец 18.11.2026): поле не висит под каждым
+      editable && !ex.note && !noteOpen.has(ex.id) && { key: 'note', text: 'Заметка', act: () => setNoteOpen((v) => new Set(v).add(ex.id)) },
       canDelete && { key: 'delete', text: 'Удалить упражнение', critical: true, act: removeExercise },
     ].filter(Boolean);
     const menuOpen = exMenu === ex.id;
@@ -2527,11 +2557,18 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             onDelete={() => { const snapshot = s.exercises; setUndo('Упражнение удалено', v => putExercisesBack(v, snapshot, new Set([ex.id]))); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
             {picking && <span className={'workout__pick' + (picked.has(ex.id) ? ' is-on' : '')} aria-hidden="true">{picked.has(ex.id) && <IconCheck size={14} />}</span>}
-            <h3 data-flip={'name:' + ex.id}><span className="workout__ex-num">{ei + 1}</span> {compact
+            {/* Картинка упражнения вместо номера (FT-802, этап 2); в режиме
+                выбора и переноса — номер, как было */}
+            {!compact && <ExerciseThumb ex={{ ...ex, exercise: ex.exerciseId ? setups[ex.exerciseId] : null }} className="wk-ex-pic" />}
+            <div className="wk-ex-title">
+            <h3 data-flip={'name:' + ex.id}>{compact && <><span className="workout__ex-num">{ei + 1}</span> </>}{compact
               ? (ex.name || 'Новое упражнение')
               // Название — касанием: из базы или новое прямо здесь
               : asClient ? (ex.name || 'Новое упражнение')
                 : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id)}>{ex.name || 'Новое упражнение'}</button>}</h3>
+            {/* План строкой — пока строки-сводки свёрнутого нет */}
+            {!compact && !(editable && (folded || opened.has(ex.id))) && foldLine(ex) && <span className="wk-ex-meta">{foldLine(ex)}</span>}
+            </div>
             <ExRing done={doneSets} total={ex.sets.length} partial={finished && !allMade} />
           </div>
           </SwipeRow>
@@ -2557,8 +2594,37 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           {/* Цель диапазона — к ней клиент стремится (19.10.2026) */}
           {repsGoalText(ex) && <p className="workout__goal">{repsGoalText(ex)}</p>}
           <LastRunHint last={ex.lastRun} tired={ex.tired} sets={ex.sets} />
+          {/* Полосой столбиков (FT-802, этап 2, владелец 18.11.2026): крупно —
+              один подход, остальные — столбиками; нажать столбик — открыть его.
+              Остальные строки остаются в разметке (display: none): черновик и
+              ввод не теряются. Кардио, пара и закрытое занятие — таблицей */}
+          {stripMode(ex) ? (() => {
+            const view = setView[ex.id] || null;
+            const bars = stripOf(ex, view);
+            const shownAt = shownSetOf(ex, view);
+            return <>
+              <div className="wk-strip" role="group" aria-label={ex.name + ': подходы'}>
+                {bars.map((b) => (
+                  <button type="button" key={b.si} className={'wk-bar' + (b.warmup ? ' is-warm' : '') + (b.state === 'done' ? ' is-done is-' + b.effort : '') + (b.state === 'skipped' ? ' is-skipped' : '') + (b.next ? ' is-next' : '') + (b.shown ? ' is-shown' : '')}
+                    aria-pressed={b.shown} aria-label={(b.warmup ? 'Разминка' : 'Подход ' + b.label) + (b.state === 'done' ? ', сделан: ' + effortLabel(b.effort).toLowerCase() : b.state === 'skipped' ? ', пропущен' : '')}
+                    onClick={() => { haptic('light'); setSetView((v) => ({ ...v, [ex.id]: viewSet(ex, b.si) })); }}>
+                    {b.state === 'done' && <IconCheck size={14} aria-hidden="true" />}
+                    <span>{b.label}</span>
+                  </button>
+                ))}
+                <button type="button" className={'wk-bar wk-bar--add' + (addOpen === ex.id ? ' is-open' : '')} aria-expanded={addOpen === ex.id} aria-label="Добавить подход или разминку"
+                  disabled={ex.sets.length >= 20} onClick={() => { haptic(); setAddOpen(addOpen === ex.id ? '' : ex.id); }}><IconPlus size={18} aria-hidden="true" /></button>
+              </div>
+              {addOpen === ex.id && <div className="wk-add">
+                <button type="button" className="button" disabled={ex.sets.length >= 20} onClick={() => { haptic(); setAddOpen(''); setSetView((v) => { const n = { ...v }; delete n[ex.id]; return n; }); updateExercise(ei, x => ({ ...x, sets: [...x.sets, cloneSet(x.sets[x.sets.length - 1])] })); }}>Добавить подход</button>
+                <button type="button" className="button" aria-label="Добавить разминочный подход" disabled={ex.sets.length >= 20} onClick={() => { haptic(); setAddOpen(''); updateExercise(ei, withWarmup); }}>Разминка</button>
+              </div>}
+              {ex.sets.map((set, si) => <div key={si} className={'wk-set' + (si === shownAt ? ' is-shown' : '')}>{setRow(ex, ei, si, bars[si] ? bars[si].label : setLabel(ex.sets, si), true, false, si === shownAt)}</div>)}
+            </>;
+          })() : <>
           {trackOf(ex).kind !== 'cardio' && setHead(ex, ei)}
           {ex.sets.map((set, si) => setRow(ex, ei, si, setLabel(ex.sets, si)))}
+          </>}
           {trackOf(ex).kind === 'cardio' && !isFunctional(ex) && metricAdd(ex, ei)}
           {/* У пары подход добавляется кругом — по одному каждому, кто
               делает упражнение, с его последним весом */}
@@ -2570,6 +2636,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             // Разминка — кнопкой рядом (вариант А2, 24.10.2026); встаёт перед
             // рабочими (FT-532)
             const warm = trackOf(ex).kind !== 'cardio' && !who.length;
+            if (stripMode(ex)) return null;
             return (
               <div className="workout__add-row">
                 <button className="button button--ghost button--block workout__add" disabled={ex.sets.length + round.length > 20} onClick={() => updateExercise(ei, ex => ({ ...ex, sets: [...ex.sets, ...round] }))}>
@@ -2581,10 +2648,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           })()}
           {/* Заметка — свёрнута, пока пустая: поле ввода на всю ширину в
               каждом упражнении перетягивало взгляд с подходов */}
-          <details className="workout__note" {...(ex.note ? { open: true } : {})}>
-            <summary>{ex.note ? 'Заметка' : 'Добавить заметку'}</summary>
-            <textarea aria-label="Заметка к упражнению" value={ex.note} maxLength={500} rows={2} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} />
-          </details>
+          {(ex.note || noteOpen.has(ex.id) || !stripMode(ex)) && <details className="workout__note" {...(ex.note || noteOpen.has(ex.id) ? { open: true } : {})}>
+            <summary>{ex.note || noteOpen.has(ex.id) ? 'Заметка' : 'Добавить заметку'}</summary>
+            <textarea aria-label="Заметка к упражнению" value={ex.note} maxLength={500} rows={2} autoFocus={noteOpen.has(ex.id) && !ex.note} onChange={e => updateExercise(ei, ex => ({ ...ex, note: e.target.value }))} />
+          </details>}
           </div></div>}
         </section></React.Fragment>;
         })}

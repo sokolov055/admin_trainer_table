@@ -430,7 +430,8 @@ test('суперсет из программы виден в занятии', as
     const heads = () => local.root.findAllByType('h3').map(text);
     const rounds = () => local.root.findAllByProps({ className: 'workout__round' }).map(r =>
       r.findAllByProps({ className: 'workout__round-name' }).map(n => text(n).split(' · ')[0]));
-    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3 Планка']);
+    // Номер у названия — только в режиме выбора; у развёрнутого — картинка (FT-802)
+    assert.deepEqual(heads(), ['Суперсет · 3 круга', 'Планка']);
     assert.deepEqual(rounds(), [['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока'], ['Подтягивания', 'Тяга блока']]);
     assert.equal(local.root.findAllByProps({ className: 'workout__round-title' }).map(text).join(), 'Круг 1,Круг 2,Круг 3');
     // Поля в круге без заголовков колонок — единицы стоят у названия
@@ -488,13 +489,13 @@ test('суперсет из программы виден в занятии', as
     // Разъединили — два отдельных упражнения, подходов у каждого столько,
     // сколько было кругов
     await press('Разъединить');
-    assert.deepEqual(heads(), ['1 Подтягивания', '2 Тяга блока', '3 Планка']);
+    assert.deepEqual(heads(), ['Подтягивания', 'Тяга блока', 'Планка']);
     assert.equal(local.root.findAll(n => n.type === 'div' && String(n.props.className || '').split(' ').includes('workout__set')).length, 9);
     assert.equal(rounds().length, 0);
 
     // И обратно — кнопкой между карточками
     await press('Соединить в суперсет');
-    assert.deepEqual(heads(), ['Суперсет · 3 круга', '3 Планка']);
+    assert.deepEqual(heads(), ['Суперсет · 3 круга', 'Планка']);
   } finally {
     if (local) local.unmount();
   }
@@ -1316,8 +1317,9 @@ test('«было» у каждого подхода: тот же подход п
   // 15.11.2026: на экране — коротко в клетке веса, для чтения вслух — целиком
   const hints = tree.root.findAll(n => n.type === 'span' && n.props.className === 'workout__sr').map(text);
   assert.deepEqual(hints, ['было 6 кг × 10', 'было 8 кг × 8'], 'у третьего прошлого раза нет');
-  const cells = tree.root.findAll(n => n.type === 'span' && n.props.className === 'workout__cell-was').map(text);
-  assert.deepEqual(cells, ['было 6', 'было 8']);
+  // Ближайший подход — крупно (FT-802): «было» под весом и под повторами
+  const cells = tree.root.findAll(n => n.type === 'span' && ['workout__cell-was', 'wk-val__was'].includes(n.props.className) && /было/.test(text(n))).map(text);
+  assert.deepEqual(cells, ['было 6', 'было 10', 'было 8']);
   const input = (si, what) => tree.root.findAllByType('input').find(n => new RegExp('подход ' + (si + 1) + ', ' + what).test(n.props['aria-label'] || ''));
   // Сегодня в первом подходе 10 повторов, как тогда, — вес тот же, 6
   await act(async () => input(0, 'повторы').props.onChange({ target: { value: '10' } }));
@@ -1455,22 +1457,28 @@ test('клиент не меняет ни названия, ни состава 
     assert.deepEqual(buttons().map(b => b.props['aria-label'] || '').filter(l => /^[^,]+: настройки$/.test(l)), [], 'меню настроек под названием — нет, и в суперсете');
     assert.ok(!buttons().some(b => text(b) === 'Выбрать'), '«Выбрать» — нет');
     assert.ok(!buttons().some(b => text(b) === 'Разъединить'), '«Разъединить» — нет');
+    // «+» в конце полосы подходов (FT-802): подход или разминка
+    const plus = buttons().find(b => b.props['aria-label'] === 'Добавить подход или разминку');
+    assert.ok(plus, '«+» у полосы — и у клиента');
+    await act(async () => { plus.props.onClick(); await delay(); });
     assert.ok(buttons().find(b => text(b) === 'Добавить подход'), 'добавить подход — может');
     assert.ok(local.root.findAllByType('input').find(n => n.props['aria-label'] === 'Жим ногами, подход 1, вес в кг'), 'вес в строке подхода — правит');
 
     // FT-532: разминочный — сверху, перед рабочими, половина веса кратно 2,5
     const weight = (n) => local.root.findAllByType('input').find(x => x.props['aria-label'] === `Жим ногами, подход ${n}, вес в кг`);
-    const warm = buttons().find(b => text(b) === '+ Разминка');
+    const warm = buttons().find(b => b.props['aria-label'] === 'Добавить разминочный подход');
     assert.ok(warm, 'кнопка рядом с «Добавить подход» — и у клиента');
     await act(async () => { warm.props.onClick(); await delay(); });
     assert.equal(weight(1).props.value, '50');
     assert.equal(weight(2).props.value, '100', 'рабочие — после разминки');
     assert.equal(weight(4).props.value, '100');
     // Второй разминочный — после первого, всё ещё перед рабочими
-    await act(async () => { buttons().find(b => text(b) === '+ Разминка').props.onClick(); await delay(); });
+    await act(async () => { buttons().find(b => b.props['aria-label'] === 'Добавить подход или разминку').props.onClick(); await delay(); });
+    await act(async () => { buttons().find(b => b.props['aria-label'] === 'Добавить разминочный подход').props.onClick(); await delay(); });
     assert.equal(weight(2).props.value, '50');
     assert.equal(weight(3).props.value, '100');
-    assert.equal(local.root.findAll(n => n.type === 'span' && n.props.className === 'workout__set-sub' && text(n) === 'Разминка').length, 2, 'оба помечены «Разминка» (было «1 · Р»)');
+    // В полосе — столбиками «Р» (FT-802); у крупного подхода — «Разминка» в заголовке
+    assert.equal(buttons().filter(b => /^Разминка/.test(b.props['aria-label'] || '')).length, 2, 'оба помечены «Разминка» (было «1 · Р»)');
   } finally {
     if (local) local.unmount();
   }
