@@ -4,6 +4,7 @@
  * вес прошлого раза и итог проведённого занятия.
  */
 import { trackOf, techniqueOf } from './exercise-track.js';
+import { isRoundList, topWeight } from './round-plan.js';
 import { supersets } from './plan-model.js';
 import { addDays, dateKey, WEEKDAY_SHORT } from './program-timeline.js';
 
@@ -115,7 +116,8 @@ export function lastWeightOf(ex) {
   if (track.kind === 'cardio' || track.kind === 'timed') return null;
   const last = weightNum(ex.lastWeight);
   if (!(last > 0)) return null;
-  const plan = weightNum(ex.weight);
+  // Лесенка по кругам «6, 8, 10» (17.11.2026) — сравниваем с наибольшим
+  const plan = isRoundList(ex.weight, 'weight') ? topWeight(ex.weight) : weightNum(ex.weight);
   const up = plan > last ? '+' + kg(plan - last) : '';
   return { last: kg(last) + ' кг', up };
 }

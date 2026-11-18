@@ -1,4 +1,5 @@
 import { techniqueOf, techniqueText } from './exercise-track.js';
+import { resizeRounds } from './round-plan.js';
 
 /** Копия тренировки не наследует связь с проведёнными занятиями. */
 export function copyPlanBlocks(blocks, indices, stamp = Date.now()) {
@@ -38,11 +39,18 @@ export function patchPlanExercise(exercises, index, values) {
   if (!current) return next;
   Object.assign(current, values);
   const group = current.supersetGroup;
+  // Кругов (подходов) стало больше — значения «по кругам» продолжают шаг
+  // (12, 15, 20 → 25), меньше — последний убирается (этап 5, 17.11.2026)
+  const rounds = 'sets' in values ? parseInt(values.sets, 10) : 0;
+  const resize = (exercise) => { if (rounds > 0) Object.assign(exercise, resizeRounds(exercise, rounds)); };
+  resize(current);
   if (!group) return next;
 
   if ('sets' in values) {
     next.forEach((exercise) => {
-      if (exercise.supersetGroup === group) exercise.sets = values.sets;
+      if (exercise.supersetGroup !== group) return;
+      exercise.sets = values.sets;
+      if (exercise !== current) resize(exercise);
     });
   }
   if ('technique' in values) {

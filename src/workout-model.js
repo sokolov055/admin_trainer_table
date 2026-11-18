@@ -1,5 +1,6 @@
 import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf, planOneSide, missing } from './exercise-track.js';
 import { wasSet, wasIndex, scaleTo, isAssisted } from './effort.js';
+import { withRounds } from './round-plan.js';
 
 export const uid = () => crypto.randomUUID();
 export const blankSet = () => ({ weight: '', reps: '', rpe: '', state: 'pending', kind: 'work' });
@@ -19,7 +20,7 @@ export function fromPlan(block, month, members = []) {
     // значит «не запускать сам»: пока человек не выбрал длительность,
     // таймер ведёт себя как раньше.
     status: 'active', elapsedMs: 0, restUntil: 0, restSeconds: 0, note: '',
-    exercises: block.exercises.slice(0, 30).map(e => withTechnique(e, {
+    exercises: block.exercises.slice(0, 30).map(e => withTechnique(e, withRounds(e, {
       id: uid(), name: e.name, note: '',
       // Упражнение из базы: по нему сервер ведёт историю весов клиента
       ...(e.exerciseId ? { exerciseId: e.exerciseId } : {}),
@@ -76,7 +77,9 @@ export function fromPlan(block, month, members = []) {
           [isAssisted(e) ? 'assist' : 'weight']: byTime(trackOf(e)) && trackOf(e).kind === 'cardio' ? '' : num(e.lastWeight) || num(e.weight),
           ...planSet(e, trackOf(e)),
         })),
-    })) };
+      // Разные круги (17.11.2026): у подхода — повторы, вес, цель и
+      // нагрузка кардио своего круга (round-plan.js)
+    }))) };
 }
 
 /**

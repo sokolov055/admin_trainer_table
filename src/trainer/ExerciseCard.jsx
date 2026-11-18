@@ -12,7 +12,9 @@ import {
 import {
   stepWeight, stepReps, workOf, barsOf, barsText, withWarmup, withDrop, withSets, withRest, withSide,
   canWarmup, canDrop, navOf, restAdvice, MAX_SETS, MAX_WARMUP,
+  groupMembers, groupLetter, groupVaries, roundFields, varies, flatField,
 } from './exercise-card-model.js';
+import RoundsTable from './RoundsTable.jsx';
 import './exercise-card.css';
 
 /**
@@ -118,10 +120,14 @@ function RestRow({ label, value, advice, onChange }) {
 
 export default function ExerciseCard({
   list, index, onIndex, split = false, members = [], base = [], picking = false, onPicking,
-  onPatch, onClose, onRemove, onJoin, onLeave, renderPicker, renderAbout, renderHistory,
+  onPatch, onPatchAll, onClose, onRemove, onJoin, onLeave, renderPicker, renderAbout, renderHistory,
 }) {
   const ex = list[index];
   const [about, setAbout] = useState(false);
+  // Суперсет «Одинаково · По кругам» и выбранный круг в таблице — общие для
+  // вкладок А1/А2: переход к другому упражнению их не сбрасывает
+  const [byRounds, setByRounds] = useState(null);
+  const [col, setCol] = useState(0);
   const closeRef = useRef(null);
   const after = useRef(null);
   if (!ex) return null;
@@ -130,8 +136,21 @@ export default function ExerciseCard({
   const tech = techniqueOf(ex.technique);
   const work = workOf(ex);
   const group = ex.supersetGroup;
-  const members_ = group ? list.map((e, k) => (e.supersetGroup === group ? k : -1)).filter((k) => k >= 0) : [];
+  const members_ = group ? groupMembers(list, index) : [index];
   const inGroup = members_.length > 1;
+  const letter = inGroup ? groupLetter(list, group) : '';
+  const rounds = inGroup ? byRounds ?? groupVaries(list, members_) : false;
+  /** «Одинаково»: у всего суперсета все круги как 1-й */
+  const flatAll = () => {
+    const changes = [];
+    members_.forEach((k) => {
+      let e = list[k];
+      const out = {};
+      roundFields(e).filter((f) => varies(e, f)).forEach((f) => { const p = flatField(e, f, work); Object.assign(out, p); e = { ...e, ...p }; });
+      if (Object.keys(out).length) changes.push([k, out]);
+    });
+    if (changes.length) (onPatchAll ? onPatchAll(changes) : changes.forEach(([k, v]) => onPatch(k, v)));
+  };
   const cardio = track.kind === 'cardio';
   const timed = track.kind === 'timed';
   const one = planOneSide(ex);
@@ -176,6 +195,17 @@ export default function ExerciseCard({
   return (
     <Sheet title={title} className="exc-sheet" onClose={done} closeRef={closeRef}>
       <div className="exc" key={index}>
+        {/* Вкладки суперсета: А1 · Выпады, А2 · Подъём… — та же карточка */}
+        {inGroup && (
+          <div className="exc-tabs" role="tablist" aria-label={'Суперсет ' + letter}>
+            {members_.map((k, n) => (
+              <button key={k} type="button" role="tab" aria-selected={k === index} className={k === index ? 'is-on' : ''}
+                onClick={() => { if (k !== index) { onIndex(k); haptic('light'); } }}>
+                <b>{letter}{n + 1}</b><span>{String(list[k].name || '').trim().split(/\s+/)[0] || 'Новое'}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {picking || !String(ex.name || '').trim()
           ? <div className="exc-pick">{renderPicker(index)}</div>
           : (
@@ -195,14 +225,24 @@ export default function ExerciseCard({
           </div>
         )}
 
-        {inGroup && !cardio && (
+        {inGroup && (
           <div className="exc-ss">
-            <div className="exc-ss__head"><IconLinkPair size={16} />Суперсет · общее для круга</div>
+            <div className="exc-ss__head"><IconLinkPair size={16} />Суперсет {letter} · общее для круга</div>
             <div className="exc-opts">
               <Mini label="Круги" value={work} min={1} max={MAX_SETS} onValue={(n) => patch(withSets(ex, n))} />
               {canWarmup(ex) && <Mini label="Разминка" value={tech.warmup} max={MAX_WARMUP} onValue={(n) => patch(withWarmup(ex, n))} />}
             </div>
             <RestRow label="Отдых после круга" value={tech.rest} advice={[90, 120]} onChange={(s) => patch(withRest(ex, s))} />
+            {/* Разные круги (17.11.2026): повторы и вес, цель и нагрузка кардио — свои на каждом круге */}
+            <div className="exc-seg" role="radiogroup" aria-label="Круги суперсета">
+              {[[false, 'Одинаково'], [true, 'По кругам']].map(([v, label]) => (
+                <button key={label} type="button" role="radio" aria-checked={rounds === v} className={rounds === v ? 'is-on' : ''}
+                  onClick={() => { if (rounds === v) return; if (!v) flatAll(); setByRounds(v); haptic('light'); }}>{label}</button>
+              ))}
+            </div>
+            {rounds
+              ? <RoundsTable list={list} idx={members_} index={index} n={work} col={col} onCol={setCol} onIndex={onIndex} onPatch={onPatch} />
+              : <p className="exc-ss__hint">Все круги одинаковые: повторы, вес и кардио — у каждого упражнения ниже.</p>}
           </div>
         )}
 
@@ -218,7 +258,7 @@ export default function ExerciseCard({
                 ))}
               </div>
               <CardioPlan value={cardioFrom(ex, track)} track={track} onChange={cardioChange} />
-              <RestRow label={inGroup ? 'Отдых после круга' : 'Отдых после отрезка'} value={tech.rest} advice={[]} onChange={(s) => patch(withRest(ex, s))} />
+              {!inGroup && <RestRow label="Отдых после отрезка" value={tech.rest} advice={[]} onChange={(s) => patch(withRest(ex, s))} />}
             </div>
           )
           : (

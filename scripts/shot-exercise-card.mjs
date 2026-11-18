@@ -74,6 +74,41 @@ try {
     await sheet.waitFor({ timeout: 5000 });
     await page.waitForTimeout(800);
     await shot('6-superset-card');
+    // Разные круги: «По кругам», у первого — повторы и вес лесенкой
+    await sheet.getByRole('radio', { name: 'По кругам' }).click();
+    await sheet.locator('.rt-tab').waitFor({ timeout: 5000 });
+    await sheet.getByRole('button', { name: 'Повторы', exact: true }).click().catch(() => {});
+    await sheet.getByRole('button', { name: /^(Вес|Доп\. вес)$/ }).click().catch(() => {});
+    for (const k of [1, 2, 3]) await sheet.getByRole('button', { name: 'Повторы: шаг больше' }).click().catch(() => {});
+    for (const k of [1, 2]) await sheet.getByRole('button', { name: /вес: шаг больше$/i }).click().catch(() => {});
+    await sheet.locator('.rt-tab tr.is-row .rt-cell').nth(1).click();
+    await page.waitForTimeout(400);
+    await sheet.locator('.exc-ss').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(300);
+    await shot('6b-rounds');
+    await sheet.locator('.rt-kinds').first().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(300);
+    await shot('6c-rounds-steps');
+    await sheet.getByRole('tab').nth(1).click();
+    await page.waitForTimeout(500);
+    await shot('6d-rounds-a2');
+    await closeSheet();
+    await ss.scrollIntoViewIfNeeded();
+    await shot('6e-superset-list-rounds');
+    // Кардио в круге: звено «Беговая дорожка ⛓ Присед», у дорожки — цель и нагрузка по кругам
+    await second.locator('.ss-link__b').first().click();
+    await page.waitForTimeout(400);
+    await second.locator('.ss-head').first().click();
+    await sheet.waitFor({ timeout: 5000 });
+    await sheet.getByRole('radio', { name: 'По кругам' }).click();
+    await sheet.getByRole('button', { name: 'Цель', exact: true }).click();
+    await sheet.getByRole('button', { name: 'Нагрузка', exact: true }).click();
+    await sheet.getByRole('button', { name: /: шаг больше$/ }).first().click();
+    await sheet.getByRole('button', { name: /: шаг больше$/ }).nth(1).click();
+    await page.waitForTimeout(300);
+    await sheet.locator('.rt-tab').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(300);
+    await shot('6f-cardio-rounds');
     await closeSheet();
     // Кардио
     await second.getByRole('button', { name: 'Кардио', exact: true }).click();
@@ -82,6 +117,19 @@ try {
     await shot('7-cardio');
     await sheet.getByRole('button', { name: 'Удалить упражнение' }).click();
     await page.waitForTimeout(600);
+    if (want('live')) {
+      // Экран тренировки: подходы суперсета — повторы и вес своего круга
+      await page.waitForTimeout(1200);
+      await second.getByRole('button', { name: /Начать тренировку/ }).click();
+      await page.getByText('Выпады с гантелями').first().waitFor({ timeout: 10000 });
+      await page.waitForTimeout(800);
+      await page.getByText('Выпады с гантелями').first().scrollIntoViewIfNeeded();
+      await shot('6g-live');
+      await page.getByText('Круг 2', { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await page.waitForTimeout(300);
+      await shot('6h-live-round2');
+      await page.goto(origin + '/?mockRole=trainer');
+    }
   }
 
   if (want('program')) {

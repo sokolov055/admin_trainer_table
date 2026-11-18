@@ -26,8 +26,37 @@
 .exr-dots i.is-warmup { height: 9px; background: var(--warning-text); opacity: 0.75; }
 .exr-dots i.is-drop { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); }
 
-/* В суперсете строка без отступов скобки */
-.plan-inline__bracket .exr { min-height: 50px; }
+/* ---------- Суперсет звеньями (шаг 2, 17.11.2026) ---------- */
+/* Звено между упражнениями: серое — собрать, синее внутри рамки — разобрать */
+.ss-link { position: relative; display: flex; justify-content: center; height: 0; z-index: 1; transition: opacity var(--dur-fast) var(--ease-out); }
+.ss-link__b {
+  position: relative; display: grid; place-items: center; width: 28px; height: 28px; margin-top: -14px; padding: 0; border: 1.5px dashed var(--border);
+  border-radius: 50%; background: var(--surface); color: var(--text-muted); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+/* Палец попадает и мимо 28 px — поле нажатия 44 */
+.ss-link__b::before { content: ''; position: absolute; inset: -8px; }
+.ss-link__b:active { transform: scale(0.9); color: var(--accent); border-color: var(--accent); }
+.ss-link--in .ss-link__b { border: 0; background: var(--accent-fill); color: var(--accent-text); box-shadow: 0 0 0 3px var(--accent-wash); }
+.plan-inline__list.is-dragging .ss-link { opacity: 0; pointer-events: none; }
+
+/* Рамка суперсета: синяя плашка с полосой слева и шапкой */
+.plan-inline__unit--superset {
+  margin: var(--space-2) 0; padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + 3px); border-bottom: 0; border-radius: var(--radius-lg);
+  --ss-bg: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface);
+  background: var(--ss-bg); box-shadow: inset 3px 0 0 var(--accent);
+}
+/* Строка смахивается поверх кнопки «удалить» — фон непрозрачный, тот же, что у рамки */
+.plan-inline__unit--superset .plan-inline__row { background: transparent; }
+.plan-inline__unit--superset .swipe__content { background: var(--ss-bg); }
+.plan-inline__unit--superset .exr { min-height: 50px; }
+.ss-head {
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 40px; padding: 8px 0 2px; border: 0; background: none;
+  color: var(--accent-ink); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ss-head__t { font-weight: 700; }
+.ss-head__m { margin-left: auto; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; }
+.ss-head:active { opacity: 0.7; }
 
 /* ---------- Лист карточки ---------- */
 .exc-sheet .sheet__panel { height: calc(100vh - 40px); height: calc(100dvh - 40px); }
@@ -195,6 +224,91 @@
 .exc-foot__ic:active { transform: scale(0.94); }
 .exc-foot__ic--bad { color: var(--critical-text); }
 .exc-foot__ok { flex: 1; min-height: 50px; border-radius: var(--radius-lg); font-size: 17px; font-weight: 720; }
+
+/* Вкладки суперсета в карточке: А1 · Выпады */
+.exc-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; margin-top: calc(var(--space-1) * -1); border-radius: var(--radius-lg); background: var(--surface-sunken); scrollbar-width: none; }
+.exc-tabs::-webkit-scrollbar { display: none; }
+.exc-tabs button {
+  flex: 1 0 auto; display: grid; justify-items: center; gap: 0; min-width: 58px; min-height: 44px; padding: 4px 8px; border: 0; border-radius: var(--radius);
+  background: none; color: var(--text-secondary); font: inherit; line-height: 1.15; cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.exc-tabs button b { font-size: var(--text-sm); font-weight: 750; }
+.exc-tabs button span { max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-xs); font-weight: 550; }
+.exc-tabs button.is-on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.exc-tabs button:active { transform: scale(0.96); }
+
+/* «Одинаково · По кругам» */
+.exc-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--radius); background: var(--surface); }
+.exc-seg button {
+  min-height: 38px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.exc-seg button.is-on { background: var(--accent-fill); color: var(--accent-text); }
+.exc-ss__hint { margin: 0; font-size: var(--text-sm); color: var(--accent-ink); opacity: 0.85; }
+
+/* Таблица «упражнения × круги» */
+.rt { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.rt-scroll { overflow-x: auto; margin: 0 calc(var(--space-3) * -1); padding: 0 var(--space-3); scrollbar-width: none; }
+.rt-scroll::-webkit-scrollbar { display: none; }
+.rt-tab { width: 100%; border-collapse: separate; border-spacing: 4px; margin: -4px; font-variant-numeric: tabular-nums; }
+.rt-tab thead th { padding: 0 2px; font-size: var(--text-xs); font-weight: 650; color: var(--accent-ink); opacity: 0.75; text-align: center; white-space: nowrap; }
+.rt-tab thead th.is-col { opacity: 1; }
+.rt-tab tbody th { width: 40%; min-width: 96px; padding: 0 4px 0 0; text-align: left; vertical-align: middle; }
+.rt-name { display: block; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-sm); font-weight: 650; line-height: 1.2; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.rt-tab tr.is-row .rt-name { color: var(--accent-ink); }
+.rt-tab tbody th small { display: block; margin-top: 1px; font-size: var(--text-xs); color: var(--text-muted); line-height: 1.2; }
+.rt-tab td { padding: 0; min-width: 48px; }
+.rt-cell {
+  display: grid; justify-items: center; align-content: center; gap: 0; width: 100%; min-height: 48px; padding: 4px 2px; border: 0; border-radius: var(--radius);
+  background: var(--surface); color: var(--text); font: inherit; line-height: 1.1; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+.rt-cell b { font-size: var(--text-md); font-weight: 750; animation: exc-bump var(--dur) var(--ease-out); }
+.rt-cell small { font-size: 10.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.rt-cell.is-flat b { color: var(--text-secondary); font-weight: 650; }
+.rt-cell.is-on { background: var(--accent-wash); color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--accent); }
+.rt-cell:active { transform: scale(0.95); }
+
+.rt-kinds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rt-kinds__lab { font-size: var(--text-sm); font-weight: 650; color: var(--accent-ink); opacity: 0.8; }
+.rt .exc-tog { height: 34px; padding: 0 12px; background: var(--surface); }
+.rt .exc-tog.is-on { background: var(--accent-fill); color: var(--accent-text); }
+.rt-chip {
+  min-height: 32px; padding: 0 11px; border: 0; border-radius: 99px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+.rt-chip.is-on { background: var(--accent-ink); color: var(--surface); }
+.rt-chip:active { transform: scale(0.96); }
+
+.rt-step { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-2); padding: 8px 10px; border-radius: var(--radius); background: var(--surface); }
+.rt-step__lab { flex: 1 0 100%; font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; }
+.rt-step__lab b { color: var(--text); }
+.rt-step__ctl { display: inline-flex; align-items: center; gap: 6px; }
+.rt-step__ctl--ladder { margin-left: auto; }
+.rt-step__ctl button {
+  display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: var(--radius); background: var(--surface-sunken);
+  color: var(--text); cursor: pointer; transition: transform var(--dur-press) var(--ease-out);
+}
+.rt-step__ctl--ladder button { width: 32px; height: 32px; }
+.rt-step__ctl button:active { transform: scale(0.94); }
+.rt-step__ctl button:disabled { opacity: var(--disabled-opacity); cursor: default; }
+.rt-step__ctl .rt-step__val { width: auto; min-width: 64px; padding: 0 6px; background: none; display: inline-flex; align-items: baseline; justify-content: center; gap: 3px; cursor: text; }
+.rt-step__val b { font-size: var(--text-lg); font-weight: 750; animation: exc-bump var(--dur) var(--ease-out); }
+.rt-step__val small { font-size: var(--text-xs); color: var(--text-muted); font-weight: 600; }
+.rt-step__input {
+  width: 72px; height: 38px; box-sizing: border-box; padding: 0 4px; border: 1.5px solid var(--accent); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font: inherit; font-size: 18px !important; font-weight: 700; text-align: center; outline: none;
+}
+.rt-step__word { font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; }
+.rt-step__ladder { min-width: 34px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; animation: exc-bump var(--dur) var(--ease-out); }
+.rt-flat { justify-self: start; }
+.rt-hint { margin: 0; font-size: var(--text-xs); color: var(--accent-ink); opacity: 0.75; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-cell b, .rt-step__val b, .rt-step__ladder { animation: none; }
+  .rt-cell:active, .rt-chip:active, .rt-step__ctl button:active, .exc-tabs button:active, .ss-link__b:active { transform: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .exc, .exc-acc__body, .exc-bar, .exc-step__num, .exc-mini b { animation: none; }

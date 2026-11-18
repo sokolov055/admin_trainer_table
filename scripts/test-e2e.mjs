@@ -1329,21 +1329,45 @@ test('мои тренировки: программа, прогресс, пит�
     await firstBlock.getByRole('button', { name: 'Вернуть' }).click();
     assert.equal(await firstBlock.locator('.exr').count(), rowsBefore, 'удалённое вернулось');
 
-    // Суперсет: круги справа от скобки; нажать — карточка с общим для круга.
-    // Добавленный круг — у всех сразу
+    // Звено ⛓ между упражнениями (шаг 2): нажал — суперсет в синей рамке;
+    // синее звено внутри рамки — разобрать обратно
+    const plainLinks = firstBlock.locator('.ss-link:not(.ss-link--in) .ss-link__b');
+    if (await plainLinks.count()) {
+      const framesBefore = await firstBlock.locator('.plan-inline__unit--superset').count();
+      await plainLinks.first().click();
+      await assert.doesNotReject(firstBlock.locator('.plan-inline__unit--superset').nth(framesBefore).waitFor({ timeout: 5000 }), 'звено собрало суперсет');
+      await firstBlock.locator('.ss-link--in .ss-link__b').first().click();
+      await phone.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .plan-card')[0].querySelectorAll('.plan-inline__unit--superset').length === n, framesBefore, { timeout: 5000 });
+    }
+
+    // Суперсет: шапка рамки «Суперсет А · 3 круга»; нажать — карточка с
+    // общим для круга и вкладками А1/А2. Добавленный круг — у всех сразу
     const secondBlock = phone.locator('#root main:not([hidden]) .plan-card').nth(1);
     await secondBlock.getByRole('button', { name: 'Править' }).click();
     const superset = secondBlock.locator('.plan-inline__unit--superset').first();
-    const before = Number(await superset.locator('.plan-inline__rounds-sum strong').innerText());
-    await superset.locator('.plan-inline__rounds-sum').click();
-    await card.getByText('Суперсет · общее для круга').waitFor({ timeout: 5000 });
+    const roundsOf = async () => Number((await superset.locator('.ss-head__m').innerText()).match(/^\d+/)[0]);
+    const before = await roundsOf();
+    await superset.locator('.ss-head').click();
+    await card.getByText(/^Суперсет [А-Я] · общее для круга$/).waitFor({ timeout: 5000 });
+    assert.ok(await card.getByRole('tab').count() >= 2, 'вкладки А1/А2');
     await card.getByRole('button', { name: 'Круги: больше' }).click();
     // Выйти из суперсета — у каждого упражнения (FT-473, FT-486): кнопкой в карточке
     assert.equal(await card.getByRole('button', { name: 'Выйти из суперсета' }).count(), 1, 'выход из суперсета в карточке');
+    // «По кругам»: таблица упражнения × круги; клетка 2-го круга «+» — повторы этого круга
+    await card.getByRole('radio', { name: 'По кругам' }).click();
+    await card.locator('.rt-tab').waitFor({ timeout: 5000 });
+    assert.equal(await card.locator('.rt-tab thead th').count(), before + 2, 'столбцы — круги');
+    await card.getByRole('button', { name: 'Повторы', exact: true }).click();
+    await card.locator('.rt-tab tr.is-row .rt-cell').nth(1).click();
+    await card.getByRole('button', { name: 'Повторы: шаг больше' }).click();
+    await card.getByRole('button', { name: 'Повторы: шаг больше' }).click();
+    const reps = (await card.locator('.rt-tab tr.is-row .rt-cell b').allInnerTexts()).map(Number);
+    assert.equal(reps[1] - reps[0], 2, 'шаг лесенкой');
     if (process.env.SHOT_SUPERSET) await phone.screenshot({ path: process.env.SHOT_SUPERSET });
     await card.getByRole('button', { name: 'Готово', exact: true }).click();
     await card.waitFor({ state: 'detached', timeout: 5000 });
-    assert.equal(await superset.locator('.plan-inline__rounds-sum strong').innerText(), String(before + 1), 'число кругов в обычном виде');
+    assert.equal(await roundsOf(), before + 1, 'число кругов в шапке рамки');
+    await assert.doesNotReject(superset.locator('.ss-head__m', { hasText: 'по кругам' }).waitFor({ timeout: 3000 }), 'в шапке — «по кругам»');
 
     // «Об упражнении» — вид упражнения, как в занятии; уходит в базу
     await superset.locator('.exr').first().click();

@@ -242,7 +242,10 @@ export function raiseOf(ex, step) {
 }
 
 /** Повторы плана: «8–12» → { lo: 8, hi: 12 }, «10» → { lo: 10, hi: 10 }; нет — null */
-function repsPlan(ex) {
+function repsPlan(ex, set = null) {
+  // Повторы по кругам («12, 15, 20», 17.11.2026): у подхода — цель своего круга
+  const own = set && /^\d{1,3}$/.test(String(set.target || '')) ? Number(set.target) : 0;
+  if (own > 0) return { lo: own, hi: own };
   const g = repsGoal(ex);
   if (g) return g;
   const t = targetOf(ex);
@@ -290,7 +293,7 @@ export function rateSet(ex, si, effort) {
   // Что можно сдвигать: следующие неотмеченные рабочие того же человека, не вписанные руками
   const open = (x, i) => i > si && mine(x) && x.state === 'pending' && x.kind !== 'warmup' && !x.own;
   const before = ex.sets.slice(0, si).filter((x) => mine(x) && x.state === 'done' && x.kind !== 'warmup');
-  const plan = repsPlan(ex);
+  const plan = repsPlan(ex, set);
   const reps = num(set.reps);
   const short = !!plan && reps > 0 && reps < plan.lo;
   const over = !!plan && reps > 0 && reps > plan.hi;

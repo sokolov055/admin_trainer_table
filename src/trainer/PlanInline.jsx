@@ -12,13 +12,13 @@ import { haptic } from '../telegram.js';
 import { apiPublic } from '../api.js';
 import { useData } from '../useData.js';
 import { useReveal } from '../reveal.js';
-import { trackOf, planScheme, planOneSide } from '../exercise-track.js';
-import { IconPlus, IconCheck } from '../icons.jsx';
+import { trackOf, planScheme, planOneSide, techniqueOf, restText } from '../exercise-track.js';
+import { IconPlus, IconCheck, IconLinkPair, IconUnlink } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 import MuscleEdit from '../muscles/MuscleEdit.jsx';
 import { Loading } from '../ui.jsx';
-import { barsOf, workOf } from './exercise-card-model.js';
+import { barsOf, workOf, splitGroupAt, groupLetter, groupVaries } from './exercise-card-model.js';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -30,6 +30,8 @@ import { barsOf, workOf } from './exercise-card-model.js';
  * упражнение — снизу карточка (ExerciseCard): «‹ 2 из 6 ›», картинка,
  * «Заменить», мышцы, подходы столбиками, счётчики «− / +», отдых, «Об
  * упражнении» (что записывать, мышцы, тренажёры, история клиента).
+ *   звено ⛓ между упражнениями — собрать суперсет, синее звено внутри
+ *   рамки — разобрать (шаг 2: круги «по кругам» — в карточке суперсета);
  *   подержать упражнение — перетащить; суперсет едет целиком;
  *   смахнуть влево — удалить, «Вернуть».
  * Каждое изменение сразу уходит на сервер всем месяцем (onChange родителя).
@@ -90,9 +92,20 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     fn(next);
     onChange(next);
   };
-  const patch = (i, values) => onChange(patchPlanExercise(latest.current, i, values));
   const latest = useRef(list);
   latest.current = list;
+  const patch = (i, values) => {
+    const next = patchPlanExercise(latest.current, i, values);
+    latest.current = next;
+    onChange(next);
+  };
+  /** Несколько правок одним изменением: «Одинаково» у всего суперсета */
+  const patchAll = (changes) => {
+    let next = latest.current;
+    changes.forEach(([i, values]) => { next = patchPlanExercise(next, i, values); });
+    latest.current = next;
+    onChange(next);
+  };
 
   /**
    * Вид упражнения (что записывать, на сторону) — в базу тренера, а не в
@@ -146,9 +159,13 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const g = a.supersetGroup || b.supersetGroup || 'g' + Date.now();
     const old = [a.supersetGroup, b.supersetGroup].filter(Boolean);
     next.forEach((e, k) => { if (k === i || k === i + 1 || old.includes(e.supersetGroup)) e.supersetGroup = g; });
-    const sets = next.find((e) => e.supersetGroup === g && String(e.sets || '').trim());
-    next.forEach((e) => { if (e.supersetGroup === g) e.sets = sets ? sets.sets : '3'; });
+    // Кругов — больше из двух: кардио (1 отрезок) со звеном к силовому (4 × 12)
+    // давало суперсет на 1 круг (17.11.2026)
+    const most = Math.max(0, ...next.filter((e) => e.supersetGroup === g).map((e) => parseInt(e.sets, 10) || 0));
+    next.forEach((e) => { if (e.supersetGroup === g) e.sets = most > 0 ? String(most) : '3'; });
   });
+  /** Синее звено внутри рамки: суперсет разбирается в этом месте */
+  const unlinkAt = (i) => { onChange(splitGroupAt(latest.current, i)); haptic('light'); };
   const leave = (i) => set((next) => {
     const g = next[i].supersetGroup;
     next[i].supersetGroup = '';
@@ -231,6 +248,8 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const g = { to: from };
     drag.current = g;
     rows[from].classList.add('plan-inline__unit--lifted');
+    // Звенья стоят на месте — пока едут упражнения, их не видно
+    box.classList.add('is-dragging');
     const move = (ev) => {
       if (ev.pointerId !== pointerId) return;
       const dy = ev.clientY - y0;
@@ -256,6 +275,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
       rows.forEach((row) => { row.style.transform = ''; row.classList.remove('plan-inline__unit--lifted'); });
+      box.classList.remove('is-dragging');
       drag.current = null;
       swallow.current = true;
       setTimeout(() => { swallow.current = false; }, 350);
@@ -308,23 +328,40 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     );
   };
 
-  /** Круги суперсета — справа от скобки; нажать — карточка первого упражнения с «общим для круга» */
-  const roundsColumn = (first) => {
+  /** Шапка рамки суперсета: «⛓ Суперсет А · 3 круга · отдых 1:30»; нажать — карточка первого */
+  const groupHead = (u) => {
+    const first = u.idx[0];
     const ex = list[first];
     const work = workOf(ex);
-    const warmup = barsOf(ex).filter((b) => b === 'warmup').length;
     const word = work % 10 === 1 && work % 100 !== 11 ? 'круг' : [2, 3, 4].includes(work % 10) && ![12, 13, 14].includes(work % 100) ? 'круга' : 'кругов';
-    const warm = warmup ? '+ ' + (warmup > 1 ? warmup + ' ' : '') + (warmup === 1 ? 'разминка' : warmup < 5 ? 'разминки' : 'разминок') : '';
+    const rest = techniqueOf(ex.technique).rest;
+    const letter = groupLetter(list, u.group);
+    const differs = groupVaries(list, u.idx);
+    const line = [work + ' ' + word, differs && 'по кругам', rest && 'отдых ' + restText(rest)].filter(Boolean).join(' · ');
     return (
-      <div className="plan-inline__rounds-col">
-        <button type="button" className="plan-inline__rounds-sum" aria-label={'Круги: ' + work + (warm ? ', ' + warm : '') + '. Изменить'} onClick={() => openCard(first)}>
-          <strong>{work}</strong>
-          <span>{word}</span>
-          {warm && <em>{warm}</em>}
-        </button>
-      </div>
+      <button type="button" className="ss-head" aria-label={'Суперсет ' + letter + ': ' + line + '. Изменить'} onClick={() => openCard(first)}>
+        <IconLinkPair size={16} />
+        <span className="ss-head__t">Суперсет {letter}</span>
+        <span className="ss-head__m">{line}</span>
+      </button>
     );
   };
+
+  /** Звено между упражнениями: серое — собрать суперсет, синее (внутри рамки) — разобрать */
+  const link = (i, inside) => (split ? null : (
+    <div className={'ss-link' + (inside ? ' ss-link--in' : '')} key={'l' + i}>
+      <button
+        type="button"
+        className="ss-link__b"
+        aria-label={inside
+          ? 'Разобрать суперсет между «' + (list[i].name || i + 1) + '» и «' + (list[i + 1].name || i + 2) + '»'
+          : 'В суперсет: «' + (list[i].name || i + 1) + '» и «' + (list[i + 1].name || i + 2) + '»'}
+        onClick={() => (inside ? unlinkAt(i) : (joinNext(i), haptic('light')))}
+      >
+        {inside ? <IconUnlink size={14} /> : <IconLinkPair size={14} />}
+      </button>
+    </div>
+  ));
 
   /* ---------- Что карточка берёт у редактора ---------- */
   const renderPicker = (i) => {
@@ -397,19 +434,31 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   return (
     <div className="plan-inline">
       <div ref={root} className="plan-inline__list">
-        {units.map((u) => {
+        {units.map((u, ui) => {
           const key = u.group ? 'g' + u.group : 'e' + u.idx[0];
+          const before = ui > 0 ? link(units[ui - 1].idx[units[ui - 1].idx.length - 1], false) : null;
           if (!u.group) {
-            return <div className="plan-inline__unit" data-unit={key} key={key} onPointerDown={hold(key)}>{row(u.idx[0], false)}</div>;
+            return (
+              <React.Fragment key={key}>
+                {before}
+                <div className="plan-inline__unit" data-unit={key} onPointerDown={hold(key)}>{row(u.idx[0], false)}</div>
+              </React.Fragment>
+            );
           }
           return (
-            <div className="plan-inline__unit plan-inline__unit--superset" data-unit={key} key={key} onPointerDown={hold(key)}>
-              {/* Скобка объединяет упражнения; от неё — колонка кругов */}
-              <div className="plan-inline__bracket">
-                {u.idx.map((i) => row(i, true))}
+            <React.Fragment key={key}>
+              {before}
+              {/* Рамка суперсета: шапка с кругами, упражнения, синие звенья между ними */}
+              <div className="plan-inline__unit plan-inline__unit--superset" data-unit={key} onPointerDown={hold(key)}>
+                {groupHead(u)}
+                {u.idx.map((i, k) => (
+                  <React.Fragment key={i}>
+                    {k > 0 && link(u.idx[k - 1], true)}
+                    {row(i, true)}
+                  </React.Fragment>
+                ))}
               </div>
-              {roundsColumn(u.idx[0])}
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
@@ -419,7 +468,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
           <button type="button" className="button button--ghost" onClick={restore}>Вернуть</button>
         </div>
       )}
-      {list.length > 1 && <p className="plan-inline__hint">Подержите упражнение, чтобы перетащить. Смахните влево — удалить.</p>}
+      {list.length > 1 && <p className="plan-inline__hint">{split ? '' : '⛓ между упражнениями — суперсет. '}Подержите упражнение, чтобы перетащить. Смахните влево — удалить.</p>}
       <div className="plan-inline__add">
         <button type="button" className="button" onClick={() => add(blankExercise)}><IconPlus size={16} />Упражнение</button>
         <button type="button" className="button button--ghost" onClick={() => add(() => cardioExercise())}><IconPlus size={16} />Кардио</button>
@@ -444,6 +493,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
           picking={picking}
           onPicking={setPicking}
           onPatch={patch}
+          onPatchAll={patchAll}
           onClose={closeCard}
           onRemove={remove}
           onJoin={joinNext}
