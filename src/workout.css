@@ -1101,6 +1101,11 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 .workout__tools .workout__about { order: -1; }
 .workout__head-note, .workout__head-note--wide { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .workout__head-note:has(.workout__note-form) { flex-basis: 100%; }
+/* Форма настройки — на всю ширину ряда (иначе на iPhone поле сжималось
+   до ширины текста) и с запасом 4 px по бокам: тело карточки режет всё
+   за своим краем (overflow — для сворачивания), и кольцо фокуса поля
+   срезалось — «Своя регулировка вылезает за рамку» (18.11.2026) */
+.workout__head-note > .workout__note-form { flex: 1 1 100%; min-width: 0; padding-inline: 4px; }
 .workout__tools .workout__chip { min-height: 36px; padding: 0 12px; border-radius: 999px; flex: none; }
 .workout__tools .workout__chip--more { width: 36px; padding: 0; }
 .workout__tools-more { display: block; flex: none; }
