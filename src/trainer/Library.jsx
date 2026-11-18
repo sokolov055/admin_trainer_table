@@ -1,5 +1,5 @@
 import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
-import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf } from '../exercise-track.js';
+import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf, planText } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
@@ -372,8 +372,9 @@ function Back({ onClick, children = 'Назад' }) {
 function exerciseLine(e) {
   // Кардио — целями, режимом и интервалами, а не «подходы × повторы»
   if (e.cardio) return `${e.name} — ${cardioLine(e.cardio, trackOf(e))}`;
-  const volume = [e.sets, e.reps].filter(Boolean).join('×');
-  const extra = [volume, e.weight && e.weight + (/\d$/.test(e.weight) ? ' кг' : '')].filter(Boolean).join(', ');
+  const volume = [e.sets, planText(e.reps)].filter(Boolean).join('×');
+  const w = planText(e.weight);
+  const extra = [volume, w && w + (/\d$/.test(w) ? ' кг' : '')].filter(Boolean).join(', ');
   return extra ? `${e.name} — ${extra}` : e.name;
 }
 

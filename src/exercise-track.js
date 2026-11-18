@@ -518,6 +518,12 @@ export function setOneSide(set, track = STRENGTH) {
 }
 
 /**
+ * Повторы и вес программы для показа: «по кругам» без единого значения
+ * («, , » — все круги пустые, 18.11.2026) — пусто, а не запятые
+ */
+export const planText = (v) => (/^[\s,;/→]*$/.test(String(v ?? '')) ? '' : String(v).trim());
+
+/**
  * План упражнения строкой — для программы и подсказки в занятии.
  * У кардио в «повторах» программы — время («20 мин»), в «весе» — режим
  * («8 км/ч, 3%»): колонки те же, смысл по типу.
@@ -525,11 +531,11 @@ export function setOneSide(set, track = STRENGTH) {
 export function planScheme(ex, inSuperset = false) {
   const track = trackOf(ex);
   const sets = String(ex.sets || '');
-  const reps = String(ex.reps || '');
+  const reps = planText(ex.reps);
   if (track.kind === 'cardio' && ex.cardio) return cardioLine(ex.cardio, track);
   if (track.kind === 'cardio') {
     const time = /^\d+$/.test(reps) ? reps + ' мин' : reps;
-    return [(Number(sets) > 1 ? sets + ' × ' : '') + time, ex.weight].filter(Boolean).join(' · ');
+    return [(Number(sets) > 1 ? sets + ' × ' : '') + time, planText(ex.weight)].filter(Boolean).join(' · ');
   }
   const unit = track.kind === 'timed' && /^\d+$/.test(reps) ? ' с' : '';
   const side = track.unilateral && reps ? ' на сторону' : '';

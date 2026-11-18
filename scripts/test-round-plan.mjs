@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { roundList, roundValue, topWeight, withRounds, resizeList, cardioRound, perRoundOf } from '../src/round-plan.js';
+import { planText, planScheme } from '../src/exercise-track.js';
 import {
   splitGroupAt, groupLetter, groupMembers, varies, roundValues, toggleField, withLadder, withCell, stepCell, ladderStep,
   flatField, withCardioKey, groupVaries,
@@ -173,4 +174,65 @@ test('стёрли число в клетке — пустой круг, стр�
   // В тренировке пустой круг не подставляет ничего
   const w = fromPlan({ title: 'Круг', exercises: [{ ...cleared, supersetGroup: '' }] }, 'Ноябрь');
   assert.deepEqual(w.exercises[0].sets.map((s) => s.reps), ['12', '', '20']);
+});
+
+test('все круги пустые: «Повторы» без повторов, стёрли все клетки (второй случай 18.11.2026)', () => {
+  const ex = { name: 'Отжимания от пола', sets: '3', reps: '', weight: '', track: { kind: 'bodyweight' } };
+  const on = { ...ex, ...toggleField(ex, 'reps', 3, true) };
+  assert.equal(varies(on, 'reps'), true, '«Повторы» включились');
+  assert.deepEqual(roundValues(on, 'reps', 3), ['', '', '']);
+  // Дальше — правки не размножают строку
+  const again = { ...on, ...toggleField(on, 'reps', 3, true) };
+  assert.equal(again.reps, on.reps);
+  const one = { ...on, ...withCell(on, 'reps', 3, 1, '15') };
+  assert.equal(one.reps, ', 15, ');
+  const cleared = { ...one, ...withCell(one, 'reps', 3, 1, '') };
+  assert.deepEqual(roundValues(cleared, 'reps', 3), ['', '', '']);
+  assert.equal({ ...cleared, ...flatField(cleared, 'reps', 3) }.reps, '');
+  // Показ: пустые круги — пусто, без запятых
+  assert.equal(planText(', , '), '');
+  assert.equal(planText('12, , 20'), '12, , 20');
+  assert.equal(planScheme({ ...cleared, supersetGroup: 'g' }, true), '');
+  // Кардио без значения цели — то же
+  const cardio = { name: 'Гребля', sets: '3', track: { kind: 'cardio', machine: 'rower' }, cardio: { machine: 'rower', goal: 'kcal', metrics: ['kcal'], targets: { kcal: '' }, settings: {} } };
+  const c = { ...cardio, ...toggleField(cardio, 'goal', 3, true) };
+  assert.equal(varies(c, 'goal'), true);
+  assert.equal({ ...c, ...toggleField(c, 'goal', 3, true) }.cardio.perRound.goals, c.cardio.perRound.goals);
+});
+
+test('случайные цепочки правок: строка не растёт сверх числа кругов', () => {
+  let seed = 7;
+  const rnd = (n) => { seed = (seed * 16807) % 2147483647; return seed % n; };
+  const vals = ['', '12', '15', '8–12', ' ', '0', '7,5'];
+  for (let run = 0; run < 3000; run++) {
+    let list = [
+      { name: 'A', sets: '3', reps: '', weight: '', supersetGroup: 'g', track: { kind: 'strength' } },
+      { name: 'B', sets: '3', reps: '12', weight: '', supersetGroup: 'g', track: { kind: 'strength' } },
+    ];
+    for (let step = 0; step < 20; step++) {
+      const i = rnd(2);
+      const f = rnd(2) ? 'reps' : 'weight';
+      const n = parseInt(list[i].sets, 10);
+      const ex = list[i];
+      const op = rnd(6);
+      let p = null;
+      if (op === 0) p = withCell(ex, f, n, rnd(n), vals[rnd(vals.length)]);
+      if (op === 1) p = toggleField(ex, f, n, !varies(ex, f));
+      if (op === 2) p = withLadder(ex, f, n, rnd(2) ? 1 : -1);
+      if (op === 3) { const k = rnd(n); const v = stepCell(ex, f, roundValues(ex, f, n)[k], rnd(2) ? 1 : -1); if (v !== null) p = withCell(ex, f, n, k, v); }
+      if (op === 4) p = { sets: String(Math.max(1, n + (rnd(2) ? 1 : -1))) };
+      if (op === 5) p = flatField(ex, f, n);
+      if (p) list = patchPlanExercise(list, i, p);
+      for (const e of list) {
+        for (const g of ['reps', 'weight']) {
+          const s = String(e[g] ?? '');
+          const m = parseInt(e.sets, 10);
+          const l = roundList(s, g);
+          assert.ok(s.length <= 8 * Math.max(m, 2) + 6, `${g} «${s}» при ${m} кругах`);
+          if (l) assert.ok(l.length <= Math.max(m, 2), `${g} «${s}»: кругов в строке больше, чем ${m}`);
+          if (g === 'reps') assert.ok(l || !/[,;/→]/.test(s), `повторы «${s}» с запятой, но не список`);
+        }
+      }
+    }
+  }
 });

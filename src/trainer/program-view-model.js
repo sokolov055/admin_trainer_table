@@ -5,6 +5,8 @@
  * функции без React — scripts/test-program-view.mjs.
  */
 
+import { planText } from '../exercise-track.js';
+
 /** Тот же подсчёт, что tallyExercises (MuscleMap.jsx): подходы основной и синергистом */
 export function tallyOf(exercises) {
   const tally = {};
@@ -84,8 +86,8 @@ export function gapsLine(gaps, max = 4) {
 
 /** Схема упражнения плашками: ['4×10', '40 кг']; кардио — отдельно (cardioLine) */
 export function schemeOf(e) {
-  const volume = [e.sets, e.reps].filter(Boolean).join('×');
-  const w = String(e.weight || '').trim();
+  const volume = [e.sets, planText(e.reps)].filter(Boolean).join('×');
+  const w = planText(e.weight);
   return [volume, w && w + (/\d$/.test(w) ? ' кг' : '')].filter(Boolean);
 }
 

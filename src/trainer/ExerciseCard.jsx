@@ -4,7 +4,7 @@ import { haptic } from '../telegram.js';
 import { ExerciseThumb } from '../client/PlanCard.jsx';
 import { namesOf } from '../muscles/MuscleMap.jsx';
 import CardioPlan, { MACHINE_NAMES } from './CardioPlan.jsx';
-import { trackOf, cardioFrom, techniqueOf, planOneSide, REST_OPTIONS, restText } from '../exercise-track.js';
+import { trackOf, cardioFrom, techniqueOf, planOneSide, planText, REST_OPTIONS, restText } from '../exercise-track.js';
 import {
   IconBack, IconChevron, IconCheck, IconLinkPair, IconMinus, IconPlus, IconSwap, IconTrash, IconUnlink,
   IconTreadmill, IconSkillmill, IconRower, IconElliptical, IconBike, IconStepper, IconWave,
@@ -57,6 +57,7 @@ function Stepper({ label, note, value, placeholder = '—', step, onText, mode =
             placeholder={placeholder}
             value={shown}
             onChange={(e) => onText(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             onBlur={() => setEdit(false)}
             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
           />
@@ -285,10 +286,10 @@ export default function ExerciseCard({
                   <Stepper label="Подходы" value={String(work)} step={(d) => (work + d >= 1 && work + d <= MAX_SETS ? String(work + d) : null)}
                     onText={(v) => { const n = parseInt(v, 10); if (n > 0) patch(withSets(ex, n)); }} mode="numeric" />
                 )}
-                <Stepper label={track.unilateral && !timed ? 'Повт. на сторону' : repsLabel} value={ex.reps} placeholder={timed ? '60' : '12'} step={(d) => stepReps(ex.reps, d, timed)}
+                <Stepper label={track.unilateral && !timed ? 'Повт. на сторону' : repsLabel} value={planText(ex.reps)} placeholder={timed ? '60' : '12'} step={(d) => stepReps(planText(ex.reps), d, timed)}
                   onText={(v) => patch({ reps: v })} />
                 {!split && (
-                  <Stepper label={weightLabel} value={ex.weight} step={(d) => stepWeight(ex.weight, d)} onText={(v) => patch({ weight: v })} mode="decimal" />
+                  <Stepper label={weightLabel} value={planText(ex.weight)} step={(d) => stepWeight(planText(ex.weight), d)} onText={(v) => patch({ weight: v })} mode="decimal" />
                 )}
               </div>
               <div className="exc-under">

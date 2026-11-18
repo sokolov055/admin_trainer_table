@@ -19,7 +19,6 @@ import {
 
 const short = (name) => String(name || '').trim().split(/\s+/)[0] || 'Упражнение';
 /** Одно значение круга: разделители списка в нём не нужны (у повторов и запятая) */
-const clip = (field, v) => (field === 'reps' ? v.replace(/[,;/→]/g, '') : v.replace(/[;/→]/g, '').replace(/,\s+/g, ','));
 const shown = (v) => String(v || '').trim() || '—';
 
 /** Второе число клетки: «8 кг», «ск 38», «ур 9» */
@@ -35,6 +34,9 @@ function cellParts(ex, n, col) {
 
 /** «Круг 2 · Повторы  − 15 +   шаг − +3 +» — одна строка на то, что меняется */
 function StepRow({ ex, field, n, col, edit, onEdit, onPatch }) {
+  // Что набрано в поле: «7,» по пути к «7,5» — в данные уходит «7»
+  // (oneValue), а в поле остаётся набранное
+  const [typed, setTyped] = useState(null);
   const meta = fieldMeta(ex, field);
   const values = roundValues(ex, field, n);
   const value = values[col];
@@ -58,9 +60,11 @@ function StepRow({ ex, field, n, col, edit, onEdit, onPatch }) {
               inputMode={field === 'reps' ? 'text' : 'decimal'}
               enterKeyHint="done"
               maxLength={12}
-              value={value}
-              onChange={(e) => onPatch(withCell(ex, field, n, col, clip(field, e.target.value)))}
-              onBlur={() => onEdit(null)}
+              value={typed ?? value}
+              onChange={(e) => { setTyped(e.target.value); onPatch(withCell(ex, field, n, col, e.target.value)); }}
+              // Открыли — значение выделено: набранное заменяет его, а не дописывается
+              onFocus={(e) => e.currentTarget.select()}
+              onBlur={() => { setTyped(null); onEdit(null); }}
               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
             />
           )

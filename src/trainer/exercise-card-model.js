@@ -327,10 +327,21 @@ export function withLadder(ex, field, n, dir) {
   return withRoundValues(ex, field, next);
 }
 
+/**
+ * Одно значение круга — без разделителей списка, иначе круг делится на два:
+ * у повторов не бывает и запятой, у веса и кардио «7,5» — дробь, а «7, 5»
+ * и запятая в конце — разделители (18.11.2026)
+ */
+export function oneValue(field, value) {
+  const v = String(value ?? '');
+  return (field === 'reps' ? v.replace(/[,;/→]/g, ' ') : v.replace(/[;/→]/g, ' ').replace(/,(?=\s|$)/g, ' ').replace(/,\s+/g, ','))
+    .replace(/\s+/g, ' ').trim();
+}
+
 /** Поменять значение круга k (кнопкой или клавиатурой); поле само становится «по кругам» */
 export function withCell(ex, field, n, k, value) {
   const values = roundValues(ex, field, Math.max(2, n));
-  values[k] = String(value ?? '').trim();
+  values[k] = oneValue(field, value);
   return withRoundValues(ex, field, values);
 }
 

@@ -12,7 +12,7 @@ import { haptic } from '../telegram.js';
 import { apiPublic } from '../api.js';
 import { useData } from '../useData.js';
 import { useReveal } from '../reveal.js';
-import { trackOf, planScheme, planOneSide, techniqueOf, restText } from '../exercise-track.js';
+import { trackOf, planScheme, planOneSide, planText, techniqueOf, restText } from '../exercise-track.js';
 import { IconPlus, IconCheck, IconLinkPair, IconUnlink } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
@@ -297,7 +297,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const ex = list[i];
     const track = trackOf(ex);
     const scheme = planScheme(ex, inSuperset) || 'подходы не заданы';
-    const weight = track.kind !== 'cardio' && !split && ex.weight ? ' · ' + ex.weight + (/^[+-]?\d/.test(String(ex.weight)) ? (planOneSide(ex) ? ' кг/стор.' : ' кг') : '') : '';
+    const weight = track.kind !== 'cardio' && !split && planText(ex.weight) ? ' · ' + planText(ex.weight) + (/^[+-]?\d/.test(planText(ex.weight)) ? (planOneSide(ex) ? ' кг/стор.' : ' кг') : '') : '';
     // В суперсете «было» — в карточке: рядом со скобкой названию тесно
     const was = !split && !inSuperset && track.kind !== 'cardio' && (ex.lastWeight || ex.prevWeight);
     const named = String(ex.name || '').trim();

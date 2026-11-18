@@ -1,4 +1,4 @@
-import { trackOf, byTime, planScheme, planSet, volumeOf, techniqueOf, planOneSide, missing } from './exercise-track.js';
+import { trackOf, byTime, planScheme, planSet, planText, volumeOf, techniqueOf, planOneSide, missing } from './exercise-track.js';
 import { wasSet, wasIndex, scaleTo, isAssisted } from './effort.js';
 import { withRounds } from './round-plan.js';
 
@@ -283,7 +283,8 @@ function rounds(exercise, people) {
 /** План строкой: «3 × 12 на сторону · 20 кг», у кардио — «20 мин · 8 км/ч». RPE убран 03.10.2026 */
 function prescription(e) {
   const track = trackOf(e);
-  const weight = track.kind === 'cardio' ? '' : e.weight && (/^[+-]?\d/.test(String(e.weight)) ? e.weight + (track.perSide ? ' кг/стор.' : ' кг') : e.weight);
+  const w = planText(e.weight);
+  const weight = track.kind === 'cardio' ? '' : w && (/^[+-]?\d/.test(w) ? w + (track.perSide ? ' кг/стор.' : ' кг') : w);
   return [planScheme(e), weight].filter(Boolean).join(' · ');
 }
 
