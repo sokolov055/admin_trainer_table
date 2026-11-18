@@ -1329,6 +1329,47 @@ test('мои тренировки: программа, прогресс, пит�
     await firstBlock.getByRole('button', { name: 'Вернуть' }).click();
     assert.equal(await firstBlock.locator('.exr').count(), rowsBefore, 'удалённое вернулось');
 
+    // Смахнуть упражнение влево до конца — уходит только оно, тренировка
+    // остаётся (18.11.2026: уезжала и удалялась вся тренировка — строка
+    // упражнения лежит внутри смахиваемой карточки тренировки)
+    // (карточка уже закрыта: «Удалить упражнение» закрыл её)
+    const blocksBefore = await phone.locator('#root main:not([hidden]) .plan-card').count();
+    const victim = firstBlock.locator('.exr').nth(1);
+    await victim.scrollIntoViewIfNeeded();
+    const vb = await victim.boundingBox();
+    const y = vb.y + vb.height / 2;
+    await phone.mouse.move(vb.x + vb.width - 10, y);
+    await phone.mouse.down();
+    for (let k = 1; k <= 12; k++) await phone.mouse.move(vb.x + vb.width - 10 - k * 28, y);
+    const outer = await firstBlock.evaluate((el) => {
+      const c = el.closest('.plan__block-swipe');
+      return c ? getComputedStyle(c.querySelector(':scope > .swipe__content')).transform : 'none';
+    });
+    assert.ok(outer === 'none' || /^matrix\(1, 0, 0, 1, 0, 0\)$/.test(outer), 'карточка тренировки не едет: ' + outer);
+    await phone.mouse.up();
+    await phone.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .plan-card')[0].querySelectorAll('.exr').length === n, rowsBefore - 1, { timeout: 5000 });
+    assert.equal(await phone.locator('#root main:not([hidden]) .plan-card').count(), blocksBefore, 'тренировка на месте');
+    await firstBlock.getByRole('button', { name: 'Вернуть' }).click();
+    assert.equal(await firstBlock.locator('.exr').count(), rowsBefore, 'смахнутое вернулось');
+
+    // «＋ Упражнения» (шаг 3): отметить два — встают в конец по 3 × 12,
+    // кнопка остаётся на том же месте экрана (iPhone прыгал к расписанию)
+    const addBtn = firstBlock.getByRole('button', { name: 'Упражнения', exact: true });
+    await addBtn.scrollIntoViewIfNeeded();
+    const addTop = (await addBtn.boundingBox()).y;
+    await addBtn.click();
+    const addSheet = phone.locator('.exa-sheet .sheet__panel');
+    await addSheet.waitFor({ timeout: 5000 });
+    await addSheet.locator('.exa-tile').nth(0).click();
+    await addSheet.locator('.exa-tile').nth(1).click();
+    assert.equal(await addSheet.locator('.exa-tile__n').allTextContents().then((t) => t.join(',')), '1,2', 'номера порядка');
+    await addSheet.getByRole('button', { name: 'Добавить 2 · по 3 × 12' }).click();
+    await addSheet.waitFor({ state: 'detached', timeout: 5000 });
+    await phone.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .plan-card')[0].querySelectorAll('.exr').length === n, rowsBefore + 2, { timeout: 5000 });
+    await phone.waitForTimeout(1800);
+    assert.ok(Math.abs((await addBtn.boundingBox()).y - addTop) < 4, 'кнопка «Упражнения» на месте');
+    assert.ok(await firstBlock.locator('.exr__meta', { hasText: '3 × 12' }).last().isVisible(), 'новые — 3 × 12');
+
     // Звено ⛓ между упражнениями (шаг 2): нажал — суперсет в синей рамке;
     // синее звено внутри рамки — разобрать обратно
     const plainLinks = firstBlock.locator('.ss-link:not(.ss-link--in) .ss-link__b');

@@ -99,6 +99,13 @@ export function useSwipe({ width = 88, disabled = false, onFull = null } = {}) {
 
   const onPointerDown = (e) => {
     if (disabled || (e.button !== undefined && e.button !== 0)) return;
+    // Строка в строке (упражнение внутри тренировки, 18.11.2026): смахивает
+    // ближайшая к пальцу — иначе вместе с упражнением уезжала вся тренировка
+    // и полное смахивание удаляло её. Касание из листа поверх (портал:
+    // событие React всплывает и сюда, хотя в DOM строки под пальцем нет) — не её
+    const t = e.target;
+    if (!t || !e.currentTarget.contains(t)) return;
+    if (t.closest && t.closest('[data-swipe-left]') !== e.currentTarget) return;
     // Внутри строки своё листание вбок (лента упражнений, FT-791): пока ей
     // есть куда листаться, движение вбок — её, а не смахивание строки
     const own = e.target && e.target.closest && e.target.closest('[data-scroll-x]');

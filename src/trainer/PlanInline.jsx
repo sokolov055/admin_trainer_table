@@ -13,6 +13,7 @@ import { haptic } from '../telegram.js';
 import { apiPublic } from '../api.js';
 import { useData } from '../useData.js';
 import { useReveal } from '../reveal.js';
+import { pinInView } from '../scroll-pin.js';
 import { trackOf, planScheme, planOneSide, planText, techniqueOf, restText } from '../exercise-track.js';
 import { IconPlus, IconCheck, IconLinkPair, IconUnlink } from '../icons.jsx';
 import { patchPlanExercise } from '../plan-block-actions.js';
@@ -210,8 +211,11 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   };
 
   /** Отмеченные в листе «＋ Упражнения» — в конец тренировки, карточку не открываем: схема уже 3 × 12 */
+  const addRef = useRef(null);
   const addMany = (rows) => {
     if (!rows.length) return;
+    // Кнопка «＋ Упражнения» остаётся где была, новые строки встают над ней
+    pinInView(addRef.current);
     const next = latest.current.map((e) => ({ ...e })).concat(rows);
     latest.current = next;
     onChange(next);
@@ -480,7 +484,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
         </div>
       )}
       {list.length > 1 && <p className="plan-inline__hint">{split ? '' : '⛓ между упражнениями — суперсет. '}Подержите упражнение, чтобы перетащить. Смахните влево — удалить.</p>}
-      <div className="plan-inline__add">
+      <div className="plan-inline__add" ref={addRef}>
         <button type="button" className="button" onClick={() => { setCard(null); setAdding(true); haptic('light'); }}><IconPlus size={16} />Упражнения</button>
         <button type="button" className="button button--ghost" onClick={() => add(() => cardioExercise())}><IconPlus size={16} />Кардио</button>
       </div>
