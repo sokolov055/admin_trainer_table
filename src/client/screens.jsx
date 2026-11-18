@@ -698,7 +698,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const canWeekEdit = !!(wplan && wplan.scheduled && data.month && !familyRow && !clientView && !draft && (clientRow ? canRename : true));
 
   const unnamed = (list) => list.some((b) => !b.exercises.length || b.exercises.some((e) => !String(e.name || '').trim()));
-  const push = async (list, seq) => {
+  const push = async (list, seq, tries = 0) => {
     setSaveState('saving');
     try {
       const saved = await apiMutate('plan.save', {
@@ -741,6 +741,13 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       if (editSeq.current === seq && !unnamed(list)) setDraft(null);
       setJournalTick((t) => t + 1);
     } catch (error) {
+      // Сервер просит подождать (429, предел частоты) — повторить самим, тихо:
+      // красная строка «Не сохранилось» и прыжок страницы тут ни к чему (18.11.2026)
+      if (error && error.code === 429 && tries < 3 && editSeq.current === seq) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => push(list, seq, tries + 1), 5000 * (tries + 1));
+        return;
+      }
       if (editSeq.current === seq) setSaveState('error:' + (error.message || 'не сохранилось'));
     }
   };
