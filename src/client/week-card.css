@@ -67,7 +67,8 @@
   transition: transform var(--dur-press) var(--ease-out);
 }
 button.wc-dot:active { transform: scale(.9); }
-.wc-dot.is-cardio { background: var(--warning-fill); color: var(--warning-text); }
+.wc-dot.is-toned { background: color-mix(in srgb, var(--t) var(--tone-wash), var(--surface)); color: color-mix(in srgb, var(--t) 65%, var(--text)); }
+.wc-day__name.is-toned { color: color-mix(in srgb, var(--t) 65%, var(--text)); }
 .wc-dot.is-done { background: var(--good); color: #fff; cursor: default; animation: wc-pop 520ms var(--ease-out) both; }
 .wc-dot.is-moved { box-shadow: 0 0 0 2px var(--warning); }
 @keyframes wc-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.14); } 100% { transform: scale(1); } }

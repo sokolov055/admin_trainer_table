@@ -14,6 +14,7 @@ import { cardioLine, trackOf } from '../exercise-track.js';
 import { PLACES } from '../client/programs-model.js';
 import { goalLook, daysOf, initials, avatarTone } from './program-list-model.js';
 import { weeksOf, muscleLoad, gapsLine, schemeOf, clientsLine, LOAD_WORD } from './program-view-model.js';
+import { slotTones, slotClass, LOAD_GROUP_TONE } from '../data-tones.js';
 import { GoalIcon, LevelBars } from './ProgramList.jsx';
 import './programs-lib.css';
 
@@ -105,7 +106,7 @@ function Muscles({ blocks }) {
         <MuscleFigure primary={primary} secondary={secondary} size="sm" />
         <div className="plib-bars">
           {bars.map((b, i) => (
-            <div key={b.label} className="plib-bar-row">
+            <div key={b.label} className={'plib-bar-row' + (LOAD_GROUP_TONE[b.label] ? ' tone-' + LOAD_GROUP_TONE[b.label] : '')}>
               {b.label}
               <div><i style={{ width: Math.round(b.share * 100) + '%', animationDelay: i * 100 + 'ms' }} /></div>
             </div>
@@ -128,14 +129,14 @@ function ExerciseRow({ e }) {
   );
 }
 
-function Workout({ block, num, open, onToggle, delay }) {
+function Workout({ block, num, tone = '', open, onToggle, delay }) {
   const n = block.exercises.length;
   const minutes = planMinutes(block.exercises);
   const sub = [n + ' упр', minutes && minutes + ' мин', block.with && 'вместе с прошлой'].filter(Boolean).join(' · ');
   return (
     <div className={'plib-wk' + (open ? ' is-open' : '')} style={{ animationDelay: delay + 'ms' }}>
       <button type="button" className="plib-wk__head" aria-expanded={open} onClick={() => { haptic(); onToggle(); }}>
-        <span className="plib-wk__num">{num}</span>
+        <span className={'plib-wk__num' + (tone ? ' ' + tone : '')}>{num}</span>
         <span className="plib-grow"><b>{block.title || 'Тренировка ' + num}</b><small>{sub}</small></span>
         {!open && (
           <span className="plib-thumbs" aria-hidden="true">
@@ -153,6 +154,8 @@ function Workout({ block, num, open, onToggle, delay }) {
 
 function Weeks({ t }) {
   const weeks = weeksOf(t);
+  // Номер тренировки — её цветом, как буква в «Назначить» (18.11.2026)
+  const tones = slotTones(t.blocks);
   const tabs = weeks[0].n > 0 && weeks.length > 1;
   const [week, setWeek] = useState(0);
   const [open, setOpen] = useState(() => new Set(weeks[0].items.length ? [weeks[0].items[0].index] : []));
@@ -178,7 +181,7 @@ function Weeks({ t }) {
       <div key={week}>
         {shown.items.length === 0 && <p className="plib-gaps">В этой неделе тренировок нет.</p>}
         {shown.items.map(({ block, index }, i) => (
-          <Workout key={index} block={block} num={i + 1} open={open.has(index)} onToggle={() => toggle(index)} delay={i * 50} />
+          <Workout key={index} block={block} num={i + 1} tone={slotClass(tones.get(block.title))} open={open.has(index)} onToggle={() => toggle(index)} delay={i * 50} />
         ))}
       </div>
     </>
@@ -211,7 +214,7 @@ function MoreSheet({ t, busy, saved, onClose, onDuplicate, onSaveWorkout, onDele
         </>}
         {pick && t.blocks.map((b, i) => (
           <button key={i} type="button" className="plib-menu__item" disabled={busy || saved[i]} onClick={() => onSaveWorkout(b, i)}>
-            <span className="plib-wk__num">{i + 1}</span>
+            <span className={'plib-wk__num ' + slotClass(slotTones(t.blocks).get(b.title))}>{i + 1}</span>
             <span className="plib-grow"><b>{b.title || 'Тренировка ' + (i + 1)}</b><small>{saved[i] ? 'Уже в «Тренировках»' : b.exercises.length + ' упр' + (b.week ? ' · неделя ' + b.week : '')}</small></span>
             {saved[i] && <IconCheck size={18} />}
           </button>

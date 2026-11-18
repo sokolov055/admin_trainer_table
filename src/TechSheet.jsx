@@ -18,6 +18,7 @@ import { mediaUrl } from './library.js';
 import { MuscleFigure, namesOf } from './muscles/MuscleMap.jsx';
 import { instructionParts } from './equipment-guidance.js';
 import { techModel, workoutPlan, workoutLast, workoutNow, muscleLine } from './tech-sheet-model.js';
+import { muscleTone, muscleClass } from './data-tones.js';
 import SetupSteps from './SetupSteps.jsx';
 import './tech-sheet.css';
 
@@ -129,11 +130,14 @@ function Stats({ plan, last, m }) {
   const help = m.muscles ? namesOf((m.muscles.secondary || []).filter((r) => !(m.muscles.primary || []).includes(r))) : [];
   const line = muscleLine(main, m.muscleName, m.musclesCustom || !m.muscleName);
   const canOpen = !!m.muscles && (main.length + help.length) > 0;
+  // Плитка и основные мышцы — цветом группы (макет colors-mockup, 18.11.2026);
+  // фигура остаётся акцентом (владелец: «оставь»)
+  const tone = muscleClass(muscleTone({ group: m.muscleName, primary: (m.muscles && m.muscles.primary) || [] }));
   const tiles = [
     plan && <div key="plan" className="ts-stat"><i>План</i><Big text={plan} /></div>,
     last && <div key="last" className="ts-stat"><i>Прошлый раз</i><Big text={last} /></div>,
     (m.muscles || line) && (
-      <button key="mus" type="button" className={'ts-stat ts-stat--mus ts-stat--' + sideOf((m.muscles && m.muscles.primary) || []) + (open ? ' is-open' : '')}
+      <button key="mus" type="button" className={'ts-stat ts-stat--mus ts-stat--' + sideOf((m.muscles && m.muscles.primary) || []) + (tone ? ' ' + tone : '') + (open ? ' is-open' : '')}
         disabled={!canOpen} aria-expanded={canOpen ? open : undefined} onClick={() => { haptic(); setOpen(!open); }}>
         {m.muscles && <MuscleFigure primary={m.muscles.primary || []} secondary={m.muscles.secondary || []} size="sm" />}
         <span className="ts-stat__mus"><i>Мышцы</i><b>{line}</b></span>
@@ -145,7 +149,7 @@ function Stats({ plan, last, m }) {
   return <>
     <div className="ts-stats">{tiles.map((t, i) => React.cloneElement(t, { className: t.props.className + ' ts-rise', style: { '--i': 2 + i } }))}</div>
     {canOpen && (
-      <div className={'ts-muscles' + (open ? ' is-open' : '')} inert={open ? undefined : ''}>
+      <div className={'ts-muscles' + (tone ? ' ' + tone : '') + (open ? ' is-open' : '')} inert={open ? undefined : ''}>
         <div>
           <div className="ts-muscles__in">
             <MuscleFigure primary={m.muscles.primary || []} secondary={m.muscles.secondary || []} size="md" captions />

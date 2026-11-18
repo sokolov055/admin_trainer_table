@@ -150,13 +150,21 @@ export function assignCalendar(plan, { startsOn, endsOn = '', count = 4 } = {}) 
   if (!plan.weekly || !startsOn) return { weeks: [], legend: [] };
   const legend = [];
   const titleOf = (g) => g.map((b) => b.title).join(' + ');
-  const letter = (title) => {
+  // Цвет и буква — как у тренировки на экранах клиента (data-tones.js,
+  // 18.11.2026): занятие только из кардио — «К» цветом кардио, номера не занимает
+  let n = 0;
+  const letter = (title, cardio = false) => {
     let item = legend.find((l) => l.title === title);
-    if (!item) { item = { title, letter: CAL_LETTERS[legend.length % CAL_LETTERS.length], tone: legend.length % 6 }; legend.push(item); }
+    if (!item) {
+      item = cardio ? { title, letter: 'К', tone: 'cardio' } : { title, letter: CAL_LETTERS[n % CAL_LETTERS.length], tone: n % 6 };
+      if (!cardio) n += 1;
+      legend.push(item);
+    }
     return item;
   };
+  const cardioOnly = (g) => g.every((b) => (b.exercises || []).length > 0 && b.exercises.every((e) => e && e.cardio));
   const head = new Map();
-  plan.queue.forEach((g) => { head.set(g[0].id, titleOf(g)); letter(titleOf(g)); });
+  plan.queue.forEach((g) => { head.set(g[0].id, titleOf(g)); letter(titleOf(g), cardioOnly(g)); });
   const timeline = scheduledPlan({ blocks: plan.laid, sessions: [], month: '', cfg: plan.cfg, today: at(startsOn) });
   const weeks = timeline.weeks.slice(0, count).map((w) => {
     const cells = Array.from({ length: 7 }, (_, i) => {

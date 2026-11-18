@@ -49,6 +49,7 @@ import { PlusBadge, openPlusOffer } from '../plus.jsx';
 import { useQuickRequest } from '../quick-actions.js';
 import { revealSoon } from '../reveal.js';
 import { takeStart } from './start-request.js';
+import { slotTones, slotClass, slotLetter } from '../data-tones.js';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
@@ -583,6 +584,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   const months = data.available || [];
   const blocks = data.blocks || [];
   const shownBlocks = draft && draft.month === data.month ? draft.blocks : blocks;
+  // Цвет тренировки программы (макет colors-mockup, 18.11.2026): тот же, что
+  // буква в календаре «Назначить»; одна тренировка в плане — без цвета
+  const slotMap = slotTones(data.programBlocks || blocks);
+  const tones = new Set(slotMap.values()).size > 1 ? slotMap : null;
   const running = sessions.find((x) => x.status === 'active' || x.status === 'paused') || null;
 
   // Пока занятие не закрыто, новое начать нельзя: журнал всё равно откроет
@@ -1044,6 +1049,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       {cardShown && planTab !== 'done' && (
         <WeekCard
           plan={wplan}
+          tones={tones}
           sel={weekIndex}
           onSelect={setWeekSel}
           cfg={weeksCfg}
@@ -1374,10 +1380,11 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         >
         {selectingBlocks && <span className={'plan__block-pick' + (picked ? ' is-on' : '')} aria-hidden="true">{picked && <IconCheck size={17} />}</span>}
         {/* Карточка тренировки (FT-791, макет workout-card-mockup.html) */}
-        <section className="section enter plan-card">
+        <section className={'section enter plan-card' + (tones && slotClass(tones.get(block.title)) ? ' ' + slotClass(tones.get(block.title)) : '')}>
           <div className="pc-card">
             <CardHead
               day={day}
+              slot={tones && typeof tones.get(block.title) === 'number' ? { cls: slotClass(tones.get(block.title)), letter: slotLetter(tones.get(block.title)) } : null}
               title={planTab === 'all' && past.length
                 // Во «Всей программе» проведённая — зелёной галочкой
                 ? <span className="plan__title-done"><IconCheck size={18} aria-label="Проведена" />{titleNode}</span>

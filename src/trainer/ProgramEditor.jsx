@@ -17,6 +17,7 @@ import {
 } from '../plan-weeks.js';
 import { goalLook } from './program-list-model.js';
 import { LOAD_WORD } from './program-view-model.js';
+import { slotTones, slotClass } from '../data-tones.js';
 import {
   draftOf, cleanBlocks, draftSnapshot, autoDays, autoMinutes, blockMinutes, weekItems, loadOfWeek, removedWeek,
   movedInWeek, removedAt, copiedTo, addedBlock, sessionsForCardio, cardioAdded, toggledJoin, canJoin, newKey, MAX_WEEKS,
@@ -193,7 +194,7 @@ function AddSheet({ week, length, draft, onAdd, onCopy, onCardio, onClose }) {
         {step === 'tpl' && <WorkoutTemplates onPick={(b) => { onAdd(b); onClose(); }} />}
         {step === 'copy' && draft.map((b, i) => (
           <React.Fragment key={b._k}>
-            {item(<span className="plib-wk__num">{i + 1}</span>, b.title || 'Без названия',
+            {item(<span className={'plib-wk__num ' + slotClass(slotTones(draft).get(b.title))}>{i + 1}</span>, b.title || 'Без названия',
               [length && 'неделя ' + weekOf(b), b.exercises.filter((e) => String(e.name || '').trim()).length + ' упр'].filter(Boolean).join(' · '),
               () => { onCopy(i); onClose(); })}
           </React.Fragment>
@@ -328,6 +329,8 @@ function WorkoutList({ items, draft, length, open, onToggle, onMove, renderBody,
   };
 
   let num = 0;
+  // Номер тренировки — её цветом, как буква в «Назначить» (18.11.2026)
+  const tones = slotTones(draft);
   return (
     <div className="plib-ewks" ref={listRef} data-no-gestures>
       {items.map(({ block, index }, pos) => {
@@ -351,7 +354,7 @@ function WorkoutList({ items, draft, length, open, onToggle, onMove, renderBody,
                 onKeyDown={(e) => onGripKey(e, pos)} onClick={(e) => e.stopPropagation()}>
                 <IconGrip size={18} />
               </button>
-              <span className={'plib-wk__num' + (cardio ? ' plib-wk__num--cardio' : '')} aria-hidden="true">{cardio ? <IconHeart size={16} /> : num}</span>
+              <span className={'plib-wk__num ' + (cardio ? 'plib-wk__num--cardio' : slotClass(tones.get(block.title)))} aria-hidden="true">{cardio ? <IconHeart size={16} /> : num}</span>
               <span className="plib-grow"><b>{block.with && cardio ? '+ ' + title : title}</b><small>{sub}</small></span>
               {!isOpen && !cardio && n > 0 && (
                 <span className="plib-thumbs" aria-hidden="true">

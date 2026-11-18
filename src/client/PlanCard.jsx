@@ -21,6 +21,7 @@ import { MuscleFigure, namesOf, splitTally, tallyExercises } from '../muscles/Mu
 import { supersets } from '../plan-model.js';
 import { planScheme } from '../exercise-track.js';
 import { planSets, planMinutes, lastWeightOf, doneShare } from '../plan-card-model.js';
+import { muscleTone, muscleClass } from '../data-tones.js';
 import './plan-card.css';
 
 const ANIM_ID = /^[\w-]+$/;
@@ -105,13 +106,15 @@ export function IconDumbbell({ size = 30, className = '' }) {
 /* ---------- Шапка ---------- */
 
 /** Метка дня, название, три факта; справа — «⋯» тренера */
-export function CardHead({ day, title, exercises, onMenu, note }) {
+export function CardHead({ day, title, exercises, onMenu, note, slot = null }) {
   const n = exercises.length;
   const sets = planSets(exercises);
   const minutes = n ? planMinutes(exercises) : 0;
   return (
     <div className="pc-head">
       <div className="pc-head__main">
+        {/* Буква тренировки программы её цветом, как в «Назначить» (18.11.2026) */}
+        {slot && slot.letter && <span className={'pc-slot ' + slot.cls} title={'Тренировка ' + slot.letter}>{slot.letter}</span>}
         {day && <span className={'pc-day' + (day.today ? ' pc-day--today' : '')}>{day.today && <i aria-hidden="true" />}{day.text}</span>}
         <h2 className="section__title pc-title">{title}</h2>
         <div className="pc-facts">
@@ -230,7 +233,7 @@ export function ExerciseStrip({ exercises, onOpen }) {
         const can = !!(ex.exercise && onOpen);
         const body = (
           <>
-            <span className="pc-tile__ph">
+            <span className={'pc-tile__ph' + (muscleTone(ex) ? ' ' + muscleClass(muscleTone(ex)) : '')}>
               <ExerciseThumb ex={ex} />
               <span className="pc-tile__n">{i + 1}</span>
             </span>

@@ -5,6 +5,7 @@ import { Sheet, Note } from '../ui.jsx';
 import { IconAlert, IconCheck, IconHeart, IconPlay } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { weekItems, removedFromWeek, carriedToWeek, spanTiny, sessionsText } from '../week-edits.js';
+import { slotClass } from '../data-tones.js';
 import './week-card.css';
 
 /**
@@ -69,7 +70,7 @@ function statusLine(w, cfg) {
   return (cfg.endsOn ? `до ${ru(cfg.endsOn)}` : 'до замены тренером') + debt + extra;
 }
 
-export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = null, trainer = false, canEdit = false, onSettings = null, onEdit = null, onStart = null, onSaved }) {
+export default function WeekCard({ plan, tones = null, sel, onSelect, cfg, month, clientRow = null, trainer = false, canEdit = false, onSettings = null, onEdit = null, onStart = null, onSaved }) {
   const w = plan.weeks[sel];
   const today = dateKey();
   const items = weekItems(w);
@@ -189,8 +190,12 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
     setBusy(false);
   };
 
+  // Тон занятия (макет colors-mockup, 18.11.2026): кардио — своим цветом,
+  // остальное — цветом тренировки программы, как буквы в «Назначить»
+  const toneOf = (it) => (isCardio(it) ? 'tone-cardio' : tones ? slotClass(tones.get(it.rows[0] ? it.rows[0].block.title : it.title)) : '');
   const dot = (it) => {
-    const cls = 'wc-dot' + (it.done ? ' is-done' : isCardio(it) ? ' is-cardio' : '') + (it.from ? ' is-moved' : '') + (!it.done && solo.has(it.id) ? ' is-solo' : '');
+    const tone = toneOf(it);
+    const cls = 'wc-dot' + (it.done ? ' is-done' : tone ? ' is-toned ' + tone : '') + (it.from ? ' is-moved' : '') + (!it.done && solo.has(it.id) ? ' is-solo' : '');
     const icon = it.done ? <IconCheck size={16} /> : isCardio(it) ? <IconHeart size={15} /> : <Dumbbell />;
     const label = `${it.title}${it.done ? ' — сделано' : ''}${it.from ? ', перенесено из ' + spanTiny(it.from) : ''}`;
     if (it.done) return <span key={it.idx} className={cls} role="img" aria-label={label}>{icon}</span>;
@@ -248,7 +253,7 @@ export default function WeekCard({ plan, sel, onSelect, cfg, month, clientRow = 
                 <div className="wc-day__dots">{list.slice(0, 2).map(dot)}{list.length > 2 && <span className="wc-day__more">+{list.length - 2}</span>}</div>
                 {booking && <span className="wc-day__time" aria-label={`запись в ${booking.time}`}>{booking.time}</span>}
                 {soloDay && <span className="wc-day__time is-solo" aria-label="сам, по приложению">сам</span>}
-                {list.length > 0 && <span className="wc-day__name">{shortTitle(list[0].title)}</span>}
+                {list.length > 0 && <span className={'wc-day__name' + (!list[0].done && toneOf(list[0]) ? ' is-toned ' + toneOf(list[0]) : '')}>{shortTitle(list[0].title)}</span>}
               </div>
             );
           })}

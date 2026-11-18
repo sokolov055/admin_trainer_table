@@ -81,6 +81,10 @@
 .ts-muscles__group > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .ts-mchip { padding: 5px 11px; border-radius: 999px; background: var(--accent-wash); color: var(--accent-ink); font-size: var(--text-sm); font-weight: 650; }
 .ts-mchip--help { background: none; border: 1.5px dashed var(--border-strong); color: var(--text-secondary); padding: 3.5px 10px; }
+/* Группа мышц цветом (макет colors-mockup, 18.11.2026) */
+.ts-stat--mus[class*='tone-'] { background: color-mix(in srgb, var(--t) var(--tone-wash), var(--surface)); }
+.ts-stat--mus[class*='tone-'] b, .ts-stat--mus[class*='tone-'] i { color: color-mix(in srgb, var(--t) 65%, var(--text)); }
+.ts-muscles[class*='tone-'] .ts-mchip:not(.ts-mchip--help) { background: color-mix(in srgb, var(--t) var(--tone-wash), var(--surface)); color: color-mix(in srgb, var(--t) 65%, var(--text)); }
 .ts-stat--mus b { display: block; font-size: 13px; font-weight: 700; line-height: 1.2; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
 .ts-stat--mus b small { font-weight: 650; color: var(--text-muted); }
 /* Основные мышцы «дышат» — в такт движению, мягко */

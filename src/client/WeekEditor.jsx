@@ -10,6 +10,7 @@ import {
   firstOpenDay, freeDay, programSessions, crowdedDays, changedWeeks, spanShort, spanTiny, sessionsText,
 } from '../week-edits.js';
 import './week-editor.css';
+import { slotTones, slotClass } from '../data-tones.js';
 
 /**
  * Редактор программы по неделям (FT-788, этап 3, макет
@@ -69,6 +70,8 @@ export default function WeekEditor({ blocks, sessions, month, cfg, clientRow = n
   const openDay = firstOpenDay(cursor, today);
   const titles = useMemo(() => new Map(programSessions([...(blocks || []), ...(cfg.history || []).flatMap((h) => h.blocks || [])].reverse()).map((s) => [s.id, s.title])), [blocks, cfg]);
   const programList = useMemo(() => programSessions(blocks), [blocks]);
+  // Занятие — полоской цвета тренировки программы, как кружок на неделе (18.11.2026)
+  const tones = useMemo(() => { const m = slotTones(blocks); return new Set(m.values()).size > 1 ? m : null; }, [blocks]);
   const out = useMemo(() => clean(edits, base), [edits, base]);
   const changed = changedWeeks(saved, out);
   const dirty = changed.length > 0;
@@ -368,7 +371,8 @@ export default function WeekEditor({ blocks, sessions, month, cfg, clientRow = n
 
   const chip = (it) => {
     const lifted = drag && drag.start === cursor && drag.idx === it.idx;
-    const cls = 'we-item' + (it.done ? ' is-done' : '') + (it.from ? ' is-moved' : '') + (lifted ? ' is-lifted' : '') + (canEdit && !it.done ? ' is-movable' : '');
+    const tone = !it.done && tones && it.rows && it.rows[0] ? slotClass(tones.get(it.rows[0].block.title)) : '';
+    const cls = 'we-item' + (tone ? ' ' + tone : '') + (it.done ? ' is-done' : '') + (it.from ? ' is-moved' : '') + (lifted ? ' is-lifted' : '') + (canEdit && !it.done ? ' is-movable' : '');
     const label = (
       <>
         <span className="we-item__title">{it.title}</span>

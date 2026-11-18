@@ -177,6 +177,36 @@
   --ring-food-end: #ffc21a;
   --ring-sleep: #9b3df2;
   --ring-sleep-end: #d77bff;
+  /* Цвета-данные экранов тренировок (макет colors-mockup-2026-11-17.html,
+     согласован 18.11.2026): от темы и палитры не зависят, одни в обеих темах.
+     Цели программы и аватарки — обложки «Библиотеки → Программы»; тренировка
+     программы (1-я, 2-я…) — те же тона, что буквы календаря «Назначить»;
+     группы мышц — 5 групп «Нагрузки на мышцы»; кардио — одним цветом.
+     Белый текст — только на -end (≥ 5,5:1); на светлом тоне — значки (≥ 3:1).
+     Текст цветом — color-mix 65% с --text, подложка — 14% (тёмная 22%). */
+  --goal-lose: #e0602a;     --goal-lose-end: #b93d1c;
+  --goal-mass: #2f6fe0;     --goal-mass-end: #1d4cad;
+  --goal-cut: #8a55d0;      --goal-cut-end: #5c34a0;
+  --goal-strength: #c43a3a; --goal-strength-end: #8f2323;
+  --goal-tone: #15957f;     --goal-tone-end: #0d6b5b;
+  --goal-endurance: #cf4577;--goal-endurance-end: #9c2b55;
+  --goal-back: #2f86a8;     --goal-back-end: #1e5f7a;
+  --goal-rehab: #5d8f3a;    --goal-rehab-end: #3f6826;
+  --goal-own: #6b6876;      --goal-own-end: #4a4853;
+  --ava-0: #7b61d1; --ava-1: #d1617b; --ava-2: #2f9e86; --ava-3: #c98a2b; --ava-4: #4a7bd1; --ava-5: #8a6a4f;
+  --slot-0: var(--goal-lose);      --slot-0-end: var(--goal-lose-end);
+  --slot-1: var(--goal-mass);      --slot-1-end: var(--goal-mass-end);
+  --slot-2: var(--goal-tone);      --slot-2-end: var(--goal-tone-end);
+  --slot-3: var(--goal-cut);       --slot-3-end: var(--goal-cut-end);
+  --slot-4: var(--goal-endurance); --slot-4-end: var(--goal-endurance-end);
+  --slot-5: var(--goal-back);      --slot-5-end: var(--goal-back-end);
+  --mg-legs: #d9701f;  --mg-legs-end: #a8501a;
+  --mg-back: #2b7cb8;  --mg-back-end: #1d5a8a;
+  --mg-core: #1a9488;  --mg-core-end: #0f6b62;
+  --mg-chest: #c4407a; --mg-chest-end: #93285a;
+  --mg-arms: #7656cc;  --mg-arms-end: #5636a3;
+  --kind-cardio: #d6476e; --kind-cardio-end: #a52e52;
+  --tone-wash: 14%;
 
   /* --- глубина: смещение + мягкое размытие. Свечение без смещения —
          это декорация, а не тень. --- */
@@ -368,6 +398,7 @@
   --ring-food-end: #ffd23f;
   --ring-sleep: #b14dff;
   --ring-sleep-end: #e597ff;
+  --tone-wash: 22%;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --pill-drop: rgba(0, 0, 0, 0.4);
@@ -454,6 +485,7 @@
     --ring-food-end: #ffd23f;
     --ring-sleep: #b14dff;
     --ring-sleep-end: #e597ff;
+    --tone-wash: 22%;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --pill-drop: rgba(0, 0, 0, 0.4);
@@ -492,6 +524,16 @@
    ~0,4 с всему даётся переход по цветам — экран перетекает, а не
    перещёлкивается. Только цвета: размеры и сдвиги не трогаются. Класс
    снимается сам; «Уменьшить движение» его не ставит. */
+/* Тон-данные (data-tones.js): класс ставит --t (цвет) и --t2 (тёмный конец);
+   .tone-wash — подложка тоном и текст тоном (≥ 4,5:1 в обеих темах) */
+.tone-s0 { --t: var(--slot-0); --t2: var(--slot-0-end); } .tone-s1 { --t: var(--slot-1); --t2: var(--slot-1-end); }
+.tone-s2 { --t: var(--slot-2); --t2: var(--slot-2-end); } .tone-s3 { --t: var(--slot-3); --t2: var(--slot-3-end); }
+.tone-s4 { --t: var(--slot-4); --t2: var(--slot-4-end); } .tone-s5 { --t: var(--slot-5); --t2: var(--slot-5-end); }
+.tone-cardio { --t: var(--kind-cardio); --t2: var(--kind-cardio-end); }
+.tone-legs { --t: var(--mg-legs); --t2: var(--mg-legs-end); } .tone-back { --t: var(--mg-back); --t2: var(--mg-back-end); }
+.tone-core { --t: var(--mg-core); --t2: var(--mg-core-end); } .tone-chest { --t: var(--mg-chest); --t2: var(--mg-chest-end); }
+.tone-arms { --t: var(--mg-arms); --t2: var(--mg-arms-end); }
+
 :root.color-shift *,
 :root.color-shift *::before,
 :root.color-shift *::after {

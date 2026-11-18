@@ -5,18 +5,7 @@
  * зависят; белый значок на заливке ≥ 3:1 (графика). Уровни — те же тона,
  * что «Легко/Норм/Тяжело» (--effort-*), как метка уровня у клиента.
  * ========================================================================== */
-:root {
-  --goal-lose: #e0602a;     --goal-lose-end: #b93d1c;
-  --goal-mass: #2f6fe0;     --goal-mass-end: #1d4cad;
-  --goal-cut: #8a55d0;      --goal-cut-end: #5c34a0;
-  --goal-strength: #c43a3a; --goal-strength-end: #8f2323;
-  --goal-tone: #15957f;     --goal-tone-end: #0d6b5b;
-  --goal-endurance: #cf4577;--goal-endurance-end: #9c2b55;
-  --goal-back: #2f86a8;     --goal-back-end: #1e5f7a;
-  --goal-rehab: #5d8f3a;    --goal-rehab-end: #3f6826;
-  --goal-own: #6b6876;      --goal-own-end: #4a4853;
-  --ava-0: #7b61d1; --ava-1: #d1617b; --ava-2: #2f9e86; --ava-3: #c98a2b; --ava-4: #4a7bd1; --ava-5: #8a6a4f;
-}
+/* Токены целей и аватарок --goal-*, --ava-* — в styles.css (нужны и экранам клиента) */
 .plib-goal--lose { --g: var(--goal-lose); --g2: var(--goal-lose-end); }
 .plib-goal--mass { --g: var(--goal-mass); --g2: var(--goal-mass-end); }
 .plib-goal--cut { --g: var(--goal-cut); --g2: var(--goal-cut-end); }
@@ -214,6 +203,9 @@
 .plib-bar-row { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
 .plib-bar-row div { height: 7px; margin-top: 3px; border-radius: 4px; background: var(--surface-sunken); overflow: hidden; }
 .plib-bar-row i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transform-origin: left; animation: plib-grow 1s var(--ease-out) both; }
+/* Группа мышц цветом (макет colors-mockup, 18.11.2026) */
+.plib-bar-row[class*='tone-'] { color: color-mix(in srgb, var(--t) 65%, var(--text)); }
+.plib-bar-row[class*='tone-'] i { background: linear-gradient(90deg, var(--t), var(--t2)); }
 @keyframes plib-grow { from { transform: scaleX(0); } }
 .plib-gaps { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--text-muted); }
 
@@ -230,6 +222,8 @@
 .plib-wk__head b { display: block; font-size: var(--text-base); }
 .plib-wk__head small { font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); }
 .plib-wk__num { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent-ink); font-weight: 800; font-size: var(--text-sm); }
+/* Цвет тренировки программы (data-tones.js): белая цифра на тёмном конце ≥ 5,5:1 */
+.plib-wk__num[class*='tone-'] { background: var(--t2); color: #fff; }
 .plib-wk__chev { flex: none; color: var(--text-muted); transform: rotate(-90deg); transition: transform var(--dur) var(--ease-out); }
 .plib-wk.is-open .plib-wk__chev { transform: none; }
 .plib-wk__body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur) var(--ease-out); }
@@ -368,7 +362,7 @@
   cursor: grab; touch-action: none; border-radius: var(--radius-sm);
 }
 .plib-ewk.is-lifted .plib-ewk__grip { cursor: grabbing; color: var(--accent); }
-.plib-wk__num--cardio { background: color-mix(in srgb, var(--goal-lose) 18%, transparent); color: var(--goal-lose); }
+.plib-wk__num--cardio { background: color-mix(in srgb, var(--kind-cardio) var(--tone-wash), var(--surface)); color: color-mix(in srgb, var(--kind-cardio) 65%, var(--text)); }
 .plib-ewk__body { padding: 0 var(--space-3) var(--space-3); border-top: 1px solid var(--border); animation: plib-in var(--dur-enter) var(--ease-out) both; }
 .plib-ewk__body > .plan-inline { padding: 0; }
 .plib-ewk__body .plan-edit__source { display: block; margin-top: var(--space-2); }
@@ -475,8 +469,13 @@
 .plib-cal__free i, .plib-lgd i { font-style: normal; font-size: 10px; font-weight: 800; color: #fff; border-radius: 6px; padding: 1px 4px; }
 .plib-cal__over { grid-column: 2 / -1; margin: -2px 0 2px; font-size: var(--text-xs); font-weight: 700; color: var(--warning-text); }
 .plib-cal__foot { margin: 8px 0 0; font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); }
-.plib-cal--0 { background: var(--goal-lose); } .plib-cal--1 { background: var(--goal-mass); } .plib-cal--2 { background: var(--goal-tone); }
-.plib-cal--3 { background: var(--goal-cut); } .plib-cal--4 { background: var(--goal-endurance); } .plib-cal--5 { background: var(--goal-back); }
+/* Буква на градиенте к тёмному концу (белый на светлом оранжевом был 3,6:1);
+   тона — те же, что у тренировки на экранах клиента (--slot-*, 18.11.2026) */
+.plib-cal--0 { --t: var(--slot-0); --t2: var(--slot-0-end); } .plib-cal--1 { --t: var(--slot-1); --t2: var(--slot-1-end); }
+.plib-cal--2 { --t: var(--slot-2); --t2: var(--slot-2-end); } .plib-cal--3 { --t: var(--slot-3); --t2: var(--slot-3-end); }
+.plib-cal--4 { --t: var(--slot-4); --t2: var(--slot-4-end); } .plib-cal--5 { --t: var(--slot-5); --t2: var(--slot-5-end); }
+.plib-cal--cardio { --t: var(--kind-cardio); --t2: var(--kind-cardio-end); }
+[class*='plib-cal--']:not(.plib-cal--more) { background: linear-gradient(140deg, var(--t), var(--t2) 70%); }
 .plib-cal--more { background: var(--text-muted); }
 .plib-lgd { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: var(--text-xs); font-weight: 650; color: var(--text-secondary); }
 .plib-lgd span { display: inline-flex; align-items: center; gap: 5px; }
