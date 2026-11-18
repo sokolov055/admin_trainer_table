@@ -91,16 +91,18 @@ export function putBack(list, gone) {
  * Куда упадёт упражнение, которое ведут пальцем. rows — прямоугольники
  * строк до начала переноса (top/bottom) и их суперсет, по номеру в
  * списке; frames — рамки суперсетов { group: { top, bottom } }; y — где
- * сейчас середина строки под пальцем.
+ * сейчас середина строки под пальцем (yFrame — для входа в рамку и
+ * выхода; y для порядка BlockEdit берёт по переднему краю строки — сосед
+ * уступает, когда на него наехали наполовину, как значки iPhone).
  *
  * Ответ: { to, group, at } — место в списке без него, суперсет ('' —
  * отдельно) и где рисовать черту вставки (y между строками).
  */
-export function dropTarget(rows, frames, from, y) {
+export function dropTarget(rows, frames, from, y, yFrame = y) {
   const others = rows.map((r, k) => ({ ...r, k })).filter((r) => r.k !== from);
   const mid = (r) => (r.top + r.bottom) / 2;
   let to = others.filter((r) => mid(r) < y).length;
-  const inside = Object.keys(frames).find((g) => y >= frames[g].top && y <= frames[g].bottom
+  const inside = Object.keys(frames).find((g) => yFrame >= frames[g].top && yFrame <= frames[g].bottom
     // Рамка, где кроме него никого, — не суперсет, в неё не вступают
     && others.some((r) => r.group === g));
   let group = '';
@@ -115,7 +117,7 @@ export function dropTarget(rows, frames, from, y) {
     if (a && b && a.group && a.group === b.group) {
       const pos = others.reduce((out, r, p) => (r.group === a.group ? [...out, p] : out), []);
       const f = frames[a.group];
-      to = f && y < (f.top + f.bottom) / 2 ? pos[0] : pos[pos.length - 1] + 1;
+      to = f && yFrame < (f.top + f.bottom) / 2 ? pos[0] : pos[pos.length - 1] + 1;
     }
   }
   const above = others[to - 1];
@@ -128,4 +130,48 @@ export function dropTarget(rows, frames, from, y) {
   if (!group && above && above.group && frames[above.group]) at = Math.max(at, frames[above.group].bottom + 4);
   if (!group && below && below.group && frames[below.group]) at = Math.min(at, frames[below.group].top - 4);
   return { to, group, at };
+}
+
+/**
+ * Как список выглядит, пока упражнение ведут пальцем (как значки на
+ * экране «Домой» iPhone, 18.11.2026): остальные расступаются — на месте,
+ * куда оно встанет, пустое место (gap: j = -1), рамка суперсета растёт и
+ * сжимается. Само упражнение (j = from) остаётся в своём блоке страницы —
+ * сжатым в ноль и под пальцем: узел, который держит палец, нельзя
+ * переносить в другой блок (на iPhone касание теряется). Поэтому оно
+ * стоит в своей рамке (после её последнего), а отдельное — на своём
+ * месте, но не внутри чужой рамки.
+ *
+ * Элементы: { j, group } — j — номер в list, -1 — пустое место.
+ */
+export function previewSeq(list, from, to, group = '') {
+  const gOf = (j) => list[j].supersetGroup || '';
+  const seq = list.map((_, j) => j).filter((j) => j !== from).map((j) => ({ j, group: gOf(j) }));
+  seq.splice(Math.max(0, Math.min(to, seq.length)), 0, { j: -1, group: group || '' });
+  const own = gOf(from);
+  const mine = { j: from, group: own };
+  let at;
+  const lastOwn = own ? seq.map((x) => x.group).lastIndexOf(own) : -1;
+  if (lastOwn >= 0) at = lastOwn + 1;
+  else {
+    at = from + (Math.min(to, seq.length - 1) <= from ? 1 : 0);
+    // Не разрывать чужую рамку: встать после неё
+    const g = seq[at - 1] && seq[at - 1].group;
+    if (g && seq[at] && seq[at].group === g) {
+      while (seq[at] && seq[at].group === g) at += 1;
+    }
+  }
+  seq.splice(at, 0, mine);
+  return seq;
+}
+
+/** Блоки списка: подряд один суперсет — одна рамка (если в ней больше одного) */
+export function runsOf(seq) {
+  const out = [];
+  seq.forEach((x) => {
+    const last = out[out.length - 1];
+    if (x.group && last && last.group === x.group) last.items.push(x);
+    else out.push({ group: x.group, items: [x] });
+  });
+  return out.map((u) => ({ ...u, group: u.items.length > 1 ? u.group : '' }));
 }

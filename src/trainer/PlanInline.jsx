@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import ExercisePicker from './ExercisePicker.jsx';
 import HistoryMove, { HistoryPick, hadHistory } from './HistoryMove.jsx';
@@ -21,7 +21,7 @@ import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 import MuscleEdit from '../muscles/MuscleEdit.jsx';
 import { Loading } from '../ui.jsx';
 import { barsOf, workOf, splitGroupAt, groupLetter, groupVaries, groupMembers } from './exercise-card-model.js';
-import { moveExercise, leaveBelow, ungroup, removeGroup, putBack, dropTarget } from './superset-move-model.js';
+import { moveExercise, leaveBelow, ungroup, removeGroup, putBack, dropTarget, previewSeq, runsOf } from './superset-move-model.js';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -334,77 +334,134 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   };
 
   /**
-   * Одно упражнение — удержанием (18.11.2026): строка едет за пальцем,
-   * черта показывает, куда встанет; синяя — в суперсет (рамка подсвечена),
-   * оранжевая — выходит из суперсета. Где упадёт — dropTarget
+   * Одно упражнение — удержанием, как значки на экране «Домой» iPhone
+   * (18.11.2026): строка едет за пальцем, остальные расступаются — там, куда
+   * она встанет, пустое место; рамка суперсета растёт, когда в неё ведут, и
+   * сжимается, когда выводят. Раскладка — previewSeq, куда упадёт — dropTarget
+   * (по раскладке без анимаций), соседи доезжают плавно (FLIP).
    */
+  const [preview, setPreview] = useState(null); // { from, to, group, h }
+  const dragRow = useRef(null); // { el, shrink, from, startTop, dy, ty, h }
+  const layout = useRef(null); // { rows, frames } — прямоугольники без анимаций
+  const flipFrom = useRef(null); // Map: ключ узла → top до перестройки
+  const dropAt = useRef(null); // { j, top } — посадка строки после отпускания
+  const motionKey = (el) => (el.dataset.row !== undefined ? 'r' + el.dataset.row : 'h' + el.dataset.head);
+  const movers = () => [...root.current.querySelectorAll('[data-row], [data-head]')]
+    .filter((el) => !dragRow.current || el !== dragRow.current.el);
+  const snapshot = () => new Map(movers().map((el) => [motionKey(el), el.getBoundingClientRect().top]));
+  const measure = () => {
+    const lst = latest.current;
+    const d = dragRow.current;
+    const rows = lst.map(() => ({ top: 0, bottom: 0, group: '' }));
+    root.current.querySelectorAll('[data-row]').forEach((el) => {
+      const j = Number(el.dataset.row);
+      if (!lst[j] || (d && j === d.from)) return;
+      const b = el.getBoundingClientRect();
+      rows[j] = { top: b.top, bottom: b.bottom, group: groupMembers(lst, j).length > 1 ? lst[j].supersetGroup : '' };
+    });
+    const frames = {};
+    root.current.querySelectorAll('[data-frame]').forEach((f) => { const b = f.getBoundingClientRect(); frames[f.dataset.frame] = { top: b.top, bottom: b.bottom }; });
+    layout.current = { rows, frames };
+  };
+  /** Поднятая строка — под пальцем, где бы ни оказалось её место в раскладке */
+  const follow = () => {
+    const d = dragRow.current;
+    if (!d) return;
+    const natural = d.el.getBoundingClientRect().top - d.ty;
+    d.ty = d.startTop + d.dy - natural;
+    d.el.style.transform = `translate3d(0, ${d.ty}px, 0)`;
+  };
+  const still = () => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const glide = (el, dy, ms = 240) => {
+    if (!el.animate || still() || Math.abs(dy) < 0.5) return;
+    el.animate([{ transform: `translate3d(0, ${dy}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }], { duration: ms, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+  };
+  // Раскладка поменялась: замерить без анимаций, соседей — плавно на новые места
+  useLayoutEffect(() => {
+    if (!preview || !root.current) return;
+    const before = flipFrom.current;
+    flipFrom.current = null;
+    const els = movers();
+    els.forEach((el) => { if (el.getAnimations) el.getAnimations().forEach((a) => a.cancel()); });
+    measure();
+    if (before) els.forEach((el) => { const was = before.get(motionKey(el)); if (was !== undefined) glide(el, was - el.getBoundingClientRect().top); });
+    follow();
+  }, [preview]);
+  // Отпустили: строка садится на своё место из-под пальца
+  useLayoutEffect(() => {
+    const d = dropAt.current;
+    if (!d || preview || !root.current) return;
+    dropAt.current = null;
+    const el = root.current.querySelector(`[data-row="${d.j}"]`);
+    if (el) glide(el, d.top - el.getBoundingClientRect().top, 200);
+  }, [list, preview]);
+
   const beginRow = (i, pointerId, y0, head) => {
     haptic('medium');
     flushSync(() => setCard(null));
     const box = root.current;
     if (!box) return;
     try { head.setPointerCapture && head.setPointerCapture(pointerId); } catch (_) { /* старый браузер */ }
-    const els = [...box.querySelectorAll('[data-row]')];
-    const el = els.find((r) => Number(r.dataset.row) === i);
+    const el = box.querySelector(`[data-row="${i}"]`);
     if (!el) return;
-    const from = latest.current;
-    const rect = (r) => r.getBoundingClientRect();
-    const rows = from.map((e, k) => {
-      const r = els.find((x) => Number(x.dataset.row) === k);
-      const b = r ? rect(r) : { top: 0, bottom: 0 };
-      return { top: b.top, bottom: b.bottom, group: groupMembers(from, k).length > 1 ? e.supersetGroup : '' };
-    });
-    const frameEls = [...box.querySelectorAll('[data-frame]')];
-    // Подсветка — на самой рамке (не обводкой внутреннего блока: на iPhone
-    // выглядела второй рамкой поверх, 18.11.2026) и только чужой: вступает
-    const frameOf = (f) => f.closest('.plan-inline__unit--superset') || f;
-    const frames = Object.fromEntries(frameEls.map((f) => { const b = rect(f); return [f.dataset.frame, { top: b.top, bottom: b.bottom }]; }));
-    const own = rows[i].group;
-    const mid0 = (rows[i].top + rows[i].bottom) / 2;
-    const boxTop = rect(box).top;
-    const line = document.createElement('div');
-    line.className = 'plan-inline__drop';
-    line.setAttribute('aria-hidden', 'true');
-    box.appendChild(line);
+    // Отдельное упражнение сжимается вместе со своим блоком, в рамке — только строка
+    const unit = el.closest('[data-unit]');
+    const shrink = unit && !unit.querySelector('[data-frame]') ? unit : el;
+    const r = el.getBoundingClientRect();
+    const h = shrink.getBoundingClientRect().height;
+    const own = groupMembers(latest.current, i).length > 1 ? latest.current[i].supersetGroup : '';
+    dragRow.current = { el, shrink, from: i, startTop: r.top, dy: 0, ty: 0, h: r.height };
+    shrink.style.marginBottom = -h + 'px';
     el.classList.add('plan-inline__row--lifted');
     box.classList.add('is-dragging');
-    const g = { to: null, group: own };
+    const g = { to: i, group: own };
     drag.current = g;
+    flushSync(() => setPreview({ from: i, to: i, group: own, h }));
     const move = (ev) => {
       if (ev.pointerId !== pointerId) return;
-      const dy = ev.clientY - y0;
-      el.style.transform = `translate3d(0, ${dy}px, 0)`;
-      const t = dropTarget(rows, frames, i, mid0 + dy);
-      const same = t.to === i && t.group === own;
-      line.style.transform = `translate3d(0, ${t.at - boxTop}px, 0)`;
-      line.classList.toggle('is-on', !same);
-      line.classList.toggle('is-in', !!t.group);
-      line.classList.toggle('is-out', !t.group && !!own);
-      frameEls.forEach((f) => frameOf(f).classList.toggle('is-target', !!t.group && t.group !== own && f.dataset.frame === t.group));
-      if (g.to !== null && (t.to !== g.to || t.group !== g.group)) haptic('light');
+      const d = dragRow.current;
+      if (!d || !layout.current) return;
+      d.dy = ev.clientY - y0;
+      follow();
+      // Порядок — по переднему краю (вверх — верх строки, вниз — низ):
+      // сосед уступает, когда на него наехали наполовину; рамка — по середине
+      const center = d.startTop + d.dy + d.h / 2;
+      const slot = root.current.querySelector('.plan-inline__gap');
+      const slotMid = slot ? slot.getBoundingClientRect().top + d.h / 2 : center;
+      const edge = center < slotMid ? center - d.h / 2 : center + d.h / 2;
+      const t = dropTarget(layout.current.rows, layout.current.frames, i, edge, center);
+      if (t.to === g.to && t.group === g.group) return;
       g.to = t.to;
       g.group = t.group;
+      haptic('light');
+      flipFrom.current = snapshot();
+      setPreview({ from: i, to: t.to, group: t.group, h });
     };
     const finish = (ev) => {
       if (ev.pointerId !== pointerId) return;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
+      const landTop = el.getBoundingClientRect().top;
       el.style.transform = '';
+      shrink.style.marginBottom = '';
       el.classList.remove('plan-inline__row--lifted');
-      frameEls.forEach((f) => frameOf(f).classList.remove('is-target'));
-      line.remove();
       box.classList.remove('is-dragging');
+      dragRow.current = null;
       drag.current = null;
       swallow.current = true;
       setTimeout(() => { swallow.current = false; }, 350);
-      if (ev.type === 'pointerup' && g.to !== null && !(g.to === i && g.group === own)) {
+      const moved = ev.type === 'pointerup' && !(g.to === i && g.group === own);
+      dropAt.current = { j: moved ? g.to : i, top: landTop };
+      if (moved) {
         const next = moveExercise(latest.current, i, g.to, g.group);
         latest.current = next;
         steady();
         onChange(next);
         haptic('light');
       }
+      // Вместе с новым порядком — одним кадром, без мигания прежнего
+      setPreview(null);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', finish);
@@ -461,7 +518,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const differs = groupVaries(list, u.idx);
     const line = [work + ' ' + word, differs && 'по кругам', rest && 'отдых ' + restText(rest)].filter(Boolean).join(' · ');
     return (
-      <button type="button" className="ss-head" aria-label={'Суперсет ' + letter + ': ' + line + '. Изменить'} onClick={() => openCard(first)} onPointerDown={holdUnit('g' + u.group)}>
+      <button type="button" className="ss-head" data-head={u.group} aria-label={'Суперсет ' + letter + ': ' + line + '. Изменить'} onClick={() => openCard(first)} onPointerDown={holdUnit('g' + u.group)}>
         <IconLinkPair size={16} />
         <span className="ss-head__t">Суперсет {letter}</span>
         <span className="ss-head__m">{line}</span>
@@ -552,21 +609,36 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     );
   };
 
-  const units = unitsOf(list);
+  // Пока упражнение ведут пальцем — раскладка превью (previewSeq): пустое
+  // место там, куда встанет; без переноса — блоки как в списке
+  const view = preview
+    ? previewSeq(list, preview.from, preview.to, preview.group)
+    : list.map((e, j) => ({ j, group: e.supersetGroup || '' }));
+  const gap = (key) => <div key={key} className="plan-inline__gap" style={{ height: preview ? preview.h : 0 }} aria-hidden="true" />;
+  const units = runsOf(view);
+  const lastReal = (u) => { const real = u.items.filter((x) => x.j >= 0); return real.length ? real[real.length - 1].j : -1; };
   return (
     <div className="plan-inline">
       <div ref={root} className="plan-inline__list">
         {units.map((u, ui) => {
-          const key = u.group ? 'g' + u.group : 'e' + u.idx[0];
-          const before = ui > 0 ? link(units[ui - 1].idx[units[ui - 1].idx.length - 1], false) : null;
+          const firstItem = u.items[0];
+          const key = u.group ? 'g' + u.group : firstItem.j < 0 ? 'gap' : 'e' + firstItem.j;
+          const prev = ui > 0 ? lastReal(units[ui - 1]) : -1;
+          const before = !preview && prev >= 0 ? link(prev, false) : null;
           if (!u.group) {
+            if (firstItem.j < 0) return gap(key);
             return (
               <React.Fragment key={key}>
                 {before}
-                <div className="plan-inline__unit" data-unit={key}>{row(u.idx[0], false)}</div>
+                <div className="plan-inline__unit" data-unit={key}>{row(firstItem.j, false)}</div>
               </React.Fragment>
             );
           }
+          // Шапка и действия рамки — по упражнениям суперсета в самом списке
+          const realJ = u.items.find((x) => x.j >= 0 && (list[x.j].supersetGroup || '') === u.group);
+          const idx = realJ ? groupMembers(list, realJ.j) : [];
+          const head = { group: u.group, idx };
+          const inside = u.items;
           return (
             <React.Fragment key={key}>
               {before}
@@ -577,19 +649,19 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
                 contentClassName="plan-inline__unit--superset"
                 data-unit={key}
                 label={'Удалить суперсет ' + groupLetter(list, u.group) + ' целиком'}
-                actionText={u.idx.length > 2 ? 'Удалить все' : 'Удалить оба'}
-                disabled={card !== null}
-                onDelete={() => removeAll(u.idx[0])}
-                extra={{ text: 'Разобрать', label: 'Разобрать суперсет ' + groupLetter(list, u.group), icon: <IconUnlink size={20} />, onClick: () => unpack(u.idx[0]) }}
+                actionText={idx.length > 2 ? 'Удалить все' : 'Удалить оба'}
+                disabled={card !== null || !!preview}
+                onDelete={() => removeAll(idx[0])}
+                extra={{ text: 'Разобрать', label: 'Разобрать суперсет ' + groupLetter(list, u.group), icon: <IconUnlink size={20} />, onClick: () => unpack(idx[0]) }}
               >
                 <div className="plan-inline__frame" data-frame={u.group}>
-                {groupHead(u)}
-                {u.idx.map((i, k) => (
-                  <React.Fragment key={i}>
-                    {k > 0 && link(u.idx[k - 1], true)}
-                    {row(i, true)}
+                {idx.length > 0 && groupHead(head)}
+                {inside.map((x, k) => (x.j < 0 ? gap('gap') : (
+                  <React.Fragment key={x.j}>
+                    {!preview && k > 0 && inside[k - 1].j >= 0 && link(inside[k - 1].j, true)}
+                    {row(x.j, true)}
                   </React.Fragment>
-                ))}
+                )))}
                 </div>
               </SwipeRow>
             </React.Fragment>

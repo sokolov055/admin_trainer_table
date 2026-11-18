@@ -438,16 +438,11 @@
   position: relative; z-index: 6; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-lift);
 }
 .plan-inline__row--lifted .swipe__content { background: var(--surface); border-radius: var(--radius); }
-/* Черта «встанет сюда»: синяя — в суперсет, оранжевая — выходит из суперсета */
-.plan-inline__drop {
-  position: absolute; left: 0; right: 0; top: 0; height: 3px; margin-top: -1.5px; border-radius: 2px; background: var(--accent);
-  opacity: 0; pointer-events: none; z-index: 5; transition: opacity var(--dur-fast) var(--ease-out);
-}
-.plan-inline__drop.is-on { opacity: 1; }
-.plan-inline__drop.is-out { background: var(--warning); }
-/* Рамка, в которую вступает упражнение, — обводкой по своему краю */
-.plan-inline__unit--superset { transition: box-shadow var(--dur-fast) var(--ease-out); }
-.plan-inline__unit--superset.is-target { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 2px var(--accent); }
-@media (prefers-reduced-motion: reduce) { .plan-inline__drop, .plan-inline__unit--superset { transition: none; } }
+/* Пустое место, куда встанет упражнение (как на экране «Домой» iPhone):
+   соседи расступаются, рамка суперсета растёт — без черт и подсветки */
+.plan-inline__gap { flex: none; pointer-events: none; }
+/* Поднятая строка сжата отрицательным отступом — рамка должна сжаться с ней
+   (flow-root держит отступ внутри, иначе он проваливается сквозь блок) */
+.plan-inline__frame { display: flow-root; }
 /* Строка смахнута — звенья ⛓ не ложатся поверх «Из суперсета» / «Удалить» */
 .plan-inline__list:has(.is-swiped) .ss-link { opacity: 0; pointer-events: none; }

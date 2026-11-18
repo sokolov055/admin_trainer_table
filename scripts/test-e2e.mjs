@@ -2084,16 +2084,22 @@ test('суперсет: упражнение переносится внутри
     const pair = await inFrame();
     assert.ok(pair.length >= 2, 'в демо есть суперсет: ' + pair);
 
-    // Внутри своей рамки — без подсветки (на iPhone выглядела второй рамкой поверх)
+    // Как значки на экране «Домой» iPhone: посреди жеста сосед уже отъехал,
+    // на его месте пусто; без черт и второй рамки (18.11.2026)
     {
-      const r = frame.locator('.exr').nth(1);
+      const r = frame.locator('[data-row]').nth(1);
       await r.scrollIntoViewIfNeeded();
       const b = await r.boundingBox();
-      await phone.mouse.move(b.x + 30, b.y + b.height / 2);
+      const top0 = (await frame.locator('[data-row]').first().boundingBox()).y;
+      await phone.mouse.move(b.x + 60, b.y + b.height / 2);
       await phone.mouse.down();
       await phone.waitForTimeout(600);
-      await phone.mouse.move(b.x + 30, b.y - b.height * 0.9, { steps: 10 });
-      assert.equal(await block.locator('.plan-inline__unit--superset.is-target').count(), 0, 'своя рамка не подсвечена');
+      await phone.mouse.move(b.x + 60, b.y - b.height * 0.1, { steps: 10 });
+      await phone.waitForTimeout(400);
+      assert.equal(await block.locator('.plan-inline__gap').count(), 1, 'пустое место одно');
+      const top1 = (await frame.locator('[data-row]').first().boundingBox()).y;
+      assert.ok(top1 - top0 > b.height * 0.8, 'сосед отъехал вниз: ' + top0 + ' → ' + top1);
+      assert.equal(await block.locator('.plan-inline__drop, .is-target').count(), 0, 'ни черты, ни подсветки');
       await phone.mouse.move(b.x + 30, b.y + b.height / 2, { steps: 6 });
       await phone.mouse.up();
       await phone.waitForTimeout(500);

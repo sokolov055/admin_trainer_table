@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { moveExercise, leaveBelow, ungroup, removeGroup, putBack, dropTarget, tidyGroups } from '../src/trainer/superset-move-model.js';
+import { moveExercise, leaveBelow, ungroup, removeGroup, putBack, dropTarget, tidyGroups, runsOf } from '../src/trainer/superset-move-model.js';
 import { techniqueOf } from '../src/exercise-track.js';
 
 /** Суперсет: перенос и смахивание (18.11.2026) */
@@ -67,6 +67,8 @@ test('куда упадёт: внутри рамки — в суперсет, у
   assert.equal(dropTarget(ROWS, FRAMES, 3, 85).at, 78, 'первым в рамку — черта внутри рамки над строкой');
   assert.equal(dropTarget(ROWS, FRAMES, 3, 165).at, 162, 'последним — под строкой, внутри рамки');
   assert.equal(dropTarget(ROWS, FRAMES, 0, 300).to, 4, 'вниз до конца');
+  assert.equal(dropTarget(ROWS, FRAMES, 2, 175, 150).group, 'a', 'край вышел за рамку, середина — нет: остаётся в суперсете');
+  assert.equal(dropTarget(ROWS, FRAMES, 2, 200, 175).group, '', 'середина за рамкой — вышел');
   assert.equal(dropTarget(ROWS, FRAMES, 3, 175).at, 195, 'отдельно под рамкой — черта под рамкой');
   assert.equal(dropTarget(ROWS, FRAMES, 0, 55).at, 56, 'отдельно над рамкой — черта над рамкой');
   assert.equal(dropTarget(ROWS, FRAMES, 4, -10).to, 0, 'вверх до начала');
@@ -79,4 +81,32 @@ test('рамка из двух: второй тянут — рамка пуст�
   assert.equal(t.to, 0);
   const solo = dropTarget([{ top: 0, bottom: 40, group: 'a' }], { a: { top: 0, bottom: 50 } }, 0, 20);
   assert.equal(solo.group, '', 'кроме него никого — не суперсет');
+});
+
+// Превью переноса: { j, group }, -1 — пустое место
+const seqText = (seq) => runsOf(seq).map((u) => (u.group ? '[' : '') + u.items.map((x) => (x.j < 0 ? '_' : LIST[x.j].name)).join(' ') + (u.group ? ']' : '')).join(' ');
+
+test('превью: пустое место там, куда встанет; поднятое — в своей рамке', async () => {
+  const { previewSeq, runsOf: r } = await import('../src/trainer/superset-move-model.js');
+  assert.equal(typeof r, 'function');
+  // В начале — как было: пустое место на своём месте
+  assert.equal(seqText(previewSeq(LIST, 2, 2, 'a')), 'Жим [Пек-дек _ Разгибание] Молотки Планка');
+  // Внутри рамки выше
+  assert.equal(seqText(previewSeq(LIST, 2, 1, 'a')), 'Жим [_ Пек-дек Разгибание] Молотки Планка');
+  // За рамку вниз: рамка из двух остаётся (поднятое в ней), место — под Молотками
+  assert.equal(seqText(previewSeq(LIST, 2, 3, '')), 'Жим [Пек-дек Разгибание] Молотки _ Планка');
+  // Отдельное — в рамку: поднятое стоит после рамки, не разрывая её
+  const join = previewSeq(LIST, 0, 1, 'a');
+  assert.deepEqual(join.map((x) => x.j), [0, 1, -1, 2, 3, 4], 'Жим на своём месте, место — внутри рамки');
+  assert.equal(seqText(join), 'Жим [Пек-дек _ Разгибание] Молотки Планка');
+  // Снизу в рамку: Планка встаёт после Молотков, а не внутрь рамки
+  assert.equal(seqText(previewSeq(LIST, 4, 3, 'a')), 'Жим [Пек-дек Разгибание _] Молотки Планка');
+  // Молотки — первыми в рамку
+  assert.equal(seqText(previewSeq(LIST, 3, 1, 'a')), 'Жим [_ Пек-дек Разгибание] Молотки Планка');
+});
+
+test('превью без переноса — те же блоки, что список', async () => {
+  const { runsOf: r } = await import('../src/trainer/superset-move-model.js');
+  const flat = LIST.map((e, j) => ({ j, group: e.supersetGroup }));
+  assert.deepEqual(r(flat).map((u) => [u.group, u.items.map((x) => x.j)]), [['', [0]], ['a', [1, 2]], ['', [3]], ['', [4]]]);
 });
