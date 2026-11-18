@@ -10,9 +10,11 @@ import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, withoutSet, cloneSet, editSetField } from './workout-model.js';
-import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh, IconPlay } from './icons.jsx';
+import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh, IconPlay, IconSearch } from './icons.jsx';
 import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
-import { BackButton } from './ui.jsx';
+import { BackButton, Sheet } from './ui.jsx';
+import { ExerciseThumb } from './client/PlanCard.jsx';
+import MuscleEdit from './muscles/MuscleEdit.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import { usePendingDelete, UndoBar, UNDO_MS } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
@@ -257,6 +259,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [roundLack, setRoundLack] = useState(null);
   // Переименование касанием по названию (02.10.2026): id упражнения
   const [renaming, setRenaming] = useState('');
+  // В листе упражнения открыт поиск «Другое упражнение» (FT-802)
+  const [namePick, setNamePick] = useState(false);
   // Клиент (и тренер в режиме «смотрите как клиент») название и вид не меняет
   // (владелец, 09.10.2026): это решает тренер. С 10.10.2026 (FT-531) и состав
   // занятия тоже: нет «Выбрать», настроек под названием, перестановки
@@ -1480,7 +1484,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
         .catch(e => setTrackNote({ ei, text: 'В базу не сохранилось: ' + (e.message || 'нет связи'), error: true }));
     };
     return <>
-      <ExerciseKind track={track} onChange={set} className="workout__track" note={trackNote && trackNote.ei === ei ? trackNote : null} />
+      <ExerciseKind tiles track={track} onChange={set} className="workout__track" note={trackNote && trackNote.ei === ei ? trackNote : null} />
     </>;
   };
 
@@ -1550,9 +1554,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           <h4 className="workout__round-title" data-flip-enter="" data-flip-delay={r * 90}>Круг {r + 1}</h4>
           {members.map(({ ex, ei }, k) => ex.sets[r] && (
             <div className="workout__round-item" key={ex.id} data-member={ex.id} data-anchor={ex.id + ':' + r}>
-              {renaming === ex.id + ':' + r
-                ? nameEditor(ex, ei, ex.id + ':' + r)
-                : <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}
+              {renaming === ex.id + ':' + r && nameEditor(ex, ei, ex.id + ':' + r)}
+              <div className="workout__round-name" data-flip={r === 0 && k > 0 ? 'name:' + ex.id : undefined}
                   onPointerDown={holdToMove(ex.id, (head) => ({ container: head.closest('.workout__round'), commit: reorderMembers(group) }))}>
                   {/* Название — касанием: из базы или новое прямо здесь */}
                   {asClient ? ex.name : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id + ':' + r)}>{ex.name}</button>}
@@ -1563,7 +1566,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
                   {ex.sets[r].state === 'done' && <span className={'workout__round-effort workout__round-effort--' + (ex.sets[r].effort || 'ok')}>
                     <IconCheck size={14} aria-hidden="true" />{effortLabel(ex.sets[r].effort)}
                   </span>}
-                </div>}
+                </div>
               {tuning === ex.id + ':' + r && tuneEditor(ex, ei, ex.id + ':' + r, true)}
               {setRow(ex, ei, r, '', k === members.length - 1, true)}
               {memberEffort(members, k, r)}
@@ -1601,33 +1604,62 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const startRename = (id) => {
     if (swallowClick.current || !editable || asClient) return;
     setTuning('');
+    setNamePick(false);
     setRenaming(renaming === id ? '' : id);
   };
-  const nameEditor = (ex, ei, id) => (
-    <div className="workout__panel" key={'rename-' + id}>
+  /**
+   * Лист упражнения в занятии (FT-802, макет 18.11.2026): нажали название —
+   * снизу лист, как карточка в редакторе программы, а не длинная панель
+   * внутри карточки (подходы уезжали вниз, после «Готово» экран прыгал).
+   * Сверху картинка и название, «Другое упражнение» — поиск по базе, ниже
+   * те же плитки, что в «Об упражнении»: вид, мышцы, тренажёры, замены
+   */
+  const nameEditor = (ex, ei, id) => {
+    const info = ex.exerciseId ? setups[ex.exerciseId] : null;
+    const tags = [ex.exerciseId ? 'из базы' : 'нет в базе', info && info.muscle, primaryEquipment(info)?.name].filter(Boolean);
+    const hasVideo = !!(info && info.media);
+    const body = <>
+      <div className="wk-hero">
+        <ExerciseThumb ex={{ ...ex, exercise: info }} className="wk-hero__pic" />
+        <div className="wk-hero__text">
+          <b>{ex.name || 'Новое упражнение'}</b>
+          <span className="wk-hero__tags">{tags.map((t) => <span key={t}>{t}</span>)}{hasVideo && <span className="is-accent">видео</span>}</span>
+        </div>
+      </div>
       {clientRow
-        ? <NameFromBase ex={ex} autoFocus onPick={(patch) => replaceExercise(ei, patch)} />
-        : <input className="field__input" aria-label="Название упражнения" autoFocus value={ex.name} maxLength={160}
-          onChange={e => updateExercise(ei, ({ exerciseId, ...x }) => ({ ...x, name: e.target.value }))}
-          onKeyDown={e => { if (e.key === 'Enter') closePanel(id); }} />}
-      {trackEditor(ex, ei)}
-      {trackOf(ex).kind === 'cardio' && <CardioKind value={cardioOf(ex)} onChange={c => editCardio(ei, c)} />}
-      {/* Тренажёры и оборудование (10.10.2026): тренер прикрепляет прямо в
+        ? namePick
+          ? <NameFromBase ex={ex} autoFocus onPick={(patch) => { replaceExercise(ei, patch); setNamePick(false); }} />
+          : <button type="button" className="wk-swap" onClick={() => { haptic(); setNamePick(true); }}><IconSearch size={18} />Другое упражнение</button>
+        : <label className="workout__field">Название<input className="field__input" aria-label="Название упражнения" value={ex.name} maxLength={160}
+          onChange={e => updateExercise(ei, ({ exerciseId, ...x }) => ({ ...x, name: e.target.value }))} /></label>}
+      <div className="ab-sec">{trackEditor(ex, ei)}</div>
+      {trackOf(ex).kind === 'cardio' && <div className="ab-sec"><CardioKind value={cardioOf(ex)} onChange={c => editCardio(ei, c)} /></div>}
+      {/* Мышцы — в базу тренера, как в программе */}
+      {clientRow && info && <div className="ab-sec"><MuscleEdit tile key={'mus:' + ex.exerciseId} exerciseId={ex.exerciseId} name={ex.name}
+        muscles={info.muscles} custom={!!info.musclesCustom} onSaved={() => setSetupsTick(t => t + 1)} /></div>}
+      {/* Тренажёры и замены (10.10.2026) — тренер прикрепляет прямо в
           занятии — выбор под упражнением появится сразу */}
-      {clientRow && ex.name && <ExerciseMachines exerciseId={ex.exerciseId} name={ex.name} onChanged={(saved) => { if (saved && !ex.exerciseId) updateExercise(ei, x => ({ ...x, exerciseId: saved.id })); setSetupsTick(t => t + 1); }} />}
+      {clientRow && ex.name && <ExerciseMachines compact exerciseId={ex.exerciseId} name={ex.name} onChanged={(saved) => { if (saved && !ex.exerciseId) updateExercise(ei, x => ({ ...x, exerciseId: saved.id })); setSetupsTick(t => t + 1); }} />}
       {/* Перенос истории из журнала клиента (владелец, 16.10.2026): в идущем
           занятии тоже, когда часть подходов уже сделана, а упражнение
           оказалось «тем же, но под старым названием»: сделанное остаётся
           как есть, веса и настройка — у неотмеченных подходов */}
       {!asClient && clientRow && editable && ex.exerciseId && (
-        <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
+        <HistoryPick row clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
           onOpen={() => setHistoryPick(ex.id)} onClose={() => setHistoryPick(null)} onMoved={() => reloadHistory(ei)}
           after="Веса и настройка — уже в этом занятии." />
       )}
-      <p className="small muted">Порядок — подержите название упражнения и перетащите.</p>
-      <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>
-    </div>
-  );
+    </>;
+    // Без настоящего DOM (тесты компонента) лист не открыть порталом —
+    // то же содержимое панелью на месте, как слой отдыха и сообщения
+    const dom = typeof document !== 'undefined' && !!document.body && document.body.nodeType === 1;
+    if (!dom) {
+      return <div className="workout__panel" key={'rename-' + id}>{body}
+        <div className="workout__panel-actions"><button type="button" className="button button--primary" onClick={() => closePanel(id)}>Готово</button></div>
+      </div>;
+    }
+    return <Sheet key={'rename-' + id} title="Упражнение в занятии" className="wk-name-sheet" onClose={() => closePanel(id)} onDone={() => closePanel(id)}>{body}</Sheet>;
+  };
 
   /**
    * Настройки упражнения — касанием по единицам или плану (FT-513): у кардио

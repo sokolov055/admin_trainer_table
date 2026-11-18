@@ -202,12 +202,15 @@
 .exc-person { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2); align-items: center; }
 
 /* Об упражнении — свёрнуто */
-.exc-acc { border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.exc-acc { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+/* Плитки внутри — серые на белом (FT-802); шаг между разделами — у сетки */
+.exc-acc__body .ab-sec { margin-top: 0; }
+.exc-acc__body .ab-hist { margin-top: 0; }
 .exc-acc__head {
   display: grid; grid-template-columns: 1fr auto; grid-template-areas: 't i' 's i'; align-items: center; column-gap: var(--space-2); width: 100%;
   padding: 12px 14px; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-base); font-weight: 650; text-align: left; cursor: pointer;
 }
-.exc-acc__sub { grid-area: s; font-size: var(--text-sm); font-weight: 400; color: var(--text-muted); }
+.exc-acc__sub { grid-area: s; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); font-weight: 400; color: var(--text-muted); }
 .exc-acc__head svg { grid-area: i; color: var(--text-muted); transition: transform var(--dur) var(--ease-out); }
 .exc-acc.is-open .exc-acc__head svg { transform: rotate(180deg); }
 .exc-acc__body { display: grid; gap: var(--space-4); padding: 0 14px 14px; animation: exc-in var(--dur) var(--ease-out); }

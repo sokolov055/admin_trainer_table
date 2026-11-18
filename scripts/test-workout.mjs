@@ -1122,7 +1122,8 @@ test('«делал под другим названием?» — и в идущ�
   data.clear();
   exerciseSetupResponse = { setups: { 90: { name: 'Жим над головой в тренажёре с дисками', setup: '', notes: '', machines: [], alternatives: [],
     noteKey: 'e:жим', muscles: { primary: [], secondary: [] }, media: null } }, notes: {} };
-  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Это упражнение делали под другим названием?');
+  // Строкой со значком в листе упражнения (FT-802, 18.11.2026)
+  const has = (node) => node.root.findAllByType('button').some((b) => text(b) === 'Делали под другим названием?' || text(b) === 'Это упражнение делали под другим названием?');
   let local;
   try {
     await act(async () => {

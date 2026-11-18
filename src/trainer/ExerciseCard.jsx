@@ -35,6 +35,9 @@ const MACHINES = [
   ['elliptical', 'Эллипс', IconElliptical], ['bike', 'Вело', IconBike], ['stepper', 'Степпер', IconStepper], ['other', 'Другое', IconWave],
 ];
 
+/** Вид упражнения в строке «Об упражнении» — как на плитках */
+const KIND_SHORT = { strength: 'Вес', bodyweight: 'Своё тело', timed: 'Время', cardio: 'Кардио' };
+
 /** Счётчик: подпись, крупное число (нажать — вписать своё), «− / +» */
 function Stepper({ label, note, value, placeholder = '—', step, onText, mode = 'text' }) {
   const [edit, setEdit] = useState(false);
@@ -330,7 +333,8 @@ export default function ExerciseCard({
           <div className={'exc-acc' + (about ? ' is-open' : '')}>
             <button type="button" className="exc-acc__head" aria-expanded={about} onClick={() => setAbout(!about)}>
               Об упражнении
-              <span className="exc-acc__sub">что записывать, мышцы, тренажёры</span>
+              {/* Что внутри — коротко (FT-802): вид и основная группа */}
+              <span className="exc-acc__sub">{[KIND_SHORT[track.kind] || '', primary.slice(0, 2).join(', ').toLowerCase() || 'мышцы не отмечены'].filter(Boolean).join(' · ')}</span>
               <IconChevron size={18} />
             </button>
             {about && <div className="exc-acc__body">{renderAbout(index)}</div>}

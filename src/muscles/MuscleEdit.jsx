@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
-import { IconCheck } from '../icons.jsx';
+import { IconCheck, IconPen } from '../icons.jsx';
 import { MuscleFigure, MuscleNames, LABELS } from './MuscleMap.jsx';
+import '../exercise-kind-tiles.css';
 
 /**
  * Правка карты мышц упражнения тренером (FT-491, владелец 08.10.2026:
@@ -31,7 +32,7 @@ export async function saveExerciseMuscles({ exerciseId, name, muscles }) {
   return res && res.exercise ? res.exercise : null;
 }
 
-export default function MuscleEdit({ exerciseId, name, muscles, custom = false, onSaved }) {
+export default function MuscleEdit({ exerciseId, name, muscles, custom = false, onSaved, tile = false }) {
   const [value, setValue] = useState(() => ({
     primary: (muscles && muscles.primary) || [],
     secondary: (muscles && muscles.secondary) || [],
@@ -76,6 +77,27 @@ export default function MuscleEdit({ exerciseId, name, muscles, custom = false, 
     save(next);
   };
 
+  // Плиткой (FT-802, 18.11.2026): фигура целиком, нажать — изменить;
+  // карандаш в углу вместо кнопки «Изменить»
+  if (!open && tile) {
+    return (
+      <div className="muscle-edit">
+        <span className="ab-lab">Мышцы</span>
+        <button type="button" className="ab-tile ab-tile--muscles" aria-label="Мышцы: изменить" onClick={() => { setOpen(true); haptic(); }}>
+          <MuscleFigure primary={value.primary} secondary={value.secondary} size="sm" />
+          <MuscleNames primary={value.primary} secondary={value.secondary} max={3}
+            empty={<p className="muscles__hint" style={{ flex: 1 }}>Мышцы не отмечены — нажмите, чтобы отметить</p>} />
+          <span className="ab-tile__pen" aria-hidden="true"><IconPen size={14} /></span>
+        </button>
+        {note && (
+          <p className={'exercise-kind__note' + (note.error ? ' exercise-kind__note--error' : '')} role="status">
+            {!note.error && <IconCheck size={13} />}
+            {note.text}
+          </p>
+        )}
+      </div>
+    );
+  }
   if (!open) {
     return (
       <div className="muscle-edit">
@@ -99,7 +121,7 @@ export default function MuscleEdit({ exerciseId, name, muscles, custom = false, 
   return (
     <div className="muscle-edit">
       <div className="muscle-edit__head">
-        <span className="exercise-kind__label">Мышцы</span>
+        <span className={tile ? 'ab-lab' : 'exercise-kind__label'}>Мышцы</span>
         <div className="muscle-edit__head-actions">
           {mine && (
             <button type="button" className="button button--ghost muscle-edit__reset" onClick={() => { setMine(false); save(null); }}>

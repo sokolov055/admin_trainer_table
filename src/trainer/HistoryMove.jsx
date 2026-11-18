@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useReveal } from '../reveal.js';
+import { IconClock } from '../icons.jsx';
 
 /**
  * Подписи — безличные (17.10.2026): та же кнопка и в «Моих тренировках»
@@ -82,7 +83,7 @@ function plural(n) {
  * веса с настройкой переезжают сюда (HistoryMove). Только тренеру.
  */
 /** autoOpen — открыт сразу, без своей ссылки (занятие: пункт меню «Ещё») */
-export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '«Было» и веса — уже в программе.', autoOpen = false }) {
+export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '«Было» и веса — уже в программе.', autoOpen = false, row = false }) {
   const [list, setList] = useState(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -108,6 +109,8 @@ export function HistoryPick({ clientRow, to, onOpen, onClose, onMoved, after = '
   if (from) return <HistoryMove clientRow={clientRow} from={from} to={to} onClose={close} onMoved={onMoved} after={after} />;
   if (!open) {
     if (autoOpen) return null;
+    // Строкой со значком (FT-802, 18.11.2026) — в «Об упражнении» и листе занятия
+    if (row) return <button type="button" className="ab-hist" onClick={show}><IconClock size={18} />Делали под другим названием?</button>;
     return <button type="button" className="history-move__link" onClick={show}>Это упражнение делали под другим названием?</button>;
   }
   const words = query.trim().toLowerCase();

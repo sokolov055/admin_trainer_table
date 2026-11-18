@@ -1,7 +1,8 @@
 import React from 'react';
 import { apiMutate } from './api.js';
 import { KIND_LABELS } from './exercise-track.js';
-import { IconCheck } from './icons.jsx';
+import { IconCheck, IconDumbbell, IconBody, IconClock, IconPulse } from './icons.jsx';
+import './exercise-kind-tiles.css';
 
 /**
  * Вид упражнения: что записывать в подходе и работа одной стороной или двумя
@@ -19,8 +20,87 @@ import { IconCheck } from './icons.jsx';
 // Тренажёр у кардио больше не выбирают (владелец, 09.10.2026): настройки —
 // скорость, наклон, уровень — тренер задаёт в карточке кардио (CardioPlan)
 
-export default function ExerciseKind({ track, onChange, disabled = false, className = '', note = null, allowAuto = false }) {
+/** Плитки вида (18.11.2026, FT-802): картинка и короткое слово */
+const TILES = [
+  ['strength', 'Вес', IconDumbbell],
+  ['bodyweight', 'Своё тело', IconBody],
+  ['timed', 'Время', IconClock],
+  ['cardio', 'Кардио', IconPulse],
+];
+
+/**
+ * Вид упражнения плитками (FT-802, макет 18.11.2026) — в «Об упражнении»
+ * редактора программы и в листе упражнения идущего занятия: четыре плитки
+ * с картинкой, «по одной стороне» и «вес с одной стороны» — плашками-
+ * переключателями с маленьким рисунком. Учёт тот же, что у чипов
+ */
+function KindTiles({ track, set, disabled, className, note }) {
+  const side = (key, label, bars) => (
+    <button
+      type="button"
+      className={'ek-side' + (track[key] ? ' is-on' : '')}
+      aria-pressed={!!track[key]}
+      disabled={disabled}
+      onClick={() => set({ [key]: !track[key] })}
+    >
+      <span className="ek-side__ill" aria-hidden="true">{bars.map((on, i) => <i key={i} className={on ? 'is-a' : ''} />)}</span>
+      <span className="ek-side__t">{label}</span>
+    </button>
+  );
+  return (
+    <div className={'ek' + (className ? ' ' + className : '')}>
+      <span className="ek__label">Как записывать</span>
+      <div className="ek-kinds" role="radiogroup" aria-label="Как записывать">
+        {TILES.map(([k, label, Icon]) => {
+          const on = track.kind === k;
+          return (
+            <button
+              type="button"
+              key={k}
+              role="radio"
+              aria-checked={on}
+              aria-label={KIND_LABELS[k]}
+              className={'ek-kind' + (on ? ' is-on' : '')}
+              disabled={disabled}
+              onClick={() => !on && set({ kind: k, auto: false, weightMode: undefined, machine: k === 'cardio' ? (track.machine || 'treadmill') : '' })}
+            >
+              <Icon size={24} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {track.kind !== 'cardio' && (
+        <div className="ek-sides">
+          {side('unilateral', 'По одной стороне', [true, false])}
+          {track.kind === 'strength' && side('perSide', 'Вес с одной стороны', [true, true])}
+          {track.kind === 'bodyweight' && (
+            <button
+              type="button"
+              className={'ek-side' + (track.weightMode === 'assistance' ? ' is-on' : '')}
+              aria-pressed={track.weightMode === 'assistance'}
+              disabled={disabled}
+              onClick={() => set({ weightMode: track.weightMode === 'assistance' ? undefined : 'assistance' })}
+            >
+              <span className="ek-side__ill ek-side__ill--up" aria-hidden="true"><i className="is-a" /><i /></span>
+              <span className="ek-side__t">Вес помощи</span>
+            </button>
+          )}
+        </div>
+      )}
+      {note && (
+        <p className={'exercise-kind__note' + (note.error ? ' exercise-kind__note--error' : '')} role="status">
+          {!note.error && <IconCheck size={13} />}
+          {note.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function ExerciseKind({ track, onChange, disabled = false, className = '', note = null, allowAuto = false, tiles = false }) {
   const set = (patch) => onChange({ ...track, ...patch });
+  if (tiles && !allowAuto) return <KindTiles track={track} set={set} disabled={disabled} className={className} note={note} />;
   // В карточке упражнения (Library.jsx) есть «Автоматически»: тип по
   // названию и мышце (сервер, exercise-kind.js); auto — текущая догадка
   const auto = allowAuto && !!track.auto;

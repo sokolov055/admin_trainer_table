@@ -582,9 +582,11 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     return (
       <>
         {/* Вид упражнения — как в идущем занятии; пишется в базу */}
-        <ExerciseKind track={trackOf(ex)} onChange={(t) => changeTrack(i, t)} note={kindNote && kindNote.i === i ? kindNote : null} />
+        {/* Плитками (FT-802, 18.11.2026): вид, мышцы, тренажёры, замены */}
+        <div className="ab-sec"><ExerciseKind tiles track={trackOf(ex)} onChange={(t) => changeTrack(i, t)} note={kindNote && kindNote.i === i ? kindNote : null} /></div>
         {/* Карта мышц (FT-491): основная группа и синергисты — в базу тренера */}
-        <MuscleEdit
+        <div className="ab-sec"><MuscleEdit
+          tile
           // По названию, не по id: первое сохранение заводит упражнение
           // в базе, и id появляется — правка не должна от этого схлопнуться
           key={keyOf(ex.name)}
@@ -593,13 +595,13 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
           muscles={ex.muscles}
           custom={!!ex.musclesCustom}
           onSaved={(saved) => changeMuscles(i, saved)}
-        />
+        /></div>
         {/* Тренажёры и оборудование (10.10.2026) — прямо в программе */}
-        <ExerciseMachines key={'m:' + keyOf(ex.name)} exerciseId={ex.exerciseId} name={ex.name} />
+        <ExerciseMachines compact key={'m:' + keyOf(ex.name)} exerciseId={ex.exerciseId} name={ex.name} />
         {/* До тренировки (владелец, 16.10.2026): упражнение уже новое, а
             клиент делал его под старым названием — перенести сюда */}
         {clientRow && ex.exerciseId && !(historyAsk && historyAsk.i === i) && (!hadHistory(ex) || historyPick === i) ? (
-          <HistoryPick clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
+          <HistoryPick row clientRow={clientRow} to={{ id: Number(ex.exerciseId), name: ex.name }}
             onOpen={() => setHistoryPick(i)} onClose={() => setHistoryPick(null)} onMoved={onHistoryMoved} />
         ) : null}
         {/* Настройка тренажёра у клиента — как в идущем занятии */}
