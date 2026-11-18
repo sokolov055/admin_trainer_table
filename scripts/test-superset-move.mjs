@@ -64,6 +64,8 @@ test('куда упадёт: внутри рамки — в суперсет, у
   assert.deepEqual(dropTarget(ROWS, FRAMES, 2, 240), { to: 3, group: '', at: 230 }, 'за рамкой под Молотками');
   assert.equal(dropTarget(ROWS, FRAMES, 3, 110).group, 'a', 'Молотки в рамку');
   assert.equal(dropTarget(ROWS, FRAMES, 3, 110).to, 2);
+  assert.equal(dropTarget(ROWS, FRAMES, 3, 85).at, 78, 'первым в рамку — черта внутри рамки над строкой');
+  assert.equal(dropTarget(ROWS, FRAMES, 3, 165).at, 162, 'последним — под строкой, внутри рамки');
   assert.equal(dropTarget(ROWS, FRAMES, 0, 300).to, 4, 'вниз до конца');
   assert.equal(dropTarget(ROWS, FRAMES, 3, 175).at, 195, 'отдельно под рамкой — черта под рамкой');
   assert.equal(dropTarget(ROWS, FRAMES, 0, 55).at, 56, 'отдельно над рамкой — черта над рамкой');

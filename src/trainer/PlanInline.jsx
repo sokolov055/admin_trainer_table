@@ -87,6 +87,12 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   const root = useRef(null);
   const drag = useRef(null);
   const swallow = useRef(false);
+  /**
+   * Список — на месте, пока над ним перестраивается лента картинок
+   * карточки (подписи в одну-две строки меняют её высоту): после переноса
+   * и удаления на iPhone страница прыгала (18.11.2026)
+   */
+  const steady = () => pinInView(root.current);
 
   // iPhone отменяет прокрутку только слушателю, который висел с начала касания
   useEffect(() => {
@@ -173,7 +179,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     next.forEach((e) => { if (e.supersetGroup === g) e.sets = most > 0 ? String(most) : '3'; });
   });
   /** Синее звено внутри рамки: суперсет разбирается в этом месте */
-  const unlinkAt = (i) => { onChange(splitGroupAt(latest.current, i)); haptic('light'); };
+  const unlinkAt = (i) => { steady(); onChange(splitGroupAt(latest.current, i)); haptic('light'); };
   const leave = (i) => set((next) => {
     const g = next[i].supersetGroup;
     next[i].supersetGroup = '';
@@ -191,6 +197,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     return () => clearTimeout(t);
   }, [gone]);
   const remove = (i) => {
+    steady();
     setCard(null);
     const ex = latest.current[i];
     setGone(ex && String(ex.name || '').trim() ? { items: [{ i, ex: { ...ex } }], text: 'Упражнение удалено' } : null);
@@ -200,6 +207,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   };
   const restore = () => {
     if (!gone) return;
+    steady();
     const next = putBack(latest.current, gone.items);
     latest.current = next;
     setGone(null);
@@ -207,10 +215,11 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     haptic('light');
   };
   /** Смахнули упражнение в рамке → «Из суперсета»: встаёт отдельным под рамкой */
-  const outOf = (i) => { setCard(null); const next = leaveBelow(latest.current, i); latest.current = next; onChange(next); haptic('light'); };
+  const outOf = (i) => { steady(); setCard(null); const next = leaveBelow(latest.current, i); latest.current = next; onChange(next); haptic('light'); };
   /** Смахнули шапку → «Разобрать» / «Удалить оба» */
-  const unpack = (i) => { setCard(null); const next = ungroup(latest.current, i); latest.current = next; onChange(next); haptic('light'); };
+  const unpack = (i) => { steady(); setCard(null); const next = ungroup(latest.current, i); latest.current = next; onChange(next); haptic('light'); };
   const removeAll = (i) => {
+    steady();
     setCard(null);
     const { next, gone: items } = removeGroup(latest.current, i);
     setGone({ items, text: 'Суперсет удалён · ' + items.length + ' ' + (items.length < 5 ? 'упражнения' : 'упражнений') });
@@ -315,6 +324,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
         const units = unitsOf(list);
         const [moved] = units.splice(from, 1);
         units.splice(g.to, 0, moved);
+        steady();
         onChange(units.flatMap((u) => u.idx.map((i) => ({ ...list[i] }))));
       }
     };
@@ -345,6 +355,9 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       return { top: b.top, bottom: b.bottom, group: groupMembers(from, k).length > 1 ? e.supersetGroup : '' };
     });
     const frameEls = [...box.querySelectorAll('[data-frame]')];
+    // Подсветка — на самой рамке (не обводкой внутреннего блока: на iPhone
+    // выглядела второй рамкой поверх, 18.11.2026) и только чужой: вступает
+    const frameOf = (f) => f.closest('.plan-inline__unit--superset') || f;
     const frames = Object.fromEntries(frameEls.map((f) => { const b = rect(f); return [f.dataset.frame, { top: b.top, bottom: b.bottom }]; }));
     const own = rows[i].group;
     const mid0 = (rows[i].top + rows[i].bottom) / 2;
@@ -367,7 +380,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       line.classList.toggle('is-on', !same);
       line.classList.toggle('is-in', !!t.group);
       line.classList.toggle('is-out', !t.group && !!own);
-      frameEls.forEach((f) => f.classList.toggle('is-target', !same && f.dataset.frame === t.group));
+      frameEls.forEach((f) => frameOf(f).classList.toggle('is-target', !!t.group && t.group !== own && f.dataset.frame === t.group));
       if (g.to !== null && (t.to !== g.to || t.group !== g.group)) haptic('light');
       g.to = t.to;
       g.group = t.group;
@@ -379,7 +392,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       window.removeEventListener('pointercancel', finish);
       el.style.transform = '';
       el.classList.remove('plan-inline__row--lifted');
-      frameEls.forEach((f) => f.classList.remove('is-target'));
+      frameEls.forEach((f) => frameOf(f).classList.remove('is-target'));
       line.remove();
       box.classList.remove('is-dragging');
       drag.current = null;
@@ -388,6 +401,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       if (ev.type === 'pointerup' && g.to !== null && !(g.to === i && g.group === own)) {
         const next = moveExercise(latest.current, i, g.to, g.group);
         latest.current = next;
+        steady();
         onChange(next);
         haptic('light');
       }
@@ -464,7 +478,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
         aria-label={inside
           ? 'Разобрать суперсет между «' + (list[i].name || i + 1) + '» и «' + (list[i + 1].name || i + 2) + '»'
           : 'В суперсет: «' + (list[i].name || i + 1) + '» и «' + (list[i + 1].name || i + 2) + '»'}
-        onClick={() => (inside ? unlinkAt(i) : (joinNext(i), haptic('light')))}
+        onClick={() => (inside ? unlinkAt(i) : (steady(), joinNext(i), haptic('light')))}
       >
         {inside ? <IconUnlink size={14} /> : <IconLinkPair size={14} />}
       </button>

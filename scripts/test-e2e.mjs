@@ -2084,6 +2084,20 @@ test('суперсет: упражнение переносится внутри
     const pair = await inFrame();
     assert.ok(pair.length >= 2, 'в демо есть суперсет: ' + pair);
 
+    // Внутри своей рамки — без подсветки (на iPhone выглядела второй рамкой поверх)
+    {
+      const r = frame.locator('.exr').nth(1);
+      await r.scrollIntoViewIfNeeded();
+      const b = await r.boundingBox();
+      await phone.mouse.move(b.x + 30, b.y + b.height / 2);
+      await phone.mouse.down();
+      await phone.waitForTimeout(600);
+      await phone.mouse.move(b.x + 30, b.y - b.height * 0.9, { steps: 10 });
+      assert.equal(await block.locator('.plan-inline__unit--superset.is-target').count(), 0, 'своя рамка не подсвечена');
+      await phone.mouse.move(b.x + 30, b.y + b.height / 2, { steps: 6 });
+      await phone.mouse.up();
+      await phone.waitForTimeout(500);
+    }
     // 1. Внутри рамки: второе — первым, рамка та же
     await hold(frame.locator('.exr').nth(1), (b) => b.y - b.height * 0.9);
     assert.deepEqual((await inFrame()).slice(0, 2), [pair[1], pair[0]], 'порядок внутри суперсета');

@@ -445,8 +445,9 @@
 }
 .plan-inline__drop.is-on { opacity: 1; }
 .plan-inline__drop.is-out { background: var(--warning); }
-.plan-inline__frame { border-radius: var(--radius); transition: outline-color var(--dur-fast) var(--ease-out); outline: 2px solid transparent; outline-offset: 2px; }
-.plan-inline__frame.is-target { outline-color: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .plan-inline__drop, .plan-inline__frame { transition: none; } }
+/* Рамка, в которую вступает упражнение, — обводкой по своему краю */
+.plan-inline__unit--superset { transition: box-shadow var(--dur-fast) var(--ease-out); }
+.plan-inline__unit--superset.is-target { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 2px var(--accent); }
+@media (prefers-reduced-motion: reduce) { .plan-inline__drop, .plan-inline__unit--superset { transition: none; } }
 /* Строка смахнута — звенья ⛓ не ложатся поверх «Из суперсета» / «Удалить» */
 .plan-inline__list:has(.is-swiped) .ss-link { opacity: 0; pointer-events: none; }

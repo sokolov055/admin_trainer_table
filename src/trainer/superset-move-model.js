@@ -121,6 +121,9 @@ export function dropTarget(rows, frames, from, y) {
   const above = others[to - 1];
   const below = others[to];
   let at = above && below ? (above.bottom + below.top) / 2 : above ? above.bottom + 4 : below ? below.top - 4 : 0;
+  // В суперсет первым или последним — черта внутри рамки, у строки, а не на её краю
+  if (group && !(above && above.group === group)) at = below.top - 2;
+  else if (group && !(below && below.group === group)) at = above.bottom + 2;
   // Встанет отдельно рядом с суперсетом — черта за краем рамки, не внутри
   if (!group && above && above.group && frames[above.group]) at = Math.max(at, frames[above.group].bottom + 4);
   if (!group && below && below.group && frames[below.group]) at = Math.min(at, frames[below.group].top - 4);
