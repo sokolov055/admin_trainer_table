@@ -99,14 +99,6 @@
 .plib-ava--more { background: var(--text-muted); }
 .plib-ava--big { width: 40px; height: 40px; margin: 0; border: 0; font-size: 14px; }
 
-/* Смахивание: «Назначить» (акцент) левее «Удалить» (SwipeRow extra) */
-.swipe__action--two { width: 176px; }
-.swipe__extra {
-  flex: 0 0 88px; display: flex; align-items: stretch; padding: 0; border: 0; background: var(--accent-fill);
-  color: var(--accent-text); font: inherit; font-size: var(--text-xs); font-weight: 600; cursor: pointer;
-  overflow: hidden; transition: flex-basis var(--dur) var(--ease-out);
-}
-.swipe__action--two.is-armed .swipe__extra { flex-basis: 0; }
 .plib-swipe .swipe__action { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; overflow: hidden; }
 
 /* Листы */

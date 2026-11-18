@@ -49,6 +49,8 @@ export function paintSwipe(content, action, x, { width, animate = false, armed =
   action.style.width = w + 'px';
   action.style.opacity = String(Math.min(1, Math.abs(x) / width));
   action.style.visibility = x ? 'visible' : 'hidden';
+  // Строка сдвинута — метка на ней: звенья суперсета поверх кнопок прячутся
+  if (content.parentElement && content.parentElement.classList) content.parentElement.classList.toggle('is-swiped', !!x);
   // Подпись корзины (88 px у правого края) при полном смахивании едет к
   // пальцу; второе действие (SwipeRow extra) в этот момент складывается
   const trash = action.querySelector('.swipe__trash') || action.firstElementChild;

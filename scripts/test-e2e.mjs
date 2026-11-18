@@ -2054,6 +2054,115 @@ test('тренировка в программе переносится удер
   }
 });
 
+test('суперсет: упражнение переносится внутри и за рамку, шапка — целиком', async () => {
+  // 18.11.2026, макет superset-drag-2026-11-18.html
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    const block = phone.locator('#root main:not([hidden]) .plan-card').nth(1);
+    await block.getByRole('button', { name: 'Править' }).click({ timeout: 10000 });
+    const frame = block.locator('.plan-inline__unit--superset').first();
+    await frame.waitFor({ timeout: 10000 });
+    const names = () => block.locator('.exr__name').allInnerTexts();
+    const inFrame = () => frame.locator('.exr__name').allInnerTexts();
+    const hold = async (loc, toY) => {
+      await loc.scrollIntoViewIfNeeded();
+      const b = await loc.boundingBox();
+      await phone.mouse.move(b.x + 30, b.y + b.height / 2);
+      await phone.mouse.down();
+      await phone.waitForTimeout(600);
+      await phone.mouse.move(b.x + 30, toY(b), { steps: 14 });
+      await phone.mouse.up();
+      await phone.waitForTimeout(500);
+    };
+    const pair = await inFrame();
+    assert.ok(pair.length >= 2, 'в демо есть суперсет: ' + pair);
+
+    // 1. Внутри рамки: второе — первым, рамка та же
+    await hold(frame.locator('.exr').nth(1), (b) => b.y - b.height * 0.9);
+    assert.deepEqual((await inFrame()).slice(0, 2), [pair[1], pair[0]], 'порядок внутри суперсета');
+
+    // 2. Шапка — едет весь суперсет: над предыдущим упражнением
+    const all = await names();
+    const prev = all[all.indexOf(pair[1]) - 1];
+    assert.ok(prev && !pair.includes(prev), 'в демо над суперсетом есть упражнение');
+    const pb = await block.locator('.exr__name', { hasText: prev }).first().boundingBox();
+    await hold(frame.locator('.ss-head'), () => pb.y - pb.height - 60);
+    const moved = await names();
+    assert.ok(moved.indexOf(prev) > moved.indexOf(pair[0]), 'суперсет целиком выше «' + prev + '»: ' + moved);
+    assert.deepEqual((await inFrame()).slice(0, 2), [pair[1], pair[0]], 'суперсет не развалился');
+
+    // 3. За рамку — вышел из суперсета
+    const framesBefore = await block.locator('.plan-inline__unit--superset').count();
+    const fb = await frame.boundingBox();
+    await hold(frame.locator('.exr').first(), () => fb.y + fb.height + 60);
+    if (pair.length === 2) assert.equal(await block.locator('.plan-inline__unit--superset').count(), framesBefore - 1, 'из двух — рамки нет');
+    else assert.ok(!(await inFrame()).includes(pair[1]), 'вышел из рамки');
+  } finally {
+    await context.close();
+  }
+});
+
+test('суперсет: смахнуть упражнение — «Из суперсета», шапку — «Удалить оба» и «Вернуть»', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const phone = await context.newPage();
+  phone.on('pageerror', (error) => consoleErrors.push(String(error)));
+  try {
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click({ timeout: 20000 });
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    const block = phone.locator('#root main:not([hidden]) .plan-card').nth(1);
+    await block.getByRole('button', { name: 'Править' }).click({ timeout: 10000 });
+    const frames = block.locator('.plan-inline__unit--superset');
+    await frames.first().waitFor({ timeout: 10000 });
+    const swipe = async (loc) => {
+      await loc.scrollIntoViewIfNeeded();
+      const b = await loc.boundingBox();
+      const y = b.y + Math.min(20, b.height / 2);
+      await phone.mouse.move(b.x + b.width - 12, y);
+      await phone.mouse.down();
+      await phone.mouse.move(b.x + b.width - 140, y, { steps: 8 });
+      await phone.mouse.up();
+      await phone.waitForTimeout(400);
+    };
+    const count = () => block.locator('.exr').count();
+    // Упражнение в рамке: два действия, «Из суперсета» — под рамку
+    const rows = await count();
+    const framesBefore = await frames.count();
+    const name = await frames.first().locator('.exr__name').first().innerText();
+    await swipe(frames.first().locator('.exr').first());
+    await block.getByRole('button', { name: 'Убрать «' + name + '» из суперсета' }).click();
+    await phone.waitForTimeout(400);
+    assert.equal(await count(), rows, 'упражнение не удалено');
+    const left = await frames.count() === framesBefore ? await frames.first().locator('.exr__name').allInnerTexts() : [];
+    assert.ok(!left.includes(name), 'вышло из суперсета');
+
+    // Шапка: «Удалить оба» → «Вернуть»
+    await block.locator('.ss-link:not(.ss-link--in) .ss-link__b').first().click();
+    await phone.waitForTimeout(400);
+    const frame = frames.first();
+    const members = await frame.locator('.exr').count();
+    const total = await count();
+    await swipe(frame.locator('.ss-head'));
+    await block.getByRole('button', { name: /^Удалить суперсет .+ целиком$/ }).click();
+    await phone.waitForFunction(([n]) => document.querySelectorAll('#root main:not([hidden]) .plan-card')[1].querySelectorAll('.exr').length === n, [total - members], { timeout: 5000 });
+    assert.ok(await block.getByText(/Суперсет удалён · \d/).isVisible(), 'подпись «Суперсет удалён»');
+    await block.getByRole('button', { name: 'Вернуть' }).click();
+    assert.equal(await count(), total, 'вернулись все');
+    assert.equal(await frame.locator('.exr').count(), members, 'и суперсет');
+  } finally {
+    await context.close();
+  }
+});
+
 test('FT-568: список и карточка показывают один баланс даже со старым кешем обзора', async () => {
   const context = await browser.newContext({ viewport: VIEWPORT, locale: 'ru-RU', isMobile: true, hasTouch: true });
   const phone = await context.newPage();

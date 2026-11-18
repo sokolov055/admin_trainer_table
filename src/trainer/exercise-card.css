@@ -425,3 +425,28 @@
   .exa-tile__n { animation: none; }
   .exa-tile:active, .exa-chip:active, .exa-new:active { transform: none; }
 }
+
+/* ---------- Суперсет: перенос и смахивание (18.11.2026) ---------- */
+/* Рамка смахивается целиком: корень — SwipeRow, сама рамка — его содержимое */
+.plan-inline__unit--ss { margin: var(--space-2) 0; border-bottom: 0; border-radius: var(--radius-lg); background: transparent; }
+.plan-inline__unit--ss > .plan-inline__unit--superset { margin: 0; }
+.plan-inline__unit--ss > .swipe__action { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; overflow: hidden; }
+.plan-inline__list { position: relative; }
+/* Пока тянут строку, рамки её не обрезают */
+.plan-inline__list.is-dragging .swipe { overflow: visible; }
+.plan-inline__list .plan-inline__row--lifted {
+  position: relative; z-index: 6; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-lift);
+}
+.plan-inline__row--lifted .swipe__content { background: var(--surface); border-radius: var(--radius); }
+/* Черта «встанет сюда»: синяя — в суперсет, оранжевая — выходит из суперсета */
+.plan-inline__drop {
+  position: absolute; left: 0; right: 0; top: 0; height: 3px; margin-top: -1.5px; border-radius: 2px; background: var(--accent);
+  opacity: 0; pointer-events: none; z-index: 5; transition: opacity var(--dur-fast) var(--ease-out);
+}
+.plan-inline__drop.is-on { opacity: 1; }
+.plan-inline__drop.is-out { background: var(--warning); }
+.plan-inline__frame { border-radius: var(--radius); transition: outline-color var(--dur-fast) var(--ease-out); outline: 2px solid transparent; outline-offset: 2px; }
+.plan-inline__frame.is-target { outline-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .plan-inline__drop, .plan-inline__frame { transition: none; } }
+/* Строка смахнута — звенья ⛓ не ложатся поверх «Из суперсета» / «Удалить» */
+.plan-inline__list:has(.is-swiped) .ss-link { opacity: 0; pointer-events: none; }

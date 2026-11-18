@@ -20,7 +20,8 @@ import { patchPlanExercise } from '../plan-block-actions.js';
 import ExerciseKind, { saveExerciseTrack } from '../ExerciseKind.jsx';
 import MuscleEdit from '../muscles/MuscleEdit.jsx';
 import { Loading } from '../ui.jsx';
-import { barsOf, workOf, splitGroupAt, groupLetter, groupVaries } from './exercise-card-model.js';
+import { barsOf, workOf, splitGroupAt, groupLetter, groupVaries, groupMembers } from './exercise-card-model.js';
+import { moveExercise, leaveBelow, ungroup, removeGroup, putBack, dropTarget } from './superset-move-model.js';
 
 /**
  * Правка программы прямо в развёрнутой тренировке (владелец, 03.10.2026) —
@@ -34,8 +35,11 @@ import { barsOf, workOf, splitGroupAt, groupLetter, groupVaries } from './exerci
  * упражнении» (что записывать, мышцы, тренажёры, история клиента).
  *   звено ⛓ между упражнениями — собрать суперсет, синее звено внутри
  *   рамки — разобрать (шаг 2: круги «по кругам» — в карточке суперсета);
- *   подержать упражнение — перетащить; суперсет едет целиком;
- *   смахнуть влево — удалить, «Вернуть».
+ *   подержать упражнение — перетащить одно: внутри рамки суперсета —
+ *   порядок, за рамку — выйти, в рамку — вступить; подержать шапку
+ *   суперсета — едет весь (18.11.2026, superset-move-model.js);
+ *   смахнуть упражнение — удалить (в суперсете ещё «Из суперсета»), шапку
+ *   суперсета — «Удалить оба» / «Разобрать»; всё с «Вернуть».
  * Каждое изменение сразу уходит на сервер всем месяцем (onChange родителя).
  */
 
@@ -180,7 +184,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   // client/screens.jsx): правка уходит на сервер сама через 0,7 с, и
   // смахнутое по ошибке терялось насовсем (аудит 24.10.2026). Пустую строку
   // без названия не жалеем
-  const [gone, setGone] = useState(null); // { i, ex }
+  const [gone, setGone] = useState(null); // { items: [{ i, ex }], text }
   useEffect(() => {
     if (!gone) return undefined;
     const t = setTimeout(() => setGone(null), 8000);
@@ -189,18 +193,29 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   const remove = (i) => {
     setCard(null);
     const ex = latest.current[i];
-    setGone(ex && String(ex.name || '').trim() ? { i, ex: { ...ex } } : null);
+    setGone(ex && String(ex.name || '').trim() ? { items: [{ i, ex: { ...ex } }], text: 'Упражнение удалено' } : null);
     const next = latest.current.map((e) => ({ ...e }));
     next.splice(i, 1);
     onChange(next);
   };
   const restore = () => {
     if (!gone) return;
-    const next = latest.current.map((e) => ({ ...e }));
-    next.splice(Math.min(gone.i, next.length), 0, gone.ex);
+    const next = putBack(latest.current, gone.items);
+    latest.current = next;
     setGone(null);
     onChange(next);
     haptic('light');
+  };
+  /** Смахнули упражнение в рамке → «Из суперсета»: встаёт отдельным под рамкой */
+  const outOf = (i) => { setCard(null); const next = leaveBelow(latest.current, i); latest.current = next; onChange(next); haptic('light'); };
+  /** Смахнули шапку → «Разобрать» / «Удалить оба» */
+  const unpack = (i) => { setCard(null); const next = ungroup(latest.current, i); latest.current = next; onChange(next); haptic('light'); };
+  const removeAll = (i) => {
+    setCard(null);
+    const { next, gone: items } = removeGroup(latest.current, i);
+    setGone({ items, text: 'Суперсет удалён · ' + items.length + ' ' + (items.length < 5 ? 'упражнения' : 'упражнений') });
+    latest.current = next;
+    onChange(next);
   };
 
   const add = (make) => {
@@ -232,7 +247,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
   };
 
   /* ---------- Перестановка удержанием ---------- */
-  const hold = (key) => (e) => {
+  const hold = (start) => (e) => {
     if (drag.current || (e.button !== undefined && e.button !== 0)) return;
     if (e.target.closest && e.target.closest('input, textarea, select')) return;
     const x0 = e.clientX; const y0 = e.clientY; const id = e.pointerId; const head = e.currentTarget;
@@ -243,11 +258,13 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       window.removeEventListener('pointercancel', off);
     };
     const early = (ev) => { if (ev.pointerId === id && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) off(); };
-    const timer = setTimeout(() => { off(); begin(key, id, y0, head); }, 450);
+    const timer = setTimeout(() => { off(); start(id, y0, head); }, 450);
     window.addEventListener('pointermove', early);
     window.addEventListener('pointerup', off);
     window.addEventListener('pointercancel', off);
   };
+  const holdUnit = (key) => hold((id, y0, head) => begin(key, id, y0, head));
+  const holdRow = (i) => hold((id, y0, head) => beginRow(i, id, y0, head));
   const begin = (key, pointerId, y0, head) => {
     haptic('medium');
     flushSync(() => setCard(null));
@@ -306,6 +323,80 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     window.addEventListener('pointercancel', finish);
   };
 
+  /**
+   * Одно упражнение — удержанием (18.11.2026): строка едет за пальцем,
+   * черта показывает, куда встанет; синяя — в суперсет (рамка подсвечена),
+   * оранжевая — выходит из суперсета. Где упадёт — dropTarget
+   */
+  const beginRow = (i, pointerId, y0, head) => {
+    haptic('medium');
+    flushSync(() => setCard(null));
+    const box = root.current;
+    if (!box) return;
+    try { head.setPointerCapture && head.setPointerCapture(pointerId); } catch (_) { /* старый браузер */ }
+    const els = [...box.querySelectorAll('[data-row]')];
+    const el = els.find((r) => Number(r.dataset.row) === i);
+    if (!el) return;
+    const from = latest.current;
+    const rect = (r) => r.getBoundingClientRect();
+    const rows = from.map((e, k) => {
+      const r = els.find((x) => Number(x.dataset.row) === k);
+      const b = r ? rect(r) : { top: 0, bottom: 0 };
+      return { top: b.top, bottom: b.bottom, group: groupMembers(from, k).length > 1 ? e.supersetGroup : '' };
+    });
+    const frameEls = [...box.querySelectorAll('[data-frame]')];
+    const frames = Object.fromEntries(frameEls.map((f) => { const b = rect(f); return [f.dataset.frame, { top: b.top, bottom: b.bottom }]; }));
+    const own = rows[i].group;
+    const mid0 = (rows[i].top + rows[i].bottom) / 2;
+    const boxTop = rect(box).top;
+    const line = document.createElement('div');
+    line.className = 'plan-inline__drop';
+    line.setAttribute('aria-hidden', 'true');
+    box.appendChild(line);
+    el.classList.add('plan-inline__row--lifted');
+    box.classList.add('is-dragging');
+    const g = { to: null, group: own };
+    drag.current = g;
+    const move = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      const dy = ev.clientY - y0;
+      el.style.transform = `translate3d(0, ${dy}px, 0)`;
+      const t = dropTarget(rows, frames, i, mid0 + dy);
+      const same = t.to === i && t.group === own;
+      line.style.transform = `translate3d(0, ${t.at - boxTop}px, 0)`;
+      line.classList.toggle('is-on', !same);
+      line.classList.toggle('is-in', !!t.group);
+      line.classList.toggle('is-out', !t.group && !!own);
+      frameEls.forEach((f) => f.classList.toggle('is-target', !same && f.dataset.frame === t.group));
+      if (g.to !== null && (t.to !== g.to || t.group !== g.group)) haptic('light');
+      g.to = t.to;
+      g.group = t.group;
+    };
+    const finish = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      el.style.transform = '';
+      el.classList.remove('plan-inline__row--lifted');
+      frameEls.forEach((f) => f.classList.remove('is-target'));
+      line.remove();
+      box.classList.remove('is-dragging');
+      drag.current = null;
+      swallow.current = true;
+      setTimeout(() => { swallow.current = false; }, 350);
+      if (ev.type === 'pointerup' && g.to !== null && !(g.to === i && g.group === own)) {
+        const next = moveExercise(latest.current, i, g.to, g.group);
+        latest.current = next;
+        onChange(next);
+        haptic('light');
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+  };
+
   /* ---------- Строка упражнения: картинка, название, подходы, «было» ---------- */
   const cardOf = (ex) => ex.exercise || (ex.exerciseId ? base.find((b) => b.id === ex.exerciseId) : null) || null;
   const row = (i, inSuperset) => {
@@ -320,11 +411,13 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
       <SwipeRow
         key={i}
         className="plan-inline__row"
+        data-row={i}
         label={'Удалить упражнение ' + (ex.name || i + 1)}
         disabled={card !== null}
         onDelete={() => remove(i)}
+        extra={inSuperset ? { text: 'Из суперсета', label: 'Убрать «' + (named || i + 1) + '» из суперсета', icon: <IconUnlink size={20} />, onClick: () => outOf(i) } : null}
       >
-        <button type="button" className="exr" aria-label={(named || 'Упражнение без названия') + ': ' + scheme + weight + '. Открыть карточку'} onClick={() => openCard(i)}>
+        <button type="button" className="exr" aria-label={(named || 'Упражнение без названия') + ': ' + scheme + weight + '. Открыть карточку'} onClick={() => openCard(i)} onPointerDown={holdRow(i)}>
           <ExerciseThumb ex={{ ...ex, exercise: cardOf(ex) }} className="exr__pic" />
           <span className="exr__body">
             <span className={'exr__name' + (named ? '' : ' is-empty')}>{named || 'Название упражнения'}</span>
@@ -354,7 +447,7 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
     const differs = groupVaries(list, u.idx);
     const line = [work + ' ' + word, differs && 'по кругам', rest && 'отдых ' + restText(rest)].filter(Boolean).join(' · ');
     return (
-      <button type="button" className="ss-head" aria-label={'Суперсет ' + letter + ': ' + line + '. Изменить'} onClick={() => openCard(first)}>
+      <button type="button" className="ss-head" aria-label={'Суперсет ' + letter + ': ' + line + '. Изменить'} onClick={() => openCard(first)} onPointerDown={holdUnit('g' + u.group)}>
         <IconLinkPair size={16} />
         <span className="ss-head__t">Суперсет {letter}</span>
         <span className="ss-head__m">{line}</span>
@@ -456,15 +549,26 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
             return (
               <React.Fragment key={key}>
                 {before}
-                <div className="plan-inline__unit" data-unit={key} onPointerDown={hold(key)}>{row(u.idx[0], false)}</div>
+                <div className="plan-inline__unit" data-unit={key}>{row(u.idx[0], false)}</div>
               </React.Fragment>
             );
           }
           return (
             <React.Fragment key={key}>
               {before}
-              {/* Рамка суперсета: шапка с кругами, упражнения, синие звенья между ними */}
-              <div className="plan-inline__unit plan-inline__unit--superset" data-unit={key} onPointerDown={hold(key)}>
+              {/* Рамка суперсета: шапка с кругами, упражнения, синие звенья между ними.
+                  Смахнуть шапку — уезжает вся рамка: «Удалить оба» / «Разобрать» */}
+              <SwipeRow
+                className="plan-inline__unit plan-inline__unit--ss"
+                contentClassName="plan-inline__unit--superset"
+                data-unit={key}
+                label={'Удалить суперсет ' + groupLetter(list, u.group) + ' целиком'}
+                actionText={u.idx.length > 2 ? 'Удалить все' : 'Удалить оба'}
+                disabled={card !== null}
+                onDelete={() => removeAll(u.idx[0])}
+                extra={{ text: 'Разобрать', label: 'Разобрать суперсет ' + groupLetter(list, u.group), icon: <IconUnlink size={20} />, onClick: () => unpack(u.idx[0]) }}
+              >
+                <div className="plan-inline__frame" data-frame={u.group}>
                 {groupHead(u)}
                 {u.idx.map((i, k) => (
                   <React.Fragment key={i}>
@@ -472,18 +576,19 @@ export function BlockEdit({ block, members = [], clientRow = 0, onChange, onRemo
                     {row(i, true)}
                   </React.Fragment>
                 ))}
-              </div>
+                </div>
+              </SwipeRow>
             </React.Fragment>
           );
         })}
       </div>
       {gone && (
         <div className="plan__block-undo" role="status">
-          <span>Упражнение удалено</span>
+          <span>{gone.text}</span>
           <button type="button" className="button button--ghost" onClick={restore}>Вернуть</button>
         </div>
       )}
-      {list.length > 1 && <p className="plan-inline__hint">{split ? '' : '⛓ между упражнениями — суперсет. '}Подержите упражнение, чтобы перетащить. Смахните влево — удалить.</p>}
+      {list.length > 1 && <p className="plan-inline__hint">{split ? '' : '⛓ между упражнениями — суперсет. '}Подержите упражнение, чтобы перетащить{split ? '' : ', шапку суперсета — весь суперсет'}. Смахните влево — удалить.</p>}
       <div className="plan-inline__add" ref={addRef}>
         <button type="button" className="button" onClick={() => { setCard(null); setAdding(true); haptic('light'); }}><IconPlus size={16} />Упражнения</button>
         <button type="button" className="button button--ghost" onClick={() => add(() => cardioExercise())}><IconPlus size={16} />Кардио</button>
