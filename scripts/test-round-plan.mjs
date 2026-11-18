@@ -153,3 +153,24 @@ test('«+» у кругов продолжает шаг, «−» убирает 
   assert.equal(groupVaries(list, [0, 1, 2]), true);
   assert.equal(groupVaries([{ ...raise, reps: '12' }], [0]), false);
 });
+
+test('стёрли число в клетке — пустой круг, строка не растёт (18.11.2026)', () => {
+  const ex = { name: 'Отжимания от пола', sets: '3', reps: '12, 15, 20', weight: '', track: { kind: 'bodyweight' } };
+  const cleared = { ...ex, ...withCell(ex, 'reps', 3, 1, '') };
+  assert.equal(cleared.reps, '12, , 20');
+  assert.equal(varies(cleared, 'reps'), true, 'всё ещё по кругам');
+  assert.deepEqual(roundValues(cleared, 'reps', 3), ['12', '', '20']);
+  // Повторное включение, шаг, «− / +» — значения на месте, строка той же длины
+  const again = { ...cleared, ...toggleField(cleared, 'reps', 3, true) };
+  assert.equal(again.reps, '12, , 20');
+  const filled = { ...cleared, ...withCell(cleared, 'reps', 3, 1, stepCell(cleared, 'reps', '', 1)) };
+  assert.equal(filled.reps, '12, 12, 20', 'пустое «+» — предложение 12');
+  const ladder = { ...cleared, ...withLadder(cleared, 'reps', 3, 1) };
+  assert.equal(ladder.reps, '12, 13, 14');
+  // Строка, испорченная до исправления, чинится первой же правкой
+  const broken = { ...ex, reps: '12, , 12, 12, , 12, 12, , 12' };
+  assert.equal({ ...broken, ...withCell(broken, 'reps', 3, 0, '10') }.reps, '10, , 12');
+  // В тренировке пустой круг не подставляет ничего
+  const w = fromPlan({ title: 'Круг', exercises: [{ ...cleared, supersetGroup: '' }] }, 'Ноябрь');
+  assert.deepEqual(w.exercises[0].sets.map((s) => s.reps), ['12', '', '20']);
+});
