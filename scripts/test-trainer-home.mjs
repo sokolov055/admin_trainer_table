@@ -284,3 +284,30 @@ test('список: аватар с обводкой, время пилюлей,
   const meta = textOf(byClass(tree, 'cl-item__meta').map((n) => n.props.children));
   assert.doesNotMatch(meta, /за месяц/, 'без «N тренировок за месяц»');
 });
+
+test('🎂 ДР на неделе: дата из таблицы (21:00 по UTC) — следующий день, через год, 29 февраля', () => {
+  const { birthDay, daysToBirthday } = module.exports;
+  assert.deepEqual(birthDay('1990-03-13T21:00:00'), { month: 2, day: 14 }, 'полночь по Москве, записанная по UTC');
+  assert.deepEqual(birthDay('1990-03-14T00:00:00'), { month: 2, day: 14 });
+  assert.deepEqual(birthDay('1990-03-14'), { month: 2, day: 14 });
+  assert.equal(birthDay(''), null);
+  assert.equal(daysToBirthday('1990-11-19T00:00:00', NOW), 0, 'сегодня');
+  assert.equal(daysToBirthday('1990-11-25T00:00:00', NOW), 6);
+  assert.equal(daysToBirthday('1990-11-18T00:00:00', NOW), 364, 'вчера — через год');
+  assert.equal(daysToBirthday('1992-02-29', new Date(2027, 1, 27)), 2, '29 февраля в 2027 — 1 марта');
+  assert.equal(daysToBirthday(null, NOW), null);
+});
+
+test('🎂 плитка — только когда у кого-то ДР в ближайшие 7 дней, и фильтрует', () => {
+  const soon = new Date(Date.now() + 2 * 86400000);
+  const iso = '1990-' + String(soon.getMonth() + 1).padStart(2, '0') + '-' + String(soon.getDate()).padStart(2, '0') + 'T00:00:00';
+  assert.equal(todoTiles(CLIENTS, SIGNALS).some((t) => t.id === 'birthday'), false, 'никого — плитки нет');
+  const withBirthday = CLIENTS.map((c) => (c.row === 3 ? { ...c, birthDate: iso } : c));
+  const cake = todoTiles(withBirthday, SIGNALS).find((t) => t.id === 'birthday');
+  assert.equal(cake.count, 1);
+  const { tree } = draw(withBirthday);
+  const tile = byClass(tree, 'th-td--pink')[0];
+  assert.match(textOf(tile.props.children), /ДР на неделе/);
+  act(() => tile.props.onClick());
+  assert.deepEqual(byClass(tree, 'item__name').map((n) => textOf(n.props.children)), ['Ирина Л']);
+});

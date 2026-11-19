@@ -101,9 +101,44 @@ export const TODO = [
 export const isUninvited = (c) => !c.chatId && !c.invited && !c.joined;
 export const isAsking = (c) => !!c.pause && c.pause.state === 'requested';
 
-export function todoTiles(clients, signals) {
+/**
+ * День рождения: месяц и число. Дата из старой синхронизации с таблицей —
+ * полночь по Москве, записанная по UTC («…-13T21:00:00» — это 14-е): время
+ * после полудня — следующий день. Не разобрали — null.
+ */
+export function birthDay(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}))?/.exec(String(iso || ''));
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + (m[4] && Number(m[4]) >= 12 ? 1 : 0)));
+  return { month: d.getUTCMonth(), day: d.getUTCDate() };
+}
+
+/** Через сколько дней ближайший день рождения (0 — сегодня); нет даты — null */
+export function daysToBirthday(iso, now = new Date()) {
+  const b = birthDay(iso);
+  if (!b) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // 29 февраля в невисокосный год — 1 марта (Date переносит сам)
+  let next = new Date(now.getFullYear(), b.month, b.day);
+  if (next < today) next = new Date(now.getFullYear() + 1, b.month, b.day);
+  return Math.round((next - today) / 86400000);
+}
+
+/** ДР на неделе: сегодня и шесть дней вперёд (решение владельца 19.11.2026 — «возможно», последним) */
+export const BIRTHDAY_DAYS = 7;
+export const birthdaySoon = (c, now = new Date()) => {
+  const n = daysToBirthday(c.birthDate, now);
+  return n !== null && n < BIRTHDAY_DAYS;
+};
+
+export function todoTiles(clients, signals, now = new Date()) {
   const list = Array.isArray(clients) ? clients : [];
   const sig = signals || {};
+  // «🎂 ДР на неделе» — плиткой, только когда есть у кого
+  const birthdays = list.filter((c) => birthdaySoon(c, now));
+  const extra = birthdays.length
+    ? [{ id: 'birthday', icon: '🎂', label: 'ДР на неделе', tone: 'pink', rows: new Set(birthdays.map((c) => c.row)), count: birthdays.length }]
+    : [];
   return TODO.map((t) => {
     let rows;
     let count;
@@ -118,7 +153,7 @@ export function todoTiles(clients, signals) {
       count = hit.length;
     }
     return { ...t, rows, count };
-  });
+  }).concat(extra);
 }
 
 /** Клиент из списка подходит под плитку: сам или его пара сплита */

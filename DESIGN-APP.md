@@ -330,6 +330,7 @@ Capacitor WebView на iPhone/Android). Лендинг описан в `DESIGN.m
   приглушённый цвет, `is-now` — пульс кольца через `transform`/`opacity`);
   плитки «Сделать» `.th-td` — сетка 3×, подложка `--tone-wash`, текст 65% с
   `--text`, ноль — `--surface-sunken` и `--text-muted` (не `opacity`);
+  «🎂 ДР на неделе» — `--goal-endurance`, только когда есть у кого;
   аватар `.th-ava` — `--ava-0…5` по имени, обводка состояния `.th-ring--debt`
   (`--critical`), `--plan` (`--goal-cut`), `--today` (`--accent`), `--pause`.
 
