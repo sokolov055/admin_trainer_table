@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { listChip } from '../pause/pause-model.js';
 import { useData } from '../useData.js';
 import { apiPublic, apiMutate } from '../api.js';
 import { resetClientAccess } from '../client-access.js';
@@ -85,7 +86,13 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
   const clients = data.clients.filter((c) => !c.test && !c.pairHidden);
   const tests = data.clients.filter((c) => c.test && !c.pairHidden);
 
+  // Пауза (заморозка, src/pause/): просьба ждёт ответа — требует внимания;
+  // на паузе — не «давно не был» и не «нет программы»
+  const asking = clients.filter((c) => c.pause && c.pause.state === 'requested');
+  const frozen = clients.filter((c) => c.pause && c.pause.state !== 'requested');
   const needsAttention = clients.filter((c) => {
+    if (c.pause && c.pause.state === 'requested') return true;
+    if (c.pause && c.pause.state === 'active') return c.balance < 0;
     if (c.program && c.program.attention) return true;
     // Онлайн-клиент (FT-530) с тренером не занимается — «давно не был» не
     // про него; внимания требует срок ведения: истёк или осталось 3 дня и
@@ -117,6 +124,8 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
     { value: 'all', label: `Все · ${clients.length}` },
     { value: 'splits', label: `Сплиты · ${splits.length}` },
     { value: 'online', label: `Онлайн · ${online.length}` },
+    ...(asking.length ? [{ value: 'asking', label: `⏳ Просят паузу · ${asking.length}` }] : []),
+    ...(frozen.length ? [{ value: 'frozen', label: `❄️ На паузе · ${frozen.length}` }] : []),
     { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
     { value: 'debt', label: `Долг · ${s.negativeBalance}` },
     { value: 'nomeasure', label: 'Без замера' },
@@ -130,6 +139,8 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
     if (filter === 'splits') return splits.indexOf(c) !== -1;
     if (filter === 'online') return !!c.online;
     if (filter === 'attention') return needsAttention.indexOf(c) !== -1;
+    if (filter === 'asking') return asking.indexOf(c) !== -1;
+    if (filter === 'frozen') return frozen.indexOf(c) !== -1;
     if (filter === 'debt') return c.balance < 0;
     if (filter === 'nomeasure') return String(c.lastMeasureStatus || '').indexOf('✅') !== 0;
     return true;
@@ -268,7 +279,9 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
           // Онлайн (FT-530): занятий с тренером нет — ни «нет данных»,
           // ни «не был N дней»; вместо них срок ведения
           const noData = days === null && !c.online;
-          const isStale = !noData && !c.online && days > s.staleDays;
+          const paused = !!c.pause && c.pause.state === 'active';
+          const isStale = !noData && !c.online && !paused && days > s.staleDays;
+          const pauseChip = listChip(c.pause);
           const onlineLeft = c.online ? onlineDaysLeft(c.onlineUntil) : null;
           // Сплит: деньги пары — у плательщика; у остальных — кто платит
           const money = c.splitOf ? c.splitBalance : c.balance;
@@ -293,7 +306,8 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
                 )}
               </div>
               <div className="item__meta">
-                {c.program && <span>{c.program.attention ? <Tag tone="warn">{c.program.text}</Tag> : c.program.text}</span>}
+                {pauseChip && <span className={'pause-tag pause-tag--' + pauseChip.tone}>{pauseChip.text}</span>}
+                {c.program && <span>{c.program.attention && !paused ? <Tag tone="warn">{c.program.text}</Tag> : c.program.text}</span>}
                 {c.online ? (
                   onlineLeft !== null && onlineLeft < 0
                     ? <Tag tone="warn">онлайн · {onlineLabel(c.onlineUntil)}</Tag>

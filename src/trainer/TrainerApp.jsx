@@ -776,7 +776,7 @@ function ClientDetail({ client: opened, initialView = 'overview', backLabel = 'Ð
             {v.value === 'overview'
               ? (
                 <>
-                  <Overview clientRow={client.row} trainerClient={client} trainerClients={list.data?.clients} />
+                  <Overview clientRow={client.row} trainerClient={client} trainerClients={list.data?.clients} onCardTab={open} />
                   <ClientManage client={client} />
                 </>
               )

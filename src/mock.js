@@ -1369,7 +1369,48 @@ function demoShowcaseProgram(id) {
   return t;
 }
 
+// Пауза в тренировках (заморозка, src/pause/) — в демо до перезагрузки
+let demoPause = null;
+// ?mockPause=active|open|requested — сразу с паузой (снимки экранов)
+function initDemoPause() {
+  const kind = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('mockPause') : null;
+  const d = (n) => new Date(Date.now() + 3 * 3600000 + n * 86400000).toISOString().slice(0, 10);
+  if (kind === 'active') return { status: 'active', kind: 'short', reason: 'vacation', from: d(-5), to: d(8), by: 'client' };
+  if (kind === 'open') return { status: 'active', kind: 'long', reason: 'ill', from: d(-41), to: null, by: 'trainer' };
+  if (kind === 'requested') return { status: 'requested', kind: 'short', reason: 'trip', from: d(1), to: d(14), by: 'client' };
+  return null;
+}
+demoPause = initDemoPause();
+const mskDay = (n = 0) => new Date(Date.now() + 3 * 3600000 + n * 86400000).toISOString().slice(0, 10);
+const spanOf = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1;
+function pauseView(p, withReason = true) {
+  if (!p) return null;
+  const today = mskDay();
+  const state = p.status === 'requested' ? 'requested' : p.from > today ? 'upcoming' : 'active';
+  return {
+    id: 1, state, kind: p.kind, ...(withReason ? { reason: p.reason } : {}), from: p.from, to: p.to, approx: p.approx || null,
+    requestedBy: p.by, extendOnline: false,
+    daysLeft: state === 'active' && p.to ? spanOf(today, p.to) : null,
+    dayNo: state === 'active' ? spanOf(p.from, today) : null, createdAt: new Date().toISOString(),
+  };
+}
+
 const MOCK = {
+  'pause.get': () => ({ pause: pauseView(demoPause) }),
+  'pause.preview': () => ({ events: [{ id: 'demo-1', at: daysAhead(2, '10:00'), late: false }] }),
+  'pause.request': (p) => {
+    demoPause = p.long
+      ? { status: 'requested', kind: 'long', reason: p.reason, from: mskDay(), to: null, approx: p.approx || 'unknown', by: 'client' }
+      : { status: 'requested', kind: 'short', reason: p.reason, from: p.from, to: p.to, by: 'client' };
+    return { pause: pauseView(demoPause) };
+  },
+  'pause.withdraw': () => { demoPause = null; return { pause: null }; },
+  'pause.decline': () => { demoPause = null; return { pause: null }; },
+  'pause.unfreeze': () => { demoPause = null; return { pause: null }; },
+  'pause.confirm': (p) => {
+    demoPause = { ...(demoPause || { kind: 'short', by: 'trainer' }), status: 'active', reason: p.reason !== undefined ? p.reason : demoPause?.reason || null, from: p.from || mskDay(), to: p.to || null };
+    return { pause: pauseView(demoPause), cancelled: 1, charged: 0 };
+  },
   // Пакет: те же обработчики, только за один «поход на сервер». Нужен
   // здесь, чтобы демо-режим повторял боевой путь загрузки, а не шёл
   // мимо него по запасной ветке.
@@ -1839,6 +1880,7 @@ const MOCK = {
     packageCount: 8,
     trainerName: 'Елена Соколова',
     packageEnding: { known: true, left: 4, perWeek: 2, soon: false, out: false },
+    pause: pauseView(demoPause),
     trainingsThisMonth: 6,
     lastTrainingDate: daysAgo(2),
     nextTrainingDate: daysAhead(2, '10:00'),

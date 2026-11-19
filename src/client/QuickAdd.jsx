@@ -3,7 +3,7 @@ import { Sheet } from '../ui.jsx';
 import { useRights, can } from '../rights.js';
 import { useMainAction } from './main-action.js';
 import { label as mealLabel, mealNow } from '../nutrition/diary-model.js';
-import { IconPlay, IconScale, IconRuler, IconDrop, IconNutrition, IconSend } from '../icons.jsx';
+import { IconPlay, IconScale, IconRuler, IconDrop, IconNutrition, IconSend, IconSnow } from '../icons.jsx';
 import './quick-add.css';
 
 /**
@@ -60,6 +60,8 @@ export default function QuickAdd({ me, clientRow, preview, tab, onClose, onPick,
     actions.weight,
     { kind: 'measure', tab: 'progress', label: 'Замеры', Icon: IconRuler },
     ...(coach ? [{ kind: 'wish', tab: 'plan', label: 'Написать тренеру', Icon: IconSend, off: !own }] : []),
+    // Пауза — больничный, отпуск (заморозка, src/pause/): лист на «Обзоре»
+    ...(coach ? [{ kind: 'pause', tab: 'overview', label: 'Пауза', Icon: IconSnow, off: !own }] : []),
   ].map((t) => (t.kind === mainKind ? actions.workout : t));
   const locked = tiles.some((t) => t.off);
   // Занятию нужен payload (что начать), остальным — нет

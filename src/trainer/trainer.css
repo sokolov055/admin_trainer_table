@@ -70,3 +70,16 @@
 .ai-fix__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .ai-fix__text { margin: 0; font-size: var(--text-md); font-weight: 600; }
 .ai-fix p { margin: 0; }
+
+/* Пауза в списке клиентов (заморозка, src/pause/): «❄️ до 3 дек.»,
+   «⏳ просит паузу». Цвета — токены паузы (pause.css), запасные — те же */
+.pause-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.pause-tag--ice { background: var(--pause-fill, #e3f3fc); color: var(--pause-text, #1d6c9a); }
+.pause-tag--ask { background: var(--warning-fill); color: var(--warning-text); }

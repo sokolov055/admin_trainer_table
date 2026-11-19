@@ -311,3 +311,50 @@ test('«глазами клиента» кнопки видны, но не на�
   assert.equal(plan[0].props.disabled, true);
   act(() => tree.unmount());
 });
+
+/* ==========================================================================
+ * Пауза (заморозка, src/pause/)
+ * ========================================================================== */
+
+const PAUSE = { id: 1, kind: 'short', reason: 'vacation', from: '2026-11-20', to: '2026-12-03', approx: null, requestedBy: 'client', extendOnline: false, createdAt: '' };
+
+test('пауза идёт — ледяная карточка вместо «Следующей тренировки»', () => {
+  const tree = draw(overview({ pause: { ...PAUSE, state: 'active', daysLeft: 9, dayNo: 6 } }), { onGo: () => {} });
+  const text = screen(tree);
+  assert.match(text, /Ещё 9 дней/);
+  assert.match(text, /Отпуск/);
+  assert.doesNotMatch(text, /Посмотреть план/, 'карточки «Следующая тренировка» нет');
+  assert.ok(buttons(tree).some((b) => /Потренироваться самому/.test(b)));
+  assert.ok(buttons(tree).some((b) => /Разморозить/.test(b)));
+  act(() => tree.unmount());
+});
+
+test('просьба ждёт тренера — над «Следующей», с «Отозвать»; кнопки «Пауза» нет', () => {
+  const tree = draw(overview({ pause: { ...PAUSE, state: 'requested' } }), { onGo: () => {} });
+  const text = screen(tree);
+  assert.match(text, /Пауза ждёт тренера/);
+  assert.match(text, /Посмотреть план/);
+  const list = buttons(tree);
+  assert.ok(list.includes('Отозвать'));
+  assert.ok(!list.some((b) => /^Пауза$/.test(b)));
+  act(() => tree.unmount());
+});
+
+test('без паузы на «Следующей тренировке» есть «Пауза»', () => {
+  const tree = draw(overview(), { onGo: () => {} });
+  assert.ok(buttons(tree).some((b) => /Пауза/.test(b)));
+  act(() => tree.unmount());
+});
+
+test('тренер: просьба — подтвердить, изменить, отклонить; без паузы — «Заморозить»', () => {
+  let tree = draw(overview({ pause: { ...PAUSE, state: 'requested', reason: 'ill' } }), { clientRow: 3 });
+  let list = buttons(tree);
+  assert.match(screen(tree), /Просит паузу/);
+  assert.match(screen(tree), /Болеет/);
+  assert.ok(['Подтвердить', 'Изменить даты', 'Отклонить'].every((b) => list.includes(b)), list.join(' | '));
+  act(() => tree.unmount());
+  tree = draw(overview(), { clientRow: 3 });
+  assert.ok(buttons(tree).some((b) => /Заморозить/.test(b)));
+  assert.ok(!buttons(tree).some((b) => /^Пауза$/.test(b)), 'клиентской кнопки у тренера нет');
+  act(() => tree.unmount());
+});

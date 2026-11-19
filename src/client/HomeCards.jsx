@@ -1,6 +1,6 @@
 import React from 'react';
 import { Qty, formatMoney, formatNumber, formatWhen, relativeDays, plural } from '../ui.jsx';
-import { IconPlay, IconSend, IconAlert } from '../icons.jsx';
+import { IconPlay, IconSend, IconAlert, IconSnow } from '../icons.jsx';
 import { requestQuick } from '../quick-actions.js';
 import { haptic } from '../telegram.js';
 import { slotTones, slotClass, muscleTone, muscleClass } from '../data-tones.js';
@@ -31,7 +31,7 @@ function go(onGo, tab, kind, payload) {
  * Следующая тренировка
  * ================================================================== */
 
-export function NextCard({ data, clientRow, mode, onGo }) {
+export function NextCard({ data, clientRow, mode, onGo, onPause = null }) {
   const main = useMainAction(clientRow, mode === 'preview');
   const online = !!data.online;
   const when = data.nextTrainingDate;
@@ -111,6 +111,12 @@ export function NextCard({ data, clientRow, mode, onGo }) {
             </button>
           )
         )}
+        {/* «❄️ Пауза» — больничный, отпуск (заморозка, src/pause/) */}
+        {buttons && onPause && (
+          <button type="button" className="home-next__pause" disabled={!live} onClick={() => { haptic(); onPause(); }}>
+            <IconSnow size={16} /> Пауза
+          </button>
+        )}
         {!online && <span className="home-next__month">{month ? 'в этом месяце — ' + month : 'первая в этом месяце'}</span>}
       </div>
     </section>
@@ -132,7 +138,11 @@ export function PackageCard({ data, mode, onGo }) {
   const soon = !!(state.known && state.soon) && !out;
   const trainer = mode === 'trainer';
   const tickets = ticketRow(out ? 0 : left, own ? data.packageCount : 0);
-  const until = !out && byTrainings ? enoughUntil(left, state.perWeek) : null;
+  // Пауза идёт (заморозка): оставшиеся не тратятся, «хватит до» — после неё
+  const frozen = !!data.pause && data.pause.state === 'active';
+  const resume = frozen && data.pause.to ? new Date(data.pause.to + 'T12:00:00') : null;
+  if (resume) resume.setDate(resume.getDate() + 1);
+  const until = !out && byTrainings && (!frozen || resume) ? enoughUntil(left, state.perWeek, resume || new Date()) : null;
 
   const hint = own
     ? byTrainings ? formatMoney(data.balance) + ' на балансе' : data.balance < 0 ? 'Нужно пополнить' : 'Баланс исчерпан'
@@ -158,7 +168,7 @@ export function PackageCard({ data, mode, onGo }) {
           {Array.from({ length: tickets.total }, (_, i) => {
             const used = i < tickets.used;
             const last = !used && soon;
-            return <i key={i} className={'home-pack__ticket' + (used ? ' is-used' : last ? ' is-last' : '')} style={{ '--i': i }} />;
+            return <i key={i} className={'home-pack__ticket' + (used ? ' is-used' : frozen ? ' is-frozen' : last ? ' is-last' : '')} style={{ '--i': i }} />;
           })}
         </div>
       )}
@@ -182,6 +192,10 @@ export function PackageCard({ data, mode, onGo }) {
           {payer
             ? (trainer ? 'Напомните об оплате: платит ' + payer.name + '.' : 'Пора пополнить: платит ' + payer.name + '.')
             : trainer ? 'Это примерно на неделю — самое время напомнить о продлении.' : 'Это примерно на неделю — продлите пакет, чтобы не прерываться.'}
+        </div>
+      ) : frozen ? (
+        <div className="home-pack__note home-pack__note--frozen">
+          ❄️ не тратятся, пока пауза{until ? ' · потом хватит примерно до ' + dayMonth(until) : ''}
         </div>
       ) : until ? (
         <div className="home-pack__note">хватит примерно до {dayMonth(until)}</div>

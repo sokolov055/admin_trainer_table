@@ -46,11 +46,12 @@ import { onlineDaysLeft, onlineDay } from '../online.js';
 import { MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 import { useRights, isPro, can, gate } from '../rights.js';
 import { PlusBadge, openPlusOffer } from '../plus.jsx';
-import { useQuickRequest } from '../quick-actions.js';
+import { useQuickRequest, requestQuick } from '../quick-actions.js';
 import { revealSoon } from '../reveal.js';
 import { takeStart } from './start-request.js';
 import { slotTones, slotClass, slotLetter } from '../data-tones.js';
 import { NextCard, PackageCard } from './HomeCards.jsx';
+import { ClientPause, TrainerPause, PauseSheet } from '../pause/Pause.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
@@ -84,13 +85,23 @@ const LIVE_MS = 15000;
 // день в режиме, ClientApp.jsx): под главной карточкой, чтобы, появившись
 // позже, не сдвигать её (аудит 24.10.2026)
 // onTrainer — открыть «Мой тренер» (ID для привязки) из пустого «Обзора»
-export function Overview({ clientRow, clientView = false, trainerClient, trainerClients, afterLead = null, onTrainer = null, onGo = null }) {
+// onCardTab — у тренера в карточке клиента: открыть вкладку карточки («Обсудить» паузу)
+export function Overview({ clientRow, clientView = false, trainerClient, trainerClients, afterLead = null, onTrainer = null, onGo = null, onCardTab = null }) {
   // У клиента — живой: тренер провёл оплату, баланс меняется без «потянуть»
   // (у тренера карточка перечитывается сама после его записи — onMutated)
   const { loading, data: loaded, error, reload } = useData(
     'client.overview', clientRow ? { clientRow } : {}, [clientRow], { live: LIVE_MS }
   );
   const data = trainerOverview(loaded, trainerClient, trainerClients);
+  // Лист «Пауза» клиента: 'short' — до 30 дней, 'long' — дольше (заморозка)
+  const [pauseSheet, setPauseSheet] = useState(null);
+  const ownCabinet = !clientRow && !clientView;
+  // «Пауза» из «+» (QuickAdd) — тот же лист; пауза уже есть — она и так сверху
+  useQuickRequest('pause', () => {
+    if (loading) return false;
+    if (loaded && !loaded.unlinked && !loaded.pause) setPauseSheet('short');
+    return true;
+  }, ownCabinet && !!onGo);
 
   if (loading) return <Loading rows={2} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -132,6 +143,9 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
   // Кнопки карточек главной: клиент — работают, «глазами клиента» — видны,
   // но не нажимаются, тренер в карточке клиента — их нет
   const mode = clientRow && !clientView ? 'trainer' : clientView ? 'preview' : 'own';
+  // Пауза в тренировках (заморозка, src/pause/): просьба, впереди или идёт
+  const pause = data.pause || null;
+  const paused = !!pause && pause.state === 'active';
 
   return (
     <>
@@ -159,12 +173,24 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           главный вопрос, с которым открывают приложение; «Оплачено вперёд» —
           билетиками, конец пакета и долг — в той же карточке с кнопкой
           (раньше — три карточки, повторявшие одно и то же) */}
-      <NextCard data={data} clientRow={clientRow} mode={mode} onGo={onGo} />
+      {/* Пауза (заморозка): у клиента идущая — вместо «Следующей тренировки»,
+          просьба и пауза впереди — над ней; у тренера — управление паузой */}
+      {pause && mode !== 'trainer' && <ClientPause pause={pause} mode={mode} onChanged={reload}
+        onTrain={() => { if (onGo) { haptic(); onGo('plan'); requestQuick('workout', {}); } }} />}
+      {pause && mode === 'trainer' && <TrainerPause pause={pause} clientRow={clientRow} name={data.name} online={!!online}
+        onChanged={reload} onDiscuss={onCardTab ? () => onCardTab('plan') : null} />}
+      {!(pause && pause.state === 'active' && mode !== 'trainer') && (
+        <NextCard data={data} clientRow={clientRow} mode={mode} onGo={onGo}
+          onPause={mode !== 'trainer' && !pause ? () => setPauseSheet('short') : null} />
+      )}
       {!online && <PackageCard data={data} mode={mode} onGo={onGo} />}
+      {!pause && mode === 'trainer' && <TrainerPause pause={null} clientRow={clientRow} name={data.name} online={!!online} onChanged={reload} />}
+      {pauseSheet && <PauseSheet startLong={pauseSheet === 'long'} onClose={() => setPauseSheet(null)}
+        onSent={() => { setPauseSheet(null); reload(); }} />}
 
       {afterLead}
 
-      {!online && sinceTraining !== null && sinceTraining > 14 && (
+      {!online && !paused && sinceTraining !== null && sinceTraining > 14 && (
         <Section>
           <Panel pad>
             <div className="warn">
