@@ -71,6 +71,7 @@
   transition: transform var(--dur-press) var(--ease-out);
 }
 .home-next__go:active { transform: scale(0.97); }
+.home-next__go, .home-next__pause { white-space: nowrap; }
 .home-next__go:disabled { opacity: 0.7; cursor: default; }
 .home-next__month { margin-left: auto; font-size: var(--text-xs); opacity: 0.85; }
 .home-next__pulse {
@@ -160,4 +161,63 @@
 
 @media (prefers-reduced-motion: reduce) {
   .home-next__pulse, .home-pack__ticket { animation: none; }
+}
+
+/* ---------- Плитки «как я иду» (этап 2) ---------- */
+.home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3); }
+.home-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+button.home-tile { cursor: pointer; transition: transform var(--dur-press) var(--ease-out); }
+button.home-tile:active { transform: scale(0.98); }
+.home-tile--due { background: var(--warning-fill); border-color: var(--warning-line); }
+.home-tile__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  font-size: 17px;
+}
+.home-tile__icon--weight { background: color-mix(in srgb, var(--mg-core) 16%, var(--surface)); }
+.home-tile__icon--month { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.home-tile__value { font-size: var(--text-md); font-weight: 800; line-height: 1.2; }
+.home-tile__delta { margin-left: 6px; font-size: var(--text-sm); font-weight: 700; }
+.home-tile__delta.is-down { color: var(--good-text); }
+.home-tile__delta.is-up { color: var(--text-muted); }
+.home-tile__note { font-size: var(--text-xs); color: var(--text-muted); }
+.home-tile--due .home-tile__note { color: var(--warning-text); font-weight: 650; }
+.home-tile__spark { display: block; max-width: 100%; margin-top: 6px; }
+.home-tile__spark path {
+  fill: none;
+  stroke: var(--mg-core);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: home-draw 1.1s var(--ease-out) 0.3s forwards;
+}
+@keyframes home-draw { to { stroke-dashoffset: 0; } }
+.home-tile__cal { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; width: 100%; margin-top: 8px; }
+.home-tile__cal i { aspect-ratio: 1; border-radius: 3px; background: var(--surface-sunken); }
+.home-tile__cal i.is-on { background: var(--accent); animation: home-ticket var(--dur-enter) var(--ease-out) both; animation-delay: calc(var(--i) * 15ms + 150ms); }
+.home-tile__cal i.is-ahead { background: none; box-shadow: inset 0 0 0 1px var(--border); }
+
+@media (prefers-reduced-motion: reduce) {
+  .home-tile__spark path { animation: none; stroke-dashoffset: 0; }
+  .home-tile__cal i.is-on { animation: none; }
 }

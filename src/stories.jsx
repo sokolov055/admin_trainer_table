@@ -353,15 +353,14 @@ export function Stories({ personal = [], role = 'client', onOpen }) {
               onClick={() => { setAt({ topic: i, frame: 0 }); haptic(); }}
               aria-label={topic.caption + ', экранов: ' + topic.frames.length}
             >
+              {/* Кружок с обложкой и подписью под ним (главная, этап 2,
+                  макет home-redesign-2026-11-19): экран начинается с дела, а
+                  не с двух больших плиток. Обложка-картинка остаётся — не
+                  тонкая иконка, которая читалась как кнопка настроек */}
               <span className="stories__tile">
                 {Cover ? <Cover {...(topic.coverProps || {})} /> : null}
-
-                {/* Затемнение снизу — не украшение: подпись лежит поверх
-                    картинки, и без него белый текст на светлом участке
-                    обложки перестал бы читаться. */}
-                <span className="stories__shade" />
-                <span className="stories__label">{topic.label}</span>
               </span>
+              <span className="stories__label">{topic.label}</span>
             </button>
           );
         })}

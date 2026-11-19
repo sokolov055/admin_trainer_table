@@ -1881,6 +1881,16 @@ const MOCK = {
     trainerName: 'Елена Соколова',
     packageEnding: { known: true, left: 4, perWeek: 2, soon: false, out: false },
     pause: pauseView(demoPause),
+    // Плитки главной (этап 2): вес за месяц и месяц квадратиками
+    home: (() => {
+      const now = new Date();
+      const day = now.getDate();
+      return {
+        weight: { value: 72.4, at: daysAgo(4), delta: -1.8, points: [74.6, 74.2, 73.9, 73.4, 73.1, 72.8, 72.4] },
+        measuredAt: daysAgo(4),
+        month: { month: now.toISOString().slice(0, 7), today: day, days: [1, 3, 6, 8, 10, 13, 15, 17].filter((d) => d <= day), streak: 3 },
+      };
+    })(),
     trainingsThisMonth: 6,
     lastTrainingDate: daysAgo(2),
     nextTrainingDate: daysAhead(2, '10:00'),

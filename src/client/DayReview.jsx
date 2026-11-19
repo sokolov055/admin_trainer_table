@@ -201,6 +201,18 @@ export default function DayCard({ clientRow, own = false, mine = false }) {
             })}
           </ul>
         </button>
+        {/* Неделя маленькими кольцами (главная, этап 2): видна серия — какие
+            дни закрыты. Касание — тот же разбор дня */}
+        {Array.isArray(data.days) && data.days.length > 1 && (
+          <button type="button" className="day-card__week" onClick={() => setOpen(true)} aria-label="Неделя — открыть разбор дня">
+            {data.days.map((d) => (
+              <span key={d.day} className={'day-card__wd' + (d.day === data.day ? ' is-today' : '')}>
+                <Rings rings={d.rings} size={22} label="" />
+                <span>{WEEKDAY[new Date(d.day + 'T00:00:00Z').getUTCDay()]}</span>
+              </span>
+            ))}
+          </button>
+        )}
         {tip && (
           <button type="button" className="day-card__tip" onClick={() => setOpen(true)}>
             {tip.text}

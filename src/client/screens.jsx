@@ -50,7 +50,7 @@ import { useQuickRequest, requestQuick } from '../quick-actions.js';
 import { revealSoon } from '../reveal.js';
 import { takeStart } from './start-request.js';
 import { slotTones, slotClass, slotLetter } from '../data-tones.js';
-import { NextCard, PackageCard } from './HomeCards.jsx';
+import { NextCard, PackageCard, HomeTiles } from './HomeCards.jsx';
 import { ClientPause, TrainerPause, PauseSheet } from '../pause/Pause.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
@@ -209,9 +209,16 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
       {/* «Следующей тренировки» здесь нет: она первым фактом главной
           карточки, второй раз другим форматом только путала (аудит
           24.10.2026). Клиенту — «тренировки», не «занятия» */}
-      <Section title="Тренировки">
+      {/* Этап 2 главной: вес и месяц плитками вместо строк «Программа
+          месяца ✅ / Последний замер ✅ / Дата» — они были клиенту ни о чём.
+          Ответ без home (старый сервер) — прежние строки */}
+      <HomeTiles data={data} mode={mode} onGo={onGo} />
+      {(!data.home || mode === 'trainer') && (
+      <Section title={data.home ? 'Занятия' : 'Тренировки'}>
         <Panel>
           <Rows>
+            {!data.home && (
+            <>
             <Row label="Программа месяца">
               <StatusBadge value={data.monthSheetStatus} fallback="не создана" />
             </Row>
@@ -220,6 +227,8 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
             </Row>
             {data.lastTrainingDate && (
               <Row label="Дата последней тренировки">{formatDate(data.lastTrainingDate)}</Row>
+            )}
+            </>
             )}
             {clientRow && !clientView && data.startDate && <Row label="Занимается с">{formatDate(data.startDate)}</Row>}
             {clientRow && !clientView && data.scheduleChanges && (
@@ -231,7 +240,7 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           </Rows>
         </Panel>
       </Section>
-
+      )}
 
       {/* Выход переехал в боковое меню, к «Моим данным»: он про себя, а
           не про тренировки, и на обзоре стоял только потому, что меню не

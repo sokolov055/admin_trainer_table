@@ -1275,39 +1275,40 @@ button, input, select, textarea { font-family: inherit; }
 .stories::-webkit-scrollbar { display: none; }
 
 /**
- * Плитка с обложкой вместо кружка со значком.
- *
- * Кружок с тонкой иконкой читался как кнопка настроек — такое не
- * открывают. Плитка с картинкой и подписью внутри говорит «здесь история»
- * до того, как прочитана хоть одна буква: этот язык человек уже знает по
- * банковским приложениям и мессенджерам, и объяснять его не нужно.
+ * Кружок с обложкой и подписью под ним (19.11.2026, макет главной
+ * home-redesign-2026-11-19). Раньше были плитки 92 px: кружок с тонкой
+ * иконкой читался как кнопка настроек. Здесь в кружке — та же цветная
+ * обложка, а не иконка, и подпись рядом: «здесь история» видно сразу, а
+ * экран начинается с дела, а не с двух больших плиток.
  */
 .stories__item {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 72px;
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
   cursor: pointer;
   scroll-snap-align: start;
-  border-radius: 20px;
   transition: transform var(--dur-press) var(--ease-out);
 }
 
-.stories__item:active { transform: scale(0.97); }
+.stories__item:active { transform: scale(0.96); }
 
-/* Непрочитанное обведено кольцом с просветом: кольцо вплотную к картинке
-   слилось бы с ней на светлой обложке. Просвет берёт цвет фона экрана. */
+/* Кружок с обложкой (главная, этап 2, 19.11.2026). Непрочитанное обведено
+   кольцом цвета акцента с просветом цвета фона: кольцо вплотную к картинке
+   слилось бы с ней на светлой обложке. 64 px — больше цели для пальца
+   (44 pt), а экран начинается с дела, а не с плиток. */
 .stories__tile {
   position: relative;
   display: block;
-  /* 92 — вдвое больше минимальной цели для пальца (44 pt в iOS, 48 dp в
-     Android), так что уменьшать было куда. Со 104 плитка перетягивала на
-     себя внимание с того, ради чего экран открывают, а меньше 88 подпись
-     перестаёт помещаться в две строки. */
-  width: 92px;
-  height: 92px;
-  border-radius: 18px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
   overflow: hidden;
   background: var(--surface-sunken);
   box-shadow: 0 0 0 2.5px var(--bg), 0 0 0 5px var(--accent);
@@ -1322,57 +1323,32 @@ button, input, select, textarea { font-family: inherit; }
   display: block;
 }
 
-.stories__shade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to top,
-    var(--story-scrim) 0%,
-    color-mix(in srgb, var(--story-scrim) 25%, transparent) 46%,
-    transparent 72%
-  );
-}
-
-/* Подпись прижата к низу и набрана плотно: это не заголовок, а этикетка на
-   картинке, и читать её будут одним взглядом, а не построчно. */
+/* Подпись — под кружком, переносится, а не обрезается (FT-462: самое
+   длинное слово — «Инструкция» — должно влезать целиком). */
 .stories__label {
-  position: absolute;
-  /* 6, а не 9: «Инструкция» жирным SF Pro шире 74 px и на iPhone ломалась
-     посреди слова (FT-462). Самое длинное слово подписи должно влезать целиком:
-     80 px при 12,5 px — с запасом на ширину SF Pro. */
-  left: 6px;
-  right: 6px;
-  bottom: 8px;
-  font-size: 12.5px;
-  font-weight: 640;
-  line-height: 1.18;
-  letter-spacing: -0.02em;
-  color: var(--story-fg);
-  text-align: left;
+  width: 100%;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-secondary);
+  text-align: center;
   text-wrap: balance;
-
-  /* Подпись переносится, а не обрезается многоточием. Обрезанное слово
-     заставляет гадать, что там было, и открывать плитку ради этого —
-     плохая причина для нажатия. Три строки на плитке помещаются, дальше
-     название придётся укоротить, и это правильнее, чем прятать хвост. */
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   overflow: hidden;
   overflow-wrap: break-word;
 }
 
-/* Прочитанное не исчезает и не прячется — к нему возвращаются. Но и звать
-   больше не должно: кольцо уходит, обложка приглушается. */
+/* Прочитанное не прячется — к нему возвращаются, но и звать не должно:
+   кольцо серое, обложка приглушена. */
 .stories__item--seen .stories__tile {
-  box-shadow: 0 0 0 1px var(--border);
+  box-shadow: 0 0 0 2.5px var(--bg), 0 0 0 4px var(--border-strong);
 }
 
 .stories__item--seen .stories__art { opacity: 0.55; }
-.stories__item--seen .stories__label { color: color-mix(in srgb, var(--story-fg) 82%, transparent); }
+.stories__item--seen .stories__label { color: var(--text-muted); }
 
-/* Наведение возвращает прочитанной обложке полный цвет: на мыши это
-   единственный способ показать, что плитка живая и по ней можно нажать. */
 @media (hover: hover) and (pointer: fine) {
   .stories__item:hover .stories__art { opacity: 1; }
 }

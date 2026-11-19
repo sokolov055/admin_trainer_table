@@ -358,3 +358,49 @@ test('тренер: просьба — подтвердить, изменить,
   assert.ok(!buttons(tree).some((b) => /^Пауза$/.test(b)), 'клиентской кнопки у тренера нет');
   act(() => tree.unmount());
 });
+
+/* ==========================================================================
+ * Плитки главной (этап 2)
+ * ========================================================================== */
+
+const HOME = {
+  weight: { value: 72.4, at: new Date(Date.now() - 3 * 86400000).toISOString(), delta: -1.8, points: [74.2, 73.4, 72.4] },
+  measuredAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+  month: { month: '2026-11', today: 19, days: [3, 10, 17], streak: 3 },
+};
+
+test('плитки: вес со стрелкой, месяц квадратиками; строк «Программа месяца» нет', () => {
+  const tree = draw(overview({ home: HOME, monthSheetStatus: '✅ Ноябрь 2026' }), { onGo: () => {} });
+  const text = screen(tree);
+  assert.match(text, /72,4 кг/);
+  assert.match(text, /−1,8/);
+  assert.match(text, /3 тренировки/);
+  assert.match(text, /в ноябре · серия 3 нед\./);
+  assert.doesNotMatch(text, /Программа месяца|Последний замер/);
+  act(() => tree.unmount());
+});
+
+test('плитки: давно не мерились и нет программы — подсказки', () => {
+  const tree = draw(overview({ home: { ...HOME, measuredAt: '2026-01-01T00:00:00.000Z' }, monthSheetStatus: '❌ нет «Ноябрь 2026»' }));
+  const text = screen(tree);
+  assert.match(text, /пора замер/);
+  assert.match(text, /программы нет/);
+  act(() => tree.unmount());
+});
+
+test('старый сервер без home — прежние строки', () => {
+  const tree = draw(overview({ monthSheetStatus: '✅ Ноябрь 2026' }));
+  assert.match(screen(tree), /Программа месяца/);
+  act(() => tree.unmount());
+});
+
+test('у тренера — плитки и строки «Отмены / Переносы»', () => {
+  const changes = { month: { cancelClient: 1, cancelTrainer: 0, cancelLate: 0, cancelCharged: 0, moveClient: 0, moveTrainer: 0 },
+    total: { cancelClient: 1, cancelTrainer: 0, cancelLate: 0, cancelCharged: 0, moveClient: 0, moveTrainer: 0 } };
+  const tree = draw(overview({ home: HOME, scheduleChanges: changes }), { clientRow: 3 });
+  const text = screen(tree);
+  assert.match(text, /72,4 кг/);
+  assert.match(text, /Отмены/);
+  assert.doesNotMatch(text, /Программа месяца/);
+  act(() => tree.unmount());
+});

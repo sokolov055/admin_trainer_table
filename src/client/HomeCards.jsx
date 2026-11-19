@@ -117,7 +117,8 @@ export function NextCard({ data, clientRow, mode, onGo, onPause = null }) {
             <IconSnow size={16} /> Пауза
           </button>
         )}
-        {!online && <span className="home-next__month">{month ? 'в этом месяце — ' + month : 'первая в этом месяце'}</span>}
+        {/* Сколько в этом месяце — теперь плитка месяца (этап 2); здесь — только без неё */}
+        {!online && !data.home && <span className="home-next__month">{month ? 'в этом месяце — ' + month : 'первая в этом месяце'}</span>}
       </div>
     </section>
   );
@@ -209,4 +210,100 @@ export function PackageCard({ data, mode, onGo }) {
       )}
     </section>
   );
+}
+
+/* ==================================================================
+ * Плитки «как я иду» (этап 2): вес и месяц
+ * ================================================================== */
+
+const MONTH_IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
+
+/** Линия веса: точки по порядку, без осей — только направление */
+function Spark({ points }) {
+  if (!points || points.length < 2) return null;
+  const w = 120;
+  const h = 28;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = max - min || 1;
+  const d = points.map((v, i) => `${i ? 'L' : 'M'}${Math.round((i / (points.length - 1)) * (w - 4)) + 2} ${Math.round(h - 3 - ((v - min) / span) * (h - 6))}`).join(' ');
+  return (
+    <svg className="home-tile__spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      <path d={d} pathLength="1" />
+    </svg>
+  );
+}
+
+/**
+ * Вес со стрелкой за месяц и месяц квадратиками. Замер давно (больше 28
+ * дней) или программы на месяц нет — плитка оранжевая и говорит, что
+ * сделать. Касание — в «Прогресс» и «Тренировки» (onGo); у тренера
+ * плитки только показывают.
+ */
+export function HomeTiles({ data, mode, onGo }) {
+  const home = data.home;
+  if (!home) return null;
+  const live = mode === 'own' && onGo;
+  const weight = home.weight;
+  const measuredDays = home.measuredAt ? daysAgoOf(home.measuredAt) : null;
+  const measureDue = measuredDays === null || measuredDays > 28;
+  const m = home.month || {};
+  const monthIdx = m.month ? Number(m.month.slice(5, 7)) - 1 : new Date().getMonth();
+  const inDays = m.month ? new Date(Number(m.month.slice(0, 4)), monthIdx + 1, 0).getDate() : 30;
+  const done = new Set(m.days || []);
+  const noPlan = !!data.monthSheetStatus && !String(data.monthSheetStatus).startsWith('✅');
+  const Tile = live ? 'button' : 'div';
+
+  return (
+    <div className="home-tiles">
+      <Tile {...(live ? { type: 'button', onClick: () => go(onGo, 'progress') } : {})}
+        className={'home-tile' + (measureDue ? ' home-tile--due' : '')}>
+        <span className="home-tile__icon home-tile__icon--weight" aria-hidden="true">⚖️</span>
+        {weight ? (
+          <>
+            <span className="home-tile__value">
+              {String(weight.value).replace('.', ',')} кг
+              {weight.delta !== null && weight.delta !== 0 && (
+                <span className={'home-tile__delta' + (weight.delta < 0 ? ' is-down' : ' is-up')}>
+                  {(weight.delta > 0 ? '+' : '−') + String(Math.abs(weight.delta)).replace('.', ',')}
+                </span>
+              )}
+            </span>
+            <span className="home-tile__note">
+              {weight.delta !== null ? 'за месяц · ' : ''}{measureDue ? 'пора замер' : 'замер ' + (measuredDays === 0 ? 'сегодня' : measuredDays + ' ' + plural(measuredDays, 'день', 'дня', 'дней') + ' назад')}
+            </span>
+            <Spark points={weight.points} />
+          </>
+        ) : (
+          <>
+            <span className="home-tile__value">Вес</span>
+            <span className="home-tile__note">ещё не записан — запишите в «Прогрессе»</span>
+          </>
+        )}
+      </Tile>
+
+      <Tile {...(live ? { type: 'button', onClick: () => go(onGo, 'plan') } : {})}
+        className={'home-tile' + (noPlan ? ' home-tile--due' : '')}>
+        <span className="home-tile__icon home-tile__icon--month" aria-hidden="true">📅</span>
+        <span className="home-tile__value">{done.size} {plural(done.size, 'тренировка', 'тренировки', 'тренировок')}</span>
+        <span className="home-tile__note">
+          в {MONTH_IN[monthIdx]}{noPlan ? ' · программы нет' : m.streak > 1 ? ' · серия ' + m.streak + ' нед.' : ''}
+        </span>
+        <span className="home-tile__cal" aria-hidden="true">
+          {Array.from({ length: inDays }, (_, i) => (
+            <i key={i} className={done.has(i + 1) ? 'is-on' : i + 1 > (m.today || 0) ? 'is-ahead' : ''} style={{ '--i': i }} />
+          ))}
+        </span>
+      </Tile>
+    </div>
+  );
+}
+
+function daysAgoOf(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const a = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const n = new Date();
+  const b = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  return Math.max(0, Math.round((b - a) / 86400000));
 }
