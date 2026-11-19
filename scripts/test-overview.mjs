@@ -76,7 +76,7 @@ vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0]
 );
 
 
-const { Overview } = module.exports;
+const { Overview, ticketRow, enoughUntil, topGroups } = module.exports;
 
 /* ==========================================================================
  * Инструменты
@@ -229,4 +229,85 @@ test('ответ без нового поля не ломает экран', () 
   const tree = draw(data);
 
   assert.match(screen(tree), /Оплачено вперёд/, 'экран цел');
+});
+
+/* ==========================================================================
+ * Главная, этап 1 (макет home-redesign-2026-11-19): «Следующая тренировка»
+ * и «Оплачено вперёд» билетиками
+ * ========================================================================== */
+
+const buttons = (tree) => tree.root.findAll((n) => n.type === 'button').map((b) => textOf(b.props.children).replace(/\s+/g, ' ').trim());
+
+test('билетики: размер пакета, переплата, долг и слишком длинный пакет', () => {
+  assert.deepEqual(ticketRow(4, 8), { total: 8, left: 4, used: 4 });
+  assert.deepEqual(ticketRow(10, 8), { total: 10, left: 10, used: 0 }, 'переплата — не меньше остатка');
+  assert.deepEqual(ticketRow(3, 0), { total: 3, left: 3, used: 0 }, 'пакет не задан — сколько осталось');
+  assert.deepEqual(ticketRow(-1, 8), { total: 8, left: 0, used: 8 }, 'долг — все пройдены');
+  assert.equal(ticketRow(24, 30), null, 'больше 12 — без билетиков');
+  assert.equal(ticketRow(null, 8), null);
+});
+
+test('«хватит до» — по среднему темпу', () => {
+  const now = new Date(2026, 10, 19);
+  assert.equal(enoughUntil(4, 2, now).getDate(), 3, '4 тренировки по 2 в неделю — две недели, до 3 декабря');
+  assert.equal(enoughUntil(4, 2, now).getMonth(), 11);
+  assert.equal(enoughUntil(0, 2, now), null);
+  assert.equal(enoughUntil(4, 0, now), null);
+});
+
+test('две главные группы мышц тренировки', () => {
+  const tone = (e) => e.t;
+  assert.deepEqual(topGroups([{ t: 'back' }, { t: 'legs' }, { t: 'legs' }, { t: '' }, { t: 'arms' }], tone).map((g) => g.label), ['Ноги', 'Спина']);
+  assert.deepEqual(topGroups(undefined, tone), []);
+});
+
+test('следующая тренировка: когда и с кем, пакет «из»', () => {
+  const tree = draw(overview({ trainerName: 'Анна Смирнова', packageCount: 12 }));
+  const text = screen(tree);
+  assert.match(text, /Завтра, \d\d:\d\d/);
+  assert.match(text, /тренер Анна/);
+  assert.match(text, /10 из 12/);
+  assert.match(text, /хватит примерно до/);
+  assert.ok(buttons(tree).includes('Посмотреть план'));
+  act(() => tree.unmount());
+});
+
+test('занятий впереди нет — карточка с выходом, а не «не назначена» строкой', () => {
+  const tree = draw(overview({ nextTrainingDate: null }), {});
+  const text = screen(tree);
+  assert.match(text, /Следующая не назначена/);
+  assert.match(text, /Последняя — /);
+  const list = buttons(tree);
+  assert.ok(list.some((b) => /Попросить время/.test(b)));
+  act(() => tree.unmount());
+});
+
+test('кончился пакет — одна красная карточка с кнопкой «об оплате»', () => {
+  const tree = draw(overview({ balance: -2000, trainingsLeft: -1, packageCount: 8,
+    packageEnding: { known: true, left: -1, perWeek: 2, soon: false, out: true } }), { onGo: () => {} });
+  const text = screen(tree);
+  assert.match(text, /Долг 2 000 ₽/);
+  assert.equal((text.match(/Оплаченные тренировки закончились/g) || []).length, 1, 'одна новость — одна карточка');
+  assert.doesNotMatch(text, /По балансу числится долг/, 'отдельный раздел «Оплата» ушёл в карточку');
+  const pay = tree.root.findAll((n) => n.type === 'button' && /об оплате/.test(textOf(n.props.children)));
+  assert.equal(pay.length, 1);
+  assert.equal(pay[0].props.disabled, false);
+  act(() => tree.unmount());
+});
+
+test('у тренера в карточке клиента кнопок клиента нет', () => {
+  const tree = draw(overview({ balance: -2000, trainingsLeft: -1,
+    packageEnding: { known: true, left: -1, perWeek: 2, soon: false, out: true } }), { clientRow: 3 });
+  const list = buttons(tree);
+  assert.ok(!list.some((b) => /об оплате|Посмотреть план|Начать/.test(b)), list.join(' | '));
+  assert.match(screen(tree), /напомните клиенту об оплате/);
+  act(() => tree.unmount());
+});
+
+test('«глазами клиента» кнопки видны, но не нажимаются', () => {
+  const tree = draw(overview(), { clientRow: 3, clientView: true });
+  const plan = tree.root.findAll((n) => n.type === 'button' && /Посмотреть план/.test(textOf(n.props.children)));
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].props.disabled, true);
+  act(() => tree.unmount());
 });

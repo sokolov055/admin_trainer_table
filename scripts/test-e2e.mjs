@@ -2210,22 +2210,23 @@ test('FT-568: список и карточка показывают один б�
     await phone.evaluate(() => {
       window.__balanceHints = [];
       new MutationObserver(() => {
-        const hint = document.querySelector('.card-section[data-view="overview"] .lead__hint');
+        const hint = document.querySelector('.card-section[data-view="overview"] .home-pack__money');
         if (hint) window.__balanceHints.push(hint.textContent);
       }).observe(document.getElementById('root'), { childList: true, subtree: true, characterData: true });
     });
     await row.click();
     const overview = phone.locator('.card-section[data-view="overview"]');
-    await overview.locator('.lead__hint').waitFor({ timeout: 10000 });
-    assert.match(await overview.locator('.lead__hint').innerText(), /12\s*000 ₽ на балансе/);
+    await overview.locator('.home-pack__money').waitFor({ timeout: 10000 });
+    assert.match(await overview.locator('.home-pack__money').innerText(), /12\s*000 ₽ на балансе/);
     // Число и единица — через неразрывный пробел (Qty, FT-665)
-    assert.match(await overview.locator('.lead__value').innerText(), /4.тренировки/);
+    // «4 тренировки» или «4 из N» билетиками (главная, этап 1, 19.11.2026)
+    assert.match(await overview.locator('.home-pack__value').innerText(), /4.(тренировки|из)/);
     await phone.waitForTimeout(700);
     assert.ok((await phone.evaluate(() => window.__balanceHints)).every((hint) => !hint.includes('58')),
       'устаревший кеш не мелькает даже до ответа сервера');
     await phone.getByRole('button', { name: 'К списку' }).click();
     await phone.locator('.item').filter({ hasText: 'Анна Морозова' }).first().click();
-    assert.match(await phone.locator('.card-section[data-view="overview"] .lead__hint').innerText(), /12\s*000/);
+    assert.match(await phone.locator('.card-section[data-view="overview"] .home-pack__money').innerText(), /12\s*000/);
   } finally {
     await context.close();
   }

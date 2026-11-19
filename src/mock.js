@@ -1835,6 +1835,10 @@ const MOCK = {
     balance: 12000,
     price: 3000,
     trainingsLeft: 4,
+    // Главная, этап 1: «4 из 8» билетиками, «с Еленой», «хватит до» по темпу
+    packageCount: 8,
+    trainerName: 'Елена Соколова',
+    packageEnding: { known: true, left: 4, perWeek: 2, soon: false, out: false },
     trainingsThisMonth: 6,
     lastTrainingDate: daysAgo(2),
     nextTrainingDate: daysAhead(2, '10:00'),

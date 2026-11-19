@@ -14,7 +14,7 @@ import HealthDaily, { SpentKcal } from './HealthDaily.jsx';
 import DayCard from './DayReview.jsx';
 import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
-import Wishes from './Wishes.jsx';
+import Wishes, { WISH_DRAFT } from './Wishes.jsx';
 import MeasureMove from './MeasureMove.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, StatusBadge,
@@ -50,6 +50,7 @@ import { useQuickRequest } from '../quick-actions.js';
 import { revealSoon } from '../reveal.js';
 import { takeStart } from './start-request.js';
 import { slotTones, slotClass, slotLetter } from '../data-tones.js';
+import { NextCard, PackageCard } from './HomeCards.jsx';
 
 // По требованию (lazy.js): тренировка и рацион — когда их открыли,
 // редактор программы и шаблоны — только тренеру
@@ -76,83 +77,6 @@ const waiting = <Loading lead={false} rows={3} />;
  * Обзор
  * ================================================================== */
 
-/**
- * Пакет заканчивается.
- *
- * Плашка, а не строчка в фактах: факты читают глазами по диагонали, а это
- * то, ради чего экран и открыли. Числом, а не «скоро»: человек решает,
- * платить сегодня или после выходных, и «скоро» ему в этом не помогает.
- *
- * Молчим, пока занятий больше чем на неделю: предупреждение, висящее
- * всегда, перестаёт быть предупреждением.
- */
-function PackageEnding({ state, payer, trainer }) {
-  // Платит другой человек. Сколько у него лежит и на сколько тренировок
-  // хватит, говорит главный блок наверху; здесь — только когда пора
-  // пополнять. Постоянная жёлтая плашка при полном кошельке читалась как
-  // тревога там, где всё в порядке.
-  if (payer) {
-    if (!state || !state.known || (!state.soon && !state.out)) return null;
-    const left = payer.trainingsLeft;
-    return (
-      <Section>
-        <Panel pad>
-          <div className="warn">
-            <span className={'warn__icon' + (state.out ? ' warn__icon--critical' : '')}>
-              <IconAlert size={18} />
-            </span>
-            <div className="small">
-              <strong>
-                {state.out || !left
-                  ? 'Оплаченные тренировки закончились.'
-                  : 'Осталось ' + left + ' ' + plural(left, 'тренировка', 'тренировки', 'тренировок') + '.'}
-              </strong>{' '}
-              {trainer ? 'Напомните об оплате: платит ' + payer.name + '.' : 'Пора пополнить: платит ' + payer.name + '.'}
-            </div>
-          </div>
-        </Panel>
-      </Section>
-    );
-  }
-
-  if (!state || !state.known || (!state.soon && !state.out)) return null;
-
-  return (
-    <Section>
-      <Panel pad>
-        <div className="warn">
-          <span className={'warn__icon' + (state.out ? ' warn__icon--critical' : '')}>
-            <IconAlert size={18} />
-          </span>
-          <div className="small">
-            {state.out ? (
-              <>
-                <strong>Оплаченные тренировки закончились.</strong>{' '}
-                {trainer
-                  ? 'Следующая пройдёт в долг — напомните клиенту об оплате.'
-                  : 'Следующая пройдёт в долг — напишите тренеру об оплате.'}
-              </>
-            ) : (
-              <>
-                <strong>
-                  {/* «Тренировки», как в главной карточке «Оплачено вперёд»
-                      и у плательщика выше (аудит 24.10.2026) */}
-                  {state.left === 1
-                    ? 'Осталась одна оплаченная тренировка.'
-                    : 'Осталось ' + state.left + ' ' + plural(state.left, 'тренировка', 'тренировки', 'тренировок') + '.'}
-                </strong>{' '}
-                {trainer
-                  ? 'Это примерно на неделю — самое время напомнить о продлении.'
-                  : 'Это примерно на неделю — продлите пакет, чтобы не прерываться.'}
-              </>
-            )}
-          </div>
-        </div>
-      </Panel>
-    </Section>
-  );
-}
-
 /** Как часто открытый «Обзор» клиента сверяет баланс и занятия с сервером */
 const LIVE_MS = 15000;
 
@@ -160,7 +84,7 @@ const LIVE_MS = 15000;
 // день в режиме, ClientApp.jsx): под главной карточкой, чтобы, появившись
 // позже, не сдвигать её (аудит 24.10.2026)
 // onTrainer — открыть «Мой тренер» (ID для привязки) из пустого «Обзора»
-export function Overview({ clientRow, clientView = false, trainerClient, trainerClients, afterLead = null, onTrainer = null }) {
+export function Overview({ clientRow, clientView = false, trainerClient, trainerClients, afterLead = null, onTrainer = null, onGo = null }) {
   // У клиента — живой: тренер провёл оплату, баланс меняется без «потянуть»
   // (у тренера карточка перечитывается сама после его записи — onMutated)
   const { loading, data: loaded, error, reload } = useData(
@@ -202,21 +126,12 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
 
   const sinceTraining = daysSince(data.lastTrainingDate);
 
-  // Главный вопрос клиента — «сколько у меня оплачено вперёд». Отвечаем
-  // тренировками, а не рублями: в тренировках человек и думает.
-  //
-  // Если платит другой человек, свой баланс у клиента нулевой, и крупное
-  // «0 ₽ · Баланс исчерпан» было неправдой: тренировки оплачены, просто
-  // деньгами плательщика. Тогда и отвечаем его деньгами. Свой долг
-  // клиента важнее — его показываем как раньше.
-  const payer = data.payer && data.balance >= 0 ? data.payer : null;
-  const own = !payer;
-  const leadMoney = payer ? payer.balance : data.balance;
-  const leadLeft = payer ? payer.trainingsLeft : data.trainingsLeft;
-  const leadIsTrainings = leadLeft !== null && leadLeft !== undefined && leadMoney > 0;
   // Онлайн-ведение (FT-530): занятий с тренером нет — вместо пакета срок
   const online = data.online || null;
   const onlineLeft = online ? onlineDaysLeft(online.until) : null;
+  // Кнопки карточек главной: клиент — работают, «глазами клиента» — видны,
+  // но не нажимаются, тренер в карточке клиента — их нет
+  const mode = clientRow && !clientView ? 'trainer' : clientView ? 'preview' : 'own';
 
   return (
     <>
@@ -237,55 +152,15 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
                 : (clientRow && !clientView ? 'Клиент сам строит график' : 'График строите сами, тренер на связи в мессенджере'))
           }
         />
-      ) : (
-      <Lead
-        label={leadIsTrainings ? 'Оплачено вперёд' : 'Баланс'}
-        // Число крупно, «тренировки» и «₽» мельче и серым (FT-665)
-        value={
-          leadIsTrainings
-            ? <Qty value={leadLeft} unit={plural(leadLeft, 'тренировка', 'тренировки', 'тренировок')} />
-            : <Qty value={formatNumber(Math.round(leadMoney))} unit="₽" />
-        }
-        tone={leadMoney < 0 ? 'critical' : leadMoney > 0 ? 'good' : undefined}
-        hint={
-          own
-            ? leadIsTrainings
-              ? formatMoney(data.balance) + ' на балансе'
-              : data.balance < 0
-                ? 'Нужно пополнить'
-                : 'Баланс исчерпан'
-            : 'Платит ' + payer.name + ' · ' + formatMoney(payer.balance) + ' на балансе'
-        }
-        facts={[
-          // Ближайшее занятие стоит первым фактом намеренно: чаще всего
-          // приложение открывают именно с этим вопросом, и ответ не должен
-          // требовать прокрутки.
-          {
-            label: 'Следующая тренировка',
-            // «Не назначена» и «расписание недоступно» — разные новости.
-            // Первая значит «занятий впереди нет, напишите тренеру»,
-            // вторая — «мы просто не знаем»; путать их нельзя.
-            //
-            // Сравниваем с true, а не с false: поля может не быть вовсе —
-            // например, API отвечает кодом, который про расписание ещё не
-            // знает. Отсутствие ответа — это «не знаем», а не «занятий нет».
-            //
-            // Одна формулировка на «не знаем» во всём приложении — та же в
-            // «Напоминаниях» (Settings.jsx, PlanNext; аудит 24.10.2026)
-            value: data.nextTrainingDate
-              ? formatWhen(data.nextTrainingDate)
-              : data.scheduleKnown !== true ? SCHEDULE_UNKNOWN : 'не назначена',
-          },
-          { label: 'Тренировок в этом месяце', value: formatNumber(data.trainingsThisMonth) },
-        ]}
-      />
-      )}
+      ) : null}
 
-      {/* Конец пакета. Стоит сразу под главной цифрой, потому что это
-          единственная новость, требующая действия СЕГОДНЯ: «осталось 2»
-          человек читает как «ещё есть» и узнаёт о конце в тот день, когда
-          пришёл заниматься. */}
-      <PackageEnding state={data.packageEnding} payer={data.payer} trainer={!!clientRow && !clientView} />
+      {/* Главная клиента, этап 1 (макет home-redesign-2026-11-19, 19.11.2026):
+          «Следующая тренировка» цветом своей тренировки — первой, это
+          главный вопрос, с которым открывают приложение; «Оплачено вперёд» —
+          билетиками, конец пакета и долг — в той же карточке с кнопкой
+          (раньше — три карточки, повторявшие одно и то же) */}
+      <NextCard data={data} clientRow={clientRow} mode={mode} onGo={onGo} />
+      {!online && <PackageCard data={data} mode={mode} onGo={onGo} />}
 
       {afterLead}
 
@@ -331,16 +206,6 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
         </Panel>
       </Section>
 
-      {data.balance < 0 && (
-        <Section title="Оплата">
-          <Panel pad>
-            <div className="small">
-              По балансу числится долг {formatMoney(Math.abs(data.balance))}.
-              Если оплата уже прошла — напишите тренеру, он её отметит.
-            </div>
-          </Panel>
-        </Section>
-      )}
 
       {/* Выход переехал в боковое меню, к «Моим данным»: он про себя, а
           не про тренировки, и на обзоре стоял только потому, что меню не
@@ -549,12 +414,15 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
 
   // «Тренеру» из «+» — к пожеланию тренеру внизу экрана (Wishes.jsx). Из
   // открытого занятия сначала к программе, как кнопкой «К программе»
-  useQuickRequest('wish', () => {
+  useQuickRequest('wish', (payload) => {
     if (workout) { setWorkout(null); reload(); return false; }
     if (loading) return false;
     // Экран отрисован, а поля нет (ошибка загрузки) — запрос снимаем
     const field = document.querySelector('main:not([hidden]) .wishes__input');
     if (!field) return true;
+    // Готовый текст с главной («Написать тренеру об оплате», «Попросить
+    // время») — в поле, отправляет человек сам (Wishes.jsx, WISH_DRAFT)
+    if (payload && payload.text) window.dispatchEvent(new CustomEvent(WISH_DRAFT, { detail: payload.text }));
     try { field.focus({ preventScroll: true }); } catch (_) { /* старый браузер */ }
     revealSoon(() => field.closest('.wishes') || field);
     return true;

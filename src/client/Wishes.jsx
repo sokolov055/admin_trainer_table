@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import { Section, Panel, Note, formatDate } from '../ui.jsx';
@@ -24,9 +24,25 @@ const AssignForm = lazyPage(() => import('../trainer/Library.jsx'), 'AssignForm'
 const MAX = 1000;
 const STATUS = { new: 'Отправлено', read: 'Тренер прочитал', done: 'Учтено' };
 
+/** Событие с готовым текстом пожелания (кнопки главной, screens.jsx) */
+export const WISH_DRAFT = 'fit:wish-draft';
+
 function ClientWishes() {
   const { data, reload } = useData('wish.list', {}, []);
   const [text, setText] = useState('');
+  const field = useRef(null);
+  // Свой начатый текст не затираем: готовый встаёт только в пустое поле
+  useEffect(() => {
+    const take = (e) => {
+      if (!e.detail) return;
+      setText((t) => (t.trim() ? t : e.detail));
+      setSent(false);
+      // Курсор — в конец готового текста: «Мне удобно: |»
+      setTimeout(() => { const f = field.current; if (f) f.setSelectionRange(f.value.length, f.value.length); }, 0);
+    };
+    window.addEventListener(WISH_DRAFT, take);
+    return () => window.removeEventListener(WISH_DRAFT, take);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const [sent, setSent] = useState(false);
@@ -57,6 +73,7 @@ function ClientWishes() {
       <Panel pad className="wishes">
         <form className="wishes__form" onSubmit={send}>
           <textarea
+            ref={field}
             className="field__input wishes__input"
             aria-label="Пожелание к программе"
             placeholder="Например: «больше на ягодицы», «колено болит при выпадах — заменить», «тренировки короче, до часа»"

@@ -537,7 +537,7 @@ export default function ClientApp({ me, clientRow, preview }) {
               встают под главной карточкой, а не над ней: появившись позже,
               не сдвигают «Оплачено вперёд» (аудит 24.10.2026) */}
           <t.Screen clientRow={clientRow} clientView={!!preview}
-            {...(t.id === 'overview' ? { afterLead: overviewExtras, onTrainer: menu.some((m) => m.id === 'trainer') ? () => go('trainer') : null } : {})} />
+            {...(t.id === 'overview' ? { afterLead: overviewExtras, onTrainer: menu.some((m) => m.id === 'trainer') ? () => go('trainer') : null, onGo: own ? go : null } : {})} />
         </main>
       ))}
 
