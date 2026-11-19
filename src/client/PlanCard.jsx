@@ -199,8 +199,10 @@ export function ExerciseThumb({ ex, className = '' }) {
     if (live && !still) v.play().catch(() => {}); else v.pause();
   }, [live, clip, still]);
   const kind = clip ? 'clip' : anim ? 'anim' : photo ? 'photo' : 'icon';
+  // Без картинки — цветом группы мышц (макет цветов, шаг 2, 19.11.2026)
+  const tone = kind === 'icon' ? muscleClass(muscleTone(ex)) : '';
   return (
-    <span ref={ref} className={'pc-thumb pc-thumb--' + kind + (anim && live ? ' is-live' : '') + (className ? ' ' + className : '')} aria-hidden="true">
+    <span ref={ref} className={'pc-thumb pc-thumb--' + kind + (tone ? ' ' + tone : '') + (anim && live ? ' is-live' : '') + (className ? ' ' + className : '')} aria-hidden="true">
       {/* #t=0.1 — первый кадр виден и до запуска (Safari иначе рисует пусто) */}
       {clip && <video ref={video} src={clip + '#t=0.1'} muted loop playsInline preload="metadata" disablePictureInPicture tabIndex={-1} />}
       {anim && <img src={animSrc(anim, 0)} alt="" loading="lazy" draggable="false" />}

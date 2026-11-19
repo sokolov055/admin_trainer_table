@@ -111,7 +111,7 @@ button.pc-tile:active { transform: scale(.94); }
   border-radius: 6px; background: rgba(10, 10, 14, .72); color: #fff; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
 }
 .pc-tile__ph[class*='tone-'] .pc-tile__n { background: var(--t2); }
-.pc-tile__ph[class*='tone-'] .pc-thumb--icon { background: color-mix(in srgb, var(--t) var(--tone-wash), var(--surface)); color: color-mix(in srgb, var(--t) 65%, var(--text)); }
+.pc-thumb.pc-thumb--icon[class*='tone-'] { background: color-mix(in srgb, var(--t) var(--tone-wash), var(--surface)); color: color-mix(in srgb, var(--t) 65%, var(--text)); }
 
 /* ---------- «Начать» ---------- */
 .pc-start.button {

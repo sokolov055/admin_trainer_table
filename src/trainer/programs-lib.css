@@ -67,6 +67,8 @@
 .plib-goaltext--lose { --g: var(--goal-lose); } .plib-goaltext--mass { --g: var(--goal-mass); } .plib-goaltext--cut { --g: var(--goal-cut); }
 .plib-goaltext--strength { --g: var(--goal-strength); } .plib-goaltext--tone { --g: var(--goal-tone); } .plib-goaltext--endurance { --g: var(--goal-endurance); }
 .plib-goaltext--back { --g: var(--goal-back); } .plib-goaltext--rehab { --g: var(--goal-rehab); }
+/* «Назначить»: программа клиента сейчас — цветом её цели (programNow.goal, 19.11.2026) */
+.plib-nowgoal:not(.plib-goaltext--own) { color: color-mix(in srgb, var(--g) 65%, var(--text)); }
 .plib-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .plib-facts > span { display: inline-flex; align-items: center; gap: 4px; }
 .plib-facts svg { color: var(--text-muted); }

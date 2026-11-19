@@ -23,8 +23,8 @@
 /* Подходы точками-столбиками: разминка ниже и тёплая, дропсет — рамкой */
 .exr-dots { flex: none; display: inline-flex; align-items: flex-end; gap: 3px; height: 14px; }
 .exr-dots i { width: 6px; height: 14px; border-radius: 2px; background: var(--accent-fill); }
-.exr-dots i.is-warmup { height: 9px; background: var(--warning-text); opacity: 0.75; }
-.exr-dots i.is-drop { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.exr-dots i.is-warmup { height: 9px; background: var(--set-warmup); }
+.exr-dots i.is-drop { background: transparent; box-shadow: inset 0 0 0 1.5px var(--set-drop); }
 
 /* ---------- Суперсет звеньями (шаг 2, 17.11.2026) ---------- */
 /* Звено между упражнениями: серое — собрать, синее внутри рамки — разобрать */
@@ -87,7 +87,10 @@
 
 .exc-mus { display: flex; flex-wrap: wrap; gap: 6px; margin-top: calc(var(--space-1) * -1); }
 .exc-mus span { padding: 3px 9px; border-radius: 99px; background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--text-sm); font-weight: 550; }
-.exc-mus .exc-mus__p { background: var(--critical-fill); color: var(--critical-text); }
+.exc-mus .exc-mus__p { background: var(--accent-wash); color: var(--accent-ink); }
+.exc-mus span:not(.exc-mus__p) { background: none; box-shadow: inset 0 0 0 1.5px var(--border-strong); padding: 3px 9px; }
+/* Цвета-данные (шаг 2, 19.11.2026): основные мышцы — тоном группы; красный — только ошибки */
+.exc-mus[class*='tone-'] .exc-mus__p { background: color-mix(in srgb, var(--t) var(--tone-wash), var(--surface)); color: color-mix(in srgb, var(--t) 65%, var(--text)); }
 
 /* Подходы столбиками */
 .exc-bars {
@@ -98,8 +101,8 @@
   border-radius: var(--radius-sm); background: var(--accent-fill); color: var(--accent-text); font-size: var(--text-sm); font-weight: 750;
   transform-origin: bottom; animation: exc-grow var(--dur-nav) var(--ease-ios) both; animation-delay: calc(var(--i, 0) * 30ms);
 }
-.exc-bar--warmup { height: 62%; background: var(--warning-fill); color: var(--warning-text); box-shadow: inset 0 0 0 1px var(--border); }
-.exc-bar--drop { height: 82%; background: var(--surface); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.exc-bar--warmup { height: 62%; background: var(--set-warmup-wash); color: var(--set-warmup-text); }
+.exc-bar--drop { height: 82%; background: var(--surface); color: var(--set-drop-text); box-shadow: inset 0 0 0 2px var(--set-drop); }
 @keyframes exc-grow { from { transform: scaleY(0.2); opacity: 0; } }
 
 .exc-opts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -122,6 +125,9 @@
 }
 .exc-tog:active { transform: scale(0.96); }
 .exc-tog.is-on { background: var(--accent-wash); color: var(--accent-ink); }
+.exc-tog--drop.is-on { background: var(--set-drop-wash); color: var(--set-drop-text); }
+.exc-mini--warm { background: var(--set-warmup-wash); }
+.exc-mini--warm > span, .exc-mini--warm b { color: var(--set-warmup-text); }
 
 /* Счётчики «− / +» */
 .exc-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
@@ -196,7 +202,7 @@
   transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .exc-mach__i:active { transform: scale(0.96); }
-.exc-mach__i.is-on { background: var(--accent-wash); color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--accent); }
+.exc-mach__i.is-on { background: color-mix(in srgb, var(--kind-cardio) var(--tone-wash), var(--surface)); color: color-mix(in srgb, var(--kind-cardio) 65%, var(--text)); box-shadow: inset 0 0 0 2px var(--kind-cardio); }
 
 .exc-split { display: grid; gap: var(--space-2); }
 .exc-person { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2); align-items: center; }

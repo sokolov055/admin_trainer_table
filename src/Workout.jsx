@@ -21,6 +21,7 @@ import { usePendingDelete, UndoBar, UNDO_MS } from './pendingDelete.jsx';
 import { vanish } from './remove.js';
 import { useFlip } from './flip.js';
 import { METRICS, trackOf, rowFields as trackFields, missing, metricField, settingsFields, setOneSide, planScheme, planSet, cardioFrom, cardioGoal, intervalsTotals, isFunctional, setIntervals } from './exercise-track.js';
+import { muscleTone, muscleClass } from './data-tones.js';
 
 // Вес на одну сторону — у каждого подхода своя отметка (07.10.2026), поэтому
 // в заголовке колонки просто «Вес, кг», а не «Кг / сторона» на всё упражнение
@@ -129,7 +130,8 @@ export function progressParts(exercises) {
     const done = sets.filter((x) => x.state !== 'pending').length;
     const group = ex.supersetGroup;
     if (group && byGroup.has(group)) { const part = byGroup.get(group); part.done += done; part.total += sets.length; return; }
-    const part = { key: group ? 'g' + group : String(ex.id), done, total: sets.length };
+    // Тон — группа мышц первого упражнения отрезка (цвета, шаг 2, 19.11.2026)
+    const part = { key: group ? 'g' + group : String(ex.id), done, total: sets.length, tone: muscleClass(muscleTone(ex)) };
     if (group) byGroup.set(group, part);
     parts.push(part);
   });
@@ -1141,7 +1143,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             {drops.map((d, di) => (
               <div className="workout__set-row workout__drop" key={'d' + di} style={{ '--cols': 2 }}>
                 {/* «Дроп» — как кнопка «Дропсет», которая его добавила; «сброс» читался загадкой (аудит 24.10.2026) */}
-                <span>Дроп {di + 1}</span>
+                <span className="workout__drop-tag"><i aria-hidden="true">Д</i>Дроп {di + 1}</span>
                 <input aria-label={`${ex.name}, подход ${si + 1}, дроп ${di + 1}, вес`} inputMode="decimal" placeholder="кг" maxLength={12} value={String(d.weight || '').replace('.', ',')} onChange={e => editDrop(di, 'weight', e.target.value.replace(',', '.'))} />
                 <input aria-label={`${ex.name}, подход ${si + 1}, дроп ${di + 1}, повторы`} inputMode="numeric" placeholder="повт." maxLength={6} value={d.reps} onChange={e => editDrop(di, 'reps', e.target.value)} />
                 <button type="button" className="workout__drop-remove" aria-label={`Убрать дроп ${di + 1}`} onClick={() => updateSet(ei, si, s => ({ ...s, drops: s.drops.filter((_, i) => i !== di) }))}><IconClose size={16} /></button>
@@ -2562,7 +2564,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             (владелец, 09.10.2026: в шапке, что едет за прокруткой) */}
         <div className="workout__progress">
           <div className="workout__bar" role="progressbar" aria-label="Выполненные подходы" aria-valuemin={0} aria-valuemax={stats.total || 1} aria-valuenow={stats.done}>
-            {progressParts(s.exercises).map((part) => <span key={part.key} className="workout__bar-part"><span style={{ transform: `scaleX(${part.total ? part.done / part.total : 0})` }} /></span>)}
+            {progressParts(s.exercises).map((part) => <span key={part.key} className={'workout__bar-part' + (part.tone ? ' ' + part.tone : '')}><span style={{ transform: `scaleX(${part.total ? part.done / part.total : 0})` }} /></span>)}
           </div>
           {editable && !confirm && <label className="workout__rest-pick"><span className="workout__rest-word" aria-hidden="true">⏱</span><select aria-label="Таймер отдыха" value={String(s.restSeconds || 90)} onChange={e => changeRestLength(Number(e.target.value))}><option value="60">1 мин</option><option value="90">1:30</option><option value="120">2 мин</option><option value="180">3 мин</option></select></label>}
         </div>

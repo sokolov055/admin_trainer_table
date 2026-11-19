@@ -458,6 +458,8 @@
    тем же шагом колонок, но тише: это продолжение подхода, а не новый */
 .workout__drop { margin-top: 6px; }
 .workout__drop > span { font-size: var(--text-xs); color: var(--text-muted); }
+.workout__drop > .workout__drop-tag { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; color: var(--set-drop-text); font-weight: 700; white-space: nowrap; }
+.workout__drop-tag i { width: 18px; height: 18px; border-radius: 6px; display: inline-grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800; background: var(--set-drop); color: #fff; }
 .workout__drop input { min-height: 40px; }
 .workout__drop-remove {
   width: 48px; min-height: 40px; display: grid; place-items: center;
@@ -1189,6 +1191,10 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
 
 /* Отрезки полосы: старое правило `.workout__bar span` красило и сам отрезок */
 .workout__progress .workout__bar > .workout__bar-part { display: block; background: var(--surface-active); transform: none; }
+/* Цвета-данные (шаг 2, 19.11.2026): отрезок — тоном группы мышц упражнения,
+   впереди бледный, пройденное — полный тон */
+.workout__progress .workout__bar > .workout__bar-part[class*='tone-'] { background: color-mix(in srgb, var(--t) 30%, var(--surface-sunken)); }
+.workout__bar .workout__bar-part[class*='tone-'] > span { background: var(--t); }
 /* Кольцо «сделано из» у названия (вместо «0/4») */
 .workout__ex-count.workout__ring { position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; margin-top: 0; padding: 0; border-radius: 50%; background: none; font-size: 11px; }
 .workout__ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -1245,6 +1251,8 @@ button.workout__round-units[aria-expanded="true"] { color: var(--accent); }
   transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out), transform var(--dur) var(--ease-spring, cubic-bezier(.32,1.25,.5,1)), box-shadow var(--dur) var(--ease-out);
 }
 .wk-bar.is-warm { height: 64%; }
+/* Разминка «Р», пока не начата, — янтарная; ближайшая — акцентом, сделанная — оценкой */
+.wk-bar.is-warm:not(.is-next):not(.is-done):not(.is-skipped) { background: var(--set-warmup-wash); color: var(--set-warmup-text); }
 .wk-bar:active { transform: scale(0.94); }
 .wk-bar.is-next { background: var(--accent-fill); color: var(--accent-text); }
 /* «Дышит» внутри своего столбика — за рамку полосы не выходит (владелец, 18.11.2026) */

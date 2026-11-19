@@ -1289,8 +1289,8 @@ let demoTemplateSeq = 10;
 const DEMO_PROGRAM_NOW = () => {
   const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   return {
-    3: { month: '', templateId: '4', title: 'UL [4]', startsOn: day(-8), endsOn: '', week: 2, length: 2 },
-    5: { month: '', templateId: '6', title: 'Сила + кардио', startsOn: day(-24), endsOn: day(4), week: 4, length: 4 },
+    3: { month: '', templateId: '4', title: 'UL [4]', goal: 'Сила', startsOn: day(-8), endsOn: '', week: 2, length: 2 },
+    5: { month: '', templateId: '6', title: 'Сила + кардио', goal: 'Похудение', startsOn: day(-24), endsOn: day(4), week: 4, length: 4 },
     7: { month: '', templateId: '', title: '', startsOn: day(-3), endsOn: '', week: 1, length: 0 },
   };
 };

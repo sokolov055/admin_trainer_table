@@ -243,7 +243,7 @@ function How({ template, client, onBack, onDone }) {
     conf = (
       <div className="plib-conf">
         <p>
-          Сейчас — <b>{now.title ? `«${now.title}»` : 'своя программа'}</b>{now.endsOn ? ' до ' + dayDate(now.endsOn) : ', без конца'}.
+          Сейчас — <b className={now.title && now.goal ? 'plib-nowgoal plib-goaltext--' + goalLook(now.goal).key : undefined}>{now.title ? `«${now.title}»` : 'своя программа'}</b>{now.endsOn ? ' до ' + dayDate(now.endsOn) : ', без конца'}.
           {' '}{adding ? 'Тренировки этой программы встанут в конец её списка.' : `Заменить — новая начнётся ${startTxt}, прежняя останется в истории.`}
         </p>
         {seg([{ value: 'replace', label: 'Заменить' }, { value: 'append', label: 'Добавить к ней' }], mode, setMode, 'Как назначить')}

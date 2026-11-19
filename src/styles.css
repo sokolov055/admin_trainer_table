@@ -206,6 +206,14 @@
   --mg-chest: #c4407a; --mg-chest-end: #93285a;
   --mg-arms: #7656cc;  --mg-arms-end: #5636a3;
   --kind-cardio: #d6476e; --kind-cardio-end: #a52e52;
+  /* Тип подхода (шаг 2, 19.11.2026): разминка «Р» — янтарная, дропсет «Д» —
+     фиолетовый. Белый на янтарном 2,8:1 — только подложка и текст тоном */
+  --set-warmup: #d98a14;
+  --set-drop: #8a55d0;
+  --set-warmup-wash: color-mix(in srgb, var(--set-warmup) var(--tone-wash), var(--surface));
+  --set-warmup-text: color-mix(in srgb, var(--set-warmup) 65%, var(--text));
+  --set-drop-wash: color-mix(in srgb, var(--set-drop) var(--tone-wash), var(--surface));
+  --set-drop-text: color-mix(in srgb, var(--set-drop) 65%, var(--text));
   --tone-wash: 14%;
 
   /* --- глубина: смещение + мягкое размытие. Свечение без смещения —
@@ -5212,8 +5220,8 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .plan-inline__set-x:active { transform: scale(0.9); }
 .plan-inline__sets-help { margin: -4px 0 0; color: var(--text-muted); font-size: var(--text-sm); }
 .plan-inline__set { min-width: 40px; height: 40px; padding: 0 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 650; font-variant-numeric: tabular-nums; cursor: pointer; }
-.plan-inline__set--warmup { color: var(--warning-text); background: var(--warning-fill); border-color: transparent; }
-.plan-inline__set--drop { color: var(--accent); border-color: var(--accent); }
+.plan-inline__set--warmup { color: var(--set-warmup-text); background: var(--set-warmup-wash); border-color: transparent; }
+.plan-inline__set--drop { color: var(--set-drop-text); border-color: var(--set-drop); }
 .plan-inline__set.is-on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .plan-inline__set-kind { display: grid; gap: var(--space-2); }
 .plan-inline__set-kind .button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }

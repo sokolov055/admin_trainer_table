@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Sheet } from '../ui.jsx';
 import { haptic } from '../telegram.js';
 import { ExerciseThumb } from '../client/PlanCard.jsx';
+import { muscleTone, muscleClass } from '../data-tones.js';
 import { namesOf } from '../muscles/MuscleMap.jsx';
 import CardioPlan, { MACHINE_NAMES } from './CardioPlan.jsx';
 import { trackOf, cardioFrom, techniqueOf, planOneSide, planText, REST_OPTIONS, restText } from '../exercise-track.js';
@@ -80,9 +81,9 @@ function Stepper({ label, note, value, placeholder = '—', step, onText, mode =
 }
 
 /** Маленький счётчик в строку: «Разминка − 1 +», «Круги − 3 +» */
-function Mini({ label, value, min = 0, max = 20, onValue }) {
+function Mini({ label, value, min = 0, max = 20, onValue, className = '' }) {
   return (
-    <span className="exc-mini">
+    <span className={'exc-mini' + (className ? ' ' + className : '')}>
       <span>{label}</span>
       <button type="button" aria-label={label + ': меньше'} disabled={value <= min} onClick={() => { onValue(value - 1); haptic('light'); }}><IconMinus size={14} /></button>
       <b key={value}>{value}</b>
@@ -223,7 +224,8 @@ export default function ExerciseCard({
           )}
         {renderHistory(index)}
         {!picking && (primary.length > 0 || secondary.length > 0) && (
-          <div className="exc-mus" aria-label="Мышцы">
+          // Основные — цветом группы мышц, помогающие — пунктиром (цвета, шаг 2, 19.11.2026)
+          <div className={'exc-mus ' + muscleClass(muscleTone({ ...ex, exercise: card }))} aria-label="Мышцы">
             {primary.map((m) => <span key={'p' + m} className="exc-mus__p">{m}</span>)}
             {secondary.map((m) => <span key={'s' + m}>{m}</span>)}
           </div>
@@ -234,7 +236,7 @@ export default function ExerciseCard({
             <div className="exc-ss__head"><IconLinkPair size={16} />Суперсет {letter} · общее для круга</div>
             <div className="exc-opts">
               <Mini label="Круги" value={work} min={1} max={MAX_SETS} onValue={(n) => patch(withSets(ex, n))} />
-              {canWarmup(ex) && <Mini label="Разминка" value={tech.warmup} max={MAX_WARMUP} onValue={(n) => patch(withWarmup(ex, n))} />}
+              {canWarmup(ex) && <Mini label="Разминка" value={tech.warmup} max={MAX_WARMUP} className={tech.warmup > 0 ? 'exc-mini--warm' : ''} onValue={(n) => patch(withWarmup(ex, n))} />}
             </div>
             <RestRow label="Отдых после круга" value={tech.rest} advice={[90, 120]} onChange={(s) => patch(withRest(ex, s))} />
             {/* Разные круги (17.11.2026): повторы и вес, цель и нагрузка кардио — свои на каждом круге */}
@@ -275,9 +277,9 @@ export default function ExerciseCard({
                     ))}
                   </div>
                   <div className="exc-opts">
-                    {canWarmup(ex) && <Mini label="Разминка" value={tech.warmup} max={MAX_WARMUP} onValue={(n) => patch(withWarmup(ex, n))} />}
+                    {canWarmup(ex) && <Mini label="Разминка" value={tech.warmup} max={MAX_WARMUP} className={tech.warmup > 0 ? 'exc-mini--warm' : ''} onValue={(n) => patch(withWarmup(ex, n))} />}
                     {canDrop(ex) && (
-                      <button type="button" className={'exc-tog' + (tech.dropset ? ' is-on' : '')} aria-pressed={tech.dropset} onClick={() => { patch(withDrop(ex, !tech.dropset)); haptic('light'); }}>
+                      <button type="button" className={'exc-tog exc-tog--drop' + (tech.dropset ? ' is-on' : '')} aria-pressed={tech.dropset} onClick={() => { patch(withDrop(ex, !tech.dropset)); haptic('light'); }}>
                         {tech.dropset && <IconCheck size={14} />}Дропсет в конце
                       </button>
                     )}
