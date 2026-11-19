@@ -170,6 +170,23 @@ test('темп месяца: % к тому же дню, полоска к мес
   assert.equal(shortMoney(1250000), '1,25 млн');
 });
 
+test('строка: обводка по важности, билетики, сегодня у сплита — по паре', () => {
+  const { ringOf, packOf, todayByRow, todayOf, ticketRow } = module.exports;
+  assert.equal(ringOf({}, { money: -1, noPlan: true, today: true }), 'debt');
+  assert.equal(ringOf({}, { money: 0, noPlan: true, today: true }), 'plan');
+  assert.equal(ringOf({ pause: { state: 'active' } }, { money: 0, noPlan: false, today: true }), 'pause');
+  assert.equal(ringOf({ pause: { state: 'requested' } }, { money: 0, noPlan: false, today: true }), 'today');
+  assert.equal(ringOf({}, { money: 5, noPlan: false, today: false }), '');
+  assert.deepEqual(packOf({ price: 1500, balance: 1500, count: 8 }, ticketRow), { total: 8, left: 1, used: 7 });
+  assert.deepEqual(packOf({ price: 3000, balance: -3000, count: 8 }, ticketRow), { total: 8, left: 0, used: 8 }, 'долг — все пройдены');
+  assert.deepEqual(packOf({ splitOf: 29, splitTrainingsLeft: 4, count: 0 }, ticketRow), { total: 4, left: 4, used: 0 });
+  assert.equal(packOf({ online: true, price: 1, balance: 5 }, ticketRow), null);
+  assert.equal(packOf({ price: 0, balance: 0 }, ticketRow), null);
+  const map = todayByRow([{ row: 29, at: 'x', done: false }, { row: 1, at: 'y', done: true }]);
+  assert.equal(todayOf(map, { row: 30, splitOf: 29 }).row, 29);
+  assert.equal(todayOf(map, { row: 1 }), null, 'проведённое — не «сегодня»');
+});
+
 /* ==========================================================================
  * Экран
  * ========================================================================== */
@@ -183,7 +200,7 @@ function draw(clients = CLIENTS, extra = {}) {
       count: clients.length, totalTrainings: 16, negativeBalance: 1, staleClients: 1, staleDays: 14,
       today: { total: 2, done: 1, next: null, items: [
         { row: 1, name: 'Анна Морозова', at: t(-1), done: true },
-        { row: 2, name: 'Олег Петров', at: t(1), done: false },
+        { row: 2, name: 'Олег Петров', at: t(1), done: false, topic: { title: 'Спина', exercises: [{ muscle: 'Спина' }] } },
       ].filter((x) => new Date(x.at).toDateString() === today.toDateString()) },
     },
     signals: SIGNALS,
@@ -238,7 +255,32 @@ test('плитка фильтрует список, повторное каса�
   act(() => tile('violet').props.onClick());
   assert.deepEqual(names(), ['Ирина Л']);
   act(() => tile('violet').props.onClick());
-  assert.ok(names().length !== 1, 'снова «Сегодня»');
+  assert.equal(tile('violet').props['aria-pressed'], false, 'плитка снята');
+  assert.ok(!names().includes('Ирина Л'), 'снова «Ещё сегодня»: Ирины сегодня нет');
   assert.equal(tile('teal').props.disabled, true, '0 «пора замер» — не нажимается');
   assert.ok(tile('teal').props.className.includes('is-zero'));
+});
+
+test('список: аватар с обводкой, время пилюлей, тема цветом мышц, билетики, короткая строка', () => {
+  const clients = CLIENTS.map((c) => (c.row === 2 ? { ...c, price: 3000, count: 8 } : c.row === 3 ? { ...c, price: 1500, count: 8 } : c));
+  const { tree } = draw(clients);
+  act(() => tree.root.findAll((n) => n.props && n.props.role === 'tab' && /^Все/.test(textOf(n.props.children)))[0].props.onClick());
+  const row = (name) => byClass(tree, 'cl-item')
+    .find((n) => n.findAll((x) => x.props.className === 'item__name' && textOf(x.props.children) === name).length);
+  const oleg = row('Олег Петров');
+  const ava = oleg.findAll((n) => String(n.props.className || '').includes('th-ava'))[0];
+  assert.match(ava.props.className, /th-ring--debt/, 'долг — красная обводка');
+  assert.equal(textOf(ava.props.children), 'ОП');
+  const today = new Date();
+  if (new Date(today.getTime() + 60000).toDateString() === today.toDateString()) {
+    assert.equal(oleg.findAll((n) => n.props.className === 'cl-time').length, 1, 'время сегодня пилюлей');
+    assert.match(oleg.findAll((n) => String(n.props.className || '').startsWith('cl-topic'))[0].props.className, /tone-back/);
+  }
+  const irina = row('Ирина Л');
+  assert.match(irina.findAll((n) => String(n.props.className || '').includes('th-ava'))[0].props.className, /th-ring--plan/);
+  const tickets = irina.findAll((n) => n.type === 'i' && n.parent && n.parent.props.className === 'cl-pack');
+  assert.equal(tickets.length, 8);
+  assert.equal(tickets.filter((n) => n.props.className === 'is-last').length, 1, 'последний — оранжевый');
+  const meta = textOf(byClass(tree, 'cl-item__meta').map((n) => n.props.children));
+  assert.doesNotMatch(meta, /за месяц/, 'без «N тренировок за месяц»');
 });

@@ -19,8 +19,10 @@ import PrivacyLink from '../PrivacyLink.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
 import { onlineDaysLeft, onlineLabel, addOnlineMonth } from '../online.js';
 import { SOURCES } from './Metrics.jsx';
-import { DayHead, TodoTiles, PaceCard } from './TrainerHome.jsx';
-import { todoTiles, inTile } from './trainer-home-model.js';
+import { DayHead, TodoTiles, PaceCard, Avatar } from './TrainerHome.jsx';
+import { todoTiles, inTile, todayByRow, todayOf, ringOf, packOf, timeOf } from './trainer-home-model.js';
+import { ticketRow, topGroups } from '../client/home-model.js';
+import { muscleTone, muscleClass } from '../data-tones.js';
 
 /* ==================================================================
  * Клиенты
@@ -100,11 +102,20 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
   // Заменили строку фактов и фильтры «Требуют внимания», «Долг», «Без замера»
   const tiles = todoTiles(clients, data.signals);
   const tile = todo ? tiles.find((t) => t.id === todo) : null;
+  // Строка списка (этап 4): время сегодня, тема, обводка «нет программы»
+  const todays = todayByRow(s.today && s.today.items);
+  const noPlanTile = tiles.find((t) => t.id === 'noPlan');
+  const item = (c) => (
+    <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} today={todayOf(todays, c)} noPlan={inTile(noPlanTile, c)} />
+  );
 
   // «Сегодня» — только те, у кого занятие сегодня (решение владельца
   // 30.09.2026): заходят сюда за сегодняшним днём, а не за неделей вперёд.
   // Прошедшие не попадают: сервер отдаёт дату, пока занятие не кончилось.
-  const upcoming = clients.filter((c) => c.nextTrainingDate && isTodayLocal(c.nextTrainingDate));
+  // С лентой дня (этап 4) — и те, у кого сегодняшнее занятие ещё не
+  // проведено по календарю: «Ещё сегодня» совпадает с кружками впереди
+  const todayAt = (c) => { const t = todayOf(todays, c); return t ? t.at : c.nextTrainingDate; };
+  const upcoming = clients.filter((c) => todayOf(todays, c) || (c.nextTrainingDate && isTodayLocal(c.nextTrainingDate)));
 
   // Сплиты — пары, которые тренируются вместе по одной программе: участники
   // отдельными карточками (splitOf) и пары, ещё не разделённые на карточки
@@ -140,7 +151,7 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
   // строк в таблице. Даты в ISO сравниваются как строки — этого достаточно,
   // они одного формата и одного пояса.
   const shown = filter === 'next' && !tile
-    ? [...filtered].sort((a, b) => String(a.nextTrainingDate).localeCompare(String(b.nextTrainingDate)))
+    ? [...filtered].sort((a, b) => String(todayAt(a)).localeCompare(String(todayAt(b))))
     : filtered;
 
   return (
@@ -232,14 +243,14 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
         {groupSplits(shown).map((g) => (g.split ? (
           <div className="split-group" key={'split-' + g.split}>
             <div className="split-group__items">
-              {g.items.map((c) => <ClientItem key={c.row} c={c} s={s} onOpen={onOpenClient} />)}
+              {g.items.map(item)}
             </div>
             <div className="split-group__bracket" aria-label={'Сплит: ' + g.items.map((c) => c.name).join(' и ')}>
               <span className="split-group__line" />
               <span className="split-group__label">сплит</span>
             </div>
           </div>
-        ) : <ClientItem key={g.items[0].row} c={g.items[0]} s={s} onOpen={onOpenClient} />))}
+        ) : item(g.items[0])))}
       </Section>
     </>
   );
@@ -271,80 +282,92 @@ function isTodayLocal(iso) {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
 
-/** Строка списка клиентов */
-function ClientItem({ c, s, onOpen: onOpenClient }) {
-          // «Нет данных» и «давно не приходил» — разные вещи, и лечатся
-          // по-разному: первое чинит пересчёт календаря, второе — звонок
-          // клиенту. Раньше оба показывались одним словом «пропал», которое
-          // вдобавок путалось с листом «Пропащие» — а туда клиент попадает
-          // только вручную и означает это совсем другое.
-          const days = daysSince(c.lastTrainingDate);
-          // Онлайн (FT-530): занятий с тренером нет — ни «нет данных»,
-          // ни «не был N дней»; вместо них срок ведения
-          const noData = days === null && !c.online;
-          const paused = !!c.pause && c.pause.state === 'active';
-          const isStale = !noData && !c.online && !paused && days > s.staleDays;
-          const pauseChip = listChip(c.pause);
-          const onlineLeft = c.online ? onlineDaysLeft(c.onlineUntil) : null;
-          // Сплит: деньги пары — у плательщика; у остальных — кто платит
-          const money = c.splitOf ? c.splitBalance : c.balance;
+/**
+ * Строка списка клиентов (главная тренера, этап 4, макет
+ * home-redesign-2026-11-19): аватар с обводкой состояния, время сегодня
+ * синей пилюлей, тема тренировки цветом мышц, пакет билетиками. Вместо
+ * «N тренировок за месяц · N дней назад» — только когда был.
+ *
+ * today — сегодняшнее ещё не проведённое занятие (summary.today.items, у
+ * сплита — пары), noPlan — сигнал «нет программы» («Сводка»).
+ */
+function ClientItem({ c, s, onOpen: onOpenClient, today = null, noPlan = false }) {
+  // «Нет данных» и «давно не приходил» — разные вещи, и лечатся
+  // по-разному: первое чинит пересчёт календаря, второе — звонок
+  // клиенту. Раньше оба показывались одним словом «пропал», которое
+  // вдобавок путалось с листом «Пропащие» — а туда клиент попадает
+  // только вручную и означает это совсем другое.
+  const days = daysSince(c.lastTrainingDate);
+  // Онлайн (FT-530): занятий с тренером нет — ни «нет данных»,
+  // ни «не был N дней»; вместо них срок ведения
+  const noData = days === null && !c.online;
+  const paused = !!c.pause && c.pause.state === 'active';
+  const isStale = !noData && !c.online && !paused && days > s.staleDays;
+  const pauseChip = listChip(c.pause);
+  const onlineLeft = c.online ? onlineDaysLeft(c.onlineUntil) : null;
+  // Сплит: деньги пары — у плательщика; у остальных — кто платит
+  const money = c.splitOf ? c.splitBalance : c.balance;
+  // Время сегодня: занятие из ленты дня; старый сервер — ближайшая дата
+  const todayAt = today ? today.at : (c.nextTrainingDate && isTodayLocal(c.nextTrainingDate) ? c.nextTrainingDate : null);
+  const group = today && today.topic ? topGroups(today.topic.exercises, muscleTone, 1)[0] : null;
+  const ring = ringOf(c, { money, noPlan: noPlan && !paused, today: !!todayAt });
+  const pack = packOf(c, ticketRow);
 
-          return (
-            <button className="item" onClick={() => onOpenClient(c)}>
-              <div className="item__top">
-                <span className="item__name">{c.name}</span>
-                {c.splitOf && !c.splitPayer ? (
-                  <span className="item__amount small muted">платит {c.splitPayerName}</span>
-                ) : (
-                  <span
-                    className="item__amount"
-                    style={{
-                      color: money < 0
-                        ? 'var(--critical-text)'
-                        : money > 0 ? 'var(--text)' : 'var(--text-muted)',
-                    }}
-                  >
-                    {formatMoney(money)}
-                  </span>
-                )}
-              </div>
-              <div className="item__meta">
-                {pauseChip && <span className={'pause-tag pause-tag--' + pauseChip.tone}>{pauseChip.text}</span>}
-                {c.program && <span>{c.program.attention && !paused ? <Tag tone="warn">{c.program.text}</Tag> : c.program.text}</span>}
-                {c.online ? (
-                  onlineLeft !== null && onlineLeft < 0
-                    ? <Tag tone="warn">онлайн · {onlineLabel(c.onlineUntil)}</Tag>
-                    : <span>онлайн · {onlineLabel(c.onlineUntil)}</span>
-                ) : (
-                  <>
-                    <span>
-                      {c.trainings} {plural(c.trainings, 'тренировка', 'тренировки', 'тренировок')} за месяц
-                    </span>
-                    <span>
-                      {c.lastTrainingDate ? relativeDays(c.lastTrainingDate) : 'тренировок не было'}
-                    </span>
-                  </>
-                )}
-
-                {/* Когда следующая — не значок состояния, а обычный факт,
-                    поэтому обычной строкой. Значком он спорил бы за
-                    внимание с «не был N дней», а это разные новости. */}
-                {c.nextTrainingDate && <span>дальше {formatWhen(c.nextTrainingDate)}</span>}
-                {noData && <Tag>нет данных</Tag>}
-                {isStale && (
-                  <Tag tone="warn">
-                    не был {days} {plural(days, 'день', 'дня', 'дней')}
-                  </Tag>
-                )}
-                {/* Не приглашён — это задача тренера, а не свойство
-                    клиента: ни ссылки, ни Telegram у человека нет, и в
-                    кабинет он войти не может. */}
-                {!c.chatId && !c.invited && !c.joined && <Tag tone="warn">не приглашён</Tag>}
-                {/* «без таблицы» снят (аудит 24.10.2026): сервер таблиц больше
-                    не заводит, и значок горел у каждого нового клиента */}
-              </div>
-            </button>
-          );
+  return (
+    <button className="item cl-item" onClick={() => onOpenClient(c)}>
+      <Avatar name={c.name} ring={ring} />
+      <span className="cl-item__body">
+        <span className="item__top">
+          <span className="item__name">{c.name}</span>
+          {c.splitOf && !c.splitPayer ? (
+            <span className="item__amount small muted">платит {c.splitPayerName}</span>
+          ) : (
+            <span
+              className="item__amount"
+              style={{
+                color: money < 0
+                  ? 'var(--critical-text)'
+                  : money > 0 ? 'var(--text)' : 'var(--text-muted)',
+              }}
+            >
+              {formatMoney(money)}
+            </span>
+          )}
+        </span>
+        <span className="item__meta cl-item__meta">
+          {todayAt && <span className="cl-time">{timeOf(todayAt)}</span>}
+          {group && <span className={'cl-topic ' + muscleClass(group.tone)} title={today.topic.title}>{group.label.toLowerCase()}</span>}
+          {pauseChip && <span className={'pause-tag pause-tag--' + pauseChip.tone}>{pauseChip.text}</span>}
+          {money < 0 && <Tag tone="bad">долг</Tag>}
+          {noPlan && !paused && <span className="cl-noplan">нет программы</span>}
+          {c.program && c.program.attention && !paused && !noPlan && <Tag tone="warn">{c.program.text}</Tag>}
+          {c.online ? (
+            onlineLeft !== null && onlineLeft < 0
+              ? <Tag tone="warn">онлайн · {onlineLabel(c.onlineUntil)}</Tag>
+              : <span>онлайн · {onlineLabel(c.onlineUntil)}</span>
+          ) : isStale ? (
+            <Tag tone="warn">не был {days} {plural(days, 'день', 'дня', 'дней')}</Tag>
+          ) : !noData && (
+            <span>{relativeDays(c.lastTrainingDate)}</span>
+          )}
+          {/* Когда следующая — не сегодня: сегодняшняя уже пилюлей */}
+          {c.nextTrainingDate && !todayAt && <span>дальше {formatWhen(c.nextTrainingDate)}</span>}
+          {noData && <Tag>нет данных</Tag>}
+          {/* Не приглашён — это задача тренера, а не свойство
+              клиента: ни ссылки, ни Telegram у человека нет, и в
+              кабинет он войти не может. */}
+          {!c.chatId && !c.invited && !c.joined && <Tag tone="warn">не приглашён</Tag>}
+        </span>
+        {pack && (
+          <span className="cl-pack" aria-label={'Оплачено вперёд: ' + pack.left + ' из ' + pack.total}>
+            {Array.from({ length: pack.total }, (_, i) => (
+              <i key={i} className={i < pack.used ? 'is-used' : pack.left === 1 ? 'is-last' : ''} />
+            ))}
+          </span>
+        )}
+      </span>
+    </button>
+  );
 }
 
 /**

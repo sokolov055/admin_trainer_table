@@ -1112,9 +1112,9 @@ function demoTrainerDay() {
   const items = [
     { row: 3, at: at(-300), done: true },
     { row: 5, at: at(-150), done: true },
-    { row: 7, at: at(40), done: false },
-    { row: 4, at: at(190), done: false },
-    { row: 29, at: late.toISOString(), done: late.getTime() < now },
+    { row: 7, at: at(40), done: false, topic: { title: 'Ноги и ягодицы', exercises: [{ muscle: 'Ноги' }, { muscle: 'Ноги' }, { muscle: 'Пресс' }] } },
+    { row: 4, at: at(190), done: false, topic: { title: 'Спина и бицепс', exercises: [{ muscle: 'Спина' }, { muscle: 'Спина' }, { muscle: 'Руки' }] } },
+    { row: 29, at: late.toISOString(), done: late.getTime() < now, topic: { title: 'Грудь и плечи', exercises: [{ muscle: 'Грудь' }, { muscle: 'Плечи' }] } },
   ].filter((t) => today(t.at)).map((t) => ({ ...t, name: name(t.row) }))
     .sort((a, b) => a.at.localeCompare(b.at));
   const next = items.find((t) => !t.done && Date.parse(t.at) > now);

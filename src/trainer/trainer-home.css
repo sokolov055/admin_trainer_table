@@ -230,3 +230,39 @@
   .th-day__bar span, .th-pace__bar span, .th-slot { animation: none; }
   .th-slot.is-now .th-ava::before { animation: none; opacity: 0; }
 }
+
+/* ---------- Строка списка клиентов (этап 4) ---------- */
+.cl-item { display: flex; align-items: flex-start; gap: var(--space-3); padding-left: var(--space-3); }
+.cl-item > .th-ava { margin-top: 2px; }
+.cl-item__body { display: block; flex: 1; min-width: 0; }
+.cl-item__meta { align-items: center; column-gap: 6px; }
+.cl-item__meta > span:not(.tag):not(.cl-time):not(.cl-topic):not(.cl-noplan):not(.pause-tag) { margin-right: 2px; }
+/* Время сегодня — синей пилюлей, тема — цветом мышц (.tone-*, data-tones.js) */
+.cl-time {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cl-topic, .cl-noplan {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.cl-topic {
+  background: color-mix(in srgb, var(--t, var(--accent)) var(--tone-wash, 14%), var(--surface));
+  color: color-mix(in srgb, var(--t, var(--accent)) 65%, var(--text));
+}
+.cl-noplan {
+  background: color-mix(in srgb, var(--goal-cut) var(--tone-wash, 14%), var(--surface));
+  color: color-mix(in srgb, var(--goal-cut) 65%, var(--text));
+}
+/* Пакет билетиками: пройденные — серые, оплаченные — зелёные, последний — оранжевый */
+.cl-pack { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 6px; }
+.cl-pack i { width: 11px; height: 5px; border-radius: 2px; background: var(--good); }
+.cl-pack i.is-used { background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.cl-pack i.is-last { background: var(--warning); }

@@ -169,3 +169,47 @@ export function paceLine(data) {
     goal: monthGoal ? 'цель ' + shortMoney(monthGoal) : fullBefore ? 'весь ' + (MONTHS_NOM[pm - 1] || 'прошлый').toLowerCase() + ' ' + shortMoney(fullBefore) : '',
   };
 }
+
+/* ==================================================================
+ * Строка списка клиентов (этап 4)
+ * ================================================================== */
+
+/**
+ * Сегодняшние ещё не проведённые занятия по карточке: row → занятие. У
+ * сплита занятие записано на карточку пары — участники находят его по splitOf.
+ */
+export function todayByRow(items) {
+  const map = new Map();
+  (Array.isArray(items) ? items : []).forEach((t) => {
+    if (t && !t.done && t.at && !map.has(t.row)) map.set(t.row, t);
+  });
+  return map;
+}
+
+export const todayOf = (map, c) => map.get(c.row) || (c.splitOf ? map.get(c.splitOf) : null) || null;
+
+/**
+ * Обводка аватара — одно состояние, важное первым: долг (красная), нет
+ * программы (фиолетовая), пауза (голубая), занятие сегодня (синяя).
+ */
+export function ringOf(c, { money, noPlan, today }) {
+  if (money < 0) return 'debt';
+  if (noPlan) return 'plan';
+  if (c.pause && c.pause.state !== 'requested') return 'pause';
+  if (today) return 'today';
+  return '';
+}
+
+/**
+ * Пакет билетиками: сколько занятий оплачено вперёд из размера пакета. У
+ * участника сплита — остаток пары. Онлайн, без цены и больше 12 — null
+ * (ticketRow из главной клиента решает, помещается ли).
+ */
+export function packOf(c, ticketRow) {
+  if (c.online) return null;
+  let left = null;
+  if (c.splitOf) left = Number.isFinite(Number(c.splitTrainingsLeft)) ? Number(c.splitTrainingsLeft) : null;
+  else if (Number(c.price) > 0) left = Math.floor(Number(c.balance) / Number(c.price));
+  if (left === null) return null;
+  return ticketRow(Math.max(0, left), c.count);
+}
