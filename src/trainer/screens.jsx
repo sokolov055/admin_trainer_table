@@ -19,6 +19,8 @@ import PrivacyLink from '../PrivacyLink.jsx';
 import RestSignalSetting from '../RestSignalSetting.jsx';
 import { onlineDaysLeft, onlineLabel, addOnlineMonth } from '../online.js';
 import { SOURCES } from './Metrics.jsx';
+import { DayHead, TodoTiles, PaceCard } from './TrainerHome.jsx';
+import { todoTiles, inTile } from './trainer-home-model.js';
 
 /* ==================================================================
  * Клиенты
@@ -52,10 +54,13 @@ function ProgramGaps({ gaps, onOpen }) {
 
 // adding — что открыто из «+» в шапке (TrainerApp): 'add' — новый клиент,
 // 'link' — привязать по ID или ссылке; onAdding(null) — закрыть
-export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = null, onAdding = () => {} }) {
+export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = null, onAdding = () => {}, onGo = () => {} }) {
   const { loading, data, error, reload } = useData('trainer.clients', {}, [refreshRevision]);
   // Сначала — ближайшие: заходят сюда чаще всего за тем, кто сегодня
   const [filter, setFilter] = useState('next');
+  // Плитка «Сделать» (этап 3, 19.11.2026) — тоже фильтр списка; касание
+  // плитки снимает чипс, касание чипса — плитку
+  const [todo, setTodo] = useState(null);
   const [query, setQuery] = useState('');
   const [pendingRow, setPendingRow] = useState(0);
 
@@ -86,24 +91,15 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
   const clients = data.clients.filter((c) => !c.test && !c.pairHidden);
   const tests = data.clients.filter((c) => c.test && !c.pairHidden);
 
-  // Пауза (заморозка, src/pause/): просьба ждёт ответа — требует внимания;
-  // на паузе — не «давно не был» и не «нет программы»
-  const asking = clients.filter((c) => c.pause && c.pause.state === 'requested');
+  // Пауза (заморозка, src/pause/): «На паузе» — фильтром; «просят паузу» —
+  // плиткой «Сделать»
   const frozen = clients.filter((c) => c.pause && c.pause.state !== 'requested');
-  const needsAttention = clients.filter((c) => {
-    if (c.pause && c.pause.state === 'requested') return true;
-    if (c.pause && c.pause.state === 'active') return c.balance < 0;
-    if (c.program && c.program.attention) return true;
-    // Онлайн-клиент (FT-530) с тренером не занимается — «давно не был» не
-    // про него; внимания требует срок ведения: истёк или осталось 3 дня и
-    // меньше (тогда же приходит напоминание, 21.10.2026)
-    if (c.online) {
-      const left = onlineDaysLeft(c.onlineUntil);
-      return c.balance < 0 || (left !== null && left <= 3);
-    }
-    const days = daysSince(c.lastTrainingDate);
-    return c.balance < 0 || days === null || days > s.staleDays;
-  });
+
+  // Плитки «Сделать»: сигналы — те же, что в «Сводке» (сервер считает их
+  // одним кодом, lib/metrics.js), плюс «не приглашены» и «просят паузу».
+  // Заменили строку фактов и фильтры «Требуют внимания», «Долг», «Без замера»
+  const tiles = todoTiles(clients, data.signals);
+  const tile = todo ? tiles.find((t) => t.id === todo) : null;
 
   // «Сегодня» — только те, у кого занятие сегодня (решение владельца
   // 30.09.2026): заходят сюда за сегодняшним днём, а не за неделей вперёд.
@@ -124,25 +120,18 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
     { value: 'all', label: `Все · ${clients.length}` },
     { value: 'splits', label: `Сплиты · ${splits.length}` },
     { value: 'online', label: `Онлайн · ${online.length}` },
-    ...(asking.length ? [{ value: 'asking', label: `⏳ Просят паузу · ${asking.length}` }] : []),
     ...(frozen.length ? [{ value: 'frozen', label: `❄️ На паузе · ${frozen.length}` }] : []),
-    { value: 'attention', label: `Требуют внимания · ${needsAttention.length}` },
-    { value: 'debt', label: `Долг · ${s.negativeBalance}` },
-    { value: 'nomeasure', label: 'Без замера' },
     ...(tests.length ? [{ value: 'tests', label: `Тестовые · ${tests.length}` }] : []),
   ];
 
-  const filtered = (filter === 'tests' ? tests : clients).filter((c) => {
+  const filtered = (filter === 'tests' && !tile ? tests : clients).filter((c) => {
     if (query && c.name.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
 
+    if (tile) return inTile(tile, c);
     if (filter === 'next') return upcoming.indexOf(c) !== -1;
     if (filter === 'splits') return splits.indexOf(c) !== -1;
     if (filter === 'online') return !!c.online;
-    if (filter === 'attention') return needsAttention.indexOf(c) !== -1;
-    if (filter === 'asking') return asking.indexOf(c) !== -1;
     if (filter === 'frozen') return frozen.indexOf(c) !== -1;
-    if (filter === 'debt') return c.balance < 0;
-    if (filter === 'nomeasure') return String(c.lastMeasureStatus || '').indexOf('✅') !== 0;
     return true;
   });
 
@@ -150,21 +139,29 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
   // отвечает на вопрос «кто следующий», а на него нельзя ответить порядком
   // строк в таблице. Даты в ISO сравниваются как строки — этого достаточно,
   // они одного формата и одного пояса.
-  const shown = filter === 'next'
+  const shown = filter === 'next' && !tile
     ? [...filtered].sort((a, b) => String(a.nextTrainingDate).localeCompare(String(b.nextTrainingDate)))
     : filtered;
 
   return (
     <>
-      {/* День тренера, а не деньги: деньги живут в сводке, а сюда
-          заходят за людьми — кто сегодня, кто следующий, до кого не
-          дошли руки. */}
-      <TrainerDay summary={s} clients={clients} attention={needsAttention.length} />
+      {/* День тренера: кто сегодня по времени, кто следующий (этап 3,
+          19.11.2026) — касание кружка открывает карточку */}
+      <DayHead
+        today={s.today}
+        onOpen={(row) => { const c = data.clients.find((x) => x.row === row); if (c) onOpenClient(c); }}
+      />
 
       {/* Программа по неделям, стык месяцев (28.10.2026): с четверга перед
           понедельником, с которого начинается месяц, — у кого листа на него
           нет. Без него у клиента крутится прошлая программа */}
       {data.programGaps && <ProgramGaps gaps={data.programGaps} onOpen={(row) => { const c = data.clients.find((x) => x.row === row); if (c) onOpenClient(c); }} />}
+
+      {/* До кого не дошли руки — плитками; касание фильтрует список ниже */}
+      <TodoTiles tiles={tiles} value={todo} onPick={setTodo} />
+
+      {/* Темп месяца из «Сводки» — одной строкой, касание открывает её */}
+      <PaceCard onGo={onGo} />
 
       {/* Календарь пересчитывается сам — при входе и когда страницу тянут
           вниз, — и строка с кнопкой «Обновить» больше не нужна: список
@@ -187,9 +184,9 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
         {adding === 'link' && <LinkClient onClose={() => onAdding(null)} />}
 
         <Search value={query} onChange={setQuery} placeholder="Поиск по имени" />
-        <Chips items={filters} value={filter} onChange={setFilter} />
+        <Chips items={filters} value={tile ? '' : filter} onChange={(v) => { setTodo(null); setFilter(v); }} />
 
-        {filter === 'splits' && (
+        {filter === 'splits' && !tile && (
           <AddSplit onCreated={(client) => { setPendingRow(client.row); reload(); }} />
         )}
 
@@ -210,6 +207,12 @@ export function Clients({ onOpenClient, onRefresh, refreshRevision, adding = nul
               title="Ничего не нашлось"
               text={'По запросу «' + query + '»' + (filter === 'all' ? '' : ' в этом фильтре') + ' никого нет.'}
               action={<button type="button" className="button" onClick={() => setQuery('')}>Сбросить</button>}
+            />
+          ) : tile ? (
+            <Empty
+              icon={IconCheck}
+              title="Здесь никого"
+              action={<button type="button" className="button" onClick={() => setTodo(null)}>Ко всем</button>}
             />
           ) : filter === 'next' ? (
             <Empty
@@ -342,73 +345,6 @@ function ClientItem({ c, s, onOpen: onOpenClient }) {
               </div>
             </button>
           );
-}
-
-/**
- * Сегодняшний день тренера.
- *
- * Крупно — сколько занятий сегодня, под ним — кто следующий. Рядом три
- * числа про людей: сколько тренировок за месяц, кто требует внимания и
- * кто ещё не приглашён в приложение.
- *
- * Занятия на сегодня считает сервер по календарю. Нет его ответа — крупной
- * цифрой встаёт число клиентов, у которых ближайшее занятие сегодня: это
- * то же самое, только без уже прошедших.
- *
- * Три числа — одной строкой под главным (аудит 24.10.2026): карточкой с
- * тремя колонками «Сегодня» занимало полэкрана до списка.
- */
-function TrainerDay({ summary, clients, attention }) {
-  const day = summary.today;
-  const todayLabel = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-
-  const isToday = (iso) => {
-    const d = new Date(iso);
-    const n = new Date();
-    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
-  };
-
-  const total = day ? day.total : clients.filter((c) => c.nextTrainingDate && isToday(c.nextTrainingDate)).length;
-
-  // Кто следующий: из календаря, а без него — ближайшая дата из списка
-  let next = day && day.next;
-  if (!next) {
-    const first = clients
-      .filter((c) => c.nextTrainingDate)
-      .sort((a, b) => String(a.nextTrainingDate).localeCompare(String(b.nextTrainingDate)))[0];
-    if (first) next = { name: first.name, at: first.nextTrainingDate };
-  }
-
-  const left = day ? day.total - day.done : null;
-
-  let hint;
-  if (next) hint = 'следующее — ' + next.name + ', ' + formatWhen(next.at);
-  // Сколько ещё впереди — то же число, что у фильтра «Ещё сегодня» (11.11.2026)
-  const ahead = clients.filter((c) => c.nextTrainingDate && isToday(c.nextTrainingDate)).length;
-  if (total && ahead) hint = 'ещё ' + ahead + ' ' + plural(ahead, 'клиент', 'клиента', 'клиентов') + ' · ' + hint;
-  else hint = 'впереди занятий не назначено';
-  if (day && day.total && left === 0) hint = 'все занятия на сегодня проведены · ' + hint;
-
-  const uninvited = clients.filter((c) => !c.chatId && !c.invited && !c.joined).length;
-
-  const facts = [
-    summary.totalTrainings + ' ' + plural(summary.totalTrainings, 'тренировка', 'тренировки', 'тренировок') + ' за месяц',
-    // «из N» — те же клиенты, что в фильтре «Все» (без тестовых; 11.11.2026:
-    // summary.count считал и тестовых, и «из 9» не сходилось со «Все · 8»)
-    attention ? 'внимания требуют ' + attention + ' из ' + clients.length : 'внимания никто не требует',
-    uninvited ? 'не приглашены ' + uninvited : 'приглашены все',
-  ];
-
-  return (
-    <section className="lead enter trainer-day">
-      <div className="lead__label">{'Сегодня · ' + todayLabel}</div>
-      <div className="lead__value trainer-day__value">
-        {total ? total + ' ' + plural(total, 'занятие', 'занятия', 'занятий') : 'Занятий нет'}
-      </div>
-      <div className="lead__hint">{hint}</div>
-      <p className="trainer-day__facts">{facts.join(' · ')}</p>
-    </section>
-  );
 }
 
 /**

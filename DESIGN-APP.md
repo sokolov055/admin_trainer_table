@@ -324,6 +324,14 @@ Capacitor WebView на iPhone/Android). Лендинг описан в `DESIGN.m
   `scale(0.985)`. `.item--static` — без нажатия. Смахивание — `.item-swipe`.
 - `.section` / `.section__head` / `.section__title` (17/600) — разделы;
   сверху 32 px, снизу 12 px.
+- Первая страница тренера (`trainer/TrainerHome.jsx`, `trainer-home.css`,
+  19.11.2026): шапка дня `.th-day` — градиент `--mg-core-end → --mg-core →
+  --mg-back`, белый текст, лента кружков `.th-slot` (проведено — галочка и
+  приглушённый цвет, `is-now` — пульс кольца через `transform`/`opacity`);
+  плитки «Сделать» `.th-td` — сетка 3×, подложка `--tone-wash`, текст 65% с
+  `--text`, ноль — `--surface-sunken` и `--text-muted` (не `opacity`);
+  аватар `.th-ava` — `--ava-0…5` по имени, обводка состояния `.th-ring--debt`
+  (`--critical`), `--plan` (`--goal-cut`), `--today` (`--accent`), `--pause`.
 
 ### Поля ввода
 - `.field` > `.field__label` (13, muted, отступ 5) + `.field__input` +

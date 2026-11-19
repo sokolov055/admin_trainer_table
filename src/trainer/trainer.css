@@ -39,17 +39,6 @@
 }
 @keyframes header-add-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } }
 
-/* «Сегодня» над списком клиентов — плотнее Lead: три числа одной строкой
-   (screens.jsx, TrainerDay) */
-.trainer-day { padding: var(--space-4); }
-.trainer-day .lead__label { margin-bottom: var(--space-1); }
-.trainer-day__value { font-size: var(--text-xl); }
-.trainer-day .lead__hint { margin-top: var(--space-1); }
-.trainer-day__facts {
-  margin: var(--space-3) 0 0; padding-top: var(--space-2); border-top: 1px solid var(--border);
-  font-size: var(--text-sm); line-height: 1.4; color: var(--text-muted);
-}
-
 /* Обзор сводки: изменение под цифрой, а не рядом — с «₽ к сентябрю» оно
    длиннее самой цифры и в строку не помещается (Dashboard.jsx, SideRow;
    аудит 24.10.2026) */

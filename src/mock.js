@@ -1099,6 +1099,33 @@ function demoOverview() {
   };
 }
 
+/**
+ * Лента дня на «Клиентах» (этап 3, 19.11.2026): два проведённых, ближайшее
+ * через 40 минут, дальше вечер — по часам телефона, только сегодняшние
+ */
+function demoTrainerDay() {
+  const now = Date.now();
+  const at = (min) => new Date(Math.round((now + min * 60000) / 300000) * 300000).toISOString();
+  const late = new Date(); late.setHours(23, 30, 0, 0);
+  const name = (row) => (CLIENTS.find((c) => c.row === row) || {}).name || '';
+  const today = (iso) => new Date(iso).toDateString() === new Date(now).toDateString();
+  const items = [
+    { row: 3, at: at(-300), done: true },
+    { row: 5, at: at(-150), done: true },
+    { row: 7, at: at(40), done: false },
+    { row: 4, at: at(190), done: false },
+    { row: 29, at: late.toISOString(), done: late.getTime() < now },
+  ].filter((t) => today(t.at)).map((t) => ({ ...t, name: name(t.row) }))
+    .sort((a, b) => a.at.localeCompare(b.at));
+  const next = items.find((t) => !t.done && Date.parse(t.at) > now);
+  return {
+    total: items.length,
+    done: items.filter((t) => t.done).length,
+    next: next ? { name: next.name, at: next.at } : { name: name(3), at: daysAhead(2, '10:00') },
+    items,
+  };
+}
+
 function thisMonthKey() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -2370,16 +2397,14 @@ const MOCK = {
     summary: {
       count: CLIENTS.length,
       totalTrainings: 26,
-      today: {
-        total: 4,
-        done: 1,
-        next: { name: CLIENTS[0].name, at: new Date(Date.now() + 90 * 60000).toISOString() },
-      },
+      today: demoTrainerDay(),
       negativeBalance: 1,
       staleClients: 1,
       staleDays: 14,
       currentMonth: 'Сентябрь 2026',
     },
+    // Плитки «Сделать» — те же сигналы, что в «Сводке» (demoOverview)
+    signals: demoOverview().signals,
   }),
 
   'trainer.invites': () => ({ invites: trainerInvites }),

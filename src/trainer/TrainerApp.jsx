@@ -427,6 +427,7 @@ export default function TrainerApp({ me }) {
                 refreshRevision={scheduleRevision}
                 adding={adding}
                 onAdding={setAdding}
+                onGo={go}
               />
             )}
             {clientPane === 'lost' && <Lost />}
