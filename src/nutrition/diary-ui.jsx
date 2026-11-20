@@ -23,6 +23,8 @@ export function useDiaryResource(action, params) {
   const [version, setVersion] = useState(0), [value, setValue] = useState({});
   useEffect(() => {
     let alive = true; const ticket = ++sequence.current;
+    // Без действия (вкладка закрыта тарифом) — ничего не запрашиваем
+    if (!action) { setValue({ key, data: null, loading: false, stale: false, error: null }); return () => { alive = false; }; }
     const cached = apiStale(action, params);
     setValue(old => ({ key, data: cached.data || (old.key === key ? old.data : null), loading: !cached.data && !(old.key === key && old.data), stale: !!cached.data, error: null }));
     cached.promise.then(data => { if (alive && ticket === sequence.current) setValue({ key, data, loading: false, stale: false, error: null }); })

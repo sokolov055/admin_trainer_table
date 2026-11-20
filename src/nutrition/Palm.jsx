@@ -38,7 +38,7 @@ export function Approach({ current = null, busy = false, onChoose, onCancel }) {
   return (
     <section className="palm-approach" aria-labelledby="palm-approach-title">
       <h2 id="palm-approach-title">Как вы считаете еду?</h2>
-      <p className="small muted">От ответа зависит, как будет выглядеть дневник. Поменять можно в любой момент в «Ещё».</p>
+      <p className="small muted">От ответа зависит, как будет выглядеть дневник. Поменять можно в любой момент в ⚙︎ настройках питания.</p>
       <div className="palm-approach__options" role="radiogroup" aria-label="Опыт подсчёта">
         {ANSWERS.map((a) => (
           <button key={a.id} type="button" role="radio" aria-checked={answer === a.id} className={'palm-option' + (answer === a.id ? ' is-on' : '')} onClick={() => { haptic(); setAnswer(a.id); }}>

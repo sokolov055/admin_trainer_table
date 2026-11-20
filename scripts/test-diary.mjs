@@ -98,7 +98,7 @@ test('«Удалить запись» в форме не трогает серв
   assert.equal(removed.id, 7); assert.equal(mutated, 0);
   tree.unmount();
 });
-test('дневник: четыре вкладки, смахивание строки удаляет запись с revision, «План меню» — кнопка в итоге', async () => {
+test('питание: три вкладки и ⚙︎, удаление записи из листа с revision, «План меню» — кнопка в итоге', async () => {
   const calls = [];
   __diary.read = async (a, p) => a === 'diary.get' ? { day: p.day, entries: [{ id: 7, revision: 2, day: p.day, meal: 'lunch', amount: 120, product: food }], totals: totalEntries([{ product: food, amount: 120 }]), targets: { kcal: 2000, protein: 100, fat: 60, carbs: 250 }, complete: false, waterMl: 0, comment: '', revision: 1 } : { products: [] };
   __diary.mutate = async (a, p) => { calls.push([a, p]); return {}; };
@@ -107,7 +107,8 @@ test('дневник: четыре вкладки, смахивание стро
   await act(async () => { tree = renderer.create(React.createElement(NutritionDiary, { onPlan: p => { planned = p; } })); });
   await act(async () => { await new Promise(r => setTimeout(r, 0)); });
   const tabs = tree.root.findAllByProps({ role: 'tab' }).map(t => t.props.children);
-  assert.deepEqual(tabs, ['Дневник', 'Неделя', 'Рецепты', 'Ещё']);
+  assert.deepEqual(tabs, ['Сегодня', 'Неделя', 'Идеи']);
+  assert.equal(tree.root.findAllByProps({ 'aria-label': 'Настройки питания' }).length, 1, '«Ещё» — шестерёнкой');
   // FT-744: из итога — одна ссылка «Что съесть на …» во вкладку «Рецепты»,
   // подбор из холодильника и «Перекус, который влезет» — строками там
   const next = tree.root.findAllByType('button').find(b => b.props.className === 'diary-next');
@@ -117,9 +118,11 @@ test('дневник: четыре вкладки, смахивание стро
   assert.ok(entry('Перекус, который влезет'));
   await act(async () => entry('Из того, что есть дома').props.onClick());
   assert.equal(planned.targets.kcal, 2000); assert.equal(planned.totals.kcal, 84);
-  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Дневник').props.onClick());
-  const swipe = tree.root.findAllByProps({ 'aria-label': 'Удалить: Йогурт' }).find(n => n.type === 'button');
-  await act(async () => swipe.props.onClick());
+  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Сегодня').props.onClick());
+  // Макет 20.11: еда — плашками; нажать → лист записи → «Удалить запись»
+  await act(async () => tree.root.findByProps({ 'aria-label': 'Изменить: Йогурт' }).props.onClick());
+  const del = tree.root.findAllByType('button').find(b => Array.isArray(b.props.children) && b.props.children.includes(' Удалить запись'));
+  await act(async () => del.props.onClick());
   await act(async () => { await new Promise(r => setTimeout(r, 0)); });
   assert.deepEqual(__diary.removed, [7]);
   assert.equal(calls[0][0], 'diary.entry.remove'); assert.equal(calls[0][1].id, 7); assert.equal(calls[0][1].revision, 2);
@@ -229,7 +232,7 @@ test('«примерная» запись («Только калории»): п�
   const text = screen(tree);
   assert.match(text, /примерно · ×2/);
   assert.match(text, /≈ 1200 ккал/);
-  assert.match(text, /из съеденного примерно 1200 ккал/);
+  assert.match(text, /≈ 1200 ккал на глаз/);
   await act(async () => tree.root.findByProps({ 'aria-label': 'Изменить: Бизнес-ланч' }).props.onClick());
   assert.equal(dialogTitle(tree), 'Изменить запись');
   assert.equal(tree.root.findAll(n => n.type === 'span' && n.props.className === 'field__label' && n.props.children === 'Количество порций').length, 1);
@@ -245,16 +248,15 @@ test('тренер в карточке клиента: видит «пример
   assert.match(text, /1\.5 ладони · примерно/);
   assert.equal(tree.root.findAll(n => n.type === 'div' && n.props.className === 'palm-summary').length, 1, 'круги «Ладони» при mode = palm');
   assert.match(text, /Съедено ≈ 1473 ккал из 2000/, '70 + 1,5 × 135 + 2 × 600');
-  assert.match(text, /Ужин 1200 из 600 ккал на 600 больше/, 'перебор по приёму — словами');
-  assert.match(text, /70 из 500 ккал/, 'норма завтрака — 25 % от 2000');
+  assert.match(text, /Ужин 1200 \/ 600/, 'перебор по приёму — полоской');
+  assert.match(text, /Завтрак 70 \/ 500/, 'норма завтрака — 25 % от 2000');
   assert.match(text, /Клиент ещё не завершил этот день/);
   let buttons = buttonsText(tree);
   assert.doesNotMatch(buttons.join(' | '), /Завершить день|Дописать|Как считать|Добавить еду|Отметить порции|Повторить еду|\+ 250 мл/);
   assert.ok(buttons.includes('Назначить цель') && buttons.includes('Сохранить комментарий'), 'тренер назначает цель и пишет комментарий');
   assert.equal(tree.root.findAllByProps({ 'aria-label': 'Добавить в завтрак' }).length, 0);
   assert.equal(tree.root.findByProps({ 'aria-label': 'Изменить: Йогурт' }).props.disabled, true, 'записи клиента тренер не правит');
-  assert.equal(tree.root.findByProps({ 'aria-label': 'Удалить: Йогурт' }).parent.props['data-disabled'], '1');
-  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Ещё').props.onClick());
+  await act(async () => tree.root.findByProps({ 'aria-label': 'Настройки питания' }).props.onClick());
   buttons = buttonsText(tree);
   assert.doesNotMatch(buttons.join(' | '), /Норма по приёмам|Как считать еду/);
   assert.match(screen(tree), /Как читать этикетку/, 'уроки — есть');
@@ -293,8 +295,8 @@ test('углеводы по дням: клиент видит цель дня с
   await act(async () => { tree = renderer.create(React.createElement(NutritionDiary, {})); });
   await settle();
   assert.match(screen(tree), /День тренировки: углеводов на 20 % больше, жиров меньше — калории и белок те же\./);
-  assert.match(screen(tree), /Углеводы 0 \/ 300 г/, 'цель дня — уже со сдвигом');
-  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Рецепты').props.onClick());
+  assert.match(screen(tree), /У 0 \/ 300 г углеводы/, 'цель дня — уже со сдвигом');
+  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Идеи').props.onClick());
   await settle();
   const text = screen(tree);
   assert.match(text, /Сегодня тренировка в 18:00 — больше углеводов, особенно в перекус до неё и в ужин после\./);

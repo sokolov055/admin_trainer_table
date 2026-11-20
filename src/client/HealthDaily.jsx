@@ -142,10 +142,12 @@ export function HealthTiles({ clientRow }) {
  * «Потрачено: N ккал (с часов)» за выбранный день в «Питании». Тот же
  * запрос, что у блока в «Прогрессе», — один кэш; нет данных — строки нет
  */
-export function SpentKcal({ clientRow, day }) {
+// chip — плашкой в итоге дня питания (макет nutrition-redesign-2026-11-20)
+export function SpentKcal({ clientRow, day, chip = false }) {
   const { data } = useData('health.daily.list', clientRow ? { clientRow, days: DAYS } : { days: DAYS }, [clientRow]);
   const spent = spentForDay(ownRows(data), day);
   if (!spent) return null;
+  if (chip) return <span className="nt-chip">🔥 {formatNumber(spent.kcal)} ккал потрачено{spent.kind === 'total' ? '' : ' (активные)'}</span>;
   return (
     <p className="small muted health__spent">
       Потрачено: {formatNumber(spent.kcal)} ккал {spent.kind === 'total' ? '(с часов)' : '(активные, с часов)'}

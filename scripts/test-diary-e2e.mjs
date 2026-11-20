@@ -142,30 +142,28 @@ test('FT-551: любимые, приёмы, порции, история, рец
   assert.equal(await dialog().getByLabel('Приём пищи').inputValue(), 'dinner');
   await dialog().getByLabel('Количество, г', { exact: true }).fill('150');
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days[Object.keys(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).at(-1)].entries.length > 0);
+  await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).some(d => d.entries.length > 0));
   await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).waitFor();
   assert.ok((await diary.innerText()).includes('105'));
   await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).click();
   await dialog().getByLabel('Количество, г', { exact: true }).fill('200');
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
-  await diary.getByText('200 г', { exact: true }).waitFor();
+  await diary.locator('.nt-pill', { hasText: '200 г' }).waitFor();
   await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await dialog().getByRole('button', { name: 'Убрать из любимых: Йогурт 2%', exact: true }).click();
   await dialog().getByRole('button', { name: 'Все', exact: true }).click();
   await dialog().getByLabel('Поиск продуктов и блюд').fill('Йогурт 2%');
   await dialog().getByRole('button', { name: 'В любимые: Йогурт 2%', exact: true }).click();
   await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
-  await diary.getByRole('button', { name: '+ 250 мл', exact: true }).click();
-  await diary.getByText('0,25 л выпито', { exact: true }).waitFor();
-  // FT-646: завершение дня — итог листом, потом подтверждение
-  await diary.getByRole('button', { name: 'Завершить день', exact: true }).click();
-  await dialog().getByText('Записей', { exact: true }).waitFor();
-  await dialog().getByRole('button', { name: 'Завершить день', exact: true }).click();
-  await diary.getByText('День завершён', { exact: true }).waitFor();
+  // Макет 20.11: вода — стаканами, итог дня — одной кнопкой, без листа
+  await diary.getByRole('button', { name: 'Выпил стакан', exact: true }).first().click();
+  await diary.locator('.nt-water__head', { hasText: '0,25' }).waitFor();
+  await diary.getByRole('button', { name: /Завершить день/ }).click();
+  await diary.locator('.nt-finish__done').waitFor();
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).some(d => d.complete));
   await diary.getByRole('tab', { name: 'Неделя', exact: true }).click();
   await diary.getByText('Среднее за полные дни: 140 ккал', { exact: true }).waitFor();
-  await diary.getByRole('tab', { name: 'Рецепты', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Идеи', exact: true }).click();
   await diary.getByRole('button', { name: 'Свой рецепт', exact: true }).click();
   await dialog().getByLabel('Название блюда').fill('Мой тестовый десерт');
   await dialog().getByRole('button', { name: 'Добавить ингредиент', exact: true }).click();
@@ -177,7 +175,7 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await dialog().getByLabel('Вес всего готового блюда, г').fill('100');
   await dialog().getByRole('button', { name: 'Сохранить в мои блюда', exact: true }).click();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('nutrition_demo_server:3')).recipes[0].revision === 2);
-  await diary.getByRole('tab', { name: 'Дневник', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Сегодня', exact: true }).click();
   await diary.getByRole('button', { name: 'Добавить в завтрак', exact: true }).click();
   // FT-646: список открывается на «Недавних» — рецепта там ещё нет
   await dialog().getByRole('button', { name: 'Все', exact: true }).click();
@@ -192,7 +190,7 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
   await page.evaluate(() => localStorage.setItem('demo_offline', '1'));
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
-  await diary.getByText(/на телефоне, ждёт отправки/).waitFor();
+  await diary.getByText(/ждёт отправки/).waitFor();
   const before = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0));
   await page.evaluate(() => { localStorage.removeItem('demo_offline'); window.dispatchEvent(new Event('online')); });
   await page.waitForFunction(n => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0) === n + 1, before, { timeout: 30000 });
@@ -224,7 +222,7 @@ test('FT-642: удаление записи — «Удалено · Вернут
   const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
   const entries = () => page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0));
   await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).waitFor();
-  assert.deepEqual(await diary.getByRole('tab').allInnerTexts(), ['Дневник', 'Неделя', 'Рецепты', 'Ещё']);
+  assert.deepEqual(await diary.getByRole('tab').allInnerTexts(), ['Сегодня', 'Неделя', 'Идеи']);
   await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
@@ -237,13 +235,14 @@ test('FT-642: удаление записи — «Удалено · Вернут
   await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).waitFor();
   assert.equal(await entries(), 1);
   await page.screenshot({ path: join(shots, 'diary-tabs-390.png') });
-  // Смахивание: корзина под строкой (до жеста скрыта — шлём событие), затем пауза и сервер.
-  await diary.locator('button.swipe__trash[aria-label="Удалить: Йогурт 2%"]').dispatchEvent('click');
+  // Макет 20.11: плашка еды → лист → «Удалить запись», затем пауза и сервер
+  await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).click();
+  await dialog().getByRole('button', { name: 'Удалить запись', exact: true }).click();
   await page.getByText('Запись удалена', { exact: true }).waitFor();
   assert.equal(await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).count(), 0);
   assert.equal(await entries(), 1);
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0) === 0, null, { timeout: 30000 });
-  await diary.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await diary.getByRole('button', { name: 'Настройки питания', exact: true }).click();
   await diary.getByRole('button', { name: 'Норма и анкета', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Разобраться за пару минут' }).waitFor();
   assert.deepEqual(errors, []);
@@ -257,9 +256,9 @@ test('FT-551: план меню становится фактом только �
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary');
-  await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
+  await diary.locator('.nt-hero__ring', { hasText: '2 000' }).waitFor();
   // FT-744: из итога — «Что съесть на …» во вкладку «Рецепты», там «Из того, что есть дома»
-  await diary.locator('.diary-next').click();
+  await diary.getByRole('tab', { name: 'Идеи', exact: true }).click();
   await diary.getByRole('button', { name: /^Из того, что есть дома/ }).click();
   const eat = page.getByRole('button', { name: 'Съедено — записать', exact: true }).first();
   await eat.waitFor();
@@ -294,8 +293,8 @@ test('FT-551: собственный каталог, бренд, этикетк�
   await page.getByRole('dialog').getByRole('heading', { name: 'Творог 5% · Тестовая этикетка' }).waitFor();
   await page.getByLabel('Количество, г', { exact: true }).fill('150');
   await page.getByRole('button', { name: 'Записать в дневник', exact: true }).click();
-  await page.getByTestId('nutrition-diary').getByText('180 ккал', { exact: true }).first().waitFor();
-  await page.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await page.getByTestId('nutrition-diary').locator('.nt-pill', { hasText: '180' }).first().waitFor();
+  await page.getByRole('button', { name: 'Настройки питания', exact: true }).click();
   assert.equal(await page.getByText('Расчёт по анкете', { exact: true }).count(), 0);
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: 'Собрать рацион', exact: true }).count(), 0);
@@ -304,7 +303,7 @@ test('FT-551: собственный каталог, бренд, этикетк�
   await page.screenshot({ path: join(shots, 'nutrition-tips-390.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
   await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
-  await page.getByRole('tab', { name: 'Дневник', exact: true }).click();
+  await page.getByRole('tab', { name: 'Сегодня', exact: true }).click();
 
   await page.goto(origin + '/?mockRole=trainer');
   await page.getByRole('button', { name: 'Библиотека', exact: true }).click();
@@ -321,7 +320,7 @@ test('FT-551: собственный каталог, бренд, этикетк�
   await page.screenshot({ path: join(shots, 'food-catalog-1024.png') });
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
-  await page.getByTestId('nutrition-diary').getByText('180 ккал', { exact: true }).first().waitFor();
+  await page.getByTestId('nutrition-diary').locator('.nt-pill', { hasText: '180' }).first().waitFor();
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -347,7 +346,7 @@ test('напиток с этикетки на 100 мл: единица хран�
   await page.getByRole('dialog').getByText('105 ккал', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Записать в дневник', exact: true }).click();
   await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Изменить: Крюшон', exact: true }).waitFor();
-  await page.getByTestId('nutrition-diary').getByText('250 мл', { exact: true }).waitFor();
+  await page.getByTestId('nutrition-diary').locator('.nt-pill', { hasText: '250 мл' }).waitFor();
   // В каталоге напиток подписан «на 100 мл»
   await page.getByTestId('nutrition-diary').getByRole('button', { name: 'Добавить в обед', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Поиск продуктов и блюд').fill('Крюшон');
@@ -376,14 +375,14 @@ test('FT-551: тренер назначает цель и оставляет к�
   await diary.getByRole('button', { name: 'Назначить цель', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Калории', { exact: true }).fill('1900');
   await page.getByRole('dialog').getByRole('button', { name: 'Сохранить цель', exact: true }).click();
-  await diary.getByText('Осталось 1 900 ккал', { exact: true }).waitFor();
+  await diary.locator('.nt-hero__ring', { hasText: '1 900' }).waitFor();
   await diary.getByLabel('Комментарий к выбранному дню').fill('Уточните вес готового блюда.');
   await diary.getByRole('button', { name: 'Сохранить комментарий', exact: true }).click();
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).some(d => d.comment === 'Уточните вес готового блюда.'));
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   await page.getByTestId('nutrition-diary').getByText('Уточните вес готового блюда.', { exact: true }).waitFor();
-  await page.getByTestId('nutrition-diary').getByText('Осталось 1 900 ккал', { exact: true }).waitFor();
+  await page.getByTestId('nutrition-diary').locator('.nt-hero__ring', { hasText: '1 900' }).waitFor();
   await page.close();
 });
 
@@ -443,10 +442,10 @@ test('FT-643: диалоги дневника на общем листе — с�
   await noSheets();
   assert.equal(await page.evaluate(() => document.body.style.overflow), '');
   await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).waitFor();
-  await diary.getByRole('button', { name: '+ 250 мл', exact: true }).click();
-  await diary.locator('.note--good', { hasText: 'Сохранено.' }).waitFor();
+  await diary.getByRole('button', { name: 'Выпил стакан', exact: true }).first().click();
+  await diary.locator('.nt-glass.is-on').first().waitFor();
   // Рецепт → ингредиент: Escape закрывает верхний лист, название рецепта остаётся
-  await diary.getByRole('tab', { name: 'Рецепты', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Идеи', exact: true }).click();
   await diary.getByRole('button', { name: 'Свой рецепт', exact: true }).click();
   await dialog().getByLabel('Название блюда').fill('Стопка');
   await dialog().getByRole('button', { name: 'Добавить ингредиент', exact: true }).click();
@@ -457,7 +456,7 @@ test('FT-643: диалоги дневника на общем листе — с�
   await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
   await noSheets();
   // Урок — тоже лист
-  await diary.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await diary.getByRole('button', { name: 'Настройки питания', exact: true }).click();
   await diary.locator('.diary-lesson').first().click();
   await dialog().waitFor();
   await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
@@ -493,13 +492,13 @@ test('FT-644: плашка вместо анкеты, день словом, ч�
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary');
   // Клиент без анкеты, но с нормой от тренера: ни анкеты под дневником, ни плашки «не посчитана» рядом с нормой
-  await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
+  await diary.locator('.nt-hero__ring', { hasText: '2 000' }).waitFor();
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
   assert.equal(await diary.getByRole('heading', { name: 'Норма ещё не посчитана' }).count(), 0);
   await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
   await page.screenshot({ path: join(shots, 'diary-notice-390.png'), fullPage: true, animations: 'disabled' });
   // День словами, без «2026-10-20» и «20.10.2026»
-  assert.equal(await diary.locator('.diary-date__text').innerText(), 'Сегодня');
+  assert.equal(await diary.getByRole('button', { name: 'Сегодня', exact: true }).getAttribute('aria-pressed'), 'true');
   await diary.getByRole('button', { name: 'Повторить еду', exact: true }).click();
   const copy = page.getByRole('dialog');
   await copy.getByText('Записи добавятся к дню «Сегодня».', { exact: false }).waitFor();
@@ -507,11 +506,11 @@ test('FT-644: плашка вместо анкеты, день словом, ч�
   await copy.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.locator('.sheet').waitFor({ state: 'detached' });
   // Анкета живёт в «Ещё → Норма и анкета», на дневнике её нет
-  await page.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Настройки питания', exact: true }).click();
   await diary.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
   await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
-  await page.getByRole('tab', { name: 'Дневник', exact: true }).click();
-  await diary.getByText('Осталось 2 000 ккал', { exact: true }).waitFor();
+  await page.getByRole('tab', { name: 'Сегодня', exact: true }).click();
+  await diary.locator('.nt-hero__ring', { hasText: '2 000' }).waitFor();
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
   // Продукт с белком выше нормы: название со счётчиком, потом «набран»
   await diary.getByRole('button', { name: 'Добавить в обед', exact: true }).click();
@@ -526,7 +525,7 @@ test('FT-644: плашка вместо анкеты, день словом, ч�
   await page.getByRole('button', { name: 'Записать в дневник', exact: true }).click();
   await diary.getByRole('button', { name: 'Изменить: Протеин', exact: true }).waitFor();
   // FT-744: из итога — «Что съесть на …» во вкладку «Рецепты», там «Из того, что есть дома»
-  await diary.locator('.diary-next').click();
+  await diary.getByRole('tab', { name: 'Идеи', exact: true }).click();
   await diary.getByRole('button', { name: /^Из того, что есть дома/ }).click();
   await page.getByText('белок на сегодня набран', { exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Съел — записать порцию', exact: true }).count(), 0);
@@ -560,7 +559,7 @@ test('план трёх разборов, п. 1: «Только калории»
   assert.match(await row.innerText(), /примерно/);
   // innerText сохраняет неразрывный пробел Qty между числом и «ккал» (getByText его нормализует сам)
   assert.match(await diary.innerText(), /≈ 450[\s ]ккал/);
-  assert.ok((await diary.innerText()).includes('из съеденного примерно 450 ккал'));
+  assert.ok((await diary.innerText()).includes('≈ 450 ккал на глаз'));
   await page.screenshot({ path: join(shots, 'diary-quick-390.png') });
   // П. 3: карточка продукта — проверка и источник видны до записи
   await diary.getByRole('button', { name: 'Добавить в ужин', exact: true }).click();
@@ -608,7 +607,7 @@ test('план трёх разборов, пп. 10–11: норма по при�
   await page.goto(origin);
   await page.getByRole('button', { name: 'Питание', exact: true }).click();
   const diary = page.getByTestId('nutrition-diary'), dialog = () => page.getByRole('dialog');
-  await diary.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await diary.getByRole('button', { name: 'Настройки питания', exact: true }).click();
   await diary.getByRole('button', { name: /^Норма по приёмам/ }).click();
   await dialog().getByText('Сумма: 100 %').waitFor();
   await dialog().getByRole('button', { name: 'Больше: Завтрак', exact: true }).click();
@@ -617,11 +616,10 @@ test('план трёх разборов, пп. 10–11: норма по при�
   await dialog().getByRole('button', { name: 'Меньше: Перекус', exact: true }).click();
   await page.screenshot({ path: join(shots, 'diary-meal-shares-390.png') });
   await dialog().getByRole('button', { name: 'Сохранить', exact: true }).click();
-  await diary.getByRole('tab', { name: 'Дневник', exact: true }).click();
+  await diary.getByRole('tab', { name: 'Сегодня', exact: true }).click();
   // Мок: 2000 ккал в день; завтрак 30 % → 600, перекус 5 % → 100
-  await diary.getByText(/из 600 ккал/).first().waitFor();
-  await diary.getByText(/можно ещё 600/).first().waitFor();
-  await diary.getByRole('tab', { name: 'Рецепты', exact: true }).click();
+  await diary.locator('.nt-meal--breakfast .nt-meal__kcal', { hasText: '/ 600' }).waitFor();
+  await diary.getByRole('tab', { name: 'Идеи', exact: true }).click();
   // FT-745: калорийность — в листе «Фильтры», на экране — строка «Под остаток …»
   await diary.getByText(/^Под остаток/).waitFor();
   await diary.getByRole('button', { name: /^Фильтры/ }).click();

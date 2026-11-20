@@ -158,7 +158,7 @@ test('цель клиента в «Целях»: тренер ставит «П�
     const card = phone.locator('.gl-goal').first();
     await card.getByText('Похудеть', { exact: true }).waitFor();
     await phone.getByRole('tab', { name: 'Питание', exact: true }).click();
-    await shown().getByRole('tab', { name: 'Ещё', exact: true }).click();
+    await shown().getByRole('button', { name: 'Настройки питания', exact: true }).click();
     await phone.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
     const picked = await phone.evaluate(() => [...document.querySelectorAll('[role=radio]')]
       .filter((e) => e.offsetParent && e.getAttribute('aria-checked') === 'true' && /Похудеть|Быть в форме|Набрать мышцы/.test(e.textContent))
@@ -1181,7 +1181,7 @@ test('FT-567: видимый «назад» и Back браузера на экр
     // Рацион: Back браузера (как жест и системный Back) — на шаг, как кнопка
     await openTabOn(phone, 'Питание');
     // Анкета теперь в «Ещё», дневник остаётся отдельной вкладкой (FT-744).
-    await phone.getByRole('tab', { name: 'Ещё', exact: true }).click();
+    await phone.getByRole('button', { name: 'Настройки питания', exact: true }).click();
     await phone.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
     await phone.getByPlaceholder('лет').fill('31');
     await phone.getByPlaceholder('кг').first().fill('64');
@@ -1191,7 +1191,7 @@ test('FT-567: видимый «назад» и Back браузера на экр
     await phone.locator('text=Тренировок в неделю').locator('xpath=..').getByText('3', { exact: true }).first().click();
     await phone.getByText('Похудеть', { exact: true }).first().click();
     await phone.getByRole('button', { name: 'Посчитать норму' }).click();
-    await phone.getByRole('tab', { name: 'Рецепты', exact: true }).click();
+    await phone.getByRole('tab', { name: 'Идеи', exact: true }).click();
     const build = phone.getByRole('button', { name: /Из того, что есть дома/ });
     await build.waitFor({ timeout: 10000 });
     {

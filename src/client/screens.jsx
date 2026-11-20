@@ -2475,7 +2475,7 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
 
   return (
     <>
-      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} dayNote={(day) => <SpentKcal clientRow={clientRow} day={day} />} onPlan={(self || !clientRow) && can('ration', rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} dayNote={(day) => <SpentKcal clientRow={clientRow} day={day} chip />} onPlan={(self || !clientRow) && can('ration', rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
       {(!diaryEnabled || diaryTab === 'settings' || editing) && <>
       {configured && (
         <Lead

@@ -82,7 +82,7 @@ test('FT-736: фото тарелки → проверка граммов → з
   await sheet.getByRole('button', { name: /^Добавить \d+ ккал$/ }).click();
   await page.getByText(/По фото записано: \d+ ккал, 5 продукт/).waitFor();
   await page.getByText(/Фарш куриный жареный.*150 г/).first().waitFor();
-  const lunch = await page.locator('.diary-meal').filter({ has: page.getByRole('heading', { name: 'Обед' }) }).innerText();
+  const lunch = await page.locator('.nt-meal--lunch').innerText();
   assert.match(lunch, /Фарш куриный/, 'записано в выбранный приём');
 
   // FT-746: камера есть — видоискатель во весь экран, кадр без кнопки «снять»; здесь — «Распознать сейчас»
@@ -121,7 +121,7 @@ test('FT-736: фото тарелки → проверка граммов → з
   await page.getByRole('dialog').waitFor({ state: 'detached' });
 
   // FT-752: «Ещё → Сканер еды · AI» — отзыв согласия; сканер снова спрашивает разрешение
-  await page.getByRole('tab', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Настройки питания', exact: true }).click();
   await page.getByRole('button', { name: /Сканер еды · AI.*Включён/ }).click();
   const settings = page.getByRole('dialog', { name: 'Сканер еды · AI' });
   await settings.getByRole('button', { name: 'Отозвать согласие' }).click();
@@ -130,7 +130,7 @@ test('FT-736: фото тарелки → проверка граммов → з
   await settings.getByRole('button', { name: 'Отозвать и удалить' }).click();
   await page.getByText('Сканер выключен, ответы сканера удалены.').waitFor();
   await page.getByRole('button', { name: /Сканер еды · AI.*Выключен/ }).waitFor();
-  await page.getByRole('tab', { name: 'Дневник', exact: true }).click();
+  await page.getByRole('tab', { name: 'Сегодня', exact: true }).click();
   await page.locator('.diary-add').getByRole('button', { name: /Сканер еды/ }).click();
   await page.getByRole('dialog', { name: 'Сканер еды · AI' }).getByRole('button', { name: 'Разрешить и открыть сканер' }).waitFor();
   assert.deepEqual(pageErrors, []);
