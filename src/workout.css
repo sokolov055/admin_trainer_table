@@ -1394,3 +1394,18 @@ button.wk-ssm__card:active { transform: scale(0.97); }
 .workout__panel .rest-chips__row .chip { flex: none; }
 .workout__panel .workout__panel-actions .button { width: 100%; }
 @media (prefers-reduced-motion: reduce) { .wk-set-del { transition: none; } }
+
+/* Пропуск упражнения и «Позже» (20.11.2026, макет progress-skip-chat-2026-11-19) */
+.workout__exercise--skipped { background: var(--surface-sunken); border-style: dashed; opacity: .72; }
+.workout__exercise--skipped .wk-ex-title h3 { text-decoration: line-through; text-decoration-color: var(--text-muted); }
+.workout__exercise--skipped .wk-ex-pic { filter: grayscale(1); }
+.workout__exercise--later { border-style: dashed; }
+.wk-ex-meta--skip { color: var(--text-muted); }
+.wk-ex-meta--later { color: var(--warning-text); }
+.wk-unskip { flex: none; }
+.workout__finish-skip { color: var(--text-secondary); }
+.wk-skip-sheet__lead { margin: 0 0 12px; }
+.wk-skip-sheet__reasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.wk-skip-reason { min-height: 40px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); color: var(--text); font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; }
+.wk-skip-reason:active { transform: scale(.97); }
+.workout__exercise--skipped .wk-ex-meta { white-space: normal; overflow: visible; }

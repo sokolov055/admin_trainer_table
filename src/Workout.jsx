@@ -10,6 +10,7 @@ import { localWrites } from './offline-writes.js';
 import { storageKey } from './workout-draft.js';
 import { haptic } from './telegram.js';
 import { clock, closeSets, serverTick, fromPlan, newExercise, reopenSession, summary, resultIssue, uid, setLabel, replacementPlan, replaceWorkoutExercise, withMachine, withMemberMachine, withWarmup, withSet, withoutSet, cloneSet, editSetField } from './workout-model.js';
+import { SKIP_OPTIONS, skipText, canSkip, skipExercise, unskipExercise, postponeExercise, skippedList, sessionMinutes, COUNT_MIN_MINUTES } from './workout-skip.js';
 import { IconCheck, IconClose, IconLinkPair, IconSliders, IconPlus, IconDelta, IconChevron, IconMore, IconRefresh, IconPlay, IconSearch, IconTrash } from './icons.jsx';
 import { useBackGesture, useTabLock, reducedMotion } from './gestures.jsx';
 import { BackButton, Sheet } from './ui.jsx';
@@ -2177,6 +2178,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [historyPick, setHistoryPick] = useState(null);
   // Меню «Ещё» у упражнения (toolsRow): id упражнения или null
   const [exMenu, setExMenu] = useState(null);
+  // Лист «Пропустить упражнение» (20.11.2026): id упражнения или null
+  const [skipAsk, setSkipAsk] = useState(null);
   // Раскрытый список замен — на экран (FT-595). Ошибки сохранения — нет
   // (data-reveal="off"): они бывают и фоновые, и рывок к шапке посреди
   // подходов мешал бы
@@ -2360,6 +2363,14 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       // Пункт остаётся и после открытия: иначе у упражнения без других
       // пунктов пропадал весь ряд с «⋯», и экран прыгал
       editable && { key: 'note', text: 'Заметка', act: () => setNoteOpen((v) => new Set(v).add(ex.id)) },
+      // Пропуск и «Позже» (20.11.2026) — и клиенту, и тренеру; суперсет —
+      // своим «Пропустить круг»
+      editable && canSkip(ex) && s.exercises[s.exercises.length - 1].id !== ex.id && { key: 'later', text: 'Сделать позже', act: () => {
+        const snapshot = s.exercises;
+        setUndo('Упражнение отложено', v => ({ ...v, exercises: snapshot }));
+        change(v => ({ ...v, exercises: postponeExercise(v.exercises, ex.id) }));
+      } },
+      editable && canSkip(ex) && { key: 'skip', text: 'Пропустить упражнение', act: () => setSkipAsk(ex.id) },
       canDelete && { key: 'delete', text: 'Удалить упражнение', critical: true, act: removeExercise },
     ].filter(Boolean);
     const menuOpen = exMenu === ex.id;
@@ -2609,8 +2620,10 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
           const allMade = doneSets === ex.sets.length;
           const compact = picking || !!reorder;
           // Свёрнуто: не текущее и не раскрыто руками; закрытое занятие — всё на виду
-          const folded = editable && !compact && focus.ex !== ex.id && !opened.has(ex.id);
-          return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section onFocus={pickExercise(ex.id)} className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
+          // Пропущенное целиком (20.11.2026) — одной бледной строкой с «Вернуть»
+          const skippedEx = !!ex.skip;
+          const folded = editable && !compact && (skippedEx || (focus.ex !== ex.id && !opened.has(ex.id)));
+          return <React.Fragment key={ex.id}>{!compact && joinBefore(ei)}<section onFocus={pickExercise(ex.id)} className={'workout__exercise' + (focus.ex === ex.id ? ' workout__exercise--current' : '') + (finished ? ' workout__exercise--done' : '') + (skippedEx && !compact ? ' workout__exercise--skipped' : '') + (ex.later && !finished && !compact ? ' workout__exercise--later' : '') + (picking && picked.has(ex.id) ? ' workout__exercise--picked' : '') + (compact ? ' workout__exercise--compact' : '')} key={ex.id} data-unit={ex.id} data-anchor={ex.id} data-flip-enter="" data-flip-scope={'sec:' + ex.id}>
           <SwipeRow className="workout__ex-swipe" removeClosest=".workout__exercise" removeWith={(card) => leavingBars([card])} disabled={compact || s.exercises.length === 1 || !editable || asClient} label={`Удалить упражнение «${ex.name}»`}
             onDelete={() => { const snapshot = s.exercises; setUndo('Упражнение удалено', v => putExercisesBack(v, snapshot, new Set([ex.id]))); change(v => ({ ...v, exercises: v.exercises.filter(e => e.id !== ex.id) })); }}>
           <div className={'workout__ex-head' + (picking ? ' workout__ex-head--pick' : '')} onPointerDown={holdToMove(ex.id)} {...(picking ? { role: 'checkbox', 'aria-checked': picked.has(ex.id), tabIndex: 0, onClick: () => togglePick(ex.id), onKeyDown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(ex.id); } } } : {})}>
@@ -2625,9 +2638,13 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               : asClient ? (ex.name || 'Новое упражнение')
                 : <button type="button" className="workout__name-tap" onClick={() => startRename(ex.id)}>{ex.name || 'Новое упражнение'}</button>}</h3>
             {/* План строкой — пока строки-сводки свёрнутого нет */}
-            {!compact && !(editable && (folded || opened.has(ex.id))) && foldLine(ex) && <span className="wk-ex-meta">{foldLine(ex)}</span>}
+            {!compact && !(editable && (folded || opened.has(ex.id))) && !skippedEx && foldLine(ex) && <span className="wk-ex-meta">{foldLine(ex)}</span>}
+            {!compact && skippedEx && <span className="wk-ex-meta wk-ex-meta--skip">Пропущено{skipText(ex.skip) ? ' · ' + skipText(ex.skip).toLowerCase() : ''}</span>}
+            {!compact && !skippedEx && ex.later && !finished && <span className="wk-ex-meta wk-ex-meta--later">⏭ Отложено — после остальных</span>}
             </div>
-            <ExRing done={doneSets} total={ex.sets.length} partial={finished && !allMade} />
+            {skippedEx && !compact && editable
+              ? <button type="button" className="button button--small wk-unskip" onClick={() => { haptic(); change(v => ({ ...v, exercises: unskipExercise(v.exercises, ex.id) })); }}>Вернуть</button>
+              : <ExRing done={doneSets} total={ex.sets.length} partial={finished && !allMade} />}
           </div>
           </SwipeRow>
           {/* Режим выбора — свёрнутый: одна строка на упражнение, чтобы
@@ -2637,7 +2654,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
               строкой «4 × 12 · 80 кг», касание раскрывает. Содержимое не
               убирается из разметки — прячется (inert) и раскрывается
               высотой, поэтому ввод и черновик не теряются */}
-          {!compact && editable && (folded || opened.has(ex.id)) && <button type="button" className="workout__ex-fold" aria-expanded={!folded} onClick={() => { haptic(); setOpened((v) => { const next = new Set(v); if (next.has(ex.id)) next.delete(ex.id); else next.add(ex.id); return next; }); }}>
+          {!compact && editable && !skippedEx && (folded || opened.has(ex.id)) && <button type="button" className="workout__ex-fold" aria-expanded={!folded} onClick={() => { haptic(); setOpened((v) => { const next = new Set(v); if (next.has(ex.id)) next.delete(ex.id); else next.add(ex.id); return next; }); }}>
             <span>{foldLine(ex)}</span><IconChevron size={16} aria-hidden="true" className={folded ? undefined : 'workout__chip-up'} />
           </button>}
           {!compact && <div className={'workout__ex-body' + (folded ? ' is-folded' : '')} {...(folded ? { inert: '' } : {})}><div className="workout__ex-body-in">
@@ -2730,7 +2747,29 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       </fieldset>
       {/* Главная кнопка после завершения — уйти к программе: занятие закончено,
           «Продолжить» — на случай ошибки, а не следующий шаг (QA 20.10.2026) */}
-      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{setsWord(stats.done)} · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p><p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>{backLabel}</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button>{/* Игры — после тренировки, не на отдыхе (владелец, 11.11.2026) */}{asClient && openGames && s.status === 'completed' && <button className="button" onClick={openGames}>Игры</button>}</div>}
+      {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{setsWord(stats.done)} · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p>{skippedList(s.exercises).length > 0 && <p className="small workout__finish-skip">Пропущено: {skippedList(s.exercises).join(', ')}</p>}{s.status === 'completed' && sessionMinutes(s) < COUNT_MIN_MINUTES && <p className="small muted">Занятие короче {COUNT_MIN_MINUTES} минут — в серию и награды не войдёт.</p>}<p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>{backLabel}</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button>{/* Игры — после тренировки, не на отдыхе (владелец, 11.11.2026) */}{asClient && openGames && s.status === 'completed' && <button className="button" onClick={openGames}>Игры</button>}</div>}
+      {/* Пропустить упражнение (20.11.2026): причина по желанию, одним касанием */}
+      {skipAsk && (() => {
+        const ex = s.exercises.find((e) => e.id === skipAsk);
+        if (!ex) return null;
+        const left = ex.sets.filter((x) => x.state === 'pending').length;
+        const go = (reason) => {
+          haptic();
+          const snapshot = s.exercises;
+          setSkipAsk(null);
+          setUndo(ex.name + ' пропущено', v => ({ ...v, exercises: snapshot }));
+          change(v => ({ ...v, exercises: skipExercise(v.exercises, ex.id, reason) }));
+        };
+        return <Sheet key="skip-ask" title="Пропустить упражнение?" className="wk-skip-sheet" onClose={() => setSkipAsk(null)} onDone={() => setSkipAsk(null)} done="Отмена">
+          <p className="wk-skip-sheet__lead"><strong>{ex.name}</strong><br /><span className="muted small">{left === 1 ? 'Остался 1 подход' : 'Осталось подходов: ' + left} — они не засчитаются, тренер увидит отметку.</span></p>
+          <p className="small muted">Причина — по желанию, тренеру будет понятнее:</p>
+          <div className="wk-skip-sheet__reasons">
+            {SKIP_OPTIONS.map((o) => <button type="button" key={o.id} className={'wk-skip-reason' + (o.id === 'pain' ? ' is-pain' : '')} onClick={() => go(o.id)}>{o.text}</button>)}
+          </div>
+          {SKIP_OPTIONS.some((o) => o.id === 'pain') && <p className="small muted">«Болит» — только отметка, без диагноза. Видите вы и тренер; через 90 дней она стирается.</p>}
+          <button type="button" className="button button--block" onClick={() => go('yes')}>Пропустить без причины</button>
+        </Sheet>;
+      })()}
       {/* «Сохранить сейчас» и «Скачать результат» убраны (03.10.2026):
           сохраняется само. Не сохранилось — «Повторить» в сообщении об
           ошибке вверху; конфликт версий — «Скачать мой черновик» там же */}
