@@ -2267,6 +2267,8 @@ const MOCK = {
         'Рука': { first: 34, firstDate: daysAgo(150), last: 36.5, lastDate: daysAgo(4), delta: 2.5, points: 6 },
       },
     }],
+    // «Мой путь» (этап 1 «Прогресса», 20.11.2026)
+    journey: mockEmpty() ? null : { since: daysAgo(150).slice(0, 10), workouts: 46, streak: 6 },
     lifts: mockEmpty() ? [] : [
       { name: 'Присед со штангой', block: 'Тренировка 2 — низ', weight: 95, prevWeight: 90, delta: 5, deltaPct: 5.6 },
       { name: 'Румынская тяга', block: 'Тренировка 2 — низ', weight: 85, prevWeight: 80, delta: 5, deltaPct: 6.3 },

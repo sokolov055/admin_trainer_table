@@ -33,7 +33,7 @@ import WeekEditor from './WeekEditor.jsx';
 import WeekCard from './WeekCard.jsx';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
-import { WeightCard, MeasuresCard, StrengthCard, WeekRings } from './ProgressVisual.jsx';
+import { WeightCard, MeasuresCard, StrengthCard, WeekRings, JourneyCard } from './ProgressVisual.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 import WorkoutBoundary from '../WorkoutBoundary.jsx';
 import SwipeRow from '../SwipeRow.jsx';
@@ -1863,6 +1863,8 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   return (
     <>
       {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
+      {/* «Мой путь» — главное за всё время над вкладками (этап 1, 20.11.2026) */}
+      <JourneyCard journey={progress && progress.journey} rows={(series[0] && series[0].rows) || []} lifts={lifts} />
       {addMeasure}
 
       {/* «Разбор дня» (FT-738): у клиента — на «Обзоре», тренеру — здесь */}
