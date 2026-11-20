@@ -6,7 +6,7 @@
 
 const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
 
-let seq = 7;
+let seq = 9;
 let messages = [
   { id: 1, sender: 'trainer', text: 'Как колено после вчерашнего?', at: ago(60 * 26) },
   { id: 2, sender: 'client', text: 'Колено ок, но последние два подхода тяжело', at: ago(60 * 25), edited: true },
@@ -14,6 +14,8 @@ let messages = [
   { id: 4, sender: 'trainer', text: '', at: ago(45), deleted: true },
   { id: 5, sender: 'trainer', text: 'Завтра не забудь резинку для ягодичного 😉', at: ago(40), pinned: true },
   { id: 6, sender: 'client', text: '🏋️ Тренировка', at: ago(30), card: { kind: 'workout', ref: 'w1', title: 'Ноги + спина', day: new Date(Date.now() - 86400000).toISOString().slice(0, 10), sets: 18, tonnage: 10200, minutes: 52, skipped: [{ name: 'Жим лёжа', reason: 'тренажёр занят' }] } },
+  { id: 7, sender: 'client', text: '📅 Перенести занятие', at: ago(20), card: { kind: 'move', ref: 'ev1', from: new Date(Date.now() + 2 * 86400000).toISOString(), to: new Date(Date.now() + 3 * 86400000).toISOString(), minutes: 60, by: 'client', status: 'open' } },
+  { id: 8, sender: 'client', text: '💬 Пожелание', at: ago(15), card: { kind: 'wish', ref: 1, text: 'Больше упражнений на спину', status: 'read' } },
 ];
 const read = { client: 3, trainer: 5 };
 let rev = 1;
@@ -135,6 +137,16 @@ export function chatMock(action, p) {
       return { sent: (p.to || []).flatMap((t) => ids.map((id) => ({ clientRow: t.clientRow, member: t.member || '', id: 1000 + id }))) };
     }
     case 'chat.card': {
+      if (p.kind === 'wish') {
+        const m = { id: seq++, sender: side, text: '💬 Пожелание', at: new Date().toISOString(), card: { kind: 'wish', ref: seq, text: String(p.text || ''), status: 'new' } };
+        messages.push(m); read[side] = m.id; touch();
+        return { message: shape(m, side) };
+      }
+      if (p.kind === 'move') {
+        const m = { id: seq++, sender: side, text: '📅 Перенести занятие', at: new Date().toISOString(), card: { kind: 'move', ref: p.ref, from: new Date(Date.now() + 86400000).toISOString(), to: p.to, minutes: 60, by: side, status: 'open' }, localId: p.localId };
+        messages.push(m); read[side] = m.id; touch();
+        return { message: shape(m, side) };
+      }
       const make = DEMO_CARDS[p.kind];
       if (!make) throw Object.assign(new Error('Такой карточки нет.'), { code: 400 });
       const card = make(p.ref);
@@ -144,7 +156,17 @@ export function chatMock(action, p) {
       touch();
       return { message: shape(m, side) };
     }
+    case 'chat.cardAction': {
+      const m = find(p.id);
+      const c = m.card;
+      if (c.kind === 'move') c.status = { accept: 'accepted', decline: 'declined', withdraw: 'withdrawn' }[p.action] || c.status;
+      if (c.kind === 'wish') c.status = p.action === 'done' ? 'done' : p.action === 'delete' ? 'gone' : c.status;
+      if (c.kind === 'pause') c.status = p.action === 'decline' ? 'declined' : p.action === 'withdraw' ? 'cancelled' : c.status;
+      touch();
+      return { ok: true };
+    }
     case 'chat.cardOptions': {
+      if (p.kind === 'move') return { options: [1, 3].map((d) => { const at = new Date(Date.now() + d * 86400000); at.setHours(19, 0, 0, 0); return { ref: 'ev' + d, title: at.toLocaleString('ru-RU', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), at: at.toISOString() }; }) };
       if (p.kind === 'workout') return { options: [{ ref: 'w1', title: 'Ноги + спина', day: '2026-11-19' }, { ref: 'w2', title: 'Верх', day: '2026-11-17' }] };
       if (p.kind === 'food') return { options: [{ ref: '2026-11-19', title: '19.11', note: '9 записей' }, { ref: '2026-11-18', title: '18.11', note: '7 записей' }] };
       const all = [{ ref: 1, title: 'Румынская тяга', note: 'Бедро' }, { ref: 2, title: 'Жим ногами', note: 'Квадрицепс' }, { ref: 3, title: 'Тяга верхнего блока', note: 'Спина' }];

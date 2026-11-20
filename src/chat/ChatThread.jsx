@@ -9,6 +9,7 @@ import {
 } from './chat-model.js';
 import { useChatInbox } from './ChatList.jsx';
 import { ChatCard, AttachMenu, ExerciseSheet, CARD_SECTION } from './ChatCards.jsx';
+import { PauseSheet, TrainerPauseSheet } from '../pause/Pause.jsx';
 import './chat.css';
 
 /**
@@ -44,7 +45,7 @@ function Ticks({ state }) {
   );
 }
 
-function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, onMenu, onReply, onQuote, onReact, onRetry, onCard }) {
+function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, onMenu, onReply, onQuote, onReact, onRetry, onCard, onCardAction, role, busyCard }) {
   const press = useRef(null);
   const start = useRef(null);
   const lastTap = useRef(0);
@@ -104,7 +105,7 @@ function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, o
         )}
         {msg.deleted
           ? <span className="chat-bubble__text chat-bubble__text--deleted">🚫 Сообщение удалено</span>
-          : msg.card ? <ChatCard card={msg.card} onOpen={onCard} />
+          : msg.card ? <ChatCard card={msg.card} mine={mine} role={role} busy={busyCard === msg.id} onOpen={onCard} onAction={(card, action) => onCardAction(msg, card, action)} />
             : <span className="chat-bubble__text">{msg.text}</span>}
         <span className="chat-bubble__meta">
           {msg.pinned && <span aria-label="Закреплено">📌</span>}
@@ -429,11 +430,35 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
     if (!section || !inbox.navigate({ section, clientRow, member, name })) setNote('Раздел откроется из меню приложения.');
   };
 
-  const sendCard = async (kind, ref) => {
+  const [busyCard, setBusyCard] = useState(null);
+
+  /** Решение по карточке: перенос, пауза, пожелание */
+  const cardAction = async (msg, card, action) => {
+    if (action === 'reply') { setEditing(null); setReplyTo(msg); if (field.current) field.current.focus(); return; }
+    if (action === 'decide') { openPauseDecide(); return; }
+    setBusyCard(msg.id);
+    try {
+      await send('chat.cardAction', { ...base, id: msg.id, action: action === 'counter' ? 'decline' : action });
+      await refresh();
+      if (action === 'accept') setNote('Договорились — занятие перенесено в расписании.');
+      if (action === 'counter') setLayer({ kind: 'attach', initial: { kind: 'move', ref: card.ref, at: card.from } });
+    } catch (e) { setNote(e.message || 'Не получилось.'); await refresh().catch(() => {}); }
+    setBusyCard(null);
+  };
+
+  // Пауза у тренера: подтвердить с датами и списаниями или поставить самому — лист паузы, как в карточке клиента
+  const openPauseDecide = async () => {
+    try {
+      const r = await send('pause.get', { clientRow });
+      setLayer({ kind: 'pause-decide', pause: r.pause || null, online: !!r.online });
+    } catch (e) { setNote(e.message || 'Не получилось открыть паузу.'); }
+  };
+
+  const sendCard = async (kind, ref, extra = {}) => {
     setLayer(null);
     const localId = newLocalId();
     try {
-      const r = await send('chat.card', { ...base, kind, ref, localId, replyTo: replyTo ? replyTo.id : null });
+      const r = await send('chat.card', { ...base, kind, ref, ...extra, localId, replyTo: replyTo ? replyTo.id : null });
       setReplyTo(null);
       setData((d) => (d ? { ...d, messages: d.messages.some((m) => m.id === r.message.id) ? d.messages : d.messages.concat(r.message) } : d));
     } catch (e) { setNote(e.message || 'Не получилось отправить.'); }
@@ -601,6 +626,7 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
           return (
             <Bubble key={item.key} msg={m} peer={name} tail={item.tail} tick={tickOf(m, readUpTo)} flash={flash === m.id}
               selecting={!!selected} selected={!!selected && selected.has(m.id)} onSelect={toggleSelect} onCard={openCard}
+              onCardAction={cardAction} role={role} busyCard={busyCard}
               onMenu={setMenu} onReply={(x) => { setEditing(null); setReplyTo(x); field.current && field.current.focus(); }}
               onQuote={jumpTo} onReact={react} onRetry={deliver} />
           );
@@ -714,8 +740,16 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
       )}
       {layer && layer.kind === 'attach' && (
         <Layer label="Из Fit Track" onClose={() => setLayer(null)}>
-          <AttachMenu base={base} role={role} onSend={sendCard} onClose={() => setLayer(null)} />
+          <AttachMenu base={base} role={role} onSend={sendCard} onClose={() => setLayer(null)} initial={layer.initial || null}
+            onPause={() => { if (role === 'trainer') openPauseDecide(); else setLayer({ kind: 'pause-ask' }); }} />
         </Layer>
+      )}
+      {layer && layer.kind === 'pause-ask' && (
+        <PauseSheet onClose={() => setLayer(null)} onSent={() => { setLayer(null); refresh().catch(() => {}); setNote('Просьба о паузе отправлена тренеру.'); }} />
+      )}
+      {layer && layer.kind === 'pause-decide' && (
+        <TrainerPauseSheet clientRow={clientRow} name={name} pause={layer.pause} online={layer.online}
+          onClose={() => setLayer(null)} onDone={() => { setLayer(null); refresh().catch(() => {}); }} />
       )}
       {layer && layer.kind === 'exercise' && (
         <Layer label="Упражнение" onClose={() => setLayer(null)}>

@@ -368,8 +368,10 @@
 .chat-empty-tab { text-align: center; padding: var(--space-6) var(--space-4); color: var(--text-muted); display: flex; flex-direction: column; gap: var(--space-1); }
 .chat-empty-tab strong { color: var(--text); font-size: var(--text-md); font-weight: 600; }
 
-.chat-entry { position: relative; }
-.chat-entry__badge { position: absolute; top: -2px; right: -4px; }
+/* 💬 у клиента — вплотную к ☰ справа (вариант А, владелец 20.11.2026):
+   шапка раскладывает элементы по ширине, auto-отступ прижимает кнопку к меню */
+.chat-entry { position: relative; margin-left: auto; margin-right: -4px; }
+.chat-entry__badge { position: absolute; top: 3px; right: 1px; pointer-events: none; border: 2px solid var(--bg); }
 .chat-card { margin: var(--space-3) 0 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 
 /* Счётчик на вкладке таб-бара */
@@ -576,3 +578,52 @@
 .chat-attach__options button { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
 .chat-attach__options small { color: var(--text-muted); font-size: var(--text-sm); }
 .chat-exercise__notes { white-space: pre-wrap; font-size: var(--text-base); line-height: 1.45; margin: 0 0 var(--space-2); }
+
+/* ---------- карточки с решением: перенос, пауза, пожелание ---------- */
+
+.chat-card-msg--move { border-left-color: var(--accent); }
+.chat-card-msg--pause { border-left-color: var(--info-text, var(--accent)); }
+.chat-card-msg--wish { border-left-color: var(--warning); }
+.chat-card-msg--settled { opacity: 0.85; }
+.chat-card__line s { opacity: 0.6; }
+.chat-card__quote { font-size: var(--text-base); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-card__state { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+.chat-card__state--accepted, .chat-card__state--active { color: var(--good-text); }
+.chat-card__state--declined { color: var(--critical-text); }
+.chat-card__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chat-card__btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.chat-card__btn--primary { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; }
+.chat-card__btn:disabled { opacity: var(--disabled-opacity, 0.5); }
+.chat-row--me .chat-card__btn:not(.chat-card__btn--primary) { background: #fff; color: #1a1815; }
+
+.chat-move__field { display: flex; flex-direction: column; gap: 6px; font-size: var(--text-sm); color: var(--text-secondary); }
+.chat-move__field input {
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.chat-wish__field {
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  resize: vertical;
+}
