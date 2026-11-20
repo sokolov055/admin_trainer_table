@@ -47,3 +47,10 @@ test('сила за месяц — суммарно к прошлому меся
   assert.equal(signed(0.5, 'см'), '+0,5 см');
   assert.equal(weeksSince('2026-09-12', new Date('2026-11-20T10:00:00Z')), 9);
 });
+
+test('дата словами: «23 июня», другой год — с годом', async () => {
+  const { dayWords } = await import('../src/client/progress-model.js');
+  assert.equal(dayWords('2026-06-23', new Date('2026-11-20T10:00:00Z')), '23 июня');
+  assert.equal(dayWords('2025-12-01', new Date('2026-11-20T10:00:00Z')), '1 декабря 2025');
+  assert.equal(dayWords(''), '');
+});

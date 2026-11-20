@@ -1,7 +1,7 @@
 import React from 'react';
 import { useData } from '../useData.js';
 import { Delta, Qty, formatNumber, formatDate } from '../ui.jsx';
-import { weightTrend, journeyHeadline, strengthPct, weeksSince, plural, signed, BODY_SPOTS } from './progress-model.js';
+import { weightTrend, journeyHeadline, strengthPct, weeksSince, plural, signed, dayWords, BODY_SPOTS } from './progress-model.js';
 
 /*
  * «Прогресс» картинками (владелец, 12.11.2026): на вкладке одна большая
@@ -23,11 +23,11 @@ export function JourneyCard({ journey, rows, lifts }) {
   return (
     <section className="pv-journey" aria-label="Мой путь">
       <i className="pv-journey__deco" aria-hidden="true" />
-      <div className="pv-journey__since">Мой путь · с {formatDate(journey.since, false)} · {weeks} {plural(weeks, 'неделя', 'недели', 'недель')}</div>
+      <div className="pv-journey__since">Мой путь · с {dayWords(journey.since)} · {weeks} {plural(weeks, 'неделя', 'недели', 'недель')}</div>
       {headline && <div className="pv-journey__head">{headline}</div>}
       <div className="pv-journey__stats">
         <div><b><CountUp value={journey.workouts} /></b><small>{plural(journey.workouts, 'тренировка', 'тренировки', 'тренировок')}</small></div>
-        {pct !== null && <div><b>{pct > 0 ? '+' : pct < 0 ? '−' : ''}<CountUp value={Math.abs(pct)} />%</b><small>сила за месяц</small></div>}
+        {pct !== null && <div><b>{pct > 0 ? '+' : pct < 0 ? '−' : ''}<CountUp value={Math.abs(pct)} />%</b><small>сила</small></div>}
         <div><b>{journey.streak > 0 ? '🔥 ' : ''}<CountUp value={journey.streak} /></b><small>{plural(journey.streak, 'неделя', 'недели', 'недель')} подряд</small></div>
       </div>
     </section>
@@ -107,7 +107,7 @@ export function WeightCard({ points, aim = 0, period = 'all' }) {
       </div>
       <p className="pv-card__line">
         {change !== null
-          ? <>{recent ? 'С прошлого замера, ' : 'С '}{formatDate(first.x, false)}</>
+          ? <>{recent ? 'С прошлого замера, ' : 'С '}{dayWords(first.x)}</>
           : 'Замер от ' + formatDate(last.x)}
       </p>
       {points.length > 1 && (
@@ -159,69 +159,57 @@ function BodyMap({ fields }) {
   );
 }
 
-/** Мини-график одного замера: линия за всё время, точка на последнем */
-function Spark({ values, tone, recent = false }) {
-  const W = 110;
-  const H = 30;
-  const min = Math.min(...values);
-  const span = Math.max(...values) - min || 1;
-  const pts = values.map((v, i) => [values.length > 1 ? (i / (values.length - 1)) * W : W / 2, 4 + (1 - (v - min) / span) * (H - 8)]);
-  const line = pts.map(([x, y], i) => (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1)).join(' ');
-  const [lx, ly] = pts[pts.length - 1];
-  return (
-    <svg className={'pv-mini pv-mini--' + tone} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
-      {!recent && <path d={line + ` L ${W} ${H} L 0 ${H} Z`} className="pv-mini__area" />}
-      <path d={line} className={'pv-mini__line' + (recent ? ' is-past' : '')} />
-      {recent && <path d={`M ${pts[pts.length - 2][0]} ${pts[pts.length - 2][1]} L ${lx} ${ly}`} className="pv-mini__line pv-mini__line--recent" />}
-      {recent && <circle cx={pts[pts.length - 2][0]} cy={pts[pts.length - 2][1]} r="2.6" className="pv-mini__dot" />}
-      <circle cx={lx} cy={ly} r="3" className="pv-mini__dot" />
-    </svg>
-  );
-}
-
 /**
  * Замеры строками (владелец, 12.11.2026, вариант А вместо силуэта): у каждого
  * обхвата — было → стало, свой маленький график за всё время и итог стрелкой.
  * Зелёный — в сторону цели клиента, оранжевый — от неё.
  */
-export function MeasuresCard({ rows, fields, aimOf, onAll, open, period = 'all' }) {
+export function MeasuresCard({ rows, fields, aimOf, onAll, open, period = 'all', onPeriod = null }) {
   const list = fields
     .filter((f) => f !== 'Вес')
     .map((f) => ({ f, pts: rows.filter((r) => r[f] !== null && r[f] !== undefined).map((r) => ({ x: r.date, y: r[f] })) }))
-    .filter((m) => m.pts.length > 0);
+    .filter((m) => m.pts.length > 0)
+    // Сверху вниз, как пояса на фигуре
+    .sort((a, b) => ((BODY_SPOTS[a.f] || {}).y || 999) - ((BODY_SPOTS[b.f] || {}).y || 999));
   if (!list.length) return null;
   const recent = period === 'last' && rows.length > 1;
   const since = !rows.length ? ''
-    : recent ? formatDate(rows[rows.length - 2].date, false) + ' → ' + formatDate(rows[rows.length - 1].date, false)
-      : 'с ' + formatDate(rows[0].date, false);
+    : recent ? 'с прошлого замера'
+      : 'с ' + dayWords(rows[0].date);
   return (
     <section className="pv-card" aria-label="Замеры">
       <div className="pv-card__label">Замеры{since ? ' · ' + since : ''}</div>
       <div className="pv-body-wrap">
-      <BodyMap fields={list.map((m) => m.f)} />
-      <div className="pv-measures">
-        {list.map(({ f, pts }) => {
-          const first = (recent && pts.length > 1 ? pts[pts.length - 2] : pts[0]).y;
-          const last = pts[pts.length - 1].y;
-          const change = Math.round((last - first) * 10) / 10;
-          const aim = aimOf(f);
-          const tone = !aim || !change ? 'flat' : change * aim > 0 ? 'good' : 'off';
-          return (
-            <div key={f} className="pv-measure">
-              <div className="pv-measure__name">
-                <strong>{BODY_SPOTS[f] && <i className={'pv-dot tone-' + BODY_SPOTS[f].tone} aria-hidden="true" />}{f}</strong>
-                <small>{pts.length > 1 ? formatNumber(first) + ' → ' + formatNumber(last) + ' см' : formatNumber(last) + ' см'}</small>
+        <BodyMap fields={list.map((m) => m.f)} />
+        <div className="pv-measures">
+          {list.map(({ f, pts }) => {
+            const first = (recent && pts.length > 1 ? pts[pts.length - 2] : pts[0]).y;
+            const last = pts[pts.length - 1].y;
+            const change = Math.round((last - first) * 10) / 10;
+            const aim = aimOf(f);
+            const tone = !aim || !change ? '' : change * aim > 0 ? 'is-good' : 'is-off';
+            return (
+              <div key={f} className="pv-measure">
+                <strong className="pv-measure__name">{BODY_SPOTS[f] && <i className={'pv-dot tone-' + BODY_SPOTS[f].tone} aria-hidden="true" />}{f}</strong>
+                <small className="pv-measure__values">{pts.length > 1 ? formatNumber(first) + ' → ' + formatNumber(last) : formatNumber(last)}</small>
+                <span className={'pv-pill ' + tone}>{pts.length > 1 ? (change ? signed(change) : '=') : 'см'}</span>
               </div>
-              {pts.length > 1 ? <Spark values={pts.map((p) => p.y)} tone={tone} recent={recent} /> : <span />}
-              <span className="pv-measure__delta">{pts.length > 1 ? <Delta value={change} aim={aim} /> : ''}</span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+      <div className="pv-measures__foot">
+        {onPeriod && rows.length > 1 && (
+          <div className="pv-period" role="radiogroup" aria-label="Изменения за период">
+            {[['all', 'За всё время'], ['last', 'С прошлого']].map(([v, t]) => (
+              <button key={v} type="button" role="radio" aria-checked={period === v} className={'pv-period__chip' + (period === v ? ' is-on' : '')} onClick={() => onPeriod(v)}>{t}</button>
+            ))}
+          </div>
+        )}
+        <button type="button" className="pv-link" aria-expanded={open} onClick={onAll}>
+          {open ? 'Свернуть' : 'Все замеры ›'}
+        </button>
       </div>
-      <button type="button" className="pv-link" aria-expanded={open} onClick={onAll}>
-        {open ? 'Свернуть замеры' : 'Все замеры и таблица ›'}
-      </button>
     </section>
   );
 }
@@ -278,7 +266,7 @@ export function RecordsStrip({ records }) {
             {r.fresh && <span className="pv-record__new">новый</span>}
             <small className="pv-record__name">{r.name}</small>
             <b>{formatNumber(r.weight)} кг</b>
-            <small>{r.reps ? '× ' + r.reps + ' · ' : ''}{formatDate(r.day, false)}</small>
+            <small className="pv-record__meta">{r.reps ? '× ' + r.reps + ' · ' : ''}{formatDate(r.day, false)}</small>
           </div>
         ))}
       </div>

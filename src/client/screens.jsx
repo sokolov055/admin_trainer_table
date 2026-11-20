@@ -1720,6 +1720,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       setAdded(null);
       setAdding(true);
       setQuick({ kind });
+      setTab('body');
     }
     return true;
   };
@@ -1866,7 +1867,8 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {!familyRow && <GoalBanner clientRow={clientRow} clientView={clientView || self} section="progress" />}
       {/* «Мой путь» — главное за всё время над вкладками (этап 1, 20.11.2026) */}
       <JourneyCard journey={progress && progress.journey} rows={(series[0] && series[0].rows) || []} lifts={lifts} />
-      {addMeasure}
+      {/* Форма замера открыта — над вкладками, к ней подъезжает экран */}
+      {adding && addMeasure}
 
       {/* «Разбор дня» (FT-738): у клиента — на «Обзоре», тренеру — здесь */}
       {!familyRow && (self || (clientRow && !clientView)) && <DayCard clientRow={clientRow} mine={self} />}
@@ -1883,16 +1885,13 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {/* Тело картинками: вес линией, у каждого замера свой маленький график; таблицы — «Все замеры» */}
       {/* Общий переключатель периода для веса и замеров (FT-782, владелец 12.11.2026);
           тот же выбор, что был у таблицы «Изменения по замерам» */}
-      {hasRows && series.some((x) => x.rows.length > 1) && (
-        <div className="progress__period">
-          <Segmented glide label="Изменения за период"
-            items={[{ value: 'all', label: 'За всё время' }, { value: 'last', label: 'С прошлого замера' }]}
-            value={period} onChange={setPeriod} />
-        </div>
-      )}
+      {/* Период — маленькими кнопками в карточке замеров (макет 20.11.2026) */}
       {hasRows && <WeightCard points={weightPoints} aim={measureAim('Вес', goal)} period={period} />}
       {hasRows && <MeasuresCard rows={(series[0] && series[0].rows) || []} fields={fields} aimOf={(f) => measureAim(f, goal)} period={period}
+        onPeriod={(v) => { haptic(); setPeriod(v); }}
         open={allMeasures} onAll={() => { haptic(); setAllMeasures((v) => !v); }} />}
+      {/* «Записать замер» — внизу «Тела», как в макете (20.11.2026) */}
+      {hasRows && !adding && addMeasure}
       {!hasRows && (
         <Empty icon={IconRuler} title="Замеров пока нет"
           text="Запишите вес или обхваты — здесь появится линия веса и изменения на фигуре."
@@ -2043,10 +2042,11 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       {!familyRow && <div {...pane('activity')}>
         {/* Месяц сеткой вместо колец недели — кольца на главной (этап 3, 20.11.2026) */}
         {progress && progress.activity ? <MonthCard activity={progress.activity} /> : <WeekRings clientRow={clientRow} />}
-        <Goals clientRow={clientRow} preview={clientView} compact={!allHealth} />
         {/* Шаги недели с линией цели; подключение и две недели — прежним блоком */}
         <StepsWeek clientRow={clientRow} more={allHealth} fallback={<Steps clientRow={clientRow} self={self} preview={clientView} />} />
         <HealthTiles clientRow={clientRow} />
+        {/* Цели и награды — под шагами; месяц уже сеткой выше, второй раз его не рисуем */}
+        <Goals clientRow={clientRow} preview={clientView} compact={!allHealth} noMonth={!!(progress && progress.activity)} />
         {/* Остальное здоровье и тренировки с часов — по кнопке: много цифр (12.11.2026) */}
         <button type="button" className="pv-link pv-link--block" aria-expanded={allHealth} onClick={() => { haptic(); setAllHealth((v) => !v); }}>
           {allHealth ? 'Свернуть' : 'Все данные «Здоровья» ›'}

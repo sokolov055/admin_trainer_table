@@ -265,7 +265,8 @@ function AwardList({ awards }) {
 }
 
 // preview — тренер смотрит «глазами клиента»: всё видно, править нельзя
-export default function Goals({ clientRow, preview = false, compact = false }) {
+// noMonth — «Прогресс → Активность» (20.11.2026): месяц там сеткой, карточка не повторяет его
+export default function Goals({ clientRow, preview = false, compact = false, noMonth = false }) {
   const { data, loading } = useData('client.awards', clientRow ? { clientRow } : {}, [clientRow]);
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -332,7 +333,7 @@ export default function Goals({ clientRow, preview = false, compact = false }) {
                   : leftText(week.target - week.done, daysLeft(data.today, 'week', trainedToday))}
               </p>
             </GoalCard>
-            <GoalCard title={monthName} layout={month}>
+            {!noMonth && <GoalCard title={monthName} layout={month}>
               <p className="goal-card__foot">
                 {month.done >= month.target
                   ? <span className="goal-card__ok">Цель месяца выполнена</span>
@@ -340,7 +341,7 @@ export default function Goals({ clientRow, preview = false, compact = false }) {
                 {month.missed > 0 && <> · <span className="goal-card__missed">пропущено {month.missed}</span></>}
                 {series && ' · ' + series}
               </p>
-            </GoalCard>
+            </GoalCard>}
             {/* compact — «Прогресс → Активность» (12.11.2026): годовая сетка уходит, неделя и месяц остаются */}
             {!compact && <GoalCard title={(ring('year').label || parts(data.today).y) + ' год'} layout={year} grid>
               <ul className="goal-legend">

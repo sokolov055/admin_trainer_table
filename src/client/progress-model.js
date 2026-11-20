@@ -103,6 +103,16 @@ export function weeksSince(since, today = new Date()) {
   return Math.max(1, Math.floor((dayOf(today.toISOString()) - from) / DAY / 7));
 }
 
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+/** «23 июня»; другой год — «23 июня 2025» */
+export function dayWords(date, today = new Date()) {
+  const s = String(date || '').slice(0, 10);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const words = Number(m[3]) + ' ' + MONTHS_GEN[Number(m[2]) - 1];
+  return Number(m[1]) === today.getFullYear() ? words : words + ' ' + m[1];
+}
+
 export function plural(n, one, few, many) {
   const a = Math.abs(n) % 100;
   const b = a % 10;
@@ -120,7 +130,7 @@ export const BODY_SPOTS = {
   'Плечи': { y: 40, x1: 24, x2: 76, tone: 'back' },
   'Грудь': { y: 54, x1: 31, x2: 69, tone: 'chest' },
   'Рука': { y: 66, x1: 16, x2: 27, tone: 'arms' },
-  'Талия': { y: 84, x1: 28, x2: 72, tone: 'core' },
+  'Талия': { y: 78, x1: 27, x2: 73, tone: 'core' },
   'Ягодицы': { y: 104, x1: 27, x2: 73, tone: 'legs' },
   'Бёдра': { y: 104, x1: 27, x2: 73, tone: 'legs' },
   'Бедро': { y: 128, x1: 31, x2: 47, tone: 'legs' },

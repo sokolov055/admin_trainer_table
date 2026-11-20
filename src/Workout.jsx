@@ -2180,6 +2180,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
   const [exMenu, setExMenu] = useState(null);
   // Лист «Пропустить упражнение» (20.11.2026): id упражнения или null
   const [skipAsk, setSkipAsk] = useState(null);
+  const skipClose = useRef(null);
   // Раскрытый список замен — на экран (FT-595). Ошибки сохранения — нет
   // (data-reveal="off"): они бывают и фоновые, и рывок к шапке посреди
   // подходов мешал бы
@@ -2365,12 +2366,8 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       editable && { key: 'note', text: 'Заметка', act: () => setNoteOpen((v) => new Set(v).add(ex.id)) },
       // Пропуск и «Позже» (20.11.2026) — и клиенту, и тренеру; суперсет —
       // своим «Пропустить круг»
-      editable && canSkip(ex) && s.exercises[s.exercises.length - 1].id !== ex.id && { key: 'later', text: 'Сделать позже', act: () => {
-        const snapshot = s.exercises;
-        setUndo('Упражнение отложено', v => ({ ...v, exercises: snapshot }));
-        change(v => ({ ...v, exercises: postponeExercise(v.exercises, ex.id) }));
-      } },
-      editable && canSkip(ex) && { key: 'skip', text: 'Пропустить упражнение', act: () => setSkipAsk(ex.id) },
+      // Один пункт — лист с «Сделать позже» и «Пропустить сегодня» (макет)
+      editable && canSkip(ex) && { key: 'skip', text: 'Пропустить или отложить', act: () => setSkipAsk(ex.id) },
       canDelete && { key: 'delete', text: 'Удалить упражнение', critical: true, act: removeExercise },
     ].filter(Boolean);
     const menuOpen = exMenu === ex.id;
@@ -2640,7 +2637,7 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
             {/* План строкой — пока строки-сводки свёрнутого нет */}
             {!compact && !(editable && (folded || opened.has(ex.id))) && !skippedEx && foldLine(ex) && <span className="wk-ex-meta">{foldLine(ex)}</span>}
             {!compact && skippedEx && <span className="wk-ex-meta wk-ex-meta--skip">Пропущено{skipText(ex.skip) ? ' · ' + skipText(ex.skip).toLowerCase() : ''}</span>}
-            {!compact && !skippedEx && ex.later && !finished && <span className="wk-ex-meta wk-ex-meta--later">⏭ Отложено — после остальных</span>}
+            {!compact && !skippedEx && ex.later && !finished && <span className="wk-ex-meta wk-ex-meta--later">Отложено — после остальных</span>}
             </div>
             {skippedEx && !compact && editable
               ? <button type="button" className="button button--small wk-unskip" onClick={() => { haptic(); change(v => ({ ...v, exercises: unskipExercise(v.exercises, ex.id) })); }}>Вернуть</button>
@@ -2748,26 +2745,48 @@ export default function WorkoutJournal({ clientRow, clientView = false, launch, 
       {/* Главная кнопка после завершения — уйти к программе: занятие закончено,
           «Продолжить» — на случай ошибки, а не следующий шаг (QA 20.10.2026) */}
       {!editable && <div className="workout__finish"><h3>{labels[s.status]}</h3><p>{setsWord(stats.done)} · {Math.round(stats.volume).toLocaleString('ru-RU')} кг рабочего объёма</p>{skippedList(s.exercises).length > 0 && <p className="small workout__finish-skip">Пропущено: {skippedList(s.exercises).join(', ')}</p>}{s.status === 'completed' && sessionMinutes(s) < COUNT_MIN_MINUTES && <p className="small muted">Занятие короче {COUNT_MIN_MINUTES} минут — в серию и награды не войдёт.</p>}<p className="small muted">Оплаты и учёт занятий по календарю не изменены.</p><button className="button button--primary" disabled={busy} onClick={async () => { if ((record.dirty || record.pending) && !(await park(state.current))) return; store(null); list().catch(e => setMessage(e.message)); }}>{backLabel}</button><button className="button" disabled={busy || !!conflict} onClick={() => change(s => ({ ...s, status: 'paused' }))}>Исправить результат</button><button className="button" disabled={busy || !!conflict} onClick={resume}>Продолжить тренировку</button>{/* Игры — после тренировки, не на отдыхе (владелец, 11.11.2026) */}{asClient && openGames && s.status === 'completed' && <button className="button" onClick={openGames}>Игры</button>}</div>}
-      {/* Пропустить упражнение (20.11.2026): причина по желанию, одним касанием */}
+      {/* Пропустить или отложить упражнение (20.11.2026, макет
+          progress-skip-chat-2026-11-19): «Позже» — в конец списка; пропуск —
+          с причиной по желанию одним касанием */}
       {skipAsk && (() => {
         const ex = s.exercises.find((e) => e.id === skipAsk);
         if (!ex) return null;
         const left = ex.sets.filter((x) => x.state === 'pending').length;
+        const last = s.exercises[s.exercises.length - 1].id === ex.id;
+        const close = () => (skipClose.current ? skipClose.current() : setSkipAsk(null));
         const go = (reason) => {
           haptic();
           const snapshot = s.exercises;
           setSkipAsk(null);
-          setUndo(ex.name + ' пропущено', v => ({ ...v, exercises: snapshot }));
+          setUndo(ex.name + ' — пропущено', v => ({ ...v, exercises: snapshot }));
           change(v => ({ ...v, exercises: skipExercise(v.exercises, ex.id, reason) }));
         };
-        return <Sheet key="skip-ask" title="Пропустить упражнение?" className="wk-skip-sheet" onClose={() => setSkipAsk(null)} onDone={() => setSkipAsk(null)} done="Отмена">
-          <p className="wk-skip-sheet__lead"><strong>{ex.name}</strong><br /><span className="muted small">{left === 1 ? 'Остался 1 подход' : 'Осталось подходов: ' + left} — они не засчитаются, тренер увидит отметку.</span></p>
-          <p className="small muted">Причина — по желанию, тренеру будет понятнее:</p>
+        const later = () => {
+          haptic();
+          const snapshot = s.exercises;
+          setSkipAsk(null);
+          setUndo(ex.name + ' — позже', v => ({ ...v, exercises: snapshot }));
+          change(v => ({ ...v, exercises: postponeExercise(v.exercises, ex.id) }));
+        };
+        return <Sheet key="skip-ask" title="Пропустить или отложить" className="wk-skip-sheet" onClose={() => setSkipAsk(null)} closeRef={skipClose}>
+          <div className="wk-skip-sheet__head">
+            <ExerciseThumb ex={{ ...ex, exercise: ex.exerciseId ? setups[ex.exerciseId] : null }} className="wk-ex-pic" />
+            <div><strong>{ex.name}</strong><span className="small muted">{setsWord(left) + (left === 1 ? ' ещё не сделан' : ' ещё не сделаны')}</span></div>
+          </div>
+          {!last && <button type="button" className="wk-skip-opt" onClick={later}>
+            <span className="wk-skip-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 6l7 6-7 6z" /><path d="M13 6l7 6-7 6z" /></svg></span>
+            <span><b>Сделать позже</b><small>Упражнение уйдёт в конец — если тренажёр занят</small></span>
+          </button>}
+          <div className="wk-skip-opt wk-skip-opt--static">
+            <span className="wk-skip-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17a8 8 0 0 1 14-6" /><path d="M19 5v6h-6" /></svg></span>
+            <span><b>Пропустить сегодня</b><small>Подходы не засчитаются, тренер увидит отметку. Причина — по желанию:</small></span>
+          </div>
           <div className="wk-skip-sheet__reasons">
             {SKIP_OPTIONS.map((o) => <button type="button" key={o.id} className={'wk-skip-reason' + (o.id === 'pain' ? ' is-pain' : '')} onClick={() => go(o.id)}>{o.text}</button>)}
+            <button type="button" className="wk-skip-reason wk-skip-reason--plain" onClick={() => go('yes')}>Без причины</button>
           </div>
-          {SKIP_OPTIONS.some((o) => o.id === 'pain') && <p className="small muted">«Болит» — только отметка, без диагноза. Видите вы и тренер; через 90 дней она стирается.</p>}
-          <button type="button" className="button button--block" onClick={() => go('yes')}>Пропустить без причины</button>
+          <p className="small muted wk-skip-sheet__note">«Болит» — только отметка, без диагноза. Видите вы и тренер; через 90 дней она стирается.</p>
+          <button type="button" className="button button--block" onClick={close}>Отмена</button>
         </Sheet>;
       })()}
       {/* «Сохранить сейчас» и «Скачать результат» убраны (03.10.2026):

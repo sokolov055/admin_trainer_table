@@ -1404,8 +1404,26 @@ button.wk-ssm__card:active { transform: scale(0.97); }
 .wk-ex-meta--later { color: var(--warning-text); }
 .wk-unskip { flex: none; }
 .workout__finish-skip { color: var(--text-secondary); }
-.wk-skip-sheet__lead { margin: 0 0 12px; }
-.wk-skip-sheet__reasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.wk-skip-sheet__head { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+.wk-skip-sheet__head > div { display: grid; gap: 2px; min-width: 0; }
+.wk-skip-sheet__head strong { font-size: 17px; }
+.wk-skip-opt { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 8px; padding: 12px 14px; border: 0; border-radius: var(--radius-lg); background: var(--surface-sunken); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.wk-skip-opt > span:last-child { display: grid; gap: 2px; }
+.wk-skip-opt b { font-size: 16px; }
+.wk-skip-opt small { font-size: 13px; color: var(--text-muted); }
+button.wk-skip-opt:active { transform: scale(.985); }
+.wk-skip-opt--static { margin-bottom: 4px; cursor: default; background: none; padding-bottom: 4px; }
+.wk-skip-opt__ic { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--accent-wash); color: var(--accent-ink, var(--accent)); }
+.wk-skip-opt--static .wk-skip-opt__ic { background: var(--surface-sunken); color: var(--text-secondary); }
+.wk-skip-sheet__reasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px; }
+.wk-skip-reason--plain { background: none; }
+.wk-skip-sheet__note { margin: 0 0 14px; }
 .wk-skip-reason { min-height: 40px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); color: var(--text); font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; }
 .wk-skip-reason:active { transform: scale(.97); }
 .workout__exercise--skipped .wk-ex-meta { white-space: normal; overflow: visible; }
+/* Итог занятия по центру, кнопки ровной сеткой (20.11.2026, по макету) */
+.workout__finish { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); text-align: center; }
+.workout__finish > h3, .workout__finish > p { flex-basis: 100%; margin-top: 0; margin-bottom: 0; }
+.workout__finish > h3 { font-size: 20px; }
+.workout__finish > .button { flex: 1 1 140px; margin: 0; }
+.workout__finish > .button--primary { flex-basis: 100%; margin-top: var(--space-2); }
