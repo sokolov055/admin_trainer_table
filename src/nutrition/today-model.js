@@ -68,8 +68,18 @@ export function foodEmoji(name) {
   return '🍽️';
 }
 
-/** Цель воды на день, мл (макет: «из 2 л») */
+/** Цель воды на день без веса, мл */
 export const WATER_GOAL = 2000;
+
+/**
+ * Цель воды по весу (владелец 20.11.2026): 30 мл на килограмм, округлено до
+ * 100 мл. Веса нет или он странный — 2 л
+ */
+export function waterGoal(kg) {
+  const w = Number(kg);
+  if (!(w >= 30 && w <= 300)) return WATER_GOAL;
+  return Math.round(w * 30 / 100) * 100;
+}
 export const GLASS_ML = 250;
 
 /** Сколько стаканов рисовать: норма, а сверх неё — на один больше выпитого */

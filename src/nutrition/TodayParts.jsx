@@ -193,13 +193,13 @@ export function MealCards({ meals, entries, dayKcal, shares, nowMeal, readOnly, 
 }
 
 /** Вода стаканами: нажать пустой — налить до него, последний полный — убрать */
-export function WaterGlasses({ ml, readOnly, busy, onDelta, children }) {
-  const count = glassCount(ml), full = Math.floor((ml || 0) / GLASS_ML);
+export function WaterGlasses({ ml, goal = WATER_GOAL, readOnly, busy, onDelta, children }) {
+  const count = glassCount(ml, goal), full = Math.floor((ml || 0) / GLASS_ML);
   const liters = (v) => (Math.round(v / 50) / 20).toLocaleString('ru-RU');
   return (
     <Section>
       <Panel pad>
-        <div className="nt-water__head"><span aria-hidden="true">💧</span><b>{liters(ml || 0)}</b><small>из {liters(WATER_GOAL)} л</small><span className="nt-sp" />{!readOnly && <small>нажмите стакан</small>}</div>
+        <div className="nt-water__head"><span aria-hidden="true">💧</span><b>{liters(ml || 0)}</b><small>из {liters(goal)} л</small><span className="nt-sp" />{!readOnly && <small>нажмите стакан</small>}</div>
         <div className="nt-glasses">
           {Array.from({ length: count }, (_, i) => (
             <button key={i} type="button" className={'nt-glass' + (i < full ? ' is-on' : '') + (i === full ? ' is-next' : '')}

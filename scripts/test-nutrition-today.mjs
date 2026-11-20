@@ -1,7 +1,7 @@
 // «Сегодня» в питании (макет nutrition-redesign-2026-11-20, этап 1): чистые функции
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { weekOf, dayTone, mealTarget, foodEmoji, glassCount, glassDelta, finishFace, fullStreak } from '../src/nutrition/today-model.js';
+import { weekOf, dayTone, mealTarget, foodEmoji, glassCount, glassDelta, finishFace, fullStreak, waterGoal } from '../src/nutrition/today-model.js';
 
 test('неделя — с понедельника по воскресенье, в том числе через месяц и год', () => {
   assert.deepEqual(weekOf('2026-11-20'), ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22']);
@@ -53,4 +53,12 @@ test('итог дня и серия полных дней', () => {
   assert.equal(fullStreak(days, '2026-11-19'), 2);
   assert.equal(fullStreak(days, '2026-11-20'), 0);
   assert.equal(fullStreak(undefined, '2026-11-20'), 0);
+});
+
+test('цель воды: 30 мл на кг, до 100 мл; без веса — 2 л', () => {
+  assert.equal(waterGoal(82), 2500, '82 × 30 = 2460 → 2,5 л');
+  assert.equal(waterGoal(60), 1800);
+  assert.equal(waterGoal('70'), 2100, 'вес строкой с сервера');
+  assert.equal(waterGoal(null), 2000); assert.equal(waterGoal(0), 2000); assert.equal(waterGoal(500), 2000);
+  assert.equal(glassCount(0, waterGoal(82)), 10, '2,5 л — десять стаканов');
 });
