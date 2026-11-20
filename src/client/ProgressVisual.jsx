@@ -191,8 +191,9 @@ export function MeasuresCard({ rows, fields, aimOf, onAll, open, period = 'all',
             return (
               <div key={f} className="pv-measure">
                 <strong className="pv-measure__name">{BODY_SPOTS[f] && <i className={'pv-dot tone-' + BODY_SPOTS[f].tone} aria-hidden="true" />}{f}</strong>
-                <small className="pv-measure__values">{pts.length > 1 ? formatNumber(first) + ' → ' + formatNumber(last) : formatNumber(last)}</small>
-                <span className={'pv-pill ' + tone}>{pts.length > 1 ? (change ? signed(change) : '=') : 'см'}</span>
+                <small className="pv-measure__values">{pts.length > 1 ? formatNumber(first) + ' → ' + formatNumber(last) : formatNumber(last) + ' см'}</small>
+                {/* Один замер — сравнивать не с чем, плашки нет */}
+                {pts.length > 1 ? <span className={'pv-pill ' + tone}>{change ? signed(change) : '='}</span> : <span aria-hidden="true" />}
               </div>
             );
           })}

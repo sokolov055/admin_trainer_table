@@ -109,3 +109,35 @@
    точек) — экран под блоком почти не сдвигается, когда цели приедут */
 .goals__wait { height: 132px; margin: 0; }
 .goals__wait--year { height: 300px; }
+
+/* «Цели» карточкой в стиле «Прогресса» (владелец, 20.11.2026) */
+.gl-card { display: grid; gap: 12px; }
+.gl-edit { margin: 0; padding: 0; }
+.gl-goal { display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: var(--radius-lg); color: #fff;
+  background: linear-gradient(135deg, var(--mg-core-end), var(--mg-back)); }
+.gl-goal--lose { background: linear-gradient(135deg, var(--mg-legs-end), var(--mg-legs)); }
+.gl-goal--muscle { background: linear-gradient(135deg, var(--mg-arms-end), var(--mg-arms)); }
+.gl-goal--none { background: var(--surface-sunken); color: var(--text); }
+.gl-goal__ic { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 12px; background: rgba(255, 255, 255, .2); font-size: 22px; }
+.gl-goal > span:last-child, .gl-line > span:last-child, .gl-week__text { display: grid; gap: 1px; min-width: 0; }
+.gl-goal b { font-size: 17px; }
+.gl-goal small { font-size: 12px; opacity: .88; }
+.gl-week { display: flex; align-items: center; gap: 14px; }
+.gl-ring { --p: 0; flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%;
+  background: conic-gradient(var(--good, #1a8f3a) calc(var(--p) * 360deg), var(--surface-sunken) 0); animation: gl-ring-in .9s cubic-bezier(.2, .8, .2, 1) both; }
+.gl-ring span { width: 38px; height: 38px; border-radius: 50%; background: var(--surface); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gl-ring small { display: inline; font-size: 11px; font-weight: 650; color: var(--text-muted); }
+.gl-ring span { display: flex; align-items: center; justify-content: center; line-height: 1; }
+.gl-week__text b, .gl-line b, .gl-awards b { font-size: 15px; }
+.gl-week__text small, .gl-line small { font-size: 13px; color: var(--text-muted); }
+.gl-line { display: flex; align-items: center; gap: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gl-line__ic { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 12px; background: var(--surface-sunken); font-size: 20px; }
+.gl-line.is-warn b { color: var(--warning-text); }
+.gl-awards { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 0 0; border: 0; border-top: 1px solid var(--border); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.gl-awards__main { flex: 1; display: grid; gap: 6px; min-width: 0; }
+.gl-awards__bar { display: block; height: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden; }
+.gl-awards__bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #f0b429, #f08a1c); }
+.gl-awards__count { font-size: 14px; font-weight: 700; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.gl-card .awards { margin: 0; }
+@keyframes gl-ring-in { from { transform: rotate(-90deg) scale(.85); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gl-ring { animation: none; } }

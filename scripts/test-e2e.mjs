@@ -147,14 +147,15 @@ test('цель клиента в «Целях»: тренер ставит «П�
     await shown().locator('.item').first().click();
     await phone.getByRole('tab', { name: 'Прогресс', exact: true }).click();
     await phone.getByRole('radio', { name: 'Активность', exact: true }).click();
-    await phone.getByText('Не выбрана — нажмите «Изменить»', { exact: true }).waitFor();
+    // С 20.11.2026 «Цели» — карточкой в стиле «Прогресса» (.gl-card)
+    await phone.getByText('Цель не выбрана', { exact: true }).waitFor();
     await phone.getByRole('button', { name: 'Изменить', exact: true }).click();
     const form = phone.locator('.goal-form');
     // Один список на всё приложение: «Стать сильнее» — то же, что набор
     assert.deepEqual(await form.getByRole('radiogroup', { name: 'Цель' }).getByRole('radio').allInnerTexts(), ['Похудеть', 'Быть в форме', 'Набрать мышцы']);
     await form.getByRole('radio', { name: 'Похудеть', exact: true }).click();
     await phone.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    const card = phone.locator('.goal-card').first();
+    const card = phone.locator('.gl-goal').first();
     await card.getByText('Похудеть', { exact: true }).waitFor();
     await phone.getByRole('tab', { name: 'Питание', exact: true }).click();
     await shown().getByRole('tab', { name: 'Ещё', exact: true }).click();

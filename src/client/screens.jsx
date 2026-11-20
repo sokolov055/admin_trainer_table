@@ -2046,7 +2046,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         <StepsWeek clientRow={clientRow} more={allHealth} fallback={<Steps clientRow={clientRow} self={self} preview={clientView} />} />
         <HealthTiles clientRow={clientRow} />
         {/* Цели и награды — под шагами; месяц уже сеткой выше, второй раз его не рисуем */}
-        <Goals clientRow={clientRow} preview={clientView} compact={!allHealth} noMonth={!!(progress && progress.activity)} />
+        <Goals clientRow={clientRow} preview={clientView} compact={!allHealth} noMonth={!!(progress && progress.activity)} modern />
         {/* Остальное здоровье и тренировки с часов — по кнопке: много цифр (12.11.2026) */}
         <button type="button" className="pv-link pv-link--block" aria-expanded={allHealth} onClick={() => { haptic(); setAllHealth((v) => !v); }}>
           {allHealth ? 'Свернуть' : 'Все данные «Здоровья» ›'}

@@ -148,6 +148,8 @@ function stepsLine(steps) {
   return { main: 'Норма — ' + norm + ' в день', hint: 'Сегодня ' + formatNumber(steps.today) };
 }
 
+const GOAL_ICON = { lose: '⚖️', fitness: '⚡', muscle: '💪' };
+
 // Цели ставит только тренер (владелец, 08.10.2026)
 function whoSet(goal, viewer) {
   // self — график из анкеты подбора программы у клиента без тренера (FT-577)
@@ -266,7 +268,8 @@ function AwardList({ awards }) {
 
 // preview — тренер смотрит «глазами клиента»: всё видно, править нельзя
 // noMonth — «Прогресс → Активность» (20.11.2026): месяц там сеткой, карточка не повторяет его
-export default function Goals({ clientRow, preview = false, compact = false, noMonth = false }) {
+// modern — карточкой в стиле «Прогресса» (владелец, 20.11.2026: «Цели в старом виде»)
+export default function Goals({ clientRow, preview = false, compact = false, noMonth = false, modern = false }) {
   const { data, loading } = useData('client.awards', clientRow ? { clientRow } : {}, [clientRow]);
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -309,6 +312,52 @@ export default function Goals({ clientRow, preview = false, compact = false, noM
     if (a.got || b.got) return a.got ? -1 : 1;
     return (b.done / b.need) - (a.done / a.need);
   });
+
+  if (modern && !editing) {
+    const picked = focus && GOALS.find((g) => g.id === focus.goal);
+    const wk = ring('week');
+    const share = wk.target ? Math.min(1, wk.done / wk.target) : 0;
+    const weekDone = week.done >= week.target;
+    return (
+      <section className="pv-card gl-card" aria-label="Цели">
+        <div className="pv-weight__top">
+          <div className="pv-card__label">Цели</div>
+          {viewer === 'trainer'
+            ? <button type="button" className="pv-link gl-edit" onClick={() => { haptic(); setEditing(true); }}>Изменить</button>
+            : <span className="pv-card__note">{whoSet(data.goal, viewer)}</span>}
+        </div>
+        {(picked || viewer === 'trainer') && (
+          <div className={'gl-goal gl-goal--' + (picked ? picked.id : 'none')}>
+            <span className="gl-goal__ic" aria-hidden="true">{picked ? GOAL_ICON[picked.id] || '🎯' : '🎯'}</span>
+            <span><b>{picked ? picked.title : 'Цель не выбрана'}</b><small>{picked ? 'по ней — норма питания и цвет замеров' : 'нажмите «Изменить»'}</small></span>
+          </div>
+        )}
+        <div className="gl-week">
+          <div className="gl-ring" style={{ '--p': share }} role="img" aria-label={'Неделя: ' + wk.done + ' из ' + wk.target}>
+            <span>{wk.done}<small>/{wk.target}</small></span>
+          </div>
+          <div className="gl-week__text">
+            <b>{weekDone ? 'Цель недели выполнена' : 'Неделя'}</b>
+            <small>{weekDone ? 'Отлично — дальше в счёт серии' : leftText(week.target - week.done, daysLeft(data.today, 'week', trainedToday))}</small>
+          </div>
+        </div>
+        {lines.map((l, i) => (
+          <div key={i} className={'gl-line' + (l.warn ? ' is-warn' : '')}>
+            <span className="gl-line__ic" aria-hidden="true">{i === 0 ? (l.warn ? '💔' : '🔥') : '👟'}</span>
+            <span><b>{l.main}</b><small>{l.hint}</small></span>
+          </div>
+        ))}
+        <button type="button" className="gl-awards" aria-expanded={open} onClick={() => { setOpen(!open); haptic(); }}>
+          <span className="gl-line__ic" aria-hidden="true">🏆</span>
+          <span className="gl-awards__main"><b>Награды</b>
+            <i className="gl-awards__bar" aria-hidden="true"><i style={{ width: (data.awards.length ? (data.got / data.awards.length) * 100 : 0) + '%' }} /></i></span>
+          <span className="gl-awards__count">{data.got} из {data.awards.length}</span>
+          <IconChevron size={18} className={'goals__chevron' + (open ? ' goals__chevron--open' : '')} />
+        </button>
+        {open && <AwardList awards={sorted} />}
+      </section>
+    );
+  }
 
   return (
     <Section
