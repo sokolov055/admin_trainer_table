@@ -220,7 +220,7 @@ test('карточка «Рациона»: «Чем заменить» — то�
 // правятся в строке, продукт меняется на карточку справочника; каждый — своя запись с пометкой блюда
 const plateStubs = {
   ...stubs,
-  icons: `import React from 'react';const I=()=> <i/>; export const IconTrash=I,IconPlus=I;`,
+  icons: `import React from 'react';const I=()=> <i/>; export const IconTrash=I,IconPlus=I,IconSearch=I,IconBarcode=I,IconCopy=I;`,
   telegram: `export const haptic=()=>{};`,
   ScanGuide: `export default ()=>null;`,
   'plate-photo-io': `export const shrink=async()=>'';`,
@@ -280,7 +280,7 @@ test('еда по фото (FT-749): блюдо разложено на прод
   await act(async () => inputs('Калории на 100 г: Сыр')[0].props.onChange({ target: { value: '350' } }));
   await act(() => new Promise(r => setTimeout(r, 350)));
 
-  const add = tree.root.findAll(n => n.type === 'button' && String([].concat(n.props.children).join('')).startsWith('Добавить '))[0];
+  const add = tree.root.findAll(n => n.type === 'button' && String([].concat(n.props.children).join('')).startsWith('Записать в '))[0];
   await act(async () => add.props.onClick());
   const entries = sent.filter(([a]) => a === 'diary.entry.save').map(([, p]) => p);
   assert.equal(entries.length, 6, 'хлеб с 0 г не записан, остальные — каждый своей записью');

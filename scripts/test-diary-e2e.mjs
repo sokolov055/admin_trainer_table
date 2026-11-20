@@ -137,9 +137,8 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await diary.getByRole('button', { name: 'Добавить в ужин', exact: true }).click();
   const dialog = () => page.getByRole('dialog');
   await dialog().getByRole('button', { name: 'Добавить Йогурт 2%', exact: true }).click();
-  // Дата и приём свёрнуты в строку «Сегодня · Ужин · изменить» (FT-643)
-  await dialog().getByRole('button', { name: /^Сегодня · Ужин/ }).click();
-  assert.equal(await dialog().getByLabel('Приём пищи').inputValue(), 'dinner');
+  // Этап 2 макета: приём — значками, выбран тот, куда добавляли; дата — по ссылке
+  assert.equal(await dialog().getByRole('group', { name: 'Приём пищи' }).getByRole('button', { name: /Ужин/ }).getAttribute('aria-pressed'), 'true');
   await dialog().getByLabel('Количество, г', { exact: true }).fill('150');
   await dialog().getByRole('button', { name: 'Записать в дневник', exact: true }).click();
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).some(d => d.entries.length > 0));
@@ -426,8 +425,8 @@ test('FT-643: диалоги дневника на общем листе — с�
   await dialog().getByRole('heading', { name: 'Записать съеденное' }).waitFor();
   await page.waitForFunction(() => document.activeElement?.id === 'diary-amount');
   assert.deepEqual(await page.evaluate(() => { const a = document.activeElement; return [a.selectionStart, a.selectionEnd, a.value]; }), [0, 3, '100']);
-  await dialog().getByRole('button', { name: /^Сегодня · Обед/ }).waitFor();
-  assert.equal(await dialog().getByLabel('Приём пищи').count(), 0);
+  assert.equal(await dialog().getByRole('group', { name: 'Приём пищи' }).getByRole('button', { name: /Обед/ }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await dialog().getByLabel('Дата', { exact: true }).count(), 0);
   await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
   await page.screenshot({ path: join(shots, 'diary-sheet-entry-390.png') });
   // Ошибка — под полем и без «обновите данные»

@@ -44,7 +44,7 @@ test('FT-736: фото тарелки → проверка граммов → з
   await page.waitForTimeout(400);
   // Камеры в браузере нет — запасной лист с подсказкой «как снять» и снимком
   await page.evaluate(() => { const md = navigator.mediaDevices; window.__gum = md.getUserMedia.bind(md); md.getUserMedia = () => Promise.reject(Object.assign(new Error('нет камеры'), { name: 'NotFoundError' })); });
-  await page.locator('.diary-add').getByRole('button', { name: /Сканер еды/ }).click();
+  await page.getByRole('button', { name: /Сфоткать тарелку/ }).click();
   // FT-752: первый раз — экран-разрешение, галочка не отмечена, без неё кнопка неактивна
   const consent = page.getByRole('dialog', { name: 'Сканер еды · AI' });
   await consent.getByText('ООО «Яндекс.Облако», Россия').waitFor();
@@ -79,7 +79,7 @@ test('FT-736: фото тарелки → проверка граммов → з
   await sheet.getByRole('button', { name: 'Убрать Огурец свежий' }).click();
   assert.equal(await dishes(), 2);
   await page.screenshot({ path: join(shots, 'ft736-result.png'), fullPage: false });
-  await sheet.getByRole('button', { name: /^Добавить \d+ ккал$/ }).click();
+  await sheet.getByRole('button', { name: /^Записать в .+ · \d+ ккал$/ }).click();
   await page.getByText(/По фото записано: \d+ ккал, 5 продукт/).waitFor();
   await page.getByText(/Фарш куриный жареный.*150 г/).first().waitFor();
   const lunch = await page.locator('.nt-meal--lunch').innerText();
@@ -87,7 +87,7 @@ test('FT-736: фото тарелки → проверка граммов → з
 
   // FT-746: камера есть — видоискатель во весь экран, кадр без кнопки «снять»; здесь — «Распознать сейчас»
   await page.evaluate(() => { navigator.mediaDevices.getUserMedia = window.__gum; });
-  await page.locator('.diary-add').getByRole('button', { name: /Сканер еды/ }).click();
+  await page.getByRole('button', { name: /Сфоткать тарелку/ }).click();
   const scanner = page.getByRole('dialog', { name: 'AI-сканер еды' });
   await scanner.getByRole('status').filter({ hasNotText: 'Включаем камеру' }).waitFor();
   await page.screenshot({ path: join(shots, 'ft746-scanner.png') });
@@ -115,7 +115,7 @@ test('FT-736: фото тарелки → проверка граммов → з
       return stream;
     };
   });
-  await page.locator('.diary-add').getByRole('button', { name: /Сканер еды/ }).click();
+  await page.getByRole('button', { name: /Сфоткать тарелку/ }).click();
   await page.getByRole('dialog', { name: /AI-распознавание/ }).getByRole('list', { name: 'Распознанные блюда' }).waitFor({ timeout: 15000 });
   await page.getByRole('dialog', { name: /AI-распознавание/ }).getByRole('button', { name: 'Закрыть' }).first().click();
   await page.getByRole('dialog').waitFor({ state: 'detached' });
@@ -131,7 +131,7 @@ test('FT-736: фото тарелки → проверка граммов → з
   await page.getByText('Сканер выключен, ответы сканера удалены.').waitFor();
   await page.getByRole('button', { name: /Сканер еды · AI.*Выключен/ }).waitFor();
   await page.getByRole('tab', { name: 'Сегодня', exact: true }).click();
-  await page.locator('.diary-add').getByRole('button', { name: /Сканер еды/ }).click();
+  await page.getByRole('button', { name: /Сфоткать тарелку/ }).click();
   await page.getByRole('dialog', { name: 'Сканер еды · AI' }).getByRole('button', { name: 'Разрешить и открыть сканер' }).waitFor();
   assert.deepEqual(pageErrors, []);
   void sent;

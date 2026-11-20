@@ -297,3 +297,54 @@ export function FinishCard({ data, totals, target, readOnly, busy, streak, onFin
   );
 }
 
+
+/* ==================================================================
+ * Этап 2 макета — «Добавить еду»: значки приёмов, пончик БЖУ, метки на снимке
+ * ================================================================== */
+
+/** Приём пищи четырьмя значками вместо списка (макет: выбран приём по часам) */
+export function MealPicker({ meals, value, onChange, label = 'Приём пищи' }) {
+  return (
+    <div className="nt-mealpick" role="group" aria-label={label}>
+      {meals.map((m) => (
+        <button key={m.id} type="button" className={value === m.id ? 'is-on' : ''} aria-pressed={value === m.id}
+          onClick={() => { haptic(); onChange(m.id); }}>
+          <span aria-hidden="true">{MEAL_ICONS[m.id]}</span>{m.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Доли калорий из белков, жиров и углеводов — для пончика */
+export function macroShares(t) {
+  const p = (Number(t.protein) || 0) * 4, f = (Number(t.fat) || 0) * 9, c = (Number(t.carbs) || 0) * 4, sum = p + f + c;
+  return sum > 0 ? { protein: p / sum, fat: f / sum, carbs: c / sum } : null;
+}
+
+/** Итог порции: пончик БЖУ, калории крупно, строка БЖУ и метка «много белка» */
+export function PortionPreview({ totals, note = '' }) {
+  const s = macroShares(totals);
+  return (
+    <div className="nt-prev">
+      <Ring size={46} stroke={7} parts={s ? [{ share: s.protein, color: 'var(--nt-p)' }, { share: s.fat, color: 'var(--nt-f)' }, { share: s.carbs, color: 'var(--nt-c)' }] : []} />
+      <div className="nt-prev__text">
+        <b>{n(totals.kcal)} ккал</b>
+        <small>{note}Б {n(totals.protein)} · Ж {n(totals.fat)} · У {n(totals.carbs)}</small>
+      </div>
+      {s && s.protein >= 0.3 && totals.protein >= 10 && <span className="nt-chip nt-chip--good">💪 много белка</span>}
+    </div>
+  );
+}
+
+/* Места меток на снимке: найденное всплывает по одному поверх тарелки */
+const TAG_SPOTS = [[14, 18], [52, 34], [10, 64], [48, 72], [26, 42], [58, 12]];
+export function PlateTags({ names }) {
+  return (
+    <div className="nt-tags" aria-hidden="true">
+      {names.slice(0, TAG_SPOTS.length).map((t, i) => (
+        <span key={i + t} className="nt-tag" style={{ left: TAG_SPOTS[i][0] + '%', top: TAG_SPOTS[i][1] + '%', animationDelay: (0.25 + i * 0.35) + 's' }}>{t}</span>
+      ))}
+    </div>
+  );
+}

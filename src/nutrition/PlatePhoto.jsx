@@ -10,6 +10,8 @@ import { PlateScanner } from './PlateScanner.jsx';
 import { DIARY_MEALS, label, requestId, decimal } from './diary-model.js';
 import { ErrorNote, n } from './diary-ui.jsx';
 import './food-scan.css';
+import { PortionPreview, PlateTags, MealPicker } from './TodayParts.jsx';
+import { foodEmoji } from './today-model.js';
 
 /**
  * Еда по фото (FT-736, 25.10.2026). Снимок тарелки → сервер → Yandex AI
@@ -103,6 +105,9 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
   const addDish = () => { const d = key(); setDishes(list => [...list, { key: d, name: '' }]); setItems(list => [...list, blank(d)]); };
   const kept = items.filter(it => rowValues(it).grams > 0);
   const total = kept.reduce((s, it) => s + rowValues(it).kcal, 0);
+  // Этап 2 макета: БЖУ всей тарелки — пончиком под списком
+  const sums = kept.reduce((s, it) => { const v = rowValues(it); return { kcal: s.kcal + v.kcal, protein: s.protein + v.protein, fat: s.fat + v.fat, carbs: s.carbs + v.carbs }; }, { kcal: 0, protein: 0, fat: 0, carbs: 0 });
+  const nameOf = it => it.food ? foodTitle(it.food) : it.name;
   // Блюдо пишется пометкой, только когда в нём больше одного продукта: «Гречка» из одной гречки — просто гречка
   const dishOf = it => { const d = dishes.find(x => x.key === it.dish); return d && kept.filter(x => x.dish === it.dish).length > 1 ? d.name.trim() || 'Блюдо' : ''; };
 
@@ -145,7 +150,8 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
     <div className="plate-photo">
       {denied && !image && <Note tone="warning">Нет доступа к камере — разрешите его в настройках телефона или сделайте снимок.</Note>}
       {!image && !busy && <ScanGuide mode="plate" />}
-      {image && <img className="food-scan-preview plate-photo__preview" src={image} alt="Снимок тарелки" />}
+      {/* Этап 2 макета: полоска сканера, пока AI думает, потом найденное — метками на снимке */}
+      {image && <div className="nt-shot"><img className="food-scan-preview plate-photo__preview" src={image} alt="Снимок тарелки" />{busy && <span className="nt-shot__scan" />}{!busy && items.length > 0 && <PlateTags names={items.filter(it => nameOf(it)).map(it => foodEmoji(nameOf(it)) + ' ' + nameOf(it) + (rowValues(it).grams ? ' · ' + n(rowValues(it).grams) + ' ' + (it.label ? unit : 'г') : ''))} />}</div>}
       <div className="diary-inline-actions">
         {onRescan ? <button type="button" className="button" disabled={!!busy} onClick={onRescan}>Сканировать снова</button> : <button type="button" className={'button' + (image ? '' : ' button--primary')} disabled={!!busy} onClick={() => camera.current.click()}>{image ? 'Переснять' : 'Сделать снимок'}</button>}
         <button type="button" className="button" disabled={!!busy} onClick={() => gallery.current.click()}>Выбрать фото</button>
@@ -192,9 +198,10 @@ export function PlatePhoto({ day, meal: initialMeal, file, preset = null, denied
         </ul>
         {!pack && <button type="button" className="plate-photo__more" onClick={addDish}><IconPlus size={18} />Другое блюдо или продукт</button>}
         {/* Приём угадан по часам — поправить можно здесь же, до записи */}
-        <div className="chips chips--wrap chips--flush plate-photo__meal" role="group" aria-label="Куда записать">{DIARY_MEALS.map(m => <button key={m.id} type="button" className={'chip' + (meal === m.id ? ' chip--active' : '')} aria-pressed={meal === m.id} onClick={() => setMeal(m.id)}>{m.label}</button>)}</div>
+        <PortionPreview totals={sums} note={kept.some(it => !it.food && !it.label) ? '≈ по фото · ' : ''} />
+        <MealPicker meals={DIARY_MEALS} value={meal} onChange={setMeal} label="Куда записать" />
         <div className="diary-form-footer">
-          <button type="button" className="button button--primary" disabled={!!busy || !kept.length} onClick={save}>Добавить {n(total)} ккал</button>
+          <button type="button" className="button button--primary" disabled={!!busy || !kept.length} onClick={save}>Записать в {label(meal).toLowerCase()} · {n(total)} ккал</button>
         </div>
       </>}
       {result?.id && !busy && <WrongAnswer state={wrong} onChange={setWrong} canFix={!!image && !labelValues && !pack?.match} onSend={async (comment, fix) => {
@@ -230,7 +237,9 @@ function ProductRow({ it, unit, onPatch, onDrop }) {
     : it.label ? 'С этикетки · ' + n(it.per100.kcal) + ' ккал · Б ' + one(it.per100.protein) + ' · Ж ' + one(it.per100.fat) + ' · У ' + one(it.per100.carbs) + ' на 100 ' + unit
       : it.manual ? (it.per100 ? 'Примерно · ' + n(it.per100.kcal) + ' ккал / 100 г' : 'Выберите из справочника или впишите калории')
         : 'Примерно, оценка по фото · ' + n(it.per100.kcal) + ' ккал / 100 г';
+  const g = decimal(it.grams), max = Math.max(400, Math.ceil((Number.isFinite(g) ? g : 0) * 2 / 50) * 50);
   return <li className="plate-photo__row">
+    <span className="nt-row-em" aria-hidden="true">{foodEmoji(name)}</span>
     <div className="plate-photo__main">
       <input className="field__input plate-photo__name" aria-label="Продукт" placeholder="Продукт" maxLength={80} autoFocus={it.manual && !it.name} value={name} onChange={e => onPatch({ name: e.target.value, query: e.target.value, food: null })} />
       <small>{source}</small>
@@ -244,6 +253,8 @@ function ProductRow({ it, unit, onPatch, onDrop }) {
       <input className="field__input" inputMode="decimal" aria-label={'Граммы: ' + (name || 'продукт')} placeholder={unit} value={it.grams} onChange={e => onPatch({ grams: e.target.value })} />
       <span>{unit} · {n(v.kcal)} ккал</span>
     </div>
+    {/* Граммы ползунком (этап 2 макета); поле рядом — для точного числа */}
+    <input type="range" className="nt-range" min="0" max={max} step="10" value={Number.isFinite(g) ? g : 0} aria-label={'Ползунок граммов: ' + (name || 'продукт')} onChange={e => onPatch({ grams: e.target.value })} />
     <button type="button" className="icon-button" aria-label={'Убрать ' + (name || 'продукт')} onClick={onDrop}><IconTrash size={18} /></button>
   </li>;
 }
