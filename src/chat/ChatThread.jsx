@@ -8,6 +8,7 @@ import {
   QUIET_DEFAULT, MAX_FORWARD,
 } from './chat-model.js';
 import { useChatInbox } from './ChatList.jsx';
+import { ChatCard, AttachMenu, ExerciseSheet, CARD_SECTION } from './ChatCards.jsx';
 import './chat.css';
 
 /**
@@ -43,7 +44,7 @@ function Ticks({ state }) {
   );
 }
 
-function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, onMenu, onReply, onQuote, onReact, onRetry }) {
+function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, onMenu, onReply, onQuote, onReact, onRetry, onCard }) {
   const press = useRef(null);
   const start = useRef(null);
   const lastTap = useRef(0);
@@ -86,7 +87,7 @@ function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, o
       {selecting && typeof msg.id === 'number' && <span className="chat-row__check" aria-hidden="true">{selected ? '✓' : ''}</span>}
       {dx < -10 && <span className="chat-row__reply" style={{ opacity: Math.min(1, -dx / SWIPE_REPLY) }} aria-hidden="true">↩︎</span>}
       <div
-        className={'chat-bubble' + (msg.deleted ? ' chat-bubble--deleted' : '') + (msg.failed ? ' chat-bubble--failed' : '')}
+        className={'chat-bubble' + (msg.deleted ? ' chat-bubble--deleted' : '') + (msg.failed ? ' chat-bubble--failed' : '') + (msg.card && !msg.deleted ? ' chat-bubble--card' : '')}
         style={dx ? { transform: `translateX(${dx}px)` } : undefined}
         onPointerDown={down}
         onPointerMove={move}
@@ -103,7 +104,8 @@ function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, o
         )}
         {msg.deleted
           ? <span className="chat-bubble__text chat-bubble__text--deleted">🚫 Сообщение удалено</span>
-          : <span className="chat-bubble__text">{msg.text}</span>}
+          : msg.card ? <ChatCard card={msg.card} onOpen={onCard} />
+            : <span className="chat-bubble__text">{msg.text}</span>}
         <span className="chat-bubble__meta">
           {msg.pinned && <span aria-label="Закреплено">📌</span>}
           {msg.edited && <span className="chat-bubble__edited">изменено</span>}
@@ -420,6 +422,23 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
     try { navigator.clipboard.writeText(msg.text); setNote('Скопировано'); } catch (_) { /* старый браузер */ }
   };
 
+  const openCard = (card) => {
+    haptic();
+    if (card.kind === 'exercise') { setLayer({ kind: 'exercise', card }); return; }
+    const section = CARD_SECTION[card.kind];
+    if (!section || !inbox.navigate({ section, clientRow, member, name })) setNote('Раздел откроется из меню приложения.');
+  };
+
+  const sendCard = async (kind, ref) => {
+    setLayer(null);
+    const localId = newLocalId();
+    try {
+      const r = await send('chat.card', { ...base, kind, ref, localId, replyTo: replyTo ? replyTo.id : null });
+      setReplyTo(null);
+      setData((d) => (d ? { ...d, messages: d.messages.some((m) => m.id === r.message.id) ? d.messages : d.messages.concat(r.message) } : d));
+    } catch (e) { setNote(e.message || 'Не получилось отправить.'); }
+  };
+
   const refresh = async () => apply(await send('chat.open', { ...base, read: false }));
 
   const pinMessage = async (msg, on) => {
@@ -454,7 +473,7 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
     return next;
   });
   const picked = selected ? merged.filter((m) => selected.has(m.id)) : [];
-  const pickedMine = picked.length > 0 && picked.every((m) => m.from === 'me' && !m.deleted);
+  const pickedMine = picked.length > 0 && picked.every((m) => m.from === 'me' && !m.deleted && !m.card);
   const copyPicked = () => {
     const lines = picked.filter((m) => !m.deleted).map((m) => m.text);
     try { navigator.clipboard.writeText(lines.join('\n\n')); setNote('Скопировано'); } catch (_) { /* старый браузер */ }
@@ -581,7 +600,7 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
           const m = item.msg;
           return (
             <Bubble key={item.key} msg={m} peer={name} tail={item.tail} tick={tickOf(m, readUpTo)} flash={flash === m.id}
-              selecting={!!selected} selected={!!selected && selected.has(m.id)} onSelect={toggleSelect}
+              selecting={!!selected} selected={!!selected && selected.has(m.id)} onSelect={toggleSelect} onCard={openCard}
               onMenu={setMenu} onReply={(x) => { setEditing(null); setReplyTo(x); field.current && field.current.focus(); }}
               onQuote={jumpTo} onReact={react} onRetry={deliver} />
           );
@@ -627,6 +646,13 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
           ? <p className="chat__blocked">Клиент ограничил сообщения. Новые сообщения не доставляются.</p>
           : (
             <div className="chat__row">
+              {!editing && (
+                <button type="button" className="chat__attach" aria-label="Прикрепить из Fit Track" onClick={() => { haptic(); setLayer({ kind: 'attach' }); }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M20.5 11.5l-8.3 8.3a5 5 0 0 1-7-7l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9" />
+                  </svg>
+                </button>
+              )}
               <textarea
                 ref={field}
                 className="chat__field"
@@ -659,13 +685,13 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
           <div className="chat-menu__list">
             {!menu.deleted && <button type="button" onClick={() => { setReplyTo(menu); setEditing(null); setMenu(null); field.current && field.current.focus(); }}>↩︎ Ответить</button>}
             {!menu.deleted && <button type="button" onClick={() => copy(menu)}>📋 Скопировать</button>}
-            {canEdit(menu, new Date(), data?.editHours) && (
+            {!menu.card && canEdit(menu, new Date(), data?.editHours) && (
               <button type="button" onClick={() => { setEditing(menu); setReplyTo(null); setText(menu.text); setMenu(null); field.current && field.current.focus(); }}>✏️ Изменить</button>
             )}
             {!menu.deleted && (menu.pinned
               ? <button type="button" onClick={() => pinMessage(menu, false)}>📌 Открепить</button>
               : <button type="button" onClick={() => pinMessage(menu, true)}>📌 Закрепить</button>)}
-            {role === 'trainer' && menu.from === 'me' && !menu.deleted && (
+            {role === 'trainer' && menu.from === 'me' && !menu.deleted && !menu.card && (
               <button type="button" onClick={() => { setLayer({ kind: 'forward', list: [menu] }); setMenu(null); }}>↪︎ Переслать</button>
             )}
             <button type="button" onClick={() => startSelect(menu)}>☑︎ Выбрать</button>
@@ -685,6 +711,16 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
       {layer && layer.kind === 'delete' && <DeleteLayer msg={layer.msg} name={name} onClose={() => setLayer(null)} onDelete={remove} />}
       {layer && layer.kind === 'delete-many' && (
         <DeleteLayer list={layer.list} name={name} onClose={() => setLayer(null)} onDelete={(list, both) => removeMany(list, both)} />
+      )}
+      {layer && layer.kind === 'attach' && (
+        <Layer label="Из Fit Track" onClose={() => setLayer(null)}>
+          <AttachMenu base={base} role={role} onSend={sendCard} onClose={() => setLayer(null)} />
+        </Layer>
+      )}
+      {layer && layer.kind === 'exercise' && (
+        <Layer label="Упражнение" onClose={() => setLayer(null)}>
+          <ExerciseSheet card={layer.card} />
+        </Layer>
       )}
       {layer && layer.kind === 'forward' && (
         <ForwardLayer list={layer.list} chats={inbox.chats.filter((c) => !(c.clientRow === clientRow && (c.member || '') === (member || '')) && !c.blocked)}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChatInbox, ChatButton, TrainerChatCard } from '../chat/ChatList.jsx';
+import { ChatInbox, ChatButton, TrainerChatCard, useChatInbox } from '../chat/ChatList.jsx';
 import { Overview, Plan, Progress, Nutrition, WorkoutJournal } from './screens.jsx';
 import { Deferred } from '../lazy.js';
 import { Stories, GuideViewer, guideNote, hasGuide, summaryTopics, useStoryTopics } from '../stories.jsx';
@@ -330,6 +330,13 @@ function ClientCabinet({ me, clientRow, preview }) {
     haptic();
   };
   goRef.current = go;
+
+  // Карточка в чате ведёт в раздел: тренировка — «Тренировки», замеры — «Прогресс»
+  const chatInbox = useChatInbox();
+  useEffect(() => {
+    chatInbox.setNavigator(({ section }) => { if (goRef.current) goRef.current(section); });
+    return () => chatInbox.setNavigator(null);
+  }, [chatInbox.setNavigator]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // «Игры» с экрана завершённой тренировки (Workout.jsx): занятие живёт во
   // вкладке «Тренировки», go ему не передаётся — берёт из контекста

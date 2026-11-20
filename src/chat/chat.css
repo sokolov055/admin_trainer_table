@@ -511,3 +511,68 @@
 .chat-prefs__time { display: flex; align-items: center; gap: var(--space-3); padding: 0 0 var(--space-2) 32px; font-size: var(--text-sm); }
 .chat-prefs__time input { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .chat-prefs__tz { color: var(--text-muted); }
+
+/* ---------- карточки Fit Track (этап 2) ---------- */
+
+.chat__attach {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.chat__attach:active { background: var(--surface-active); }
+
+.chat-bubble--card { padding: 4px 4px 6px; min-width: min(260px, 72vw); }
+.chat-bubble--card .chat-bubble__meta { margin-right: 6px; }
+.chat-card-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  border-left: 3px solid var(--accent);
+}
+.chat-row--me .chat-card-msg { background: rgba(255, 255, 255, 0.92); color: #1a1815; }
+.chat-card-msg--measures { border-left-color: var(--good); }
+.chat-card-msg--food { border-left-color: var(--warning); }
+.chat-card-msg--exercise { border-left-color: var(--accent-2, var(--accent)); }
+.chat-card__head { font-weight: 650; font-size: var(--text-base); }
+.chat-card__line { font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.chat-card__note { font-size: var(--text-sm); opacity: 0.72; }
+.chat-card__grid { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.chat-card__grid i { font-style: normal; font-weight: 600; }
+.chat-card__grid i.down { color: var(--good-text); }
+.chat-card__grid i.up { color: var(--warning-text); }
+.chat-card__open { margin-top: 4px; font-size: var(--text-sm); font-weight: 600; color: var(--accent-ink); }
+
+.chat-attach { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.chat-attach__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-3) var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+.chat-attach__item:active { background: var(--surface-active); }
+.chat-attach__icon { font-size: 26px; line-height: 1; }
+.chat-attach__options button { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.chat-attach__options small { color: var(--text-muted); font-size: var(--text-sm); }
+.chat-exercise__notes { white-space: pre-wrap; font-size: var(--text-base); line-height: 1.45; margin: 0 0 var(--space-2); }

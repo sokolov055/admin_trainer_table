@@ -6,13 +6,14 @@
 
 const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
 
-let seq = 6;
+let seq = 7;
 let messages = [
   { id: 1, sender: 'trainer', text: 'Как колено после вчерашнего?', at: ago(60 * 26) },
   { id: 2, sender: 'client', text: 'Колено ок, но последние два подхода тяжело', at: ago(60 * 25), edited: true },
   { id: 3, sender: 'trainer', text: 'Супер! В следующий раз жим ногами оставим 120, добавим повтор 👍', at: ago(50), replyTo: 2, reactClient: '🔥' },
   { id: 4, sender: 'trainer', text: '', at: ago(45), deleted: true },
   { id: 5, sender: 'trainer', text: 'Завтра не забудь резинку для ягодичного 😉', at: ago(40), pinned: true },
+  { id: 6, sender: 'client', text: '🏋️ Тренировка', at: ago(30), card: { kind: 'workout', ref: 'w1', title: 'Ноги + спина', day: new Date(Date.now() - 86400000).toISOString().slice(0, 10), sets: 18, tonnage: 10200, minutes: 52, skipped: [{ name: 'Жим лёжа', reason: 'тренажёр занят' }] } },
 ];
 const read = { client: 3, trainer: 5 };
 let rev = 1;
@@ -26,6 +27,15 @@ const others = {
   4: { clientRow: 4, member: '', name: 'Мария С.', rev: 1, last: { id: 91, from: 'me', text: 'Отлично, добавим вес', at: ago(60 * 30), read: true }, unread: 0, muted: true, peer: { online: false } },
   5: { clientRow: 5, member: '', name: 'Ольга Л.', rev: 1, last: { id: 92, from: 'them', text: 'Спасибо за всё!', at: ago(60 * 24 * 9), read: true }, unread: 0, muted: false, peer: { online: false } },
 };
+
+const DEMO_CARDS = {
+  workout: (ref) => ({ kind: 'workout', ref: ref || 'w1', title: 'Ноги + спина', day: new Date(Date.now() - 86400000).toISOString().slice(0, 10), sets: 18, tonnage: 10200, minutes: 52, skipped: [{ name: 'Жим лёжа', reason: 'тренажёр занят' }] }),
+  program: () => ({ kind: 'program', ref: 'Ноябрь 2026', title: 'Ноябрь 2026', trainings: 3, exercises: 21, blocks: ['Тренировка 1 — ноги', 'Тренировка 2 — спина', 'Тренировка 3 — верх'] }),
+  exercise: (ref) => ({ kind: 'exercise', ref: ref || 1, title: 'Румынская тяга', muscle: 'Задняя поверхность бедра', notes: 'Спина прямая, таз назад, гриф скользит по ногам.', media: true }),
+  measures: () => ({ kind: 'measures', ref: '2026-11-18', title: 'Замеры', day: '2026-11-18', values: { weight: 78.5, waist: 88, hips: 98 }, change: { weight: -1.5, waist: -2 }, since: '2026-11-01' }),
+  food: (ref) => ({ kind: 'food', ref: ref || '2026-11-19', title: 'Питание за день', day: ref || '2026-11-19', kcal: 1840, protein: 132, fat: 58, carbs: 190, items: 9 }),
+};
+const CARD_TEXT = { workout: '🏋️ Тренировка', program: '📋 Программа', exercise: '🎯 Упражнение', measures: '📏 Замеры', food: '🥗 Питание' };
 
 const sideOf = (p) => (p.__role === 'trainer' ? 'trainer' : 'client');
 
@@ -41,6 +51,7 @@ function shape(m, side) {
     ...(reactions.length ? { reactions } : {}),
     ...(m.pinned && !m.deleted ? { pinned: true } : {}),
     ...(m.forwarded ? { forwarded: m.forwarded } : {}),
+    ...(m.card && !m.deleted ? { card: m.card } : {}),
     ...(q ? { reply: { id: q.id, from: q.sender === side ? 'me' : 'them', text: q.deleted ? '' : q.text.slice(0, 160), deleted: !!q.deleted } } : {}),
   };
 }
@@ -122,6 +133,23 @@ export function chatMock(action, p) {
     case 'chat.forward': {
       const ids = [].concat(p.ids || p.id).map(Number);
       return { sent: (p.to || []).flatMap((t) => ids.map((id) => ({ clientRow: t.clientRow, member: t.member || '', id: 1000 + id }))) };
+    }
+    case 'chat.card': {
+      const make = DEMO_CARDS[p.kind];
+      if (!make) throw Object.assign(new Error('Такой карточки нет.'), { code: 400 });
+      const card = make(p.ref);
+      const m = { id: seq++, sender: side, text: CARD_TEXT[p.kind], at: new Date().toISOString(), card, localId: p.localId };
+      messages.push(m);
+      read[side] = m.id;
+      touch();
+      return { message: shape(m, side) };
+    }
+    case 'chat.cardOptions': {
+      if (p.kind === 'workout') return { options: [{ ref: 'w1', title: 'Ноги + спина', day: '2026-11-19' }, { ref: 'w2', title: 'Верх', day: '2026-11-17' }] };
+      if (p.kind === 'food') return { options: [{ ref: '2026-11-19', title: '19.11', note: '9 записей' }, { ref: '2026-11-18', title: '18.11', note: '7 записей' }] };
+      const all = [{ ref: 1, title: 'Румынская тяга', note: 'Бедро' }, { ref: 2, title: 'Жим ногами', note: 'Квадрицепс' }, { ref: 3, title: 'Тяга верхнего блока', note: 'Спина' }];
+      const q = String(p.q || '').toLowerCase();
+      return { options: all.filter((o) => !q || o.title.toLowerCase().includes(q)) };
     }
     case 'chat.prefs': {
       ['hideOnline', 'quietFrom', 'quietTo'].forEach((k) => { if (p[k] !== undefined) prefs[k] = p[k]; });

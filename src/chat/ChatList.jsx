@@ -1,10 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiOnce, apiWait } from '../api.js';
 import { haptic } from '../telegram.js';
 import { Chips, Search } from '../ui.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 import { listTime, previewOf, initials, filterChats, chatFilters, splitHit, loadDraft, chatId } from './chat-model.js';
+import { Inbox, useChatInbox } from './chat-context.js';
 import './chat.css';
+
+export { useChatInbox };
 
 const ChatThread = lazyPage(() => import('./ChatThread.jsx'));
 
@@ -18,7 +21,6 @@ const ChatThread = lazyPage(() => import('./ChatThread.jsx'));
  * chat.wait { scope: 'list' }, чтобы значок и список жили сами.
  */
 
-const Inbox = createContext(null);
 
 function useInboxState(enabled) {
   const [state, setState] = useState({ enabled: false, chats: [], unread: 0, prefs: null, ready: false });
@@ -71,6 +73,15 @@ function useInboxState(enabled) {
   }, [enabled, state.ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reload = useCallback(() => loader.current(), []);
+  // Карточка в чате ведёт в раздел: приложение роли регистрирует переход
+  const navigator = useRef(null);
+  const setNavigator = useCallback((fn) => { navigator.current = fn; }, []);
+  const navigate = useCallback((target) => {
+    if (!navigator.current) return false;
+    setOpen(null);
+    navigator.current(target);
+    return true;
+  }, []);
   useEffect(() => {
     if (!state.note) return undefined;
     const t = setTimeout(() => setState((st) => ({ ...st, note: '' })), 3200);
@@ -88,7 +99,13 @@ function useInboxState(enabled) {
     setState((st) => ({ ...st, prefs: r.prefs }));
     return r.prefs;
   }, []);
-  return { ...state, open, setOpen, reload, act, setPrefs };
+  // Карточка в чат не из переписки — «Отправить тренеру итог» после тренировки
+  const sendCard = useCallback(async (kind, ref, localId) => {
+    const r = await apiOnce('chat.card', { kind, ref, localId });
+    reload();
+    return r;
+  }, [reload]);
+  return { ...state, open, setOpen, reload, act, setPrefs, setNavigator, navigate, sendCard };
 }
 
 /** Обёртка роли: держит список и открытую переписку поверх всего */
@@ -113,9 +130,6 @@ export function ChatInbox({ enabled = true, role, children }) {
     </Inbox.Provider>
   );
 }
-
-const NO_INBOX = { enabled: false, chats: [], unread: 0, prefs: null, setOpen: () => {}, reload: () => {}, act: () => {}, setPrefs: async () => null };
-export const useChatInbox = () => useContext(Inbox) || NO_INBOX;
 
 function Avatar({ name, online }) {
   return (

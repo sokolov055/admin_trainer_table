@@ -200,6 +200,16 @@ function TrainerPanel({ me }) {
   const openCard = (client, at = 'overview', from = 'К списку') => {
     captureScreen('client-card'); setOpenView(at); setOpenFrom(from); setOpenClient(client);
   };
+  // Карточка в чате (тренировка, замеры, питание) ведёт в раздел карточки клиента
+  const chatInbox = useChatInbox();
+  const openCardRef = useRef(openCard);
+  openCardRef.current = openCard;
+  useEffect(() => {
+    chatInbox.setNavigator(({ section, clientRow, name }) => {
+      if (clientRow) openCardRef.current({ row: clientRow, name }, section, 'К чатам');
+    });
+    return () => chatInbox.setNavigator(null);
+  }, [chatInbox.setNavigator]); // eslint-disable-line react-hooks/exhaustive-deps
   const [previewClient, setPreviewClient] = useState(null);
 
   // Вкладка, с которой ушли в боковое меню: «назад» из расходов или логов
