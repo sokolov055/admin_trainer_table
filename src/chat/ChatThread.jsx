@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { apiOnce, apiWait } from '../api.js';
 import { haptic } from '../telegram.js';
-import { IconBack, IconSend, IconClose, IconArrowDown, IconMore } from '../icons.jsx';
+import { IconBack, IconSend, IconClose, IconArrowDown, IconArrowUp, IconMore, IconSearch } from '../icons.jsx';
 import {
   buildFeed, tickOf, canEdit, peerStatus, initials, timeOf, mergeOutbox, newLocalId,
   chatId, loadDraft, saveDraft, loadOutbox, saveOutbox, REACTIONS, MORE_REACTIONS, REPORT_REASONS, MUTE_OPTIONS,
+  QUIET_DEFAULT, MAX_FORWARD,
 } from './chat-model.js';
+import { useChatInbox } from './ChatList.jsx';
 import './chat.css';
 
 /**
@@ -41,7 +43,7 @@ function Ticks({ state }) {
   );
 }
 
-function Bubble({ msg, peer, tail, tick, flash, onMenu, onReply, onQuote, onReact, onRetry }) {
+function Bubble({ msg, peer, tail, tick, flash, selecting, selected, onSelect, onMenu, onReply, onQuote, onReact, onRetry }) {
   const press = useRef(null);
   const start = useRef(null);
   const lastTap = useRef(0);
@@ -50,7 +52,7 @@ function Bubble({ msg, peer, tail, tick, flash, onMenu, onReply, onQuote, onReac
 
   const clear = () => { clearTimeout(press.current); press.current = null; };
   const down = (e) => {
-    if (msg.pending || msg.failed) return;
+    if (msg.pending || msg.failed || selecting) return;
     start.current = { x: e.clientX, y: e.clientY, moved: false };
     clear();
     press.current = setTimeout(() => { press.current = null; start.current = null; setDx(0); haptic('medium'); onMenu(msg); }, LONG_PRESS);
@@ -66,6 +68,7 @@ function Bubble({ msg, peer, tail, tick, flash, onMenu, onReply, onQuote, onReac
   };
   const up = () => {
     clear();
+    if (selecting) return;
     const s = start.current;
     start.current = null;
     if (dx <= -SWIPE_REPLY) { haptic(); onReply(msg); }
@@ -77,7 +80,10 @@ function Bubble({ msg, peer, tail, tick, flash, onMenu, onReply, onQuote, onReac
   };
 
   return (
-    <div className={'chat-row' + (mine ? ' chat-row--me' : '') + (tail ? ' chat-row--tail' : '') + (flash ? ' chat-row--flash' : '')} data-mid={msg.id}>
+    <div className={'chat-row' + (mine ? ' chat-row--me' : '') + (tail ? ' chat-row--tail' : '') + (flash ? ' chat-row--flash' : '')
+      + (selecting ? ' chat-row--selecting' : '') + (selected ? ' chat-row--selected' : '')} data-mid={msg.id}
+      onClick={selecting && typeof msg.id === 'number' ? () => onSelect(msg) : undefined}>
+      {selecting && typeof msg.id === 'number' && <span className="chat-row__check" aria-hidden="true">{selected ? '✓' : ''}</span>}
       {dx < -10 && <span className="chat-row__reply" style={{ opacity: Math.min(1, -dx / SWIPE_REPLY) }} aria-hidden="true">↩︎</span>}
       <div
         className={'chat-bubble' + (msg.deleted ? ' chat-bubble--deleted' : '') + (msg.failed ? ' chat-bubble--failed' : '')}
@@ -88,6 +94,7 @@ function Bubble({ msg, peer, tail, tick, flash, onMenu, onReply, onQuote, onReac
         onPointerCancel={() => { clear(); start.current = null; setDx(0); }}
         onContextMenu={(e) => { e.preventDefault(); if (!msg.pending && !msg.failed) onMenu(msg); }}
       >
+        {msg.forwarded && <span className="chat-bubble__fwd">Переслано от {msg.forwarded}</span>}
         {msg.reply && (
           <button type="button" className="chat-quote" onClick={(e) => { e.stopPropagation(); if (!msg.reply.gone) onQuote(msg.reply.id); }}>
             <span className="chat-quote__who">{msg.reply.from === 'me' ? 'Вы' : peer}</span>
@@ -98,6 +105,7 @@ function Bubble({ msg, peer, tail, tick, flash, onMenu, onReply, onQuote, onReac
           ? <span className="chat-bubble__text chat-bubble__text--deleted">🚫 Сообщение удалено</span>
           : <span className="chat-bubble__text">{msg.text}</span>}
         <span className="chat-bubble__meta">
+          {msg.pinned && <span aria-label="Закреплено">📌</span>}
           {msg.edited && <span className="chat-bubble__edited">изменено</span>}
           <time>{timeOf(msg.at)}</time>
           <Ticks state={tick} />
@@ -135,7 +143,8 @@ function Layer({ onClose, children, label }) {
   );
 }
 
-export default function ChatThread({ clientRow = null, member = '', name, onClose, role = 'client' }) {
+export default function ChatThread({ clientRow = null, member = '', name, onClose, role = 'client', jump = null }) {
+  const inbox = useChatInbox();
   const id = chatId(clientRow, member);
   const base = useMemo(() => (clientRow ? { clientRow, member } : {}), [clientRow, member]);
   const [data, setData] = useState(null);
@@ -153,6 +162,9 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
   const [atBottom, setAtBottom] = useState(true);
   const [fresh, setFresh] = useState(0);
   const [note, setNote] = useState('');
+  const [pinIdx, setPinIdx] = useState(-1);
+  const [selected, setSelected] = useState(null);
+  const [finder, setFinder] = useState(null);
   const unreadFrom = useRef(null);
   const scroller = useRef(null);
   const field = useRef(null);
@@ -259,13 +271,44 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
     setFresh(0);
   };
 
-  const jumpTo = (mid) => {
+  const showAt = (mid, smooth = true) => {
     const el = scroller.current && scroller.current.querySelector(`[data-mid="${mid}"]`);
-    if (!el) { setNote('Сообщение выше — прокрутите историю.'); return; }
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
     setFlash(mid);
     setTimeout(() => setFlash(null), 1400);
+    return true;
   };
+
+  // К сообщению выше загруженного (найденное, закреплённое, цитата) —
+  // догрузить историю от него до загруженной части и показать
+  const jumpTo = async (mid) => {
+    if (showAt(mid)) return;
+    const first = merged.find((m) => typeof m.id === 'number');
+    if (!first || mid >= first.id) { setNote('Сообщение удалено или скрыто.'); return; }
+    live.current.loadingOld = true;
+    try {
+      const page = await send('chat.open', { ...base, before: first.id, from: mid, read: false });
+      setOlder((o) => page.messages.concat(o));
+      setMore(page.more);
+      live.current.pendingJump = mid;
+    } catch (e) { setNote(e.message || 'Не получилось загрузить историю.'); }
+    live.current.loadingOld = false;
+  };
+
+  useEffect(() => {
+    const mid = live.current.pendingJump;
+    if (!mid) return;
+    live.current.pendingJump = null;
+    requestAnimationFrame(() => { if (!showAt(mid, false)) setNote('Сообщение удалено или скрыто.'); });
+  }, [older]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Открыли из поиска — сразу к найденному
+  useEffect(() => {
+    if (!jump || !data || live.current.jumped) return;
+    live.current.jumped = true;
+    requestAnimationFrame(() => jumpTo(jump));
+  }, [jump, data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const deliver = async (item) => {
     setOutbox((o) => o.map((m) => (m.localId === item.localId ? { ...m, pending: true, failed: false } : m)));
@@ -377,6 +420,90 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
     try { navigator.clipboard.writeText(msg.text); setNote('Скопировано'); } catch (_) { /* старый браузер */ }
   };
 
+  const refresh = async () => apply(await send('chat.open', { ...base, read: false }));
+
+  const pinMessage = async (msg, on) => {
+    setMenu(null);
+    try {
+      await send('chat.pinMessage', { ...base, id: msg.id, on });
+      setOlder((o) => o.map((m) => (m.id === msg.id ? { ...m, pinned: on } : m)));
+      await refresh();
+      setPinIdx(-1);
+    } catch (e) { setNote(e.message || 'Не получилось.'); }
+  };
+
+  const chatAct = async (action, on) => {
+    setLayer(null);
+    try {
+      await send(action, { ...base, on });
+      await refresh();
+      inbox.reload();
+      setNote(action === 'chat.archive' ? (on ? 'Чат в архиве. Новое сообщение вернёт его.' : 'Чат вернулся из архива.') : (on ? 'Чат закреплён сверху.' : 'Чат откреплён.'));
+    } catch (e) { setNote(e.message || 'Не получилось.'); }
+  };
+
+  const savePrefs = async (change) => {
+    try { await inbox.setPrefs(change); await refresh(); } catch (e) { setNote(e.message || 'Не получилось сохранить.'); }
+  };
+
+  /* ---------- «Выбрать»: несколько сообщений ---------- */
+  const startSelect = (msg) => { setMenu(null); setSelected(new Set(typeof msg.id === 'number' ? [msg.id] : [])); };
+  const toggleSelect = (msg) => setSelected((cur) => {
+    const next = new Set(cur);
+    if (next.has(msg.id)) next.delete(msg.id); else next.add(msg.id);
+    return next;
+  });
+  const picked = selected ? merged.filter((m) => selected.has(m.id)) : [];
+  const pickedMine = picked.length > 0 && picked.every((m) => m.from === 'me' && !m.deleted);
+  const copyPicked = () => {
+    const lines = picked.filter((m) => !m.deleted).map((m) => m.text);
+    try { navigator.clipboard.writeText(lines.join('\n\n')); setNote('Скопировано'); } catch (_) { /* старый браузер */ }
+    setSelected(null);
+  };
+  const removeMany = async (list, forBoth) => {
+    setLayer(null);
+    try {
+      await send('chat.delete', { ...base, ids: list.map((m) => m.id), forBoth });
+      const gone = new Set(list.map((m) => m.id));
+      setOlder((o) => o.filter((m) => !gone.has(m.id)));
+      setSelected(null);
+      await refresh();
+    } catch (e) { setNote(e.message || 'Не получилось удалить.'); }
+  };
+
+  const forward = async (list, to) => {
+    setLayer(null);
+    try {
+      const r = await send('chat.forward', { ...base, ids: list.map((m) => m.id), to });
+      setSelected(null);
+      inbox.reload();
+      setNote(`Переслано: ${r.sent.length} ${r.sent.length === 1 ? 'сообщение' : 'сообщ.'}`);
+    } catch (e) { setNote(e.message || 'Не получилось переслать.'); }
+  };
+
+  /* ---------- поиск в чате: ⌃ — раньше, ⌄ — позже ---------- */
+  useEffect(() => {
+    if (!finder) return undefined;
+    const q = finder.q.trim();
+    if (q.length < 2) { if (finder.hits.length) setFinder((f) => ({ ...f, hits: [], idx: 0 })); return undefined; }
+    let stop = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await send('chat.search', { ...base, q });
+        if (stop) return;
+        setFinder((f) => (f ? { ...f, hits: r.hits || [], idx: 0, done: q } : f));
+        if (r.hits && r.hits[0]) jumpTo(r.hits[0].id);
+      } catch (_) { /* поиск не главное */ }
+    }, 350);
+    return () => { stop = true; clearTimeout(t); };
+  }, [finder && finder.q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stepFind = (dir) => {
+    if (!finder || !finder.hits.length) return;
+    const idx = Math.max(0, Math.min(finder.hits.length - 1, finder.idx + dir));
+    setFinder({ ...finder, idx });
+    jumpTo(finder.hits[idx].id);
+  };
+
   useEffect(() => {
     if (!note) return undefined;
     const t = setTimeout(() => setNote(''), 3200);
@@ -389,7 +516,26 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
 
   return (
     <div className="chat" role="dialog" aria-label={'Чат: ' + name}>
-      <header className="chat__head">
+      {selected && (
+        <header className="chat__head chat__head--select">
+          <button type="button" className="icon-button" onClick={() => setSelected(null)} aria-label="Отменить выбор"><IconClose size={22} /></button>
+          <span className="chat__who"><strong>Выбрано: {selected.size}</strong></span>
+        </header>
+      )}
+      {!selected && finder && (
+        <header className="chat__head chat__head--find">
+          <button type="button" className="icon-button" onClick={() => setFinder(null)} aria-label="Закрыть поиск"><IconBack size={22} /></button>
+          <input className="chat__find" type="search" autoFocus value={finder.q} placeholder="Поиск в чате" aria-label="Поиск в чате"
+            onChange={(e) => setFinder({ ...finder, q: e.target.value })}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); stepFind(1); } }} />
+          <span className="chat__find-count">
+            {finder.done && finder.done === finder.q.trim() ? (finder.hits.length ? `${finder.idx + 1} из ${finder.hits.length}` : 'нет') : ''}
+          </span>
+          <button type="button" className="icon-button" onClick={() => stepFind(1)} disabled={!finder.hits.length || finder.idx >= finder.hits.length - 1} aria-label="Раньше"><IconArrowUp size={20} /></button>
+          <button type="button" className="icon-button" onClick={() => stepFind(-1)} disabled={!finder.hits.length || finder.idx <= 0} aria-label="Позже"><IconArrowDown size={20} /></button>
+        </header>
+      )}
+      <header className="chat__head" hidden={!!selected || !!finder}>
         <button type="button" className="icon-button" onClick={onClose} aria-label="Назад"><IconBack size={22} /></button>
         <span className="chat-avatar chat-avatar--sm" aria-hidden="true">{initials(name)}{data?.peer?.online && <i className="chat-avatar__dot" />}</span>
         <span className="chat__who">
@@ -398,8 +544,26 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
             {data?.muted ? '🔕 ' : ''}{peerLine}
           </span>
         </span>
+        <button type="button" className="icon-button" onClick={() => setFinder({ q: '', hits: [], idx: 0 })} aria-label="Поиск в чате"><IconSearch size={20} /></button>
         <button type="button" className="icon-button" onClick={() => setLayer({ kind: 'chat' })} aria-label="Настройки чата"><IconMore size={22} /></button>
       </header>
+
+      {data && data.pins && data.pins.length > 0 && !selected && (() => {
+        // Как в Telegram: видна последняя; касание — к ней и дальше к предыдущей
+        const n = data.pins.length;
+        const idx = pinIdx < 0 || pinIdx >= n ? n - 1 : pinIdx;
+        const pin = data.pins[idx];
+        return (
+          <button type="button" className="chat-pins" onClick={() => { jumpTo(pin.id); setPinIdx((idx - 1 + n) % n); }}>
+            <span className="chat-pins__bars" aria-hidden="true">{data.pins.map((p, i) => <i key={p.id} className={i === idx ? 'on' : ''} />)}</span>
+            <span className="chat-pins__body">
+              <strong>Закреплено{n > 1 ? ` · ${idx + 1} из ${n}` : ''}</strong>
+              <span>{pin.text}</span>
+            </span>
+            <span aria-hidden="true">📌</span>
+          </button>
+        );
+      })()}
 
       <div className="chat__scroll" ref={scroller} onScroll={onScroll}>
         {!data && !error && <p className="chat__empty">Загружаем переписку…</p>}
@@ -417,6 +581,7 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
           const m = item.msg;
           return (
             <Bubble key={item.key} msg={m} peer={name} tail={item.tail} tick={tickOf(m, readUpTo)} flash={flash === m.id}
+              selecting={!!selected} selected={!!selected && selected.has(m.id)} onSelect={toggleSelect}
               onMenu={setMenu} onReply={(x) => { setEditing(null); setReplyTo(x); field.current && field.current.focus(); }}
               onQuote={jumpTo} onReact={react} onRetry={deliver} />
           );
@@ -432,7 +597,19 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
 
       {note && <div className="chat__note" role="status">{note}</div>}
 
-      <form className="chat__compose" onSubmit={submit}>
+      {selected && (
+        <div className="chat__selectbar">
+          <button type="button" className="button button--ghost" disabled={!picked.length} onClick={copyPicked}>📋 Скопировать</button>
+          {role === 'trainer' && (
+            <button type="button" className="button button--ghost" disabled={!pickedMine}
+              onClick={() => setLayer({ kind: 'forward', list: picked })} title={pickedMine ? '' : 'Переслать можно только свои сообщения'}>↪︎ Переслать</button>
+          )}
+          <button type="button" className="button button--ghost chat-menu__danger" disabled={!picked.length}
+            onClick={() => setLayer({ kind: 'delete-many', list: picked })}>🗑 Удалить</button>
+        </div>
+      )}
+
+      <form className="chat__compose" onSubmit={submit} hidden={!!selected}>
         {(replyTo || editing) && (
           <div className="chat__context">
             <span className="chat__context-bar" aria-hidden="true" />
@@ -485,6 +662,13 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
             {canEdit(menu, new Date(), data?.editHours) && (
               <button type="button" onClick={() => { setEditing(menu); setReplyTo(null); setText(menu.text); setMenu(null); field.current && field.current.focus(); }}>✏️ Изменить</button>
             )}
+            {!menu.deleted && (menu.pinned
+              ? <button type="button" onClick={() => pinMessage(menu, false)}>📌 Открепить</button>
+              : <button type="button" onClick={() => pinMessage(menu, true)}>📌 Закрепить</button>)}
+            {role === 'trainer' && menu.from === 'me' && !menu.deleted && (
+              <button type="button" onClick={() => { setLayer({ kind: 'forward', list: [menu] }); setMenu(null); }}>↪︎ Переслать</button>
+            )}
+            <button type="button" onClick={() => startSelect(menu)}>☑︎ Выбрать</button>
             <button type="button" className="chat-menu__danger" onClick={() => { setLayer({ kind: 'delete', msg: menu }); setMenu(null); }}>
               🗑 {menu.from === 'me' ? 'Удалить' : 'Удалить у себя'}
             </button>
@@ -499,6 +683,13 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
       )}
 
       {layer && layer.kind === 'delete' && <DeleteLayer msg={layer.msg} name={name} onClose={() => setLayer(null)} onDelete={remove} />}
+      {layer && layer.kind === 'delete-many' && (
+        <DeleteLayer list={layer.list} name={name} onClose={() => setLayer(null)} onDelete={(list, both) => removeMany(list, both)} />
+      )}
+      {layer && layer.kind === 'forward' && (
+        <ForwardLayer list={layer.list} chats={inbox.chats.filter((c) => !(c.clientRow === clientRow && (c.member || '') === (member || '')) && !c.blocked)}
+          onClose={() => setLayer(null)} onSend={forward} />
+      )}
 
       {layer && layer.kind === 'report' && (
         <Layer label="Пожаловаться" onClose={() => setLayer(null)}>
@@ -514,6 +705,13 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
         <Layer label="Настройки чата" onClose={() => setLayer(null)}>
           <h2 className="chat-layer__title">{name}</h2>
           <div className="chat-menu__list">
+            <button type="button" onClick={() => { setLayer(null); setFinder({ q: '', hits: [], idx: 0 }); }}>🔍 Поиск в чате</button>
+            {role === 'trainer' && (
+              <button type="button" onClick={() => chatAct('chat.pin', !data?.pinnedChat)}>📌 {data?.pinnedChat ? 'Открепить чат' : 'Закрепить чат сверху'}</button>
+            )}
+            {role === 'trainer' && (
+              <button type="button" onClick={() => chatAct('chat.archive', !data?.archived)}>🗄 {data?.archived ? 'Вернуть из архива' : 'В архив'}</button>
+            )}
             {data?.muted
               ? <button type="button" onClick={() => mute(0)}>🔔 Включить звук</button>
               : MUTE_OPTIONS.map((o) => <button key={o.hours} type="button" onClick={() => mute(o.hours)}>🔕 Без звука {o.label.toLowerCase()}</button>)}
@@ -521,6 +719,7 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
               ? <button type="button" onClick={() => block(false)}>✅ Снять ограничение</button>
               : <button type="button" className="chat-menu__danger" onClick={() => setLayer({ kind: 'block' })}>⛔ Ограничить сообщения тренера</button>)}
           </div>
+          <PrefsBlock prefs={inbox.prefs} role={role} onSave={savePrefs} />
         </Layer>
       )}
 
@@ -538,12 +737,15 @@ export default function ChatThread({ clientRow = null, member = '', name, onClos
   );
 }
 
-function DeleteLayer({ msg, name, onClose, onDelete }) {
+function DeleteLayer({ msg, list, name, onClose, onDelete }) {
   const [both, setBoth] = useState(true);
-  const mine = msg.from === 'me' && !msg.deleted;
+  const many = list || [msg];
+  const mine = many.every((m) => m.from === 'me' && !m.deleted);
+  const done = (forBoth) => (list ? onDelete(list, forBoth) : onDelete(msg, forBoth));
   return (
     <Layer label="Удалить сообщение" onClose={onClose}>
-      <h2 className="chat-layer__title">Удалить сообщение?</h2>
+      <h2 className="chat-layer__title">{many.length > 1 ? `Удалить сообщения (${many.length})?` : 'Удалить сообщение?'}</h2>
+      {!mine && many.length > 1 && <p className="chat-layer__text">Среди выбранных есть чужие — их можно удалить только у себя.</p>}
       {mine && (
         <label className="chat-layer__check">
           <input type="checkbox" checked={both} onChange={(e) => setBoth(e.target.checked)} />
@@ -551,9 +753,75 @@ function DeleteLayer({ msg, name, onClose, onDelete }) {
         </label>
       )}
       <div className="chat-layer__actions">
-        <button type="button" className="button button--critical" onClick={() => onDelete(msg, mine && both)}>Удалить</button>
+        <button type="button" className="button button--critical" onClick={() => done(mine && both)}>Удалить</button>
         <button type="button" className="button button--ghost" onClick={onClose}>Отмена</button>
       </div>
     </Layer>
+  );
+}
+
+/** Кому переслать: свои клиенты, несколько сразу */
+function ForwardLayer({ list, chats, onClose, onSend }) {
+  const [to, setTo] = useState(() => new Set());
+  const [q, setQ] = useState('');
+  const shown = chats.filter((c) => !c.archived && (!q.trim() || String(c.name).toLowerCase().includes(q.trim().toLowerCase())));
+  const key = (c) => c.clientRow + '#' + (c.member || '');
+  const flip = (c) => setTo((cur) => {
+    const next = new Set(cur);
+    if (next.has(key(c))) next.delete(key(c)); else if (next.size < MAX_FORWARD) next.add(key(c));
+    return next;
+  });
+  return (
+    <Layer label="Переслать" onClose={onClose}>
+      <h2 className="chat-layer__title">Переслать {list.length > 1 ? `${list.length} сообщ.` : 'сообщение'}</h2>
+      <p className="chat-layer__text">Клиент увидит подпись «Переслано от …». Пересылать можно только свои сообщения.</p>
+      <input className="chat__find chat__find--boxed" type="search" value={q} placeholder="Найти клиента" aria-label="Найти клиента" onChange={(e) => setQ(e.target.value)} />
+      <div className="chat-forward">
+        {shown.map((c) => (
+          <label key={key(c)} className="chat-layer__check">
+            <input type="checkbox" checked={to.has(key(c))} onChange={() => flip(c)} />
+            <span>{c.name}</span>
+          </label>
+        ))}
+        {!shown.length && <p className="chat-layer__text">Некому переслать.</p>}
+      </div>
+      <div className="chat-layer__actions">
+        <button type="button" className="button button--primary" disabled={!to.size}
+          onClick={() => onSend(list, chats.filter((c) => to.has(key(c))).map((c) => ({ clientRow: c.clientRow, member: c.member || '' })))}>
+          {to.size ? `Переслать (${to.size})` : 'Переслать'}
+        </button>
+        <button type="button" className="button button--ghost" onClick={onClose}>Отмена</button>
+      </div>
+    </Layer>
+  );
+}
+
+/** «В сети» и тихие часы — для всех чатов человека */
+function PrefsBlock({ prefs, role, onSave }) {
+  if (!prefs) return null;
+  const quiet = !!(prefs.quietFrom && prefs.quietTo);
+  return (
+    <div className="chat-prefs">
+      <h3 className="chat-prefs__title">Во всех чатах</h3>
+      <label className="chat-layer__check">
+        <input type="checkbox" checked={!!prefs.hideOnline} onChange={(e) => onSave({ hideOnline: e.target.checked })} />
+        <span>Скрыть «в сети»<small>Собеседник увидит «был(а) недавно». Как в Telegram, вы тоже не увидите его время.</small></span>
+      </label>
+      {role === 'trainer' && (
+        <>
+          <label className="chat-layer__check">
+            <input type="checkbox" checked={quiet} onChange={(e) => onSave(e.target.checked ? QUIET_DEFAULT : { quietFrom: null, quietTo: null })} />
+            <span>Тихие часы<small>В это время пуши о сообщениях не приходят. Сообщения ждут в чате.</small></span>
+          </label>
+          {quiet && (
+            <div className="chat-prefs__time">
+              <label>с <input type="time" value={prefs.quietFrom} onChange={(e) => e.target.value && onSave({ quietFrom: e.target.value, quietTo: prefs.quietTo })} /></label>
+              <label>до <input type="time" value={prefs.quietTo} onChange={(e) => e.target.value && onSave({ quietFrom: prefs.quietFrom, quietTo: e.target.value })} /></label>
+              <span className="chat-prefs__tz">по Москве</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

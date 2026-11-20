@@ -12,12 +12,20 @@ let messages = [
   { id: 2, sender: 'client', text: 'Колено ок, но последние два подхода тяжело', at: ago(60 * 25), edited: true },
   { id: 3, sender: 'trainer', text: 'Супер! В следующий раз жим ногами оставим 120, добавим повтор 👍', at: ago(50), replyTo: 2, reactClient: '🔥' },
   { id: 4, sender: 'trainer', text: '', at: ago(45), deleted: true },
-  { id: 5, sender: 'trainer', text: 'Завтра не забудь резинку для ягодичного 😉', at: ago(40) },
+  { id: 5, sender: 'trainer', text: 'Завтра не забудь резинку для ягодичного 😉', at: ago(40), pinned: true },
 ];
 const read = { client: 3, trainer: 5 };
 let rev = 1;
 let muted = { client: null, trainer: null };
 let blocked = false;
+let prefs = { hideOnline: false, quietFrom: null, quietTo: null };
+// Этап 2: закреп и архив у тренера по чатам, у клиента — один чат
+let lineState = { 2: { pinned: ago(5) }, 3: {}, 4: { archived: false }, 5: { archived: true }, mine: {} };
+const others = {
+  3: { clientRow: 3, member: '', name: 'Игорь П.', rev: 1, last: { id: 90, from: 'them', text: 'Можно перенести на пятницу?', at: ago(200), read: true }, unread: 1, muted: false, today: true, peer: { online: false, typing: true } },
+  4: { clientRow: 4, member: '', name: 'Мария С.', rev: 1, last: { id: 91, from: 'me', text: 'Отлично, добавим вес', at: ago(60 * 30), read: true }, unread: 0, muted: true, peer: { online: false } },
+  5: { clientRow: 5, member: '', name: 'Ольга Л.', rev: 1, last: { id: 92, from: 'them', text: 'Спасибо за всё!', at: ago(60 * 24 * 9), read: true }, unread: 0, muted: false, peer: { online: false } },
+};
 
 const sideOf = (p) => (p.__role === 'trainer' ? 'trainer' : 'client');
 
@@ -31,6 +39,8 @@ function shape(m, side) {
     ...(m.localId ? { localId: m.localId } : {}),
     ...(m.edited ? { edited: true } : {}), ...(m.deleted ? { deleted: true } : {}),
     ...(reactions.length ? { reactions } : {}),
+    ...(m.pinned && !m.deleted ? { pinned: true } : {}),
+    ...(m.forwarded ? { forwarded: m.forwarded } : {}),
     ...(q ? { reply: { id: q.id, from: q.sender === side ? 'me' : 'them', text: q.deleted ? '' : q.text.slice(0, 160), deleted: !!q.deleted } } : {}),
   };
 }
@@ -46,6 +56,9 @@ function history(side) {
     peer: { online: side === 'client', seenAt: ago(12), typing: false },
     muted: muted[side],
     blocked,
+    pins: messages.filter((m) => m.pinned && !m.deleted && !m[`hidden_${side}`]).map((m) => ({ id: m.id, from: m.sender === side ? 'me' : 'them', text: m.text.slice(0, 160) })),
+    pinnedChat: !!(side === 'trainer' ? lineState[2] : lineState.mine).pinned,
+    archived: !!(side === 'trainer' ? lineState[2] : lineState.mine).archived,
     editHours: 48,
   };
 }
@@ -78,17 +91,41 @@ export function chatMock(action, p) {
     case 'chat.list': {
       const s = summary(side);
       if (side === 'trainer') {
-        return {
-          enabled: true,
-          chats: [
-            { clientRow: 2, member: '', name: 'Анна К.', ...s },
-            { clientRow: 3, member: '', name: 'Игорь П.', rev: 1, last: { id: 90, from: 'them', text: 'Можно перенести на пятницу?', at: ago(200), read: true }, unread: 1, muted: false, peer: { online: false, typing: true } },
-            { clientRow: 4, member: '', name: 'Мария С.', rev: 1, last: { id: 91, from: 'me', text: 'Отлично, добавим вес', at: ago(60 * 30), read: true }, unread: 0, muted: true, peer: { online: false } },
-          ],
-          unread: s.unread + 1,
-        };
+        const chats = [{ clientRow: 2, member: '', name: 'Анна К.', today: true, ...s }, ...Object.values(others)]
+          .map((c) => ({ ...c, pinned: lineState[c.clientRow].pinned || null, archived: !!lineState[c.clientRow].archived }));
+        chats.sort((a, b) => (!!b.pinned - !!a.pinned) || String(b.last?.at || '').localeCompare(String(a.last?.at || '')));
+        return { enabled: true, chats, unread: chats.reduce((n, c) => n + (c.muted || c.archived ? 0 : c.unread), 0), prefs };
       }
-      return { enabled: true, chats: [{ trainerName: 'Константин', ...s }], unread: s.muted ? 0 : s.unread };
+      return { enabled: true, chats: [{ trainerName: 'Константин', ...s, pinned: lineState.mine.pinned || null, archived: !!lineState.mine.archived }], unread: s.muted ? 0 : s.unread, prefs };
+    }
+    case 'chat.pin': {
+      const key = side === 'trainer' ? Number(p.clientRow) : 'mine';
+      lineState[key] = { ...lineState[key], pinned: p.on !== false ? new Date().toISOString() : null, ...(p.on !== false ? { archived: false } : {}) };
+      touch();
+      return { pinned: p.on !== false };
+    }
+    case 'chat.archive': {
+      const key = side === 'trainer' ? Number(p.clientRow) : 'mine';
+      lineState[key] = { ...lineState[key], archived: p.on !== false, ...(p.on !== false ? { pinned: null } : {}) };
+      touch();
+      return { archived: p.on !== false };
+    }
+    case 'chat.pinMessage': { const m = find(p.id); m.pinned = p.on !== false; touch(); return { pinned: m.pinned }; }
+    case 'chat.search': {
+      const q = String(p.q || '').toLowerCase().trim();
+      if (q.length < 2) return { hits: [] };
+      return {
+        hits: messages.filter((m) => !m.deleted && !m[`hidden_${side}`] && m.text.toLowerCase().includes(q)).reverse()
+          .map((m) => ({ id: m.id, clientRow: 2, member: '', from: m.sender === side ? 'me' : 'them', at: m.at, text: m.text })),
+      };
+    }
+    case 'chat.forward': {
+      const ids = [].concat(p.ids || p.id).map(Number);
+      return { sent: (p.to || []).flatMap((t) => ids.map((id) => ({ clientRow: t.clientRow, member: t.member || '', id: 1000 + id }))) };
+    }
+    case 'chat.prefs': {
+      ['hideOnline', 'quietFrom', 'quietTo'].forEach((k) => { if (p[k] !== undefined) prefs[k] = p[k]; });
+      return { prefs };
     }
     case 'chat.open': {
       const h = history(side);
@@ -140,4 +177,9 @@ export function chatMock(action, p) {
   }
 }
 
-export function resetChatMock() { muted = { client: null, trainer: null }; blocked = false; }
+export function resetChatMock() {
+  muted = { client: null, trainer: null };
+  blocked = false;
+  prefs = { hideOnline: false, quietFrom: null, quietTo: null };
+  lineState = { 2: { pinned: ago(5) }, 3: {}, 4: { archived: false }, 5: { archived: true }, mine: {} };
+}

@@ -92,6 +92,45 @@ export function canEdit(m, now = new Date(), hours = EDIT_HOURS) {
     && now - new Date(m.at) < hours * 3600 * 1000;
 }
 
+/* ---------- список: фильтры-папки (этап 2) ---------- */
+
+/** Чаты под фильтром: «Все» — без архива; архив — отдельной папкой */
+export function filterChats(chats, filter = 'all', query = '') {
+  const q = String(query || '').trim().toLowerCase().replace(/ё/g, 'е');
+  const named = (c) => !q || String(c.name || '').toLowerCase().replace(/ё/g, 'е').includes(q);
+  return chats.filter((c) => {
+    if (!named(c)) return false;
+    if (filter === 'archive') return !!c.archived;
+    if (c.archived) return false;
+    if (filter === 'unread') return c.unread > 0;
+    if (filter === 'today') return !!c.today;
+    return true;
+  });
+}
+
+export function chatFilters(chats) {
+  const live = chats.filter((c) => !c.archived);
+  const unread = live.filter((c) => c.unread > 0).length;
+  const today = live.filter((c) => c.today).length;
+  const archived = chats.length - live.length;
+  return [
+    { value: 'all', label: 'Все' },
+    { value: 'unread', label: unread ? `Непрочитанные ${unread}` : 'Непрочитанные' },
+    ...(today ? [{ value: 'today', label: `Сегодня тренировка ${today}` }] : []),
+    ...(archived ? [{ value: 'archive', label: `Архив ${archived}` }] : []),
+  ];
+}
+
+/** Подсветка найденного: [до, найденное, после] */
+export function splitHit(text, query) {
+  const t = String(text || '');
+  const q = String(query || '').trim();
+  if (!q) return [t, '', ''];
+  const at = t.toLowerCase().replace(/ё/g, 'е').indexOf(q.toLowerCase().replace(/ё/g, 'е'));
+  if (at < 0) return [t, '', ''];
+  return [t.slice(0, at), t.slice(at, at + q.length), t.slice(at + q.length)];
+}
+
 /** Превью в строке списка */
 export function previewOf(last) {
   if (!last) return '';
@@ -159,6 +198,9 @@ export const REPORT_REASONS = [
   { value: 'inappropriate', label: 'Неприемлемое' },
   { value: 'other', label: 'Другое' },
 ];
+export const QUIET_DEFAULT = { quietFrom: '22:00', quietTo: '08:00' };
+export const MAX_FORWARD = 20;
+
 export const MUTE_OPTIONS = [
   { hours: 1, label: 'На 1 час' },
   { hours: 8, label: 'На 8 часов' },

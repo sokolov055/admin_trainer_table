@@ -59,3 +59,25 @@ test('очередь без сети: отправленное уходит из
   assert.equal(m.previewOf({ from: 'them', deleted: true }), 'Сообщение удалено');
   assert.equal(m.initials('Анна Котова'), 'АК');
 });
+
+test('этап 2: папки «Все», «Непрочитанные», «Сегодня тренировка», «Архив»', () => {
+  const chats = [
+    { clientRow: 1, name: 'Анна К.', unread: 2, today: true },
+    { clientRow: 2, name: 'Игорь', unread: 0, today: false },
+    { clientRow: 3, name: 'Ольга', unread: 1, archived: true },
+  ];
+  assert.deepEqual(m.filterChats(chats, 'all').map((c) => c.clientRow), [1, 2], '«Все» — без архива');
+  assert.deepEqual(m.filterChats(chats, 'unread').map((c) => c.clientRow), [1]);
+  assert.deepEqual(m.filterChats(chats, 'today').map((c) => c.clientRow), [1]);
+  assert.deepEqual(m.filterChats(chats, 'archive').map((c) => c.clientRow), [3]);
+  assert.deepEqual(m.filterChats(chats, 'all', 'игор').map((c) => c.clientRow), [2]);
+  const labels = m.chatFilters(chats).map((f) => f.label);
+  assert.deepEqual(labels, ['Все', 'Непрочитанные 1', 'Сегодня тренировка 1', 'Архив 1']);
+  assert.deepEqual(m.chatFilters([{ unread: 0 }]).map((f) => f.value), ['all', 'unread'], 'пустые папки не показываем');
+});
+
+test('этап 2: подсветка найденного, «ё» = «е»', () => {
+  assert.deepEqual(m.splitHit('Колено ок, но тяжело', 'КОЛЕНО'), ['', 'Колено', ' ок, но тяжело']);
+  assert.deepEqual(m.splitHit('Ещё подход', 'еще'), ['', 'Ещё', ' подход']);
+  assert.deepEqual(m.splitHit('нет', 'да'), ['нет', '', '']);
+});
