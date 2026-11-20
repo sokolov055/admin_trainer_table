@@ -15,6 +15,7 @@
  * сэкономить четыре секунды: экран входа — первое, что видит человек.
  */
 
+import { chatMock } from './chat/chat-mock.js';
 import { BUILTIN_IDS } from './setup-stickers-search.js';
 import { dateKey, nextMonday, versionAt, addDays, monday } from './program-timeline.js';
 import { withLength, monthWeeks } from './plan-weeks.js';
@@ -3010,6 +3011,7 @@ export function mockApi(action, params) {
     : action.includes('.onboarding.') ? p => onboardingMock(action, p, mockCompute)
     : action === 'client.focus' ? () => focusMock(nutrition, mockCompute)
     : action.startsWith('client.firstSteps.') ? p => firstStepsMock(action, p)
+    : action.startsWith('chat.') ? p => chatMock(action, p)
     : action.startsWith('workout.') ? p => workoutMock(action, p) : MOCK[action];
 
   return new Promise((resolve, reject) => {

@@ -110,11 +110,11 @@ test('подразделы «Управления» по группам: каж�
   assert.deepEqual(ADMIN_GROUPS.map((g) => g.label), ['Аналитика', 'Тренеры и тарифы', 'Контент', 'Система']);
   // Ничего не потеряно и не задвоено: группы подряд дают все подразделы в их порядке
   assert.deepEqual(ADMIN_GROUPS.flatMap((g) => g.panes), ADMIN_PANES.map((p) => p.value));
-  assert.equal(new Set(ADMIN_PANES.map((p) => p.value)).size, 13);
+  assert.equal(new Set(ADMIN_PANES.map((p) => p.value)).size, 14);
   assert.deepEqual(adminPanesOf('analytics').map((p) => p.label), ['Аналитика', 'AI-сканер'], 'FT-748: поправки AI — в аналитике');
   assert.equal(adminGroupOf('logs').value, 'system');
   assert.equal(adminGroupOf('look').value, 'content');
   assert.equal(adminGroupOf('нет такого').value, 'analytics');
-  assert.deepEqual(adminPanesOf('people').map((p) => p.label), ['Тренеры', 'Тарифы']);
+  assert.deepEqual(adminPanesOf('people').map((p) => p.label), ['Тренеры', 'Тарифы', 'Жалобы']);
   assert.deepEqual(adminPanesOf('system').map((p) => p.label), ['Флаги', 'Версии', 'Логи', 'Выгрузка']);
 });

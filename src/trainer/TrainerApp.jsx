@@ -35,6 +35,7 @@ import Appearance from '../Appearance.jsx';
 import { screensNote } from '../native-bridge.js';
 import { useSelfCard, selfPick } from './selfCard.js';
 import './trainer.css';
+import { ChatInbox, TrainerChats, IconChats, useChatBadge, useChatInbox } from '../chat/ChatList.jsx';
 
 // Игры тяжёлые (картинки, звук) — грузятся, только когда открыли вкладку
 const MyGames = lazyPage(() => import('./MyGames.jsx'));
@@ -69,7 +70,7 @@ function screenDirection(order) {
 
 const visibleMain = () => document.querySelector('#root .app > main:not([hidden])');
 
-const TABS = [
+const ALL_TABS = [
   { id: 'clients', label: 'Клиенты', Icon: IconUsers },
   // Расписание всех тренеров хранится в Fit Track.
   { id: 'schedule', label: 'Расписание', Icon: IconCalendar },
@@ -77,6 +78,8 @@ const TABS = [
   // программы раскладываются клиентам за минуту (Library.jsx).
   // «Библиотека», а не «Шаблоны» (FT-567): здесь ещё упражнения, тренажёры
   // и блюда — прежнее название их не обещало
+  // Переписка с клиентами (FT-808): пятой вкладкой, со счётчиком
+  { id: 'chats', label: 'Чаты', Icon: IconChats },
   { id: 'library', label: 'Библиотека', Icon: IconPlan },
   { id: 'dashboard', label: 'Сводка', Icon: IconChart },
 ];
@@ -151,7 +154,16 @@ const CLIENT_VIEWS = [
   { value: 'nutrition', label: 'Питание', Screen: Nutrition },
 ];
 
-export default function TrainerApp({ me }) {
+/** Чаты (FT-808) — один список на всё приложение: значок вкладки и экран */
+export default function TrainerApp(props) {
+  return <ChatInbox role="trainer"><TrainerPanel {...props} /></ChatInbox>;
+}
+
+function TrainerPanel({ me }) {
+  const chatBadge = useChatBadge();
+  // «Чаты» — только когда сервер их включил (флаг владельца CHAT)
+  const chatsOn = useChatInbox().enabled;
+  const TABS = chatsOn ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'chats');
   const owner = isOwner(me);
   // «Управление» — только когда сервер сам сказал owner: true: старый сервер
   // этих действий не знает, и пункт отвечал бы ошибкой
@@ -469,6 +481,16 @@ export default function TrainerApp({ me }) {
         </main>
       )}
 
+      {tabs.shown('chats') && (
+        <main
+          className="app__body"
+          hidden={view !== 'chats'}
+          data-kept={tabs.kept('chats') ? '' : undefined}
+        >
+          <TrainerChats />
+        </main>
+      )}
+
       {tabs.shown('library') && (
         <main
           className="app__body"
@@ -503,7 +525,7 @@ export default function TrainerApp({ me }) {
       </main>
       )}
 
-      <TabBar tabs={TABS} active={view} onSelect={go} />
+      <TabBar tabs={TABS.map((t) => (t.id === 'chats' ? { ...t, badge: chatBadge } : t))} active={view} onSelect={go} />
 
       <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} label="Меню">
         <div className="menu__head">

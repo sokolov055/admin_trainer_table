@@ -14,6 +14,8 @@ export const ADMIN_PANES = [
   { value: 'ai', label: 'AI-сканер' },
   { value: 'trainers', label: 'Тренеры' },
   { value: 'tariffs', label: 'Тарифы' },
+  // Жалобы на сообщения в чатах (FT-808, App Store 1.2): рассмотреть за 24 часа
+  { value: 'reports', label: 'Жалобы' },
   { value: 'games', label: 'Игры' },
   // Стикерпак настройки тренажёров файлом — добавить, удалить (16.11.2026)
   { value: 'stickers', label: 'Стикеры' },
@@ -39,7 +41,7 @@ export const ADMIN_PANES = [
  */
 export const ADMIN_GROUPS = [
   { value: 'analytics', label: 'Аналитика', panes: ['stats', 'ai'] },
-  { value: 'people', label: 'Тренеры и тарифы', panes: ['trainers', 'tariffs'] },
+  { value: 'people', label: 'Тренеры и тарифы', panes: ['trainers', 'tariffs', 'reports'] },
   { value: 'content', label: 'Контент', panes: ['games', 'stickers', 'stories', 'look', 'import'] },
   { value: 'system', label: 'Система', panes: ['flags', 'versions', 'logs', 'export'] },
 ];

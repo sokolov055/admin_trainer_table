@@ -43,7 +43,11 @@ export default function TabBar({ tabs, active, onSelect, action = null }) {
         tabIndex={onTab ? undefined : -1}
         aria-current={current ? 'page' : undefined}
       >
-        <span className="tabbar__icon"><Icon size={21} /></span>
+        <span className="tabbar__icon" style={t.badge ? { position: 'relative' } : undefined}>
+          <Icon size={21} />
+          {/* Счётчик непрочитанных («Чаты», FT-808) */}
+          {t.badge > 0 && <span className="tabbar__badge" aria-label={`непрочитанных: ${t.badge}`}>{t.badge > 99 ? '99+' : t.badge}</span>}
+        </span>
         {t.label}
       </button>
     );

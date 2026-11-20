@@ -43,6 +43,8 @@ const output = await build({
       stub(/telegram\.js$/, 'telegram');
       stub(/icons\.jsx$/, 'icons');
       stub(/api\.js$/, 'api');
+      // Чаты (FT-808) — свой список и долгий запрос; календарь их не касается
+      stub(/chat[\\/]ChatList\.jsx$/, 'chat');
 
       bundle.onLoad({ filter: /.*/, namespace: 'calendar-test' }, (args) => {
         if (args.path === 'trainer-screens') return {
@@ -72,6 +74,7 @@ const output = await build({
             export const IconSliders=I; export const IconMenu=I; export const IconClose=I; export const IconBack=I;
             export const IconPhone=I; export const IconSearch=I; export const IconMoney=I; export const IconRefresh=I; export const IconPlan=I; export const IconCalendar=I; export const IconKey=I; export const IconProgress=I; export const IconEye=I; export const IconPalette=I; export const IconUserPlus=I; export const IconLink=I;`,
         };
+        if (args.path === 'chat') return { loader: 'jsx', contents: `export const ChatInbox=({children})=>children; export const TrainerChats=()=>null; export const IconChats=()=>null; export const useChatBadge=()=>0; export const useChatInbox=()=>({ enabled: false, chats: [], unread: 0 });` };
         if (args.path === 'my-games') return { loader: 'jsx', contents: 'export default () => null;' };
         if (args.path === 'library') return { loader: 'jsx', contents: `export default () => null; export const LIBRARY_PANES = [];` };
         if (args.path === 'admin') return { loader: 'jsx', contents: `export default () => null; export const ADMIN_PANES = [{ value: 'stats', label: 'Stats' }]; export const ADMIN_GROUPS = [{ value: 'analytics', label: 'Stats', panes: ['stats'] }]; export const adminGroupOf = () => ADMIN_GROUPS[0]; export const adminPanesOf = () => ADMIN_PANES;` };

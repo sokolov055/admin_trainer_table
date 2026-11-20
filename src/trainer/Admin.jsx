@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
+import ChatReports from '../chat/ChatReports.jsx';
 import { apiMutate, apiOnce } from '../api.js';
 import { useData } from '../useData.js';
 import {
@@ -42,6 +43,7 @@ export { ADMIN_PANES, ADMIN_GROUPS, adminGroupOf, adminPanesOf } from './admin-m
 
 export default function Admin({ pane }) {
   if (pane === 'trainers') return <Trainers />;
+  if (pane === 'reports') return <ChatReports />;
   if (pane === 'tariffs') return <Tariffs />;
   if (pane === 'games') return <Games />;
   if (pane === 'stickers') return <AdminStickers />;

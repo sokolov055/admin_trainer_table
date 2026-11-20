@@ -1,0 +1,58 @@
+// Снимки мессенджера (FT-808): клиент — вход и переписка, меню сообщения;
+// тренер — вкладка «Чаты» и переписка
+import { chromium } from 'playwright';
+import { createServer } from 'node:http';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, extname } from 'node:path';
+
+const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const OUT = join(ROOT, 'dist-demo');
+const DEST = process.argv[2] || join(ROOT, 'shot');
+if (!process.env.NO_BUILD) execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', 'dist-demo'], { cwd: ROOT, env: { ...process.env, VITE_MOCK: '1' }, stdio: 'ignore' });
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const server = createServer((req, res) => {
+  const path = decodeURIComponent(req.url.split('?')[0]);
+  const file = path === '/' ? join(OUT, 'index.html') : join(OUT, path);
+  const target = existsSync(file) && extname(file) ? file : join(OUT, 'index.html');
+  res.writeHead(200, { 'Content-Type': TYPES[extname(target)] || 'application/octet-stream' });
+  res.end(readFileSync(target));
+});
+await new Promise((r) => server.listen(0, '127.0.0.1', r));
+const origin = `http://127.0.0.1:${server.address().port}`;
+const browser = await chromium.launch();
+const errors = [];
+const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: false });
+page.on('pageerror', (e) => errors.push(e.message));
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+await page.goto(origin + '/');
+await page.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+await page.goto(origin + '/');
+await page.locator('.chat-entry').waitFor({ timeout: 15000 });
+await page.waitForTimeout(800);
+await page.screenshot({ path: `${DEST}-client-home.png` });
+await page.locator('.chat-entry').click();
+await page.locator('.chat-bubble').first().waitFor({ timeout: 10000 });
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${DEST}-client-thread.png` });
+await page.getByLabel('Сообщение', { exact: true }).fill('Хорошо, возьму резинку');
+await page.getByRole('button', { name: 'Отправить' }).click();
+await page.waitForTimeout(700);
+await page.screenshot({ path: `${DEST}-client-sent.png` });
+await page.locator('.chat-row--me .chat-bubble').last().click({ button: 'right' });
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${DEST}-client-menu.png` });
+await page.keyboard.press('Escape');
+
+await page.goto(origin + '/?mockRole=trainer');
+await page.getByRole('button', { name: /Чаты/ }).last().click({ timeout: 15000 });
+await page.locator('.chat-line').first().waitFor({ timeout: 10000 });
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${DEST}-trainer-list.png` });
+await page.locator('.chat-line').first().click();
+await page.locator('.chat-bubble').first().waitFor({ timeout: 10000 });
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${DEST}-trainer-thread.png` });
+await browser.close();
+server.close();
+console.log(errors.length ? 'errors:\n' + errors.join('\n') : 'ok');

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ChatInbox, ChatButton, TrainerChatCard } from '../chat/ChatList.jsx';
 import { Overview, Plan, Progress, Nutrition, WorkoutJournal } from './screens.jsx';
 import { Deferred } from '../lazy.js';
 import { Stories, GuideViewer, guideNote, hasGuide, summaryTopics, useStoryTopics } from '../stories.jsx';
@@ -115,7 +116,20 @@ const FAMILY = { id: 'family', label: 'Семья', note: 'Тренировки 
 // у тренера, открывшего карточку, привязываться нечему
 const TRAINER = { id: 'trainer', label: 'Мой тренер', note: 'ID и привязка к тренеру', Icon: IconLink };
 
-export default function ClientApp({ me, clientRow, preview }) {
+/**
+ * Чат с тренером (FT-808): только в своём кабинете — не в карточке клиента у
+ * тренера и не в «смотрю как клиент» (там писал бы тренер сам себе).
+ */
+export default function ClientApp(props) {
+  const { me, clientRow, preview } = props;
+  return (
+    <ChatInbox role="client" enabled={!clientRow && !preview && !(me && me.unlinked)}>
+      <ClientCabinet {...props} />
+    </ChatInbox>
+  );
+}
+
+function ClientCabinet({ me, clientRow, preview }) {
   const plankEnabled = usePlankAccess();
   const career = useCareer();
   const [view, setView] = useState('overview');
@@ -451,6 +465,7 @@ export default function ClientApp({ me, clientRow, preview }) {
             <h1 className="app__title">{onTab ? me.name : current.label}</h1>
             <p className="app__subtitle">{onTab ? current.label : me.name}</p>
           </div>
+          <ChatButton />
           <button
             className="icon-button"
             onClick={() => { setMenuOpen(true); haptic(); }}
@@ -533,6 +548,8 @@ export default function ClientApp({ me, clientRow, preview }) {
           {/* «Мой день» — кольца и совет (FT-738) вместо «Сегодня»; пока
               только тестовым (me.dayReview), остальным — прежние три числа */}
           {t.id === 'overview' && own && (me && me.dayReview ? <DayCard own /> : <TodayStrip onOpen={go} />)}
+          {/* Тренер и последнее сообщение (FT-808) — сразу под «Сегодня» */}
+          {t.id === 'overview' && !clientRow && !preview && <TrainerChatCard />}
           {/* Силовая с часов и первый день в режиме бывают не всегда — они
               встают под главной карточкой, а не над ней: появившись позже,
               не сдвигают «Оплачено вперёд» (аудит 24.10.2026) */}
