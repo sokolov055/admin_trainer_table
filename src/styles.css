@@ -6744,6 +6744,47 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .pv-body__belt { fill: none; stroke: var(--t); stroke-width: 3; stroke-linecap: round; }
 .pv-body__dot { fill: var(--t); }
 .pv-dot { flex: none; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--t); }
+/* «Сила», этап 2 (20.11.2026): рекорды, объём по мышцам, упражнения с графиками */
+.tone-none { --t: var(--text-muted); --t2: var(--text-secondary); }
+.pv-card__note { font-size: 13px; color: var(--text-muted); }
+.pv-records { margin-top: var(--space-4); }
+.pv-records__row { display: flex; gap: 10px; overflow-x: auto; margin: 6px calc(-1 * var(--space-4)) 0; padding: 0 var(--space-4) 4px; scroll-snap-type: x mandatory; scroll-padding-inline: var(--space-4); scrollbar-width: none; }
+.pv-records__row::-webkit-scrollbar { display: none; }
+.pv-record { position: relative; overflow: hidden; flex: none; width: 128px; padding: 10px 12px; border-radius: var(--radius-lg); color: #fff; scroll-snap-align: start;
+  background: linear-gradient(140deg, var(--t2), var(--t)); animation: pv-pop .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.pv-record b { display: block; margin: 2px 0; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pv-record small { display: block; font-size: 12px; color: rgba(255, 255, 255, .9); }
+.pv-record__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 2px; }
+.pv-record.is-fresh .pv-record__name { padding-right: 40px; }
+.pv-record__new { position: absolute; right: 8px; top: 8px; padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 800; background: rgba(255, 255, 255, .25); }
+.pv-record.is-fresh::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .35) 50%, transparent 70%);
+  transform: translateX(-100%); animation: pv-shine 2.8s 1s infinite; pointer-events: none; }
+.pv-bars { display: flex; align-items: flex-end; gap: 6px; height: 112px; margin-top: 10px; }
+.pv-bars__col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.pv-bars__stack { width: 100%; min-height: 2px; display: flex; flex-direction: column-reverse; overflow: hidden; border-radius: 6px; transform-origin: bottom; animation: pv-grow .8s cubic-bezier(.2, .8, .2, 1) both; }
+.pv-bars__stack i { display: block; flex-basis: 0; background: var(--t); }
+.pv-bars__col.is-now .pv-bars__stack { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pv-bars__days { display: flex; gap: 6px; margin-top: 4px; font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.pv-bars__days span { flex: 1; text-align: center; }
+.pv-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+.pv-legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 3px; background: var(--t); vertical-align: -1px; }
+.pv-lifts2 { display: grid; margin-top: 4px; }
+.pv-lift2 { display: grid; grid-template-columns: minmax(0, 1fr) 64px 3.8em; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.pv-lift2:last-child { border-bottom: 0; }
+.pv-lift2__name { display: grid; min-width: 0; }
+.pv-lift2__name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.pv-lift2__name small { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.pv-lift2__spark { width: 64px; height: 24px; }
+.pv-lift2__spark path { fill: none; stroke: var(--t); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: pv-draw 1s .2s cubic-bezier(.3, .7, .2, 1) forwards; }
+.pv-lift2 .pv-pill { justify-self: end; }
+@keyframes pv-grow { from { transform: scaleY(0); } }
+@keyframes pv-pop { from { transform: scale(.85); opacity: 0; } }
+@keyframes pv-shine { 40%, 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .pv-record, .pv-bars__stack { animation: none; }
+  .pv-record.is-fresh::after { display: none; }
+  .pv-lift2__spark path { animation: none; stroke-dashoffset: 0; }
+}
 @keyframes pv-draw { to { stroke-dashoffset: 0; } }
 @keyframes pv-fade { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {

@@ -2269,6 +2269,28 @@ const MOCK = {
     }],
     // «Мой путь» (этап 1 «Прогресса», 20.11.2026)
     journey: mockEmpty() ? null : { since: daysAgo(150).slice(0, 10), workouts: 46, streak: 6 },
+    // «Сила» (этап 2): рекорды, объём по неделям по мышцам, упражнения с графиками
+    strength: mockEmpty() ? null : {
+      records: [
+        { name: 'Присед со штангой', tone: 'legs', weight: 95, reps: 8, day: daysAgo(3).slice(0, 10), fresh: true },
+        { name: 'Тяга штанги в наклоне', tone: 'back', weight: 65, reps: 10, day: daysAgo(9).slice(0, 10), fresh: false },
+        { name: 'Жим лёжа', tone: 'chest', weight: 72.5, reps: 6, day: daysAgo(16).slice(0, 10), fresh: false },
+        { name: 'Подъём на бицепс', tone: 'arms', weight: 14, reps: 12, day: daysAgo(23).slice(0, 10), fresh: false },
+      ],
+      weeks: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+        const k = [0.55, 0.62, 0.48, 0.7, 0.76, 0.84, 0.95, 0.4][i];
+        return { week: daysAgo((7 - i) * 7).slice(0, 10), total: Math.round(14000 * k),
+          tones: { legs: Math.round(5600 * k), back: Math.round(3800 * k), chest: Math.round(3000 * k), arms: Math.round(1000 * k), core: Math.round(600 * k) } };
+      }),
+      growth: 18,
+      exercises: [
+        { name: 'Присед со штангой', tone: 'legs', first: 80, last: 95, points: [80, 82.5, 85, 87.5, 90, 92.5, 95] },
+        { name: 'Румынская тяга', tone: 'legs', first: 75, last: 85, points: [75, 77.5, 80, 80, 82.5, 85] },
+        { name: 'Тяга штанги в наклоне', tone: 'back', first: 60, last: 65, points: [60, 60, 62.5, 62.5, 65] },
+        { name: 'Жим лёжа', tone: 'chest', first: 70, last: 72.5, points: [70, 70, 72.5, 70, 72.5] },
+        { name: 'Жим гантелей сидя', tone: 'chest', first: 24, last: 24, points: [22, 24, 24, 24] },
+      ],
+    },
     lifts: mockEmpty() ? [] : [
       { name: 'Присед со штангой', block: 'Тренировка 2 — низ', weight: 95, prevWeight: 90, delta: 5, deltaPct: 5.6 },
       { name: 'Румынская тяга', block: 'Тренировка 2 — низ', weight: 85, prevWeight: 80, delta: 5, deltaPct: 6.3 },

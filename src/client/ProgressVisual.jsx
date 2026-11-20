@@ -255,6 +255,102 @@ export function StrengthCard({ lifts, onAll, open }) {
   );
 }
 
+/* ==========================================================================
+ * «Сила», этап 2 (макет progress-skip-chat-2026-11-19, 20.11.2026): рекорды
+ * плашками цвета мышц, объём по неделям столбиками по группам, упражнения с
+ * мини-графиками. Данные — client.progress → strength (server lib/strength.js)
+ * ========================================================================== */
+
+const TONE_ORDER = ['legs', 'back', 'chest', 'arms', 'core', 'other'];
+const TONE_TITLE = { legs: 'Ноги', back: 'Спина', chest: 'Грудь и плечи', arms: 'Руки', core: 'Кор', other: 'Другое' };
+const toneCls = (t) => (t && t !== 'other' ? 'tone-' + t : 'tone-none');
+const shortDay = (d) => String(d).slice(8, 10).replace(/^0/, '') + '.' + String(d).slice(5, 7);
+
+/** Рекорды лентой: новый за неделю — с «блеском» */
+export function RecordsStrip({ records }) {
+  if (!records || !records.length) return null;
+  return (
+    <section className="pv-records" aria-label="Рекорды">
+      <div className="pv-card__label">Рекорды</div>
+      <div className="pv-records__row">
+        {records.map((r, i) => (
+          <div key={i} className={'pv-record ' + toneCls(r.tone) + (r.fresh ? ' is-fresh' : '')} style={{ animationDelay: i * 0.06 + 's' }}>
+            {r.fresh && <span className="pv-record__new">новый</span>}
+            <small className="pv-record__name">{r.name}</small>
+            <b>{formatNumber(r.weight)} кг</b>
+            <small>{r.reps ? '× ' + r.reps + ' · ' : ''}{formatDate(r.day, false)}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Объём по неделям: столбик недели сложен из групп мышц */
+export function VolumeCard({ weeks, growth }) {
+  if (!weeks || !weeks.some((w) => w.total > 0)) return null;
+  const max = Math.max(...weeks.map((w) => w.total), 1);
+  const used = TONE_ORDER.filter((t) => weeks.some((w) => w.tones[t] > 0));
+  return (
+    <section className="pv-card" aria-label="Объём по неделям">
+      <div className="pv-weight__top">
+        <div className="pv-card__label">Объём по неделям</div>
+        {growth !== null && growth !== undefined && growth !== 0 && (
+          <span className={'pv-pill ' + (growth > 0 ? 'is-good' : 'is-off')}>{growth > 0 ? '+' : '−'}{Math.abs(growth)}% к прошлому месяцу</span>
+        )}
+      </div>
+      <div className="pv-bars" role="img" aria-label={'Тоннаж по неделям: ' + weeks.map((w) => shortDay(w.week) + ' — ' + w.total + ' кг').join(', ')}>
+        {weeks.map((w, i) => (
+          <div key={w.week} className={'pv-bars__col' + (i === weeks.length - 1 ? ' is-now' : '')}>
+            <div className="pv-bars__stack" style={{ height: (w.total / max) * 100 + '%', animationDelay: i * 0.05 + 's' }}>
+              {used.map((t) => (w.tones[t] > 0 ? <i key={t} className={toneCls(t)} style={{ flexGrow: w.tones[t] }} /> : null))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="pv-bars__days" aria-hidden="true">{weeks.map((w) => <span key={w.week}>{shortDay(w.week)}</span>)}</div>
+      <div className="pv-legend">{used.map((t) => <span key={t} className={toneCls(t)}>{TONE_TITLE[t]}</span>)}</div>
+    </section>
+  );
+}
+
+/** Упражнения с мини-графиком веса по занятиям */
+export function LiftsCard({ exercises, lifts, open, onAll }) {
+  if (!exercises || !exercises.length) return null;
+  const grew = (lifts || []).filter((l) => l.delta > 0).length;
+  const W = 64;
+  const H = 24;
+  return (
+    <section className="pv-card" aria-label="Упражнения">
+      <div className="pv-weight__top">
+        <div className="pv-card__label">Упражнения</div>
+        {lifts && lifts.length > 0 && <span className="pv-card__note">{grew} из {lifts.length} тяжелее за месяц</span>}
+      </div>
+      <div className="pv-lifts2">
+        {exercises.map((e, i) => {
+          const min = Math.min(...e.points);
+          const span = Math.max(...e.points) - min || 1;
+          const d = e.points.map((v, k) => (k ? 'L' : 'M') + ((k / (e.points.length - 1)) * (W - 4) + 2).toFixed(1) + ' ' + (3 + (1 - (v - min) / span) * (H - 6)).toFixed(1)).join(' ');
+          const delta = Math.round((e.last - e.first) * 10) / 10;
+          return (
+            <div key={i} className={'pv-lift2 ' + toneCls(e.tone)}>
+              <span className="pv-lift2__name"><strong>{e.name}</strong>
+                <small>{delta ? formatNumber(e.first) + ' → ' + formatNumber(e.last) + ' кг' : formatNumber(e.last) + ' кг держится'}</small></span>
+              <svg viewBox={`0 0 ${W} ${H}`} className="pv-lift2__spark" aria-hidden="true"><path d={d} pathLength="1" /></svg>
+              <span className={'pv-pill ' + (delta > 0 ? 'is-good' : delta < 0 ? 'is-off' : '')}>{delta ? signed(delta) : '='}</span>
+            </div>
+          );
+        })}
+      </div>
+      {lifts && lifts.length > 0 && (
+        <button type="button" className="pv-link" aria-expanded={open} onClick={onAll}>
+          {open ? 'Свернуть рабочие веса' : 'Рабочие веса месяца ›'}
+        </button>
+      )}
+    </section>
+  );
+}
+
 function Ring({ share, color, value, label }) {
   const deg = Math.max(0, Math.min(1, share || 0)) * 360;
   return (

@@ -33,7 +33,7 @@ import WeekEditor from './WeekEditor.jsx';
 import WeekCard from './WeekCard.jsx';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
-import { WeightCard, MeasuresCard, StrengthCard, WeekRings, JourneyCard } from './ProgressVisual.jsx';
+import { WeightCard, MeasuresCard, StrengthCard, WeekRings, JourneyCard, RecordsStrip, VolumeCard, LiftsCard } from './ProgressVisual.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 import WorkoutBoundary from '../WorkoutBoundary.jsx';
 import SwipeRow from '../SwipeRow.jsx';
@@ -1751,6 +1751,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
   });
 
   const lifts = (progress && progress.lifts) || [];
+  const strength = (progress && progress.strength) || null;
   const grew = lifts.filter((l) => l.delta > 0);
   const hasRows = series.some((s) => s.rows.length > 0);
 
@@ -1996,7 +1997,13 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       </div>
 
       <div {...pane('strength')}>
-      <StrengthCard lifts={lifts} open={allLifts} onAll={() => { haptic(); setAllLifts((v) => !v); }} />
+      {/* «Сила» картинками (этап 2, 20.11.2026): рекорды, объём по мышцам,
+          упражнения с графиками; без журнала — прежняя карточка «За месяц» */}
+      {strength && <RecordsStrip records={strength.records} />}
+      {strength && <VolumeCard weeks={strength.weeks} growth={strength.growth} />}
+      {strength && strength.exercises.length > 0
+        ? <LiftsCard exercises={strength.exercises} lifts={lifts} open={allLifts} onAll={() => { haptic(); setAllLifts((v) => !v); }} />
+        : <StrengthCard lifts={lifts} open={allLifts} onAll={() => { haptic(); setAllLifts((v) => !v); }} />}
       {!familyRow && <Summary clientRow={clientRow} compact={!allLifts} />}
       {lifts.length > 0 && allLifts && (
         <Section
@@ -2030,7 +2037,7 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
         </Section>
       )}
 
-      {lifts.length === 0 && <Empty icon={IconProgress} title="Рабочих весов пока нет" text="Они подтянутся из программы месяца, когда появятся тренировки." />}
+      {lifts.length === 0 && !strength && <Empty icon={IconProgress} title="Рабочих весов пока нет" text="Они подтянутся из программы месяца, когда появятся тренировки." />}
       </div>
 
       {!familyRow && <div {...pane('activity')}>
