@@ -109,6 +109,36 @@ export default function HealthDaily({ clientRow }) {
 }
 
 /**
+ * Сон и пульс покоя двумя плитками — в «Активности» (этап 3 «Прогресса»,
+ * 20.11.2026); остальное «Здоровье» — по «Все данные». Нет данных — ничего.
+ */
+export function HealthTiles({ clientRow }) {
+  const { data } = useData('health.daily.list', clientRow ? { clientRow, days: DAYS } : { days: DAYS }, [clientRow]);
+  const s = data ? healthSummary(ownRows(data)) : null;
+  if (!s || (!s.sleep && !s.restingHr)) return null;
+  const sleepDelta = s.sleep && s.sleep.avg7 !== null ? s.sleep.min - s.sleep.avg7 : null;
+  return (
+    <div className="health-tiles">
+      {s.sleep && (
+        <div className="health-tile">
+          <div className="health-tile__label">Сон</div>
+          <b>{formatMinutes(s.sleep.min)}</b>
+          <small>{sleepDelta === null || Math.abs(sleepDelta) < 10 ? (s.sleep.lastNight ? 'прошлая ночь' : 'позапрошлая ночь')
+            : (sleepDelta > 0 ? '+' : '−') + formatMinutes(Math.abs(sleepDelta)) + ' к обычному'}</small>
+        </div>
+      )}
+      {s.restingHr && (
+        <div className="health-tile">
+          <div className="health-tile__label">Пульс покоя</div>
+          <b>{formatNumber(s.restingHr.value)} <span className="qty__unit">уд/мин</span></b>
+          <small>{trendLine(s.restingHr, 'уд') || 'последний замер'}</small>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * «Потрачено: N ккал (с часов)» за выбранный день в «Питании». Тот же
  * запрос, что у блока в «Прогрессе», — один кэш; нет данных — строки нет
  */

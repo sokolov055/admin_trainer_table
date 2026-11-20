@@ -1443,8 +1443,9 @@ test('мои тренировки: программа, прогресс, пит�
       if (tab === 'Прогресс') {
         // Тренировки с часов — рядом с шагами, во вкладке «Активность» (11.11.2026);
         // совпавшая с занятием совмещена
+        // С 20.11.2026 (этап 3 «Прогресса») кнопка — «Все данные «Здоровья» ›»
         await phone.getByRole('radio', { name: 'Активность', exact: true }).click();
-        await phone.getByRole('button', { name: 'Сон, пульс и тренировки с часов' }).click();
+        await phone.getByRole('button', { name: 'Все данные «Здоровья» ›' }).click();
         await phone.getByText('Тренировки с часов').waitFor({ timeout: 5000 });
         await phone.getByText('Совмещено с «Верх»').waitFor({ timeout: 5000 });
         if (process.env.SHOT_HW) { await phone.getByText('Тренировки с часов').scrollIntoViewIfNeeded(); await phone.screenshot({ path: process.env.SHOT_HW }); }

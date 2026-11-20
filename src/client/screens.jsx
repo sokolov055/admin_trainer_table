@@ -10,7 +10,7 @@ import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures }
 import { LineChart } from '../charts.jsx';
 import Steps from './Steps.jsx';
 import HealthWorkouts from './HealthWorkouts.jsx';
-import HealthDaily, { SpentKcal } from './HealthDaily.jsx';
+import HealthDaily, { SpentKcal, HealthTiles } from './HealthDaily.jsx';
 import DayCard from './DayReview.jsx';
 import Goals from './Goals.jsx';
 import Summary from './Summary.jsx';
@@ -33,7 +33,7 @@ import WeekEditor from './WeekEditor.jsx';
 import WeekCard from './WeekCard.jsx';
 import { holdToReorder } from '../hold-reorder.js';
 import { recentDeltas, savedPeriod, savePeriod, PROGRESS_TABS, savedProgressTab, saveProgressTab } from './deltas.js';
-import { WeightCard, MeasuresCard, StrengthCard, WeekRings, JourneyCard, RecordsStrip, VolumeCard, LiftsCard } from './ProgressVisual.jsx';
+import { WeightCard, MeasuresCard, StrengthCard, WeekRings, JourneyCard, RecordsStrip, VolumeCard, LiftsCard, MonthCard, StepsWeek } from './ProgressVisual.jsx';
 import { lazyPage, Deferred } from '../lazy.js';
 import WorkoutBoundary from '../WorkoutBoundary.jsx';
 import SwipeRow from '../SwipeRow.jsx';
@@ -2041,12 +2041,15 @@ export function Progress({ clientRow, clientView = false, familyRow = null, self
       </div>
 
       {!familyRow && <div {...pane('activity')}>
-        <WeekRings clientRow={clientRow} />
+        {/* Месяц сеткой вместо колец недели — кольца на главной (этап 3, 20.11.2026) */}
+        {progress && progress.activity ? <MonthCard activity={progress.activity} /> : <WeekRings clientRow={clientRow} />}
         <Goals clientRow={clientRow} preview={clientView} compact={!allHealth} />
-        <Steps clientRow={clientRow} self={self} preview={clientView} />
-        {/* Здоровье и тренировки с часов — по кнопке: много цифр (12.11.2026) */}
+        {/* Шаги недели с линией цели; подключение и две недели — прежним блоком */}
+        <StepsWeek clientRow={clientRow} more={allHealth} fallback={<Steps clientRow={clientRow} self={self} preview={clientView} />} />
+        <HealthTiles clientRow={clientRow} />
+        {/* Остальное здоровье и тренировки с часов — по кнопке: много цифр (12.11.2026) */}
         <button type="button" className="pv-link pv-link--block" aria-expanded={allHealth} onClick={() => { haptic(); setAllHealth((v) => !v); }}>
-          {allHealth ? 'Свернуть здоровье' : 'Сон, пульс и тренировки с часов'}
+          {allHealth ? 'Свернуть' : 'Все данные «Здоровья» ›'}
         </button>
         {allHealth && <HealthDaily clientRow={clientRow} />}
         {allHealth && <HealthWorkouts clientRow={clientRow} self={self} preview={clientView} />}

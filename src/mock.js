@@ -2269,6 +2269,17 @@ const MOCK = {
     }],
     // «Мой путь» (этап 1 «Прогресса», 20.11.2026)
     journey: mockEmpty() ? null : { since: daysAgo(150).slice(0, 10), workouts: 46, streak: 6 },
+    // «Активность» (этап 3): месяц сеткой
+    activity: mockEmpty() ? null : (() => {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      const tones = ['legs', 'back', 'chest', 'legs', 'back', 'arms', ''];
+      const today = now.getDate();
+      const days = [2, 4, 6, 9, 11, 13, 16, 18, 20, 23, 25, 27].filter((d) => d <= today).map((day, i) => ({ day, tone: tones[i % tones.length] }));
+      return { month: y + '-' + String(m + 1).padStart(2, '0'), today, length: new Date(y, m + 1, 0).getDate(),
+        offset: (new Date(y, m, 1).getDay() + 6) % 7, days, paused: [14, 15].filter((d) => d <= today), goal: 13, streak: 6 };
+    })(),
     // «Сила» (этап 2): рекорды, объём по неделям по мышцам, упражнения с графиками
     strength: mockEmpty() ? null : {
       records: [

@@ -6777,6 +6777,29 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 .pv-lift2__spark { width: 64px; height: 24px; }
 .pv-lift2__spark path { fill: none; stroke: var(--t); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: pv-draw 1s .2s cubic-bezier(.3, .7, .2, 1) forwards; }
 .pv-lift2 .pv-pill { justify-self: end; }
+/* «Активность», этап 3 (20.11.2026): месяц сеткой, шаги недели, плитки здоровья */
+.pv-month__dows, .pv-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.pv-month__dows { margin-top: 10px; margin-bottom: 4px; font-size: 11px; color: var(--text-muted); text-align: center; }
+.pv-month__cell { display: block; aspect-ratio: 1.35; border-radius: 7px; background: var(--surface-sunken); }
+.pv-month__cell.is-empty { visibility: hidden; }
+.pv-month__cell.is-future { opacity: .45; }
+.pv-month__cell.is-on { background: linear-gradient(140deg, var(--t), var(--t2)); animation: pv-pop .4s cubic-bezier(.2, .9, .3, 1.2) both; }
+.pv-month__cell.is-paused, .pv-legend__pause::before { background: repeating-linear-gradient(45deg, var(--surface-sunken) 0 4px, color-mix(in srgb, var(--mg-back) 28%, var(--surface-sunken)) 4px 8px) !important; }
+.pv-month__cell.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pv-steps { position: relative; display: flex; align-items: flex-end; gap: 6px; height: 88px; margin-top: 10px; }
+.pv-steps__col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.pv-steps__bar { display: block; width: 100%; border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--ring-move, #20b486) 35%, var(--surface-sunken));
+  transform-origin: bottom; animation: pv-grow .7s cubic-bezier(.2, .8, .2, 1) both; }
+.pv-steps__bar.is-met { background: var(--ring-move, #20b486); }
+.pv-steps__bar.is-today { opacity: .6; }
+.pv-steps__goal { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed color-mix(in srgb, var(--ring-move, #20b486) 70%, var(--text)); z-index: 1; pointer-events: none; }
+.pv-steps__avg { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
+.health-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: var(--space-4); }
+.health-tile { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.health-tile__label { font-size: 13px; color: var(--text-muted); }
+.health-tile b { display: block; margin: 2px 0; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.health-tile small { font-size: 12px; color: var(--text-secondary); }
+@media (prefers-reduced-motion: reduce) { .pv-month__cell.is-on, .pv-steps__bar { animation: none; } }
 @keyframes pv-grow { from { transform: scaleY(0); } }
 @keyframes pv-pop { from { transform: scale(.85); opacity: 0; } }
 @keyframes pv-shine { 40%, 100% { transform: translateX(100%); } }

@@ -351,6 +351,100 @@ export function LiftsCard({ exercises, lifts, open, onAll }) {
   );
 }
 
+/* ==========================================================================
+ * «Активность», этап 3 (макет progress-skip-chat-2026-11-19, 20.11.2026):
+ * месяц сеткой цветами мышц, шаги недели столбиками с линией цели
+ * ========================================================================== */
+
+const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const DOWS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+/** Месяц сеткой: день тренировки — цветом главной группы, пауза — штриховкой */
+export function MonthCard({ activity }) {
+  if (!activity || !activity.length) return null;
+  const byDay = new Map(activity.days.map((d) => [d.day, d.tone]));
+  const paused = new Set(activity.paused || []);
+  const done = activity.days.length;
+  const cells = [];
+  for (let i = 0; i < activity.offset; i++) cells.push(<i key={'e' + i} className="pv-month__cell is-empty" />);
+  for (let d = 1; d <= activity.length; d++) {
+    const trained = byDay.has(d);
+    const tone = byDay.get(d);
+    const cls = 'pv-month__cell' + (trained ? ' is-on ' + toneCls(tone || 'other') : paused.has(d) ? ' is-paused' : '')
+      + (d === activity.today ? ' is-today' : '') + (d > activity.today ? ' is-future' : '');
+    cells.push(<i key={d} className={cls} style={trained ? { animationDelay: (d * 0.012).toFixed(3) + 's' } : undefined}
+      title={d + (trained ? ' — тренировка' : paused.has(d) ? ' — пауза' : '')} />);
+  }
+  const usedTones = TONE_ORDER.filter((t) => activity.days.some((d) => (d.tone || 'other') === t));
+  const left = activity.goal ? Math.max(0, activity.goal - done) : null;
+  return (
+    <section className="pv-card" aria-label={'Тренировки за месяц: ' + done}>
+      <div className="pv-weight__top">
+        <div className="pv-card__label">{MONTH_NAMES[Number(activity.month.slice(5, 7)) - 1]}</div>
+        {activity.streak > 0 && <span className="pv-pill is-good">🔥 {activity.streak} {plural(activity.streak, 'неделя', 'недели', 'недель')} подряд</span>}
+      </div>
+      <div className="pv-month__dows" aria-hidden="true">{DOWS.map((d) => <span key={d}>{d}</span>)}</div>
+      <div className="pv-month" aria-hidden="true">{cells}</div>
+      {(usedTones.length > 0 || paused.size > 0) && (
+        <div className="pv-legend">
+          {usedTones.map((t) => <span key={t} className={toneCls(t)}>{t === 'other' ? 'Тренировка' : TONE_TITLE[t]}</span>)}
+          {paused.size > 0 && <span className="pv-legend__pause">Пауза</span>}
+        </div>
+      )}
+      <p className="pv-weight__trend">
+        {done} {plural(done, 'тренировка', 'тренировки', 'тренировок')}
+        {activity.goal ? ' · цель ' + activity.goal + (left ? ' · осталось ' + left : ' · цель выполнена 🎉') : ''}
+      </p>
+    </section>
+  );
+}
+
+/** Шаги недели: 7 столбиков, пунктир — цель; ниже цели — бледнее */
+export function StepsWeek({ clientRow, fallback = null, more = false }) {
+  const steps = useData('steps.list', clientRow ? { clientRow, days: 14 } : { days: 14 }, [clientRow]);
+  const awards = useData('client.awards', clientRow ? { clientRow } : {}, [clientRow]);
+  const rows = (steps.data && steps.data.days) || [];
+  if (steps.loading) return null;
+  if (!rows.length) return fallback;
+  const member = rows[0].member;
+  const byDate = new Map(rows.filter((r) => r.member === member).map((r) => [r.date, r.steps || 0]));
+  const goal = (awards.data && awards.data.goal && awards.data.goal.steps) || 8000;
+  const today = new Date();
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    days.push({ key, label: i === 0 ? 'сег' : DOWS[(d.getDay() + 6) % 7], value: byDate.has(key) ? byDate.get(key) : null, today: i === 0 });
+  }
+  const values = days.filter((d) => d.value !== null && !d.today).map((d) => d.value);
+  const average = values.length ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : null;
+  const met = days.filter((d) => d.value !== null && d.value >= goal).length;
+  const max = Math.max(goal * 1.15, ...days.map((d) => d.value || 0));
+  return (
+    <>
+      <section className="pv-card" aria-label="Шаги за неделю">
+        <div className="pv-weight__top">
+          <div className="pv-card__label">Шаги · неделя</div>
+          {average !== null && <span className="pv-card__note"><b className="pv-steps__avg">{formatNumber(average)}</b> в среднем</span>}
+        </div>
+        <div className="pv-steps" role="img" aria-label={days.map((d) => d.label + ' — ' + (d.value === null ? 'нет данных' : d.value)).join(', ')}>
+          <i className="pv-steps__goal" style={{ bottom: (goal / max) * 100 + '%' }} aria-hidden="true" />
+          {days.map((d, i) => (
+            <span key={d.key} className="pv-steps__col">
+              <i className={'pv-steps__bar' + (d.value !== null && d.value >= goal ? ' is-met' : '') + (d.today ? ' is-today' : '')}
+                style={{ height: d.value ? Math.max(2, (d.value / max) * 100) + '%' : '2px', animationDelay: i * 0.05 + 's' }} />
+            </span>
+          ))}
+        </div>
+        <div className="pv-bars__days" aria-hidden="true">{days.map((d) => <span key={d.key}>{d.label}</span>)}</div>
+        <p className="pv-weight__trend">Пунктир — цель {formatNumber(goal)}. Выполнена {met} {plural(met, 'день', 'дня', 'дней')} из 7.</p>
+      </section>
+      {more && fallback}
+    </>
+  );
+}
+
 function Ring({ share, color, value, label }) {
   const deg = Math.max(0, Math.min(1, share || 0)) * 360;
   return (
