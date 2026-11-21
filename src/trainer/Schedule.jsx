@@ -9,8 +9,10 @@ import { haptic } from '../telegram.js';
 import { Panel, Note, Field, Options, ErrorState, BackButton, Sheet, useLeaveGuard } from '../ui.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { scheduledPlan, sessionQueue, dateKey as dayKey } from '../program-timeline.js';
+import { initials } from '../chat/chat-model.js';
+import { ChatGlyph, useChatInbox } from '../chat/ChatList.jsx';
 import { requestStart } from '../client/start-request.js';
-import { IconAlert, IconBack, IconCheck, IconChevron, IconCopy, IconMenu, IconPlus } from '../icons.jsx';
+import { IconAlert, IconBack, IconCheck, IconChevron, IconClose, IconCopy, IconMenu, IconPen, IconPlay, IconPlus, IconSwap, IconUser } from '../icons.jsx';
 import {
   addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
   rangeOf, sameTimeOn, shifted, startOfDay,
@@ -119,6 +121,9 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   const [view, setViewState] = useState(readView);
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [editing, setEditing] = useState(null); // null | {} — новое | событие
+  const [selectedId, setSelectedId] = useState(null);
+  const [formMode, setFormMode] = useState('edit');
+  const chat = useChatInbox();
   const [preset, setPreset] = useState(null); // время нового занятия из сетки
   // Прокрутка по часам ставится заново только по этому счётчику: открыли,
   // сменили вид, «Сегодня», выбрали дату. Листание её не трогает
@@ -144,7 +149,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   // раньше набранное пропадало от жеста от края (аудит 24.10.2026)
   const [formDirty, setFormDirty] = useState(false);
   const [delFailure, setDelFailure] = useState(null);
-  const closeForm = () => { setEditing(null); setPreset(null); setFormDirty(false); };
+  const closeForm = () => { setEditing(null); setPreset(null); setFormDirty(false); setFormMode('edit'); };
   const formGuard = useLeaveGuard(formDirty, closeForm);
   useBackGesture(formGuard.leave, !!editing, null, { swipe: !formDirty });
 
@@ -246,12 +251,12 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
   function today() { leap(new Date()); }
   const jump = (d) => leap(d);
   const openDay = (d) => { setAnchor(startOfDay(d)); setView('day'); };
-  const openEvent = (e) => { if (!e.moving) { setEditing(e); haptic(); } };
+  const openEvent = (e) => { if (!e.moving) { setSelectedId(e.id); haptic(); } };
 
   // Сочетания клавиш на компьютере — как в Google: ←/→, T — сегодня, D/X/W/M/A — вид
   const keyRef = useRef(null);
   keyRef.current = (e) => {
-    if (!active || editing || ask || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!active || editing || selectedId || ask || e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     if (document.querySelector('.drawer--open, [role="dialog"][aria-modal="true"]')) return;
@@ -284,35 +289,41 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
     return () => clearTimeout(t);
   }, [undo]);
 
+  const clientList = clients.data?.clients || [];
+  const selected = events.find((e) => e.id === selectedId);
+  const removePersonal = (e) => {
+    setSelectedId(null);
+    closeForm();
+    setUndo(null);
+    setDelFailure(null);
+    haptic('success');
+    del.remove(e.id, e, 'Событие удалено');
+  };
+  const copy = (e) => {
+    const start = new Date(e.startsAt);
+    setPreset({ date: startOfDay(start), minutes: start.getHours() * 60 + start.getMinutes() });
+    setEditing({ clientRow: e.clientRow || '', personal: !!e.personal, title: e.personal ? e.title : '',
+      duration: durationOf(e), copyOf: e.clientName || e.title || '' });
+    setFormMode('edit');
+    haptic();
+  };
+
   if (editing) {
     return (
       <div className="cal-form">
-      <EventForm
-        key={editing.id || editing.copyKey || 'new'}
-        event={editing}
-        preset={preset}
-        onCopy={(e) => {
-          // Копия — на те же дату и время (решение владельца): тренер правит
-          // их перед сохранением
-          const s0 = new Date(e.startsAt);
-          setPreset({ date: startOfDay(s0), minutes: s0.getHours() * 60 + s0.getMinutes() });
-          setEditing({ copyKey: 'copy-' + e.id + '-' + Date.now(), clientRow: e.clientRow || '',
-            personal: !!e.personal, title: e.personal ? e.title : '',
-            duration: Math.round((new Date(e.endsAt) - s0) / 60000), copyOf: e.clientName || e.title || '' });
-          haptic();
-        }}
-        clients={(clients.data && clients.data.clients) || []}
-        onOpenClient={onOpenClient}
-        onDone={(res) => { closeForm(); setUnpaid(!!(res && res.unpaid)); setTick((t) => t + 1); }}
-        onCancel={formGuard.leave}
-        confirm={formGuard.confirm}
-        onDirty={setFormDirty}
-        onRemovePersonal={(e) => { closeForm(); setUndo(null); setDelFailure(null); haptic('success'); del.remove(e.id, e, 'Событие удалено'); }}
-      />
+        <EventForm
+          event={editing}
+          mode={formMode}
+          preset={preset}
+          clients={clientList}
+          onDone={(res) => { closeForm(); setSelectedId(null); setUnpaid(!!res?.unpaid); setTick((t) => t + 1); }}
+          onCancel={formGuard.leave}
+          confirm={formGuard.confirm}
+          onDirty={setFormDirty}
+        />
       </div>
     );
   }
-
 
   // Новое событие: из сетки — на нажатое время; кнопкой «+» — на ближайший
   // целый час сегодня, если сегодня на экране, иначе на 10:00 первого дня
@@ -483,6 +494,20 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
           экран, а кнопка всегда под пальцем над нижним меню */}
       <button type="button" className="cal-fab" aria-label="Добавить событие" onClick={() => create()}><IconPlus size={24} /></button>
 
+      {selected && active && !chat.open && (
+        <EventSheet
+          key={selected.id}
+          event={selected}
+          clients={clientList}
+          chat={chat}
+          onClose={() => setSelectedId(null)}
+          onEdit={(mode) => { setFormMode(mode); setEditing(selected); haptic(); }}
+          onCopy={() => copy(selected)}
+          onRemovePersonal={() => removePersonal(selected)}
+          onOpenClient={onOpenClient}
+          onProgramSaved={() => setTick((t) => t + 1)}
+        />
+      )}
       {ask && <MoveAsk ask={ask} onAnswer={answer} />}
       {del.bar}
       {undoShown && typeof document !== 'undefined' && createPortal(
@@ -606,7 +631,7 @@ function Dumbbell() {
  * «▶ Начать» — сразу тренировка у клиента, «другое ▾» — провести в эту
  * запись другое занятие или ничего (правка недели, как в редакторе недель)
  */
-function SessionRow({ item, pair, onStart, onSaved }) {
+function SessionRow({ item, pair, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState('');
   const edit = item.edit;
@@ -643,7 +668,139 @@ function SessionRow({ item, pair, onStart, onSaved }) {
         )}
         {failure && <em>{failure}</em>}
       </span>
-      {item.id && <button type="button" className="schedule__session-go" aria-label={'Начать тренировку ' + item.title} onClick={() => { haptic(); onStart(); }}>▶</button>}
+    </div>
+  );
+}
+
+function EventSheet({ event, clients, chat, onClose, onEdit, onCopy, onRemovePersonal, onOpenClient, onProgramSaved }) {
+  const start = new Date(event.startsAt);
+  const title = event.clientName || event.title || 'Занятие';
+  const client = clients.find((c) => Number(c.row) === Number(event.clientRow));
+  const sessions = event.sessions || [];
+  const planned = sessions.filter((s) => s.id);
+  const canMove = movable(event);
+  const canEdit = !event.cancelledCharged;
+  const hasClient = !event.personal && !!event.clientRow;
+  const scheduledClients = planned.length ? planned : [{ row: event.clientRow, id: '', title: '', name: '' }];
+  const thread = chat.chats?.find((c) => Number(c.clientRow) === Number(event.clientRow) && !c.member);
+  const [chatHint, setChatHint] = useState('');
+  const write = () => {
+    haptic();
+    if (chat.enabled && thread) {
+      chat.setOpen({ clientRow: thread.clientRow, member: thread.member, name: title });
+      return;
+    }
+    setChatHint(!chat.ready ? 'Чат ещё не загрузился. Попробуйте ещё раз.'
+      : chat.enabled ? 'Чат с этим клиентом пока недоступен.' : 'Чаты в приложении пока выключены.');
+  };
+  const openWorkout = (row, target) => {
+    const person = clients.find((c) => Number(c.row) === Number(row)) || { row, name: title };
+    requestStart(row, target);
+    onOpenClient(person, 'plan');
+  };
+  const heading = <span className="cal-detail__title">{hasClient && <span className="cal-detail__avatar" aria-hidden="true">{initials(title)}</span>}{title}</span>;
+  const date = start.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
+
+  return (
+    <Sheet title={heading} className="cal-detail" onClose={onClose}
+      action={canEdit && <button type="button" className="icon-button" aria-label="Редактировать событие" onClick={() => onEdit('edit')}><IconPen size={18} /></button>}>
+      <div className="cal-detail__summary">
+        <div className="cal-detail__when">
+          <div>{date} · {isAllDay(event) ? 'Весь день' : hm(event.startsAt) + '–' + hm(event.endsAt) + ' · ' + durationOf(event) + ' мин'}</div>
+          <div className="cal-detail__tools">
+            {canEdit && <button type="button" className="icon-button" aria-label="Копировать событие" onClick={onCopy}><IconCopy size={17} /></button>}
+          </div>
+        </div>
+        {event.cancelledCharged && <Note tone="info">Отменено клиентом, занятие списано.</Note>}
+        {event.personal && <p className="small muted">Личное событие</p>}
+        {hasClient && !event.cancelledCharged && onOpenClient && (
+          event.done
+            ? <EventReports event={event} onOpen={openWorkout} />
+            : scheduledClients.map((s) => (
+              <button key={s.row} type="button" className="button button--primary button--block cal-detail__start"
+                onClick={() => openWorkout(s.row, { blockId: s.id })}>
+                <IconPlay size={17} />Начать тренировку{s.title && ' · ' + (scheduledClients.length > 1 && s.name ? s.name + ': ' : '') + s.title}
+              </button>
+            ))
+        )}
+        <div className="cal-detail__actions">
+          {canMove && <DetailAction icon={IconSwap} onClick={() => onEdit('move')}>Перенести</DetailAction>}
+          {canEdit && (event.personal
+            ? <DetailAction icon={IconClose} onClick={onRemovePersonal}>Удалить</DetailAction>
+            : <DetailAction icon={IconClose} onClick={() => onEdit('cancel')}>Отменить</DetailAction>)}
+          {hasClient && <DetailAction icon={ChatGlyph} onClick={write}>Написать</DetailAction>}
+          {hasClient && onOpenClient && (
+            <DetailAction icon={IconUser} onClick={() => onOpenClient(client || { row: event.clientRow, name: title }, 'overview')}>Карточка</DetailAction>
+          )}
+        </div>
+        {chatHint && <p className="small muted" role="status">{chatHint}</p>}
+        {hasClient && <EventClientDetails key={event.clientRow} row={event.clientRow} unpaid={event.unpaid} />}
+        {hasClient && canEdit && (
+          <div className="cal-detail__program">
+            {sessions.map((s) => (
+              <SessionRow key={s.row} item={s} pair={sessions.length > 1} onSaved={onProgramSaved} />
+            ))}
+            {onOpenClient && <button type="button" className="button button--ghost" onClick={() => onOpenClient(client || { row: event.clientRow, name: title }, 'plan')}>Программа клиента</button>}
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function DetailAction({ icon: Icon, children, onClick }) {
+  return <button type="button" className="button" onClick={onClick}><Icon size={19} />{children}</button>;
+}
+
+function EventClientDetails({ row, unpaid }) {
+  const overview = useData('client.overview', { clientRow: row }, [row]);
+  const wishes = useData('wish.list', { clientRow: row }, [row]);
+  const client = overview.data;
+  const left = client?.payer ? client.payer.trainingsLeft : client?.trainingsLeft;
+  const wish = wishes.data?.wishes?.find((w) => w.status !== 'done' && w.text);
+  return (
+    <dl className="cal-detail__meta">
+      {(unpaid || left != null) && (
+        <div><dt>Абонемент</dt><dd className={unpaid ? 'cal-detail__unpaid' : undefined}>
+          {unpaid ? 'Не оплачено' : 'Осталось ' + Math.max(0, left) + (client.packageCount ? ' из ' + client.packageCount : '')}
+        </dd></div>
+      )}
+      {client?.lastTrainingDate && (
+        <div><dt>Последнее занятие</dt><dd>{new Date(client.lastTrainingDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</dd></div>
+      )}
+      {wish && <div><dt>Пожелание клиента</dt><dd>{wish.text}</dd></div>}
+      {(overview.error || wishes.error) && <div><dd role="status">Не удалось загрузить сведения о клиенте. Откройте карточку занятия ещё раз.</dd></div>}
+    </dl>
+  );
+}
+
+function EventReports({ event, onOpen }) {
+  const participants = event.sessions?.length
+    ? event.sessions
+    : [{ row: event.clientRow }];
+  return participants.map((p) => <EventReport key={p.row} event={event} participant={p} named={participants.length > 1} onOpen={onOpen} />);
+}
+
+function EventReport({ event, participant, named, onOpen }) {
+  const row = participant.row;
+  const journal = useData('workout.list', { clientRow: row }, [row]);
+  const reports = (journal.data?.sessions || []).filter((s) => {
+    const started = Date.parse(s.startedAt);
+    return s.status === 'completed' && started >= Date.parse(event.startsAt) && started < Date.parse(event.endsAt);
+  });
+  const matching = participant.id ? reports.filter((s) => s.sourceBlockId === participant.id) : reports;
+  const report = matching.length === 1 ? matching[0] : null;
+  return (
+    <div className="cal-detail__report">
+      {report ? (
+        <button type="button" className="button button--primary button--block" onClick={() => onOpen(row, { sessionId: report.id })}>
+          Открыть отчёт{named && participant.name ? ' · ' + participant.name : ''}
+        </button>
+      ) : (
+        <p className="small muted" role="status">Проведено · {journal.loading ? 'ищем отчёт…'
+          : journal.error ? 'не удалось загрузить отчёт. Откройте карточку ещё раз.'
+          : 'отчёт для этой записи не найден'}</p>
+      )}
     </div>
   );
 }
@@ -1609,7 +1766,7 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
 }
 
 /** Создать, перенести или удалить занятие либо личное событие */
-function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenClient, confirm = null, onDirty, onRemovePersonal }) {
+function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = null, onDirty }) {
   // Новое — на время, куда нажали в сетке (или 10:00 опорного дня)
   const base = (preset && preset.date) || startOfDay(new Date());
   const presetMinutes = preset && Number.isFinite(preset.minutes) ? preset.minutes : 10 * 60;
@@ -1627,7 +1784,7 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
   // Шаг подтверждения: 'move' — что это за перенос, 'cancel' — кто отменил
-  const [step, setStep] = useState(null);
+  const [step, setStep] = useState(mode === 'cancel' ? 'cancel' : null);
   const [change, setChange] = useState('');
   const [who, setWho] = useState('');
   const [charge, setCharge] = useState(null); // null — по умолчанию (поздняя → да)
@@ -1635,7 +1792,7 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
   // Есть ли что терять при выходе — против значений, с которыми открыли
   const snapshot = JSON.stringify([clientRow, kind, title, date, time, minutes, change, who, charge, reason]);
   const [initial] = useState(snapshot);
-  const dirty = !event.cancelledCharged && snapshot !== initial;
+  const dirty = mode !== 'cancel' && snapshot !== initial;
   useEffect(() => { if (onDirty) onDirty(dirty); }, [dirty]);
 
   const active = clients.filter((c) => !c.archived).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
@@ -1671,84 +1828,62 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
   }));
 
   const remove = () => run(() => apiMutate('trainer.schedule.delete', {
-    id: event.id, who: personal ? 'error' : who, reason, ...(charged ? { charge: true } : {}),
+    id: event.id, who, reason, ...(charged ? { charge: true } : {}),
   }));
-
-  // Отменено со списанием: событие в календаре ради денег, править нечего
-  if (event.cancelledCharged) {
-    return (
-      <>
-        <BackButton label="Расписание" onClick={onCancel} />
-        <Panel pad>
-          <div className="library__form">
-            <strong>{event.clientName || event.title}</strong>
-            <p className="small muted" style={{ margin: 0 }}>
-              {new Date(event.startsAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <Note tone="info">Отменено клиентом, занятие списано. В календаре оно осталось серым — по нему считаются деньги.</Note>
-          </div>
-        </Panel>
-      </>
-    );
-  }
 
   return (
     <>
-      <BackButton label="Расписание" onClick={onCancel} />
+      <BackButton label={event.id || event.copyOf ? 'К занятию' : 'Расписание'} onClick={onCancel} />
       {confirm}
       <Panel pad>
         <div className="library__form">
-          <strong>{event.id ? (personal ? 'Личное событие' : 'Занятие') : event.copyOf ? 'Копия события' : 'Новое событие'}</strong>
-          {/* Из занятия — сразу к человеку (FT-567): раньше путь к его
-              программе шёл через «Клиенты» и поиск по списку */}
-          {event.id && !personal && onOpenClient && (() => {
-            const who = clients.find((c) => c.row === Number(event.clientRow));
-            return who ? (
-              <div className="schedule__client-links">
-                {/* Занятие программы на эту запись (FT-788, этап 4) — у клиента «по записям»;
-                    у пары — по строке на участника */}
-                {(event.sessions || []).map((x) => (
-                  <SessionRow key={x.row} item={x} pair={(event.sessions || []).length > 1 || !!x.name}
-                    onStart={() => { const c = clients.find((cl) => cl.row === x.row) || who; requestStart(x.row, x.id); onOpenClient(c, 'plan'); }}
-                    onSaved={onDone} />
-                ))}
-                <button type="button" className="button" onClick={() => onOpenClient(who, 'plan')}>Программа клиента</button>
-                <button type="button" className="button button--ghost" onClick={() => onOpenClient(who, 'overview')}>Карточка</button>
-              </div>
-            ) : null;
-          })()}
+          <strong>{mode === 'cancel' ? 'Отмена занятия' : mode === 'move' ? 'Перенос события'
+            : event.id ? (personal ? 'Личное событие' : 'Занятие') : event.copyOf ? 'Копия события' : 'Новое событие'}</strong>
+          {event.id && mode !== 'edit' && (
+            <p className="small muted">{event.clientName || event.title} · {start.toLocaleString('ru-RU', {
+              day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+            })}</p>
+          )}
           {event.copyOf && (
             <p className="small muted" style={{ margin: 0 }}>Скопированы название или клиент, дата, время и длительность. Проверьте их и нажмите «Добавить».</p>
           )}
-          {!event.id && (
-            <Options items={[{ value: 'client', label: 'Занятие с клиентом' }, { value: 'personal', label: 'Личное событие' }]}
-              value={kind} onChange={setKind} label="Тип события" disabled={busy || !!step} />
-          )}
-          {personal ? (
+          {mode === 'edit' && (
             <>
-              <Field label="Название события" value={title} onChange={setTitle} placeholder="Например, обед или личная встреча" inputMode="text" />
-              <p className="form-hint">Не указывайте данные клиентов, сведения о здоровье и другую чувствительную информацию.</p>
+              {!event.id && (
+                <Options items={[{ value: 'client', label: 'Занятие с клиентом' }, { value: 'personal', label: 'Личное событие' }]}
+                  value={kind} onChange={setKind} label="Тип события" disabled={busy || !!step} />
+              )}
+              {personal ? (
+                <>
+                  <Field label="Название события" value={title} onChange={setTitle} placeholder="Например, обед или личная встреча" inputMode="text" />
+                  <p className="form-hint">Не указывайте данные клиентов, сведения о здоровье и другую чувствительную информацию.</p>
+                </>
+              ) : (
+                <label className="field">
+                  <span className="field__label">Клиент</span>
+                  <select className="field__input" value={clientRow} disabled={busy || !!step} onChange={(e) => setClientRow(e.target.value)}>
+                    <option value="">Выберите клиента</option>
+                    {active.map((c) => <option key={c.row} value={c.row}>{c.name}</option>)}
+                  </select>
+                </label>
+              )}
             </>
-          ) : (
+          )}
+          {mode !== 'cancel' && (
+            <div className="field-row schedule__when">
+              <Field label="Дата" type="date" value={date} onChange={(v) => { setDate(v); setStep(null); }} />
+              <Field label="Время" type="time" value={time} onChange={(v) => { setTime(v); setStep(null); }} />
+            </div>
+          )}
+          {mode === 'edit' && (
             <label className="field">
-              <span className="field__label">Клиент</span>
-              <select className="field__input" value={clientRow} disabled={busy || !!step} onChange={(e) => setClientRow(e.target.value)}>
-                <option value="">Выберите клиента</option>
-                {active.map((c) => <option key={c.row} value={c.row}>{c.name}</option>)}
+              <span className="field__label">Длительность</span>
+              <select className="field__input" value={minutes} disabled={busy || !!step} onChange={(e) => setMinutes(e.target.value)}>
+                {DURATIONS.map((m) => <option key={m} value={m}>{m} мин</option>)}
+                {!DURATIONS.includes(Number(minutes)) && <option value={minutes}>{minutes} мин</option>}
               </select>
             </label>
           )}
-          <div className="field-row schedule__when">
-            <Field label="Дата" type="date" value={date} onChange={(v) => { setDate(v); setStep(null); }} />
-            <Field label="Время" type="time" value={time} onChange={(v) => { setTime(v); setStep(null); }} />
-          </div>
-          <label className="field">
-            <span className="field__label">Длительность</span>
-            <select className="field__input" value={minutes} disabled={busy || !!step} onChange={(e) => setMinutes(e.target.value)}>
-              {DURATIONS.map((m) => <option key={m} value={m}>{m} мин</option>)}
-              {!DURATIONS.includes(Number(minutes)) && <option value={minutes}>{minutes} мин</option>}
-            </select>
-          </label>
 
           {/* Перенос — не всегда перенос: бывает, просто записали не туда.
               В статистику идёт только настоящий перенос. */}
@@ -1811,13 +1946,13 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
                 {busy ? 'Отменяем…' : who === 'error' ? 'Удалить запись' : charged ? 'Отменить и списать' : 'Отменить занятие'}
               </button>
               {/* «Отмена» без рамки сразу за главной — одно правило на всё приложение (аудит 24.10.2026) */}
-              <button className="button button--ghost" disabled={busy} onClick={() => setStep(null)}>Отмена</button>
+              <button className="button button--ghost" disabled={busy} onClick={onCancel}>Не отменять занятие</button>
             </div>
           ) : (
             <div className="library__actions">
               <button
                 className="button button--primary"
-                disabled={busy || (personal ? !title.trim() : !clientRow) || !date || !time || (step === 'move' && !change)}
+                disabled={busy || (personal ? !title.trim() : !clientRow) || !date || !time || (mode === 'move' && !moved) || (step === 'move' && !change)}
                 onClick={() => (moved && !personal && step !== 'move' ? setStep('move') : save())}
               >
                 {busy ? 'Сохраняем…' : event.id ? (moved && step !== 'move' ? 'Перенести…' : 'Сохранить') : 'Добавить'}
@@ -1826,16 +1961,6 @@ function EventForm({ event, preset, clients, onDone, onCancel, onCopy, onOpenCli
             </div>
           )}
 
-          {event.id && !step && (
-            <div className="library__actions" style={{ marginTop: 0 }}>
-              <button className="button button--ghost" disabled={busy} onClick={() => onCopy && onCopy(event)}>
-                <IconCopy size={16} />Копировать
-              </button>
-              <button className="button button--ghost" disabled={busy} onClick={() => (personal && onRemovePersonal ? onRemovePersonal(event) : personal ? remove() : setStep('cancel'))}>
-                {personal ? 'Удалить событие' : 'Отменить занятие'}
-              </button>
-            </div>
-          )}
         </div>
       </Panel>
     </>

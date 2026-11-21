@@ -464,15 +464,18 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     return true;
   }, quickHere && !clientRow);
 
-  // «▶ Начать тренировку» из записи «Расписания» (FT-788, этап 4): заявку
-  // забираем один раз, когда программа загрузилась и занятие не идёт
+  // Из карточки занятия — к записи журнала или к запуску тренировки.
   useEffect(() => {
-    if (loading || error || !data || workout || !clientRow) return;
-    if (sessions.some((x) => x.status === 'active' || x.status === 'paused')) return;
-    const id = takeStart(clientRow);
-    const block = id && [...(data.blocks || []), ...(data.programBlocks || [])].find((b) => b.id === id);
+    if (loading || error || !data || workout || !clientRow || !journalReady) return;
+    const target = takeStart(clientRow);
+    if (!target) return;
+    if (target.sessionId) { openWorkout({ sessionId: target.sessionId }); return; }
+    const live = sessions.find((x) => x.status === 'active' || x.status === 'paused');
+    if (live) { openWorkout({ sessionId: live.id }); return; }
+    if (!target.blockId) { freeWorkout(); return; }
+    const block = [...(data.blocks || []), ...(data.programBlocks || [])].find((b) => b.id === target.blockId);
     if (block) startBlock(block);
-  }, [loading, error, data, workout]);
+  }, [loading, error, data, workout, clientRow, journalReady]);
 
   // Выход из журнала — перечитать и программу: тренер мог переименовать
   // занятие, и тренировка в программе переименовалась вместе с ним

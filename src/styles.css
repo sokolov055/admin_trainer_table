@@ -6365,15 +6365,13 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
 .schedule__session { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 14px; background: var(--accent-wash); color: var(--text); text-align: left; font: inherit; animation: cal-sheet-in .35s var(--ease-out) both; }
 .schedule__session select { -webkit-appearance: none; appearance: none; display: block; margin-top: 2px; padding: 0; border: 0; background: transparent; color: var(--accent-ink); font: 650 13px/1.3 var(--font); cursor: pointer; max-width: 100%; }
 .schedule__session em { display: block; font-style: normal; font-size: 12px; color: var(--critical-text); }
-.schedule__session-go { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--accent-fill); color: var(--accent-text); font-size: 16px; cursor: pointer; box-shadow: var(--shadow-sm); }
-.schedule__session-go:active { transform: scale(.92); }
 @keyframes cal-sheet-in { from { opacity: 0; transform: translateY(6px); } }
 .schedule__session-t { flex: 1; min-width: 0; }
 .schedule__session small { display: block; font-size: 12px; font-weight: 600; color: var(--accent-ink); }
 .schedule__session b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .schedule__session-ic { width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent-fill); color: var(--accent-text); }
 .schedule__session-ic.is-cardio { background: var(--warning-fill); color: var(--warning-text); }
-@media (prefers-reduced-motion: reduce) { .schedule__session { animation: none; } .schedule__session-go:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .schedule__session { animation: none; } }
 
 /* Ряд фильтров, который листается вбок, — тот же намёк краем (FT-567) */
 .chips.is-more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
@@ -6608,6 +6606,23 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 /* 16px — иначе iOS приближает страницу при фокусе в поле */
 .sheet__body input, .sheet__body select, .sheet__body textarea { font-size: 16px; }
 .sheet__done { flex: none; min-height: 54px; margin-top: 8px; border-radius: var(--radius-lg); font-size: 17px; font-weight: 720; }
+.cal-detail__title { display: inline-flex; align-items: center; gap: 8px; text-align: start; }
+.cal-detail__avatar { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 50%; background: var(--accent-wash); color: var(--accent-ink); font-size: 12px; }
+.cal-detail__summary { display: grid; gap: 10px; }
+.cal-detail__summary p { margin: 0; }
+.cal-detail__when { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-muted); font-size: var(--text-sm); }
+.cal-detail__tools .icon-button { width: 44px; height: 44px; }
+.cal-detail__actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cal-detail__actions .button { flex-direction: column; gap: 5px; min-width: 0; min-height: 58px; padding: 6px 2px; font-size: 12px; }
+.cal-detail__start { white-space: normal; overflow-wrap: anywhere; }
+.cal-detail__start svg { flex: none; }
+.cal-detail__meta { display: grid; gap: 8px; margin: 0; font-size: var(--text-sm); }
+.cal-detail__meta:empty { display: none; }
+.cal-detail__meta > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.cal-detail__meta dt { color: var(--text-muted); }
+.cal-detail__meta dd { margin: 0; overflow-wrap: anywhere; min-width: 0; white-space: pre-wrap; }
+.cal-detail__unpaid { color: var(--critical-text); }
+.cal-detail__program { display: grid; gap: 8px; }
 @keyframes sheet-fade { from { opacity: 0; } }
 @keyframes sheet-fade-out { to { opacity: 0; } }
 @keyframes sheet-up { from { transform: translateY(100%); } }

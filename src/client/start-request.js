@@ -6,13 +6,13 @@
  */
 let pending = null;
 
-export function requestStart(clientRow, blockId) {
-  pending = { row: Number(clientRow), blockId: String(blockId || ''), at: Date.now() };
+export function requestStart(clientRow, target) {
+  pending = { row: Number(clientRow), target, at: Date.now() };
 }
 
 export function takeStart(clientRow) {
-  if (!pending || pending.row !== Number(clientRow) || Date.now() - pending.at > 60000) return '';
-  const id = pending.blockId;
+  if (!pending || pending.row !== Number(clientRow) || Date.now() - pending.at > 60000) return null;
+  const { target } = pending;
   pending = null;
-  return id;
+  return target;
 }
