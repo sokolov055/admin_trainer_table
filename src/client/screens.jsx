@@ -18,7 +18,7 @@ import Wishes, { WISH_DRAFT } from './Wishes.jsx';
 import MeasureMove from './MeasureMove.jsx';
 import {
   Lead, Section, Panel, Rows, Row, Loading, ErrorState, Empty, StatusBadge,
-  Chips, Segmented, Options, Field, Note, Delta, Qty,
+  Chips, Segmented, Field, Note, Delta, Qty,
   formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
 import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
@@ -42,6 +42,7 @@ import { uid } from '../workout-model.js';
 import { trainerOverview } from './trainer-overview.js';
 import { SCHEDULE_UNKNOWN } from './schedule-text.js';
 import { GoalBanner } from './focus.jsx';
+import { SurveyWizard, NormPlate, PaceCard } from '../nutrition/SurveyParts.jsx';
 import { onlineDaysLeft, onlineDay } from '../online.js';
 import { MuscleSummary, tallyExercises } from '../muscles/MuscleMap.jsx';
 import { useRights, isPro, can, gate } from '../rights.js';
@@ -2475,19 +2476,15 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
 
   return (
     <>
-      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary weightKg={(data.prefill && data.prefill.weight) || (survey && survey.weight) || null} activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} dayNote={(day) => <SpentKcal clientRow={clientRow} day={day} chip />} onPlan={(self || !clientRow) && can('ration', rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
+      {!editing && diaryEnabled && <Deferred fallback={<Loading lead={false} rows={2} />}><NutritionDiary goalLabel={survey && survey.goalLabel} weightKg={(data.prefill && data.prefill.weight) || (survey && survey.weight) || null} activeTab={diaryTab} onTabChange={setDiaryTab} notice={surveyNotice} key={clientRow || 'self'} clientRow={clientRow} readOnly={!!clientRow && !self} self={self} preview={clientView} targets={targets} dayNote={(day) => <SpentKcal clientRow={clientRow} day={day} chip />} onPlan={(self || !clientRow) && can('ration', rights) ? (plan) => { setDiaryPlan(plan); captureScreen(); setRation(true); } : undefined} /></Deferred>}
       {(!diaryEnabled || diaryTab === 'settings' || editing) && <>
-      {configured && (
-        <Lead
-          label="Расчёт по анкете"
-          value={formatNumber(targets.kcal) + ' ккал'}
-          hint={survey && survey.goalLabel ? survey.goalLabel : undefined}
-          facts={[
-            { label: 'Белки', value: grams(targets.protein) },
-            { label: 'Жиры', value: grams(targets.fat) },
-            { label: 'Углеводы', value: grams(targets.carbs) },
-          ]}
-        />
+      {/* Норма — тарелкой (этап 5 макета nutrition-redesign-2026-11-20) */}
+      {configured && !editing && (
+        <Section>
+          <Panel pad>
+            <NormPlate targets={targets} goalLabel={survey && survey.goalLabel} />
+          </Panel>
+        </Section>
       )}
 
       {saved && !editing && (
@@ -2518,6 +2515,7 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
         <PaceChooser
           plans={plans}
           pace={data.pace}
+          goal={survey && survey.goal}
           clientRow={clientRow}
           onChanged={onSaved}
         />
@@ -2675,7 +2673,7 @@ export function Nutrition({ clientRow, clientView = false, self = false }) {
  * заблокирован целиком — иначе нетерпеливый палец отправит два выбора
  * подряд, и в таблицу ляжет тот, что ответил последним.
  */
-function PaceChooser({ plans, pace, clientRow, onChanged }) {
+function PaceChooser({ plans, pace, goal, clientRow, onChanged }) {
   const [busy, setBusy] = useState(null);
   const [failure, setFailure] = useState(null);
 
@@ -2701,34 +2699,11 @@ function PaceChooser({ plans, pace, clientRow, onChanged }) {
 
   return (
     <Section title="Темп" note="насколько быстро идём к цели">
-      <div className="options" role="radiogroup" aria-label="Темп">
-        {plans.map((plan) => {
-          const active = plan.id === pace;
-
-          return (
-            <button
-              key={plan.id}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              className={'option option--pace' + (active ? ' option--active' : '')}
-              onClick={() => choose(plan.id)}
-              disabled={!!busy}
-            >
-              <span className="option__mark">{active && <IconCheck size={12} />}</span>
-              <span className="option__body">
-                <span className="option__top">
-                  <span>{plan.label}{plan.note ? ' · ' + plan.note : ''}</span>
-                  <span className="option__kcal">
-                    {busy === plan.id ? '…' : formatNumber(plan.kcal) + ' ккал'}
-                  </span>
-                </span>
-                {plan.hint && <span className="option__hint">{plan.hint}</span>}
-                <span className="option__macros">Б {plan.protein} · Ж {plan.fat} · У {plan.carbs} г</span>
-              </span>
-            </button>
-          );
-        })}
+      <div className="nt-paces" role="radiogroup" aria-label="Темп">
+        {plans.map((plan, i) => (
+          <PaceCard key={plan.id} plan={plan} active={plan.id === pace} busy={busy === plan.id} goal={goal}
+            index={i} count={plans.length} disabled={!!busy} onChoose={() => choose(plan.id)} />
+        ))}
       </div>
 
       {failure && (
@@ -2745,12 +2720,6 @@ function pick(saved, hint) {
   if (saved !== null && saved !== undefined && saved !== '') return String(saved);
   if (hint !== null && hint !== undefined && hint !== '') return String(hint);
   return '';
-}
-
-/** «169 г» — единица прижата к числу: иначе ряд фактов читается как
- *  список голых чисел, и белки от углеводов отличает только подпись */
-function grams(value) {
-  return value === null || value === undefined ? '—' : formatNumber(value) + ' г';
 }
 
 /**
@@ -2814,38 +2783,27 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
   const [filled] = useState(() => ['age', 'weight', 'height', 'sex']
     .filter((field) => !(survey && survey[field]) && pick(null, prefill && prefill[field]) !== ''));
 
-  const [errors, setErrors] = useState({});
-  const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
 
-  const inputs = useRef({});
   const limits = options.limits || {};
 
-  // До первой попытки отправить молчим: подчёркивать красным поле, в
-  // которое человек ещё не дописал, — значит ругаться на него за то, что
-  // он печатает. После неё, наоборот, пересчитываем на каждый знак: он
-  // уже знает про ошибку и сейчас её чинит.
+  // Ответ на текущий вопрос проверяет сам шаг анкеты («Дальше»), поэтому
+  // красным подчёркивается только то, что человек уже попробовал сдать
   const set = (field, value) => {
-    const next = { ...form, [field]: value };
-    setForm(next);
-    if (attempted) setErrors(validateSurvey(next, limits));
+    setForm((prev) => ({ ...prev, [field]: value }));
     setFailure(null);
   };
 
   const submit = async () => {
     const found = validateSurvey(form, limits);
-
-    setAttempted(true);
-    setErrors(found);
     setFailure(null);
 
+    // Все шаги уже проверены по одному; сюда попадёт только то, что
+    // испортили, вернувшись назад, — называем словами, что не так
     const bad = Object.keys(found);
     if (bad.length) {
-      // Ошибка может оказаться выше края экрана — уводим к ней сами,
-      // иначе нажатие выглядит как «кнопка не работает»
-      const node = inputs.current[bad[0]];
-      if (node && node.focus) node.focus();
+      setFailure({ message: found[bad[0]] });
       return;
     }
 
@@ -2871,133 +2829,28 @@ function NutritionForm({ options, survey, prefill, clientRow, onSaved, onCancel 
     }
   };
 
+  // Анкета по одному вопросу (этап 5 макета): ошибка — только по текущему
+  const check = (field, values) => validateSurvey(values, limits)[field] || null;
+  const note = filled.length > 0
+    ? (filled.includes('weight')
+      ? 'Заполнили за вас: из профиля и последнего замера. Проверьте и поправьте, если что-то изменилось.'
+      : 'Заполнили за вас из профиля. Проверьте и поправьте, если что-то изменилось.')
+    : null;
+
   return (
     <Panel pad>
-      <div className="survey">
-        {/* Откуда взялись числа — человек должен понимать сразу. Молча
-            подставленный вес выглядит как чужой, и первое, что с ним
-            делают, — стирают и вписывают заново. */}
-        {filled.length > 0 && (
-          <p className="small muted survey__prefill">
-            {filled.includes('weight')
-              ? 'Заполнили за вас: из профиля и последнего замера. Проверьте и поправьте, если что-то изменилось.'
-              : 'Заполнили за вас из профиля. Проверьте и поправьте, если что-то изменилось.'}
-          </p>
-        )}
-
-        <div className="survey__group">
-          <div className="field-row">
-            <Field
-              label="Возраст, лет"
-              inputMode="numeric"
-              placeholder="лет"
-              value={form.age}
-              onChange={(v) => set('age', v)}
-              error={errors.age}
-              disabled={busy}
-              inputRef={(el) => { inputs.current.age = el; }}
-            />
-            <Field
-              label="Вес, кг"
-              placeholder="кг"
-              inputMode="decimal"
-              value={form.weight}
-              onChange={(v) => set('weight', v)}
-              error={errors.weight}
-              disabled={busy}
-              inputRef={(el) => { inputs.current.weight = el; }}
-            />
-            <Field
-              label="Рост, см"
-              placeholder="см"
-              inputMode="decimal"
-              value={form.height}
-              onChange={(v) => set('height', v)}
-              error={errors.height}
-              disabled={busy}
-              inputRef={(el) => { inputs.current.height = el; }}
-            />
-          </div>
-        </div>
-
-        <div className="survey__group">
-          <div className="survey__legend">
-            Пол
-            <span className="survey__legend-note">
-              без него основной обмен не считается
-            </span>
-          </div>
-          <Segmented
-            items={options.sexes || []}
-            value={form.sex}
-            onChange={(v) => set('sex', v)}
-            label="Пол"
-            disabled={busy}
-          />
-          {errors.sex && <span className="field__error">{errors.sex}</span>}
-        </div>
-
-        <div className="survey__group">
-          <div className="survey__legend">
-            Образ жизни
-            <span className="survey__legend-note">без тренировок: работа, дорога, быт</span>
-          </div>
-          <Options
-            items={options.lifestyles || LIFESTYLES}
-            value={form.lifestyle}
-            onChange={(v) => set('lifestyle', v)}
-            label="Образ жизни"
-            disabled={busy}
-          />
-          {errors.lifestyle && <span className="field__error">{errors.lifestyle}</span>}
-        </div>
-
-        <div className="survey__group">
-          <div className="survey__legend">
-            Тренировок в неделю
-            <span className="survey__legend-note">все: с тренером, сами, бассейн, бег</span>
-          </div>
-          <div className="chips survey__trainings" role="radiogroup" aria-label="Тренировок в неделю">
-            {['0', '1', '2', '3', '4', '5', '6', '7'].map((n) => (
-              <button key={n} type="button" role="radio" aria-checked={form.trainings === n} className={'chip' + (form.trainings === n ? ' chip--active' : '')} disabled={busy} onClick={() => set('trainings', n)}>{n}</button>
-            ))}
-          </div>
-          {errors.trainings && <span className="field__error">{errors.trainings}</span>}
-        </div>
-
-        <div className="survey__group">
-          <div className="survey__legend">Цель</div>
-          <Options
-            items={options.goal}
-            value={form.goal}
-            onChange={(v) => set('goal', v)}
-            label="Цель"
-            disabled={busy}
-          />
-          {errors.goal && <span className="field__error">{errors.goal}</span>}
-        </div>
-
-        {/* Отказ сервера показываем его же словами: он называет и поле, и
-            что с ним не так. Переписывать это здесь значило бы завести
-            второй словарь ошибок, который однажды отстанет от первого. */}
-        {failure && <Note tone="critical">{failure.message}</Note>}
-
-        <div className="survey__actions">
-          <button
-            className="button button--primary button--block"
-            onClick={submit}
-            disabled={busy}
-          >
-            {busy ? 'Считаем…' : 'Посчитать норму'}
-          </button>
-
-          {onCancel && (
-            <button className="button button--block" onClick={onCancel} disabled={busy}>
-              Отмена
-            </button>
-          )}
-        </div>
-      </div>
+      <SurveyWizard
+        options={options}
+        lifestyles={options.lifestyles || LIFESTYLES}
+        form={form}
+        onSet={set}
+        check={check}
+        busy={busy}
+        failure={failure}
+        note={note}
+        onSubmit={submit}
+        onCancel={onCancel}
+      />
     </Panel>
   );
 }

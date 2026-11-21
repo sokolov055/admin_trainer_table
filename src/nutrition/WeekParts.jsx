@@ -39,10 +39,11 @@ function Kpi({ color, value, label }) {
 export function WeekBars({ view, day, onOpen }) {
   const grown = useGrown(), now = today();
   return (
-    <div className="nt-wk" role="group" aria-label="Калории по дням">
-      {view.band && (
-        <div className="nt-wk__band" style={{ bottom: view.band.lo * 100 + '%', height: (view.band.hi - view.band.lo) * 100 + '%' }} aria-hidden="true"><span>норма</span></div>
+    <div className={'nt-wk' + (view.empty ? ' is-empty' : '')} role="group" aria-label="Калории по дням">
+      {view.band && !view.empty && (
+        <div className="nt-wk__band" style={{ bottom: view.band.lo * 100 + '%', height: (view.band.hi - view.band.lo) * 100 + '%' }} aria-hidden="true" />
       )}
+      {view.empty && <p className="nt-wk__empty"><span aria-hidden="true">🍽️</span>За эту неделю еды ещё нет — столбики вырастут, когда появятся записи</p>}
       {view.bars.map((b) => {
         // Сегодня, пока день идёт, «меньше» — оранжевым «ещё набираем»
         const color = b.day === now && b.tone === 'under' && !b.complete ? 'var(--nt-kcal)' : TONE[b.tone];
@@ -82,6 +83,7 @@ export function WeekScreen({ data, day, waterGoalMl, onOpenDay }) {
         <div className="nt-week__row"><b>Калории</b><span className="nt-sp" /><span className="nt-week__s">{avg ? 'Среднее за полные дни: ' + n(avg.kcal) + ' ккал' : 'нет полных дней'}</span></div>
         <WeekBars view={view} day={day} onOpen={onOpenDay} />
         <div className="nt-leg">
+          {view.band && !view.empty && <span className="nt-leg__band"><i />норма {n(view.band.from)}–{n(view.band.to)} ккал</span>}
           {view.band && <><span><i style={{ background: 'var(--nt-good)' }} />в норме</span><span><i style={{ background: 'var(--nt-over)' }} />больше</span><span><i style={{ background: 'var(--nt-under)' }} />меньше</span></>}
           <span><i className="is-part" />не всё записано</span>
         </div>

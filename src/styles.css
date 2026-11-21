@@ -2108,6 +2108,10 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: var(--shadow-sm);
 }
 
+/* Вкладки питания — во всю ширину, без пустого хвоста дорожки (владелец 21.11) */
+.nt-nav .chips--nav { display: flex; width: 100%; }
+.nt-nav .chips--nav .chip { flex: 1 1 0; justify-content: center; text-align: center; padding-left: 8px; padding-right: 8px; }
+
 /* Значки состояния .badge убраны (аудит 24.10.2026): метка в приложении
    одна — .tag (ui.jsx, Tag) с тонами good / warn / bad. */
 

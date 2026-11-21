@@ -160,9 +160,23 @@ test('цель клиента в «Целях»: тренер ставит «П�
     await phone.getByRole('tab', { name: 'Питание', exact: true }).click();
     await shown().getByRole('button', { name: 'Настройки питания', exact: true }).click();
     await phone.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
+    // Анкета по одному вопросу (этап 5 питания): доходим до цели, ответы — как есть или свои
+    const next = () => phone.getByRole('button', { name: 'Дальше →' }).click();
+    for (const [ph, v] of [['лет', '30'], ['кг', '70'], ['см', '170']]) {
+      const field = phone.getByPlaceholder(ph);
+      if (!(await field.inputValue())) await field.fill(v);
+      await next();
+    }
+    for (const [group, first] of [['Пол', 'Женский'], ['Образ жизни', /^Сидячий/], ['Тренировок в неделю', '3']]) {
+      const g = phone.getByRole('radiogroup', { name: group, exact: true });
+      await g.waitFor();
+      if (await g.locator('[aria-checked=true]').count()) await next();
+      else await g.getByRole('radio', { name: first, exact: typeof first === 'string' }).click();
+    }
+    await phone.getByRole('radiogroup', { name: 'Цель', exact: true }).waitFor();
     const picked = await phone.evaluate(() => [...document.querySelectorAll('[role=radio]')]
       .filter((e) => e.offsetParent && e.getAttribute('aria-checked') === 'true' && /Похудеть|Быть в форме|Набрать мышцы/.test(e.textContent))
-      .map((e) => e.textContent.trim()));
+      .map((e) => (e.querySelector('.nt-qz__pt') || e).textContent.trim()));
     assert.deepEqual(picked, ['Похудеть'], 'анкета питания — с целью из «Целей»');
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
@@ -1183,13 +1197,15 @@ test('FT-567: видимый «назад» и Back браузера на экр
     // Анкета теперь в «Ещё», дневник остаётся отдельной вкладкой (FT-744).
     await phone.getByRole('button', { name: 'Настройки питания', exact: true }).click();
     await phone.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
-    await phone.getByPlaceholder('лет').fill('31');
-    await phone.getByPlaceholder('кг').first().fill('64');
-    await phone.getByPlaceholder('см').fill('168');
-    await phone.getByText('Женский', { exact: true }).first().click();
-    await phone.getByText(/^Подвижный/).first().click();
-    await phone.locator('text=Тренировок в неделю').locator('xpath=..').getByText('3', { exact: true }).first().click();
-    await phone.getByText('Похудеть', { exact: true }).first().click();
+    // Анкета по одному вопросу (этап 5 макета питания): число — «Дальше», картинка — сама дальше
+    const next = () => phone.getByRole('button', { name: 'Дальше →' }).click();
+    await phone.getByPlaceholder('лет').fill('31'); await next();
+    await phone.getByPlaceholder('кг').fill('64'); await next();
+    await phone.getByPlaceholder('см').fill('168'); await next();
+    await phone.getByRole('radio', { name: 'Женский' }).click();
+    await phone.getByRole('radio', { name: /^Подвижный/ }).click();
+    await phone.getByRole('radiogroup', { name: 'Тренировок в неделю' }).getByRole('radio', { name: '3', exact: true }).click();
+    await phone.getByRole('radio', { name: 'Похудеть' }).click();
     await phone.getByRole('button', { name: 'Посчитать норму' }).click();
     await phone.getByRole('tab', { name: 'Идеи', exact: true }).click();
     const build = phone.getByRole('button', { name: /Из того, что есть дома/ });

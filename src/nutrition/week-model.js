@@ -60,7 +60,10 @@ export function weekView(data, waterGoalMl = 2000) {
   const goal = waterGoalMl > 0 ? waterGoalMl : 2000;
   return {
     bars,
-    band: aim > 0 ? { lo: aim * (1 - NORM_BAND) / top, hi: aim * (1 + NORM_BAND) / top } : null,
+    band: aim > 0 ? { lo: aim * (1 - NORM_BAND) / top, hi: aim * (1 + NORM_BAND) / top,
+      from: Math.round(aim * (1 - NORM_BAND) / 10) * 10, to: Math.round(aim * (1 + NORM_BAND) / 10) * 10 } : null,
+    // Неделя без единой записи — график не рисуем пустыми полосами
+    empty: !bars.some((b) => b.tone !== 'empty'),
     inNorm: judged.length ? { n: inNorm, of: judged.length } : null,
     fullDays: data?.fullDays ?? full.length,
     // Последний день ещё не завершён (обычно — сегодня) — серию считаем до него

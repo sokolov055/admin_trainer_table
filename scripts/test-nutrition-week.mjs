@@ -40,6 +40,13 @@ test('столбики: цвет по норме своего дня, часть
   assert.ok(v.bars.every((b) => b.h >= 0 && b.h <= 1));
   assert.ok(v.band.lo < v.band.hi && v.band.hi < 1, 'коридор помещается в график');
   assert.equal(v.bars[4].h, 0);
+  assert.ok(v.band.from < v.band.to && v.band.from % 10 === 0, 'границы нормы для подписи под графиком');
+  assert.equal(v.empty, false);
+});
+
+test('неделя без записей — пустая, без голых полосок', () => {
+  const v = weekView({ days: [day('2026-11-19', 0, { target: 1800 }), day('2026-11-20', 0, { target: 1800 })], fullDays: 0, average: null });
+  assert.equal(v.empty, true);
 });
 
 test('без нормы: нет коридора и счёта «в норме»', () => {

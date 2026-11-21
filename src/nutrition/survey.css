@@ -1,0 +1,79 @@
+/* «Норма и анкета» — макет nutrition-redesign-2026-11-20, этап 5 (SurveyParts.jsx) */
+
+/* анкета по одному вопросу */
+.nt-qz { text-align: center; }
+.nt-qz__dots { display: flex; gap: 5px; justify-content: center; margin-bottom: 8px; }
+.nt-qz__dots button { width: 22px; height: 5px; padding: 0; border: 0; border-radius: 5px; background: var(--surface-sunken); cursor: pointer; transition: background-color .25s; }
+.nt-qz__dots button.is-on { background: var(--nt-teal); }
+.nt-qz__dots button:disabled { cursor: default; }
+.nt-qz__n { font-size: 12px; color: var(--text-muted); font-weight: 700; }
+.nt-qz__q { font-size: 20px; margin: 4px 0 4px; animation: nt-qz-in .3s cubic-bezier(.2, .8, .2, 1); }
+.nt-qz__note { margin: 0 0 6px; font-size: 13px; color: var(--text-secondary); }
+.nt-qz__prefill { margin: 0 0 6px; }
+.nt-qz__body { margin: 12px 0 6px; animation: nt-qz-in .3s cubic-bezier(.2, .8, .2, 1); }
+.nt-qz__err { display: block; margin: 2px 0 6px; }
+.nt-qz__nav { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+@keyframes nt-qz-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+/* число и ползунок */
+.nt-qz__num { display: inline-flex; align-items: baseline; justify-content: center; gap: 6px; }
+.nt-qz__value { width: 4.2ch; border: 0; border-bottom: 2px dashed var(--border); background: none; color: var(--text); text-align: center;
+  font: inherit; font-size: 40px; font-weight: 850; padding: 0; font-variant-numeric: tabular-nums; }
+.nt-qz__value::placeholder { color: var(--text-muted); opacity: .45; }
+.nt-qz__value:focus { outline: none; border-bottom-color: var(--accent); }
+.nt-qz__unit { font-size: 16px; color: var(--text-muted); font-weight: 700; }
+.nt-qz__slider input[type='range'] { width: 100%; margin: 14px 0 2px; accent-color: var(--accent); height: 28px; }
+.nt-qz__ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: 650; }
+
+/* выбор картинкой */
+.nt-qz__grid { display: grid; gap: 8px; }
+.nt-qz__grid--2 { grid-template-columns: 1fr 1fr; }
+.nt-qz__grid--3 { grid-template-columns: 1fr 1fr 1fr; }
+.nt-qz__grid--n { grid-template-columns: repeat(4, 1fr); }
+.nt-qz__list { display: grid; gap: 8px; }
+.nt-qz__pick { border: 1.5px solid var(--border); background: var(--surface); color: var(--text); border-radius: 16px; padding: 12px 6px;
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform .15s, border-color .2s, background-color .2s; }
+.nt-qz__pick:active { transform: scale(.96); }
+.nt-qz__pick.is-on { border-color: var(--accent); background: var(--accent-wash); }
+.nt-qz__em { display: block; font-size: 30px; line-height: 1.1; margin-bottom: 4px; }
+.nt-qz__grid--n .nt-qz__pick { font-size: 20px; font-weight: 800; padding: 12px 0; }
+.nt-qz__list .nt-qz__pick { display: grid; grid-template-columns: 40px 1fr; align-items: center; text-align: left; column-gap: 10px; padding: 10px 12px; }
+.nt-qz__list .nt-qz__em { grid-row: span 2; margin: 0; font-size: 26px; text-align: center; }
+.nt-qz__list .nt-qz__pt { font-size: 15px; }
+.nt-qz__pick small { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+
+/* норма тарелкой */
+.nt-norm { display: grid; justify-items: center; text-align: center; gap: 2px; }
+.nt-norm__title { font-size: var(--text-md, 17px); }
+.nt-norm__src { font-size: 12px; color: var(--text-muted); font-weight: 650; }
+.nt-norm__ring { margin: 8px 0 6px; }
+.nt-norm__kcal { display: block; font-size: 28px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.nt-norm__unit { font-size: 12px; color: var(--text-muted); font-weight: 650; }
+.nt-norm__leg { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: 12.5px; font-weight: 650; color: var(--text-secondary); }
+.nt-norm__leg span { display: inline-flex; align-items: center; gap: 5px; }
+.nt-norm__leg i { width: 9px; height: 9px; border-radius: 50%; }
+
+/* темп с наклоном */
+.nt-paces { display: grid; gap: 6px; }
+.nt-pace { display: flex; align-items: center; gap: 10px; width: 100%; border: 1.5px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 14px; padding: 9px 12px; font: inherit; text-align: left; cursor: pointer; transition: border-color .2s, background-color .2s; }
+.nt-pace.is-on { border-color: var(--accent); background: var(--accent-wash); }
+.nt-pace svg { flex: none; }
+.nt-pace__body { flex: 1; min-width: 0; display: grid; }
+.nt-pace__note { color: var(--text-muted); font-weight: 650; }
+.nt-pace__body small { font-size: 12px; color: var(--text-secondary); }
+.nt-pace__macros { color: var(--text-muted) !important; }
+.nt-pace__kcal { flex: none; font-size: 13px; }
+
+/* ⚙︎ — строки со значками */
+.nt-menu__title { display: block; padding: var(--space-4) var(--space-4) 0; font-size: var(--text-base); }
+.nt-mi { display: flex !important; align-items: center; gap: 12px; }
+.nt-mi__ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px;
+  background: color-mix(in srgb, var(--ic) var(--nt-w), var(--surface)); }
+.nt-mi__tx { flex: 1; min-width: 0; }
+.nt-mi__ch { flex: none; color: var(--text-muted); font-size: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-qz__q, .nt-qz__body { animation: none; }
+  .nt-qz__pick, .nt-pace, .nt-qz__dots button { transition: none; }
+}
