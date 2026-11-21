@@ -71,40 +71,58 @@
 
 /* --- Холодильник --- */
 
+/* Холодильник — сетка значков (макет nutrition-redesign-2026-11-20, этап 4):
+   продукт — плитка с эмодзи, отмеченная — зелёная с галочкой в углу. */
 .pantry {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
-/* Продукт — цель для пальца, а не строка списка: отмечают их подряд и
-   быстро, и промах здесь стоит лишнего блюда в подборке. */
 .pantry__item {
-  display: inline-flex;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 5px;
-  min-height: 44px;
-  padding: 0 var(--space-3);
+  justify-content: flex-start;
+  gap: 2px;
+  min-height: 72px;
+  min-width: 0;
+  padding: 8px 3px 7px;
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: 11px;
+  line-height: 1.15;
+  text-align: center;
   color: var(--text-secondary);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: background-color var(--dur-fast) var(--ease-out),
               color var(--dur-fast) var(--ease-out),
-              border-color var(--dur-fast) var(--ease-out);
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-press, 120ms) var(--ease-out);
 }
+.pantry__item:active { transform: scale(.95); }
+.pantry__emoji { font-size: 26px; line-height: 1.1; }
+.pantry__name { overflow-wrap: anywhere; hyphens: auto; }
 
 .pantry__item--on {
-  color: var(--good-text);
+  color: var(--text);
   background: var(--good-fill);
   border-color: var(--good-line);
-  font-weight: 600;
+  font-weight: 650;
 }
 
-.pantry__tick { display: inline-flex; margin-left: -2px; }
+.pantry__tick {
+  position: absolute; top: 4px; right: 4px;
+  display: grid; place-items: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--good-text); color: var(--surface);
+}
+
+.ration__count small { display: block; font-size: var(--text-xs, 12px); color: var(--good-text); font-weight: 650; }
 
 .pantry__item:focus-visible,
 .deck__button:focus-visible {
@@ -534,3 +552,8 @@
 /* «Как готовить» — спокойная ссылка, а не третий синий акцент в каждом блоке */
 .day__dish .recipe summary { color: var(--text-secondary); font-weight: 500; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
 .ration__main { flex-basis: 100%; }
+
+/* шаги точками */
+.ration__dots { display: flex; gap: 5px; margin-top: 6px; }
+.ration__dots i { width: 18px; height: 5px; border-radius: 3px; background: var(--border); transition: background-color var(--dur-fast) var(--ease-out), width var(--dur-fast) var(--ease-out); }
+.ration__dots i.is-on { width: 26px; background: var(--good-text); }

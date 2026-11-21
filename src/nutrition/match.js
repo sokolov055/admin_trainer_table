@@ -124,6 +124,16 @@ export function rankRecipes(pantry, { limit = 20, maxMissing = 3 } = {}) {
 }
 
 /**
+ * Сколько блюд можно приготовить без магазина: все основные продукты есть
+ * дома (мелочи вроде масла и соли не в счёт). Под сеткой холодильника —
+ * «уже хватает на N блюд» (макет nutrition-redesign-2026-11-20, этап 4).
+ */
+export function readyCount(pantry) {
+  const have = asSet(pantry);
+  return CATALOG.RECIPES.filter((recipe) => splitItems(recipe).main.every((i) => have.has(i.food))).length;
+}
+
+/**
  * Сумма КБЖУ за день.
  *
  * `servings` — сколько порций человек СЪЕДАЕТ, и это не то же самое, что

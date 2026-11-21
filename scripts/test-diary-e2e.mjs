@@ -162,6 +162,11 @@ test('FT-551: любимые, приёмы, порции, история, рец
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).some(d => d.complete));
   await diary.getByRole('tab', { name: 'Неделя', exact: true }).click();
   await diary.getByText('Среднее за полные дни: 140 ккал', { exact: true }).waitFor();
+  // Этап 3 макета: столбик дня открывает его в «Сегодня»
+  await diary.getByRole('button', { name: /^Открыть день: .*140 ккал/ }).click();
+  await diary.getByRole('button', { name: 'Изменить: Йогурт 2%', exact: true }).waitFor();
+  await diary.getByRole('tab', { name: 'Неделя', exact: true }).click();
+  await diary.locator('.nt-kpi', { hasText: 'полных подряд' }).waitFor();
   await diary.getByRole('tab', { name: 'Идеи', exact: true }).click();
   await diary.getByRole('button', { name: 'Свой рецепт', exact: true }).click();
   await dialog().getByLabel('Название блюда').fill('Мой тестовый десерт');
@@ -243,7 +248,6 @@ test('FT-642: удаление записи — «Удалено · Вернут
   await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('nutrition_demo_server:3')).days).reduce((s, d) => s + d.entries.length, 0) === 0, null, { timeout: 30000 });
   await diary.getByRole('button', { name: 'Настройки питания', exact: true }).click();
   await diary.getByRole('button', { name: 'Норма и анкета', exact: true }).waitFor();
-  await page.getByRole('heading', { name: 'Разобраться за пару минут' }).waitFor();
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -298,7 +302,6 @@ test('FT-551: собственный каталог, бренд, этикетк�
   assert.equal(await page.getByRole('heading', { name: 'Анкета', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: 'Собрать рацион', exact: true }).count(), 0);
   assert.equal(await page.getByLabel('Дата дневника').count(), 0);
-  await page.getByRole('heading', { name: 'Разобраться за пару минут' }).waitFor();
   await page.screenshot({ path: join(shots, 'nutrition-tips-390.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Норма и анкета', exact: true }).click();
   await page.getByRole('heading', { name: 'Анкета', exact: true }).waitFor();
@@ -455,8 +458,9 @@ test('FT-643: диалоги дневника на общем листе — с�
   await dialog().getByRole('button', { name: 'Закрыть', exact: true }).click();
   await noSheets();
   // Урок — тоже лист
-  await diary.getByRole('button', { name: 'Настройки питания', exact: true }).click();
-  await diary.locator('.diary-lesson').first().click();
+  // Этап 4 макета: советы — кружками в «Идеях»
+  await diary.getByRole('tab', { name: 'Идеи', exact: true }).click();
+  await diary.locator('.nt-tip').first().click();
   await dialog().waitFor();
   await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
   await page.screenshot({ path: join(shots, 'diary-sheet-lesson-390.png') });
@@ -625,8 +629,10 @@ test('план трёх разборов, пп. 10–11: норма по при�
   assert.equal(await dialog().getByRole('button', { name: /под остаток$/ }).getAttribute('aria-pressed'), 'true');
   await dialog().getByRole('button', { name: /^Показать|^Блюд нет/ }).click();
   await dialog().waitFor({ state: 'detached' });
-  await diary.getByRole('button', { name: 'Ужин', exact: true }).click();
-  await diary.getByText('Влезает в остаток', { exact: false }).first().waitFor();
+  // Этап 4 макета: приёмы — чипами у заголовка «Влезет в …», блюда — колодой
+  await diary.getByText(/^Влезет в /).waitFor();
+  await diary.getByRole('button', { name: 'ужин', exact: true }).click();
+  await diary.locator('.nt-dcard:not(.nt-dcard--under) .nt-dcard__name').waitFor();
   await page.screenshot({ path: join(shots, 'diary-recipes-390.png') });
   await page.close();
 });

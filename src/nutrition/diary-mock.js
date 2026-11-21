@@ -90,7 +90,7 @@ export function diaryMock(action, p = {}) {
     dayOf(day).complete = false; dayOf(day).revision++; result = { copied: source.length };
   } else if (action === 'diary.week') {
     const days = Array.from({ length: 7 }, (_, i) => present(shiftDay(day, i - 6))), full = days.filter(d => d.complete);
-    result = { days, fullDays: full.length, average: full.length ? Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, full.reduce((sum, d) => sum + d.totals[k], 0) / full.length])) : null };
+    result = { days, fullDays: full.length, average: full.length ? Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, full.reduce((sum, d) => sum + d.totals[k], 0) / full.length])) : null, weights: (s.weights || []).filter(w => w.day >= days[0].day && w.day <= day) };
   } else if (action === 'diary.target.save') { s.targets = Object.fromEntries(['kcal', 'protein', 'fat', 'carbs'].map(k => [k, Number(p.targets[k])])); if (p.carbCycle !== undefined) s.carbCycle = Number(p.carbCycle) || 0; result = { targets: s.targets, carbCycle: s.carbCycle ?? 20 }; }
   else if (action === 'diary.recipe.save') {
     const ingredients = p.ingredients.map(i => ({ product: resolve(i.product), amount: Number(i.amount) })), total = totalEntries(ingredients), id = p.id || 'recipe-' + p.requestId;

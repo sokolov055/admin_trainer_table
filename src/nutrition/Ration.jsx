@@ -6,9 +6,10 @@ import { useTabLock, useBackGesture } from '../gestures.jsx';
 import { MEALS } from './recipes.js';
 import { CATALOG, setCatalog } from './catalog.js';
 import {
-  rankRecipes, planVariants, shoppingList, foodByGroup, defaultPantry, splitItems,
+  rankRecipes, readyCount, planVariants, shoppingList, foodByGroup, defaultPantry, splitItems,
   portionWeight, per100, extraTotals, remainingTarget, addTotals,
 } from './match.js';
+import { pantryEmoji } from './pantry-emoji.js';
 import Extras from './Extras.jsx';
 import { DiaryEntryForm } from './Diary.jsx';
 import { mealFromRecipe } from './diary-model.js';
@@ -220,6 +221,7 @@ function Pantry({ pantry, onToggle, onNext }) {
     .filter((group) => group.items.length);
 
   const chosen = pantry.length;
+  const ready = useMemo(() => readyCount(pantry), [pantry]);
 
   return (
     <>
@@ -247,8 +249,9 @@ function Pantry({ pantry, onToggle, onNext }) {
                   aria-pressed={active}
                   onClick={() => { onToggle(name); haptic(); }}
                 >
-                  {active && <span className="pantry__tick"><IconCheck size={13} /></span>}
-                  {name}
+                  <span className="pantry__emoji" aria-hidden="true">{pantryEmoji(name)}</span>
+                  <span className="pantry__name">{name}</span>
+                  {active && <span className="pantry__tick" aria-hidden="true"><IconCheck size={11} /></span>}
                 </button>
               );
             })}
@@ -274,6 +277,7 @@ function Pantry({ pantry, onToggle, onNext }) {
       <div className="ration__bar">
         <span className="ration__count">
           {chosen ? 'Отмечено ' + chosen : 'Ничего не отмечено'}
+          {chosen > 0 && <small>{ready > 0 ? 'уже хватает на ' + ready + ' ' + plural(ready, 'блюдо', 'блюда', 'блюд') : 'отметьте ещё — целых блюд пока нет'}</small>}
         </span>
         <button
           className="button button--primary"
@@ -1003,6 +1007,10 @@ export default function Ration({ targets: calculatedTargets, onClose, trial = fa
             серая (аудит 24.10.2026) */}
         <BackButton label={step === 'pantry' ? 'К норме' : 'Назад'} onClick={back} />
         <h2 className="ration__title">{titles[step]}</h2>
+        {/* Шаги холодильника точками (макет nutrition-redesign-2026-11-20, этап 4) */}
+        <div className="ration__dots" role="img" aria-label={'Шаг ' + (['pantry', 'swipe', 'day'].indexOf(step) + 1) + ' из 3'}>
+          {['pantry', 'swipe', 'day'].map((s, i) => <i key={s} className={i <= ['pantry', 'swipe', 'day'].indexOf(step) ? 'is-on' : ''} />)}
+        </div>
       </div>
 
       {trial && (

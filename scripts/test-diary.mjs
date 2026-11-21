@@ -39,14 +39,14 @@ const stubs = {
   pendingDelete: `export const usePendingDelete=(commit,{onDone,onError}={})=>({remove:(id,payload)=>{globalThis.__diary.removed.push(id);Promise.resolve(commit(payload)).then(()=>onDone&&onDone(payload),e=>onError&&onError(e));},hidden:()=>false,bar:null,flush(){}});`,
 };
 // «+» нижнего меню: requestQuick — из той же сборки, что и дневник (одна очередь запросов)
-const bundle = await build({ stdin: { contents: "export * from './src/nutrition/Diary.jsx'; export { default } from './src/nutrition/Diary.jsx'; export { requestQuick } from './src/quick-actions.js';", resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'cjs', platform: 'node', external: ['react'], logLevel: 'silent', plugins: [{ name: 'diary-stubs', setup(b) {
+const bundle = await build({ stdin: { contents: "export * from './src/nutrition/Diary.jsx'; export { default } from './src/nutrition/Diary.jsx'; export { requestQuick } from './src/quick-actions.js'; export { DishDeck } from './src/nutrition/IdeasParts.jsx';", resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'cjs', platform: 'node', external: ['react'], logLevel: 'silent', plugins: [{ name: 'diary-stubs', setup(b) {
   b.onResolve({ filter: /\/(api|gestures|ui|icons|offline-writes|offline-account|SwipeRow|pendingDelete)\.(js|jsx)$/ }, a => ({ path: ({ 'offline-writes': 'offline', 'offline-account': 'account' })[a.path.split('/').at(-1).split('.')[0]] || a.path.split('/').at(-1).split('.')[0], namespace: 'stub' }));
   b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: stubs[a.path], loader: 'jsx' }));
   b.onLoad({ filter: /\.css$/ }, () => ({ contents: '', loader: 'js' }));
 } }] });
 const module = { exports: {} };
 vm.runInThisContext('(function(require,module,exports){' + bundle.outputFiles[0].text + '\n})')(createRequire(import.meta.url), module, module.exports);
-const { useDiaryResource, DiaryEntryForm, default: NutritionDiary, requestQuick } = module.exports;
+const { useDiaryResource, DiaryEntryForm, default: NutritionDiary, requestQuick, DishDeck } = module.exports;
 globalThis.window = { addEventListener() {}, removeEventListener() {} };
 globalThis.document = { activeElement: null, addEventListener() {}, removeEventListener() {} };
 globalThis.__diary = { queued: [], removed: [] };
@@ -116,7 +116,8 @@ test('питание: три вкладки и ⚙︎, удаление запи
   await act(async () => next.props.onClick());
   const entry = title => tree.root.findAllByType('strong').find(s => s.props.children === title)?.parent;
   assert.ok(entry('Перекус, который влезет'));
-  await act(async () => entry('Из того, что есть дома').props.onClick());
+  // Этап 4 макета: холодильник — карточкой с кнопкой
+  await act(async () => tree.root.findByProps({ 'aria-label': 'Из того, что есть дома: открыть холодильник' }).props.onClick());
   assert.equal(planned.targets.kcal, 2000); assert.equal(planned.totals.kcal, 84);
   await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Сегодня').props.onClick());
   // Макет 20.11: еда — плашками; нажать → лист записи → «Удалить запись»
@@ -259,7 +260,8 @@ test('тренер в карточке клиента: видит «пример
   await act(async () => tree.root.findByProps({ 'aria-label': 'Настройки питания' }).props.onClick());
   buttons = buttonsText(tree);
   assert.doesNotMatch(buttons.join(' | '), /Норма по приёмам|Как считать еду/);
-  assert.match(screen(tree), /Как читать этикетку/, 'уроки — есть');
+  await act(async () => tree.root.findAllByProps({ role: 'tab' }).find(t => t.props.children === 'Идеи').props.onClick());
+  assert.ok(tree.root.findAllByProps({ 'aria-label': 'Совет: Как читать этикетку' }).length, 'советы — кружками в «Идеях»');
   tree.unmount();
 });
 
@@ -300,13 +302,15 @@ test('углеводы по дням: клиент видит цель дня с
   await settle();
   const text = screen(tree);
   assert.match(text, /Сегодня тренировка в 18:00 — больше углеводов, особенно в перекус до неё и в ужин после\./);
-  assert.match(text, /Каша с бананом/);
-  assert.doesNotMatch(text, /Омлет с сыром/, 'в день тренировки по умолчанию — блюда с углеводами');
-  assert.match(text, /углеводов много/, 'подпись уровня у блюда');
+  // Этап 4 макета: блюда — колодой по одному; что в колоде — по её списку
+  const deck = () => tree.root.findByType(DishDeck).props.dishes.map(p => p.name).join(' | ');
+  assert.match(deck(), /Каша с бананом/);
+  assert.doesNotMatch(deck(), /Омлет с сыром/, 'в день тренировки по умолчанию — блюда с углеводами');
+  assert.match(text, /углеводов (много|средне|мало)/, 'подпись уровня у блюда');
   assert.match(text, /Углеводов много/, 'включённый фильтр — строкой под рядом (FT-745)');
   await act(async () => tree.root.findAll(n => n.type === 'button' && /^Фильтры/.test(n.props['aria-label'] || ''))[0].props.onClick());
   await act(async () => tree.root.findAll(n => n.type === 'button' && n.props.children === 'Любые')[0].props.onClick());
-  assert.match(screen(tree), /Омлет с сыром/);
+  assert.match(deck(), /Омлет с сыром/);
   tree.unmount();
 });
 test('углеводы по дням: тренер открывает цель с базовыми цифрами, видит дни и отправляет процент', async () => {

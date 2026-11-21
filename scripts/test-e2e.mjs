@@ -96,7 +96,7 @@ test('FT-776: Настройки владельца с выбранными ст
     });
     const openSettings = async () => {
       await phone.getByRole('button', { name: 'Меню', exact: true }).click();
-      await phone.getByRole('button', { name: /Настройки/ }).click();
+      await phone.getByRole('button', { name: /^Настройки Уведомления/ }).click();
       await phone.getByText('Анкета перед выбором программы', { exact: true }).waitFor();
       await phone.getByText('Стартовые программы и включение', { exact: true }).click();
     };
@@ -998,7 +998,7 @@ test('смахнуть вправо возвращает из «Моих дан�
     // Короткое движение без скорости «назад» не делает: экран пружиной
     // возвращается на место
     await phone.getByRole('button', { name: 'Меню', exact: true }).click();
-    await phone.getByRole('button', { name: /Настройки/ }).click();
+    await phone.getByRole('button', { name: /^Настройки Уведомления/ }).click();
     await phone.waitForFunction(() => document.body.style.overflow !== 'hidden', null, { timeout: 5000 });
     // На экране бокового меню нижнее меню уезжает, а не висит пустым
     assert.equal(await phone.locator('.tabbar').getAttribute('aria-hidden'), 'true', 'нижнее меню спрятано');
