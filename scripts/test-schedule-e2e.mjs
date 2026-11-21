@@ -98,6 +98,8 @@ test('расписание: календарь, жесты и карточка �
     await booked.click();
     await details.getByRole('button', { name: 'Начать тренировку · Велотренажёр' }).waitFor();
     await details.getByLabel('Другое занятие на эту запись').waitFor();
+    assert.equal(await details.locator('.cal-detail__name').evaluate((el) => getComputedStyle(el).whiteSpace), 'nowrap');
+    assert.ok(await details.locator('.cal-detail__name').evaluate((el) => el.scrollWidth <= el.clientWidth));
     assert.ok(await page.locator('.cal-grid--3').isVisible());
     await page.screenshot({ path: join(REVIEW, 'schedule-event-grid.png') });
     const grip = await details.locator('.sheet__grip').boundingBox();
@@ -286,6 +288,8 @@ test('расписание: календарь, жесты и карточка �
     await details.waitFor();
     await details.getByRole('button', { name: 'Редактировать событие' }).click();
     await page.getByLabel('Длительность').waitFor();
+    assert.equal(await page.getByLabel('Дата', { exact: true }).count(), 0);
+    assert.equal(await page.getByLabel('Время', { exact: true }).count(), 0);
     await page.getByRole('button', { name: 'К занятию', exact: true }).click();
     await details.waitFor();
 

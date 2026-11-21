@@ -6606,7 +6606,9 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 /* 16px — иначе iOS приближает страницу при фокусе в поле */
 .sheet__body input, .sheet__body select, .sheet__body textarea { font-size: 16px; }
 .sheet__done { flex: none; min-height: 54px; margin-top: 8px; border-radius: var(--radius-lg); font-size: 17px; font-weight: 720; }
-.cal-detail__title { display: inline-flex; align-items: center; gap: 8px; text-align: start; }
+.cal-detail .sheet__head h2 { min-width: 0; }
+.cal-detail__title { display: flex; align-items: center; gap: 8px; text-align: start; }
+.cal-detail__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-detail__avatar { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 50%; background: var(--accent-wash); color: var(--accent-ink); font-size: 12px; }
 .cal-detail__summary { display: grid; gap: 10px; }
 .cal-detail__summary p { margin: 0; }

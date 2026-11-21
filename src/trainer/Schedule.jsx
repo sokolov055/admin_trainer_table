@@ -698,7 +698,12 @@ function EventSheet({ event, clients, chat, onClose, onEdit, onCopy, onRemovePer
     requestStart(row, target);
     onOpenClient(person, 'plan');
   };
-  const heading = <span className="cal-detail__title">{hasClient && <span className="cal-detail__avatar" aria-hidden="true">{initials(title)}</span>}{title}</span>;
+  const heading = (
+    <span className="cal-detail__title">
+      {hasClient && <span className="cal-detail__avatar" aria-hidden="true">{initials(title)}</span>}
+      <span className="cal-detail__name">{title}</span>
+    </span>
+  );
   const date = start.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
 
   return (
@@ -1796,7 +1801,8 @@ function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = n
   useEffect(() => { if (onDirty) onDirty(dirty); }, [dirty]);
 
   const active = clients.filter((c) => !c.archived).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  const startsAt = new Date(`${date}T${time}`);
+  const editTime = mode === 'move' || !event.id;
+  const startsAt = editTime ? new Date(`${date}T${time}`) : start;
   // Время поменялось — перенос или исправление: спросим, какое из двух
   const moved = !!event.id && startsAt.getTime() !== start.getTime();
   const personal = kind === 'personal';
@@ -1839,7 +1845,7 @@ function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = n
         <div className="library__form">
           <strong>{mode === 'cancel' ? 'Отмена занятия' : mode === 'move' ? 'Перенос события'
             : event.id ? (personal ? 'Личное событие' : 'Занятие') : event.copyOf ? 'Копия события' : 'Новое событие'}</strong>
-          {event.id && mode !== 'edit' && (
+          {event.id && (
             <p className="small muted">{event.clientName || event.title} · {start.toLocaleString('ru-RU', {
               day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
             })}</p>
@@ -1869,7 +1875,7 @@ function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = n
               )}
             </>
           )}
-          {mode !== 'cancel' && (
+          {editTime && (
             <div className="field-row schedule__when">
               <Field label="Дата" type="date" value={date} onChange={(v) => { setDate(v); setStep(null); }} />
               <Field label="Время" type="time" value={time} onChange={(v) => { setTime(v); setStep(null); }} />
@@ -1952,7 +1958,7 @@ function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = n
             <div className="library__actions">
               <button
                 className="button button--primary"
-                disabled={busy || (personal ? !title.trim() : !clientRow) || !date || !time || (mode === 'move' && !moved) || (step === 'move' && !change)}
+                disabled={busy || (personal ? !title.trim() : !clientRow) || (editTime && (!date || !time)) || (mode === 'move' && !moved) || (step === 'move' && !change)}
                 onClick={() => (moved && !personal && step !== 'move' ? setStep('move') : save())}
               >
                 {busy ? 'Сохраняем…' : event.id ? (moved && step !== 'move' ? 'Перенести…' : 'Сохранить') : 'Добавить'}
