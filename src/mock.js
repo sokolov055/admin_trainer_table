@@ -2025,6 +2025,8 @@ const MOCK = {
           endsAt: new Date(s.getTime() + mins * 60000).toISOString(),
           done: s.getTime() + mins * 60000 < now,
           cancelledCharged: j === 1 && k % 4 === 0,
+          // «₽» на плашке: у клиента кончились оплаченные занятия (FT-784)
+          unpaid: !unknown && row === 7 && s.getTime() > now,
         });
       });
     }
@@ -2048,7 +2050,10 @@ const MOCK = {
   'trainer.schedule.programs': (p = {}) => {
     const w = demoWeeks[MONTHS[0]];
     if (!w || !w.bySchedule || !String(p.rows || '').split(',').includes('3')) return { programs: {} };
-    return { programs: { 3: { month: MONTHS[0], blocks: PLAN_BLOCKS.map((b) => ({ id: b.id, title: b.title, week: b.week, ...(b.with ? { with: true } : {}) })), weeks: w } } };
+    return { programs: { 3: { month: MONTHS[0], blocks: PLAN_BLOCKS.map((b) => ({
+      id: b.id, title: b.title, week: b.week, ...(b.with ? { with: true } : {}),
+      cardio: !!b.exercises?.length && b.exercises.every((e) => e.cardio),
+    })), weeks: w } } };
   },
   'trainer.schedule.save': (params) => {
     const id = params.id || 'demo-custom-' + Date.now();

@@ -50,7 +50,7 @@ test('расписание: экран, виды, листание и перен
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU', timezoneId: 'UTC', hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   const touch = finger(cdp);
@@ -62,7 +62,16 @@ test('расписание: экран, виды, листание и перен
   try {
     const origin = `http://127.0.0.1:${server.address().port}`;
     await page.goto(origin + '/?mockRole=trainer');
-    await page.evaluate(() => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.removeItem('schedule_view_v1'); });
+    await page.clock.setFixedTime(new Date('2026-11-21T12:22:00Z'));
+    await page.evaluate(() => {
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      localStorage.removeItem('schedule_view_v1');
+      localStorage.setItem('ft775-program-demo', JSON.stringify({
+        month: 'Ноябрь 2026',
+        blocks: [{ id: 'demo-cardio', title: 'Велотренажёр', week: 1, exercises: [{ name: 'Вело', cardio: true }] }],
+        weeks: { 'Ноябрь 2026': { schedule: 1, bySchedule: 1, startsOn: '2026-11-16', length: 1, days: [1, 3, 5, 6, 7] } },
+      }));
+    });
     await page.goto(origin + '/?mockRole=trainer');
     await page.getByRole('button', { name: 'Расписание' }).first().click();
     await page.locator('.cal-grid__scroll').waitFor();
@@ -75,6 +84,13 @@ test('расписание: экран, виды, листание и перен
     assert.ok(pageScroll <= 1, 'страница не прокручивается: ' + pageScroll);
     const gridBottom = await page.locator('.cal-grid').evaluate((el) => el.getBoundingClientRect().bottom);
     assert.ok(gridBottom > 700, 'сетка тянется до нижнего меню: ' + gridBottom);
+    await page.locator('.cal-event--cardio .cal-event__sub').filter({ hasText: 'Велотренажёр' }).first().waitFor();
+    assert.equal(await page.locator('.cal-grid__nowtime').innerText(), '12:22');
+    assert.equal(await page.locator('.cal-grid__past').count(), 1);
+    for (const selector of ['.cal-event--personal', '.cal-event--done', '.cal-event--cancelled', '.cal-event__rub', '.cal-grid__dot--cardio']) {
+      assert.ok(await page.locator(selector).count(), selector);
+    }
+    assert.ok(await page.getByRole('button', { name: /не оплачено/ }).count());
     await page.screenshot({ path: join(REVIEW, 'schedule-3day.png') });
 
     // Листание пальцем: «3 дня» — ровно на три дня, прокрутка по часам на месте
@@ -211,6 +227,23 @@ test('расписание: экран, виды, листание и перен
     await page.getByRole('menuitemradio', { name: 'Список' }).click();
     await page.locator('.cal-agenda__item').first().waitFor();
     await page.screenshot({ path: join(REVIEW, 'schedule-list.png') });
+
+    await page.locator('.cal-viewpick__button').click();
+    await page.getByRole('menuitemradio', { name: 'Неделя' }).click();
+    await page.locator('.cal-grid--7').waitFor();
+    await page.screenshot({ path: join(REVIEW, 'schedule-week.png') });
+
+    await page.locator('.cal-viewpick__button').click();
+    await page.getByRole('menuitemradio', { name: 'День', exact: true }).click();
+    await page.locator('.cal-grid--1').waitFor();
+    const grid = page.locator('.cal-grid__scroll > .cal-grid__row');
+    const hourHeight = () => grid.evaluate((el) => parseFloat(el.style.getPropertyValue('--hour')));
+    const beforePinch = await hourHeight();
+    const pinchAt = (left, right) => [left, right].map((x, id) => ({ x, y: 300, id }));
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pinchAt(140, 220) });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pinchAt(100, 260) });
+    await page.waitForFunction((h) => parseFloat(document.querySelector('.cal-grid__scroll > .cal-grid__row').style.getPropertyValue('--hour')) > h, beforePinch);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 
     // Выбор даты — по названию месяца
     await page.locator('.cal-top__title').click();

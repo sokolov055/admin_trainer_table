@@ -15,6 +15,7 @@ import {
   addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
   rangeOf, sameTimeOn, shifted, startOfDay,
 } from './calendar-move.js';
+import { dayDots, dayTypeLabels, eventAria, eventKind, eventLines } from './calendar-look.js';
 
 /**
  * Расписание тренера — по образцу Google Календаря (переделано 19.10.2026).
@@ -702,7 +703,9 @@ const labelOf = (e) => e.clientName || e.title || 'Без названия';
 const shortLabelOf = (e) => labelOf(e).split(/\s+/)[0];
 
 function eventClass(e) {
-  return 'cal-event'
+  // Цвет — по типу события (макет calendar-redesign-2026-11-21, этап 1)
+  return 'cal-event cal-event--' + eventKind(e)
+    + (e.unpaid && !e.cancelledCharged ? ' cal-event--unpaid' : '')
     + (e.cancelledCharged ? ' cal-event--cancelled' : '')
     + (e.personal ? ' cal-event--personal' : '')
     + (e.done && !e.cancelledCharged ? ' cal-event--done' : '')
@@ -1287,11 +1290,16 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
           <div className="cal-grid__track" ref={headTrack} style={{ gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))` }}>
             {strip.map((d) => {
               const today = sameDay(d, now);
+              const dots = dayDots([...(byDay.get(dateValue(d)) || []), ...allDayOf(d)]);
               return (
                 <button type="button" key={d.getTime()} className={'cal-grid__day' + (today ? ' cal-grid__day--today' : '')} onClick={() => onDay(d)}
-                  aria-label={weekdayOf(d) + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()]}>
+                  aria-label={weekdayOf(d) + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + dayTypeLabels(dots)}>
                   <span>{weekdayOf(d)}</span>
                   <strong>{d.getDate()}</strong>
+                  {/* Кто будет — точками типов событий, ещё до прокрутки */}
+                  <i className="cal-grid__dots" aria-hidden="true">
+                    {dots.map((kind) => <b key={kind} className={'cal-grid__dot cal-grid__dot--' + kind} />)}
+                  </i>
                 </button>
               );
             })}
@@ -1307,8 +1315,8 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
               {strip.map((d) => (
                 <div key={d.getTime()} className="cal-grid__allcell">
                   {allDayOf(d).map((e) => (
-                    <button type="button" key={e.id} className={eventClass(e) + ' cal-event--chip'} onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
-                      {labelOf(e)}
+                    <button type="button" key={e.id} className={eventClass(e) + ' cal-event--chip'} aria-label={eventAria(e, 'Весь день')} onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
+                      <span className="cal-event__name">{labelOf(e)}</span>
                     </button>
                   ))}
                 </div>
@@ -1324,6 +1332,10 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
             {Array.from({ length: 24 }, (_, h) => (
               <span key={h} style={{ top: h * hour }}>{h ? pad(h) + ':00' : ''}</span>
             ))}
+            {/* Время «сейчас» в колонке часов — когда сегодня на экране */}
+            {visibleDays.some((d) => sameDay(d, now)) && (
+              <b className="cal-grid__nowtime" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * hour }}>{clock(now.getHours() * 60 + now.getMinutes())}</b>
+            )}
           </div>
           <div className="cal-grid__viewport">
             <div className="cal-grid__track cal-grid__body" ref={bodyTrack}
@@ -1340,6 +1352,7 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
                       const top = (from.getHours() * 60 + from.getMinutes()) / 60 * hour;
                       const height = Math.max(((f - s) / 3600000) * hour - 2, 14);
                       const lifted = ghost && !ghost.settle && ghost.id === e.id;
+                      const lines = eventLines(e, { height });
                       return (
                         <button
                           type="button"
@@ -1348,16 +1361,16 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
                           data-movable={movable(e) && !e.moving ? '1' : '0'}
                           className={eventClass(e) + (lifted ? ' is-lifted' : '')}
                           style={{ top, height, left: `calc(${(col / cols) * 100}% + 1px)`, width: `calc(${100 / cols}% - 3px)` }}
-                          aria-label={hm(e.startsAt) + '–' + hm(e.endsAt) + ' ' + labelOf(e)}
+                          aria-label={eventAria(e, hm(e.startsAt) + '–' + hm(e.endsAt))}
                           onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}
                         >
                           {/* Неделя на телефоне — только имя, как в Google; на широком экране — целиком */}
                           {days === 7 && <span className="cal-event__name cal-event__short">{shortLabelOf(e)}</span>}
                           <span className={'cal-event__name' + (days === 7 ? ' cal-event__full' : '')}>{labelOf(e)}</span>
-                          {/* Занятие программы — на «Дне» и «3 днях»; на неделе тесно. Высокая
-                              плитка — плашкой под временем, низкая (мелкий масштаб) — в строке времени */}
-                          {height >= 30 && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}{e.session && days < 7 && height < 44 ? ' · ' + e.session.short : ''}</span>}
-                          {e.session && days < 7 && height >= 44 && <span key={e.session.id + e.startsAt} className={'cal-event__session' + (e.session.cardio ? ' is-cardio' : '')}>{e.session.short}</span>}
+                          {/* Под именем — занятие программы, затем время, если хватает высоты. */}
+                          {lines.session && <span key={e.session.id + e.startsAt} className="cal-event__sub">{lines.session}</span>}
+                          {lines.time && <span className="cal-event__time">{hm(e.startsAt)}–{hm(e.endsAt)}</span>}
+                          {e.unpaid && !e.cancelledCharged && <span className="cal-event__rub" aria-hidden="true">₽</span>}
                         </button>
                       );
                     })}
@@ -1368,7 +1381,11 @@ function TimeGrid({ start, days, events, scrollKey, pager, onDay, onEvent, onCre
                       </button>
                     )}
                     {today && (
-                      <span className="cal-grid__now" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * hour }} aria-hidden="true" />
+                      <>
+                        {/* Прошедшее сегодня чуть притушено — видно, что осталось */}
+                        <span className="cal-grid__past" style={{ height: (now.getHours() * 60 + now.getMinutes()) / 60 * hour }} aria-hidden="true" />
+                        <span className="cal-grid__now" style={{ top: (now.getHours() * 60 + now.getMinutes()) / 60 * hour }} aria-hidden="true" />
+                      </>
                     )}
                   </div>
                 );
@@ -1513,9 +1530,10 @@ function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) 
                       {list.slice(0, shown).map((e) => (
                         <button type="button" key={e.id} data-cal-event={e.id} data-movable={movable(e) && !e.moving ? '1' : '0'}
                           className={eventClass(e) + ' cal-event--chip' + (lifted && lifted.id === e.id ? ' is-lifted' : '')}
-                          aria-label={hm(e.startsAt) + ' ' + labelOf(e)} tabIndex={i === 1 ? 0 : -1}
+                          aria-label={eventAria(e, isAllDay(e) ? 'Весь день' : hm(e.startsAt))} tabIndex={i === 1 ? 0 : -1}
                           onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
-                          {shortLabelOf(e)}
+                          <span className="cal-event__name">{shortLabelOf(e)}</span>
+                          {e.unpaid && !e.cancelledCharged && <span className="cal-event__rub" aria-hidden="true">₽</span>}
                         </button>
                       ))}
                       {list.length > shown && <span className="cal-month__more">ещё {list.length - shown}</span>}
@@ -1569,13 +1587,14 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
                 </p>
               )}
               {ofDay.map((e) => (
-                <button type="button" key={e.id} className={eventClass(e) + ' cal-agenda__item'} onClick={() => onEvent(e)}>
+                <button type="button" key={e.id} className={eventClass(e) + ' cal-agenda__item'} aria-label={eventAria(e, isAllDay(e) ? 'Весь день' : hm(e.startsAt) + '–' + hm(e.endsAt))} onClick={() => onEvent(e)}>
                   <span className="cal-event__name">{labelOf(e)}</span>
+                  {e.session?.title && <span className="cal-event__sub">{e.session.title}</span>}
                   <span className="cal-event__time">
                     {isAllDay(e) ? 'Весь день' : hm(e.startsAt) + '–' + hm(e.endsAt)}
                     {e.cancelledCharged ? ' · отменено, списано' : e.personal ? ' · личное' : ''}
                   </span>
-                  {e.session && <span className={'cal-event__session' + (e.session.cardio ? ' is-cardio' : '')}>{e.session.title}</span>}
+                  {e.unpaid && !e.cancelledCharged && <span className="cal-event__rub" aria-hidden="true">₽</span>}
                 </button>
               ))}
             </div>
