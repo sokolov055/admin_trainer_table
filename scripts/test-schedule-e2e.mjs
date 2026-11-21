@@ -98,7 +98,8 @@ test('расписание: календарь, жесты и карточка �
     await booked.click();
     await details.getByRole('button', { name: 'Начать тренировку · Велотренажёр' }).waitFor();
     await details.getByLabel('Другое занятие на эту запись').waitFor();
-    assert.equal(await details.locator('.cal-detail__name').evaluate((el) => getComputedStyle(el).whiteSpace), 'nowrap');
+    assert.deepEqual(await details.locator('.cal-detail__name > span').allTextContents(), ['Анна', 'Морозова']);
+    assert.equal(await details.locator('.cal-detail__name > span').first().evaluate((el) => getComputedStyle(el).whiteSpace), 'nowrap');
     assert.ok(await details.locator('.cal-detail__name').evaluate((el) => el.scrollWidth <= el.clientWidth));
     assert.ok(await page.locator('.cal-grid--3').isVisible());
     await page.screenshot({ path: join(REVIEW, 'schedule-event-grid.png') });
@@ -286,10 +287,11 @@ test('расписание: календарь, жесты и карточка �
     await details.getByRole('button', { name: 'Карточка', exact: true }).click();
     await page.getByRole('button', { name: 'К занятию' }).click();
     await details.waitFor();
-    await details.getByRole('button', { name: 'Редактировать событие' }).click();
+    assert.equal(await details.getByRole('button', { name: /Изменить|Редактировать событие|^Перенести$/ }).count(), 1);
+    await details.getByRole('button', { name: 'Изменить' }).click();
     await page.getByLabel('Длительность').waitFor();
-    assert.equal(await page.getByLabel('Дата', { exact: true }).count(), 0);
-    assert.equal(await page.getByLabel('Время', { exact: true }).count(), 0);
+    await page.getByLabel('Дата', { exact: true }).waitFor();
+    await page.getByLabel('Время', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'К занятию', exact: true }).click();
     await details.waitFor();
 
@@ -298,8 +300,7 @@ test('расписание: календарь, жесты и карточка �
     assert.equal(await page.getByLabel('Время', { exact: true }).inputValue(), '10:30');
     await page.getByRole('button', { name: 'К занятию', exact: true }).click();
 
-    await details.getByRole('button', { name: 'Перенести', exact: true }).click();
-    assert.equal(await page.getByLabel('Длительность').count(), 0);
+    await details.getByRole('button', { name: 'Изменить', exact: true }).click();
     await page.getByLabel('Время', { exact: true }).fill('12:15');
     await page.getByRole('button', { name: 'Перенести…' }).click();
     await page.getByText('Исправление — неверно записал', { exact: true }).click();
@@ -346,7 +347,7 @@ test('расписание: календарь, жесты и карточка �
 
     await page.locator('.cal-agenda__item.cal-event--cancelled').first().click();
     await details.getByText('Отменено клиентом, занятие списано.').waitFor();
-    assert.equal(await details.getByRole('button', { name: /Начать тренировку|Редактировать событие|Перенести/ }).count(), 0);
+    assert.equal(await details.getByRole('button', { name: /Начать тренировку|Изменить|Перенести/ }).count(), 0);
     await page.keyboard.press('Escape');
     await details.waitFor({ state: 'detached' });
 

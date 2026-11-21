@@ -12,7 +12,7 @@ import { scheduledPlan, sessionQueue, dateKey as dayKey } from '../program-timel
 import { initials } from '../chat/chat-model.js';
 import { ChatGlyph, useChatInbox } from '../chat/ChatList.jsx';
 import { requestStart } from '../client/start-request.js';
-import { IconAlert, IconBack, IconCheck, IconChevron, IconClose, IconCopy, IconMenu, IconPen, IconPlay, IconPlus, IconSwap, IconUser } from '../icons.jsx';
+import { IconAlert, IconBack, IconCheck, IconChevron, IconClose, IconCopy, IconMenu, IconPen, IconPlay, IconPlus, IconUser } from '../icons.jsx';
 import {
   addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
   rangeOf, sameTimeOn, shifted, startOfDay,
@@ -678,7 +678,6 @@ function EventSheet({ event, clients, chat, onClose, onEdit, onCopy, onRemovePer
   const client = clients.find((c) => Number(c.row) === Number(event.clientRow));
   const sessions = event.sessions || [];
   const planned = sessions.filter((s) => s.id);
-  const canMove = movable(event);
   const canEdit = !event.cancelledCharged;
   const hasClient = !event.personal && !!event.clientRow;
   const scheduledClients = planned.length ? planned : [{ row: event.clientRow, id: '', title: '', name: '' }];
@@ -701,14 +700,15 @@ function EventSheet({ event, clients, chat, onClose, onEdit, onCopy, onRemovePer
   const heading = (
     <span className="cal-detail__title">
       {hasClient && <span className="cal-detail__avatar" aria-hidden="true">{initials(title)}</span>}
-      <span className="cal-detail__name">{title}</span>
+      <span className="cal-detail__name">{title.split(/(\s+)/).map((part, index) => (
+        part.trim() ? <span key={index}>{part}</span> : part
+      ))}</span>
     </span>
   );
   const date = start.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
 
   return (
-    <Sheet title={heading} className="cal-detail" onClose={onClose}
-      action={canEdit && <button type="button" className="icon-button" aria-label="Редактировать событие" onClick={() => onEdit('edit')}><IconPen size={18} /></button>}>
+    <Sheet title={heading} className="cal-detail" onClose={onClose}>
       <div className="cal-detail__summary">
         <div className="cal-detail__when">
           <div>{date} · {isAllDay(event) ? 'Весь день' : hm(event.startsAt) + '–' + hm(event.endsAt) + ' · ' + durationOf(event) + ' мин'}</div>
@@ -729,7 +729,7 @@ function EventSheet({ event, clients, chat, onClose, onEdit, onCopy, onRemovePer
             ))
         )}
         <div className="cal-detail__actions">
-          {canMove && <DetailAction icon={IconSwap} onClick={() => onEdit('move')}>Перенести</DetailAction>}
+          {canEdit && <DetailAction icon={IconPen} onClick={() => onEdit('edit')}>Изменить</DetailAction>}
           {canEdit && (event.personal
             ? <DetailAction icon={IconClose} onClick={onRemovePersonal}>Удалить</DetailAction>
             : <DetailAction icon={IconClose} onClick={() => onEdit('cancel')}>Отменить</DetailAction>)}
@@ -1801,8 +1801,9 @@ function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = n
   useEffect(() => { if (onDirty) onDirty(dirty); }, [dirty]);
 
   const active = clients.filter((c) => !c.archived).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  const editTime = mode === 'move' || !event.id;
-  const startsAt = editTime ? new Date(`${date}T${time}`) : start;
+  const editTime = mode === 'edit';
+  const timeChanged = date !== dateValue(start) || time !== hm(start);
+  const startsAt = !event.id || timeChanged ? new Date(`${date}T${time}`) : start;
   // Время поменялось — перенос или исправление: спросим, какое из двух
   const moved = !!event.id && startsAt.getTime() !== start.getTime();
   const personal = kind === 'personal';
@@ -1843,7 +1844,7 @@ function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = n
       {confirm}
       <Panel pad>
         <div className="library__form">
-          <strong>{mode === 'cancel' ? 'Отмена занятия' : mode === 'move' ? 'Перенос события'
+          <strong>{mode === 'cancel' ? 'Отмена занятия'
             : event.id ? (personal ? 'Личное событие' : 'Занятие') : event.copyOf ? 'Копия события' : 'Новое событие'}</strong>
           {event.id && (
             <p className="small muted">{event.clientName || event.title} · {start.toLocaleString('ru-RU', {
@@ -1958,7 +1959,7 @@ function EventForm({ event, mode, preset, clients, onDone, onCancel, confirm = n
             <div className="library__actions">
               <button
                 className="button button--primary"
-                disabled={busy || (personal ? !title.trim() : !clientRow) || (editTime && (!date || !time)) || (mode === 'move' && !moved) || (step === 'move' && !change)}
+                disabled={busy || (personal ? !title.trim() : !clientRow) || (editTime && (!date || !time)) || (step === 'move' && !change)}
                 onClick={() => (moved && !personal && step !== 'move' ? setStep('move') : save())}
               >
                 {busy ? 'Сохраняем…' : event.id ? (moved && step !== 'move' ? 'Перенести…' : 'Сохранить') : 'Добавить'}
