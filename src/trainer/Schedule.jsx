@@ -517,7 +517,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
         {/* key — вид: сменили вид — новый проявляется (cal-view-in), а не
             подменяет прежний одним кадром */}
         {view === 'month' ? (
-          <MonthPager key="month" pager={pager} anchor={anchor} events={events} onDay={openDay} onEvent={openEvent} onShift={shift} onDrop={drop} />
+          <MonthPager key="month" pager={pager} anchor={anchor} events={events} loading={load.loading} onDay={openDay} onEvent={openEvent} onShift={shift} onDrop={drop} />
         ) : view === 'list' ? (
           <Agenda key="list" start={start} days={agendaDays} events={events} loading={load.loading}
             onEvent={openEvent} onDay={openDay} onCreate={create} onMore={() => setAgendaDays((n) => n + 28)} />
@@ -1790,7 +1790,7 @@ function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, day
  * событий помещается в день — по высоте ячейки, остальное «ещё N».
  * Событие тоже переносится удержанием — в другой день, время то же.
  */
-function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) {
+function MonthPager({ anchor, events, loading, pager, onDay, onEvent, onShift, onDrop }) {
   const ownPager = useRef(null);
   const handle = pager || ownPager;
   const root = useRef(null);
@@ -1919,13 +1919,13 @@ function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) 
       </div>
       <div className="cal-month__selected" aria-live="polite">
         <div className="cal-month__selected-head">
-          <strong>{weekdayOf(keyDate(selectedKey))}, {keyDate(selectedKey).getDate()} {MONTHS[keyDate(selectedKey).getMonth()]} · {countText((byDay.get(selectedKey) || []).length, { one: 'событие', few: 'события', many: 'событий' })}</strong>
+          <strong>{weekdayOf(keyDate(selectedKey))}, {keyDate(selectedKey).getDate()} {MONTHS[keyDate(selectedKey).getMonth()]} · {loading && !byDay.get(selectedKey)?.length ? 'загрузка' : countText((byDay.get(selectedKey) || []).length, { one: 'событие', few: 'события', many: 'событий' })}</strong>
           <button type="button" onClick={() => onDay(keyDate(selectedKey))}>Открыть день <IconChevron size={16} /></button>
         </div>
         <div className="cal-month__selected-items">
           {(byDay.get(selectedKey) || []).length ? (byDay.get(selectedKey) || []).map((e) =>
             <AgendaEntry key={e.id} event={e} day={keyDate(selectedKey)} now={now} onEvent={onEvent} />)
-            : <p className="cal-agenda__empty">Занятий нет</p>}
+            : <p className="cal-agenda__empty">{loading ? 'Загружаем…' : 'Событий нет'}</p>}
         </div>
       </div>
       {lifted && createPortal(
@@ -2008,7 +2008,7 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onCreate, onMore
           <React.Fragment key={d.getTime()}>
           {monthStart && <div className="cal-agenda__month">
             <strong>{MONTHS_TITLE[d.getMonth()]}</strong>
-            <span>{countText(monthEvents.length, { one: 'занятие', few: 'занятия', many: 'занятий' })} · {countText(new Set(monthEvents.map((e) => e.clientRow)).size, { one: 'клиент', few: 'клиента', many: 'клиентов' })}</span>
+            <span>{loading ? 'Загружаем…' : countText(monthEvents.length, { one: 'занятие', few: 'занятия', many: 'занятий' }) + ' · ' + countText(new Set(monthEvents.map((e) => e.clientRow)).size, { one: 'клиент', few: 'клиента', many: 'клиентов' })}</span>
           </div>}
           <section className={'cal-agenda__day' + (today ? ' cal-agenda__day--today' : '')}>
             <button type="button" className="cal-agenda__date" onClick={() => onDay(d)}
