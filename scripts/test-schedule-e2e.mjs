@@ -304,6 +304,28 @@ test('расписание: календарь, жесты и карточка �
     await page.locator('.cal-viewpick__button').click();
     await page.getByRole('menuitemradio', { name: 'День', exact: true }).click();
     await page.locator('.cal-grid--1').waitFor();
+    await page.getByRole('button', { name: 'Сегодня', exact: true }).click();
+    const summary = page.locator('.cal-day-summary');
+    await summary.getByRole('button', { name: 'Ближайшее окно 12:30–14:00' }).waitFor();
+    assert.match(await summary.innerText(), /4 занятия · 4 ч 15 мин/);
+    const window = page.getByRole('button', { name: 'Свободное окно 12:30–14:00', exact: true });
+    await window.tap();
+    await quick.getByText(/12:30/).waitFor();
+    await quick.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await quick.waitFor({ state: 'hidden' });
+    await summary.getByRole('button', { name: '₽ 1 не оплачено', exact: true }).click();
+    await details.getByText('Не оплачено', { exact: true }).waitFor();
+    await details.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await details.waitFor({ state: 'hidden' });
+
+    for (const [width, theme] of [[390, 'light'], [320, 'dark']]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; }, theme);
+      assert.equal(await summary.evaluate((el) => el.scrollWidth > el.clientWidth), false);
+      await page.screenshot({ path: join(REVIEW, 'schedule-day-' + theme + '.png') });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
     const grid = page.locator('.cal-grid__scroll > .cal-grid__row');
     const hourHeight = () => grid.evaluate((el) => parseFloat(el.style.getPropertyValue('--hour')));
     const beforePinch = await hourHeight();

@@ -2,6 +2,7 @@
 // тип события, точки под днём, строки плашки, подпись для чтения с экрана.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { dayOverview } from '../src/trainer/calendar-day.js';
 import { bookingOverlap } from '../src/trainer/quick-booking.js';
 import { dayDots, eventAria, eventKind, eventLines } from '../src/trainer/calendar-look.js';
 
@@ -50,4 +51,46 @@ test('пересечение игнорирует старое событие н
   assert.equal(bookingOverlap([long], from, end), long);
   assert.equal(bookingOverlap([{ ...long, id: 'demo-custom-booking' }], from, end)?.id, 'demo-custom-booking');
   assert.equal(bookingOverlap([{ ...timed, cancelledCharged: true }], from, end), undefined);
+});
+
+const day = new Date(2026, 10, 21);
+const time = (hour, minute = 0) => new Date(2026, 10, 21, hour, minute);
+const appointment = (id, start, end, extra) => ({
+  id, clientRow: 1, startsAt: start.toISOString(), endsAt: end.toISOString(), ...extra,
+});
+
+test('сводка дня и окна учитывают пересечения, личные записи и границы суток', () => {
+  const unpaid = appointment('app-unpaid', time(6), time(7), { unpaid: true });
+  const events = [
+    appointment('app-overnight', time(-2), time(5), { personal: true }),
+    unpaid,
+    appointment('app-overlap', time(6, 30), time(7, 15)),
+    appointment('app-late', time(22, 15), time(25)),
+    appointment('app-cancelled', time(10), time(11), { cancelledCharged: true, unpaid: true }),
+    appointment('legacy', day, time(24), { clientRow: null }),
+  ];
+  assert.deepEqual(dayOverview(events, day, time(-1)), {
+    count: 3, minutes: 210, unpaid: [unpaid],
+    windows: [
+      { start: +time(5), end: +time(6), minutes: 60 },
+      { start: +time(7, 15), end: +time(22, 15), minutes: 900 },
+    ],
+  });
+});
+
+test('в окнах сегодня остаётся только время для новой записи, от часа', () => {
+  const events = [appointment('app-first', time(14), time(23, 15))];
+  assert.deepEqual(dayOverview(events, day, time(12, 22)).windows, [
+    { start: +time(12, 30), end: +time(14), minutes: 90 },
+  ]);
+  assert.deepEqual(dayOverview(events, day, time(14)).windows, []);
+  assert.deepEqual(dayOverview([], day, time(24)).windows, []);
+});
+
+test('новая запись на весь день блокирует окна, пустой будущий день доступен целиком', () => {
+  const tomorrow = time(24);
+  assert.deepEqual(dayOverview([appointment('app-full', day, tomorrow)], day, time(-1)).windows, []);
+  assert.deepEqual(dayOverview([], day, time(-1)).windows, [
+    { start: +day, end: +tomorrow, minutes: (+tomorrow - +day) / 60000 },
+  ]);
 });

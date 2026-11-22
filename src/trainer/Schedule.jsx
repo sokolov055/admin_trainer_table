@@ -17,6 +17,7 @@ import {
   addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
   rangeOf, sameTimeOn, shifted, startOfDay,
 } from './calendar-move.js';
+import { dayOverview } from './calendar-day.js';
 import { BookingColor } from './BookingColor.jsx';
 import { BookingDuration } from './BookingDuration.jsx';
 import { bookingTime, resizeBooking } from './quick-booking.js';
@@ -358,8 +359,9 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
         ? { date: startOfDay(now), minutes: (now.getHours() + 1) * 60 }
         : { date: view === 'month' ? startOfDay(anchor) : start, minutes: 10 * 60 };
     }
-    const day = at.date;
-    const next = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, at.minutes);
+    const next = at.start == null
+      ? new Date(at.date.getFullYear(), at.date.getMonth(), at.date.getDate(), 0, at.minutes)
+      : new Date(at.start);
     if (!quick) setQuickMinutes(60);
     setQuick((current) => current ? { ...current, at: next }
       : { at: next, row: '', personal: false, title: '', manualMinutes: null, repeat: false, until: '', color: null });
@@ -521,6 +523,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
             onEvent={openEvent} onDay={openDay} onMore={() => setAgendaDays((n) => n + 28)} />
         ) : (
           <TimeGrid key={view} pager={pager} start={start} days={days} events={events} scrollKey={scrollKey} draft={draft} draftOpen={!!quick && !choosingSlot}
+            dayReady={!load.error && loaded.current.has(rangesKey)}
             onDay={openDay} onEvent={openEvent} onCreate={create} onShift={shift} onDrop={drop}
             onResize={(patch) => {
               setQuick((current) => current && { ...current, ...patch });
@@ -1301,6 +1304,54 @@ function eventDays(event) {
 }
 
 
+function dayDuration(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return [hours && hours + ' ч', (rest || !hours) && rest + ' мин'].filter(Boolean).join(' ');
+}
+
+function windowTime(window, day) {
+  return hm(window.start) + '–' + (window.end === +addDays(day, 1) ? '24:00' : hm(window.end));
+}
+
+function DaySummary({ summary, day, onWindow, onEvent }) {
+  const [showUnpaid, setShowUnpaid] = useState(false);
+  const { count, minutes, unpaid, windows: [next] } = summary;
+  const form = new Intl.PluralRules('ru').select(count);
+  const unit = { one: 'занятие', few: 'занятия', many: 'занятий' }[form];
+
+  return (
+    <div className="cal-day-summary" aria-label="Сводка дня">
+      <strong>{count} {unit} · {dayDuration(minutes)}</strong>
+      <div className="cal-day-summary__actions">
+        {next ? (
+          <button type="button" onClick={() => onWindow(next)} aria-label={'Ближайшее окно ' + windowTime(next, day)}>
+            Окно {windowTime(next, day)}
+          </button>
+        ) : <span>Нет доступных окон от 1 ч</span>}
+        {unpaid.length > 0 && (
+          <button type="button" className="cal-day-summary__unpaid" onClick={() => {
+            if (unpaid.length === 1) onEvent(unpaid[0]);
+            else setShowUnpaid(true);
+          }}>₽ {unpaid.length} не оплачено</button>
+        )}
+      </div>
+      {showUnpaid && (
+        <Sheet title="Неоплаченные занятия" onClose={() => setShowUnpaid(false)}>
+          <div className="cal-day-unpaid">
+            {unpaid.map((event) => (
+              <button type="button" className="button" key={event.id} onClick={() => {
+                setShowUnpaid(false);
+                onEvent(event);
+              }}>{eventTime(event)} · {labelOf(event)}</button>
+            ))}
+          </div>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
 /**
  * Сетка по часам на 1, 3 или 7 дней — как в Google Календаре.
  *
@@ -1309,7 +1360,7 @@ function eventDays(event) {
  * колонки), колонка часов стоит на месте; отпустили — лента доезжает до
  * соседнего экрана целиком, прокрутка по часам остаётся.
  */
-function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, onDay, onEvent, onCreate, onShift, onDrop, onResize }) {
+function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, dayReady, onDay, onEvent, onCreate, onShift, onDrop, onResize }) {
   const root = useRef(null);
   const ownPager = useRef(null);
   const handle = pager || ownPager;
@@ -1336,6 +1387,13 @@ function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, onD
   const allDay = events.filter(isAllDay);
   const allDayOf = (d) => allDay.filter((e) => eventDays(e).includes(dateValue(d)));
   const hasAllDay = visibleDays.some((d) => allDayOf(d).length);
+  const summaries = days === 1 && dayReady
+    ? strip.map((d) => dayOverview(events, d, now))
+    : [];
+  const openWindow = (window) => {
+    touched();
+    onCreate({ start: window.start });
+  };
 
   const byDay = new Map();
   timed.forEach((e) => eventDays(e).forEach((key) => {
@@ -1578,6 +1636,8 @@ function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, onD
         </div>
       </div>
 
+      {summaries[1] && <DaySummary key={+start} summary={summaries[1]} day={start} onWindow={openWindow} onEvent={onEvent} />}
+
       {hasAllDay && (
         <div className="cal-grid__row cal-grid__allday">
           <span className="cal-grid__gutter" />
@@ -1611,7 +1671,7 @@ function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, onD
           <div className="cal-grid__viewport">
             <div className="cal-grid__track cal-grid__body" ref={bodyTrack}
               style={{ height: 24 * hour, gridTemplateColumns: `repeat(${days * 3}, minmax(0, 1fr))` }}>
-              {strip.map((d) => {
+              {strip.map((d, index) => {
                 const key = dateValue(d);
                 const ofDay = byDay.get(key) || [];
                 const today = sameDay(d, now);
@@ -1623,6 +1683,22 @@ function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, onD
                 return (
                   <div key={d.getTime()} className={'cal-grid__col' + (today ? ' cal-grid__col--today' : '')} data-cal-day={key}
                     onClick={(ev) => slot(d, ev)} role="presentation">
+                    {summaries[index]?.windows.map((window) => {
+                      const begin = new Date(window.start);
+                      const end = new Date(window.end);
+                      const from = begin.getHours() * 60 + begin.getMinutes();
+                      const to = window.end === +next ? 1440 : end.getHours() * 60 + end.getMinutes();
+                      return (
+                        <div className="cal-free-window" key={window.start}
+                          style={{ top: from / 60 * hour, height: Math.max(0, (to - from) / 60 * hour - 2) }}>
+                          <button type="button" tabIndex={index === 1 ? undefined : -1}
+                            aria-label={'Свободное окно ' + windowTime(window, d)}
+                            onClick={(ev) => { ev.stopPropagation(); openWindow(window); }}>
+                            Свободно {dayDuration(window.minutes)}
+                          </button>
+                        </div>
+                      );
+                    })}
                     {layoutDay(ofDay, d).map(({ e, s, f, col, cols }) => {
                       const from = new Date(s);
                       const top = (from.getHours() * 60 + from.getMinutes()) / 60 * hour;

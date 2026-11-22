@@ -4694,6 +4694,43 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   color: var(--text-muted); font-variant-numeric: tabular-nums; background: var(--surface); padding: 0 2px;
 }
 .cal-grid__col { position: relative; border-left: 1px solid var(--border); cursor: pointer; }
+.cal-day-summary {
+  flex: none;
+  display: grid;
+  padding: var(--space-1) var(--space-3);
+  border-block: 1px solid var(--border);
+  background: var(--surface);
+  font-size: var(--text-xs);
+}
+.cal-day-summary__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0 var(--space-3); color: var(--text-muted); }
+.cal-day-summary button, .cal-free-window button {
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.cal-day-summary button { min-height: 32px; padding: 0; }
+.cal-day-summary .cal-day-summary__unpaid { color: var(--warning-text); }
+.cal-day-unpaid { display: grid; gap: var(--space-2); }
+.cal-free-window {
+  position: absolute;
+  inset-inline: 2px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-xs);
+  pointer-events: none;
+}
+.cal-free-window button {
+  display: block;
+  max-height: 100%;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  min-width: 44px;
+  height: 34px;
+  pointer-events: auto;
+}
+
 .cal-grid__now { position: absolute; left: -1px; right: 0; height: 2px; background: var(--critical-text); z-index: 3; pointer-events: none; }
 .cal-grid__past { position: absolute; left: 0; right: 0; top: 0; background: var(--surface-sunken); pointer-events: none; z-index: 0; }
 .cal-grid__nowtime {
