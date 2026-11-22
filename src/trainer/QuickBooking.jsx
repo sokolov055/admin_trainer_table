@@ -91,7 +91,7 @@ export default function QuickBooking({ draft, clients, events, grid, onDuration,
           <div className="cal-quick__people">
             <div className="field__label">{!all && visible.some((c) => c.usual) ? 'Обычно в это время' : 'Клиенты'}</div>
             {all && <Field label="Поиск клиента" value={search} onChange={setSearch} />}
-            <div className="cal-quick__clients">
+            <div className={'cal-quick__clients' + (all ? ' cal-quick__clients--expanded' : '')}>
               {visible.map((c, index) => (
                 <button type="button" key={c.row} data-avatar-tone={index % 4} aria-label={c.name} aria-pressed={Number(row) === Number(c.row)} disabled={busy}
                   onClick={() => change({ row: c.row })}>

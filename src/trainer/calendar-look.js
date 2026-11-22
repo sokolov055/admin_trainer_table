@@ -6,6 +6,12 @@
  * scripts/test-calendar-look.mjs.
  */
 
+/** Длинные записи идут в отдельную строку над сеткой по часам. */
+export const isAllDay = (event) => Date.parse(event.endsAt) - Date.parse(event.startsAt) >= 20 * 3600000;
+
+/** Старые события «весь день» не занимают время для быстрой записи. */
+export const isLegacyAllDay = (event) => isAllDay(event) && !/^(app-|demo-custom-)/.test(event.id);
+
 /** Тип события: 'personal' | 'cardio' | 'training' */
 export function eventKind(e) {
   if (!e) return 'training';

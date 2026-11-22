@@ -1,4 +1,5 @@
 import { durationOf } from './calendar-move.js';
+import { isLegacyAllDay } from './calendar-look.js';
 
 export const MIN_BOOKING_MINUTES = 15;
 export const MAX_BOOKING_MINUTES = 14 * 24 * 60;
@@ -49,5 +50,5 @@ export function bookingDuration(row, history, lastDurations) {
 }
 
 export function bookingOverlap(events, from, end) {
-  return events.find((e) => !e.cancelledCharged && Date.parse(e.startsAt) < end && Date.parse(e.endsAt) > from);
+  return events.find((e) => !e.cancelledCharged && !isLegacyAllDay(e) && Date.parse(e.startsAt) < end && Date.parse(e.endsAt) > from);
 }

@@ -54,6 +54,20 @@ test('расписание: календарь, жесты и карточка �
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   const touch = finger(cdp);
+  const checkPaletteLayout = async (dialog, columns) => {
+    const { centered, equal, overflow } = await dialog.locator('.cal-color__options').evaluate((el, count) => {
+      const bounds = el.getBoundingClientRect();
+      const buttons = [...el.children].map((button) => button.getBoundingClientRect());
+      const rowCenter = (i) => (buttons[i].left + buttons[i + count - 1].right) / 2;
+      return {
+        centered: buttons.length === 6 && Math.abs(rowCenter(0) - (bounds.left + bounds.right) / 2) < 1
+          && (count === 6 || Math.abs(rowCenter(3) - rowCenter(0)) < 1),
+        equal: buttons.every((button) => button.width === 44 && button.height === 44),
+        overflow: el.scrollWidth > el.clientWidth,
+      };
+    }, columns);
+    assert.deepEqual({ centered, equal, overflow }, { centered: true, equal: true, overflow: false });
+  };
   const errors = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', (error) => errors.push(String(error)));
@@ -168,6 +182,7 @@ test('расписание: календарь, жесты и карточка �
     await page.getByRole('button', { name: 'Вернуться к записи' }).click();
     await quick.getByText('Длительность · 1:30', { exact: true }).waitFor();
     await quick.getByRole('radio', { name: '60 мин' }).click();
+    await checkPaletteLayout(quick, 6);
     await page.screenshot({ path: join(REVIEW, 'schedule-quick-light.png'), animations: 'disabled' });
     await quick.getByRole('button', { name: 'Личное' }).click();
     const personalQuick = page.getByRole('dialog', { name: 'Личное событие' });
@@ -181,6 +196,18 @@ test('расписание: календарь, жесты и карточка �
     const event = page.getByRole('button', { name: /Массаж QA/ }).first();
     await event.waitFor();
     assert.equal(await event.getAttribute('data-event-color'), 'purple');
+    const outlines = await event.evaluate((el) => {
+      const active = getComputedStyle(el).outlineColor;
+      el.classList.add('cal-event--done');
+      const done = getComputedStyle(el).outlineColor;
+      el.removeAttribute('data-event-color');
+      const doneAuto = getComputedStyle(el).outlineColor;
+      el.setAttribute('data-event-color', 'purple');
+      el.classList.remove('cal-event--done');
+      return { active, done, doneAuto };
+    });
+    assert.notEqual(outlines.active, outlines.done);
+    assert.equal(outlines.done, outlines.doneAuto);
     await page.waitForTimeout(400);
 
     // Перенос удержанием: палец стоит 450 мс, потом ведёт на час вниз
@@ -382,10 +409,14 @@ test('расписание: календарь, жесты и карточка �
     await quick.waitFor();
     await quick.getByRole('button', { name: 'Все · Поиск' }).click();
     await quick.getByLabel('Поиск клиента').fill('Дмитрий Соколов');
-    await quick.getByRole('button', { name: /Дмитрий Соколов/ }).click();
+    const result = quick.getByRole('button', { name: /Дмитрий Соколов/ });
+    assert.ok(await result.evaluate((el) => el.getBoundingClientRect().width >= 100));
+    await result.click();
     await quick.getByRole('radio', { name: '75 мин' }).click();
     await quick.getByRole('switch', { name: 'Повторять каждую неделю' }).click();
     await quick.getByLabel('До даты').fill('2026-12-04');
+    await checkPaletteLayout(quick, 3);
+    assert.ok(await quick.locator('.sheet__body').evaluate((el) => el.scrollWidth <= el.clientWidth));
     await page.screenshot({ path: join(REVIEW, 'schedule-quick-dark.png'), animations: 'disabled' });
     assert.equal(await quick.getByRole('radio', { name: '75 мин' }).getAttribute('aria-checked'), 'true');
     await quick.getByRole('button', { name: 'Ещё…' }).click();
@@ -396,6 +427,12 @@ test('расписание: календарь, жесты и карточка �
     await full.getByRole('spinbutton', { name: 'Часы' }).press('End');
     await full.getByText('Длительность · 336:00', { exact: true }).waitFor();
     assert.equal(await full.getByRole('spinbutton', { name: 'Минуты' }).getAttribute('aria-valuemax'), '0');
+    const wheelAlignment = await full.locator('.cal-duration__wheels').evaluate((el) => {
+      const [first, separator, last] = [...el.children].map((child) => child.getBoundingClientRect());
+      return Math.abs(first.width - last.width) < 1
+        && Math.abs((separator.left + separator.right) / 2 - (first.left + last.right) / 2) < 1;
+    });
+    assert.ok(wheelAlignment, 'колонки барабанов симметричны');
     await page.screenshot({ path: join(REVIEW, 'schedule-duration-maximum.png'), animations: 'disabled' });
     await full.getByRole('radio', { name: '75 мин' }).click();
     await page.locator('.cal-form').getByRole('button', { name: 'Отмена', exact: true }).click();

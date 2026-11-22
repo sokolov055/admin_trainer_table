@@ -2,6 +2,7 @@
 // тип события, точки под днём, строки плашки, подпись для чтения с экрана.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { bookingOverlap } from '../src/trainer/quick-booking.js';
 import { dayDots, eventAria, eventKind, eventLines } from '../src/trainer/calendar-look.js';
 
 const lesson = { id: 'a', clientRow: 3, clientName: 'Анна', startsAt: '2026-11-21T08:00:00Z' };
@@ -36,4 +37,17 @@ test('подпись для чтения с экрана называет сос
   assert.equal(eventAria({ ...lesson, done: true }, '08:00–09:00'), '08:00–09:00 Анна, проведено');
   assert.equal(eventAria(mine, '13:00–14:00'), '13:00–14:00 Обед, личное');
   assert.equal(eventAria({ ...lesson, cancelledCharged: true, done: true, unpaid: true }, '1'), '1 Анна, отменено со списанием');
+});
+
+test('пересечение игнорирует старое событие на весь день, учитывает длинную запись и обычное занятие', () => {
+  const from = Date.parse('2026-11-21T10:30:00Z');
+  const end = Date.parse('2026-11-21T11:30:00Z');
+  const legacy = { id: 'birthday', startsAt: '2026-11-21T00:00:00Z', endsAt: '2026-11-22T00:00:00Z' };
+  const timed = { ...mine, endsAt: '2026-11-21T11:00:00Z' };
+  const long = { ...legacy, id: 'app-booking' };
+  assert.equal(bookingOverlap([legacy], from, end), undefined);
+  assert.equal(bookingOverlap([legacy, timed], from, end), timed);
+  assert.equal(bookingOverlap([long], from, end), long);
+  assert.equal(bookingOverlap([{ ...long, id: 'demo-custom-booking' }], from, end)?.id, 'demo-custom-booking');
+  assert.equal(bookingOverlap([{ ...timed, cancelledCharged: true }], from, end), undefined);
 });

@@ -21,7 +21,7 @@ import { BookingColor } from './BookingColor.jsx';
 import { BookingDuration } from './BookingDuration.jsx';
 import { bookingTime, resizeBooking } from './quick-booking.js';
 import QuickBooking, { RepeatFields, weeklyPayload } from './QuickBooking.jsx';
-import { dayDots, dayTypeLabels, eventAria, eventKind, eventLines } from './calendar-look.js';
+import { dayDots, dayTypeLabels, eventAria, eventKind, eventLines, isAllDay, isLegacyAllDay } from './calendar-look.js';
 
 /**
  * Расписание тренера — по образцу Google Календаря (переделано 19.10.2026).
@@ -1282,10 +1282,6 @@ function layoutDay(list, day) {
   return out;
 }
 
-/** Событие на весь день (день рождения, отпуск) приходит сутками и больше.
- *  В сетку по часам его не ставим, а показываем строкой под датами */
-const isAllDay = (e) => new Date(e.endsAt) - new Date(e.startsAt) >= 20 * 3600000;
-const isLegacyAllDay = (event) => isAllDay(event) && !/^(app-|demo-custom-)/.test(event.id);
 const eventTime = (event) => isLegacyAllDay(event)
   ? 'Весь день'
   : bookingTime(new Date(event.startsAt), new Date(event.endsAt));
