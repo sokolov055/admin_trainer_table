@@ -992,11 +992,15 @@ test('обзор: динамика берёт реальные месяцы и �
   const { tree, charted } = draw(Dashboard, answer, { props: quiet });
 
   assert.deepEqual(charted, [{ by: 'month' }]);
-  assert.match(screenText(tree), /Сентябрь 2026 · ещё идёт, данные неполные 216 850 ₽/);
+  assert.match(screenText(tree), /Август 2026 340 000 ₽/);
+  assert.match(screenText(tree), /Сентябрь 2026 ещё не закончился — пунктиром/);
+  const bars = barsOf(tree);
+  assert.match(bars[1].props.className, /bars__bar--current/, 'по умолчанию выбран последний полный месяц');
+  assert.doesNotMatch(bars[2].props.className, /bars__bar--current/, 'неполный месяц не подсвечен как основной');
   press(tree, 'Клиенты');
-  assert.match(screenText(tree), /Сентябрь 2026 · ещё идёт, данные неполные 14/);
+  assert.match(screenText(tree), /Август 2026 13/);
   press(tree, 'Занятия');
-  assert.match(screenText(tree), /Сентябрь 2026 · ещё идёт, данные неполные 90/);
+  assert.match(screenText(tree), /Август 2026 80/);
 });
 
 test('клиенты: откуда приходят новые — по источникам из карточек', () => {

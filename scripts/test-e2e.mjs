@@ -206,18 +206,21 @@ test('FT-818: обзор сводки — график, листы и клави
     }));
     assert.deepEqual(width, { client: 320, scroll: 320 });
 
-    const packages = phone.getByRole('button', { name: 'Пакет и долг: 3' });
+    const packages = phone.locator('[data-signal="packages"]');
     await packages.focus();
     await phone.keyboard.press('Enter');
     const signal = phone.getByRole('dialog');
     await signal.waitFor();
-    assert.match(await signal.innerText(), /платит/);
+    assert.match(await signal.innerText(), /Пакет и долг/);
     await signal.getByRole('button', { name: 'Закрыть' }).click();
 
     const clients = phone.getByRole('radio', { name: 'Клиенты', exact: true });
     await clients.focus();
     await phone.keyboard.press('Space');
     assert.equal(await clients.getAttribute('aria-checked'), 'true');
+    const clientReadout = (await phone.locator('.overview-chart .bars__value').innerText()).trim();
+    assert.match(clientReadout, /\d/, 'демо-ответ trainer.metrics.series содержит process.activeClients');
+    assert.notEqual(clientReadout, '—', 'график клиентов не пустой');
 
     const transitions = await phone.evaluate(() => ({
       chart: getComputedStyle(document.querySelector('.bars__bar')).transitionDuration,
@@ -225,7 +228,24 @@ test('FT-818: обзор сводки — график, листы и клави
     }));
     assert.deepEqual(transitions, { chart: '0s', year: '0s' });
 
-    await phone.getByRole('button', { name: 'Пора замер: 2' }).tap();
+    const partial = phone.locator('.overview-chart .bars__bar--partial');
+    assert.equal(await partial.count(), 1);
+    assert.equal(await partial.evaluate((node) => getComputedStyle(node).fillOpacity), '0.35');
+    const partialNote = phone.locator('.overview-chart__note');
+    await partialNote.waitFor();
+    assert.match(await partialNote.innerText(), /ещё не закончился — пунктиром/);
+    await phone.locator('.overview-chart .bars__svg rect[fill="transparent"]').last().click();
+    const partialReadout = phone.locator('.overview-chart .bars__period');
+    assert.match(await partialReadout.innerText(), /ещё идёт, данные неполные/);
+    const [readoutBox, chartBox] = await Promise.all([
+      partialReadout.boundingBox(),
+      phone.locator('.overview-chart').boundingBox(),
+    ]);
+    assert.ok(readoutBox && chartBox && readoutBox.x >= chartBox.x
+      && readoutBox.x + readoutBox.width <= chartBox.x + chartBox.width,
+    'подпись неполного месяца помещается в карточке на 320 px');
+
+    await phone.locator('[data-signal="measureDue"]').tap();
     await phone.getByRole('dialog').waitFor();
     await phone.getByRole('button', { name: 'Закрыть' }).click();
 

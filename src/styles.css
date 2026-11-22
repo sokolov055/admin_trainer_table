@@ -3810,6 +3810,7 @@ code {
 
 .overview-chart { min-width: 0; }
 .overview-chart__plot { margin-top: var(--space-3); }
+.overview-chart__note { margin: var(--space-1) 0 0; line-height: 1.35; }
 
 .overview-deviation {
   display: flex;

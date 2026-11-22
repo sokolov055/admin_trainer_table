@@ -238,7 +238,15 @@ function Dynamics() {
       partial: point.partial,
       value: point[spec.group] ? point[spec.group][spec.id] : null,
     }));
-    chart = <BarChart points={points} format={spec.format} label={spec.label} plain highlight={points.at(-1)?.key} />;
+    const newestFirst = points.slice().reverse();
+    const partial = newestFirst.find((point) => point.partial);
+    const complete = newestFirst.find((point) => !point.partial && point.value !== null && point.value !== undefined);
+    chart = (
+      <>
+        <BarChart points={points} format={spec.format} label={spec.label} plain highlight={(complete || points.at(-1))?.key} />
+        {partial && <p className="small muted overview-chart__note">{monthLabel(partial.key) + ' ещё не закончился — пунктиром.'}</p>}
+      </>
+    );
   }
 
   return (
@@ -340,6 +348,7 @@ export function Dashboard({ onGo, onOpenClient }) {
               key={signal.id}
               type="button"
               className="overview-signal"
+              data-signal={signal.id}
               aria-label={signal.label + ': ' + signal.list.length}
               onClick={() => { setActiveSignal(signal.id); haptic(); }}
             >
