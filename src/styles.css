@@ -3678,6 +3678,170 @@ code {
    Обзор сводки: стороны с целью, год, сигналы (20.10.2026)
    ========================================================================== */
 
+.overview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.overview-head__period {
+  min-width: 0;
+  font-size: var(--text-md);
+  font-weight: 650;
+  letter-spacing: -0.014em;
+}
+
+.overview-pace { margin-bottom: 0; }
+
+.overview-pace--good {
+  background: var(--good-fill);
+  border-color: var(--good-line);
+}
+
+.overview-pace__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.overview-pace__label,
+.overview-pace__hint {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.overview-pace--good .overview-pace__label,
+.overview-pace--good .overview-pace__hint,
+.overview-pace--good .overview-pace__facts small {
+  color: color-mix(in srgb, var(--good-text) 82%, transparent);
+}
+
+.overview-pace__delta {
+  color: var(--good-text);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-pace:not(.overview-pace--good) .overview-pace__delta { color: var(--text-secondary); }
+
+.overview-pace__value {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-num);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-pace__hint { margin: var(--space-2) 0 0; }
+
+.overview-pace__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.overview-pace--good .overview-pace__facts { border-top-color: var(--good-line); }
+
+.overview-pace__facts span { min-width: 0; }
+.overview-pace__facts small,
+.overview-pace__facts b { display: block; }
+.overview-pace__facts small { color: var(--text-muted); font-size: var(--text-sm); }
+.overview-pace__facts b {
+  margin-top: 2px;
+  font-size: var(--text-base);
+  font-weight: 620;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.overview-signals,
+.overview-deviations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.overview-signal,
+.overview-deviation {
+  min-width: 0;
+  min-height: 80px;
+  padding: var(--space-3);
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.overview-signal:active,
+.overview-deviation:active { transform: scale(0.985); }
+
+.overview-signal__count {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xl);
+  font-weight: 680;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-signal__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+
+.overview-signal__label svg:first-child { color: var(--text-muted); flex: none; }
+.overview-signal__label .side__chevron { margin-left: auto; }
+.overview-signal-sheet__note { margin: 0 0 var(--space-3); line-height: 1.45; }
+
+.overview-chart { min-width: 0; }
+.overview-chart__plot { margin-top: var(--space-3); }
+
+.overview-deviation {
+  display: flex;
+  flex-direction: column;
+  min-height: 112px;
+}
+
+.overview-deviation strong {
+  font-size: var(--text-xl);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-deviation > span {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 580;
+}
+
+.overview-deviation small {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: auto;
+  padding-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.25;
+}
+
+.overview-deviation small .side__chevron { margin-left: auto; }
+
 /* Строка стороны: слева — кто и что, цель и полоса; справа — цифра со
    стрелкой и шеврон «туда». Выравнивание по верху, не по базовой линии:
    слева три строки, справа одна. */
@@ -3789,6 +3953,16 @@ code {
 
 @media (prefers-reduced-motion: reduce) {
   .bar__fill { transition: none; }
+  .overview-signal:active,
+  .overview-deviation:active { transform: none; }
+}
+
+@media (max-width: 340px) {
+  .overview-pace__facts { gap: var(--space-2); }
+  .overview-pace__facts small { font-size: var(--text-xs); }
+  .overview-pace__facts b { font-size: var(--text-sm); }
+  .overview-signal,
+  .overview-deviation { padding: var(--space-3) var(--space-2); }
 }
 
 /* --- расходы --- */

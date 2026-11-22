@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import {
-  Lead, Section, Panel, Rows, Loading, ErrorState, Empty, Delta, Field, Sheet, Tag,
+  Section, Panel, Rows, Loading, ErrorState, Empty, Field, Sheet, Tag, Segmented,
   formatNumber, formatMoney, formatDate, plural,
 } from '../ui.jsx';
+import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
 import { IconCheck, IconPhone, IconMoney, IconRuler, IconPlan, IconChevron } from '../icons.jsx';
-import { monthLabel, format, deltaUnit, shiftMonth, toMonthWord } from './Metrics.jsx';
+import { monthLabel, format } from './Metrics.jsx';
 
 /**
  * Обзор — первая вкладка сводки. То, ради чего в неё заглядывают:
@@ -132,54 +133,6 @@ function GoalsSheet({ targets, onClose, onSaved }) {
 }
 
 /* ==================================================================
- * Стороны
- * ================================================================== */
-
-/**
- * Одна сторона: ключевая цифра, изменение к прошлому месяцу и полоса до
- * цели. Строка — кнопка на вкладку стороны. Полоса есть только у цифры с
- * целью: без цели мерить нечем, и пустая полоса читалась бы как ноль.
- */
-function SideRow({ goal, value, was, target, against, onGo }) {
-  const unit = goal.unit;
-  const known = value !== null && value !== undefined;
-  const aim = goal.aim || 1;
-  const done = reached(value, target, aim);
-  const bar = progress(value, target, aim);
-
-  return (
-    <button type="button" className="rows__item rows__item--pick side" onClick={() => onGo(SIDES[goal.side].pane)}>
-      <span className="side__text">
-        <span className="side__who">{SIDES[goal.side].label}</span>
-        <span className="side__what">{goal.label}</span>
-        <span className={'side__goal' + (done ? ' side__goal--done' : '')}>
-          {done && <IconCheck size={12} />}
-          {toGoal(known ? value : null, target, unit, aim)}
-        </span>
-        {bar !== null && (
-          <span className={'bar' + (done ? ' bar--done' : '')} role="progressbar" aria-valuenow={bar} aria-valuemin={0} aria-valuemax={100}>
-            <span className="bar__fill" style={{ width: bar + '%' }} />
-          </span>
-        )}
-      </span>
-      <span className="side__value">
-        {known ? (
-          <span className="metric">
-            <span className="metric__value">{format(value, unit)}</span>
-            {was !== null && was !== undefined && was !== value && (
-              // С единицей и с чем сравнили: красное «↓ 21 850» без «₽» и
-              // месяца было непонятно, что упало и к чему (аудит 24.10.2026)
-              <Delta value={value - was} suffix={deltaUnit(unit) + (against ? ' ' + against : '')} aim={aim} />
-            )}
-          </span>
-        ) : <span className="muted small">пока нет</span>}
-        <IconChevron size={16} className="side__chevron" />
-      </span>
-    </button>
-  );
-}
-
-/* ==================================================================
  * Сигналы
  * ================================================================== */
 
@@ -190,6 +143,14 @@ const dayWord = (n) => n + ' ' + plural(n, 'день', 'дня', 'дней');
  * одной строкой с меткой: занятия, деньги и программа у неё общие.
  */
 function People({ list, note, onOpen, at }) {
+  if (!list.length) {
+    return (
+      <Panel>
+        <Empty icon={IconCheck} title="Всё в порядке" text="Сейчас в этой группе никого нет." />
+      </Panel>
+    );
+  }
+
   return (
     <Panel>
       <Rows>
@@ -207,13 +168,13 @@ function People({ list, note, onOpen, at }) {
 const SIGNALS = [
   {
     id: 'silent', Icon: IconPhone, at: 'overview',
-    title: (n) => 'Молчат · ' + n,
+    label: 'Не приходят', sheetTitle: (n) => 'Не приходят · ' + n,
     note: 'месяц без занятий — пора позвонить',
     line: (c) => (c.days === null ? 'занятий не было' : dayWord(c.days) + ' без занятий') + (c.nextAt ? ' · записан на ' + formatDate(c.nextAt, false) : ''),
   },
   {
     id: 'packages', Icon: IconMoney, at: 'payments',
-    title: (n) => 'Пакет кончается · ' + n,
+    label: 'Пакет и долг', sheetTitle: (n) => 'Пакет и долг · ' + n,
     note: 'осталось одно занятие или уже долг',
     // Деньги у плательщика (семья, пара) — так и пишем: звонить ему
     line: (c) => (c.payer ? 'платит ' + c.payer + ' · ' : '')
@@ -221,13 +182,13 @@ const SIGNALS = [
   },
   {
     id: 'measureDue', Icon: IconRuler, at: 'progress',
-    title: (n) => 'Пора снять замер · ' + n,
+    label: 'Пора замер', sheetTitle: (n) => 'Пора снять замер · ' + n,
     note: 'ходят, а замера не было четыре недели',
     line: (c) => (c.days === null ? 'замера ещё не было' : 'замер ' + dayWord(c.days) + ' назад'),
   },
   {
     id: 'noPlan', Icon: IconPlan, at: 'plan',
-    title: (n) => 'Нет программы · ' + n,
+    label: 'Без программы', sheetTitle: (n) => 'Без программы · ' + n,
     note: 'ходят, а программы нет ни на один месяц',
     line: () => 'программы нет',
   },
@@ -248,21 +209,69 @@ const dayOf = (day, month) => {
   return 'к ' + day + (MONTHS_OF[m - 1] ? ' ' + MONTHS_OF[m - 1] : '');
 };
 
+const SHORT_MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const DYNAMICS = [
+  { value: 'revenue', label: 'Выручка', group: 'finance', id: 'revenue', format: formatMoney },
+  { value: 'clients', label: 'Клиенты', group: 'process', id: 'activeClients', format: (v) => formatNumber(v, 0) },
+  { value: 'trainings', label: 'Занятия', group: 'process', id: 'trainings', format: (v) => formatNumber(v, 0) },
+];
+
+function shortMonth(key) {
+  const [year, month] = String(key || '').split('-').map(Number);
+  return month && SHORT_MONTHS[month - 1] ? SHORT_MONTHS[month - 1] + ' ' + String(year).slice(-2) : key;
+}
+
+/** История только из серверного ряда: никаких условных значений из макета. */
+function Dynamics() {
+  const [metric, setMetric] = useState('revenue');
+  const { loading, data, error, reload } = useData('trainer.metrics.series', { by: 'month' }, []);
+  const spec = DYNAMICS.find((item) => item.value === metric) || DYNAMICS[0];
+
+  let chart;
+  if (loading) chart = <Loading rows={2} />;
+  else if (error) chart = <ErrorState error={error} onRetry={reload} />;
+  else {
+    const points = (data.points || []).slice(-6).map((point) => ({
+      key: point.key,
+      label: monthLabel(point.key),
+      short: shortMonth(point.key),
+      partial: point.partial,
+      value: point[spec.group] ? point[spec.group][spec.id] : null,
+    }));
+    chart = <BarChart points={points} format={spec.format} label={spec.label} plain highlight={points.at(-1)?.key} />;
+  }
+
+  return (
+    <Panel pad className="overview-chart">
+      <Segmented
+        items={DYNAMICS}
+        value={metric}
+        onChange={(next) => { setMetric(next); haptic(); }}
+        label="Показатель графика"
+      />
+      <div className="overview-chart__plot">{chart}</div>
+    </Panel>
+  );
+}
+
+function deviationScore(value, target, aim) {
+  if (!target || value === null || value === undefined || reached(value, target, aim)) return null;
+  return Math.abs(value - target) / Math.abs(target);
+}
+
 export function Dashboard({ onGo, onOpenClient }) {
   const { loading, data, error, reload } = useData('trainer.metrics.overview', {}, []);
   const [editing, setEditing] = useState(false);
   const [targets, setTargets] = useState(null);
+  const [activeSignal, setActiveSignal] = useState(null);
 
   if (loading) return <Loading rows={4} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
   const goals = targets || data.targets || {};
   const f = data.finance.now;
-  const fb = data.finance.before;
   const c = (data.clients && data.clients.now) || {};
-  const cb = (data.clients && data.clients.before) || {};
   const p = data.process.now;
-  const pb = data.process.before;
   const pace = data.pace || {};
 
   // Темп: к тому же числу прошлого месяца. Выше — зелёным; ниже — без
@@ -275,86 +284,93 @@ export function Dashboard({ onGo, onOpenClient }) {
       ? 'столько же, сколько ' + then
       : (diff > 0 ? 'на ' + diff + '% больше' : 'на ' + (-diff) + '% меньше') + ', чем ' + then + ' (' + formatMoney(pace.revenue) + ')';
 
-  // Старый сервер сторон «Маркетинг» и «Развитие» не знает — строки
-  // покажут «пока нет», а не упадут
+  // Старый сервер сторон «Маркетинг» и «Развитие» не знает — отклонение
+  // просто не попадёт в две главные проверки.
   const m = (data.marketing && data.marketing.now) || {};
-  const mb = (data.marketing && data.marketing.before) || {};
   const d = (data.development && data.development.now) || {};
-  const dbf = (data.development && data.development.before) || {};
   const values = { finance: f, clients: c, process: p, marketing: m, development: d };
-  const befores = { finance: fb, clients: cb, process: pb, marketing: mb, development: dbf };
 
   const year = data.year || {};
   const yearTarget = goals.revenueYear;
   const yearBar = progress(year.revenue, yearTarget);
   const yearDone = reached(year.revenue, yearTarget);
 
-  // С каким месяцем сравнивают стороны — подпись к стрелке у цифры
-  const against = toMonthWord(data.previousMonth || shiftMonth(data.month, -1));
-
-  const signals = SIGNALS.map((s) => ({ ...s, list: (data.signals && data.signals[s.id]) || [] })).filter((s) => s.list.length);
-  const quiet = !signals.length;
+  const signals = SIGNALS.map((s) => ({ ...s, list: (data.signals && data.signals[s.id]) || [] }));
+  const signalCount = signals.reduce((sum, signal) => sum + signal.list.length, 0);
+  const selectedSignal = signals.find((signal) => signal.id === activeSignal);
+  const deviations = GOALS
+    .filter((goal) => !goal.year)
+    .map((goal) => {
+      const value = values[goal.group][goal.id];
+      const target = goals[goal.id];
+      const aim = goal.aim || 1;
+      return { goal, value, target, score: deviationScore(value, target, aim) };
+    })
+    .filter((item) => item.score !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
 
   return (
     <>
-      <Lead
-        label={'Выручка · ' + monthLabel(data.month) + ', ' + byDay(pace.day || new Date().getDate())}
-        tone={diff !== null && diff > 0 ? 'good' : undefined}
-        value={formatMoney(f.revenue)}
-        hint={paceHint}
-        facts={[
-          { label: 'Тренировок', value: formatNumber(f.trainings, 0) + (pace.trainings ? ' · было ' + formatNumber(pace.trainings, 0) : '') },
-          { label: 'Прибыль', value: formatMoney(f.profit) },
-          // Подпись — как у цели «Клиентов в работе»: занимались в этом месяце
-          { label: 'Клиентов в работе', value: formatNumber(f.activeClients, 0) },
-        ]}
-      />
+      <div className="overview-head">
+        <span className="overview-head__period">{monthLabel(data.month)}</span>
+        <button type="button" className="button button--ghost button--small" onClick={() => { setEditing(true); haptic(); }}>
+          Цели · изменить
+        </button>
+      </div>
 
-      {/* Кому позвонить — выше цифр (владелец, 11.11.2026): со Сводки
-          начинают день, и люди важнее процентов */}
-      {quiet ? (
-        <Section title="Сделать на этой неделе">
-          <Panel>
-            <Empty
-              icon={IconCheck}
-              title="Всё на месте"
-              text="Никто не молчит, пакеты оплачены, замеры свежие, программы на месяц у всех."
-            />
-          </Panel>
-        </Section>
-      ) : signals.map((s) => (
-        <Section key={s.id} title={s.title(s.list.length)} note={s.note}>
-          <People list={s.list} note={s.line} onOpen={onOpenClient} at={s.at} />
-        </Section>
-      ))}
+      <Panel pad className={'overview-pace' + (diff !== null && diff > 0 ? ' overview-pace--good' : '')}>
+        <div className="overview-pace__head">
+          <span className="overview-pace__label">{'Выручка ' + byDay(pace.day || new Date().getDate())}</span>
+          {diff !== null && <span className="overview-pace__delta">{diff > 0 ? '↑ ' : diff < 0 ? '↓ ' : ''}{Math.abs(diff)}%</span>}
+        </div>
+        <strong className="overview-pace__value">{formatMoney(f.revenue)}</strong>
+        <p className="overview-pace__hint">{paceHint}</p>
+        <div className="overview-pace__facts">
+          <span><small>Занятий</small><b>{formatNumber(f.trainings, 0)}{pace.trainings ? ' · было ' + formatNumber(pace.trainings, 0) : ''}</b></span>
+          <span><small>Прибыль</small><b>{formatMoney(f.profit)}</b></span>
+          <span><small>Клиентов</small><b>{formatNumber(f.activeClients, 0)}</b></span>
+        </div>
+      </Panel>
 
-      <Section
-        title="Главные цифры месяца"
-        note="каждая — к цели и к прошлому месяцу"
-        action={(
-          <button type="button" className="button button--ghost button--small" onClick={() => { setEditing(true); haptic(); }}>
-            Цели
-          </button>
-        )}
-      >
-        <Panel>
-          <Rows>
-            {GOALS.filter((g) => !g.year).map((g) => (
-              <SideRow
-                key={g.id}
-                goal={g}
-                value={values[g.group][g.id]}
-                was={befores[g.group][g.id]}
-                target={goals[g.id]}
-                against={against}
-                onGo={onGo}
-              />
-            ))}
-          </Rows>
-        </Panel>
+      <Section title="Требуют внимания" note={signalCount ? signalCount + ' ' + plural(signalCount, 'сигнал', 'сигнала', 'сигналов') : 'всё в порядке'}>
+        <div className="overview-signals">
+          {signals.map((signal) => (
+            <button
+              key={signal.id}
+              type="button"
+              className="overview-signal"
+              aria-label={signal.label + ': ' + signal.list.length}
+              onClick={() => { setActiveSignal(signal.id); haptic(); }}
+            >
+              <span className="overview-signal__count">{signal.list.length}</span>
+              <span className="overview-signal__label"><signal.Icon size={16} />{signal.label}<IconChevron size={14} className="side__chevron" /></span>
+            </button>
+          ))}
+        </div>
       </Section>
 
-      <Section title={'Год · ' + year.year} note={yearTarget ? 'выручка с января к цели на год' : 'выручка с января и куда выйдем при этом темпе'}>
+      <Section title="Динамика" note="последние 6 месяцев">
+        <Dynamics />
+      </Section>
+
+      <Section title="Отклонения от целей" note={deviations.length ? 'главное на сейчас' : 'цели выполнены'}>
+        {deviations.length ? (
+          <div className="overview-deviations">
+            {deviations.map(({ goal, value, target }) => (
+              <button key={goal.id} type="button" className="overview-deviation" onClick={() => onGo(SIDES[goal.side].pane)}>
+                <strong>{format(value, goal.unit)}</strong>
+                <span>{goal.label}</span>
+                <small>{'цель ' + (goal.aim < 0 ? 'не больше ' : '') + format(target, goal.unit)}<IconChevron size={14} className="side__chevron" /></small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Panel><Empty icon={IconCheck} title="Цели выполнены" text="Сейчас отклонений по заданным целям нет." /></Panel>
+        )}
+      </Section>
+
+      <Section title={'Год · ' + year.year} note="выручка с января">
         <Panel pad className="year">
           <div className="year__row">
             <span className="year__value">{formatMoney(year.revenue || 0)}</span>
@@ -379,13 +395,17 @@ export function Dashboard({ onGo, onOpenClient }) {
         </Panel>
       </Section>
 
-
-      <p className="small muted metrics__foot">
-        Всё считается из календаря, оплат, замеров и программ — вписывать
-        ничего не нужно. Молчит — тридцать дней без проведённого занятия;
-        пора снять замер — четыре недели с последнего. Нажмите на человека —
-        откроется нужный раздел его карточки.
-      </p>
+      {selectedSignal && (
+        <Sheet title={selectedSignal.sheetTitle(selectedSignal.list.length)} onClose={() => setActiveSignal(null)}>
+          <p className="small muted overview-signal-sheet__note">{selectedSignal.note}</p>
+          <People
+            list={selectedSignal.list}
+            note={selectedSignal.line}
+            at={selectedSignal.at}
+            onOpen={(client, at) => { setActiveSignal(null); onOpenClient(client, at); }}
+          />
+        </Sheet>
+      )}
 
       {editing && (
         <GoalsSheet

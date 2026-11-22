@@ -182,6 +182,61 @@ test('цель клиента в «Целях»: тренер ставит «П�
   } finally { await context.close(); }
 });
 
+test('FT-818: обзор сводки — график, листы и клавиатура на 320 px', async () => {
+  const context = await browser.newContext({
+    viewport: { width: 320, height: 844 },
+    locale: 'ru-RU',
+    colorScheme: 'dark',
+    reducedMotion: 'reduce',
+    hasTouch: true,
+  });
+  const phone = await context.newPage();
+  const errors = [];
+  phone.on('pageerror', (error) => errors.push(error.message));
+  try {
+    await phone.addInitScript(() => localStorage.setItem('auth_token_v1', 'demo-session'));
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Сводка', exact: true }).waitFor();
+    await phone.getByRole('button', { name: 'Сводка', exact: true }).click();
+    await phone.locator('.overview-chart .bars__svg').waitFor();
+
+    const width = await phone.locator('main:not([hidden])').evaluate((node) => ({
+      client: node.clientWidth,
+      scroll: node.scrollWidth,
+    }));
+    assert.deepEqual(width, { client: 320, scroll: 320 });
+
+    const packages = phone.getByRole('button', { name: 'Пакет и долг: 3' });
+    await packages.focus();
+    await phone.keyboard.press('Enter');
+    const signal = phone.getByRole('dialog');
+    await signal.waitFor();
+    assert.match(await signal.innerText(), /платит/);
+    await signal.getByRole('button', { name: 'Закрыть' }).click();
+
+    const clients = phone.getByRole('radio', { name: 'Клиенты', exact: true });
+    await clients.focus();
+    await phone.keyboard.press('Space');
+    assert.equal(await clients.getAttribute('aria-checked'), 'true');
+
+    const transitions = await phone.evaluate(() => ({
+      chart: getComputedStyle(document.querySelector('.bars__bar')).transitionDuration,
+      year: getComputedStyle(document.querySelector('.bar__fill')).transitionDuration,
+    }));
+    assert.deepEqual(transitions, { chart: '0s', year: '0s' });
+
+    await phone.getByRole('button', { name: 'Пора замер: 2' }).tap();
+    await phone.getByRole('dialog').waitFor();
+    await phone.getByRole('button', { name: 'Закрыть' }).click();
+
+    const goals = phone.getByRole('button', { name: 'Цели · изменить' });
+    await goals.focus();
+    await phone.keyboard.press('Enter');
+    await phone.getByRole('dialog', { name: 'Цели' }).waitFor();
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
 before(async () => {
   execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', 'dist-demo'], {
     cwd: ROOT,

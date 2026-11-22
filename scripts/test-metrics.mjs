@@ -846,41 +846,36 @@ test('обзор: выручка к сегодняшнему числу прот
   const { tree } = draw(Dashboard, () => overview(), { props: quiet });
   const text = screenText(tree);
 
-  assert.match(text, /Выручка · Октябрь 2026, к 20-му/);
+  assert.match(text, /Октябрь 2026 Цели · изменить Выручка к 20-му ↑ 9 %/);
   assert.match(text, /216 850 ₽/);
   assert.match(text, /на 9% больше, чем к 20 сентября \(199 800 ₽\)/);
   assert.match(text, /89 · было 82/, 'тренировок — тоже к тому же числу');
 
-  const lead = tree.root.findAll((node) => typeof node.type === 'string' && String(node.props.className || '').includes('lead--'), { deep: true })[0];
-  assert.match(lead.props.className, /lead--good/, 'темп выше прошлого — зелёным');
+  const pace = tree.root.find((node) => String(node.props.className || '').includes('overview-pace'));
+  assert.match(pace.props.className, /overview-pace--good/, 'темп выше прошлого — зелёным');
 });
 
-test('обзор: четыре стороны с целью, достигнутая помечена, недостигнутая — «до цели»', () => {
+test('обзор: показывает только два самых больших отклонения от целей', () => {
   const { tree } = draw(Dashboard, () => overview(), { props: quiet });
   const text = screenText(tree);
 
-  assert.match(text, /Средняя оплата/);
-  assert.match(text, /до цели 954 ₽ из 3 500 ₽/);
-  assert.match(text, /Удержание/);
-  assert.match(text, /цель 80% — есть/);
-  assert.match(text, /Доля отмен/);
-  assert.match(text, /цель 10% — есть/, 'у «не больше» цель достигнута, когда цифра ниже');
-  assert.match(text, /Клиентов в работе/);
-  assert.match(text, /цель не задана/);
+  assert.match(text, /Отклонения от целей главное на сейчас/);
+  assert.match(text, /50% Доля с замером цель 100%/);
+  assert.match(text, /4,5 ч Часов обучения цель 8 ч/);
+  assert.doesNotMatch(text, /Средняя оплата/, 'третье отклонение не раздувает обзор');
 
-  const bars = tree.root.findAll((node) => node.props && node.props.role === 'progressbar', { deep: true });
-  const check = bars.find((b) => b.props['aria-valuenow'] === 73);
-  assert.ok(check, 'средняя оплата 2 546 из 3 500 — 73 %');
+  const deviations = tree.root.findAll((node) => node.type === 'button' && node.props.className === 'overview-deviation', { deep: true });
+  assert.equal(deviations.length, 2);
 });
 
-test('обзор: строка стороны ведёт на её вкладку', () => {
+test('обзор: отклонение ведёт на нужную вкладку', () => {
   const gone = [];
   const { tree } = draw(Dashboard, () => overview(), { props: { onGo: (pane) => gone.push(pane), onOpenClient() {} } });
 
-  const row = tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).includes('Удержание'), { deep: true })[0];
+  const row = tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).includes('Доля с замером'), { deep: true })[0];
   act(() => { row.props.onClick(); });
 
-  assert.deepEqual(gone, ['clients']);
+  assert.deepEqual(gone, ['processes']);
 });
 
 test('обзор: год к цели и прогноз по темпу', () => {
@@ -896,31 +891,33 @@ test('обзор: год к цели и прогноз по темпу', () => {
 test('обзор: сигналы с именами открывают нужный раздел карточки', () => {
   const opened = [];
   const { tree } = draw(Dashboard, () => overview(), { props: { onGo() {}, onOpenClient: (client, at) => opened.push([client.name, at]) } });
-  const text = screenText(tree);
+  const openPerson = (name) => {
+    const person = tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).startsWith(name), { deep: true })[0];
+    assert.ok(person, 'не нашёлся человек «' + name + '»');
+    act(() => { person.props.onClick(); });
+  };
 
-  assert.match(text, /Молчат · 2/);
-  assert.match(text, /38 дней без занятий/);
-  assert.match(text, /31 день без занятий · записан на 24\.10/);
-  assert.match(text, /Пакет кончается · 2/);
-  assert.match(text, /долг 4 000 ₽/);
-  assert.match(text, /Пора снять замер · 1/);
-  assert.match(text, /замер 79 дней назад/);
-  assert.match(text, /Нет программы · 1/);
+  press(tree, 'Без программы: 1');
+  assert.match(screenText(tree), /Без программы · 1.*Мария Волкова.*программы нет/);
+  openPerson('Мария Волкова');
 
-  const personButton = (name) => tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).startsWith(name), { deep: true });
-  act(() => { personButton('Мария Волкова')[1].props.onClick(); });
-  act(() => { personButton('Евгений')[0].props.onClick(); });
-  act(() => { personButton('Дмитрий Соколов')[0].props.onClick(); });
+  press(tree, 'Пакет и долг: 2');
+  assert.match(screenText(tree), /Пакет и долг · 2.*Евгений.*долг 4 000 ₽/);
+  openPerson('Евгений');
+
+  press(tree, 'Пора замер: 1');
+  assert.match(screenText(tree), /Пора снять замер · 1.*Дмитрий Соколов.*замер 79 дней назад/);
+  openPerson('Дмитрий Соколов');
 
   assert.deepEqual(opened, [['Мария Волкова', 'plan'], ['Евгений', 'payments'], ['Дмитрий Соколов', 'progress']]);
 });
 
-test('обзор без сигналов хвалит, а не показывает пустые разделы', () => {
+test('обзор без сигналов оставляет компактные действия и честное пустое состояние', () => {
   const { tree } = draw(Dashboard, () => overview({ signals: { silent: [], packages: [], measureDue: [], noPlan: [] } }), { props: quiet });
-  const text = screenText(tree);
+  assert.match(screenText(tree), /Требуют внимания всё в порядке 0 Не приходят 0 Пакет и долг/);
 
-  assert.match(text, /Всё на месте/);
-  assert.doesNotMatch(text, /Молчат ·/);
+  press(tree, 'Не приходят: 0');
+  assert.match(screenText(tree), /Не приходят · 0.*Всё в порядке.*Сейчас в этой группе никого нет/);
 });
 
 test('обзор: пустой месяц без целей не показывает NaN и не красит', () => {
@@ -937,8 +934,8 @@ test('обзор: пустой месяц без целей не показыв�
 
   assert.ok(!/NaN|Infinity|undefined|null/.test(text), 'в тексте экрана: ' + text);
   assert.match(text, /занятий в этом месяце ещё не было/);
-  const lead = tree.root.findAll((node) => typeof node.type === 'string' && String(node.props.className || '').includes('lead'), { deep: true })[0];
-  assert.doesNotMatch(lead.props.className, /lead--/);
+  const pace = tree.root.find((node) => String(node.props.className || '').includes('overview-pace'));
+  assert.doesNotMatch(pace.props.className, /overview-pace--good/);
 });
 
 test('цели правятся листом и уходят на сервер разом', async () => {
@@ -947,7 +944,7 @@ test('цели правятся листом и уходят на сервер �
     onMutate: (action, params) => ({ targets: { ...params.targets, averageCheck: 4000 } }),
   });
 
-  press(tree, 'Цели');
+  press(tree, 'Цели · изменить');
   assert.match(screenText(tree), /Норма, с которой сравнивается каждая цифра/);
 
   type(tree, 'Средняя оплата', '4000');
@@ -960,28 +957,16 @@ test('цели правятся листом и уходят на сервер �
   assert.equal(sent[0].action, 'trainer.metrics.targets.set');
   assert.equal(sent[0].params.targets.averageCheck, '4000');
   assert.equal(sent[0].params.targets.retention, '', 'пустое поле снимает цель');
-  assert.match(screenText(tree), /из 4 000 ₽/, 'экран показывает цель из ответа сервера');
 });
 
 /* ==========================================================================
  * Маркетинг, развитие, сплит и плательщик (20.10.2026)
  * ========================================================================== */
 
-test('обзор: главные цифры месяца — маркетинг и развитие с целями', () => {
-  const { tree } = draw(Dashboard, () => overview(), { props: quiet });
-  const text = screenText(tree);
-
-  assert.match(text, /Главные цифры месяца/);
-  assert.match(text, /Маркетинг Доля по рекомендации цель 50% — есть 50%/);
-  assert.match(text, /Развитие Часов обучения до цели 3,5 ч из 8 ч 4,5 ч/);
-});
-
 test('обзор: пара сплита — одной строкой с меткой, деньги плательщика подписаны', () => {
   const { tree } = draw(Dashboard, () => overview(), { props: quiet });
-  const text = screenText(tree);
-
-  assert.match(text, /Пакет кончается · 2/);
-  assert.match(text, /Соня \+ Юля сплит платит Евгений · занятий не осталось/);
+  press(tree, 'Пакет и долг: 2');
+  assert.match(screenText(tree), /Соня \+ Юля сплит платит Евгений · занятий не осталось/);
 });
 
 test('старый обзор без маркетинга и развития не падает', () => {
@@ -990,9 +975,28 @@ test('старый обзор без маркетинга и развития н
   delete data.development;
   const { tree } = draw(Dashboard, () => data, { props: quiet });
   const text = screenText(tree);
-  assert.match(text, /Доля по рекомендации/);
-  assert.match(text, /пока нет/);
+  assert.match(text, /Отклонения от целей/);
   assert.ok(!/NaN|undefined/.test(text));
+});
+
+test('обзор: динамика берёт реальные месяцы и переключает показатель', () => {
+  const answer = (action, params) => {
+    if (action !== 'trainer.metrics.series') return overview();
+    const data = series(params.by);
+    data.points.forEach((point, index) => {
+      point.process.activeClients = 12 + index;
+      point.process.trainings = 70 + index * 10;
+    });
+    return data;
+  };
+  const { tree, charted } = draw(Dashboard, answer, { props: quiet });
+
+  assert.deepEqual(charted, [{ by: 'month' }]);
+  assert.match(screenText(tree), /Сентябрь 2026 · ещё идёт, данные неполные 216 850 ₽/);
+  press(tree, 'Клиенты');
+  assert.match(screenText(tree), /Сентябрь 2026 · ещё идёт, данные неполные 14/);
+  press(tree, 'Занятия');
+  assert.match(screenText(tree), /Сентябрь 2026 · ещё идёт, данные неполные 90/);
 });
 
 test('клиенты: откуда приходят новые — по источникам из карточек', () => {
