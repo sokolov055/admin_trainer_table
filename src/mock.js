@@ -2037,11 +2037,12 @@ const MOCK = {
     DEMO_SCHEDULE_CHANGES.forEach((e, id) => {
       if (!e || known.has(id)) return;
       const start = new Date(e.startsAt);
-      if (start >= from && start < to) changed.push(e);
+      if (start < to && (start >= from || (params.includeOverlaps && new Date(e.endsAt) > from))) changed.push(e);
     });
     return {
       events: changed,
       calendar: true,
+      weeklyRepeat: true,
       serviceEmail: '',
       feedUrl: '',
     };
@@ -2069,6 +2070,8 @@ const MOCK = {
       endsAt: new Date(new Date(startsAt).getTime() + Number(params.minutes || 60) * 60000).toISOString(),
       done: false,
       cancelledCharged: false,
+      color: params.color === undefined ? DEMO_SCHEDULE_CHANGES.get(id)?.color : params.color,
+      ...(params.repeat ? { weekly: params.repeat } : {}),
     };
     DEMO_SCHEDULE_CHANGES.set(id, event);
     return { id };

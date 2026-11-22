@@ -4767,7 +4767,7 @@ video.library__video { aspect-ratio: auto; max-height: 60vh; }
   background: var(--accent-wash); color: var(--accent-ink); font: inherit; font-size: var(--text-xs); font-weight: 700;
   cursor: pointer;
 }
-.cal-grid--7 .cal-draft > span { display: none; }
+.cal-grid--7 .cal-draft__open > span { display: none; }
 .form-hint { margin: calc(-1 * var(--space-2)) 0 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.4; }
 
 /* Месяц на весь экран: шесть недель, листается вбок лентой из трёх месяцев */
@@ -6911,4 +6911,109 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .chips__thumb, .chips--glide .chip { transition: none; }
   .progress__pane.from-right, .progress__pane.from-left { animation: none; }
+}
+
+.cal-quick__body { display: grid; gap: var(--space-3); }
+.cal-quick .sheet__scrim { background: rgb(0 0 0 / 20%); }
+.cal-quick__chips .options { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; }
+.cal-quick__chips .option {
+  min-height: 44px;
+  width: auto;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+}
+.cal-quick__chips .option__mark { display: none; }
+.cal-quick__when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+}
+.cal-quick__when > span { flex: 1; color: var(--text-muted); }
+.cal-quick__personal { width: auto; min-height: 44px; padding: 0 var(--space-3); border-radius: 999px; }
+.cal-quick__personal[aria-pressed="true"] { background: var(--accent-wash); color: var(--accent-ink); }
+.cal-quick__move.button { margin: 0; justify-self: start; }
+.cal-quick .sheet__head { justify-content: flex-start; padding-left: 0; }
+.cal-quick__clients {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.cal-quick__clients button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+}
+.cal-quick__clients button span {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.cal-quick__clients button[data-avatar-tone] span { background: var(--avatar-fill); color: #fff; border: 0; font-weight: 700; }
+.cal-quick__clients [data-avatar-tone="0"] { --avatar-fill: #08776e; }
+.cal-quick__clients [data-avatar-tone="1"] { --avatar-fill: #6346ab; }
+.cal-quick__clients [data-avatar-tone="2"] { --avatar-fill: #225da5; }
+.cal-quick__clients [data-avatar-tone="3"] { --avatar-fill: #a84f13; }
+.cal-quick__clients button[aria-pressed="true"] span { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
+.cal-quick__clients button b, .cal-quick__clients button small {
+  font-size: 12px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.cal-quick__clients button small { color: var(--text-muted); }
+.cal-quick__actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.cal-quick__actions .button { margin: 0; white-space: normal; }
+.cal-repeat { display: grid; gap: var(--space-2); }
+.cal-quick__slot-tip { position: absolute; z-index: 4; bottom: var(--space-2); left: var(--space-3); }
+.cal-duration__actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); }
+.cal-duration__actions > .button { margin: 0; }
+.cal-duration__wheels { display: flex; align-items: center; gap: var(--space-2); max-width: 240px; margin: auto; }
+.cal-draft__open, .cal-draft__edge { appearance: none; border: 0; color: inherit; background: transparent; cursor: pointer; }
+.cal-draft__open { position: absolute; inset: 0; display: flex; gap: 3px; align-items: center; padding: 3px 5px; font: inherit; touch-action: none; }
+.cal-draft__edge { position: absolute; z-index: 1; left: 50%; transform: translateX(-50%); width: min(100%, 52px); height: 24px; touch-action: none; cursor: ns-resize; }
+.cal-draft__edge::before { content: ''; display: block; width: 22px; height: 6px; margin: auto; background: var(--accent-solid); border-radius: 99px; }
+.cal-draft__edge--start { top: -12px; }
+.cal-draft__edge--end { bottom: -12px; }
+.cal-draft[data-compact="true"] .cal-draft__edge { max-width: 50%; }
+.cal-draft[data-compact="true"] .cal-draft__edge--start { left: 25%; }
+.cal-draft[data-compact="true"] .cal-draft__edge--end { left: 75%; }
+.cal-color__options { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.cal-color__options .option { width: auto; min-width: 44px; min-height: 44px; padding: 0 var(--space-2); border-radius: 999px; }
+.cal-color__options .option[aria-pressed="true"] { border-color: var(--accent-solid); box-shadow: inset 0 0 0 1px var(--accent-solid); }
+.cal-color__options i { width: 22px; height: 22px; border-radius: 50%; background: var(--ev); }
+[data-event-color="teal"] { --ev: #08776e; }
+[data-event-color="purple"] { --ev: #6346ab; }
+[data-event-color="orange"] { --ev: #a84f13; }
+[data-event-color="pink"] { --ev: #a33f6c; }
+[data-event-color="green"] { --ev: #3f6e37; }
+.cal-event[data-event-color].cal-event--personal { outline-color: var(--ev); }
+.cal-draft[data-event-color] { border-color: var(--ev); background: color-mix(in srgb, var(--ev) 18%, var(--surface)); color: var(--text); }
+.cal-color__preview {
+  border-left: 4px solid var(--ev, var(--accent-solid));
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--ev, var(--accent-solid)) 15%, var(--surface));
+  color: var(--text);
+  padding: var(--space-1) var(--space-2);
+  margin-top: var(--space-1);
+  overflow-wrap: anywhere;
 }

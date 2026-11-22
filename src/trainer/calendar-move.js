@@ -68,13 +68,13 @@ export function fetchRanges(view, anchor, listDays = 28) {
  * месте, а не пустая до ответа сервера. Ответ за промежуток заменяет в
  * копилке всё, что начиналось в этом промежутке (удалённое пропадает).
  */
-export function mergeRange(cache, from, to, events) {
+export function mergeRange(cache, from, to, events, includeOverlaps = false) {
   const lo = new Date(from).getTime();
   const hi = new Date(to).getTime();
   const next = new Map();
   cache.forEach((e, id) => {
     const s = new Date(e.startsAt).getTime();
-    if (s < lo || s >= hi) next.set(id, e);
+    if (s >= hi || (s < lo && (!includeOverlaps || Date.parse(e.endsAt) <= lo))) next.set(id, e);
   });
   (events || []).forEach((e) => next.set(e.id, e));
   return next;

@@ -127,7 +127,7 @@ test('расписание: календарь, жесты и карточка �
     await page.waitForTimeout(900);
     assert.equal(await firstDay(), before, 'вернулись на исходные три дня');
 
-    // Новое личное событие: заготовка по первому нажатию, форма — по второму
+    // Новое личное событие: заготовка и быстрый лист по первому нажатию
     await page.locator('.cal-grid__scroll').evaluate((el) => { el.scrollTop = 48 * 9; });
     // Свободное место в среднем дне: середина часа, где нет занятий
     const spot = await page.locator('.cal-grid__col').nth(3).evaluate((col, h) => {
@@ -147,13 +147,40 @@ test('расписание: календарь, жесты и карточка �
     await page.touchscreen.tap(spot2.x, spot2.y);
     const draft = page.locator('.cal-draft');
     await draft.waitFor();
-    await draft.click();
-    await page.getByRole('radio', { name: 'Личное событие' }).click();
-    await page.getByLabel('Название события').fill('Массаж QA');
+    const quick = page.getByRole('dialog', { name: 'Новое занятие' });
+    await quick.waitFor();
+    const originalTime = await quick.locator('.cal-quick__when > span').innerText();
+    await quick.getByRole('button', { name: 'Передвинуть в сетке' }).click();
+    const db = await draft.boundingBox();
+    await touch.drag({ x: db.x + db.width / 2, y: db.y + db.height / 2 },
+      { x: db.x + db.width / 2, y: db.y + db.height / 2 + 48 }, { hold: 450 });
+    await quick.waitFor();
+    const timeBefore = await quick.locator('.cal-quick__when > span').innerText();
+    assert.equal(await draft.count(), 1);
+    assert.notEqual(timeBefore, originalTime, 'время обновилось после перемещения заготовки');
+    assert.match(timeBefore, /\d\d:\d\d–\d\d:\d\d/);
+    await quick.getByRole('button', { name: 'Передвинуть в сетке' }).click();
+    const lowerEdge = page.getByRole('button', { name: 'Изменить окончание заготовки' });
+    const edgeBox = await lowerEdge.boundingBox();
+    await touch.drag({ x: edgeBox.x + edgeBox.width / 2, y: edgeBox.y + edgeBox.height / 2 },
+      { x: edgeBox.x + edgeBox.width / 2, y: edgeBox.y + edgeBox.height / 2 + 12 }, { steps: 5 });
+    await page.getByRole('button', { name: 'Изменить начало заготовки' }).press('ArrowUp');
+    await page.getByRole('button', { name: 'Вернуться к записи' }).click();
+    await quick.getByText('Длительность · 1:30', { exact: true }).waitFor();
+    await quick.getByRole('radio', { name: '60 мин' }).click();
+    await page.screenshot({ path: join(REVIEW, 'schedule-quick-light.png'), animations: 'disabled' });
+    await quick.getByRole('button', { name: 'Личное' }).click();
+    const personalQuick = page.getByRole('dialog', { name: 'Личное событие' });
+    await personalQuick.getByLabel('Название события').fill('Массаж QA');
+    await personalQuick.getByRole('button', { name: 'Фиолетовый' }).click();
+    assert.equal(await draft.getAttribute('data-event-color'), 'purple');
+    await personalQuick.getByRole('button', { name: 'Ещё…' }).click();
+    assert.equal(await page.getByLabel('Название события').inputValue(), 'Массаж QA');
     await page.getByLabel('Время').fill('11:00');
     await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     const event = page.getByRole('button', { name: /Массаж QA/ }).first();
     await event.waitFor();
+    assert.equal(await event.getAttribute('data-event-color'), 'purple');
     await page.waitForTimeout(400);
 
     // Перенос удержанием: палец стоит 450 мс, потом ведёт на час вниз
@@ -235,8 +262,7 @@ test('расписание: календарь, жесты и карточка �
     await page.screenshot({ path: join(REVIEW, 'schedule-month.png') });
     const vp = await page.locator('.cal-month__viewport').boundingBox();
     await touch.drag({ x: vp.x + vp.width - 40, y: vp.y + 200 }, { x: vp.x + 60, y: vp.y + 210 });
-    await page.waitForTimeout(900);
-    assert.notEqual(await page.locator('.cal-top__title').innerText(), monthTitle, 'месяц перелистнулся');
+    await page.waitForFunction((before) => document.querySelector('.cal-top__title')?.textContent !== before, monthTitle);
 
     await page.getByRole('button', { name: /^Месяц/ }).click();
     await page.getByRole('menuitemradio', { name: 'Список' }).click();
@@ -289,7 +315,7 @@ test('расписание: календарь, жесты и карточка �
     await details.waitFor();
     assert.equal(await details.getByRole('button', { name: /Изменить|Редактировать событие|^Перенести$/ }).count(), 1);
     await details.getByRole('button', { name: 'Изменить' }).click();
-    await page.getByLabel('Длительность').waitFor();
+    await page.getByRole('radiogroup', { name: 'Длительность' }).waitFor();
     await page.getByLabel('Дата', { exact: true }).waitFor();
     await page.getByLabel('Время', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'К занятию', exact: true }).click();
@@ -350,6 +376,47 @@ test('расписание: календарь, жесты и карточка �
     assert.equal(await details.getByRole('button', { name: /Начать тренировку|Изменить|Перенести/ }).count(), 0);
     await page.keyboard.press('Escape');
     await details.waitFor({ state: 'detached' });
+
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.getByRole('button', { name: 'Добавить событие' }).click();
+    await quick.waitFor();
+    await quick.getByRole('button', { name: 'Все · Поиск' }).click();
+    await quick.getByLabel('Поиск клиента').fill('Дмитрий Соколов');
+    await quick.getByRole('button', { name: /Дмитрий Соколов/ }).click();
+    await quick.getByRole('radio', { name: '75 мин' }).click();
+    await quick.getByRole('switch', { name: 'Повторять каждую неделю' }).click();
+    await quick.getByLabel('До даты').fill('2026-12-04');
+    await page.screenshot({ path: join(REVIEW, 'schedule-quick-dark.png'), animations: 'disabled' });
+    assert.equal(await quick.getByRole('radio', { name: '75 мин' }).getAttribute('aria-checked'), 'true');
+    await quick.getByRole('button', { name: 'Ещё…' }).click();
+    assert.equal(await page.getByRole('radio', { name: '75 мин' }).getAttribute('aria-checked'), 'true');
+    assert.equal(await page.getByLabel('До даты').inputValue(), '2026-12-04');
+    const full = page.locator('.cal-form');
+    await full.getByRole('button', { name: 'Своя…' }).click();
+    await full.getByRole('spinbutton', { name: 'Часы' }).press('End');
+    await full.getByText('Длительность · 336:00', { exact: true }).waitFor();
+    assert.equal(await full.getByRole('spinbutton', { name: 'Минуты' }).getAttribute('aria-valuemax'), '0');
+    await page.screenshot({ path: join(REVIEW, 'schedule-duration-maximum.png'), animations: 'disabled' });
+    await full.getByRole('radio', { name: '75 мин' }).click();
+    await page.locator('.cal-form').getByRole('button', { name: 'Отмена', exact: true }).click();
+    await quick.getByRole('button', { name: 'Личное' }).click();
+    await personalQuick.getByLabel('Название события').fill('Серия QA');
+    await personalQuick.getByRole('button', { name: 'Розовый' }).click();
+    await personalQuick.getByRole('button', { name: 'Добавить событие' }).click();
+    await personalQuick.waitFor({ state: 'detached' });
+    const weekly = page.locator('.cal-agenda__item').filter({ hasText: 'Серия QA' }).first();
+    await weekly.click();
+    assert.equal(await weekly.getAttribute('data-event-color'), 'pink');
+    await details.getByText('Повтор каждую неделю', { exact: true }).waitFor();
+    await details.getByRole('button', { name: 'Изменить' }).click();
+    assert.equal(await page.getByRole('button', { name: 'Розовый' }).getAttribute('aria-pressed'), 'true');
+    await page.getByRole('radio', { name: 'Это и следующие' }).click();
+    assert.equal(await page.getByLabel('До даты').inputValue(), '2026-12-04');
+    await page.locator('.cal-form').getByRole('button', { name: 'Отмена', exact: true }).click();
+    await page.getByRole('alertdialog', { name: 'Выйти без сохранения?' }).getByRole('button', { name: 'Выйти' }).click();
+    await details.getByRole('button', { name: 'Закрыть' }).click();
+    await details.waitFor({ state: 'detached' });
+    await page.setViewportSize({ width: 390, height: 844 });
 
     await page.locator('.cal-agenda__item:not(.cal-event--done):not(.cal-event--cancelled)').filter({ hasText: 'Дмитрий Соколов' }).first().click();
     await details.getByRole('button', { name: 'Начать тренировку', exact: true }).click();

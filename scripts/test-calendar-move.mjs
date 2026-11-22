@@ -86,3 +86,9 @@ test('переносить можно занятия и личные событ�
   assert.equal(movable({ clientRow: 3, cancelledCharged: true }), false);
   assert.equal(movable({ clientRow: null, title: 'Массаж' }), false);
 });
+
+test('диапазон с пересечением удаляет устаревшую запись, начавшуюся накануне', () => {
+  const event = { id: 'long', startsAt: '2026-11-21T10:00:00Z', endsAt: '2026-12-05T10:00:00Z' };
+  const result = mergeRange(new Map([[event.id, event]]), '2026-11-25T00:00:00Z', '2026-11-26T00:00:00Z', [], true);
+  assert.equal(result.has(event.id), false);
+});
