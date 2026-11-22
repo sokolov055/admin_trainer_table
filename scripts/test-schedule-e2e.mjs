@@ -287,6 +287,13 @@ test('расписание: календарь, жесты и карточка �
     await page.waitForFunction(() => [...document.querySelectorAll('.cal-month__page--current .cal-month__cell')]
       .filter((c) => c.querySelector('.cal-event--chip')).length >= 40, null, { timeout: 8000 });
     await page.screenshot({ path: join(REVIEW, 'schedule-month.png') });
+    await page.locator('.cal-month__page--current [data-cal-day="2026-11-22"]').click({ position: { x: 20, y: 12 } });
+    await page.locator('.cal-month__selected-head').getByText(/22 ноября/).waitFor();
+    await page.locator('.cal-month__selected-head').getByRole('button', { name: 'Открыть день' }).click();
+    await page.locator('.cal-grid--1').waitFor();
+    await page.locator('.cal-viewpick__button').click();
+    await page.getByRole('menuitemradio', { name: 'Месяц' }).click();
+    await page.locator('.cal-month__page--current').waitFor();
     const vp = await page.locator('.cal-month__viewport').boundingBox();
     await touch.drag({ x: vp.x + vp.width - 40, y: vp.y + 200 }, { x: vp.x + 60, y: vp.y + 210 });
     await page.waitForFunction((before) => document.querySelector('.cal-top__title')?.textContent !== before, monthTitle);
@@ -294,7 +301,28 @@ test('расписание: календарь, жесты и карточка �
     await page.getByRole('button', { name: /^Месяц/ }).click();
     await page.getByRole('menuitemradio', { name: 'Список' }).click();
     await page.locator('.cal-agenda__item').first().waitFor();
+    await page.locator('.cal-agenda__month').first().getByText('Декабрь').waitFor();
+    await page.locator('.cal-agenda__gap').first().waitFor();
     await page.screenshot({ path: join(REVIEW, 'schedule-list.png') });
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.screenshot({ path: join(REVIEW, 'schedule-list-dark-320.png'), animations: 'disabled' });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'список не расширяет узкий экран');
+    await page.locator('.cal-viewpick__button').click();
+    await page.getByRole('menuitemradio', { name: 'Месяц' }).click();
+    await page.screenshot({ path: join(REVIEW, 'schedule-month-dark-320.png'), animations: 'disabled' });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'месяц не расширяет узкий экран');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
+    await page.locator('.cal-viewpick__button').click();
+    await page.getByRole('menuitemradio', { name: 'Список' }).click();
+    await page.getByRole('button', { name: 'Сегодня', exact: true }).click();
+    await page.locator('.cal-agenda__now').waitFor();
+    await page.locator('.cal-agenda__gap:not([disabled])').first().click();
+    const listBooking = page.getByRole('dialog', { name: 'Новое занятие' });
+    await listBooking.waitFor();
+    assert.match(await listBooking.locator('.cal-quick__when').innerText(), /12:30/);
+    await listBooking.getByRole('button', { name: 'Закрыть', exact: true }).click();
 
     await page.locator('.cal-viewpick__button').click();
     await page.getByRole('menuitemradio', { name: 'Неделя' }).click();

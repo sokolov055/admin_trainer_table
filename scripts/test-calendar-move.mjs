@@ -47,8 +47,9 @@ test('загружается экран и по экрану с каждой с�
   assert.equal(m[0].from.getTime(), local(2026, 8, 31).getTime(), 'сентябрь с понедельника его первой недели (1.09 — вторник)');
   assert.equal(m[1].from.getTime(), local(2026, 9, 28).getTime());
   const list = fetchRanges('list', local(2026, 10, 19), 84);
-  assert.equal(list.length, 3);
-  assert.equal(list[2].to.getTime(), local(2027, 1, 11).getTime());
+  assert.equal(list.length, 4);
+  assert.equal(list[0].from.getTime(), local(2026, 10, 1).getTime());
+  assert.equal(list[3].to.getTime(), local(2027, 2, 1).getTime());
   for (const view of ['day', '3day', 'week', 'month']) {
     for (const x of fetchRanges(view, local(2026, 10, 19), 84).concat(fetchRanges('list', local(2026, 10, 19), 84))) {
       assert.ok((x.to - x.from) / 86400000 <= MAX_FETCH_DAYS + 1, view + ': промежуток не длиннее предела сервера');

@@ -14,7 +14,7 @@ import { ChatGlyph, useChatInbox } from '../chat/ChatList.jsx';
 import { requestStart } from '../client/start-request.js';
 import { IconAlert, IconBack, IconCheck, IconChevron, IconClose, IconCopy, IconMenu, IconPen, IconPlay, IconPlus, IconUser } from '../icons.jsx';
 import {
-  addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
+  SNAP, addDays, dateValue, dropMinutes, durationOf, fetchRanges, mergeRange, mondayOf, movable, moveRequest,
   rangeOf, sameTimeOn, shifted, startOfDay,
 } from './calendar-move.js';
 import { dayOverview } from './calendar-day.js';
@@ -520,7 +520,7 @@ export default function Schedule({ onOpenClient = null, onMenu = null, active = 
           <MonthPager key="month" pager={pager} anchor={anchor} events={events} onDay={openDay} onEvent={openEvent} onShift={shift} onDrop={drop} />
         ) : view === 'list' ? (
           <Agenda key="list" start={start} days={agendaDays} events={events} loading={load.loading}
-            onEvent={openEvent} onDay={openDay} onMore={() => setAgendaDays((n) => n + 28)} />
+            onEvent={openEvent} onDay={openDay} onCreate={create} onMore={() => setAgendaDays((n) => n + 28)} />
         ) : (
           <TimeGrid key={view} pager={pager} start={start} days={days} events={events} scrollKey={scrollKey} draft={draft} draftOpen={!!quick && !choosingSlot}
             dayReady={!load.error && loaded.current.has(rangesKey)}
@@ -1310,6 +1310,10 @@ function dayDuration(minutes) {
   return [hours && hours + ' ч', (rest || !hours) && rest + ' мин'].filter(Boolean).join(' ');
 }
 
+function countText(count, forms) {
+  return count + ' ' + forms[new Intl.PluralRules('ru').select(count)];
+}
+
 function windowTime(window, day) {
   return hm(window.start) + '–' + (window.end === +addDays(day, 1) ? '24:00' : hm(window.end));
 }
@@ -1792,11 +1796,13 @@ function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) 
   const root = useRef(null);
   const track = useRef(null);
   const ghostEl = useRef(null);
-  const [fit, setFit] = useState(3);
+  const [fit, setFit] = useState(4);
+  const [selectedKey, setSelectedKey] = useState(() => dateValue(anchor));
   const [hover, setHover] = useState(null);
   const [lifted, setLifted] = useState(null);
   const months = [-1, 0, 1].map((i) => new Date(anchor.getFullYear(), anchor.getMonth() + i, 1));
   const now = new Date();
+  useEffect(() => setSelectedKey(dateValue(anchor)), [anchor.getTime()]);
 
   const byDay = useMemo(() => {
     const m = new Map();
@@ -1815,7 +1821,7 @@ function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) 
     const measure = () => {
       const cell = el.querySelector('.cal-month__page--current .cal-month__cell');
       if (!cell) return;
-      setFit(Math.max(1, Math.floor((cell.clientHeight - 24) / 17)));
+      setFit(Math.max(1, Math.min(4, Math.floor((cell.clientHeight - 30) / 5))));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -1881,36 +1887,45 @@ function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) 
                 {cells.map((d) => {
                   const k = dateValue(d);
                   const list = byDay.get(k) || [];
-                  const shown = list.length > fit ? Math.max(0, fit - 1) : list.length;
+                  const shown = Math.min(list.length, fit);
                   const other = d.getMonth() !== first.getMonth();
+                  const count = list.filter((e) => e.clientRow && !e.personal && !e.cancelledCharged).length;
                   return (
                     <div
                       key={d.getTime()}
                       data-cal-day={k}
-                      className={'cal-month__cell' + (other ? ' cal-month__cell--other' : '') + (sameDay(d, now) ? ' cal-month__cell--today' : '') + (hover === k ? ' cal-month__cell--drop' : '')}
-                      onClick={() => onDay(d)}
+                      className={'cal-month__cell cal-month__cell--load-' + Math.min(3, count) + (other ? ' cal-month__cell--other' : '') + (sameDay(d, now) ? ' cal-month__cell--today' : '') + (selectedKey === k && i === 1 ? ' cal-month__cell--selected' : '') + (hover === k ? ' cal-month__cell--drop' : '')}
+                      onClick={() => { if (selectedKey === k) onDay(d); else setSelectedKey(k); }}
                       role="button"
                       tabIndex={i === 1 ? 0 : -1}
-                      aria-label={d.getDate() + ' ' + MONTHS[d.getMonth()] + (list.length ? ', событий: ' + list.length : '')}
-                      onKeyDown={(ev) => { if (ev.key === 'Enter') onDay(d); }}
+                      aria-label={d.getDate() + ' ' + MONTHS[d.getMonth()] + (list.length ? ', событий: ' + list.length : '') + (selectedKey === k ? ', открыть день' : ', показать занятия')}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); if (selectedKey === k) onDay(d); else setSelectedKey(k); } }}
                     >
                       <span className="cal-month__date">{d.getDate()}</span>
                       {list.slice(0, shown).map((e) => (
                         <button type="button" key={e.id} data-cal-event={e.id} data-event-color={e.color} data-movable={movable(e) && !e.moving ? '1' : '0'}
-                          className={eventClass(e) + ' cal-event--chip' + (lifted && lifted.id === e.id ? ' is-lifted' : '')}
+                          className={eventClass(e) + ' cal-event--chip cal-month__bar' + (lifted && lifted.id === e.id ? ' is-lifted' : '')}
                           aria-label={eventAria(e, eventTime(e))} tabIndex={i === 1 ? 0 : -1}
-                          onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
-                          <span className="cal-event__name">{shortLabelOf(e)}</span>
-                          {e.unpaid && !e.cancelledCharged && <span className="cal-event__rub" aria-hidden="true">₽</span>}
-                        </button>
+                          onClick={(ev) => { ev.stopPropagation(); onEvent(e); }} />
                       ))}
-                      {list.length > shown && <span className="cal-month__more">ещё {list.length - shown}</span>}
+                      {!!list.length && <span className="cal-month__more">{list.length} соб.</span>}
                     </div>
                   );
                 })}
               </div>
             );
           })}
+        </div>
+      </div>
+      <div className="cal-month__selected" aria-live="polite">
+        <div className="cal-month__selected-head">
+          <strong>{weekdayOf(keyDate(selectedKey))}, {keyDate(selectedKey).getDate()} {MONTHS[keyDate(selectedKey).getMonth()]} · {countText((byDay.get(selectedKey) || []).length, { one: 'событие', few: 'события', many: 'событий' })}</strong>
+          <button type="button" onClick={() => onDay(keyDate(selectedKey))}>Открыть день <IconChevron size={16} /></button>
+        </div>
+        <div className="cal-month__selected-items">
+          {(byDay.get(selectedKey) || []).length ? (byDay.get(selectedKey) || []).map((e) =>
+            <AgendaEntry key={e.id} event={e} day={keyDate(selectedKey)} now={now} onEvent={onEvent} />)
+            : <p className="cal-agenda__empty">Занятий нет</p>}
         </div>
       </div>
       {lifted && createPortal(
@@ -1925,8 +1940,26 @@ function MonthPager({ anchor, events, pager, onDay, onEvent, onShift, onDrop }) 
  * Список, как «Расписание» в Google: дни подряд, в дне — занятия по
  * времени. Пустые дни не показываем, сегодня — всегда, даже пустое.
  */
-function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
-  const now = new Date();
+function AgendaEntry({ event: e, day, now, onEvent }) {
+  const past = sameDay(day, now) && Date.parse(e.endsAt) <= +now;
+  return (
+    <button type="button" data-event-color={e.color}
+      className={eventClass(e) + ' cal-agenda__item cal-agenda__entry' + (past ? ' cal-agenda__entry--past' : '')}
+      aria-label={eventAria(e, eventTime(e))} onClick={() => onEvent(e)}>
+      <span className="cal-agenda__time">{hm(e.startsAt)}<br />{hm(e.endsAt)}</span>
+      <span className="cal-agenda__avatar" aria-hidden="true">{initials(labelOf(e))}</span>
+      <span className="cal-agenda__info">
+        <strong>{labelOf(e)}{e.done && !e.cancelledCharged ? ' ✓' : ''}</strong>
+        <small>{e.session?.title || (e.personal ? 'Личное' : e.cancelledCharged ? 'Отменено, списано' : 'Занятие')}</small>
+      </span>
+      {e.unpaid && !e.cancelledCharged && <span className="cal-event__rub cal-agenda__unpaid">₽ не оплачено</span>}
+    </button>
+  );
+}
+
+function Agenda({ start, days, events, loading, onEvent, onDay, onCreate, onMore }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   const list = [];
   for (let i = 0; i < days; i += 1) {
     const d = addDays(start, i);
@@ -1939,10 +1972,45 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
   const empty = !list.some((x) => x.ofDay.length);
   return (
     <div className="cal-agenda">
-      {list.map(({ d, ofDay }) => {
+      {list.map(({ d, ofDay }, index) => {
         const today = sameDay(d, now);
+        const monthStart = index === 0 || d.getMonth() !== list[index - 1].d.getMonth();
+        const monthEvents = events.filter((e) => {
+          const startDate = new Date(e.startsAt);
+          return startDate.getMonth() === d.getMonth() && startDate.getFullYear() === d.getFullYear()
+            && e.clientRow && !e.personal && !e.cancelledCharged;
+        });
+        let previousEnd = null;
+        let nowPlaced = false;
+        const rows = [];
+        const nowLine = <div key="now" className="cal-agenda__now"><span>сейчас {hm(now)}</span></div>;
+        for (const e of ofDay) {
+          const begin = Math.max(+d, Date.parse(e.startsAt));
+          const end = Math.min(+addDays(d, 1), Date.parse(e.endsAt));
+          const occupiesTime = !e.cancelledCharged && !isLegacyAllDay(e);
+          if (today && !nowPlaced && +now < begin) { rows.push(nowLine); nowPlaced = true; }
+          if (occupiesTime && previousEnd != null && begin - previousEnd >= 60 * 60000) {
+            const availableStart = Math.max(previousEnd, +now);
+            const nextSlot = Math.ceil(availableStart / (SNAP * 60000)) * SNAP * 60000;
+            const minutes = Math.floor((begin - (today ? nextSlot : previousEnd)) / 60000);
+            if (minutes >= 60) rows.push(<button type="button" key={'gap-' + e.id} className="cal-agenda__gap"
+              onClick={() => onCreate({ start: nextSlot })}
+              disabled={+addDays(d, 1) <= +now}
+              aria-label={'Свободно ' + dayDuration(minutes) + ', записать занятие'}>
+              Свободно {dayDuration(minutes)}
+            </button>);
+          }
+          rows.push(<AgendaEntry key={e.id} event={e} day={d} now={now} onEvent={onEvent} />);
+          if (occupiesTime) previousEnd = Math.max(previousEnd || 0, end);
+        }
+        if (today && !nowPlaced) rows.push(nowLine);
         return (
-          <section key={d.getTime()} className={'cal-agenda__day' + (today ? ' cal-agenda__day--today' : '')}>
+          <React.Fragment key={d.getTime()}>
+          {monthStart && <div className="cal-agenda__month">
+            <strong>{MONTHS_TITLE[d.getMonth()]}</strong>
+            <span>{countText(monthEvents.length, { one: 'занятие', few: 'занятия', many: 'занятий' })} · {countText(new Set(monthEvents.map((e) => e.clientRow)).size, { one: 'клиент', few: 'клиента', many: 'клиентов' })}</span>
+          </div>}
+          <section className={'cal-agenda__day' + (today ? ' cal-agenda__day--today' : '')}>
             <button type="button" className="cal-agenda__date" onClick={() => onDay(d)}
               aria-label={'Открыть ' + d.getDate() + ' ' + MONTHS[d.getMonth()]}>
               <span>{weekdayOf(d)}</span>
@@ -1954,19 +2022,10 @@ function Agenda({ start, days, events, loading, onEvent, onDay, onMore }) {
                   {loading ? 'Загружаем…' : empty ? 'Занятий нет до ' + addDays(start, days - 1).getDate() + ' ' + MONTHS[addDays(start, days - 1).getMonth()] : today ? 'Сегодня занятий нет' : 'Занятий нет'}
                 </p>
               )}
-              {ofDay.map((e) => (
-                <button type="button" key={e.id} data-event-color={e.color} className={eventClass(e) + ' cal-agenda__item'} aria-label={eventAria(e, eventTime(e))} onClick={() => onEvent(e)}>
-                  <span className="cal-event__name">{labelOf(e)}</span>
-                  {e.session?.title && <span className="cal-event__sub">{e.session.title}</span>}
-                  <span className="cal-event__time">
-                    {eventTime(e)}
-                    {e.cancelledCharged ? ' · отменено, списано' : e.personal ? ' · личное' : ''}
-                  </span>
-                  {e.unpaid && !e.cancelledCharged && <span className="cal-event__rub" aria-hidden="true">₽</span>}
-                </button>
-              ))}
+              {rows}
             </div>
           </section>
+          </React.Fragment>
         );
       })}
       <button type="button" className="button button--ghost cal-agenda__more" onClick={onMore}>

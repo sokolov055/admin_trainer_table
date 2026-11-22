@@ -45,7 +45,8 @@ export const MAX_FETCH_DAYS = 62;
  * Что загрузить — списком промежутков, каждый не длиннее предела сервера:
  * сам экран и по экрану с каждой стороны — соседи видны, пока сетку тянут
  * пальцем, и после листания приходят уже с занятиями. Месяц — три сетки по
- * шесть недель отдельными запросами, список — кусками по четыре недели.
+ * шесть недель отдельными запросами. Список загружает целые месяцы, чтобы
+ * шапка месяца показывала точное число занятий.
  */
 export function fetchRanges(view, anchor, listDays = 28) {
   if (view === 'month') {
@@ -57,7 +58,11 @@ export function fetchRanges(view, anchor, listDays = 28) {
   const { start, days } = rangeOf(view, anchor);
   if (view === 'list') {
     const out = [];
-    for (let i = 0; i < listDays; i += 28) out.push({ from: addDays(start, i), to: addDays(start, Math.min(listDays, i + 28)) });
+    const end = addDays(start, listDays);
+    for (let from = new Date(start.getFullYear(), start.getMonth(), 1); from < end;
+      from = new Date(from.getFullYear(), from.getMonth() + 1, 1)) {
+      out.push({ from, to: new Date(from.getFullYear(), from.getMonth() + 1, 1) });
+    }
     return out;
   }
   return [{ from: addDays(start, -days), to: addDays(start, days * 2) }];
