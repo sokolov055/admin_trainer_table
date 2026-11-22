@@ -1688,13 +1688,14 @@ function TimeGrid({ start, days, events, scrollKey, pager, draft, draftOpen, day
                       const end = new Date(window.end);
                       const from = begin.getHours() * 60 + begin.getMinutes();
                       const to = window.end === +next ? 1440 : end.getHours() * 60 + end.getMinutes();
+                      const label = 'Свободно ' + dayDuration(window.minutes);
                       return (
                         <div className="cal-free-window" key={window.start}
                           style={{ top: from / 60 * hour, height: Math.max(0, (to - from) / 60 * hour - 2) }}>
                           <button type="button" tabIndex={index === 1 ? undefined : -1}
-                            aria-label={'Свободное окно ' + windowTime(window, d)}
+                            aria-label={label + ' · ' + windowTime(window, d)}
                             onClick={(ev) => { ev.stopPropagation(); openWindow(window); }}>
-                            Свободно {dayDuration(window.minutes)}
+                            {label}
                           </button>
                         </div>
                       );

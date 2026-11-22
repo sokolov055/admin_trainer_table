@@ -308,7 +308,8 @@ test('расписание: календарь, жесты и карточка �
     const summary = page.locator('.cal-day-summary');
     await summary.getByRole('button', { name: 'Ближайшее окно 12:30–14:00' }).waitFor();
     assert.match(await summary.innerText(), /4 занятия · 4 ч 15 мин/);
-    const window = page.getByRole('button', { name: 'Свободное окно 12:30–14:00', exact: true });
+    const window = page.getByRole('button', { name: 'Свободно 1 ч 30 мин · 12:30–14:00', exact: true });
+    assert.equal(await window.innerText(), 'Свободно 1 ч 30 мин');
     await window.tap();
     await quick.getByText(/12:30/).waitFor();
     await quick.getByRole('button', { name: 'Закрыть', exact: true }).click();
