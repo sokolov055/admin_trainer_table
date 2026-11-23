@@ -214,6 +214,9 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const [dropped, setDropped] = useState([]);
   const [added, setAdded] = useState([]); // [{ blob, url }]
   const [saved, setSaved] = useState({ exerciseId: exercise ? exercise.id : 0, uid: machine ? machine.uid : '' });
+  // Запись уже могла пройти, даже если фото не загрузились: при выходе
+  // каталог должен перечитаться и открыть фактически сохранённый UID.
+  const [persisted, setPersisted] = useState(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
   const [asking, setAsking] = useState(false); // «Убрать / Удалить» — вопрос на месте
@@ -223,7 +226,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const snapshot = JSON.stringify([name, setup, meta, originalName, brand, muscleGroups, setupOk, weightStep, kind, setupFields, dropped, added.map(a => a.url)]);
   const initial = useRef(snapshot);
   const dirty = snapshot !== initial.current;
-  const cancel = () => { if (busy) return; if (library && dirty) setLeaving(true); else onDone(null); };
+  const cancel = () => { if (busy) return; if (library && dirty) setLeaving(true); else onDone(library ? persisted : null); };
   useTabLock(library);
   useBackGesture(cancel, library);
   useEffect(() => {
@@ -264,7 +267,8 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         setupMeta: meta,
         ...(dropped.length ? { removePhotoUrls: dropped } : {}),
       });
-      result = exercise ? r.exercise : r.machine;
+      result = exercise ? r.exercise : { ...r.machine, uid: r.uid };
+      setPersisted(result);
       setSaved({ exerciseId: exercise ? r.exercise.id : 0, uid: r.uid });
       setDropped([]);
       // Новые — по одному, по порядку; загруженное уходит из очереди
@@ -309,7 +313,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       {library && <>
         <div className="mlib-etop"><button type="button" disabled={busy} onClick={cancel}>Отмена</button><b>{kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{dirty && <span className="mlib-dirty" aria-label="Есть несохранённые изменения" />}</b><button type="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button></div>
         <input className="mlib-ename" aria-label="Название тренажёра" value={name} maxLength={80} placeholder="Название тренажёра" onChange={e => setName(e.target.value)} />
-        <div className="mlib-pass">{[muscleGroups.join(', ') || 'Мышцы', kind === 'equipment' ? 'Оборудование' : 'Тренажёр', brand || 'Бренд', weightStep ? weightStep + ' кг' : 'Шаг веса'].map((text, i) => <button type="button" key={i} className="mlib-pchip" onClick={() => setPassport(true)}>{text}</button>)}</div>
+        <div className="mlib-pass">{[muscleGroups.join(', ') || 'Мышцы', kind === 'equipment' ? 'Оборудование' : 'Тренажёр', brand || 'Бренд', ...(kind === 'machine' ? [weightStep ? weightStep + ' кг' : 'Шаг веса'] : [])].map((text, i) => <button type="button" key={i} className="mlib-pchip" onClick={() => setPassport(true)}>{text}</button>)}</div>
         <button type="button" className="mlib-model" onClick={() => setPassport(true)}>{originalName || 'Добавить модель'}</button>
       </>}
       {(!library || passport) && <SheetOrInline library={library} onClose={() => setPassport(false)}>
@@ -393,7 +397,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         <span className="field__hint">Что клиент выставляет на тренажёре: сиденье, спинка, высота блока. Цифры у каждого свои — их вписывают в занятии, текстом или числом. Клиент может добавить и свою регулировку — она только у него.</span>
       </fieldset>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      {library && leaving && <Sheet title="Выйти без сохранения?" onClose={() => setLeaving(false)}><p>Изменения карточки ещё не сохранены.</p><button type="button" className="button button--primary button--block" onClick={() => setLeaving(false)}>Продолжить редактирование</button><button type="button" className="button button--ghost button--block" onClick={() => onDone(null)}>Выйти без сохранения</button></Sheet>}
+      {library && leaving && <Sheet title="Выйти без сохранения?" onClose={() => setLeaving(false)}><p>Изменения карточки ещё не сохранены.</p><button type="button" className="button button--primary button--block" onClick={() => setLeaving(false)}>Продолжить редактирование</button><button type="button" className="button button--ghost button--block" onClick={() => onDone(persisted)}>Выйти без сохранения</button></Sheet>}
       {!library && (asking ? (
         <Confirm
           text={question}
