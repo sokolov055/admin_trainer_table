@@ -296,7 +296,18 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.locator('.metrics-chart-options summary').click();
       await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Месяц' }).click();
       await phone.waitForFunction((year) => document.querySelector('.bars__period')?.textContent?.includes(year), selectedYear);
-      assert.ok(await phone.locator('.bars--compact .bars__bar').count() <= 12);
+      const monthBars = await phone.locator('.bars--compact .bars__bar').count();
+      assert.ok(monthBars <= 12);
+      if (monthBars > 8) {
+        await phone.locator('.bars__svg rect[fill="transparent"]').nth(monthBars - 2).click();
+        const axis = await phone.locator('.bars__axis').evaluateAll((nodes) => nodes
+          .map((node) => node.getBoundingClientRect())
+          .sort((a, b) => a.left - b.left)
+          .map((rect) => ({ left: rect.left, right: rect.right })));
+        assert.ok(axis.every((rect, index) => index === 0 || rect.left >= axis[index - 1].right + 4),
+          `подписи не слипаются на ${width} px: ${JSON.stringify(axis)}`);
+      }
+      if (process.env.SHOT_FT818_STAGE2) await phone.locator('.chart-card').screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-year-months-${width}-${colorScheme}.png` });
       await phone.locator('.metrics-chart-options summary').click();
       await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Месяц' }).click();
       await phone.locator('.metrics-period__options summary').click();

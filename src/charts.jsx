@@ -508,6 +508,17 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
     ? bars[active]
     : bars.find((b) => b.key === highlight) || bars[bars.length - 1];
 
+  const compactAxis = new Set();
+  if (compact && bars.length > 8) {
+    const add = (index) => {
+      if ([...compactAxis].every((shown) => Math.abs(shown - index) > 1)) compactAxis.add(index);
+    };
+    add(current.i);
+    add(0);
+    add(bars.length - 1);
+    bars.forEach((_, index) => add(index));
+  }
+
   const ticks = [max, (max + min) / 2, min].filter((v, i, all) => all.indexOf(v) === i);
 
   const pick = (i) => setActive((prev) => (prev === i ? null : i));
@@ -587,7 +598,7 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
           {/* Подписи оси — первый, последний и выбранный период: подпись
               под каждым столбиком на телефоне слиплась бы в кашу */}
           {bars.filter((b, i) => compact
-            ? bars.length <= 8 || i % 2 === 0 || i === bars.length - 1 || b.key === current.key
+            ? bars.length <= 8 || compactAxis.has(i)
             : i === 0 || i === bars.length - 1 || b.key === current.key).map((b) => (
             <text
               key={'l' + b.key}

@@ -84,7 +84,7 @@ vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0]
   createRequire(import.meta.url), module, module.exports,
 );
 
-const { Finance, Clients, Processes, Expenses, Dashboard, resetPeriod, useLeaveGuard } = module.exports;
+const { Finance, Clients, Processes, Expenses, Dashboard, BarChart, resetPeriod, useLeaveGuard } = module.exports;
 
 /* ==========================================================================
  * Инструменты
@@ -109,6 +109,26 @@ function textOf(node) {
 function screenText(tree) {
   return textOf(tree.toJSON()).replace(/\s+/g, ' ');
 }
+
+test('компактная ось с 12 месяцами не подписывает соседние столбики', () => {
+  const points = Array.from({ length: 12 }, (_, index) => ({
+    key: String(index), label: `Месяц ${index + 1}`, short: String(index), value: index + 1,
+  }));
+  let tree;
+  act(() => { tree = renderer.create(React.createElement(BarChart, {
+    points, compact: true, highlight: '11', label: 'Прибыль', format: String,
+  })); });
+  const labels = () => tree.root.findAll((node) => node.type === 'text' && node.props.className?.includes('bars__axis'))
+    .map((node) => Number(textOf(node)));
+  const spaced = (shown) => shown.every((index, pos) => pos === 0 || index - shown[pos - 1] > 1);
+  assert.ok(spaced(labels()), `при последнем выбранном столбике: ${labels()}`);
+  assert.ok(labels().includes(11), 'последний столбик подписан');
+
+  const hits = tree.root.findAll((node) => node.type === 'rect' && node.props.fill === 'transparent');
+  act(() => { hits[10].props.onClick(); });
+  assert.ok(spaced(labels()), `при выборе предпоследнего столбика: ${labels()}`);
+  assert.ok(labels().includes(10), 'выбранный столбик подписан');
+});
 
 /** Кнопка по подписи для экранного диктора или по видимому тексту */
 function button(tree, name) {

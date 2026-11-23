@@ -3,3 +3,4 @@ export { Finance, Clients, Processes, resetPeriod } from '../../src/trainer/Metr
 export { Dashboard } from '../../src/trainer/Dashboard.jsx';
 export { Expenses } from '../../src/trainer/Expenses.jsx';
 export { useLeaveGuard } from '../../src/ui.jsx';
+export { BarChart } from '../../src/charts.jsx';
