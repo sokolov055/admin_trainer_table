@@ -87,16 +87,6 @@ export function thisMonth(now = new Date()) {
  * Выбор общий для всех трёх сторон и переживает переход между ними:
  * переключив на год, человек ждёт года и на соседней вкладке.
  */
-const PERIODS = [
-  { value: 'month', label: 'Месяц' },
-  { value: 'year', label: 'Год' },
-];
-
-const COMPARES = [
-  { value: 'month', label: 'К прошлому месяцу' },
-  { value: 'year', label: 'К году назад' },
-];
-
 let remembered = null;
 
 /** Для проверок: каждый экран в них открывается как в первый раз */
@@ -169,9 +159,20 @@ function rangeOf(state) {
   return { from: new Date(y, m - 1, 1).toISOString(), to: new Date(y, m, 1).toISOString() };
 }
 
-function CompactPeriodBar({ state, update }) {
+export function comparisonLabels(data) {
+  const range = data.year && data.throughMonth > 0 && data.throughMonth < 12
+    ? ' · янв. — ' + SHORT_MONTHS[data.throughMonth - 1] : '';
+  return data.year ? [data.year + range, data.previousYear + range]
+    : [monthLabel(data.month), monthLabel(data.previousMonth)];
+}
+
+function CompactPeriodBar({ state, update, data }) {
+  const [draft, setDraft] = useState(null);
   const isYear = state.period === 'year';
-  const canForward = isYear ? state.year < new Date().getFullYear() : shiftMonth(state.month, 1) <= thisMonth();
+  const currentYear = new Date().getFullYear();
+  const canForward = isYear ? state.year < currentYear : shiftMonth(state.month, 1) <= thisMonth();
+  const labels = data ? comparisonLabels(data) : null;
+  const fallbackPast = isYear ? String(state.year - 1) : monthLabel(shiftMonth(state.month, state.compare === 'year' ? -12 : -1));
   const step = (direction) => {
     if (direction > 0 && !canForward) return;
     update(isYear ? { year: state.year + direction } : { month: shiftMonth(state.month, direction) });
@@ -179,15 +180,27 @@ function CompactPeriodBar({ state, update }) {
   return <div className="metrics-period">
     <div className="metrics-period__line">
       <button type="button" className="icon-button" onClick={() => step(-1)} aria-label={isYear ? 'Предыдущий год' : 'Предыдущий месяц'}><IconBack size={18} /></button>
-      <strong>{isYear ? state.year : monthLabel(state.month)}</strong>
+      <button type="button" className="metrics-period__choose" aria-haspopup="dialog" onClick={() => setDraft({ ...state })}>
+        <strong>{isYear ? state.year : monthLabel(state.month)} <span aria-hidden="true">▾</span></strong>
+        <small>Сравнение · {labels ? labels[1] : fallbackPast}</small>
+      </button>
       <button type="button" className="icon-button monthpick__next" onClick={() => step(1)} disabled={!canForward}
         aria-label={isYear ? 'Следующий год' : 'Следующий месяц'}><IconBack size={18} /></button>
     </div>
-    <details className="metrics-period__options">
-      <summary>{isYear ? 'Год' : 'Месяц'} · {isYear ? 'к прошлому году' : state.compare === 'year' ? 'к году назад' : 'к прошлому месяцу'}<span>Изменить</span></summary>
-      <Segmented items={PERIODS} value={state.period} onChange={(period) => update({ period })} label="Период" />
-      {!isYear && <Segmented items={COMPARES} value={state.compare} onChange={(compare) => update({ compare })} label="Сравнить" />}
-    </details>
+    {draft && <Sheet title="Период и сравнение" onClose={() => setDraft(null)}
+      onDone={() => { update(draft); setDraft(null); }} done="Применить">
+      <div className="metrics-period__form">
+        <label>Показывать<select value={draft.period} onChange={e => setDraft({ ...draft, period: e.target.value })}>
+          <option value="month">Месяц</option><option value="year">Год</option>
+        </select></label>
+        <label>Период{draft.period === 'year'
+          ? <input type="number" min="1" max={currentYear} value={draft.year} onChange={e => setDraft({ ...draft, year: Math.max(1, Math.min(currentYear, Math.trunc(Number(e.target.value)) || currentYear)) })} />
+          : <input type="month" max={thisMonth()} value={draft.month} onChange={e => { if (/^\d{4}-\d{2}$/.test(e.target.value) && e.target.value <= thisMonth()) setDraft({ ...draft, month: e.target.value }); }} />}</label>
+        {draft.period === 'month' && <label>Сравнить<select value={draft.compare} onChange={e => setDraft({ ...draft, compare: e.target.value })}>
+          <option value="month">С прошлым месяцем</option><option value="year">С тем же месяцем прошлого года</option>
+        </select></label>}
+      </div>
+    </Sheet>}
   </div>;
 }
 
@@ -532,7 +545,7 @@ function ReturnClients({ onOpenClient, loading, data, error, reload }) {
  * Финансы
  * ================================================================== */
 
-function FinanceComparison({ spec, values, labels }) {
+function FinanceComparison({ spec, values, labels, controls = null }) {
   const known = values.filter(Number.isFinite);
   const low = Math.min(0, ...known);
   const high = Math.max(0, ...known);
@@ -541,7 +554,8 @@ function FinanceComparison({ spec, values, labels }) {
 
   return (
     <section className="finance-comparison" aria-labelledby="finance-comparison-title" aria-live="polite">
-      <h2 id="finance-comparison-title">{spec.label} · сравнение</h2>
+      <h2 id="finance-comparison-title">{controls ? 'Сравнение' : spec.label + ' · сравнение'}</h2>
+      {controls}
       {values.map((value, index) => (
         <div key={index} className="finance-comparison__row">
           <div className="finance-comparison__label">
@@ -568,7 +582,7 @@ export function Finance({ onExpenses }) {
   const [picked, pick] = useChosen('finance');
   const { loading, data, error, reload } = useMetrics(state);
 
-  const top = <CompactPeriodBar state={state} update={update} />;
+  const top = <CompactPeriodBar state={state} update={update} data={!loading && !error ? data : null} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
@@ -576,12 +590,7 @@ export function Finance({ onExpenses }) {
   const now = data.finance?.now || {};
   const before = data.finance?.before || {};
   const period = describe(data);
-  const yearRange = data.year && data.throughMonth > 0 && data.throughMonth < 12
-    ? ' · янв. — ' + SHORT_MONTHS[data.throughMonth - 1]
-    : '';
-  const labels = data.year
-    ? [data.year + yearRange, data.previousYear + yearRange]
-    : [period.label, monthLabel(data.previousMonth)];
+  const labels = comparisonLabels(data);
   const row = (id, label) => (
     <Metric id={id} spec={FINANCE[id]} now={now} before={before} picked={picked === id} onPick={pick} label={label} />
   );
@@ -644,11 +653,12 @@ export function Clients({ onOpenClient = null }) {
   const [clientMetric, pickClient] = useChosen('clients');
   const [processMetric, pickProcess] = useChosen('process');
   const [historyGroup, setHistoryGroup] = useState('clients');
+  const [comparisonMetric, setComparisonMetric] = useState('active');
   const [signal, setSignal] = useState(null);
   const [showCancellations, setShowCancellations] = useState(false);
   const { loading, data, error, reload } = useMetrics(state);
   const overview = useData('trainer.metrics.overview', {}, []);
-  const top = <CompactPeriodBar state={state} update={update} />;
+  const top = <CompactPeriodBar state={state} update={update} data={!loading && !error ? data : null} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
@@ -691,6 +701,16 @@ export function Clients({ onOpenClient = null }) {
           <span><small>Удержание</small><b>{format(clients.retention, '%')}</b></span>
         </div>
       </Panel>
+
+      <FinanceComparison
+        spec={comparisonMetric === 'trainings' ? PROCESS.trainings : CLIENTS[comparisonMetric]}
+        values={comparisonMetric === 'trainings'
+          ? [data.process?.now?.trainings, data.process?.before?.trainings]
+          : [data.clients?.now?.[comparisonMetric], data.clients?.before?.[comparisonMetric]]}
+        labels={comparisonLabels(data)}
+        controls={<Segmented items={[
+          { value: 'active', label: 'Клиенты' }, { value: 'trainings', label: 'Занятия' }, { value: 'retention', label: 'Удержание' },
+        ]} value={comparisonMetric} onChange={setComparisonMetric} label="Показатель сравнения" />} />
 
       <Section title="Ведение клиентов" note="из занимающихся">
         {!process.trainings && !process.planShare && !process.measuredShare

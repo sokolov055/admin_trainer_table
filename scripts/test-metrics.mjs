@@ -142,6 +142,13 @@ function button(tree, name) {
   return all[0];
 }
 
+function changePeriod(tree, field, value) {
+  act(() => tree.root.findByProps({ className: 'metrics-period__choose' }).props.onClick());
+  const select = tree.root.findAllByType('select')[field === 'period' ? 0 : 1];
+  act(() => select.props.onChange({ target: { value } }));
+  act(() => tree.root.find(n => typeof n.type === 'function' && n.props.title === 'Период и сравнение').props.onDone());
+}
+
 function press(tree, name) {
   const target = button(tree, name);
   act(() => { target.props.onClick(); });
@@ -370,7 +377,7 @@ test('месяц сравнивается с тем же месяцем год �
     ...(params.compare === 'year' ? { compare: 'year', previousMonth: '2025-09' } : {}),
   }));
 
-  press(tree, 'К году назад');
+  changePeriod(tree, 'compare', 'year');
 
   assert.equal(asked[asked.length - 1].params.compare, 'year');
   const text = screenText(tree);
@@ -391,7 +398,7 @@ test('год сравнивается с прошлым, текущий — с �
 
   const { tree, asked } = draw(Finance, (action, params) => (params.year ? year(metrics()) : metrics()));
 
-  press(tree, 'Год');
+  changePeriod(tree, 'period', 'year');
 
   assert.deepEqual(asked[asked.length - 1].params, { year: new Date().getFullYear() });
 
@@ -410,7 +417,7 @@ test('компактный график года запрашивает годы
       : ['2026-09', '2026-10', '2026-11'].map((month) => ({ key: month, finance: { revenue: 100 } })) };
     return params.year ? { year: params.year, previousYear: params.year - 1, throughMonth: 11, ...metrics() } : metrics();
   });
-  press(tree, 'Год');
+  changePeriod(tree, 'period', 'year');
   assert.equal(charted.at(-1).by, 'year');
   const readout = tree.root.find((node) => node.props.className === 'bars__period');
   assert.match(textOf(readout), /^2026/);
@@ -430,7 +437,7 @@ test('выбранный период сохраняется при перехо
     : metrics());
 
   const first = draw(Finance, answer);
-  press(first.tree, 'Год');
+  changePeriod(first.tree, 'period', 'year');
 
   // Второй экран открываем без сброса — как переход по вкладке
   const asked = [];
@@ -1114,4 +1121,32 @@ test('FT-818 v3: клиенты и занятия объединены, разв
   const dialog = tree.root.findByProps({ role: 'dialog' });
   assert.match(textOf(dialog), /Анна Морозова.*заболела/);
   assert.doesNotMatch(textOf(dialog), /Доля отмен|Из них поздних/);
+});
+
+test('FT-818: сравнение клиентов различает ноль и отсутствие, переключает занятия и удержание', () => {
+  const { tree } = draw(Clients, () => metrics({ clients: { active: 0, retention: null }, clientsBefore: { active: 4, retention: 0 }, process: { trainings: 12 }, processBefore: { trainings: 0 } }));
+  const comparison = () => textOf(tree.root.findByProps({ className: 'finance-comparison' }));
+  assert.match(comparison(), /0/);
+  assert.match(comparison(), /4/);
+  press(tree, 'Занятия');
+  assert.match(comparison(), /12/);
+  assert.match(comparison(), /0/);
+  press(tree, 'Удержание');
+  assert.match(comparison(), /Нет данных/);
+  assert.match(comparison(), /0\s?%/);
+});
+
+test('FT-818: закрытие листа не применяет черновик', () => {
+  const { tree, asked } = draw(Finance, () => metrics());
+  act(() => tree.root.findByProps({ className: 'metrics-period__choose' }).props.onClick());
+  act(() => tree.root.findAllByType('select')[0].props.onChange({ target: { value: 'year' } }));
+  assert.equal(asked.at(-1).params.year, undefined);
+  const yearInput = () => tree.root.findAllByType('input').find(n => n.props.type === 'number');
+  act(() => yearInput().props.onChange({ target: { value: '9999' } }));
+  assert.equal(yearInput().props.value, new Date().getFullYear());
+  act(() => yearInput().props.onChange({ target: { value: '2020.5' } }));
+  assert.equal(yearInput().props.value, 2020);
+  act(() => tree.root.find(n => typeof n.type === 'function' && n.props.title === 'Период и сравнение').props.onClose());
+  assert.equal(asked.at(-1).params.year, undefined);
+  assert.equal(button(tree, 'Следующий месяц').props.disabled, true);
 });

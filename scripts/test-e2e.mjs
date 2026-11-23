@@ -294,20 +294,22 @@ test('FT-818: деньги и клиенты — компактные показ
       }
       if (process.env.SHOT_FT818_V3) await content.screenshot({ style: '.tabbar { visibility: hidden }', path: `${process.env.SHOT_FT818_V3}-${width}-${colorScheme}-money.png` });
       assert.equal(await phone.getByText('Сверка денег').count(), 0, 'выключенная Google-таблица не показывается в сводке');
-      await phone.locator('.metrics-period__options summary').click();
-      await phone.getByRole('radio', { name: 'К году назад' }).waitFor();
-      await phone.locator('.metrics-period__options summary').click();
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('select').last().waitFor();
+      await phone.getByRole('button', { name: 'Закрыть', exact: true }).click();
       assert.match(await phone.locator('.metrics-tiles').innerText(), /Выручка[\s\S]*за проведённое[\s\S]*Касса[\s\S]*Предоплаты/);
       const comparison = content.locator('.finance-comparison');
       assert.match(await comparison.innerText(), /Выручка · сравнение/);
       assert.equal(await comparison.locator('.finance-comparison__row').count(), 2);
       const previous = comparison.locator('.finance-comparison__row').last();
       const previousMonth = await previous.locator('.finance-comparison__label span').innerText();
-      await phone.locator('.metrics-period__options summary').click();
-      await phone.getByRole('radio', { name: 'К году назад' }).tap();
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('select').last().selectOption('year');
+      await phone.getByRole('button', { name: 'Применить', exact: true }).click();
       await phone.waitForFunction(month => document.querySelector('.finance-comparison__row:last-child .finance-comparison__label span')?.textContent !== month, previousMonth);
-      await phone.getByRole('radio', { name: 'К прошлому месяцу' }).tap();
-      await phone.locator('.metrics-period__options summary').click();
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('select').last().selectOption('month');
+      await phone.getByRole('button', { name: 'Применить', exact: true }).click();
       await content.locator('.metrics-tile').filter({ hasText: 'Расходы' }).tap();
       assert.match(await comparison.innerText(), /Расходы · сравнение/);
       assert.equal(await content.locator('.metrics-tile--picked').getAttribute('aria-pressed'), 'true');
@@ -321,9 +323,11 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Год' }).click();
       await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Месяц' }).click();
       await phone.locator('.metrics-chart-options summary').click();
-      await phone.locator('.metrics-period__options summary').click();
-      await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Год', exact: true }).click();
-      const selectedYear = await phone.locator('.metrics-period__line strong').innerText();
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('select').first().selectOption('year');
+      await phone.getByRole('button', { name: 'Применить', exact: true }).click();
+      await phone.getByRole('button', { name: 'Предыдущий год' }).waitFor();
+      const selectedYear = (await phone.locator('.metrics-period__line strong').innerText()).replace(' ▾', '').trim();
       try {
         await phone.waitForFunction((year) => document.querySelector('.bars__period')?.textContent?.startsWith(year), selectedYear, { timeout: 10000 });
       } catch (error) {
@@ -346,13 +350,29 @@ test('FT-818: деньги и клиенты — компактные показ
           `подписи не слипаются на ${width} px: ${JSON.stringify(axis)}`);
       }
       await phone.locator('.metrics-chart-options summary').click();
-      await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Месяц' }).click();
-      await phone.locator('.metrics-period__options summary').click();
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('select').first().selectOption('month');
+      await phone.getByRole('button', { name: 'Применить', exact: true }).click();
       await phone.getByText('Отработать это займёт').waitFor();
 
       await nav.getByRole('tab', { name: 'Клиенты' }).tap();
       await phone.getByText('Удержание', { exact: true }).first().waitFor();
       if (process.env.SHOT_FT818_V3) await content.screenshot({ style: '.tabbar { visibility: hidden }', path: `${process.env.SHOT_FT818_V3}-${width}-${colorScheme}-clients.png` });
+      const clientComparison = content.locator('.finance-comparison');
+      for (const name of ['Занятия', 'Удержание', 'Клиенты']) {
+        await clientComparison.getByRole('radio', { name, exact: true }).tap();
+        assert.equal(await clientComparison.locator('.finance-comparison__row').count(), 2);
+      }
+      const fullLabel = clientComparison.getByRole('radio', { name: 'Удержание', exact: true });
+      assert.ok(await fullLabel.evaluate(n => n.scrollWidth <= n.clientWidth), 'Удержание не сокращается');
+      const applied = await phone.locator('.metrics-period__choose').innerText();
+      await phone.locator('.metrics-period__choose').tap();
+      await phone.getByRole('dialog').locator('select').first().selectOption('year');
+      if (process.env.SHOT_FT818_V3) await phone.screenshot({ animations: 'disabled', path: `${process.env.SHOT_FT818_V3}-${width}-${colorScheme}-sheet.png` });
+      await phone.keyboard.press('Escape');
+      await phone.getByRole('dialog').waitFor({ state: 'detached' });
+      assert.equal(await phone.locator('.metrics-period__choose').innerText(), applied);
+      assert.ok(await phone.locator('.metrics-period__choose').evaluate(n => n === document.activeElement), 'фокус возвращается к выбору периода');
       await phone.locator('.summary-history > summary').click();
       await phone.getByText('По рекомендации', { exact: true }).waitFor();
       const dimensions = await phone.locator('main.app__body:not([hidden])').evaluate((node) => [node.clientWidth, node.scrollWidth]);
@@ -392,8 +412,10 @@ test('FT-818: клиенты и занятия — отмены, ведение 
       await phone.getByRole('button', { name: 'Предыдущий месяц' }).tap();
       assert.equal(await phone.locator('button.summary-care').count(), 0);
       assert.equal(await phone.getByRole('heading', { name: 'Кого вернуть' }).count(), 0);
-      await phone.locator('.metrics-period__options summary').click();
-      await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Год', exact: true }).click();
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('select').first().selectOption('year');
+      await phone.getByRole('button', { name: 'Применить', exact: true }).click();
+      await phone.getByRole('button', { name: 'Предыдущий год' }).waitFor();
       await phone.getByRole('heading', { name: 'Ведение клиентов' }).waitFor();
       const dimensions = await phone.locator('main.app__body:not([hidden])').evaluate(n => [n.clientWidth, n.scrollWidth]);
       assert.deepEqual(dimensions, [width, width]);
