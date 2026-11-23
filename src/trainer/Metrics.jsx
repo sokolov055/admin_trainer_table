@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import {
@@ -462,14 +462,40 @@ function highlightFor(state, by) {
  * всю историю по кварталам — обычное желание.
  */
 function MetricChart({ group, id, spec, state, compact = false }) {
-  const [by, setBy] = useState(compact ? 'month' : grainRemembered);
-  const { loading, data, error, reload } = useData('trainer.metrics.series', { by }, [by]);
+  const defaultBy = state.period === 'year' ? 'year' : 'month';
+  const [grain, setGrain] = useState({ period: state.period, by: compact ? defaultBy : grainRemembered });
+  const by = compact && grain.period !== state.period ? defaultBy : grain.by;
+
+  useEffect(() => {
+    if (compact && grain.period !== state.period) setGrain({ period: state.period, by: defaultBy });
+  }, [compact, defaultBy, grain.period, state.period]);
 
   const changeBy = (next) => {
     grainRemembered = next;
-    setBy(next);
+    setGrain({ period: state.period, by: next });
     haptic();
   };
+
+  return (
+    <Panel pad className="chart-card">
+      <div className="chart-card__head">
+        <h2 className="chart-card__title">{spec.label}</h2>
+      </div>
+      {!compact && <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />}
+      <div className={compact ? 'metrics-chart__plot' : undefined} style={compact ? undefined : { marginTop: 'var(--space-3)' }}>
+        <MetricChartData key={by} group={group} id={id} spec={spec} state={state} compact={compact} by={by} />
+      </div>
+      {compact && <details className="metrics-chart-options"><summary>Разбивка: {GRAINS.find((grain) => grain.value === by)?.label}</summary>
+        <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />
+      </details>}
+    </Panel>
+  );
+}
+
+function MetricChartData({ group, id, spec, state, compact, by }) {
+  // Смена разбивки создаёт новый загрузчик: поздний ответ старой разбивки
+  // не должен перезаписать данные выбранного периода.
+  const { loading, data, error, reload } = useData('trainer.metrics.series', { by }, [by]);
 
   let chart;
   if (loading) chart = <Loading rows={2} />;
@@ -481,10 +507,14 @@ function MetricChart({ group, id, spec, state, compact = false }) {
       value: p[group] ? p[group][id] : null,
       partial: p.partial,
     }));
-    const selectedIndex = compact && by === 'month' && state.period === 'month'
-      ? allPoints.findIndex((point) => point.key === state.month) : -1;
+    const selectedKey = compact ? highlightFor(state, by) : null;
+    const selectedIndex = selectedKey ? allPoints.findIndex((point) => point.key === selectedKey) : -1;
     const points = compact
-      ? allPoints.slice(Math.max(0, (selectedIndex < 0 ? allPoints.length : selectedIndex + 1) - 8), selectedIndex < 0 ? undefined : selectedIndex + 1)
+      ? state.period === 'year' && by !== 'year'
+        ? allPoints.filter((point) => point.key.startsWith(`${state.year}-`))
+        : state.period === 'year' && selectedIndex < 0
+          ? []
+          : allPoints.slice(Math.max(0, (selectedIndex < 0 ? allPoints.length : selectedIndex + 1) - 8), selectedIndex < 0 ? undefined : selectedIndex + 1)
       : allPoints;
     if (compact && by === 'month') points.forEach((point) => { point.short = SHORT_MONTHS[Number(point.key.slice(5, 7)) - 1] || point.short; });
 
@@ -508,18 +538,7 @@ function MetricChart({ group, id, spec, state, compact = false }) {
     );
   }
 
-  return (
-    <Panel pad className="chart-card">
-      <div className="chart-card__head">
-        <h2 className="chart-card__title">{spec.label}</h2>
-      </div>
-      {!compact && <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />}
-      <div className={compact ? 'metrics-chart__plot' : undefined} style={compact ? undefined : { marginTop: 'var(--space-3)' }}>{chart}</div>
-      {compact && <details className="metrics-chart-options"><summary>Разбивка: {GRAINS.find((grain) => grain.value === by)?.label}</summary>
-        <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />
-      </details>}
-    </Panel>
-  );
+  return chart;
 }
 
 function SummaryTiles({ items, picked, onPick }) {
@@ -663,7 +682,7 @@ export function Clients({ onOpenClient = null }) {
       <Lead
         label={'Клиентов · ' + period.label}
         value={formatNumber(now.active || 0, 0)}
-        hint={`${formatNumber(now.newClients || 0, 0)} новых · ${formatNumber(now.lost || 0, 0)} ушли · ${formatNumber(now.renewals || 0, 0)} продлили`}
+        hint={`${formatNumber(now.newClients || 0, 0)} ${plural(now.newClients || 0, 'новый', 'новых', 'новых')} · ${formatNumber(now.lost || 0, 0)} ${plural(now.lost || 0, 'ушёл', 'ушли', 'ушли')} · ${formatNumber(now.renewals || 0, 0)} ${plural(now.renewals || 0, 'продлил', 'продлили', 'продлили')}`}
       />
 
       <Section title="Удержание" note={target ? 'цель ' + formatNumber(target) + '%' : undefined}>

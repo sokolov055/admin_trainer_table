@@ -283,6 +283,23 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Год' }).click();
       await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Месяц' }).click();
       await phone.locator('.metrics-chart-options summary').click();
+      await phone.locator('.metrics-period__options summary').click();
+      await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Год', exact: true }).click();
+      const selectedYear = await phone.locator('.metrics-period__line strong').innerText();
+      try {
+        await phone.waitForFunction((year) => document.querySelector('.bars__period')?.textContent?.startsWith(year), selectedYear, { timeout: 10000 });
+      } catch (error) {
+        const chart = await phone.locator('.chart-card').innerText();
+        throw new Error(`Год ${selectedYear}, график: ${chart.slice(0, 400)}; ${error.message}`);
+      }
+      assert.equal(await phone.locator('.bars__axis--current').textContent(), selectedYear);
+      await phone.locator('.metrics-chart-options summary').click();
+      await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Месяц' }).click();
+      await phone.waitForFunction((year) => document.querySelector('.bars__period')?.textContent?.includes(year), selectedYear);
+      assert.ok(await phone.locator('.bars--compact .bars__bar').count() <= 12);
+      await phone.locator('.metrics-chart-options summary').click();
+      await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Месяц' }).click();
+      await phone.locator('.metrics-period__options summary').click();
       if (process.env.SHOT_FT818_STAGE2) await phone.locator('.chart-card').screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-money-chart-${width}-${colorScheme}.png` });
       await phone.locator('.metrics-more').first().locator('summary').click();
       await phone.getByText('Отработать это займёт').waitFor();

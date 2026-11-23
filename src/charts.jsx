@@ -586,7 +586,9 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
 
           {/* Подписи оси — первый, последний и выбранный период: подпись
               под каждым столбиком на телефоне слиплась бы в кашу */}
-          {bars.filter((b, i) => compact || i === 0 || i === bars.length - 1 || b.key === current.key).map((b) => (
+          {bars.filter((b, i) => compact
+            ? bars.length <= 8 || i % 2 === 0 || i === bars.length - 1 || b.key === current.key
+            : i === 0 || i === bars.length - 1 || b.key === current.key).map((b) => (
             <text
               key={'l' + b.key}
               x={compact ? b.x + barW / 2 : Math.min(Math.max(b.x + barW / 2, pad.left + 16), width - pad.right - 16)}

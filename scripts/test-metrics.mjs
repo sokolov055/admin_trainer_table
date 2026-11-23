@@ -196,8 +196,6 @@ function draw(Screen, answer, { onMutate, props } = {}) {
           reload() {},
         };
       }
-      // Сверка денег (LedgerCheck) о периоде не спрашивает — не считаем
-      if (action === 'trainer.ledger') return { loading: false, data: null, error: null, reload() {} };
       // Журнал обучения — свой запрос по месяцу
       if (action === 'trainer.learning.list') {
         const data = answer(action, params);
@@ -370,6 +368,27 @@ test('год сравнивается с прошлым, текущий — с �
   assert.match(text, /изменение к 2025 году \(январь — сентябрь\)/);
   assert.match(text, /Касса за год/);
   assert.doesNotMatch(text, /К году назад/, 'у года способ сравнения один');
+});
+
+test('компактный график года запрашивает годы и выделяет выбранный год', () => {
+  const { tree, charted } = draw(Finance, (action, params) => {
+    if (action === 'trainer.metrics.series') return { by: params.by, points: params.by === 'year'
+      ? [2024, 2025, 2026].map((year) => ({ key: String(year), label: String(year), finance: { profit: year * 100 }, partial: year === 2026 }))
+      : ['2026-09', '2026-10', '2026-11'].map((month) => ({ key: month, finance: { profit: 100 } })) };
+    return params.year ? { year: params.year, previousYear: params.year - 1, throughMonth: 11, ...metrics() } : metrics();
+  });
+  press(tree, 'Год');
+  assert.equal(charted.at(-1).by, 'year');
+  const readout = tree.root.find((node) => node.props.className === 'bars__period');
+  assert.match(textOf(readout), /^2026/);
+  const bars = tree.root.findAll((node) => node.type === 'path' && node.props.className?.includes('bars__bar'));
+  assert.equal(bars.length, 3);
+  assert.equal(bars.filter((node) => node.props.className.includes('bars__bar--current')).length, 1);
+  press(tree, 'Предыдущий год');
+  assert.equal(charted.at(-1).by, 'year');
+  assert.match(textOf(tree.root.find((node) => node.props.className === 'bars__period')), /^2025/);
+  assert.equal(tree.root.findAll((node) => node.type === 'path' && node.props.className?.includes('bars__bar')).length, 2,
+    'будущий год не попадает в историю выбранного года');
 });
 
 test('выбранный период сохраняется при переходе на процессы', () => {
@@ -734,9 +753,18 @@ test('клиенты: удержание словами, новые и ушед�
   assert.match(text, /Клиентов · Сентябрь 2026/);
   assert.match(text, /Удержание 86,7%/);
   assert.match(text, /13 из 15 занимавшихся в прошлом месяце вернулись/);
-  assert.match(text, /2 новых · 1 ушли · 9 продлили/);
+  assert.match(text, /2 новых · 1 ушёл · 9 продлили/);
   assert.match(text, /Пришли впервые/);
   assert.match(text, /Продлений/);
+});
+
+test('подсказка клиентов склоняет 1 и 21 без ошибки', () => {
+  for (const count of [1, 21]) {
+    const { tree } = draw(Clients, () => metrics({ clients: {
+      active: count, newClients: count, lost: count, renewals: count,
+    } }));
+    assert.match(screenText(tree), new RegExp(`${count} новый · ${count} ушёл · ${count} продлил`));
+  }
 });
 
 test('клиенты без прошлого периода не делят на ноль', () => {
