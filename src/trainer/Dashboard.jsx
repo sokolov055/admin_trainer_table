@@ -56,7 +56,7 @@ const SIDES = {
   finance: { label: 'Деньги', pane: 'finance' },
   clients: { label: 'Клиенты', pane: 'clients' },
   marketing: { label: 'Маркетинг', pane: 'clients' },
-  process: { label: 'Процессы', pane: 'processes' },
+  process: { label: 'Занятия', pane: 'processes' },
   development: { label: 'Развитие', pane: 'processes' },
 };
 

@@ -336,6 +336,38 @@ test('FT-818: деньги и клиенты — компактные показ
   }
 });
 
+test('FT-818: занятия — отмены, ведение и обучение на узком экране', async () => {
+  for (const width of [320, 390]) for (const colorScheme of ['light', 'dark']) {
+    const context = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ru-RU', colorScheme, reducedMotion: 'reduce', hasTouch: true });
+    const phone = await context.newPage();
+    const errors = [];
+    phone.on('pageerror', e => errors.push(e.message));
+    try {
+      await phone.addInitScript(scheme => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('app_theme_v1', scheme); }, colorScheme);
+      await phone.goto(origin + '/?mockRole=trainer');
+      await phone.getByRole('button', { name: 'Сводка', exact: true }).click();
+      await phone.locator('.chips--nav .chip').filter({ hasText: 'Занятия' }).click();
+      await phone.getByRole('heading', { name: 'Как ведём клиентов' }).waitFor();
+      if (process.env.SHOT_FT818_STAGE3) await phone.screenshot({ path: `${process.env.SHOT_FT818_STAGE3}-${width}-${colorScheme}.png`, fullPage: true });
+      await phone.locator('.metrics-cancellations summary').click();
+      await phone.getByRole('heading', { name: 'Кто отменяет' }).waitFor();
+      await phone.getByRole('button', { name: 'Записать', exact: true }).click();
+      const dialog = phone.getByRole('dialog', { name: 'Записать обучение' });
+      await dialog.waitFor();
+      await dialog.getByLabel('Часов', { exact: true }).fill('1,5');
+      await dialog.getByLabel('Что это было').fill('Проверка обучения');
+      await dialog.getByRole('button', { name: 'Записать', exact: true }).click();
+      await dialog.waitFor({ state: 'hidden' });
+      await phone.locator('.metrics-period__options summary').click();
+      await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Год', exact: true }).click();
+      await phone.getByRole('heading', { name: 'Как ведём клиентов' }).waitFor();
+      const dimensions = await phone.locator('main.app__body:not([hidden])').evaluate(n => [n.clientWidth, n.scrollWidth]);
+      assert.deepEqual(dimensions, [width, width]);
+      assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+  }
+});
+
 before(async () => {
   execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', 'dist-demo'], {
     cwd: ROOT,

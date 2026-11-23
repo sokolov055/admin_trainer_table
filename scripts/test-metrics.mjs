@@ -1091,7 +1091,7 @@ test('процессы: развитие — часы из журнала, за�
   });
   const text = screenText(tree);
 
-  assert.match(text, /Развитие/);
+  assert.match(text, /Моё развитие/);
   assert.match(text, /Часов обучения 4,5 ч/);
   assert.match(text, /Своих тренировок 9/);
   assert.match(text, /12\.09 · Семинар 1,5 ч/);
@@ -1113,4 +1113,17 @@ test('процессы: развитие — часы из журнала, за�
   await act(async () => { await Promise.resolve(); });
   assert.equal(sent[1].action, 'trainer.learning.delete');
   assert.equal(sent[1].params.id, 7);
+});
+
+
+test('FT-818: занятия сохраняют компактный порядок и раскрываемую историю', () => {
+  const { tree } = draw(Processes, action => action === 'trainer.schedule.stats' ? STATS : metrics({ process: { trainings: 41, cancels: 6, moves: 6, cancelShare: 12.7, planShare: 90, measuredShare: 60 } }));
+  const text = screenText(tree);
+  assert.ok(text.indexOf('Как ведём клиентов') < text.indexOf('Срывы'));
+  assert.ok(text.indexOf('Срывы') < text.indexOf('Моё развитие'));
+  assert.ok(text.indexOf('Моё развитие') < text.indexOf('Все показатели и история'));
+  const details = tree.root.findAllByType('details');
+  assert.ok(details.some(n => textOf(n.props.children).includes('Кто отменял')));
+  assert.ok(details.some(n => textOf(n.props.children).includes('Все показатели и история')));
+  assert.doesNotMatch(text, /NaN|undefined|Infinity/);
 });

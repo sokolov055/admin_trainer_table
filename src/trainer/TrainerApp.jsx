@@ -128,7 +128,7 @@ const DASH_PANES = [
   // на одно и то же (аудит 24.10.2026)
   { value: 'finance', label: 'Деньги' },
   { value: 'clients', label: 'Клиенты' },
-  { value: 'processes', label: 'Процессы' },
+  { value: 'processes', label: 'Занятия' },
 ];
 
 /**

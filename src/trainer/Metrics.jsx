@@ -748,12 +748,7 @@ export function Processes() {
   const [picked, pick] = useChosen('process');
   const { loading, data, error, reload } = useMetrics(state);
 
-  const top = (
-    <>
-      <PeriodBar state={state} update={update} />
-      <MetricChart group="process" id={picked} spec={PROCESS[picked]} state={state} />
-    </>
-  );
+  const top = <CompactPeriodBar state={state} update={update} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
@@ -778,71 +773,39 @@ export function Processes() {
             ? 'по ' + formatNumber(now.perClient, 1) + ' на клиента'
             : 'занятий за этот период ещё не было'
         }
-        facts={[
-          { label: 'Клиентов в работе', value: formatNumber(now.activeClients, 0) },
-          { label: 'Молчат месяц', value: formatNumber(now.silentClients, 0) },
-        ]}
+
       />
 
-      <Section title="Работа" note={'рядом — изменение к ' + period.against}>
-        <Panel>
-          <Rows>
-            {row('activeClients')}
-            {row('trainings')}
-            {row('perClient')}
-          </Rows>
-        </Panel>
+      <Section title="Как ведём клиентов" note="среди занимающихся за выбранный период">
+        <Panel><Rows>
+          <Metric id="planShare" spec={PROCESS.planShare} now={now} before={before} label="С программой" />
+          <Metric id="measuredShare" spec={PROCESS.measuredShare} now={now} before={before} label="С замером" />
+        </Rows></Panel>
       </Section>
 
-      {/* Две проверки того, что работу ведут, а не просто ходят: замер и
-          программа. И то и другое делает тренер, и по этим долям видно,
-          до кого руки не дошли. */}
-      <Section title="Ведение">
-        <Panel>
-          <Rows>
-            {row('measuredClients')}
-            {row('measuredShare')}
-            {row('withPlan')}
-            {row('planShare')}
-          </Rows>
-        </Panel>
-      </Section>
-
-      {knowsCancels && (
-        <Section title="Срывы" note="отмены и переносы занятий этого периода">
-          <Panel>
-            <Rows>
-              {row('cancels')}
-              {row('cancelsLate')}
-              {row('moves')}
-              {row('cancelShare')}
-            </Rows>
-          </Panel>
-        </Section>
-      )}
-
-      <Section title="Кому позвонить" note="месяц без занятий — это ещё не уход, но уже повод">
-        <Panel>
-          <Rows>
-            {row('silentClients')}
-          </Rows>
-        </Panel>
-      </Section>
-
-      <p className="small muted metrics__foot">
-        {now.silentClients > 0
-          ? 'Молчащие — те, у кого за последние тридцать дней нет ни одного проведённого занятия. Считается от сегодняшнего дня, а не от выбранного месяца. Имена — в «Обзоре».'
-          : 'Все, кто в работе, за последний месяц приходили хотя бы раз.'}
-      </p>
-
-      {/* Кто именно отменяет и переносит — тот же период, что и сверху.
-          Раньше это была отдельная вкладка «Занятия» со своим выбором
-          месяца: два разных «этот месяц» на одном экране путали. */}
-      <ScheduleStats range={rangeOf(state)} />
+      {knowsCancels && <Section title="Срывы">
+        <SummaryTiles picked={picked} onPick={pick} items={[
+          { id: 'cancels', label: 'Отмены', value: formatNumber(now.cancels, 0), note: now.cancelShare == null ? 'нет доли за период' : 'доля ' + formatNumber(now.cancelShare, 1) + '%', static: true },
+          { id: 'moves', label: 'Переносы', value: formatNumber(now.moves, 0), static: true },
+        ]} />
+        <details className="metrics-more metrics-cancellations">
+          <summary>Кто отменял</summary>
+          <Panel><Rows>{row('cancels')}{row('cancelsLate')}{row('moves')}{row('cancelShare')}</Rows></Panel>
+          <ScheduleStats range={rangeOf(state)} />
+        </details>
+      </Section>}
+      {!knowsCancels && <ScheduleStats range={rangeOf(state)} />}
 
       {data.development && data.development.now && (
-        <Development state={state} now={data.development.now} before={data.development.before} />
+        <Development state={state} now={data.development.now} before={data.development.before} onChanged={reload} />
       )}
+      <details className="metrics-more metrics-process-details">
+        <summary>Все показатели и история</summary>
+        <MetricChart group="process" id={picked} spec={PROCESS[picked]} state={state} compact />
+        <Panel><Rows>{Object.keys(PROCESS).filter(id => knowsCancels || !['cancels', 'cancelsLate', 'moves', 'cancelShare'].includes(id)).map(id => <React.Fragment key={id}>{row(id)}</React.Fragment>)}</Rows></Panel>
+        <p className="small muted">Не приходили месяц — за последние 30 дней на сегодня. Имена и переходы к замерам и программам — в «Обзоре».</p>
+      </details>
+
     </>
   );
 }
@@ -889,9 +852,10 @@ function LearningSheet({ onClose, onSaved }) {
   );
 }
 
-function Development({ state, now, before }) {
+function Development({ state, now, before, onChanged }) {
   const [adding, setAdding] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [problem, setProblem] = useState('');
   const month = state.period === 'year' ? null : state.month;
   const { data, reload } = useData('trainer.learning.list', { month: month || thisMonth() }, [month, revision]);
 
@@ -899,8 +863,11 @@ function Development({ state, now, before }) {
     try {
       await apiMutate('trainer.learning.delete', { id });
       haptic();
+      setProblem('');
       setRevision((v) => v + 1);
-    } catch (_) {
+      onChanged();
+    } catch (err) {
+      setProblem(err.message || 'Не получилось удалить запись. Попробуйте ещё раз.');
       reload();
     }
   };
@@ -911,8 +878,8 @@ function Development({ state, now, before }) {
   return (
     <>
       <Section
-        title="Развитие"
-        note="часы обучения — из журнала, свои тренировки — с вашей карточки"
+        title="Моё развитие"
+        note="за выбранный период"
         action={(
           <button type="button" className="button button--ghost button--small" onClick={() => { setAdding(true); haptic(); }}>
             Записать
@@ -922,10 +889,11 @@ function Development({ state, now, before }) {
         <Panel>
           <Rows>
             {row('learningHours')}
-            {row('learningEntries')}
             {row('ownWorkouts')}
+            <details className="metrics-more"><summary>Журнал обучения</summary>{row('learningEntries')}</details>
           </Rows>
         </Panel>
+        {problem && <p className="form__error" role="alert">{problem}</p>}
         {entries.length > 0 && (
           <Panel className="learning">
             <Rows>
@@ -946,7 +914,7 @@ function Development({ state, now, before }) {
           </Panel>
         )}
       </Section>
-      {adding && <LearningSheet onClose={() => setAdding(false)} onSaved={() => setRevision((v) => v + 1)} />}
+      {adding && <LearningSheet onClose={() => setAdding(false)} onSaved={() => { setRevision((v) => v + 1); onChanged(); }} />}
     </>
   );
 }
