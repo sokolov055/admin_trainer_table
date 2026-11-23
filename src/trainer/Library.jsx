@@ -1,3 +1,4 @@
+import MachineView from './MachineView.jsx';
 import MachineList from './MachineList.jsx';
 import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
 import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf, planText } from '../exercise-track.js';
@@ -1222,20 +1223,20 @@ function Machines() {
   const { loading, data, error, reload } = useData('library.machines', {}, []);
   const [open, setOpen] = useState('');
   const [form, setForm] = useState(null);
-  const [exerciseQ, setExerciseQ] = useState('');
   const [busyExercise, setBusyExercise] = useState(0);
   const [failure, setFailure] = useState(null);
 
   useBackGesture(() => setForm(null), !!form);
-  useBackGesture(() => { setOpen(''); setExerciseQ(''); setFailure(null); }, !form && !!open);
+  useBackGesture(() => { setOpen(''); setFailure(null); }, !form && !!open);
   useReturnScroll(!!(open || form));
+
+  const del = usePendingDelete((m) => apiMutate('library.machine.delete', { uid: m.uid }), { onDone: reload, onError: setFailure });
 
   if (loading) return <Loading lead={false} rows={5} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
-  const list = data.machines || [];
+  const list = (data.machines || []).filter((m) => !del.hidden(m.uid));
   const exercises = data.exercises || [];
-  const keyOf = (value) => String(value || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
   const machine = open ? list.find((item) => item.uid === open) : null;
 
   if (form) {
@@ -1256,10 +1257,6 @@ function Machines() {
 
   if (machine) {
     const attached = new Set(machine.uses.map((exercise) => exercise.id));
-    const nq = keyOf(exerciseQ);
-    const choices = exercises
-      .filter((exercise) => !nq || keyOf(exercise.name).includes(nq) || keyOf(exercise.muscle).includes(nq))
-      .sort((a, b) => Number(attached.has(b.id)) - Number(attached.has(a.id)) || a.name.localeCompare(b.name, 'ru'));
     const toggle = async (exercise) => {
       setBusyExercise(exercise.id);
       setFailure(null);
@@ -1277,54 +1274,13 @@ function Machines() {
       }
     };
 
-    return (
-      <>
-        <Back onClick={() => { setOpen(''); setExerciseQ(''); setFailure(null); }}>Тренажёры</Back>
-        <div className="item__top">
-          <div>
-            <h2 className="library__title">{machine.name}</h2>
-            <p className="library__sub">{machine.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{machine.photos.length > 1 ? ' · ' + machine.photos.length + ' фото' : ''}</p>
-          </div>
-          {machine.mine && <Tag tone="good">своё</Tag>}
-        </div>
-        {machine.originalName && <p className="small">Модель: {machine.originalName}</p>}
-        {machine.brand && <p className="small">Производитель: {machine.brand}</p>}
-        {machine.weightStep > 0 && <p className="small">Шаг веса: {String(machine.weightStep).replace('.', ',')} кг</p>}
-        {machine.muscleGroups?.length > 0 && <p className="small">Мышцы: {machine.muscleGroups.join(', ')}</p>}
-        <MachinePhoto machine={machine} />
-        {machine.setup
-          ? <><h4 className="setup__title">{machine.kind === 'equipment' ? 'Как использовать' : 'Где регулировки'}</h4><SetupText text={machine.setup} /></>
-          : <p className="small muted">Описание не добавлено.</p>}
-        <button type="button" className="button button--ghost" onClick={() => { setForm({ machine }); haptic(); }}>Изменить карточку</button>
-
-        <h4 className="setup__title">Упражнения</h4>
-        <p className="small muted">Отметьте все упражнения, где нужен этот предмет. Для жима лёжа можно выбрать и скамью, и гриф отдельными карточками.</p>
-        <Search value={exerciseQ} onChange={setExerciseQ} placeholder="Поиск упражнения" />
-        {choices.slice(0, 100).map((exercise) => {
-          const checked = attached.has(exercise.id);
-          return (
-            <button
-              type="button"
-              key={exercise.id}
-              className="item"
-              aria-pressed={checked}
-              disabled={!!busyExercise}
-              onClick={() => toggle(exercise)}
-            >
-              <div className="item__top">
-                <span className="item__name">{exercise.name}</span>
-                {checked && <Tag tone="good">привязано</Tag>}
-              </div>
-              {exercise.muscle && <div className="item__meta"><span>{exercise.muscle}</span></div>}
-            </button>
-          );
-        })}
-        {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      </>
-    );
+    return <>{del.bar}<MachineView key={machine.uid} machine={machine} owner={!!data.owner} exercises={exercises}
+      onBack={() => { setOpen(''); setFailure(null); }} onEdit={() => setForm({ machine })}
+      onDelete={() => { del.remove(machine.uid, machine, 'Карточка удалена'); setOpen(''); }}
+      onToggle={toggle} busy={busyExercise} failure={failure} /></>;
   }
 
-  return <MachineList state={listState} setState={setListState} list={list} onOpen={setOpen} onCreate={(kind) => setForm({ machine: null, kind })} />;
+  return <>{del.bar}{failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}<MachineList state={listState} setState={setListState} list={list} onOpen={setOpen} onCreate={(kind) => setForm({ machine: null, kind })} /></>;
 }
 
 /**

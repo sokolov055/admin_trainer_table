@@ -4,7 +4,17 @@ import { IconSearch, IconClose, IconPlus, IconSliders, IconBench, IconDumbbell, 
 import { muscleTone, muscleClass } from '../data-tones.js';
 import { haptic } from '../telegram.js';
 import { NO_MACHINE_FILTERS, machineFilterCount, shownMachines } from './machine-list-model.js';
+import { mediaUrl } from '../library.js';
 import './machines-lib.css';
+
+/** Фото целиком; значок остаётся запасным вариантом без фото или при ошибке. */
+function MachineCover({ photo, kind }) {
+  const [failed, setFailed] = useState(false);
+  const hasPhoto = !!photo && !failed;
+  return <span className={'mlib-cover' + (hasPhoto ? ' mlib-cover--photo' : '')} aria-hidden="true">
+    {hasPhoto ? <img src={mediaUrl(photo)} alt="" loading="lazy" draggable="false" onError={() => setFailed(true)} /> : kind === 'equipment' ? <IconDumbbell size={28} /> : <IconBench size={28} />}
+  </span>;
+}
 
 const KINDS = [{ value: '', label: 'Все' }, { value: 'machine', label: 'Тренажёры' }, { value: 'equipment', label: 'Оборудование' }];
 function Tiles({ label, values, value, onChange, cols = 3 }) {
@@ -45,7 +55,7 @@ export default function MachineList({ list, onOpen, onCreate, state, setState })
     {shown.map((m) => {
       const tone = muscleClass(muscleTone({ group: (m.muscleGroups || [])[0] }));
       return <button type="button" key={m.uid} className={'mlib-card ' + tone} onClick={() => { onOpen(m.uid); haptic(); }}>
-        <span className="mlib-cover" aria-hidden="true">{m.kind === 'equipment' ? <IconDumbbell size={28} /> : <IconBench size={28} />}</span>
+        <MachineCover key={m.photos?.[0] || m.photo || ''} photo={m.photos?.[0] || m.photo || ''} kind={m.kind} />
         <span className="mlib-body"><span className="mlib-name">{m.name}</span>
           {!!m.muscleGroups?.length && <span className="mlib-muscle">{m.muscleGroups.join(', ')}</span>}
           <span className="mlib-facts"><span><IconDumbbell size={14} />{(m.uses || []).length} упр.</span>{m.weightStep > 0 && <span><IconSliders size={14} />{String(m.weightStep).replace('.', ',')} кг</span>}</span>
