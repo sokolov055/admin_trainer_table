@@ -118,3 +118,5 @@
 .mlib-pinned .ss-photo img { width:100%; height:auto; object-fit:contain; }
 .mlib-pinned.is-full .ss-photo { height:auto; }
 .mlib-pinned.is-full .ss-photo img { height:auto; }
+
+.mlib-step__main { display:block; margin-top:4px; font-size:var(--text-sm); line-height:1.4; }

@@ -4,13 +4,14 @@ import { IconBench, IconDumbbell, IconMore, IconLink, IconPen, IconTrash, IconCo
 import { MachinePhoto } from '../media.jsx';
 import { PinnedPhoto } from '../SetupSteps.jsx';
 import { mediaUrl } from '../library.js';
-import { Sticker } from '../setup-stickers.jsx';
+import { Sticker, stickerFor, useStickerPack } from '../setup-stickers.jsx';
 import { parseSetup } from './setup-text.js';
 import { muscleClass, muscleTone } from '../data-tones.js';
 import './machines-lib.css';
 
 /** FT-819, этап 2: представление; все записи остаются у прежнего API. */
 export default function MachineView({ machine: m, owner, exercises, onBack, onEdit, onDelete, onToggle, busy, failure }) {
+  useStickerPack();
   const [sheet, setSheet] = useState('');
   const [q, setQ] = useState('');
   const { steps, avoid } = parseSetup(m.setup, m.steps);
@@ -36,7 +37,7 @@ export default function MachineView({ machine: m, owner, exercises, onBack, onEd
     </div>}
     {m.photos?.length > 1 && <MachinePhoto machine={{...m,photos:m.photos.slice(1),photo:''}}/>}
     <section className="mlib-section"><div className="mlib-section__head"><span className="mlib-section__icon"><IconSliders size={18}/></span><div><h3>{m.kind === 'equipment' ? 'Как использовать' : 'Как настроить'}</h3><small>{m.setupOk === true ? 'Инструкция проверена' : 'Пошаговая инструкция'}</small></div></div>
-      {steps.length ? steps.map((s,i)=><div className="mlib-step" id={'mlib-step-'+i} key={i}><span className="mlib-sticker">{s.sticker ? <Sticker id={s.sticker}/> : <IconSliders size={24}/>}</span><div className="mlib-grow">{s.label && <small>{s.label}</small>}<b>{s.main}</b>{s.rest && <p>{s.rest}</p>}</div><span className="mlib-step__num">{i+1}</span></div>) : <p className="mlib-section__empty">Инструкции пока нет. Добавьте её в редакторе карточки.</p>}
+      {steps.length ? steps.map((s,i)=><div className="mlib-step" id={'mlib-step-'+i} key={i}><span className="mlib-sticker">{(s.sticker || stickerFor(s.label,s.main)) ? <Sticker id={s.sticker || stickerFor(s.label,s.main)}/> : <span>{i+1}</span>}</span><div className="mlib-grow">{s.label && <b>{s.label}</b>}<span className="mlib-step__main">{s.main}</span>{s.rest && <p>{s.rest}</p>}</div><span className="mlib-step__num">{i+1}</span></div>) : <p className="mlib-section__empty">Инструкции пока нет. Добавьте её в редакторе карточки.</p>}
       {!!avoid.length && <div className="mlib-section__empty"><b>Частые ошибки</b><p>{avoid.join(', ')}</p></div>}
       {!!m.fields?.length && <div className="mlib-section__empty"><b>Регулировки</b><p>{m.fields.join(' · ')}</p></div>}
     </section>
