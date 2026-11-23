@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BackButton, Sheet, Search, Note } from '../ui.jsx';
+import { BackButton, Sheet, Search, Note, plural } from '../ui.jsx';
 import { IconBench, IconDumbbell, IconMore, IconLink, IconPen, IconTrash, IconCopy, IconSliders, IconAlert } from '../icons.jsx';
 import { MachinePhoto } from '../media.jsx';
 import { PinnedPhoto } from '../SetupSteps.jsx';
@@ -28,7 +28,7 @@ export default function MachineView({ machine: m, owner, exercises, onBack, onEd
       <div className="mlib-hero__goal">{m.muscleGroups?.join(', ') || (m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр')}</div>
       <h2 className="mlib-hero__title">{m.name}</h2>
       <div className="mlib-hero__pills"><span className="mlib-pill"><KindIcon size={13}/>{m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}</span>{m.brand && <span className="mlib-pill">{m.brand}</span>}</div>
-      <div className="mlib-hero__stats">{[[(m.uses || []).length,'упражнений'],[photos,'фото'],[steps.length,'шага'],[m.weightStep ? String(m.weightStep).replace('.',',') : '—','шаг, кг']].map(([n,label])=><div key={label}><b>{n}</b><span>{label}</span></div>)}</div>
+      <div className="mlib-hero__stats">{[[(m.uses || []).length,plural((m.uses || []).length,'упражнение','упражнения','упражнений')],[photos,'фото'],[steps.length,plural(steps.length,'шаг','шага','шагов')],[m.weightStep ? String(m.weightStep).replace('.',',') : '—','шаг, кг']].map(([n,label])=><div key={label}><b>{n}</b><span>{label}</span></div>)}</div>
     </div>
     {m.originalName && <p className="mlib-desc">{m.originalName}</p>}
     {photos > 0 && <div className="mlib-pinned">

@@ -45,7 +45,7 @@
     "test:blini": "node --test scripts/test-blini-model.mjs scripts/test-career-model.mjs scripts/test-blini-browser.mjs",
     "check:blini-balance": "node scripts/check-blini-balance.mjs",
     "profile:blini": "node scripts/profile-blini.mjs",
-    "test:machines": "node --test scripts/test-machine-list.mjs scripts/test-machine-fields.mjs scripts/test-machine-list-browser.mjs scripts/test-machine-view-browser.mjs"
+    "test:machines": "node --test scripts/test-machine-list.mjs scripts/test-machine-fields.mjs scripts/test-machine-list-browser.mjs scripts/test-machine-view-browser.mjs scripts/test-machine-editor-browser.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",

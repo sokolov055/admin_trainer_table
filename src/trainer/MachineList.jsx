@@ -75,7 +75,7 @@ export default function MachineList({ list, onOpen, onCreate, state, setState })
       <div className="mlib-filter"><h4>Производитель</h4><Tiles label="Производитель" value={filters.brand} onChange={(brand) => set({ brand })} values={[[ '', 'Все' ], ...brands.map((b) => [b, b]), ['—', 'Без бренда']]} />
         <h4>Мышечная группа</h4><Tiles label="Мышечная группа" value={filters.muscle} onChange={(muscle) => set({ muscle })} values={[[ '', 'Все' ], ...muscles.map((m) => [m, m])]} />
         <h4>Связи с упражнениями</h4><Tiles cols={2} label="Связи с упражнениями" value={filters.missing} onChange={(missing) => set({ missing })} values={[[false, 'Все карточки'], [true, 'Без упражнений']]} />
-        <h4>Порядок</h4><div className="mlib-order"><Segmented track label="Порядок" value={filters.sort} onChange={(sort) => set({ sort })} items={[{ value: 'recent', label: 'В каталоге' }, { value: 'uses', label: 'Частые' }, { value: 'az', label: 'А–Я' }]} /></div>
+        <h4>Порядок</h4><div className="mlib-order"><Segmented track label="Порядок" value={filters.sort} onChange={(sort) => set({ sort })} items={[{ value: 'recent', label: 'Недавние' }, { value: 'uses', label: 'Частые' }, { value: 'az', label: 'А–Я' }]} /></div>
         <button type="button" className="button button--primary button--block mlib-go" onClick={() => setSheet(false)}>{shown.length ? `Показать: ${shown.length}` : 'Ничего не нашлось'}</button>
       </div>
     </Sheet>}

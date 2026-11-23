@@ -22,3 +22,12 @@ test('порядок не меняет исходные данные и связ
  const before=JSON.stringify(list);assert.deepEqual(ids({filters:{sort:'az'}}),['b','a']);
  assert.deepEqual(ids({filters:{sort:'uses'}}),['a','b']); assert.equal(JSON.stringify(list),before);
 });
+
+test('Недавние: дата изменения, затем создания; без даты — в конце, исходник не меняется', () => {
+ const items=[{...list[0],uid:'old',updatedAt:'2026-11-01T10:00:00Z'},
+  {...list[0],uid:'new',updatedAt:'2026-11-23T10:00:00Z',createdAt:'2026-01-01'},
+  {...list[0],uid:'created',updatedAt:'ошибка',createdAt:'2026-11-20T10:00:00Z'},
+  {...list[0],uid:'legacy'}];
+ assert.deepEqual(shownMachines(items).map(m=>m.uid),['new','created','old','legacy']);
+ assert.deepEqual(items.map(m=>m.uid),['old','new','created','legacy']);
+});
