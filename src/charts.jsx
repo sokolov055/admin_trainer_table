@@ -437,7 +437,7 @@ const BAR_HEIGHT = 180;
  * unit — единица у числа над графиком: строка или функция от значения
  * («шаг», «шага», «шагов»); мельче и серым, как везде (FT-665)
  */
-export function BarChart({ points, aim = 1, format, highlight, label, plain = false, compact = false, unit }) {
+export function BarChart({ points, aim = 1, format, highlight, label, plain = false, compact = false, height, unit }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(320);
   const [active, setActive] = useState(null);
@@ -477,7 +477,7 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
   const span = max - min || 1;
 
   const pad = compact ? { top: 10, right: 5, bottom: 25, left: 5 } : BAR_PAD;
-  const chartHeight = compact ? 164 : BAR_HEIGHT;
+  const chartHeight = height ?? (compact ? 164 : BAR_HEIGHT);
   const plotW = width - pad.left - pad.right;
   const plotH = chartHeight - pad.top - pad.bottom;
   const slot = plotW / list.length;

@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
-import { apiMutate } from '../api.js';
 import {
-  Lead, Section, Panel, Rows, Loading, ErrorState, Delta, Segmented, Field, Sheet,
+  Section, Panel, Rows, Row, Loading, ErrorState, Delta, Segmented, Sheet,
   formatNumber, formatMoney, formatDate, plural,
 } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
-import { IconBack } from '../icons.jsx';
+import { IconBack, IconChevron } from '../icons.jsx';
 import ScheduleStats from './ScheduleStats.jsx';
+import { SummarySignalSheet } from './SummarySignals.jsx';
 
 /**
  * Показатели: финансы, клиенты и процессы — три стороны одного BSC.
@@ -102,7 +102,7 @@ let remembered = null;
 /** Для проверок: каждый экран в них открывается как в первый раз */
 export function resetPeriod() {
   remembered = null;
-  chosen.finance = 'profit';
+  chosen.finance = 'revenue';
   chosen.clients = 'active';
   chosen.process = 'trainings';
   grainRemembered = 'month';
@@ -167,54 +167,6 @@ function rangeOf(state) {
   }
   const [y, m] = state.month.split('-').map(Number);
   return { from: new Date(y, m - 1, 1).toISOString(), to: new Date(y, m, 1).toISOString() };
-}
-
-/**
- * Шапка периода: месяц или год, стрелки и способ сравнения.
- *
- * Стрелками, а не списком: ходят почти всегда на шаг назад — «а в прошлом
- * сколько было». Вперёд за текущий период не пускаем: там заведомо нули,
- * и человек решит, что сломалось.
- */
-function PeriodBar({ state, update }) {
-  const yearNow = new Date().getFullYear();
-  const isYear = state.period === 'year';
-
-  const label = isYear ? String(state.year) : monthLabel(state.month);
-  const canForward = isYear ? state.year < yearNow : shiftMonth(state.month, 1) <= thisMonth();
-
-  const step = (dir) => {
-    if (dir > 0 && !canForward) return;
-    if (isYear) update({ year: state.year + dir });
-    else update({ month: shiftMonth(state.month, dir) });
-  };
-
-  return (
-    <div className="period">
-      <Segmented items={PERIODS} value={state.period} onChange={(period) => update({ period })} label="Период" />
-
-      <div className="monthpick">
-        <button className="icon-button" onClick={() => step(-1)} aria-label={isYear ? 'Предыдущий год' : 'Предыдущий месяц'}>
-          <IconBack size={18} />
-        </button>
-
-        <span className="monthpick__label">{label}</span>
-
-        <button
-          className="icon-button monthpick__next"
-          onClick={() => step(1)}
-          disabled={!canForward}
-          aria-label={isYear ? 'Следующий год' : 'Следующий месяц'}
-        >
-          <IconBack size={18} />
-        </button>
-      </div>
-
-      {!isYear && (
-        <Segmented items={COMPARES} value={state.compare} onChange={(compare) => update({ compare })} label="Сравнить" />
-      )}
-    </div>
-  );
 }
 
 function CompactPeriodBar({ state, update }) {
@@ -322,15 +274,8 @@ export const MARKETING = {
   unknown: { label: 'Источник не отмечен', aim: -1 },
 };
 
-/** Развитие — часы обучения из журнала и свои тренировки */
-export const DEVELOPMENT = {
-  learningHours: { label: 'Часов обучения', unit: 'ч', digits: 1 },
-  learningEntries: { label: 'Записей в журнале', aim: 0 },
-  ownWorkouts: { label: 'Своих тренировок' },
-};
-
 /** Выбранная для графика цифра — своя у каждой стороны */
-const chosen = { finance: 'profit', clients: 'active', process: 'trainings' };
+const chosen = { finance: 'revenue', clients: 'active', process: 'trainings' };
 
 function useChosen(group) {
   const [key, setKey] = useState(chosen[group]);
@@ -403,6 +348,7 @@ function Metric({ id, spec, now, before, picked, onPick, label }) {
 const NBSP = ' ';
 
 export function format(value, unit, digits) {
+  if (value == null) return '—';
   if (unit === '₽') return formatMoney(value).replace(/ ₽$/, NBSP + '₽');
   if (unit === '%') return formatNumber(value, digits) + '%';
   if (unit === 'мес.') return formatNumber(value, digits) + NBSP + 'мес.';
@@ -542,13 +488,19 @@ function MetricChartData({ group, id, spec, state, compact, by }) {
 }
 
 function SummaryTiles({ items, picked, onPick }) {
-  return <div className="metrics-tiles">{items.map(({ id, label, value, note, static: fixed }) => {
-    const body = <><strong>{value}</strong><span>{label}</span>{note && <small>{note}</small>}</>;
-    return fixed
-      ? <div key={id} className="metrics-tile">{body}</div>
-      : <button key={id} type="button" className={'metrics-tile' + (picked === id ? ' metrics-tile--picked' : '')}
-          onClick={() => onPick(id)} aria-pressed={picked === id}>{body}</button>;
-  })}</div>;
+  const amountLength = Math.max(...items.map((item) => item.value.length));
+  return <div className="metrics-tiles" style={{ '--amount-length': amountLength }}>
+    {items.map(({ id, label, value, note, static: fixed }) => {
+      const body = <>
+        <strong className="summary-tile-amount">{value}</strong>
+        <span>{label}</span>{note && <small>{note}</small>}
+      </>;
+      return fixed
+        ? <div key={id} className="metrics-tile">{body}</div>
+        : <button key={id} type="button" className={'metrics-tile' + (picked === id ? ' metrics-tile--picked' : '')}
+            onClick={() => onPick(id)} aria-pressed={picked === id}>{body}</button>;
+    })}
+  </div>;
 }
 
 function ReturnClients({ onOpenClient, loading, data, error, reload }) {
@@ -568,10 +520,10 @@ function ReturnClients({ onOpenClient, loading, data, error, reload }) {
         <span className="metrics-person__chevron" aria-hidden="true">›</span>
       </button>;
   };
-  return <Section title="Кого вернуть" note="месяц без занятий">
-    <div className="metrics-people">{people.slice(0, 2).map(personRow)}</div>
+  return <Section title="Кого вернуть" note="30 дней без занятий">
+    <Panel pad><div className="metrics-people">{people.slice(0, 2).map(personRow)}</div></Panel>
     {people.length > 2 && <details className="metrics-more"><summary>Ещё {people.length - 2}</summary>
-      <div className="metrics-people">{people.slice(2).map(personRow)}</div>
+      <Panel pad><div className="metrics-people">{people.slice(2).map(personRow)}</div></Panel>
     </details>}
   </Section>;
 }
@@ -580,7 +532,7 @@ function ReturnClients({ onOpenClient, loading, data, error, reload }) {
  * Финансы
  * ================================================================== */
 
-export function Finance() {
+export function Finance({ onExpenses }) {
   const [state, update] = usePeriod();
   const [picked, pick] = useChosen('finance');
   const { loading, data, error, reload } = useMetrics(state);
@@ -590,8 +542,8 @@ export function Finance() {
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
 
-  const now = data.finance.now;
-  const before = data.finance.before;
+  const now = data.finance?.now || {};
+  const before = data.finance?.before || {};
   const period = describe(data);
   const row = (id, label) => (
     <Metric id={id} spec={FINANCE[id]} now={now} before={before} picked={picked === id} onPick={pick} label={label} />
@@ -600,31 +552,31 @@ export function Finance() {
   return (
     <>
       {top}
-      <Lead
-        label={'Прибыль · ' + period.label}
-        value={formatMoney(now.profit)}
-        hint={<>{signed(now.profit - before.profit, period)}<br />
-          Выручка {formatMoney(now.revenue)} − расходы {formatMoney(now.expenses)}</>}
-      />
+      <Panel pad className="summary-hero">
+        <span className="overview-pace__label">{data.year ? 'Прибыль за год' : 'Прибыль за месяц'}</span>
+        <strong className="overview-pace__value">{format(now.profit, '₽')}</strong>
+        <p className="overview-pace__hint">Выручка за занятия минус расходы</p>
+      </Panel>
 
-      <Section title="Откуда сумма" note={'изменение к ' + period.against}>
-        <Panel pad className="metrics-breakdown">
-          <SummaryTiles picked={picked} onPick={pick} items={[
-            { id: 'revenue', label: 'Выручка за проведённое', value: formatMoney(now.revenue) },
-            { id: 'expenses', label: 'Расходы', value: formatMoney(now.expenses) },
-            { id: 'cash', label: data.year ? 'Касса за год' : 'Касса за месяц', value: formatMoney(now.cash || 0), note: 'получено оплат' },
-            { id: 'bank', label: 'Оплачено вперёд', value: formatMoney(now.bank || 0), static: true },
-          ]} />
-          <p className="small muted metrics__tile-note">Оплачено вперёд — обязательство провести занятия, не выручка.</p>
-        </Panel>
+      <Section>
+        {!now.trainings && !now.revenue && !now.expenses && !now.cash && !now.bank
+          ? <p className="summary-empty">Пока нет занятий, оплат и расходов.</p>
+          : <SummaryTiles picked={picked} onPick={pick} items={[
+            { id: 'revenue', label: 'Выручка', value: format(now.revenue, '₽'), note: 'за проведённое' },
+            { id: 'expenses', label: 'Расходы', value: format(now.expenses, '₽'), note: 'за выбранный период' },
+            { id: 'cash', label: 'Касса', value: format(now.cash || 0, '₽'), note: 'получено оплат' },
+            { id: 'bank', label: 'Предоплаты', value: format(now.bank || 0, '₽'), note: 'остаток на сегодня', static: true },
+          ]} />}
+        <p className="small muted metrics__tile-note">Предоплаты — обязательство провести занятия. Это не выручка.</p>
       </Section>
 
-      <Section title="Динамика">
+      <details className="metrics-more">
+        <summary>История и остальные показатели</summary>
+        {now.profit != null && before.profit != null &&
+          <p className="small muted">{signed(now.profit - before.profit, period)} · изменение к {period.against}</p>}
         <MetricChart group="finance" id={picked} spec={FINANCE[picked]} state={state} compact />
-      </Section>
-
-      <Section title="Ещё показатели" note="нажмите строку для графика">
-        <details className="metrics-more"><summary>Все показатели</summary><Panel>
+        {onExpenses && <button type="button" className="button button--ghost" onClick={onExpenses}>Учёт расходов</button>}
+        <Panel>
           <Rows>
             {row('profit')}
             {row('revenue')}
@@ -639,10 +591,8 @@ export function Finance() {
             {row('bank')}
             {row('bankCover')}
           </Rows>
-        </Panel></details>
-      </Section>
-
-      <p className="small muted metrics__foot">Прибыль — выручка минус расходы; налоги и личные траты сюда не входят. Предоплаты и запас предоплат показаны на сегодня.</p>
+        </Panel>
+      </details>
     </>
   );
 }
@@ -653,267 +603,114 @@ export function Finance() {
 
 export function Clients({ onOpenClient = null }) {
   const [state, update] = usePeriod();
-  const [picked, pick] = useChosen('clients');
+  const [clientMetric, pickClient] = useChosen('clients');
+  const [processMetric, pickProcess] = useChosen('process');
+  const [historyGroup, setHistoryGroup] = useState('clients');
+  const [signal, setSignal] = useState(null);
+  const [showCancellations, setShowCancellations] = useState(false);
   const { loading, data, error, reload } = useMetrics(state);
   const overview = useData('trainer.metrics.overview', {}, []);
-
   const top = <CompactPeriodBar state={state} update={update} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
 
-  // Старый сервер стороны «Клиенты» не знает — тогда экран честно пуст
-  const now = (data.clients && data.clients.now) || {};
-  const before = (data.clients && data.clients.before) || {};
+  const clients = data.clients?.now || {};
+  const process = data.process?.now || {};
   const period = describe(data);
-  const row = (id) => (
-    <Metric id={id} spec={CLIENTS[id]} now={now} before={before} picked={picked === id} onPick={pick} />
-  );
-
-  const activeBefore = before.active || 0;
-  const retentionKnown = now.retention !== null && now.retention !== undefined;
-  const target = overview.data && overview.data.targets && overview.data.targets.retention;
+  const active = clients.active || 0;
   const isCurrent = state.period === 'month' && state.month === thisMonth();
+  const group = historyGroup === 'clients' ? CLIENTS : PROCESS;
+  const metric = historyGroup === 'clients' ? clientMetric : processMetric;
+  const knowsCancels = process.cancels !== undefined;
+  const counts = [
+    [clients.newClients, 'новый', 'новых', 'новых'],
+    [clients.lost, 'ушёл', 'ушли', 'ушли'],
+    [clients.renewals, 'продлил', 'продлили', 'продлили'],
+  ].map(([count = 0, ...words]) => formatNumber(count || 0, 0) + ' ' + plural(count || 0, ...words));
+
+  const historyRows = (key, specs, picked, pick) => Object.entries(specs).map(([id, spec]) => (
+    <Metric key={id} id={id} spec={spec} now={data[key]?.now || {}} before={data[key]?.before}
+      picked={picked === id && historyGroup === key} onPick={(next) => { pick(next); setHistoryGroup(key); }} />
+  ));
+  const care = [
+    { id: 'noPlan', key: 'planShare', label: 'С программой', note: 'Кому нужна программа' },
+    { id: 'measureDue', key: 'measuredShare', label: 'С замером', note: 'Кому пора замер' },
+  ];
+  const canOpenCare = isCurrent && onOpenClient && overview.data;
+  const target = overview.data?.targets?.retention;
 
   return (
     <>
       {top}
+      <Panel pad className="summary-hero">
+        <span className="overview-pace__label">Клиенты и занятия {data.year ? 'за год' : 'за месяц'}</span>
+        <strong className="overview-pace__value">{formatNumber(active, 0)} {plural(active, 'клиент', 'клиента', 'клиентов')}</strong>
+        <p className="overview-pace__hint">{counts.join(' · ')}</p>
+        <div className="overview-pace__facts">
+          <span><small>Проведено</small><b>{formatNumber(process.trainings || 0, 0)}</b></span>
+          <span><small>На клиента</small><b>{process.perClient ? formatNumber(process.perClient, 1) : '—'}</b></span>
+          <span><small>Удержание</small><b>{format(clients.retention, '%')}</b></span>
+        </div>
+      </Panel>
 
-      <Lead
-        label={'Клиентов · ' + period.label}
-        value={formatNumber(now.active || 0, 0)}
-        hint={`${formatNumber(now.newClients || 0, 0)} ${plural(now.newClients || 0, 'новый', 'новых', 'новых')} · ${formatNumber(now.lost || 0, 0)} ${plural(now.lost || 0, 'ушёл', 'ушли', 'ушли')} · ${formatNumber(now.renewals || 0, 0)} ${plural(now.renewals || 0, 'продлил', 'продлили', 'продлили')}`}
-      />
-
-      <Section title="Удержание" note={target ? 'цель ' + formatNumber(target) + '%' : undefined}>
-        <Panel pad className="metrics-retention">
-          <strong>{retentionKnown ? format(now.retention, '%') : '—'}</strong>
-          <div className="metrics-retention__track" role="meter" aria-label="Удержание" aria-valuemin={0} aria-valuemax={100}
-            aria-valuenow={retentionKnown ? Math.max(0, Math.min(100, now.retention)) : undefined}>
-            <span style={{ width: (retentionKnown ? Math.max(0, Math.min(100, now.retention)) : 0) + '%' }} />
-          </div>
-          <p className="small muted">{retentionKnown
-            ? `${formatNumber(now.retained || 0, 0)} из ${formatNumber(activeBefore, 0)} занимавшихся ${period.before} вернулись`
-            : 'Сравнить не с чем: в прошлом периоде занятий не было.'}</p>
-        </Panel>
+      <Section title="Ведение клиентов" note="из занимающихся">
+        {!process.trainings && !process.planShare && !process.measuredShare
+          ? <p className="summary-empty">Нет занимающихся за выбранный период.</p>
+          : <div className="metrics-tiles">
+            {care.map(({ id, key, label, note }) => {
+              const body = <><strong>{format(process[key], '%')}</strong><span className="summary-care__label">{label}{canOpenCare && <IconChevron size={14} />}</span>{canOpenCare && <small>{note}</small>}</>;
+              const props = { className: 'metrics-tile summary-care', 'data-signal': id };
+              return canOpenCare
+                ? <button key={id} type="button" {...props} onClick={() => { setSignal(id); haptic(); }}>{body}</button>
+                : <div key={id} {...props}>{body}</div>;
+            })}
+          </div>}
       </Section>
 
       {isCurrent && onOpenClient && <ReturnClients onOpenClient={onOpenClient} {...overview} />}
 
-      <Section title="Динамика">
-        <MetricChart group="clients" id={picked} spec={CLIENTS[picked]} state={state} compact />
+      <Section title="Отмены и переносы">
+        {knowsCancels && !process.cancels && !process.moves
+          ? <p className="summary-empty">Отмен и переносов за период нет.</p>
+          : <Panel>
+            {knowsCancels && <Rows>
+              <Row label={<>Отмены{process.cancelShare != null && <small className="summary-row-note">
+                {format(process.cancelShare, '%', 1)} от запланированных
+              </small>}</>}>{formatNumber(process.cancels, 0)}</Row>
+              <Row label="Переносы">{formatNumber(process.moves, 0)}</Row>
+            </Rows>}
+            <button type="button" className="button button--ghost summary-cancellers"
+              onClick={() => { setShowCancellations(true); haptic(); }}>Кто отменял ›</button>
+          </Panel>}
       </Section>
 
-      <Section title="Движение и оплаты" note={'изменение к ' + period.against}>
-        <details className="metrics-more"><summary>Все показатели</summary><Panel>
-          <Rows>
-            {row('active')}
-            {row('newClients')}
-            {row('retained')}
-            {row('lost')}
-            {row('retention')}
-            {row('renewals')}
-            {row('newPayers')}
-          </Rows>
-        </Panel></details>
-      </Section>
-
-      {data.marketing && data.marketing.now && (
-        <Section title="Откуда приходят" note="источник отмечают в карточке клиента">
-          <Panel>
-            <Rows>
-              <Metric id="referralShare" spec={MARKETING.referralShare} now={data.marketing.now} before={data.marketing.before} />
-              <Metric id="unknown" spec={MARKETING.unknown} now={data.marketing.now} before={data.marketing.before} />
-            </Rows>
-          </Panel>
-          <details className="metrics-more"><summary>Все источники</summary><Panel><Rows>
-              {SOURCES.map((s) => (
-                <Metric key={s.value} id={s.value} spec={MARKETING[s.value]} now={data.marketing.now} before={data.marketing.before} />
-              ))}
-            </Rows></Panel></details>
+      <details className="metrics-more summary-history">
+        <summary>Источники, история и все показатели</summary>
+        {data.marketing?.now && <Section title="Откуда приходят"><Panel><Rows>
+          {['referralShare', 'unknown', ...SOURCES.map((source) => source.value)].map((id) => (
+            <Metric key={id} id={id} spec={MARKETING[id]} now={data.marketing.now} before={data.marketing.before} />
+          ))}
+        </Rows></Panel></Section>}
+        <Section title="Динамика" note={'к ' + period.against}>
+          <MetricChart group={historyGroup} id={metric} spec={group[metric]} state={state} compact />
         </Section>
-      )}
-
-      <p className="small muted metrics__foot">Ушёл — был в прошлом периоде, сейчас не занимается и вперёд не записан. Новый — впервые занимался в этом периоде. Продление — повторная оплата.</p>
-    </>
-  );
-}
-
-/* ==================================================================
- * Процессы
- * ================================================================== */
-
-export function Processes() {
-  const [state, update] = usePeriod();
-  const [picked, pick] = useChosen('process');
-  const { loading, data, error, reload } = useMetrics(state);
-
-  const top = <CompactPeriodBar state={state} update={update} />;
-
-  if (loading) return <>{top}<Loading rows={4} /></>;
-  if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
-
-  const now = data.process.now;
-  const before = data.process.before;
-  const period = describe(data);
-  const row = (id) => (
-    <Metric id={id} spec={PROCESS[id]} now={now} before={before} picked={picked === id} onPick={pick} />
-  );
-  const knowsCancels = now.cancels !== undefined;
-
-  return (
-    <>
-      {top}
-
-      <Lead
-        label={'Тренировок · ' + period.label}
-        value={formatNumber(now.trainings, 0)}
-        hint={
-          now.perClient
-            ? 'по ' + formatNumber(now.perClient, 1) + ' на клиента'
-            : 'занятий за этот период ещё не было'
-        }
-
-      />
-
-      <Section title="Как ведём клиентов" note="среди занимающихся за выбранный период">
-        <Panel><Rows>
-          <Metric id="planShare" spec={PROCESS.planShare} now={now} before={before} label="С программой" />
-          <Metric id="measuredShare" spec={PROCESS.measuredShare} now={now} before={before} label="С замером" />
-        </Rows></Panel>
-      </Section>
-
-      {knowsCancels && <Section title="Срывы">
-        <SummaryTiles picked={picked} onPick={pick} items={[
-          { id: 'cancels', label: 'Отмены', value: formatNumber(now.cancels, 0), note: now.cancelShare == null ? 'нет доли за период' : 'доля ' + formatNumber(now.cancelShare, 1) + '%', static: true },
-          { id: 'moves', label: 'Переносы', value: formatNumber(now.moves, 0), static: true },
-        ]} />
-        <details className="metrics-more metrics-cancellations">
-          <summary>Кто отменял</summary>
-          <ScheduleStats range={rangeOf(state)} />
-        </details>
-      </Section>}
-      {!knowsCancels && <ScheduleStats range={rangeOf(state)} />}
-
-      {data.development && data.development.now && (
-        <Development state={state} now={data.development.now} before={data.development.before} onChanged={reload} />
-      )}
-      <details className="metrics-more metrics-process-details">
-        <summary>Все показатели и история</summary>
-        <MetricChart group="process" id={picked} spec={PROCESS[picked]} state={state} compact />
-        <Panel><Rows>{Object.keys(PROCESS).filter(id => knowsCancels || !['cancels', 'cancelsLate', 'moves', 'cancelShare'].includes(id)).map(id => <React.Fragment key={id}>{row(id)}</React.Fragment>)}</Rows></Panel>
-        <p className="small muted">Не приходили месяц — за последние 30 дней на сегодня. Имена и переходы к замерам и программам — в «Обзоре».</p>
+        <Section title="Движение и оплаты" note={target ? 'цель ' + format(target, '%') : undefined}>
+          <p className="small muted">{clients.retention == null
+            ? 'Сравнить не с чем: в прошлом периоде занятий не было.'
+            : `${formatNumber(clients.retained || 0, 0)} из ${formatNumber(data.clients?.before?.active || 0, 0)} занимавшихся ${period.before} вернулись`}</p>
+          <Panel><Rows>{historyRows('clients', CLIENTS, clientMetric, pickClient)}</Rows></Panel>
+        </Section>
+        <Section title="Занятия">
+          <Panel><Rows>{historyRows('process', PROCESS, processMetric, pickProcess)}</Rows></Panel>
+        </Section>
       </details>
 
-    </>
-  );
-}
-
-/* ==================================================================
- * Развитие
- * ================================================================== */
-
-/**
- * Часы обучения — единственное в сводке, что вписывают руками, кроме
- * расходов и целей: лист «Развитие» иначе не посчитать. Запись — лист с
- * часами и парой слов; свои тренировки берутся с карточки тренера сами.
- */
-function LearningSheet({ onClose, onSaved }) {
-  const [hours, setHours] = useState('');
-  const [note, setNote] = useState('');
-  const [day, setDay] = useState(new Date().toISOString().slice(0, 10));
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState('');
-
-  const save = async () => {
-    setBusy(true);
-    setProblem('');
-    try {
-      await apiMutate('trainer.learning.add', { hours, note, day });
-      haptic('success');
-      onSaved();
-      onClose();
-    } catch (err) {
-      setProblem(err.message || 'Не получилось сохранить.');
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Sheet title="Записать обучение" onClose={onClose} onDone={save} done={busy ? 'Сохраняем…' : 'Записать'} dirty={!!hours} locked={busy} focus="input">
-      <div className="goals__form">
-        <Field label="Часов" inputMode="decimal" value={hours} onChange={setHours} placeholder="1,5" disabled={busy} />
-        <Field label="Что это было" inputMode="text" value={note} onChange={setNote} placeholder="Семинар, курс, книга" disabled={busy} />
-        <Field label="Дата" type="date" value={day} onChange={setDay} disabled={busy} />
-      </div>
-      {problem && <p className="small form__error" role="alert">{problem}</p>}
-    </Sheet>
-  );
-}
-
-function Development({ state, now, before, onChanged }) {
-  const [adding, setAdding] = useState(false);
-  const [revision, setRevision] = useState(0);
-  const [problem, setProblem] = useState('');
-  const month = state.period === 'year' ? null : state.month;
-  const { data, reload } = useData('trainer.learning.list', { month: month || thisMonth() }, [month, revision]);
-
-  const remove = async (id) => {
-    try {
-      await apiMutate('trainer.learning.delete', { id });
-      haptic();
-      setProblem('');
-      setRevision((v) => v + 1);
-      onChanged();
-    } catch (err) {
-      setProblem(err.message || 'Не получилось удалить запись. Попробуйте ещё раз.');
-      reload();
-    }
-  };
-
-  const entries = month && data && data.entries ? data.entries : [];
-  const row = (id) => <Metric id={id} spec={DEVELOPMENT[id]} now={now} before={before} />;
-
-  return (
-    <>
-      <Section
-        title="Моё развитие"
-        note="за выбранный период"
-        action={(
-          <button type="button" className="button button--ghost button--small" onClick={() => { setAdding(true); haptic(); }}>
-            Записать
-          </button>
-        )}
-      >
-        <Panel>
-          <Rows>
-            {row('learningHours')}
-            {row('ownWorkouts')}
-            <details className="metrics-more"><summary>Журнал обучения</summary>{row('learningEntries')}</details>
-          </Rows>
-        </Panel>
-        {problem && <p className="form__error" role="alert">{problem}</p>}
-        {entries.length > 0 && (
-          <Panel className="learning">
-            <Rows>
-              {entries.map((e) => (
-                <div className="rows__item learning__item" key={e.id}>
-                  <span className="rows__label learning__what">
-                    {formatDate(e.day, false)}{e.note ? ' · ' + e.note : ''}
-                  </span>
-                  <span className="rows__value learning__hours">
-                    {formatNumber(e.hours, 1)} ч
-                    <button type="button" className="button button--ghost button--small" onClick={() => remove(e.id)} aria-label={'Удалить запись ' + formatDate(e.day, false)}>
-                      Удалить
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </Rows>
-          </Panel>
-        )}
-      </Section>
-      {adding && <LearningSheet onClose={() => setAdding(false)} onSaved={() => { setRevision((v) => v + 1); onChanged(); }} />}
+      {signal && <SummarySignalSheet id={signal} signals={overview.data?.signals}
+        onOpenClient={onOpenClient} onClose={() => setSignal(null)} />}
+      {showCancellations && <Sheet title="Кто отменял" onClose={() => setShowCancellations(false)}>
+        <div className="summary-cancellations"><ScheduleStats range={rangeOf(state)} /></div>
+      </Sheet>}
     </>
   );
 }

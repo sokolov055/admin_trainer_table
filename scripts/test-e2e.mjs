@@ -267,14 +267,41 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.addInitScript((scheme) => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('app_theme_v1', scheme); }, colorScheme);
       await phone.goto(origin + '/?mockRole=trainer');
       await phone.getByRole('button', { name: 'Сводка', exact: true }).click();
-      await phone.locator('.chips--nav .chip').filter({ hasText: 'Деньги' }).click();
-      await phone.getByText('Откуда сумма').waitFor();
+      const nav = phone.getByRole('tablist', { name: 'Разделы сводки' });
+      const content = phone.locator('.summary-content');
+      assert.deepEqual(await nav.getByRole('tab').allTextContents(), ['Обзор', 'Деньги', 'Клиенты']);
+      await content.locator('.overview-chart .bars__svg').waitFor();
+      const tabBounds = await nav.getByRole('tab').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().width));
+      assert.ok(Math.max(...tabBounds) - Math.min(...tabBounds) < 1);
+      const edges = await Promise.all([nav.boundingBox(), content.locator('.summary-hero').boundingBox()]);
+      assert.equal(edges[0].x, edges[1].x);
+      assert.equal(edges[0].width, edges[1].width);
+      if (process.env.SHOT_FT818_V3) await content.screenshot({ style: '.tabbar { visibility: hidden }', path: `${process.env.SHOT_FT818_V3}-${width}-${colorScheme}-overview.png` });
+      await nav.getByRole('tab', { name: 'Деньги' }).tap();
+      await content.locator('.metrics-tiles').waitFor();
+      const tiles = await content.locator('.metrics-tile').evaluateAll(nodes => nodes.map(node => {
+        const box = node.getBoundingClientRect();
+        const amount = node.querySelector('strong').getBoundingClientRect();
+        return { top: box.top, width: box.width, height: box.height, amountTop: amount.top, amountRight: amount.right, right: box.right };
+      }));
+      assert.equal(tiles.length, 4);
+      for (const [left, right] of [tiles.slice(0, 2), tiles.slice(2)]) {
+        assert.equal(left.top, right.top);
+        assert.equal(left.width, right.width);
+        assert.equal(left.height, right.height);
+        assert.equal(left.amountTop, right.amountTop);
+        assert.ok(left.amountRight < left.right && right.amountRight < right.right);
+      }
+      if (process.env.SHOT_FT818_V3) await content.screenshot({ style: '.tabbar { visibility: hidden }', path: `${process.env.SHOT_FT818_V3}-${width}-${colorScheme}-money.png` });
       assert.equal(await phone.getByText('Сверка денег').count(), 0, 'выключенная Google-таблица не показывается в сводке');
       await phone.locator('.metrics-period__options summary').click();
       await phone.getByRole('radio', { name: 'К году назад' }).waitFor();
       await phone.locator('.metrics-period__options summary').click();
-      assert.match(await phone.locator('.metrics-tiles').innerText(), /Выручка за проведённое[\s\S]*Касса за месяц[\s\S]*Оплачено вперёд/);
-      await phone.getByRole('button', { name: /Выручка за проведённое/ }).click();
+      assert.match(await phone.locator('.metrics-tiles').innerText(), /Выручка[\s\S]*за проведённое[\s\S]*Касса[\s\S]*Предоплаты/);
+      await content.locator('.metrics-tile').filter({ hasText: 'Расходы' }).tap();
+      assert.equal(await content.locator('.metrics-tile--picked').getAttribute('aria-pressed'), 'true');
+      await content.locator('.metrics-tile').filter({ hasText: 'Выручка' }).tap();
+      await content.locator('.metrics-more > summary').click();
       assert.match(await phone.locator('.chart-card__title').innerText(), /Выручка/);
       assert.ok(await phone.locator('.bars--compact .bars__bar').count() <= 8);
       await phone.locator('.metrics-chart-options summary').click();
@@ -307,28 +334,16 @@ test('FT-818: деньги и клиенты — компактные показ
         assert.ok(axis.every((rect, index) => index === 0 || rect.left >= axis[index - 1].right + 4),
           `подписи не слипаются на ${width} px: ${JSON.stringify(axis)}`);
       }
-      if (process.env.SHOT_FT818_STAGE2) await phone.locator('.chart-card').screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-year-months-${width}-${colorScheme}.png` });
       await phone.locator('.metrics-chart-options summary').click();
       await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Месяц' }).click();
       await phone.locator('.metrics-period__options summary').click();
-      if (process.env.SHOT_FT818_STAGE2) await phone.locator('.chart-card').screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-money-chart-${width}-${colorScheme}.png` });
-      await phone.locator('.metrics-more').first().locator('summary').click();
       await phone.getByText('Отработать это займёт').waitFor();
-      if (process.env.SHOT_FT818_STAGE2) {
-        await phone.evaluate(() => window.scrollTo(0, 0));
-        await phone.screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-money-${width}-${colorScheme}.png` });
-      }
 
-      await phone.locator('.chips--nav .chip').filter({ hasText: 'Клиенты' }).click();
+      await nav.getByRole('tab', { name: 'Клиенты' }).tap();
       await phone.getByText('Удержание', { exact: true }).first().waitFor();
-      await phone.locator('.metrics-retention__track').waitFor();
-      if (process.env.SHOT_FT818_STAGE2) await phone.locator('.chart-card').screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-clients-chart-${width}-${colorScheme}.png` });
-      await phone.locator('.metrics-more').last().locator('summary').click();
+      if (process.env.SHOT_FT818_V3) await content.screenshot({ style: '.tabbar { visibility: hidden }', path: `${process.env.SHOT_FT818_V3}-${width}-${colorScheme}-clients.png` });
+      await phone.locator('.summary-history > summary').click();
       await phone.getByText('По рекомендации', { exact: true }).waitFor();
-      if (process.env.SHOT_FT818_STAGE2) {
-        await phone.evaluate(() => window.scrollTo(0, 0));
-        await phone.screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-clients-${width}-${colorScheme}.png` });
-      }
       const dimensions = await phone.locator('main.app__body:not([hidden])').evaluate((node) => [node.clientWidth, node.scrollWidth]);
       assert.deepEqual(dimensions, [width, width], `нет горизонтальной прокрутки: ${width}, ${colorScheme}`);
       assert.deepEqual(errors, []);
@@ -336,7 +351,7 @@ test('FT-818: деньги и клиенты — компактные показ
   }
 });
 
-test('FT-818: занятия — отмены, ведение и обучение на узком экране', async () => {
+test('FT-818: клиенты и занятия — отмены, ведение и история на узком экране', async () => {
   for (const width of [320, 390]) for (const colorScheme of ['light', 'dark']) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ru-RU', colorScheme, reducedMotion: 'reduce', hasTouch: true });
     const phone = await context.newPage();
@@ -346,25 +361,29 @@ test('FT-818: занятия — отмены, ведение и обучени�
       await phone.addInitScript(scheme => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('app_theme_v1', scheme); }, colorScheme);
       await phone.goto(origin + '/?mockRole=trainer');
       await phone.getByRole('button', { name: 'Сводка', exact: true }).click();
-      await phone.locator('.chips--nav .chip').filter({ hasText: 'Занятия' }).click();
-      await phone.getByRole('heading', { name: 'Как ведём клиентов' }).waitFor();
-      if (process.env.SHOT_FT818_STAGE3) await phone.screenshot({ path: `${process.env.SHOT_FT818_STAGE3}-${width}-${colorScheme}.png`, fullPage: true });
-      await phone.locator('.metrics-cancellations summary').click();
-      await phone.getByRole('heading', { name: 'Кто отменяет' }).waitFor();
-      await phone.locator('.metrics-process-details > summary').click();
-      assert.equal(await phone.locator('.metrics-cancellations .rows__label').filter({ hasText: /^Доля отмен$/ }).count(), 0);
-      assert.equal(await phone.locator('.metrics-process-details .rows__label').filter({ hasText: /^Доля отмен$/ }).count(), 1);
-      await phone.locator('.metrics-process-details > summary').click();
-      await phone.getByRole('button', { name: 'Записать', exact: true }).click();
-      const dialog = phone.getByRole('dialog', { name: 'Записать обучение' });
-      await dialog.waitFor();
-      await dialog.getByLabel('Часов', { exact: true }).fill('1,5');
-      await dialog.getByLabel('Что это было').fill('Проверка обучения');
-      await dialog.getByRole('button', { name: 'Записать', exact: true }).click();
-      await dialog.waitFor({ state: 'hidden' });
+      await phone.getByText('Цели и годовой итог').click();
+      await phone.locator('.overview-deviation').filter({ hasText: /замер|отмен/ }).first().click();
+      const nav = phone.getByRole('tablist', { name: 'Разделы сводки' });
+      assert.equal(await nav.getByRole('tab', { name: 'Клиенты' }).getAttribute('aria-selected'), 'true');
+      await phone.getByRole('heading', { name: 'Ведение клиентов' }).waitFor();
+      assert.equal(await phone.getByText('Моё развитие', { exact: true }).count(), 0);
+      await phone.locator('button.summary-care[data-signal="measureDue"]').tap();
+      await phone.getByRole('dialog', { name: /Пора снять замер/ }).waitFor();
+      await phone.getByRole('button', { name: 'Закрыть' }).tap();
+      await phone.getByRole('button', { name: /Кто отменял/ }).tap();
+      const dialog = phone.getByRole('dialog', { name: 'Кто отменял' });
+      await dialog.getByRole('heading', { name: 'Кто отменяет' }).waitFor();
+      assert.equal(await dialog.getByText('Доля отмен', { exact: true }).count(), 0);
+      await dialog.getByRole('button', { name: 'Закрыть' }).tap();
+      await phone.locator('.summary-history > summary').click();
+      await phone.locator('.summary-history').getByRole('button', { name: /Доля отмен/ }).click();
+      assert.match(await phone.locator('.chart-card__title').innerText(), /Доля отмен/);
+      await phone.getByRole('button', { name: 'Предыдущий месяц' }).tap();
+      assert.equal(await phone.locator('button.summary-care').count(), 0);
+      assert.equal(await phone.getByRole('heading', { name: 'Кого вернуть' }).count(), 0);
       await phone.locator('.metrics-period__options summary').click();
       await phone.locator('.metrics-period__options').getByRole('radio', { name: 'Год', exact: true }).click();
-      await phone.getByRole('heading', { name: 'Как ведём клиентов' }).waitFor();
+      await phone.getByRole('heading', { name: 'Ведение клиентов' }).waitFor();
       const dimensions = await phone.locator('main.app__body:not([hidden])').evaluate(n => [n.clientWidth, n.scrollWidth]);
       assert.deepEqual(dimensions, [width, width]);
       assert.deepEqual(errors, []);

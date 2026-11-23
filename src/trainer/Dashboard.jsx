@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate } from '../api.js';
 import {
-  Section, Panel, Rows, Loading, ErrorState, Empty, Field, Sheet, Tag, Segmented,
-  formatNumber, formatMoney, formatDate, plural,
+  Section, Panel, Rows, Loading, ErrorState, Empty, Field, Sheet, Segmented,
+  formatNumber, formatMoney, plural,
 } from '../ui.jsx';
 import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
-import { IconCheck, IconPhone, IconMoney, IconRuler, IconPlan, IconChevron } from '../icons.jsx';
+import { IconCheck, IconChevron } from '../icons.jsx';
 import { monthLabel, format } from './Metrics.jsx';
+import { SIGNALS, SummarySignalSheet } from './SummarySignals.jsx';
 
 /**
  * Обзор — первая вкладка сводки. То, ради чего в неё заглядывают:
@@ -46,18 +47,15 @@ export const GOALS = [
   { id: 'referralShare', label: 'Доля по рекомендации', unit: '%', side: 'marketing', group: 'marketing', hint: 'из новых с отмеченным источником' },
   { id: 'measuredShare', label: 'Доля с замером', unit: '%', side: 'process', group: 'process', hint: 'из тех, кто ходит' },
   { id: 'cancelShare', label: 'Доля отмен', unit: '%', side: 'process', group: 'process', aim: -1, hint: 'не больше' },
-  { id: 'learningHours', label: 'Часов обучения', unit: 'ч', side: 'development', group: 'development', hint: 'за месяц' },
   { id: 'activeClients', label: 'Клиентов в работе', unit: 'чел', side: 'clients', group: 'process' },
 ];
 
-/** Пять сторон BSC из листов; «Маркетинг» живёт на вкладке клиентов,
- *  «Развитие» — на процессах */
+/** Цели клиентов, занятий и источников ведут в объединённый раздел. */
 const SIDES = {
   finance: { label: 'Деньги', pane: 'finance' },
   clients: { label: 'Клиенты', pane: 'clients' },
   marketing: { label: 'Маркетинг', pane: 'clients' },
   process: { label: 'Занятия', pane: 'processes' },
-  development: { label: 'Развитие', pane: 'processes' },
 };
 
 /** Насколько цифра дошла до цели: 0…100, у «не больше» — обратный смысл */
@@ -136,64 +134,6 @@ function GoalsSheet({ targets, onClose, onSaved }) {
  * Сигналы
  * ================================================================== */
 
-const dayWord = (n) => n + ' ' + plural(n, 'день', 'дня', 'дней');
-
-/**
- * Список людей, по которому можно нажать: имя и в чём дело. Пара сплита —
- * одной строкой с меткой: занятия, деньги и программа у неё общие.
- */
-function People({ list, note, onOpen, at }) {
-  if (!list.length) {
-    return (
-      <Panel>
-        <Empty icon={IconCheck} title="Всё в порядке" text="Сейчас в этой группе никого нет." />
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel>
-      <Rows>
-        {list.map((c) => (
-          <button type="button" key={c.row} className="rows__item rows__item--pick person" onClick={() => onOpen({ row: c.row, name: c.name }, at)}>
-            <span className="rows__label person__name">{c.name}{c.split && <Tag>сплит</Tag>}</span>
-            <span className="rows__value person__note">{note(c)}<IconChevron size={16} className="side__chevron" /></span>
-          </button>
-        ))}
-      </Rows>
-    </Panel>
-  );
-}
-
-const SIGNALS = [
-  {
-    id: 'silent', Icon: IconPhone, at: 'overview',
-    label: 'Не приходят', sheetTitle: (n) => 'Не приходят · ' + n,
-    note: 'месяц без занятий — пора позвонить',
-    line: (c) => (c.days === null ? 'занятий не было' : dayWord(c.days) + ' без занятий') + (c.nextAt ? ' · записан на ' + formatDate(c.nextAt, false) : ''),
-  },
-  {
-    id: 'packages', Icon: IconMoney, at: 'payments',
-    label: 'Пакет и долг', sheetTitle: (n) => 'Пакет и долг · ' + n,
-    note: 'осталось одно занятие или уже долг',
-    // Деньги у плательщика (семья, пара) — так и пишем: звонить ему
-    line: (c) => (c.payer ? 'платит ' + c.payer + ' · ' : '')
-      + (c.balance < 0 ? 'долг ' + formatMoney(-c.balance) : c.left <= 0 ? 'занятий не осталось' : 'осталось 1 занятие'),
-  },
-  {
-    id: 'measureDue', Icon: IconRuler, at: 'progress',
-    label: 'Пора замер', sheetTitle: (n) => 'Пора снять замер · ' + n,
-    note: 'ходят, а замера не было четыре недели',
-    line: (c) => (c.days === null ? 'замера ещё не было' : 'замер ' + dayWord(c.days) + ' назад'),
-  },
-  {
-    id: 'noPlan', Icon: IconPlan, at: 'plan',
-    label: 'Без программы', sheetTitle: (n) => 'Без программы · ' + n,
-    note: 'ходят, а программы нет ни на один месяц',
-    line: () => 'программы нет',
-  },
-];
-
 /* ==================================================================
  * Обзор
  * ================================================================== */
@@ -217,8 +157,8 @@ const DYNAMICS = [
 ];
 
 function shortMonth(key) {
-  const [year, month] = String(key || '').split('-').map(Number);
-  return month && SHORT_MONTHS[month - 1] ? SHORT_MONTHS[month - 1] + ' ' + String(year).slice(-2) : key;
+  const month = Number(String(key || '').split('-')[1]);
+  return SHORT_MONTHS[month - 1] || key;
 }
 
 /** История только из серверного ряда: никаких условных значений из макета. */
@@ -243,7 +183,7 @@ function Dynamics() {
     const complete = newestFirst.find((point) => !point.partial && point.value !== null && point.value !== undefined);
     chart = (
       <>
-        <BarChart points={points} format={spec.format} label={spec.label} plain highlight={(complete || points.at(-1))?.key} />
+        <BarChart points={points} format={spec.format} label={spec.label} plain compact height={110} highlight={(complete || points.at(-1))?.key} />
         {partial && <p className="small muted overview-chart__note">{monthLabel(partial.key) + ' ещё не закончился — пунктиром.'}</p>}
       </>
     );
@@ -281,22 +221,20 @@ export function Dashboard({ onGo, onOpenClient }) {
   const c = (data.clients && data.clients.now) || {};
   const p = data.process.now;
   const pace = data.pace || {};
+  const profit = format(f.profit, '₽');
 
-  // Темп: к тому же числу прошлого месяца. Выше — зелёным; ниже — без
-  // цвета: в середине месяца это ещё не провал, и красить рано
+  // Темп сравниваем с тем же числом прошлого месяца.
   const diff = pace.revenue ? Math.round(((f.revenue - pace.revenue) / pace.revenue) * 100) : null;
   const then = dayOf(pace.day, pace.month);
   const paceHint = diff === null
     ? (f.revenue ? then + ' занятий не было' : 'занятий в этом месяце ещё не было')
     : diff === 0
       ? 'столько же, сколько ' + then
-      : (diff > 0 ? 'на ' + diff + '% больше' : 'на ' + (-diff) + '% меньше') + ', чем ' + then + ' (' + formatMoney(pace.revenue) + ')';
+      : then + ' было ' + format(pace.revenue, '₽');
 
-  // Старый сервер сторон «Маркетинг» и «Развитие» не знает — отклонение
-  // просто не попадёт в две главные проверки.
+  // Старые ответы могут не содержать источников клиентов.
   const m = (data.marketing && data.marketing.now) || {};
-  const d = (data.development && data.development.now) || {};
-  const values = { finance: f, clients: c, process: p, marketing: m, development: d };
+  const values = { finance: f, clients: c, process: p, marketing: m };
 
   const year = data.year || {};
   const yearTarget = goals.revenueYear;
@@ -305,7 +243,7 @@ export function Dashboard({ onGo, onOpenClient }) {
 
   const signals = SIGNALS.map((s) => ({ ...s, list: (data.signals && data.signals[s.id]) || [] }));
   const signalCount = signals.reduce((sum, signal) => sum + signal.list.length, 0);
-  const selectedSignal = signals.find((signal) => signal.id === activeSignal);
+
   const deviations = GOALS
     .filter((goal) => !goal.year)
     .map((goal) => {
@@ -327,94 +265,89 @@ export function Dashboard({ onGo, onOpenClient }) {
         </button>
       </div>
 
-      <Panel pad className={'overview-pace' + (diff !== null && diff > 0 ? ' overview-pace--good' : '')}>
+      <Panel pad className="overview-pace summary-hero summary-hero--accent">
         <div className="overview-pace__head">
           <span className="overview-pace__label">{'Выручка ' + byDay(pace.day || new Date().getDate())}</span>
           {diff !== null && <span className="overview-pace__delta">{diff > 0 ? '↑ ' : diff < 0 ? '↓ ' : ''}{Math.abs(diff)}%</span>}
         </div>
-        <strong className="overview-pace__value">{formatMoney(f.revenue)}</strong>
+        <strong className="overview-pace__value">{format(f.revenue, '₽')}</strong>
         <p className="overview-pace__hint">{paceHint}</p>
         <div className="overview-pace__facts">
-          <span><small>Занятий</small><b>{formatNumber(f.trainings, 0)}{pace.trainings ? ' · было ' + formatNumber(pace.trainings, 0) : ''}</b></span>
-          <span><small>Прибыль</small><b>{formatMoney(f.profit)}</b></span>
+          <span><small>Занятий</small><b>{formatNumber(f.trainings, 0)}</b></span>
+          <span><small>Прибыль</small><b className="summary-fact-amount" style={{ '--amount-length': profit.length }}>{profit}</b></span>
           <span><small>Клиентов</small><b>{formatNumber(f.activeClients, 0)}</b></span>
         </div>
       </Panel>
 
       <Section title="Требуют внимания" note={signalCount ? signalCount + ' ' + plural(signalCount, 'сигнал', 'сигнала', 'сигналов') : 'всё в порядке'}>
-        <div className="overview-signals">
+        {signalCount ? <div className="overview-signals">
           {signals.map((signal) => (
             <button
               key={signal.id}
               type="button"
               className="overview-signal"
               data-signal={signal.id}
+              data-empty={signal.list.length === 0 ? '' : undefined}
               aria-label={signal.label + ': ' + signal.list.length}
               onClick={() => { setActiveSignal(signal.id); haptic(); }}
             >
               <span className="overview-signal__count">{signal.list.length}</span>
-              <span className="overview-signal__label"><signal.Icon size={16} />{signal.label}<IconChevron size={14} className="side__chevron" /></span>
+              <span className="overview-signal__label">{signal.label}<IconChevron size={14} className="side__chevron" /></span>
             </button>
           ))}
-        </div>
+        </div> : <p className="summary-empty">Сейчас нет клиентов, которым требуется внимание.</p>}
       </Section>
 
-      <Section title="Динамика" note="последние 6 месяцев">
+      <Section title="Динамика" note="6 месяцев">
         <Dynamics />
       </Section>
 
-      <Section title="Отклонения от целей" note={deviations.length ? 'главное на сейчас' : 'цели выполнены'}>
-        {deviations.length ? (
-          <div className="overview-deviations">
-            {deviations.map(({ goal, value, target }) => (
-              <button key={goal.id} type="button" className="overview-deviation" onClick={() => onGo(SIDES[goal.side].pane)}>
-                <strong>{format(value, goal.unit)}</strong>
-                <span>{goal.label}</span>
-                <small>{'цель ' + (goal.aim < 0 ? 'не больше ' : '') + format(target, goal.unit)}<IconChevron size={14} className="side__chevron" /></small>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <Panel><Empty icon={IconCheck} title="Цели выполнены" text="Сейчас отклонений по заданным целям нет." /></Panel>
-        )}
-      </Section>
-
-      <Section title={'Год · ' + year.year} note="выручка с января">
-        <Panel pad className="year">
-          <div className="year__row">
-            <span className="year__value">{formatMoney(year.revenue || 0)}</span>
-            {yearTarget ? (
-              <span className={'side__goal' + (yearDone ? ' side__goal--done' : '')}>
-                {yearDone && <IconCheck size={12} />}
-                {toGoal(year.revenue, yearTarget, '₽')}
-              </span>
-            ) : null}
-          </div>
-          {yearBar !== null && (
-            <span className={'bar' + (yearDone ? ' bar--done' : '')} role="progressbar" aria-valuenow={yearBar} aria-valuemin={0} aria-valuemax={100}>
-              <span className="bar__fill" style={{ width: yearBar + '%' }} />
-            </span>
+      <details className="metrics-more">
+        <summary>Цели и годовой итог</summary>
+        <Section title="Отклонения от целей" note={deviations.length ? 'главное на сейчас' : 'цели выполнены'}>
+          {deviations.length ? (
+            <div className="overview-deviations">
+              {deviations.map(({ goal, value, target }) => (
+                <button key={goal.id} type="button" className="overview-deviation" onClick={() => onGo(SIDES[goal.side].pane)}>
+                  <strong>{format(value, goal.unit)}</strong>
+                  <span>{goal.label}</span>
+                  <small>{'цель ' + (goal.aim < 0 ? 'не больше ' : '') + format(target, goal.unit)}<IconChevron size={14} className="side__chevron" /></small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <Panel><Empty icon={IconCheck} title="Цели выполнены" text="Сейчас отклонений по заданным целям нет." /></Panel>
           )}
-          {year.forecast ? (
-            <p className="small muted year__forecast">
-              {'При том же темпе к концу года — около ' + formatMoney(year.forecast)
-                + (yearTarget ? (year.forecast >= yearTarget ? ': цель по силам.' : ', цель ' + formatMoney(yearTarget) + ' при таком темпе не выйдет.') : '.')}
-            </p>
-          ) : null}
-        </Panel>
-      </Section>
+        </Section>
 
-      {selectedSignal && (
-        <Sheet title={selectedSignal.sheetTitle(selectedSignal.list.length)} onClose={() => setActiveSignal(null)}>
-          <p className="small muted overview-signal-sheet__note">{selectedSignal.note}</p>
-          <People
-            list={selectedSignal.list}
-            note={selectedSignal.line}
-            at={selectedSignal.at}
-            onOpen={(client, at) => { setActiveSignal(null); onOpenClient(client, at); }}
-          />
-        </Sheet>
-      )}
+        <Section title={'Год · ' + year.year} note="выручка с января">
+          <Panel pad className="year">
+            <div className="year__row">
+              <span className="year__value">{formatMoney(year.revenue || 0)}</span>
+              {yearTarget ? (
+                <span className={'side__goal' + (yearDone ? ' side__goal--done' : '')}>
+                  {yearDone && <IconCheck size={12} />}
+                  {toGoal(year.revenue, yearTarget, '₽')}
+                </span>
+              ) : null}
+            </div>
+            {yearBar !== null && (
+              <span className={'bar' + (yearDone ? ' bar--done' : '')} role="progressbar" aria-valuenow={yearBar} aria-valuemin={0} aria-valuemax={100}>
+                <span className="bar__fill" style={{ width: yearBar + '%' }} />
+              </span>
+            )}
+            {year.forecast ? (
+              <p className="small muted year__forecast">
+                {'При том же темпе к концу года — около ' + formatMoney(year.forecast)
+                  + (yearTarget ? (year.forecast >= yearTarget ? ': цель по силам.' : ', цель ' + formatMoney(yearTarget) + ' при таком темпе не выйдет.') : '.')}
+              </p>
+            ) : null}
+          </Panel>
+        </Section>
+      </details>
+
+      {activeSignal && <SummarySignalSheet id={activeSignal} signals={data.signals}
+        onOpenClient={onOpenClient} onClose={() => setActiveSignal(null)} />}
 
       {editing && (
         <GoalsSheet

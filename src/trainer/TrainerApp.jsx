@@ -1,7 +1,7 @@
 import { useReturnScroll } from '../scroll.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clients, Lost, Settings, ClientManage } from './screens.jsx';
-import { Finance, Clients as ClientMetrics, Processes } from './Metrics.jsx';
+import { Finance, Clients as ClientMetrics } from './Metrics.jsx';
 import { Dashboard } from './Dashboard.jsx';
 import { Expenses } from './Expenses.jsx';
 import ClientApp from '../client/ClientApp.jsx';
@@ -128,7 +128,6 @@ const DASH_PANES = [
   // на одно и то же (аудит 24.10.2026)
   { value: 'finance', label: 'Деньги' },
   { value: 'clients', label: 'Клиенты' },
-  { value: 'processes', label: 'Занятия' },
 ];
 
 /**
@@ -406,9 +405,8 @@ function TrainerPanel({ me }) {
           </SubNav>
         )}
         {view === 'dashboard' && (
-          <SubNav>
-            <Chips items={DASH} value={dashPane} onChange={switchPane(setDashPane)} variant="nav" />
-          </SubNav>
+          <Chips items={DASH} value={dashPane} onChange={switchPane(setDashPane)}
+            variant="nav" className="summary-nav" label="Разделы сводки" />
         )}
         {view === 'library' && (
           <SubNav>
@@ -477,16 +475,15 @@ function TrainerPanel({ me }) {
           hidden={view !== 'dashboard'}
           data-kept={tabs.kept('dashboard') ? '' : undefined}
         >
-          <div key={dashPane}>
+          <div key={dashPane} className="summary-content">
             {dashPane === 'overview' && (
               <Dashboard
-                onGo={switchPane(setDashPane)}
+                onGo={(pane) => switchPane(setDashPane)(['process', 'processes'].includes(pane) ? 'clients' : pane)}
                 onOpenClient={(client, at) => openCard(client, at, 'К обзору')}
               />
             )}
-            {dashPane === 'finance' && <Finance />}
+            {dashPane === 'finance' && <Finance onExpenses={() => go('expenses')} />}
             {dashPane === 'clients' && <ClientMetrics onOpenClient={(client, at) => openCard(client, at, 'К клиентам')} />}
-            {dashPane === 'processes' && <Processes />}
           </div>
         </main>
       )}

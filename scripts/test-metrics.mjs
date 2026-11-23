@@ -84,7 +84,7 @@ vm.runInThisContext('(function(require,module,exports){' + output.outputFiles[0]
   createRequire(import.meta.url), module, module.exports,
 );
 
-const { Finance, Clients, Processes, Expenses, Dashboard, BarChart, resetPeriod, useLeaveGuard } = module.exports;
+const { Finance, Clients, Expenses, Dashboard, BarChart, resetPeriod, useLeaveGuard } = module.exports;
 
 /* ==========================================================================
  * Инструменты
@@ -254,7 +254,7 @@ test('прибыль стоит крупно, а выручка и расход�
 
   const text = screenText(tree);
 
-  assert.match(text, /Прибыль · Сентябрь 2026/);
+  assert.match(text, /Прибыль за месяц/);
   assert.match(text, /240 400 ₽/);
   assert.match(text, /336 400 ₽/, 'выручка');
   assert.match(text, /96 000 ₽/, 'расходы');
@@ -307,7 +307,7 @@ test('убыток виден числом и не окрашен как усп�
   const { tree } = draw(Finance, () => metrics({ now: { revenue: 10000, expenses: 30000, profit: -20000 } }));
 
   assert.match(screenText(tree), /−20 000 ₽/);
-  const lead = tree.root.find((node) => node.props.className === 'lead enter');
+  const lead = tree.root.find((node) => node.type === 'div' && node.props.className?.endsWith('summary-hero'));
   assert.ok(lead, 'нейтральная карточка не объявляет прибыль успешной при падении');
 });
 
@@ -383,7 +383,7 @@ test('год сравнивается с прошлым, текущий — с �
   assert.deepEqual(asked[asked.length - 1].params, { year: new Date().getFullYear() });
 
   const text = screenText(tree);
-  assert.match(text, /Прибыль · 2026/);
+  assert.match(text, /Прибыль за год/);
   assert.match(text, /\+200 000 ₽ к 2025 году/);
   assert.match(text, /изменение к 2025 году \(январь — сентябрь\)/);
   assert.match(text, /Касса за год/);
@@ -393,8 +393,8 @@ test('год сравнивается с прошлым, текущий — с �
 test('компактный график года запрашивает годы и выделяет выбранный год', () => {
   const { tree, charted } = draw(Finance, (action, params) => {
     if (action === 'trainer.metrics.series') return { by: params.by, points: params.by === 'year'
-      ? [2024, 2025, 2026].map((year) => ({ key: String(year), label: String(year), finance: { profit: year * 100 }, partial: year === 2026 }))
-      : ['2026-09', '2026-10', '2026-11'].map((month) => ({ key: month, finance: { profit: 100 } })) };
+      ? [2024, 2025, 2026].map((year) => ({ key: String(year), label: String(year), finance: { revenue: year * 100 }, partial: year === 2026 }))
+      : ['2026-09', '2026-10', '2026-11'].map((month) => ({ key: month, finance: { revenue: 100 } })) };
     return params.year ? { year: params.year, previousYear: params.year - 1, throughMonth: 11, ...metrics() } : metrics();
   });
   press(tree, 'Год');
@@ -426,10 +426,10 @@ test('выбранный период сохраняется при перехо
     return { loading: false, data: answer(action, params), error: null, reload() {} };
   };
   let tree;
-  act(() => { tree = renderer.create(React.createElement(Processes)); });
+  act(() => { tree = renderer.create(React.createElement(Clients)); });
 
   assert.equal(asked[0].year, new Date().getFullYear());
-  assert.match(screenText(tree), /Тренировок · 2026/);
+  assert.match(screenText(tree), /Клиенты и занятия за год/);
 });
 
 /* ==========================================================================
@@ -437,7 +437,7 @@ test('выбранный период сохраняется при перехо
  * ========================================================================== */
 
 test('процессы показывают доли и тех, кто пропал', () => {
-  const { tree } = draw(Processes, () => metrics({
+  const { tree } = draw(Clients, () => metrics({
     process: {
       activeClients: 20, measuredClients: 12, measuredShare: 60, trainings: 178,
       perClient: 8.9, withPlan: 18, planShare: 90, silentClients: 3,
@@ -447,19 +447,19 @@ test('процессы показывают доли и тех, кто проп�
 
   const text = screenText(tree);
 
-  assert.match(text, /Тренировок · Сентябрь 2026/);
-  assert.match(text, /по 8,9 на клиента/);
+  assert.match(text, /Клиенты и занятия за месяц/);
+  assert.match(text, /На клиента 8,9/);
   assert.match(text, /60%/, 'доля с замером');
   assert.match(text, /90%/, 'доля с программой');
   assert.match(text, /Не приходили месяц/);
 });
 
 test('пустые процессы не врут про долю', () => {
-  const { tree } = draw(Processes, () => metrics());
+  const { tree } = draw(Clients, () => metrics());
   const text = screenText(tree);
 
   assert.ok(!/NaN|Infinity|undefined/.test(text), 'в тексте экрана: ' + text);
-  assert.match(text, /занятий за этот период ещё не было/);
+  assert.match(text, /Нет занимающихся за выбранный период/);
 });
 
 /* ==========================================================================
@@ -683,11 +683,11 @@ const barsOf = (tree) => tree.root.findAll(
   { deep: true },
 );
 
-test('график показывает прибыль, пока не выбрали другое', () => {
+test('график показывает выручку, пока не выбрали другое', () => {
   const { tree } = draw(Finance, answerWithSeries);
 
   const title = tree.root.find((node) => node.props.className === 'chart-card__title');
-  assert.equal(textOf(title.props.children), 'Прибыль');
+  assert.equal(textOf(title.props.children), 'Выручка');
 });
 
 test('короткая динамика прибыли использует один ряд без цветового шума', () => {
@@ -750,7 +750,7 @@ test('цифры «на сегодня» на график не переключ
     { deep: true },
   );
   assert.equal(clickable.length, 0);
-  assert.match(screenText(tree), /Оплачено вперёд — обязательство провести занятия, не выручка/);
+  assert.match(screenText(tree), /Предоплаты — обязательство провести занятия. Это не выручка./);
   assert.doesNotMatch(screenText(tree), /В банке|Хватит месяцев/);
 });
 
@@ -770,7 +770,7 @@ test('клиенты: удержание словами, новые и ушед�
   }));
 
   const text = screenText(tree);
-  assert.match(text, /Клиентов · Сентябрь 2026/);
+  assert.match(text, /15 клиентов/);
   assert.match(text, /Удержание 86,7%/);
   assert.match(text, /13 из 15 занимавшихся в прошлом месяце вернулись/);
   assert.match(text, /2 новых · 1 ушёл · 9 продлили/);
@@ -801,7 +801,7 @@ test('без стороны «Клиенты» в ответе экран рис
   const data = metrics();
   delete data.clients;
   const { tree } = draw(Clients, () => data);
-  assert.match(screenText(tree), /Клиентов · Сентябрь 2026 0/);
+  assert.match(screenText(tree), /Клиенты и занятия за месяц 0 клиентов/);
 });
 
 /* ==========================================================================
@@ -816,13 +816,14 @@ const STATS = {
 };
 
 test('срывы: отмены, переносы и доля — с красным ростом', () => {
-  const { tree, stats } = draw(Processes, (action) => (action === 'trainer.schedule.stats' ? STATS : metrics({
+  const { tree, stats } = draw(Clients, (action) => (action === 'trainer.schedule.stats' ? STATS : metrics({
     process: { trainings: 100, cancels: 6, cancelsLate: 3, moves: 6, cancelShare: 5.7 },
     processBefore: { trainings: 90, cancels: 2, cancelsLate: 0, moves: 1, cancelShare: 2.2 },
   })));
 
+  press(tree, 'Кто отменял ›');
   const text = screenText(tree);
-  assert.match(text, /Срывы/);
+  assert.match(text, /Отмены и переносы/);
   assert.match(text, /Доля отмен/);
   assert.match(text, /Кто отменяет/, 'имена — под теми же цифрами');
   assert.match(text, /Анна Морозова/);
@@ -842,16 +843,17 @@ test('срывы: отмены, переносы и доля — с красны
 test('старый сервер без срывов: раздела нет, экран цел', () => {
   const data = metrics({ process: { trainings: 10 } });
   delete data.process.now.cancels;
-  const { tree } = draw(Processes, (action) => (action === 'trainer.schedule.stats' ? null : data));
+  const { tree } = draw(Clients, (action) => (action === 'trainer.schedule.stats' ? null : data));
   const text = screenText(tree);
-  assert.doesNotMatch(text, /Срывы/);
+  assert.match(text, /Отмены и переносы/);
   assert.ok(!/NaN|undefined/.test(text));
 });
 
 test('шаг назад в процессах двигает и период «кто отменяет»', () => {
-  const { tree, stats } = draw(Processes, (action) => (action === 'trainer.schedule.stats' ? STATS : metrics()));
+  const { tree, stats } = draw(Clients, (action) => (action === 'trainer.schedule.stats' ? STATS : metrics({ process: { cancels: 1 } })));
   press(tree, 'Предыдущий месяц');
 
+  press(tree, 'Кто отменял ›');
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
   assert.equal(stats[stats.length - 1].from, from);
@@ -898,11 +900,11 @@ test('обзор: выручка к сегодняшнему числу прот
 
   assert.match(text, /Октябрь 2026 Цели · изменить Выручка к 20-му ↑ 9 %/);
   assert.match(text, /216 850 ₽/);
-  assert.match(text, /на 9% больше, чем к 20 сентября \(199 800 ₽\)/);
-  assert.match(text, /89 · было 82/, 'тренировок — тоже к тому же числу');
+  assert.match(text, /к 20 сентября было 199 800 ₽/);
+  assert.match(text, /Занятий 89/);
 
   const pace = tree.root.find((node) => String(node.props.className || '').includes('overview-pace'));
-  assert.match(pace.props.className, /overview-pace--good/, 'темп выше прошлого — зелёным');
+  assert.match(pace.props.className, /summary-hero--accent/);
 });
 
 test('обзор: показывает только два самых больших отклонения от целей', () => {
@@ -911,8 +913,8 @@ test('обзор: показывает только два самых больш
 
   assert.match(text, /Отклонения от целей главное на сейчас/);
   assert.match(text, /50% Доля с замером цель 100%/);
-  assert.match(text, /4,5 ч Часов обучения цель 8 ч/);
-  assert.doesNotMatch(text, /Средняя оплата/, 'третье отклонение не раздувает обзор');
+  assert.doesNotMatch(text, /Часов обучения/);
+  assert.match(text, /Средняя оплата/);
 
   const deviations = tree.root.findAll((node) => node.type === 'button' && node.props.className === 'overview-deviation', { deep: true });
   assert.equal(deviations.length, 2);
@@ -962,12 +964,15 @@ test('обзор: сигналы с именами открывают нужны
   assert.deepEqual(opened, [['Мария Волкова', 'plan'], ['Евгений', 'payments'], ['Дмитрий Соколов', 'progress']]);
 });
 
-test('обзор без сигналов оставляет компактные действия и честное пустое состояние', () => {
-  const { tree } = draw(Dashboard, () => overview({ signals: { silent: [], packages: [], measureDue: [], noPlan: [] } }), { props: quiet });
-  assert.match(screenText(tree), /Требуют внимания всё в порядке 0 Не приходят 0 Пакет и долг/);
-
-  press(tree, 'Не приходят: 0');
-  assert.match(screenText(tree), /Не приходят · 0.*Всё в порядке.*Сейчас в этой группе никого нет/);
+test('обзор: для нулевых сигналов нейтральное оформление и пустое состояние', () => {
+  const empty = { silent: [], packages: [], measureDue: [], noPlan: [] };
+  const { tree } = draw(Dashboard, () => overview({ signals: empty }), { props: quiet });
+  assert.match(screenText(tree), /Сейчас нет клиентов, которым требуется внимание/);
+  const withSignals = draw(Dashboard, () => overview({ signals: {
+    ...empty, packages: [{ row: 4, name: 'Евгений', balance: -10 }],
+  } }), { props: quiet }).tree;
+  assert.equal(withSignals.root.findByProps({ 'data-signal': 'silent' }).props['data-empty'], '');
+  assert.equal(withSignals.root.findByProps({ 'data-signal': 'packages' }).props['data-empty'], undefined);
 });
 
 test('обзор: пустой месяц без целей не показывает NaN и не красит', () => {
@@ -1082,65 +1087,18 @@ test('клиенты: цель удержания и актуальный сиг
   assert.doesNotMatch(screenText(tree), /Анна Морозова/);
 });
 
-test('процессы: развитие — часы из журнала, запись уходит на сервер, удаление тоже', async () => {
-  const learning = { month: '2026-09', hours: 4.5, entries: [{ id: 7, day: '2026-09-12', hours: 1.5, note: 'Семинар' }, { id: 8, day: '2026-09-20', hours: 3, note: null }] };
-  const { tree, sent } = draw(Processes, (action) => (action === 'trainer.learning.list' ? learning
-    : action === 'trainer.schedule.stats' ? null
-      : metrics({ development: { learningHours: 4.5, learningEntries: 2, ownWorkouts: 9 } })), {
-    onMutate: () => ({ id: 9 }),
-  });
+
+test('FT-818 v3: клиенты и занятия объединены, развитие отсутствует', () => {
+  const { tree } = draw(Clients, action => action === 'trainer.schedule.stats' ? STATS : metrics({
+    clients: { active: 15, retention: 76 },
+    process: { trainings: 41, cancels: 6, moves: 6, cancelShare: 12.7, planShare: 90, measuredShare: 60 },
+    development: { learningHours: 4.5, ownWorkouts: 9 },
+  }));
   const text = screenText(tree);
-
-  assert.match(text, /Моё развитие/);
-  assert.match(text, /Часов обучения 4,5 ч/);
-  assert.match(text, /Своих тренировок 9/);
-  assert.match(text, /12\.09 · Семинар 1,5 ч/);
-
-  press(tree, 'Записать');
-  assert.match(screenText(tree), /Записать обучение/);
-  type(tree, 'Часов', '2');
-  type(tree, 'Что это было', 'Книга');
-  // Две кнопки «Записать»: открывающая лист и его же «готово» — нужна вторая
-  const buttons = tree.root.findAll((node) => node.type === 'button' && textOf(node.props.children).trim() === 'Записать', { deep: true });
-  act(() => { buttons[buttons.length - 1].props.onClick(); });
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
-
-  assert.equal(sent[0].action, 'trainer.learning.add');
-  assert.equal(sent[0].params.hours, '2');
-  assert.equal(sent[0].params.note, 'Книга');
-
-  press(tree, 'Удалить запись 12.09');
-  await act(async () => { await Promise.resolve(); });
-  assert.equal(sent[1].action, 'trainer.learning.delete');
-  assert.equal(sent[1].params.id, 7);
-});
-
-
-test('FT-818: занятия сохраняют компактный порядок и раскрываемую историю', () => {
-  const { tree } = draw(Processes, action => action === 'trainer.schedule.stats' ? STATS : metrics({ process: { trainings: 41, cancels: 6, moves: 6, cancelShare: 12.7, planShare: 90, measuredShare: 60 } }));
-  const text = screenText(tree);
-  assert.ok(text.indexOf('Как ведём клиентов') < text.indexOf('Срывы'));
-  assert.ok(text.indexOf('Срывы') < text.indexOf('Моё развитие'));
-  assert.ok(text.indexOf('Моё развитие') < text.indexOf('Все показатели и история'));
-  const details = tree.root.findAllByType('details');
-  assert.ok(details.some(n => textOf(n.props.children).includes('Кто отменял')));
-  assert.ok(details.some(n => textOf(n.props.children).includes('Все показатели и история')));
-  assert.doesNotMatch(text, /NaN|undefined|Infinity/);
-});
-
-
-test('FT-818 ревью: список отмен содержит людей, а показатели не дублируются', () => {
-  const { tree } = draw(Processes, action => action === 'trainer.schedule.stats' ? STATS : metrics({ process: { cancels: 6, cancelsLate: 3, moves: 6, cancelShare: 5.7 } }));
-  const details = tree.root.findAllByType('details');
-  const people = details.find(n => n.props.className?.includes('metrics-cancellations'));
-  const history = details.find(n => n.props.className?.includes('metrics-process-details'));
-  assert.match(textOf(people), /Анна Морозова/);
-  assert.doesNotMatch(textOf(people), /Доля отмен|Из них поздних/);
-  assert.match(textOf(history), /Доля отмен/);
-  assert.match(textOf(history), /Из них поздних/);
-  assert.match(textOf(history), /Клиентов в работе/);
-  assert.match(textOf(history), /Не приходили месяц/);
-  for (const label of ['Отмен', 'Переносов', 'Из них поздних', 'Доля отмен']) {
-    assert.equal(tree.root.findAll(n => n.type === 'span' && n.props.className === 'rows__label' && textOf(n.props.children) === label).length, 1, label + ' только в истории');
-  }
+  assert.match(text, /15 клиентов.*Проведено 41.*Удержание 76%.*Ведение клиентов.*Отмены и переносы.*Источники, история и все показатели/);
+  assert.doesNotMatch(text, /Моё развитие|Часов обучения|Своих тренировок|Анна Морозова|NaN|undefined/);
+  press(tree, 'Кто отменял ›');
+  const dialog = tree.root.findByProps({ role: 'dialog' });
+  assert.match(textOf(dialog), /Анна Морозова.*заболела/);
+  assert.doesNotMatch(textOf(dialog), /Доля отмен|Из них поздних/);
 });
