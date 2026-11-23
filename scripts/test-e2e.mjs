@@ -351,6 +351,10 @@ test('FT-818: занятия — отмены, ведение и обучени�
       if (process.env.SHOT_FT818_STAGE3) await phone.screenshot({ path: `${process.env.SHOT_FT818_STAGE3}-${width}-${colorScheme}.png`, fullPage: true });
       await phone.locator('.metrics-cancellations summary').click();
       await phone.getByRole('heading', { name: 'Кто отменяет' }).waitFor();
+      await phone.locator('.metrics-process-details > summary').click();
+      assert.equal(await phone.locator('.metrics-cancellations .rows__label').filter({ hasText: /^Доля отмен$/ }).count(), 0);
+      assert.equal(await phone.locator('.metrics-process-details .rows__label').filter({ hasText: /^Доля отмен$/ }).count(), 1);
+      await phone.locator('.metrics-process-details > summary').click();
       await phone.getByRole('button', { name: 'Записать', exact: true }).click();
       const dialog = phone.getByRole('dialog', { name: 'Записать обучение' });
       await dialog.waitFor();

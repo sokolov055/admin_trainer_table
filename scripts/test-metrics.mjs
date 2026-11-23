@@ -1127,3 +1127,20 @@ test('FT-818: занятия сохраняют компактный поряд�
   assert.ok(details.some(n => textOf(n.props.children).includes('Все показатели и история')));
   assert.doesNotMatch(text, /NaN|undefined|Infinity/);
 });
+
+
+test('FT-818 ревью: список отмен содержит людей, а показатели не дублируются', () => {
+  const { tree } = draw(Processes, action => action === 'trainer.schedule.stats' ? STATS : metrics({ process: { cancels: 6, cancelsLate: 3, moves: 6, cancelShare: 5.7 } }));
+  const details = tree.root.findAllByType('details');
+  const people = details.find(n => n.props.className?.includes('metrics-cancellations'));
+  const history = details.find(n => n.props.className?.includes('metrics-process-details'));
+  assert.match(textOf(people), /Анна Морозова/);
+  assert.doesNotMatch(textOf(people), /Доля отмен|Из них поздних/);
+  assert.match(textOf(history), /Доля отмен/);
+  assert.match(textOf(history), /Из них поздних/);
+  assert.match(textOf(history), /Клиентов в работе/);
+  assert.match(textOf(history), /Не приходили месяц/);
+  for (const label of ['Отмен', 'Переносов', 'Из них поздних', 'Доля отмен']) {
+    assert.equal(tree.root.findAll(n => n.type === 'span' && n.props.className === 'rows__label' && textOf(n.props.children) === label).length, 1, label + ' только в истории');
+  }
+});

@@ -790,7 +790,6 @@ export function Processes() {
         ]} />
         <details className="metrics-more metrics-cancellations">
           <summary>Кто отменял</summary>
-          <Panel><Rows>{row('cancels')}{row('cancelsLate')}{row('moves')}{row('cancelShare')}</Rows></Panel>
           <ScheduleStats range={rangeOf(state)} />
         </details>
       </Section>}
