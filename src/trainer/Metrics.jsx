@@ -166,21 +166,27 @@ export function comparisonLabels(data) {
     : [monthLabel(data.month), monthLabel(data.previousMonth)];
 }
 
+const MIN_METRICS_YEAR = 2000;
+
 function CompactPeriodBar({ state, update, data }) {
   const [draft, setDraft] = useState(null);
   const isYear = state.period === 'year';
   const currentYear = new Date().getFullYear();
+  const canBack = !isYear || state.year > MIN_METRICS_YEAR;
+  const draftYear = Number(draft?.year);
+  const validYear = /^\d{4}$/.test(String(draft?.year ?? '')) && draftYear >= MIN_METRICS_YEAR && draftYear <= currentYear;
+  const invalidYear = draft?.period === 'year' && !validYear;
   const canForward = isYear ? state.year < currentYear : shiftMonth(state.month, 1) <= thisMonth();
   const labels = data ? comparisonLabels(data) : null;
   const fallbackPast = isYear ? String(state.year - 1) : monthLabel(shiftMonth(state.month, state.compare === 'year' ? -12 : -1));
   const step = (direction) => {
-    if (direction > 0 && !canForward) return;
+    if ((direction > 0 && !canForward) || (direction < 0 && !canBack)) return;
     update(isYear ? { year: state.year + direction } : { month: shiftMonth(state.month, direction) });
   };
   return <div className="metrics-period">
     <div className="metrics-period__line">
-      <button type="button" className="icon-button" onClick={() => step(-1)} aria-label={isYear ? 'Предыдущий год' : 'Предыдущий месяц'}><IconBack size={18} /></button>
-      <button type="button" className="metrics-period__choose" aria-haspopup="dialog" onClick={() => setDraft({ ...state })}>
+      <button type="button" className="icon-button" onClick={() => step(-1)} disabled={!canBack} aria-label={isYear ? 'Предыдущий год' : 'Предыдущий месяц'}><IconBack size={18} /></button>
+      <button type="button" className="metrics-period__choose" aria-haspopup="dialog" onClick={() => setDraft({ ...state, year: String(state.year) })}>
         <strong>{isYear ? state.year : monthLabel(state.month)} <span aria-hidden="true">▾</span></strong>
         <small>Сравнение · {labels ? labels[1] : fallbackPast}</small>
       </button>
@@ -188,14 +194,15 @@ function CompactPeriodBar({ state, update, data }) {
         aria-label={isYear ? 'Следующий год' : 'Следующий месяц'}><IconBack size={18} /></button>
     </div>
     {draft && <Sheet title="Период и сравнение" onClose={() => setDraft(null)}
-      onDone={() => { update(draft); setDraft(null); }} done="Применить">
+      onDone={() => { if (invalidYear) return; update({ ...draft, year: validYear ? draftYear : state.year }); setDraft(null); }} done="Применить" doneDisabled={invalidYear}>
       <div className="metrics-period__form">
         <label>Показывать<select value={draft.period} onChange={e => setDraft({ ...draft, period: e.target.value })}>
           <option value="month">Месяц</option><option value="year">Год</option>
         </select></label>
         <label>Период{draft.period === 'year'
-          ? <input type="number" min="1" max={currentYear} value={draft.year} onChange={e => setDraft({ ...draft, year: Math.max(1, Math.min(currentYear, Math.trunc(Number(e.target.value)) || currentYear)) })} />
+          ? <input type="number" min={MIN_METRICS_YEAR} max={currentYear} step="1" value={draft.year} aria-invalid={invalidYear || undefined} aria-describedby={invalidYear ? 'metrics-period-year-error' : undefined} onChange={e => setDraft({ ...draft, year: e.target.value })} />
           : <input type="month" max={thisMonth()} value={draft.month} onChange={e => { if (/^\d{4}-\d{2}$/.test(e.target.value) && e.target.value <= thisMonth()) setDraft({ ...draft, month: e.target.value }); }} />}</label>
+        {invalidYear && <p id="metrics-period-year-error" role="alert" className="small">Укажите целый год от {MIN_METRICS_YEAR} до {currentYear}.</p>}
         {draft.period === 'month' && <label>Сравнить<select value={draft.compare} onChange={e => setDraft({ ...draft, compare: e.target.value })}>
           <option value="month">С прошлым месяцем</option><option value="year">С тем же месяцем прошлого года</option>
         </select></label>}

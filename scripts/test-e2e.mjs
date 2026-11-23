@@ -325,6 +325,19 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.locator('.metrics-chart-options summary').click();
       await phone.locator('.metrics-period__choose').click();
       await phone.getByRole('dialog').locator('select').first().selectOption('year');
+      const yearField = phone.getByRole('dialog').locator('input[type=number]');
+      const applyPeriod = phone.getByRole('button', { name: 'Применить', exact: true });
+      for (const value of ['', '1', '1999', String(new Date().getFullYear() + 1), '2020.5']) {
+        await yearField.fill(value);
+        assert.equal(await yearField.inputValue(), value, 'год можно очистить и перепечатать');
+        assert.equal(await applyPeriod.isDisabled(), true, 'невалидный год не применяется');
+      }
+      await yearField.fill('2000');
+      await applyPeriod.click();
+      await phone.getByRole('button', { name: 'Предыдущий год' }).waitFor();
+      assert.equal(await phone.getByRole('button', { name: 'Предыдущий год' }).isDisabled(), true);
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('input[type=number]').fill(String(new Date().getFullYear()));
       await phone.getByRole('button', { name: 'Применить', exact: true }).click();
       await phone.getByRole('button', { name: 'Предыдущий год' }).waitFor();
       const selectedYear = (await phone.locator('.metrics-period__line strong').innerText()).replace(' ▾', '').trim();
@@ -414,6 +427,19 @@ test('FT-818: клиенты и занятия — отмены, ведение 
       assert.equal(await phone.getByRole('heading', { name: 'Кого вернуть' }).count(), 0);
       await phone.locator('.metrics-period__choose').click();
       await phone.getByRole('dialog').locator('select').first().selectOption('year');
+      const yearField = phone.getByRole('dialog').locator('input[type=number]');
+      const applyPeriod = phone.getByRole('button', { name: 'Применить', exact: true });
+      for (const value of ['', '1', '1999', String(new Date().getFullYear() + 1), '2020.5']) {
+        await yearField.fill(value);
+        assert.equal(await yearField.inputValue(), value, 'год можно очистить и перепечатать');
+        assert.equal(await applyPeriod.isDisabled(), true, 'невалидный год не применяется');
+      }
+      await yearField.fill('2000');
+      await applyPeriod.click();
+      await phone.getByRole('button', { name: 'Предыдущий год' }).waitFor();
+      assert.equal(await phone.getByRole('button', { name: 'Предыдущий год' }).isDisabled(), true);
+      await phone.locator('.metrics-period__choose').click();
+      await phone.getByRole('dialog').locator('input[type=number]').fill(String(new Date().getFullYear()));
       await phone.getByRole('button', { name: 'Применить', exact: true }).click();
       await phone.getByRole('button', { name: 'Предыдущий год' }).waitFor();
       await phone.getByRole('heading', { name: 'Ведение клиентов' }).waitFor();

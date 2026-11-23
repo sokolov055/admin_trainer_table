@@ -1099,7 +1099,7 @@ const SHEET_LEAVE = 220;
  * gestures.jsx. С набранной формой (`dirty`) лист тянется туго и всегда
  * возвращается: как и касание мимо, смахивание ввод не стирает.
  */
-export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = false, locked = false, focus, className, closeRef, onLeaving, action = null, children }) {
+export function Sheet({ title, onClose, onDone, done = 'Готово', doneDisabled = false, dirty = false, locked = false, focus, className, closeRef, onLeaving, action = null, children }) {
   const [leaving, setLeaving] = useState(false);
   const [covered, setCovered] = useState(0);
   const panel = useRef(null);
@@ -1307,7 +1307,7 @@ export function Sheet({ title, onClose, onDone, done = 'Готово', dirty = f
             <button type="button" className="sheet__close" aria-label="Закрыть" onClick={() => close(live.current.onClose)}><IconClose size={18} /></button>
           </header>
           <div className="sheet__body">{children}</div>
-          {onDone && <button type="button" className="button button--primary button--block sheet__done" onClick={() => close(onDone)}>{done}</button>}
+          {onDone && <button type="button" className="button button--primary button--block sheet__done" disabled={doneDisabled} onClick={() => { if (!doneDisabled) close(onDone); }}>{done}</button>}
         </section>
       </div>
     </SheetContext.Provider>,

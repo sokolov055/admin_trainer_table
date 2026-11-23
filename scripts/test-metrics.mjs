@@ -1125,15 +1125,16 @@ test('FT-818 v3: клиенты и занятия объединены, разв
 
 test('FT-818: сравнение клиентов различает ноль и отсутствие, переключает занятия и удержание', () => {
   const { tree } = draw(Clients, () => metrics({ clients: { active: 0, retention: null }, clientsBefore: { active: 4, retention: 0 }, process: { trainings: 12 }, processBefore: { trainings: 0 } }));
-  const comparison = () => textOf(tree.root.findByProps({ className: 'finance-comparison' }));
-  assert.match(comparison(), /0/);
-  assert.match(comparison(), /4/);
+  const values = () => tree.root.findByProps({ className: 'finance-comparison' })
+    .findAllByProps({ className: 'finance-comparison__label' }).map(row => textOf(row.findByType('strong')));
+  assert.deepEqual(values(), ['0', '4']);
   press(tree, 'Занятия');
-  assert.match(comparison(), /12/);
-  assert.match(comparison(), /0/);
+  assert.deepEqual(values(), ['12', '0']);
   press(tree, 'Удержание');
-  assert.match(comparison(), /Нет данных/);
-  assert.match(comparison(), /0\s?%/);
+  assert.deepEqual(values(), ['Нет данных', '0%']);
+  const missing = draw(Clients, () => metrics({ clients: { active: null }, clientsBefore: { active: 0 } })).tree;
+  const rows = missing.root.findByProps({ className: 'finance-comparison' }).findAllByProps({ className: 'finance-comparison__label' });
+  assert.deepEqual(rows.map(row => textOf(row.findByType('strong'))), ['Нет данных', '0']);
 });
 
 test('FT-818: закрытие листа не применяет черновик', () => {
@@ -1142,10 +1143,14 @@ test('FT-818: закрытие листа не применяет чернови
   act(() => tree.root.findAllByType('select')[0].props.onChange({ target: { value: 'year' } }));
   assert.equal(asked.at(-1).params.year, undefined);
   const yearInput = () => tree.root.findAllByType('input').find(n => n.props.type === 'number');
-  act(() => yearInput().props.onChange({ target: { value: '9999' } }));
-  assert.equal(yearInput().props.value, new Date().getFullYear());
-  act(() => yearInput().props.onChange({ target: { value: '2020.5' } }));
-  assert.equal(yearInput().props.value, 2020);
+  for (const value of ['', '1', '1999', '9999', '2020.5', 'abc']) {
+    act(() => yearInput().props.onChange({ target: { value } }));
+    assert.equal(yearInput().props.value, value, 'черновик не подменяется при вводе');
+    assert.equal(button(tree, 'Применить').props.disabled, true);
+    assert.equal(asked.at(-1).params.year, undefined, 'невалидный год не отправлен');
+  }
+  act(() => yearInput().props.onChange({ target: { value: '2020' } }));
+  assert.equal(button(tree, 'Применить').props.disabled, false);
   act(() => tree.root.find(n => typeof n.type === 'function' && n.props.title === 'Период и сравнение').props.onClose());
   assert.equal(asked.at(-1).params.year, undefined);
   assert.equal(button(tree, 'Следующий месяц').props.disabled, true);
