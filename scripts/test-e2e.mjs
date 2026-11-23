@@ -257,6 +257,50 @@ test('FT-818: обзор сводки — график, листы и клави
   } finally { await context.close(); }
 });
 
+test('FT-818: деньги и клиенты — компактные показатели, график и источники на 320/390 px', async () => {
+  for (const width of [320, 390]) for (const colorScheme of ['light', 'dark']) {
+    const context = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ru-RU', colorScheme, reducedMotion: 'reduce', hasTouch: true });
+    const phone = await context.newPage();
+    const errors = [];
+    phone.on('pageerror', (error) => errors.push(error.message));
+    try {
+      await phone.addInitScript((scheme) => { localStorage.setItem('auth_token_v1', 'demo-session'); localStorage.setItem('app_theme_v1', scheme); }, colorScheme);
+      await phone.goto(origin + '/?mockRole=trainer');
+      await phone.getByRole('button', { name: 'Сводка', exact: true }).click();
+      await phone.locator('.chips--nav .chip').filter({ hasText: 'Деньги' }).click();
+      await phone.getByText('Откуда сумма').waitFor();
+      const reconcile = phone.getByText(/Разобрать расхождения/);
+      if (await reconcile.count()) {
+        await reconcile.click();
+        await phone.getByRole('button', { name: 'Верна таблица' }).waitFor();
+        await reconcile.click();
+      }
+      assert.match(await phone.locator('.metrics-tiles').innerText(), /Выручка за проведённое[\s\S]*Касса за месяц[\s\S]*Оплачено вперёд/);
+      await phone.getByRole('button', { name: /Выручка за проведённое/ }).click();
+      assert.match(await phone.locator('.chart-card__title').innerText(), /Выручка/);
+      await phone.locator('.metrics-more').first().locator('summary').click();
+      await phone.getByText('Отработать это займёт').waitFor();
+      if (process.env.SHOT_FT818_STAGE2) {
+        await phone.evaluate(() => window.scrollTo(0, 0));
+        await phone.screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-money-${width}-${colorScheme}.png` });
+      }
+
+      await phone.locator('.chips--nav .chip').filter({ hasText: 'Клиенты' }).click();
+      await phone.getByText('Удержание', { exact: true }).first().waitFor();
+      await phone.locator('.metrics-retention__track').waitFor();
+      await phone.locator('.metrics-more').last().locator('summary').click();
+      await phone.getByText('По рекомендации', { exact: true }).waitFor();
+      if (process.env.SHOT_FT818_STAGE2) {
+        await phone.evaluate(() => window.scrollTo(0, 0));
+        await phone.screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-clients-${width}-${colorScheme}.png` });
+      }
+      const dimensions = await phone.locator('main.app__body:not([hidden])').evaluate((node) => [node.clientWidth, node.scrollWidth]);
+      assert.deepEqual(dimensions, [width, width], `нет горизонтальной прокрутки: ${width}, ${colorScheme}`);
+      assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+  }
+});
+
 before(async () => {
   execFileSync(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--outDir', 'dist-demo'], {
     cwd: ROOT,

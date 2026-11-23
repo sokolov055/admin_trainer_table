@@ -46,6 +46,7 @@ export default function LedgerCheck() {
       title="Сверка денег"
       note={`${data.state.matched} из ${data.state.clients} сошлись · таблица против сервера с ${formatDate(data.state.since, false)}`}
     >
+      <details className="metrics-more"><summary>Разобрать расхождения · {open.length}</summary>
       <Panel pad>
         <p className="small">
           Перед отказом от Google-таблицы решите по каждому клиенту, чья цифра верна.
@@ -79,6 +80,7 @@ export default function LedgerCheck() {
       ))}
       {problem && <p className="small muted" role="alert">{problem}</p>}
       <div className="ledger-check__gap" aria-hidden="true" />
+      </details>
     </Section>
   );
 }

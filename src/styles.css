@@ -4088,6 +4088,42 @@ code {
 
 .chart-card__title { margin: 0; font-size: var(--text-md); font-weight: 650; }
 
+.metrics-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.metrics-tile {
+  min-width: 0;
+  min-height: 94px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+button.metrics-tile { cursor: pointer; }
+button.metrics-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.metrics-tile--picked { border-color: var(--accent); background: var(--info-fill); }
+.metrics-tile strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.metrics-tile span, .metrics-tile small { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.25; }
+.metrics__tile-note { margin: var(--space-2) 0 0; }
+
+.metrics-retention strong { display: block; font-size: var(--text-num); font-variant-numeric: tabular-nums; }
+.metrics-retention__track { height: 6px; border-radius: 6px; background: var(--border); overflow: hidden; margin-top: var(--space-3); }
+.metrics-retention__track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.metrics-retention p { margin: var(--space-3) 0 0; }
+.metrics-more > summary { min-height: 44px; display: flex; align-items: center; color: var(--accent); cursor: pointer; font-weight: 600; }
+.metrics-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .bars { position: relative; }
 
 .bars__readout {

@@ -485,7 +485,7 @@ function TrainerPanel({ me }) {
               />
             )}
             {dashPane === 'finance' && <Finance />}
-            {dashPane === 'clients' && <ClientMetrics />}
+            {dashPane === 'clients' && <ClientMetrics onOpenClient={(client, at) => openCard(client, at, 'К клиентам')} />}
             {dashPane === 'processes' && <Processes />}
           </div>
         </main>

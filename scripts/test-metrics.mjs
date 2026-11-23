@@ -711,7 +711,7 @@ test('цифры «на сегодня» на график не переключ
     { deep: true },
   );
   assert.equal(clickable.length, 0);
-  assert.match(screenText(tree), /Долг перед клиентами/);
+  assert.match(screenText(tree), /Оплачено вперёд — обязательство провести занятия, не выручка/);
   assert.doesNotMatch(screenText(tree), /В банке|Хватит месяцев/);
 });
 
@@ -732,7 +732,9 @@ test('клиенты: удержание словами, новые и ушед�
 
   const text = screenText(tree);
   assert.match(text, /Клиентов · Сентябрь 2026/);
-  assert.match(text, /удержание 86,7% — 13 из 15 остались/);
+  assert.match(text, /Удержание 86,7%/);
+  assert.match(text, /13 из 15 занимавшихся в прошлом месяце вернулись/);
+  assert.match(text, /2 новых · 1 ушли · 9 продлили/);
   assert.match(text, /Пришли впервые/);
   assert.match(text, /Продлений/);
 });
@@ -742,7 +744,7 @@ test('клиенты без прошлого периода не делят на
   const text = screenText(tree);
 
   assert.ok(!/NaN|Infinity|undefined|null/.test(text), 'в тексте экрана: ' + text);
-  assert.match(text, /сравнить не с чем/);
+  assert.match(text, /Сравнить не с чем/);
   assert.match(text, /прошлый период пуст/, 'прочерк у удержания объясняется');
 });
 
@@ -751,7 +753,7 @@ test('без стороны «Клиенты» в ответе экран рис
   const data = metrics();
   delete data.clients;
   const { tree } = draw(Clients, () => data);
-  assert.match(screenText(tree), /занятий за этот период ещё не было/);
+  assert.match(screenText(tree), /Клиентов · Сентябрь 2026 0/);
 });
 
 /* ==========================================================================
@@ -1010,10 +1012,26 @@ test('клиенты: откуда приходят новые — по исто
   }));
   const text = screenText(tree);
 
-  assert.match(text, /Откуда приходят новые/);
+  assert.match(text, /Откуда приходят/);
   assert.match(text, /По рекомендации 2/);
   assert.match(text, /Подошёл в зале 1/);
   assert.match(text, /Доля по рекомендации 66,7%/);
+});
+
+test('клиенты: цель удержания и актуальный сигнал ведут в карточку, исторический месяц не смешивается с ним', () => {
+  const opened = [];
+  const { tree } = draw(Clients, (action) => action === 'trainer.metrics.overview'
+    ? { targets: { retention: 75 }, signals: { silent: [{ row: 17, name: 'Анна Морозова', days: 34 }] } }
+    : metrics({ clients: { active: 12, retained: 8, retention: 80 }, clientsBefore: { active: 10 } }), {
+    props: { onOpenClient: (...args) => opened.push(args) },
+  });
+
+  assert.match(screenText(tree), /цель 75%/);
+  assert.match(screenText(tree), /Анна Морозова 34 дн. без занятий/);
+  press(tree, 'Анна Морозова: 34 дн. без занятий');
+  assert.deepEqual(opened, [[{ row: 17, name: 'Анна Морозова' }, 'overview']]);
+  press(tree, 'Предыдущий месяц');
+  assert.doesNotMatch(screenText(tree), /Анна Морозова/);
 });
 
 test('процессы: развитие — часы из журнала, запись уходит на сервер, удаление тоже', async () => {

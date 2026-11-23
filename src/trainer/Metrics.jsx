@@ -483,6 +483,32 @@ function MetricChart({ group, id, spec, state }) {
   );
 }
 
+function SummaryTiles({ items, picked, onPick }) {
+  return <div className="metrics-tiles">{items.map(({ id, label, value, note, static: fixed }) => {
+    const body = <><strong>{value}</strong><span>{label}</span>{note && <small>{note}</small>}</>;
+    return fixed
+      ? <div key={id} className="metrics-tile">{body}</div>
+      : <button key={id} type="button" className={'metrics-tile' + (picked === id ? ' metrics-tile--picked' : '')}
+          onClick={() => onPick(id)} aria-pressed={picked === id}>{body}</button>;
+  })}</div>;
+}
+
+function ReturnClients({ onOpenClient, loading, data, error, reload }) {
+  if (loading) return <Loading rows={1} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+  const people = (data && data.signals && data.signals.silent) || [];
+  return <Section title="Кого вернуть" note={people.length ? 'месяц без занятий' : 'сейчас никого нет'}>
+    {people.length > 0 && <Panel><Rows>{people.map((person) => (
+      <button type="button" className="rows__item rows__item--pick" key={person.row}
+        aria-label={person.name + ': ' + (person.days === null ? 'занятий не было' : person.days + ' дн. без занятий')}
+        onClick={() => onOpenClient({ row: person.row, name: person.name }, 'overview')}>
+        <span className="rows__label">{person.name}{person.split ? ' · сплит' : ''}</span>
+        <span className="rows__value">{person.days === null ? 'занятий не было' : person.days + ' дн. без занятий'} ›</span>
+      </button>
+    ))}</Rows></Panel>}
+  </Section>;
+}
+
 /* ==================================================================
  * Финансы
  * ================================================================== */
@@ -492,12 +518,7 @@ export function Finance() {
   const [picked, pick] = useChosen('finance');
   const { loading, data, error, reload } = useMetrics(state);
 
-  const top = (
-    <>
-      <PeriodBar state={state} update={update} />
-      <MetricChart group="finance" id={picked} spec={FINANCE[picked]} state={state} />
-    </>
-  );
+  const top = <PeriodBar state={state} update={update} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
@@ -511,75 +532,50 @@ export function Finance() {
 
   return (
     <>
-      {/* Сверка — над цифрами: пока она не разобрана, деньги считает таблица */}
       <LedgerCheck />
       {top}
-
-      {/* Крупно — прибыль, а не выручка. Выручка — отработанное, та же
-          цифра, что на экране клиентов. Касса стоит отдельно и в прибыль
-          не входит: это деньги, которые ещё предстоит отработать. */}
       <Lead
         label={'Прибыль · ' + period.label}
         tone={now.profit >= 0 ? 'good' : 'critical'}
         value={formatMoney(now.profit)}
-        hint={signed(now.profit - before.profit, period)}
-        facts={[
-          { label: 'Выручка', value: formatMoney(now.revenue) },
-          { label: 'Расходы', value: formatMoney(now.expenses) },
-        ]}
+        hint={<>{signed(now.profit - before.profit, period)}<br />
+          Выручка {formatMoney(now.revenue)} − расходы {formatMoney(now.expenses)}</>}
       />
 
-      <Section title="Деньги" note={'рядом — изменение к ' + period.against}>
-        <Panel>
-          <Rows>
-            {row('revenue')}
-            {row('expenses')}
-            {row('profit')}
-            {row('trainings')}
-          </Rows>
-        </Panel>
+      <Section title="Откуда сумма" note={'изменение к ' + period.against}>
+        <SummaryTiles picked={picked} onPick={pick} items={[
+          { id: 'revenue', label: 'Выручка за проведённое', value: formatMoney(now.revenue) },
+          { id: 'expenses', label: 'Расходы', value: formatMoney(now.expenses) },
+          { id: 'cash', label: data.year ? 'Касса за год' : 'Касса за месяц', value: formatMoney(now.cash || 0), note: 'получено оплат' },
+          { id: 'bank', label: 'Оплачено вперёд', value: formatMoney(now.bank || 0), static: true },
+        ]} />
+        <p className="small muted metrics__tile-note">Оплачено вперёд — обязательство провести занятия, не выручка.</p>
       </Section>
 
-      <Section title="Сколько приносит работа">
-        <Panel>
+      <Section title="Динамика">
+        <MetricChart group="finance" id={picked} spec={FINANCE[picked]} state={state} />
+      </Section>
+
+      <Section title="Ещё показатели" note="нажмите строку для графика">
+        <details className="metrics-more"><summary>Все показатели</summary><Panel>
           <Rows>
+            {row('profit')}
+            {row('revenue')}
+            {row('expenses')}
+            {row('cash', data.year ? 'Касса за год' : 'Касса за месяц')}
+            {row('trainings')}
             {row('perTraining')}
             {row('perClient')}
             {row('topShare')}
-          </Rows>
-        </Panel>
-      </Section>
-
-      <Section title="Касса" note="деньги, которые пришли за период">
-        <Panel>
-          <Rows>
-            {row('cash', data.year ? 'Касса за год' : 'Касса за месяц')}
             {row('payments')}
             {row('averageCheck')}
-          </Rows>
-        </Panel>
-      </Section>
-
-      {/* Раньше здесь стояли «В банке» и «Хватит месяцев», и что они
-          значат, было не понять. Это одна мысль в двух числах: сколько
-          клиенты заплатили вперёд и ещё не отходили — то есть сколько
-          тренер им должен, — и на сколько месяцев работы этого хватит. */}
-      <Section title="Долг перед клиентами" note="на сегодня: оплачено вперёд, но ещё не отработано">
-        <Panel>
-          <Rows>
             {row('bank')}
             {row('bankCover')}
           </Rows>
-        </Panel>
+        </Panel></details>
       </Section>
 
-      <p className="small muted metrics__foot">
-        Выручка — проведённые тренировки по цене клиента, как на экране
-        клиентов. Прибыль — выручка минус расходы, и больше ничего: налоги и
-        личные траты сюда не входят. Касса — оплаты, принятые за период:
-        это ещё не заработок, а тренировки, которые предстоит провести.
-        Нажмите на любую строку — график наверху покажет её историю.
-      </p>
+      <p className="small muted metrics__foot">Прибыль — выручка минус расходы; налоги и личные траты сюда не входят. Предоплаты и запас предоплат показаны на сегодня.</p>
     </>
   );
 }
@@ -588,17 +584,13 @@ export function Finance() {
  * Клиенты
  * ================================================================== */
 
-export function Clients() {
+export function Clients({ onOpenClient = null }) {
   const [state, update] = usePeriod();
   const [picked, pick] = useChosen('clients');
   const { loading, data, error, reload } = useMetrics(state);
+  const overview = useData('trainer.metrics.overview', {}, []);
 
-  const top = (
-    <>
-      <PeriodBar state={state} update={update} />
-      <MetricChart group="clients" id={picked} spec={CLIENTS[picked]} state={state} />
-    </>
-  );
+  const top = <PeriodBar state={state} update={update} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
@@ -612,10 +604,9 @@ export function Clients() {
   );
 
   const activeBefore = before.active || 0;
-  const hint = now.retention === null || now.retention === undefined
-    ? (now.active ? 'сравнить не с чем: ' + period.before + ' занятий не было' : 'занятий за этот период ещё не было')
-    : 'удержание ' + formatNumber(now.retention) + '% — ' + formatNumber(now.retained, 0) + ' из '
-      + formatNumber(activeBefore, 0) + ' ' + plural(activeBefore, 'остался', 'остались', 'остались');
+  const retentionKnown = now.retention !== null && now.retention !== undefined;
+  const target = overview.data && overview.data.targets && overview.data.targets.retention;
+  const isCurrent = state.period === 'month' && state.month === thisMonth();
 
   return (
     <>
@@ -623,58 +614,66 @@ export function Clients() {
 
       <Lead
         label={'Клиентов · ' + period.label}
-        tone={now.retention !== null && now.retention !== undefined ? (now.retention >= 80 ? 'good' : undefined) : undefined}
+        tone={retentionKnown && target ? (now.retention >= target ? 'good' : undefined) : undefined}
         value={formatNumber(now.active || 0, 0)}
-        hint={hint}
+        hint={`${formatNumber(now.newClients || 0, 0)} новых · ${formatNumber(now.lost || 0, 0)} ушли · ${formatNumber(now.renewals || 0, 0)} продлили`}
         facts={[
-          { label: 'Новых', value: formatNumber(now.newClients || 0, 0) },
-          { label: 'Ушли', value: formatNumber(now.lost || 0, 0) },
+          { label: 'Впервые', value: formatNumber(now.newClients || 0, 0) },
+          { label: 'Остались', value: formatNumber(now.retained || 0, 0) },
           { label: 'Продлений', value: formatNumber(now.renewals || 0, 0) },
         ]}
       />
 
-      <Section title="Движение" note={'рядом — изменение к ' + period.against}>
-        <Panel>
+      <Section title="Удержание" note={target ? 'цель ' + formatNumber(target) + '%' : undefined}>
+        <Panel pad className="metrics-retention">
+          <strong>{retentionKnown ? format(now.retention, '%') : '—'}</strong>
+          <div className="metrics-retention__track" role="meter" aria-label="Удержание" aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={retentionKnown ? Math.max(0, Math.min(100, now.retention)) : undefined}>
+            <span style={{ width: (retentionKnown ? Math.max(0, Math.min(100, now.retention)) : 0) + '%' }} />
+          </div>
+          <p className="small muted">{retentionKnown
+            ? `${formatNumber(now.retained || 0, 0)} из ${formatNumber(activeBefore, 0)} занимавшихся ${period.before} вернулись`
+            : 'Сравнить не с чем: в прошлом периоде занятий не было.'}</p>
+        </Panel>
+      </Section>
+
+      {isCurrent && onOpenClient && <ReturnClients onOpenClient={onOpenClient} {...overview} />}
+
+      <Section title="Динамика">
+        <MetricChart group="clients" id={picked} spec={CLIENTS[picked]} state={state} />
+      </Section>
+
+      <Section title="Движение и оплаты" note={'изменение к ' + period.against}>
+        <details className="metrics-more"><summary>Все показатели</summary><Panel>
           <Rows>
             {row('active')}
             {row('newClients')}
             {row('retained')}
             {row('lost')}
             {row('retention')}
-          </Rows>
-        </Panel>
-      </Section>
-
-      <Section title="Оплаты" note="продление — повторная оплата того, кто уже платил">
-        <Panel>
-          <Rows>
             {row('renewals')}
             {row('newPayers')}
           </Rows>
-        </Panel>
+        </Panel></details>
       </Section>
 
-      {/* Маркетинг — откуда пришли новые. Старый сервер стороны не знает */}
       {data.marketing && data.marketing.now && (
-        <Section title="Откуда приходят новые" note="источник отмечают в карточке клиента">
+        <Section title="Откуда приходят" note="источник отмечают в карточке клиента">
           <Panel>
             <Rows>
               <Metric id="referralShare" spec={MARKETING.referralShare} now={data.marketing.now} before={data.marketing.before} />
-              {SOURCES.map((s) => (
-                <Metric key={s.value} id={s.value} spec={MARKETING[s.value]} now={data.marketing.now} before={data.marketing.before} />
-              ))}
               <Metric id="unknown" spec={MARKETING.unknown} now={data.marketing.now} before={data.marketing.before} />
             </Rows>
           </Panel>
+          <details className="metrics-more"><summary>Все источники</summary><Panel><Rows>
+              {SOURCES.map((s) => (
+                <Metric key={s.value} id={s.value} spec={MARKETING[s.value]} now={data.marketing.now} before={data.marketing.before} />
+              ))}
+            </Rows></Panel></details>
         </Section>
       )}
 
-      <p className="small muted metrics__foot">
-        Удержание — сколько из тех, кто занимался в прошлом периоде,
-        занимались и в этом. Ушёл — был в прошлом периоде, в этом не был и
-        вперёд не записан. Новый — тот, у кого первое занятие пришлось на этот
-        период. Нажмите на строку — график покажет её историю.
-      </p>
+      <p className="small muted metrics__foot">Ушёл — был в прошлом периоде, сейчас не занимается и вперёд не записан. Новый — впервые занимался в этом периоде. Продление — повторная оплата.</p>
     </>
   );
 }
