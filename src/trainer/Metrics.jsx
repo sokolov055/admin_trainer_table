@@ -8,7 +8,6 @@ import {
 import { BarChart } from '../charts.jsx';
 import { haptic } from '../telegram.js';
 import { IconBack } from '../icons.jsx';
-import LedgerCheck from './LedgerCheck.jsx';
 import ScheduleStats from './ScheduleStats.jsx';
 
 /**
@@ -216,6 +215,28 @@ function PeriodBar({ state, update }) {
       )}
     </div>
   );
+}
+
+function CompactPeriodBar({ state, update }) {
+  const isYear = state.period === 'year';
+  const canForward = isYear ? state.year < new Date().getFullYear() : shiftMonth(state.month, 1) <= thisMonth();
+  const step = (direction) => {
+    if (direction > 0 && !canForward) return;
+    update(isYear ? { year: state.year + direction } : { month: shiftMonth(state.month, direction) });
+  };
+  return <div className="metrics-period">
+    <div className="metrics-period__line">
+      <button type="button" className="icon-button" onClick={() => step(-1)} aria-label={isYear ? 'Предыдущий год' : 'Предыдущий месяц'}><IconBack size={18} /></button>
+      <strong>{isYear ? state.year : monthLabel(state.month)}</strong>
+      <button type="button" className="icon-button monthpick__next" onClick={() => step(1)} disabled={!canForward}
+        aria-label={isYear ? 'Следующий год' : 'Следующий месяц'}><IconBack size={18} /></button>
+    </div>
+    <details className="metrics-period__options">
+      <summary>{isYear ? 'Год' : 'Месяц'} · {isYear ? 'к прошлому году' : state.compare === 'year' ? 'к году назад' : 'к прошлому месяцу'}<span>Изменить</span></summary>
+      <Segmented items={PERIODS} value={state.period} onChange={(period) => update({ period })} label="Период" />
+      {!isYear && <Segmented items={COMPARES} value={state.compare} onChange={(compare) => update({ compare })} label="Сравнить" />}
+    </details>
+  </div>;
 }
 
 /* ==================================================================
@@ -440,8 +461,8 @@ function highlightFor(state, by) {
  * того, какой период открыт в сводке: смотреть «сентябрь» и видеть рядом
  * всю историю по кварталам — обычное желание.
  */
-function MetricChart({ group, id, spec, state }) {
-  const [by, setBy] = useState(grainRemembered);
+function MetricChart({ group, id, spec, state, compact = false }) {
+  const [by, setBy] = useState(compact ? 'month' : grainRemembered);
   const { loading, data, error, reload } = useData('trainer.metrics.series', { by }, [by]);
 
   const changeBy = (next) => {
@@ -454,21 +475,36 @@ function MetricChart({ group, id, spec, state }) {
   if (loading) chart = <Loading rows={2} />;
   else if (error) chart = <ErrorState error={error} onRetry={reload} />;
   else {
-    const points = (data.points || []).map((p) => ({
+    const allPoints = (data.points || []).map((p) => ({
       key: p.key,
       ...pointLabels(p, data.by),
       value: p[group] ? p[group][id] : null,
       partial: p.partial,
     }));
+    const selectedIndex = compact && by === 'month' && state.period === 'month'
+      ? allPoints.findIndex((point) => point.key === state.month) : -1;
+    const points = compact
+      ? allPoints.slice(Math.max(0, (selectedIndex < 0 ? allPoints.length : selectedIndex + 1) - 8), selectedIndex < 0 ? undefined : selectedIndex + 1)
+      : allPoints;
+    if (compact && by === 'month') points.forEach((point) => { point.short = SHORT_MONTHS[Number(point.key.slice(5, 7)) - 1] || point.short; });
 
+    const chartHighlight = compact && by === 'month' && state.period === 'month' && state.month === thisMonth()
+      ? points.slice().reverse().find((point) => !point.partial && point.value !== null && point.value !== undefined)?.key
+      : highlightFor(state, data.by);
     chart = (
+      <>
       <BarChart
         points={points}
         aim={spec.aim === undefined ? 1 : spec.aim}
         format={(v) => format(v, spec.unit, spec.digits)}
-        highlight={highlightFor(state, data.by)}
+        highlight={chartHighlight}
         label={spec.label}
+        plain={compact && spec.aim !== -1}
+        compact={compact}
       />
+      {compact && by === 'month' && points.some((point) => point.partial) &&
+        <p className="small muted metrics-chart__note">{monthLabel(points.find((point) => point.partial).key)} ещё идёт, данные неполные.</p>}
+      </>
     );
   }
 
@@ -477,8 +513,11 @@ function MetricChart({ group, id, spec, state }) {
       <div className="chart-card__head">
         <h2 className="chart-card__title">{spec.label}</h2>
       </div>
-      <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />
-      <div style={{ marginTop: 'var(--space-3)' }}>{chart}</div>
+      {!compact && <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />}
+      <div className={compact ? 'metrics-chart__plot' : undefined} style={compact ? undefined : { marginTop: 'var(--space-3)' }}>{chart}</div>
+      {compact && <details className="metrics-chart-options"><summary>Разбивка: {GRAINS.find((grain) => grain.value === by)?.label}</summary>
+        <Segmented items={GRAINS} value={by} onChange={changeBy} label="Разбивка графика" />
+      </details>}
     </Panel>
   );
 }
@@ -497,15 +536,24 @@ function ReturnClients({ onOpenClient, loading, data, error, reload }) {
   if (loading) return <Loading rows={1} />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
   const people = (data && data.signals && data.signals.silent) || [];
-  return <Section title="Кого вернуть" note={people.length ? 'месяц без занятий' : 'сейчас никого нет'}>
-    {people.length > 0 && <Panel><Rows>{people.map((person) => (
-      <button type="button" className="rows__item rows__item--pick" key={person.row}
-        aria-label={person.name + ': ' + (person.days === null ? 'занятий не было' : person.days + ' дн. без занятий')}
+  if (!people.length) return null;
+  const personRow = (person) => {
+    const note = (person.days === null ? 'занятий не было' : person.days + ' дн. без занятий')
+      + (person.nextAt ? ' · записан на ' + formatDate(person.nextAt, false) : '');
+    const initials = String(person.name || '').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase();
+    return <button type="button" className="metrics-person" key={person.row}
+        aria-label={person.name + ': ' + note}
         onClick={() => onOpenClient({ row: person.row, name: person.name }, 'overview')}>
-        <span className="rows__label">{person.name}{person.split ? ' · сплит' : ''}</span>
-        <span className="rows__value">{person.days === null ? 'занятий не было' : person.days + ' дн. без занятий'} ›</span>
-      </button>
-    ))}</Rows></Panel>}
+        <span className="metrics-person__avatar" aria-hidden="true">{initials}</span>
+        <span className="metrics-person__body"><strong>{person.name}{person.split ? ' · сплит' : ''}</strong><small>{note}</small></span>
+        <span className="metrics-person__chevron" aria-hidden="true">›</span>
+      </button>;
+  };
+  return <Section title="Кого вернуть" note="месяц без занятий">
+    <div className="metrics-people">{people.slice(0, 2).map(personRow)}</div>
+    {people.length > 2 && <details className="metrics-more"><summary>Ещё {people.length - 2}</summary>
+      <div className="metrics-people">{people.slice(2).map(personRow)}</div>
+    </details>}
   </Section>;
 }
 
@@ -518,7 +566,7 @@ export function Finance() {
   const [picked, pick] = useChosen('finance');
   const { loading, data, error, reload } = useMetrics(state);
 
-  const top = <PeriodBar state={state} update={update} />;
+  const top = <CompactPeriodBar state={state} update={update} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
@@ -532,28 +580,28 @@ export function Finance() {
 
   return (
     <>
-      <LedgerCheck />
       {top}
       <Lead
         label={'Прибыль · ' + period.label}
-        tone={now.profit >= 0 ? 'good' : 'critical'}
         value={formatMoney(now.profit)}
         hint={<>{signed(now.profit - before.profit, period)}<br />
           Выручка {formatMoney(now.revenue)} − расходы {formatMoney(now.expenses)}</>}
       />
 
       <Section title="Откуда сумма" note={'изменение к ' + period.against}>
-        <SummaryTiles picked={picked} onPick={pick} items={[
-          { id: 'revenue', label: 'Выручка за проведённое', value: formatMoney(now.revenue) },
-          { id: 'expenses', label: 'Расходы', value: formatMoney(now.expenses) },
-          { id: 'cash', label: data.year ? 'Касса за год' : 'Касса за месяц', value: formatMoney(now.cash || 0), note: 'получено оплат' },
-          { id: 'bank', label: 'Оплачено вперёд', value: formatMoney(now.bank || 0), static: true },
-        ]} />
-        <p className="small muted metrics__tile-note">Оплачено вперёд — обязательство провести занятия, не выручка.</p>
+        <Panel pad className="metrics-breakdown">
+          <SummaryTiles picked={picked} onPick={pick} items={[
+            { id: 'revenue', label: 'Выручка за проведённое', value: formatMoney(now.revenue) },
+            { id: 'expenses', label: 'Расходы', value: formatMoney(now.expenses) },
+            { id: 'cash', label: data.year ? 'Касса за год' : 'Касса за месяц', value: formatMoney(now.cash || 0), note: 'получено оплат' },
+            { id: 'bank', label: 'Оплачено вперёд', value: formatMoney(now.bank || 0), static: true },
+          ]} />
+          <p className="small muted metrics__tile-note">Оплачено вперёд — обязательство провести занятия, не выручка.</p>
+        </Panel>
       </Section>
 
       <Section title="Динамика">
-        <MetricChart group="finance" id={picked} spec={FINANCE[picked]} state={state} />
+        <MetricChart group="finance" id={picked} spec={FINANCE[picked]} state={state} compact />
       </Section>
 
       <Section title="Ещё показатели" note="нажмите строку для графика">
@@ -590,7 +638,7 @@ export function Clients({ onOpenClient = null }) {
   const { loading, data, error, reload } = useMetrics(state);
   const overview = useData('trainer.metrics.overview', {}, []);
 
-  const top = <PeriodBar state={state} update={update} />;
+  const top = <CompactPeriodBar state={state} update={update} />;
 
   if (loading) return <>{top}<Loading rows={4} /></>;
   if (error) return <>{top}<ErrorState error={error} onRetry={reload} /></>;
@@ -614,14 +662,8 @@ export function Clients({ onOpenClient = null }) {
 
       <Lead
         label={'Клиентов · ' + period.label}
-        tone={retentionKnown && target ? (now.retention >= target ? 'good' : undefined) : undefined}
         value={formatNumber(now.active || 0, 0)}
         hint={`${formatNumber(now.newClients || 0, 0)} новых · ${formatNumber(now.lost || 0, 0)} ушли · ${formatNumber(now.renewals || 0, 0)} продлили`}
-        facts={[
-          { label: 'Впервые', value: formatNumber(now.newClients || 0, 0) },
-          { label: 'Остались', value: formatNumber(now.retained || 0, 0) },
-          { label: 'Продлений', value: formatNumber(now.renewals || 0, 0) },
-        ]}
       />
 
       <Section title="Удержание" note={target ? 'цель ' + formatNumber(target) + '%' : undefined}>
@@ -640,7 +682,7 @@ export function Clients({ onOpenClient = null }) {
       {isCurrent && onOpenClient && <ReturnClients onOpenClient={onOpenClient} {...overview} />}
 
       <Section title="Динамика">
-        <MetricChart group="clients" id={picked} spec={CLIENTS[picked]} state={state} />
+        <MetricChart group="clients" id={picked} spec={CLIENTS[picked]} state={state} compact />
       </Section>
 
       <Section title="Движение и оплаты" note={'изменение к ' + period.against}>

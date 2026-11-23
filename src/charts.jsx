@@ -437,7 +437,7 @@ const BAR_HEIGHT = 180;
  * unit — единица у числа над графиком: строка или функция от значения
  * («шаг», «шага», «шагов»); мельче и серым, как везде (FT-665)
  */
-export function BarChart({ points, aim = 1, format, highlight, label, plain = false, unit }) {
+export function BarChart({ points, aim = 1, format, highlight, label, plain = false, compact = false, unit }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(320);
   const [active, setActive] = useState(null);
@@ -476,13 +476,15 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
   const min = Math.min(0, ...values);
   const span = max - min || 1;
 
-  const plotW = width - BAR_PAD.left - BAR_PAD.right;
-  const plotH = BAR_HEIGHT - BAR_PAD.top - BAR_PAD.bottom;
+  const pad = compact ? { top: 10, right: 5, bottom: 25, left: 5 } : BAR_PAD;
+  const chartHeight = compact ? 164 : BAR_HEIGHT;
+  const plotW = width - pad.left - pad.right;
+  const plotH = chartHeight - pad.top - pad.bottom;
   const slot = plotW / list.length;
   const gap = 2;
   const barW = Math.max(2, Math.min(28, slot - gap));
 
-  const y = (v) => BAR_PAD.top + ((max - v) / span) * plotH;
+  const y = (v) => pad.top + ((max - v) / span) * plotH;
   const zero = y(0);
 
   const bars = list.map((p, i) => {
@@ -495,7 +497,7 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
     let trend = plain ? 'plain' : 'flat';
     if (delta && !plain) trend = (aim < 0 ? -delta : delta) > 0 ? 'up' : 'down';
 
-    const x = BAR_PAD.left + slot * i + (slot - barW) / 2;
+    const x = pad.left + slot * i + (slot - barW) / 2;
     const top = has ? Math.min(y(p.value), zero) : zero;
     const h = has ? Math.max(Math.abs(y(p.value) - zero), p.value ? 2 : 0) : 0;
 
@@ -511,7 +513,7 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
   const pick = (i) => setActive((prev) => (prev === i ? null : i));
 
   return (
-    <div className="bars" ref={wrapRef}>
+    <div className={'bars' + (compact ? ' bars--compact' : '')} ref={wrapRef}>
       <div className="bars__readout" aria-live="polite">
         <span className="bars__period">{current.label}{current.partial ? ' · ещё идёт, данные неполные' : ''}</span>
         <span className="bars__value">
@@ -545,29 +547,29 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
       ) : (
         <svg
           width={width}
-          height={BAR_HEIGHT}
+          height={chartHeight}
           className="bars__svg"
           role="img"
           aria-label={label + ' по периодам'}
         >
-          {ticks.map((t) => (
+          {!compact && ticks.map((t) => (
             <g key={t}>
-              <line x1={BAR_PAD.left} x2={width - BAR_PAD.right} y1={y(t)} y2={y(t)} className="bars__grid" />
-              <text x={BAR_PAD.left - 6} y={y(t) + 4} textAnchor="end" className="bars__tick">{shortNumber(t)}</text>
+              <line x1={pad.left} x2={width - pad.right} y1={y(t)} y2={y(t)} className="bars__grid" />
+              <text x={pad.left - 6} y={y(t) + 4} textAnchor="end" className="bars__tick">{shortNumber(t)}</text>
             </g>
           ))}
 
           {/* Выбранный период — подложка во всю колонку: глаз находит его сразу */}
-          <rect
-            x={BAR_PAD.left + slot * current.i + 1}
-            y={BAR_PAD.top - 6}
+          {!compact && <rect
+            x={pad.left + slot * current.i + 1}
+            y={pad.top - 6}
             width={Math.max(slot - 2, 4)}
             height={plotH + 6}
             rx="6"
             className="bars__focus"
-          />
+          />}
 
-          <line x1={BAR_PAD.left} x2={width - BAR_PAD.right} y1={zero} y2={zero} className="bars__zero" />
+          <line x1={pad.left} x2={width - pad.right} y1={zero} y2={zero} className="bars__zero" />
 
           {bars.map((b) => (
             <path
@@ -575,6 +577,7 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
               d={barPath(b.x, b.top, barW, b.h, b.negative)}
               className={
                 'bars__bar bars__bar--' + b.trend
+                + (compact && b.negative ? ' bars__bar--negative' : '')
                 + (b.partial ? ' bars__bar--partial' : '')
                 + (current.key === b.key ? ' bars__bar--current' : '')
               }
@@ -583,11 +586,11 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
 
           {/* Подписи оси — первый, последний и выбранный период: подпись
               под каждым столбиком на телефоне слиплась бы в кашу */}
-          {bars.filter((b, i) => i === 0 || i === bars.length - 1 || b.key === current.key).map((b) => (
+          {bars.filter((b, i) => compact || i === 0 || i === bars.length - 1 || b.key === current.key).map((b) => (
             <text
               key={'l' + b.key}
-              x={Math.min(Math.max(b.x + barW / 2, BAR_PAD.left + 16), width - BAR_PAD.right - 16)}
-              y={BAR_HEIGHT - 6}
+              x={compact ? b.x + barW / 2 : Math.min(Math.max(b.x + barW / 2, pad.left + 16), width - pad.right - 16)}
+              y={chartHeight - 6}
               textAnchor="middle"
               className={'bars__axis' + (b.key === current.key ? ' bars__axis--current' : '')}
             >
@@ -600,10 +603,10 @@ export function BarChart({ points, aim = 1, format, highlight, label, plain = fa
           {bars.map((b) => (
             <rect
               key={'hit' + b.key}
-              x={BAR_PAD.left + slot * b.i}
+              x={pad.left + slot * b.i}
               y={0}
               width={slot}
-              height={BAR_HEIGHT}
+              height={chartHeight}
               fill="transparent"
               onClick={() => pick(b.i)}
               style={{ cursor: 'pointer' }}

@@ -260,6 +260,12 @@ test('касса стоит отдельно от выручки', () => {
   assert.match(text, /155 000 ₽/);
 });
 
+test('выключенная сверка Google-таблицы не запрашивается и не занимает экран денег', () => {
+  const { tree, asked } = draw(Finance, () => metrics());
+  assert.ok(asked.every(({ action }) => action !== 'trainer.ledger'));
+  assert.doesNotMatch(screenText(tree), /Сверка денег|Верна таблица|Верен сервер/);
+});
+
 /** Число без сравнения ничего не значит — за этим сюда и приходят */
 test('изменение к прошлому месяцу видно рядом с цифрой', () => {
   const { tree } = draw(Finance, () => metrics({
@@ -279,13 +285,12 @@ test('месяц без данных не показывает NaN и беско
   assert.match(text, /столько же, сколько месяцем раньше/);
 });
 
-test('убыток помечен тревожным, а не зелёным', () => {
+test('убыток виден числом и не окрашен как успех', () => {
   const { tree } = draw(Finance, () => metrics({ now: { revenue: 10000, expenses: 30000, profit: -20000 } }));
 
-  const lead = tree.root.findAll((node) => typeof node.type === 'string'
-    && String(node.props.className || '').includes('lead--'), { deep: true })[0];
-
-  assert.match(lead.props.className, /lead--critical/);
+  assert.match(screenText(tree), /−20 000 ₽/);
+  const lead = tree.root.find((node) => node.props.className === 'lead enter');
+  assert.ok(lead, 'нейтральная карточка не объявляет прибыль успешной при падении');
 });
 
 /* ==========================================================================
@@ -646,16 +651,11 @@ test('график показывает прибыль, пока не выбра
   assert.equal(textOf(title.props.children), 'Прибыль');
 });
 
-/**
- * Как на бирже: зелёный — стало лучше, красный — хуже. Первый столбик
- * сравнить не с чем. Падение рисуется ещё и «пустым» — это отдельный
- * класс, а не только цвет.
- */
-test('рост зелёный, падение красное, первый столбик нейтральный', () => {
+test('короткая динамика прибыли использует один ряд без цветового шума', () => {
   const { tree } = draw(Finance, answerWithSeries);
-  const kinds = barsOf(tree).map((bar) => bar.props.className.match(/bars__bar--(up|down|flat)/)[1]);
+  const kinds = barsOf(tree).map((bar) => bar.props.className.match(/bars__bar--(plain|up|down|flat)/)[1]);
 
-  assert.deepEqual(kinds, ['flat', 'up', 'down']);
+  assert.deepEqual(kinds, ['plain', 'plain', 'plain']);
 });
 
 test('нажатие на строку переводит на неё график', () => {

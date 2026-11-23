@@ -269,15 +269,21 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.getByRole('button', { name: 'Сводка', exact: true }).click();
       await phone.locator('.chips--nav .chip').filter({ hasText: 'Деньги' }).click();
       await phone.getByText('Откуда сумма').waitFor();
-      const reconcile = phone.getByText(/Разобрать расхождения/);
-      if (await reconcile.count()) {
-        await reconcile.click();
-        await phone.getByRole('button', { name: 'Верна таблица' }).waitFor();
-        await reconcile.click();
-      }
+      assert.equal(await phone.getByText('Сверка денег').count(), 0, 'выключенная Google-таблица не показывается в сводке');
+      await phone.locator('.metrics-period__options summary').click();
+      await phone.getByRole('radio', { name: 'К году назад' }).waitFor();
+      await phone.locator('.metrics-period__options summary').click();
       assert.match(await phone.locator('.metrics-tiles').innerText(), /Выручка за проведённое[\s\S]*Касса за месяц[\s\S]*Оплачено вперёд/);
       await phone.getByRole('button', { name: /Выручка за проведённое/ }).click();
       assert.match(await phone.locator('.chart-card__title').innerText(), /Выручка/);
+      assert.ok(await phone.locator('.bars--compact .bars__bar').count() <= 8);
+      await phone.locator('.metrics-chart-options summary').click();
+      await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Квартал' }).click();
+      assert.ok(await phone.locator('.bars--compact .bars__bar').count() <= 8);
+      await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Год' }).click();
+      await phone.locator('.metrics-chart-options').getByRole('radio', { name: 'Месяц' }).click();
+      await phone.locator('.metrics-chart-options summary').click();
+      if (process.env.SHOT_FT818_STAGE2) await phone.locator('.chart-card').screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-money-chart-${width}-${colorScheme}.png` });
       await phone.locator('.metrics-more').first().locator('summary').click();
       await phone.getByText('Отработать это займёт').waitFor();
       if (process.env.SHOT_FT818_STAGE2) {
@@ -288,6 +294,7 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.locator('.chips--nav .chip').filter({ hasText: 'Клиенты' }).click();
       await phone.getByText('Удержание', { exact: true }).first().waitFor();
       await phone.locator('.metrics-retention__track').waitFor();
+      if (process.env.SHOT_FT818_STAGE2) await phone.locator('.chart-card').screenshot({ path: `${process.env.SHOT_FT818_STAGE2}-clients-chart-${width}-${colorScheme}.png` });
       await phone.locator('.metrics-more').last().locator('summary').click();
       await phone.getByText('По рекомендации', { exact: true }).waitFor();
       if (process.env.SHOT_FT818_STAGE2) {
