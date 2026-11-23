@@ -298,7 +298,18 @@ test('FT-818: деньги и клиенты — компактные показ
       await phone.getByRole('radio', { name: 'К году назад' }).waitFor();
       await phone.locator('.metrics-period__options summary').click();
       assert.match(await phone.locator('.metrics-tiles').innerText(), /Выручка[\s\S]*за проведённое[\s\S]*Касса[\s\S]*Предоплаты/);
+      const comparison = content.locator('.finance-comparison');
+      assert.match(await comparison.innerText(), /Выручка · сравнение/);
+      assert.equal(await comparison.locator('.finance-comparison__row').count(), 2);
+      const previous = comparison.locator('.finance-comparison__row').last();
+      const previousMonth = await previous.locator('.finance-comparison__label span').innerText();
+      await phone.locator('.metrics-period__options summary').click();
+      await phone.getByRole('radio', { name: 'К году назад' }).tap();
+      await phone.waitForFunction(month => document.querySelector('.finance-comparison__row:last-child .finance-comparison__label span')?.textContent !== month, previousMonth);
+      await phone.getByRole('radio', { name: 'К прошлому месяцу' }).tap();
+      await phone.locator('.metrics-period__options summary').click();
       await content.locator('.metrics-tile').filter({ hasText: 'Расходы' }).tap();
+      assert.match(await comparison.innerText(), /Расходы · сравнение/);
       assert.equal(await content.locator('.metrics-tile--picked').getAttribute('aria-pressed'), 'true');
       await content.locator('.metrics-tile').filter({ hasText: 'Выручка' }).tap();
       await content.locator('.metrics-more > summary').click();

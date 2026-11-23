@@ -246,6 +246,19 @@ function draw(Screen, answer, { onMutate, props } = {}) {
  * Финансы
  * ========================================================================== */
 
+test('сравнение денег показывает обе суммы и меняет показатель по плитке', () => {
+  const { tree } = draw(Finance, () => metrics({
+    now: { revenue: 300000, expenses: 60000 },
+    before: { revenue: 150000, expenses: 0 },
+  }));
+  const plot = () => tree.root.findByProps({ className: 'finance-comparison' });
+  assert.match(textOf(plot()), /Выручка\s+· сравнение.*300\s000\s₽.*150\s000\s₽/);
+  assert.deepEqual(plot().findAllByProps({ className: 'finance-comparison__bar' }).map(bar => bar.props.style.width), ['100%', '50%']);
+  const expense = tree.root.findAllByType('button').find(node => node.props.className?.startsWith('metrics-tile') && textOf(node).includes('Расходы'));
+  act(() => expense.props.onClick());
+  assert.match(textOf(plot()), /Расходы\s+· сравнение.*60\s000\s₽.*0\s₽/);
+});
+
 test('прибыль стоит крупно, а выручка и расходы — рядом', () => {
   const { tree } = draw(Finance, () => metrics({
     now: { revenue: 336400, expenses: 96000, profit: 240400, payments: 23, trainings: 178 },

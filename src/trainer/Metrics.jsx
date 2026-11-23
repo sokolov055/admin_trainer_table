@@ -532,6 +532,37 @@ function ReturnClients({ onOpenClient, loading, data, error, reload }) {
  * Финансы
  * ================================================================== */
 
+function FinanceComparison({ spec, values, labels }) {
+  const known = values.filter(Number.isFinite);
+  const low = Math.min(0, ...known);
+  const high = Math.max(0, ...known);
+  const span = high - low || 1;
+  const zero = 100 * -low / span;
+
+  return (
+    <section className="finance-comparison" aria-labelledby="finance-comparison-title" aria-live="polite">
+      <h2 id="finance-comparison-title">{spec.label} · сравнение</h2>
+      {values.map((value, index) => (
+        <div key={index} className="finance-comparison__row">
+          <div className="finance-comparison__label">
+            <span>{labels[index]}</span>
+            <strong>{Number.isFinite(value) ? format(value, spec.unit, spec.digits) : 'Нет данных'}</strong>
+          </div>
+          {Number.isFinite(value) && (
+            <div className="finance-comparison__track" aria-hidden="true">
+              <span className="finance-comparison__bar" style={{
+                insetInlineStart: Math.min(zero, 100 * (value - low) / span) + '%',
+                width: 100 * Math.abs(value) / span + '%',
+              }} />
+              {low < 0 && high > 0 && <span className="finance-comparison__zero" style={{ insetInlineStart: zero + '%' }} />}
+            </div>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export function Finance({ onExpenses }) {
   const [state, update] = usePeriod();
   const [picked, pick] = useChosen('finance');
@@ -545,6 +576,12 @@ export function Finance({ onExpenses }) {
   const now = data.finance?.now || {};
   const before = data.finance?.before || {};
   const period = describe(data);
+  const yearRange = data.year && data.throughMonth > 0 && data.throughMonth < 12
+    ? ' · янв. — ' + SHORT_MONTHS[data.throughMonth - 1]
+    : '';
+  const labels = data.year
+    ? [data.year + yearRange, data.previousYear + yearRange]
+    : [period.label, monthLabel(data.previousMonth)];
   const row = (id, label) => (
     <Metric id={id} spec={FINANCE[id]} now={now} before={before} picked={picked === id} onPick={pick} label={label} />
   );
@@ -567,11 +604,12 @@ export function Finance({ onExpenses }) {
             { id: 'cash', label: 'Касса', value: format(now.cash || 0, '₽'), note: 'получено оплат' },
             { id: 'bank', label: 'Предоплаты', value: format(now.bank || 0, '₽'), note: 'остаток на сегодня', static: true },
           ]} />}
-        <p className="small muted metrics__tile-note">Предоплаты — обязательство провести занятия. Это не выручка.</p>
+        <FinanceComparison spec={FINANCE[picked]} values={[now[picked], before[picked]]} labels={labels} />
       </Section>
 
       <details className="metrics-more">
         <summary>История и остальные показатели</summary>
+        <p className="small muted metrics__tile-note">Предоплаты — обязательство провести занятия. Это не выручка.</p>
         {now.profit != null && before.profit != null &&
           <p className="small muted">{signed(now.profit - before.profit, period)} · изменение к {period.against}</p>}
         <MetricChart group="finance" id={picked} spec={FINANCE[picked]} state={state} compact />

@@ -7525,3 +7525,39 @@ span.alt-chip__name { color: var(--text-secondary); cursor: default; }
   overflow-wrap: anywhere;
 }
 .summary-cancellations .rows__value { overflow-wrap: anywhere; }
+
+.finance-comparison {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--accent-wash);
+}
+.finance-comparison h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--accent-ink);
+}
+.finance-comparison__row { margin-top: var(--space-3); }
+.finance-comparison__label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+  font-size: var(--text-sm);
+}
+.finance-comparison__label strong { font-variant-numeric: tabular-nums; }
+.finance-comparison__track {
+  position: relative;
+  height: 8px;
+  margin-top: var(--space-1);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.finance-comparison__bar, .finance-comparison__zero { position: absolute; inset-block: 0; }
+.finance-comparison__bar { border-radius: inherit; background: var(--accent-fill); }
+.finance-comparison__row:last-child .finance-comparison__bar {
+  background: color-mix(in srgb, var(--accent-fill) 55%, var(--surface));
+}
+.finance-comparison__zero { width: 1px; background: var(--text-secondary); }
