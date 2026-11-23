@@ -2037,22 +2037,21 @@ test('оборудование создаётся без упражнения и
     await phone.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await phone.getByRole('tab', { name: 'Тренажёры', exact: true }).click();
     await phone.getByRole('button', { name: 'Новый тренажёр', exact: true }).click();
-    await phone.getByRole('radio', { name: 'Оборудование', exact: true }).click();
-    await phone.getByLabel('Название для клиента').fill('Разборные гантели');
+    await phone.getByRole('dialog').getByRole('button', { name: 'Оборудование', exact: true }).click();
+    await phone.getByLabel('Название тренажёра').fill('Разборные гантели');
     // Шаги настройки (16.11.2026): подпись и главное у шага, а не одно поле
     await phone.getByLabel('Подпись шага 1').fill('Где');
     await phone.getByLabel('Главное шага 1').fill('Стойка у окна');
     await phone.getByRole('button', { name: 'Сохранить', exact: true }).click();
 
-    const card = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Разборные гантели' });
-    await card.waitFor({ timeout: 5000 });
-    await assert.doesNotReject(card.getByText('пока без упражнений').waitFor({ timeout: 3000 }), 'карточка сохранена отдельно');
-    await card.click();
+    await phone.getByRole('heading', { name: 'Разборные гантели', exact: true }).waitFor();
+    await phone.getByText('Упражнения можно привязать сейчас или позже.', { exact: true }).waitFor();
+    await phone.getByRole('button', { name: 'Привязать упражнения', exact: true }).click();
 
     const bench = phone.getByRole('button', { name: /Жим гантелей лёжа/ });
     await bench.click();
     await phone.waitForFunction(() => {
-      const row = [...document.querySelectorAll('#root main:not([hidden]) .item')]
+      const row = [...document.querySelectorAll('.mlib-attach')]
         .find((item) => item.textContent.includes('Жим гантелей лёжа'));
       return row && row.getAttribute('aria-pressed') === 'true';
     });
@@ -2060,16 +2059,20 @@ test('оборудование создаётся без упражнения и
     const squat = phone.getByRole('button', { name: /Приседания со штангой/ });
     await squat.click();
     await phone.waitForFunction(() => {
-      const row = [...document.querySelectorAll('#root main:not([hidden]) .item')]
+      const row = [...document.querySelectorAll('.mlib-attach')]
         .find((item) => item.textContent.includes('Приседания со штангой'));
       return row && row.getAttribute('aria-pressed') === 'true';
     });
 
-    // «Назад» к списку — общий BackButton (аудит 24.10.2026): для диктора «Назад: Тренажёры»
+    await phone.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await phone.locator('.sheet').waitFor({ state: 'detached' });
     await phone.getByRole('button', { name: 'Назад: Тренажёры', exact: true }).click();
-    const linked = phone.locator('#root main:not([hidden]) .item').filter({ hasText: 'Разборные гантели' });
-    await assert.doesNotReject(linked.getByText(/Жим гантелей лёжа/).waitFor({ timeout: 3000 }));
-    await assert.doesNotReject(linked.getByText(/Приседания со штангой/).waitFor({ timeout: 3000 }));
+    const linked = phone.locator('#root main:not([hidden]) .mlib-card').filter({ hasText: 'Разборные гантели' });
+    await linked.getByText('2 упр.', { exact: true }).waitFor();
+    await linked.click();
+    const uses = phone.locator('.mlib-section').filter({has:phone.getByRole('heading',{name:'Связанные упражнения',exact:true})});
+    await uses.getByText('Жим гантелей лёжа', {exact:true}).waitFor();
+    await uses.getByText('Приседания со штангой', {exact:true}).waitFor();
   } finally {
     await context.close();
   }

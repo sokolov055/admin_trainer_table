@@ -1,3 +1,4 @@
+import SwipeRow from '../SwipeRow.jsx';
 import React, { useState } from 'react';
 import { Search, Sheet, Segmented, Empty } from '../ui.jsx';
 import { IconSearch, IconClose, IconPlus, IconSliders, IconBench, IconDumbbell, IconCamera, IconList } from '../icons.jsx';
@@ -24,7 +25,7 @@ function Tiles({ label, values, value, onChange, cols = 3 }) {
 }
 
 /** Список отделён от просмотра и формы: их данные, UID и права не меняются. */
-export default function MachineList({ list, onOpen, onCreate, state, setState }) {
+export default function MachineList({ list, onOpen, onCreate, onDelete, onExercises, state, setState }) {
   const { scope, q, search, kind, filters } = state;
   const setter = (key) => (value) => setState((s) => ({ ...s, [key]: typeof value === 'function' ? value(s[key]) : value }));
   const setScope = setter('scope'), setQ = setter('q'), setSearch = setter('search'), setKind = setter('kind'), setFilters = setter('filters');
@@ -54,7 +55,7 @@ export default function MachineList({ list, onOpen, onCreate, state, setState })
     </div>
     {shown.map((m) => {
       const tone = muscleClass(muscleTone({ group: (m.muscleGroups || [])[0] }));
-      return <button type="button" key={m.uid} className={'mlib-card ' + tone} onClick={() => { onOpen(m.uid); haptic(); }}>
+      const card = <button type="button" className={'mlib-card ' + tone} onClick={() => { onOpen(m.uid); haptic(); }}>
         <MachineCover key={m.photos?.[0] || m.photo || ''} photo={m.photos?.[0] || m.photo || ''} kind={m.kind} />
         <span className="mlib-body"><span className="mlib-name">{m.name}</span>
           {!!m.muscleGroups?.length && <span className="mlib-muscle">{m.muscleGroups.join(', ')}</span>}
@@ -63,6 +64,7 @@ export default function MachineList({ list, onOpen, onCreate, state, setState })
         </span>
         <span className="mlib-side"><span className="mlib-flags"><span className={m.photos?.length ? 'is-on' : ''} aria-label={m.photos?.length ? `${m.photos.length} фото` : 'Без фото'}><IconCamera size={15} /></span><span className={m.setup ? 'is-on' : ''} aria-label={m.setup ? 'Настройка добавлена' : 'Нет инструкции'}><IconList size={15} /></span></span><span className="mlib-free">{!m.mine ? 'общая' : !(m.uses || []).length ? 'без связей' : ''}</span></span>
       </button>;
+      return m.mine && onDelete ? <SwipeRow key={m.uid} className="mlib-swipe" label={'Удалить ' + m.name} onDelete={() => onDelete(m)} extra={{ text: 'Упражнения', onClick: () => (onExercises || onOpen)(m.uid) }}>{card}</SwipeRow> : <React.Fragment key={m.uid}>{card}</React.Fragment>;
     })}
     {!shown.length && <>
       <Empty icon={IconSearch}

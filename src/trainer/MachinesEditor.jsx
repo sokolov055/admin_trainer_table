@@ -1,13 +1,15 @@
 import { primaryEquipment } from '../equipment-guidance.js';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
 import { shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
-import { Confirm, Loading, Segmented, Note, Search } from '../ui.jsx';
+import { Confirm, Loading, Segmented, Note, Search, Sheet } from '../ui.jsx';
 import { IconAlert, IconClose, IconPlus, IconBench } from '../icons.jsx';
 import '../exercise-kind-tiles.css';
 import { useReveal } from '../reveal.js';
+import { useBackGesture, useTabLock } from '../gestures.jsx';
+import './machines-lib.css';
 import SetupStepsEditor from './SetupStepsEditor.jsx';
 
 /*
@@ -189,7 +191,7 @@ function MachinesFull({ exercise, owner, onChanged }) {
  * фото кладётся уже к нему. Не загрузилось фото — тренажёр остаётся, форма
  * открыта: повторное «Сохранить» правит его, а не заводит второй.
  */
-export function MachineForm({ exercise = null, machine, onDone, canDelete = true, kind: initialKind = 'machine' }) {
+export function MachineForm({ exercise = null, machine, onDone, canDelete = true, kind: initialKind = 'machine', library = false }) {
   const [name, setName] = useState(machine ? machine.name : '');
   const [setup, setSetup] = useState(machine ? machine.setup : '');
   // Стикеры и цифры на фото у шагов (16.11.2026)
@@ -216,6 +218,21 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const [failure, setFailure] = useState(null);
   const [asking, setAsking] = useState(false); // «Убрать / Удалить» — вопрос на месте
 
+  const [passport, setPassport] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const snapshot = JSON.stringify([name, setup, meta, originalName, brand, muscleGroups, setupOk, weightStep, kind, setupFields, dropped, added.map(a => a.url)]);
+  const initial = useRef(snapshot);
+  const dirty = snapshot !== initial.current;
+  const cancel = () => { if (busy) return; if (library && dirty) setLeaving(true); else onDone(null); };
+  useTabLock(library);
+  useBackGesture(cancel, library);
+  useEffect(() => {
+    if (!library || !dirty) return;
+    const guard = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [library, dirty]);
+
   const kept = had.filter((u) => !dropped.includes(u));
   const total = kept.length + added.length;
   const pick = async (ev) => {
@@ -236,6 +253,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   };
 
   const save = async () => {
+    if (busy) return;
     setBusy(true);
     setFailure(null);
     let result = null;
@@ -287,16 +305,23 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
 
   const touch = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   return (
-    <div className="library__form library__machine-form">
+    <div className={'library__form library__machine-form' + (library ? ' mlib-editor' : '')}>
+      {library && <>
+        <div className="mlib-etop"><button type="button" disabled={busy} onClick={cancel}>Отмена</button><b>{kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{dirty && <span className="mlib-dirty" aria-label="Есть несохранённые изменения" />}</b><button type="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button></div>
+        <input className="mlib-ename" aria-label="Название тренажёра" value={name} maxLength={80} placeholder="Название тренажёра" onChange={e => setName(e.target.value)} />
+        <div className="mlib-pass">{[muscleGroups.join(', ') || 'Мышцы', kind === 'equipment' ? 'Оборудование' : 'Тренажёр', brand || 'Бренд', weightStep ? weightStep + ' кг' : 'Шаг веса'].map((text, i) => <button type="button" key={i} className="mlib-pchip" onClick={() => setPassport(true)}>{text}</button>)}</div>
+        <button type="button" className="mlib-model" onClick={() => setPassport(true)}>{originalName || 'Добавить модель'}</button>
+      </>}
+      {(!library || passport) && <SheetOrInline library={library} onClose={() => setPassport(false)}>
       <div className="field">
         <span className="field__label">Что это</span>
         <Segmented label="Что это" items={MACHINE_KIND_ITEMS} value={kind} onChange={setKind} />
       </div>
-      <label className="field">
+      {!library && <label className="field">
         <span className="field__label">Название для клиента</span>
         <input className="field__input" value={name} maxLength={80} autoFocus={!machine}
           onChange={(ev) => setName(ev.target.value)} placeholder={kind === 'equipment' ? 'Гантели, фитбол, степ-платформа…' : 'Hammer у окна, Technogym…'} />
-      </label>
+      </label>}
       <label className="field"><span className="field__label">Оригинальное название модели</span><input className="field__input" value={originalName} maxLength={120} onChange={(e) => setOriginalName(e.target.value)} /></label>
       <label className="field"><span className="field__label">Производитель / бренд</span><input className="field__input" value={brand} maxLength={120} onChange={(e) => setBrand(e.target.value)} /></label>
       {kind === 'machine' && <label className="field">
@@ -308,6 +333,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       <fieldset className="field"><legend className="field__label">Мышечные группы</legend>
         {['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Предплечье', 'Пресс', 'Всё тело', 'Кардио'].map((g) => <label className="library__check" key={g}><input type="checkbox" checked={muscleGroups.includes(g)} onChange={(e) => setMuscleGroups(e.target.checked ? [...muscleGroups, g] : muscleGroups.filter((x) => x !== g))} />{g}</label>)}
       </fieldset>
+      </SheetOrInline>}
       {machine && <p className="small muted">Инструкция изменится во всех упражнениях с этой карточкой оборудования.</p>}
       <div className="field">
         <span className="field__label">Фото{total ? ' · ' + total + ' из ' + MAX_MACHINE_PHOTOS : ''}</span>
@@ -346,7 +372,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         <span className="field__hint">Первое фото — главное. Снимайте без людей в кадре — фото увидят клиенты.</span>
       </div>
       <div className="field">
-        <span className="field__label">Как настроить</span>
+        <span className="field__label">{library ? 'Шаги настройки' : 'Как настроить'}</span>
         <SetupStepsEditor value={setup} meta={meta} kind={kind} name={name}
           photo={kept.length ? mediaUrl(kept[0]) : added.length ? added[0].url : ''}
           onChange={(text, m) => { if (text !== setup) setSetupOk(false); setSetup(text); setMeta(m); }} />
@@ -367,7 +393,8 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         <span className="field__hint">Что клиент выставляет на тренажёре: сиденье, спинка, высота блока. Цифры у каждого свои — их вписывают в занятии, текстом или числом. Клиент может добавить и свою регулировку — она только у него.</span>
       </fieldset>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      {asking ? (
+      {library && leaving && <Sheet title="Выйти без сохранения?" onClose={() => setLeaving(false)}><p>Изменения карточки ещё не сохранены.</p><button type="button" className="button button--primary button--block" onClick={() => setLeaving(false)}>Продолжить редактирование</button><button type="button" className="button button--ghost button--block" onClick={() => onDone(null)}>Выйти без сохранения</button></Sheet>}
+      {!library && (asking ? (
         <Confirm
           text={question}
           action={exercise ? 'Убрать' : 'Удалить'}
@@ -381,9 +408,13 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
           <button type="button" className="button button--ghost" disabled={busy} onClick={() => onDone(null)}>Отмена</button>
           {saved.uid && canDelete && <button type="button" className="button button--ghost danger" disabled={busy} onClick={() => setAsking(true)}>{exercise ? 'Убрать ' + word : 'Удалить из каталога'}</button>}
         </div>
-      )}
+      ))}
     </div>
   );
+}
+
+function SheetOrInline({ library, onClose, children }) {
+  return library ? <Sheet title="Паспорт тренажёра" className="mlib-sheet" onClose={onClose}>{children}<button type="button" className="button button--primary button--block" onClick={onClose}>Готово</button></Sheet> : <>{children}</>;
 }
 
 const MAX_MACHINE_PHOTOS = 6;

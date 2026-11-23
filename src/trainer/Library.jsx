@@ -1219,6 +1219,7 @@ function Exercises() {
 
 /** FT-569: отдельный каталог и явные связи с несколькими упражнениями. */
 function Machines() {
+  const [machineSheet, setMachineSheet] = useState('');
   const [listState, setListState] = useState({ scope: 'mine', q: '', search: false, kind: '', filters: { brand: '', muscle: '', missing: false, sort: 'recent' } });
   const { loading, data, error, reload } = useData('library.machines', {}, []);
   const [open, setOpen] = useState('');
@@ -1226,7 +1227,6 @@ function Machines() {
   const [busyExercise, setBusyExercise] = useState(0);
   const [failure, setFailure] = useState(null);
 
-  useBackGesture(() => setForm(null), !!form);
   useBackGesture(() => { setOpen(''); setFailure(null); }, !form && !!open);
   useReturnScroll(!!(open || form));
 
@@ -1242,14 +1242,12 @@ function Machines() {
   if (form) {
     return (
       <>
-        <Back onClick={() => setForm(null)}>Тренажёры</Back>
-        <h2 className="library__title">{form.machine ? 'Изменить карточку' : 'Новая карточка'}</h2>
-        <p className="library__sub">Карточку можно сохранить без упражнения и привязать позже.</p>
-        <MachineForm
+        {del.bar}
+        <MachineForm library
           machine={form.machine}
           kind={form.kind}
           canDelete={!form.machine || !!data.owner || !!form.machine.mine}
-          onDone={() => { setForm(null); setOpen(''); reload(); }}
+          onDone={(saved) => { setForm(null); if (saved) { setOpen(saved.uid || open); reload(); } }}
         />
       </>
     );
@@ -1274,13 +1272,13 @@ function Machines() {
       }
     };
 
-    return <>{del.bar}<MachineView key={machine.uid} machine={machine} owner={!!data.owner} exercises={exercises}
+    return <>{del.bar}<MachineView initialSheet={machineSheet} key={machine.uid} machine={machine} owner={!!data.owner} exercises={exercises}
       onBack={() => { setOpen(''); setFailure(null); }} onEdit={() => setForm({ machine })}
       onDelete={() => { del.remove(machine.uid, machine, 'Карточка удалена'); setOpen(''); }}
       onToggle={toggle} busy={busyExercise} failure={failure} /></>;
   }
 
-  return <>{del.bar}{failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}<MachineList state={listState} setState={setListState} list={list} onOpen={setOpen} onCreate={(kind) => setForm({ machine: null, kind })} /></>;
+  return <>{del.bar}{failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}<MachineList onExercises={(uid) => { setMachineSheet('attach'); setOpen(uid); }} onDelete={(m) => del.remove(m.uid, m, 'Карточка удалена')} state={listState} setState={setListState} list={list} onOpen={(uid) => { setMachineSheet(''); setOpen(uid); }} onCreate={(kind) => setForm({ machine: null, kind })} /></>;
 }
 
 /**

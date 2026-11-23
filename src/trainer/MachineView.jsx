@@ -10,9 +10,9 @@ import { muscleClass, muscleTone } from '../data-tones.js';
 import './machines-lib.css';
 
 /** FT-819, этап 2: представление; все записи остаются у прежнего API. */
-export default function MachineView({ machine: m, owner, exercises, onBack, onEdit, onDelete, onToggle, busy, failure }) {
+export default function MachineView({ machine: m, owner, exercises, onBack, onEdit, onDelete, onToggle, busy, failure, initialSheet = '' }) {
   useStickerPack();
-  const [sheet, setSheet] = useState('');
+  const [sheet, setSheet] = useState(initialSheet);
   const [q, setQ] = useState('');
   const { steps, avoid } = parseSetup(m.setup, m.steps);
   const attached = new Set((m.uses || []).map((e) => e.id));
