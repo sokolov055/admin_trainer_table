@@ -1,7 +1,7 @@
 /* FT-819: композиция Программ, отдельные классы и область тренажёров. */
 .mlib-bar { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); }
 .mlib-scope,.mlib-search { flex:1; min-width:0; }
-.mlib-search .search { margin:0; }
+.mlib-search .search { margin:0 0 var(--space-3); }
 .mlib-scope .chips,.mlib-order .chips { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); width:100%; margin:0; }
 .mlib-scope .chip,.mlib-order .chip { min-width:0; display:flex; align-items:center; justify-content:center; text-align:center; padding-inline:6px; }
 .mlib-scope .chip > span { display:inline-flex; align-items:center; justify-content:center; gap:5px; }

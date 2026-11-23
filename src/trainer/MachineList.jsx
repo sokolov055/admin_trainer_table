@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Chips, Search, Sheet, Segmented, Empty } from '../ui.jsx';
+import { Search, Sheet, Segmented, Empty } from '../ui.jsx';
 import { IconSearch, IconClose, IconPlus, IconSliders, IconBench, IconDumbbell, IconCamera, IconList } from '../icons.jsx';
 import { muscleTone, muscleClass } from '../data-tones.js';
 import { haptic } from '../telegram.js';
@@ -21,6 +21,8 @@ export default function MachineList({ list, onOpen, onCreate, state, setState })
   const [sheet, setSheet] = useState(false);
   const [create, setCreate] = useState(false);
   const count = machineFilterCount(filters);
+  const scopeCount = list.filter((m) => !!m.mine === (scope === 'mine')).length;
+  const narrowed = !!(q.trim() || kind || count);
   const shown = shownMachines(list, { scope, q, kind, filters });
   const set = (patch) => setFilters((f) => ({ ...f, ...patch }));
   const reset = () => { setQ(''); setKind(''); setFilters({ ...NO_MACHINE_FILTERS }); };
@@ -28,14 +30,14 @@ export default function MachineList({ list, onOpen, onCreate, state, setState })
   const muscles = [...new Set(list.flatMap((m) => m.muscleGroups || []))].sort((a, b) => a.localeCompare(b, 'ru'));
   return <div className="mlib">
     <div className="mlib-bar">
-      {search ? <div className="mlib-search"><Search value={q} onChange={setQ} placeholder="Название, бренд, упражнение" /></div> :
-        <div className="mlib-scope"><Segmented label="Чьи тренажёры" value={scope} onChange={setScope} items={[
+      <div className="mlib-scope"><Segmented label="Чьи тренажёры" value={scope} onChange={setScope} items={[
           { value: 'mine', label: <span>Мои <em className="mlib-count">{list.filter((m) => m.mine).length}</em></span> },
           { value: 'public', label: <span>Общие <em className="mlib-count">{list.filter((m) => !m.mine).length}</em></span> },
-        ]} /></div>}
+        ]} /></div>
       <button type="button" className="mlib-ib" aria-label={search ? 'Закрыть поиск' : 'Поиск тренажёров'} aria-pressed={search} onClick={() => { setSearch(!search); if (search) setQ(''); haptic(); }}>{search ? <IconClose size={20} /> : <IconSearch size={20} />}</button>
       <button type="button" className="mlib-ib mlib-ib--add" aria-label="Новый тренажёр" onClick={() => { setCreate(true); haptic(); }}><IconPlus size={22} /></button>
     </div>
+    {search && <div className="mlib-search"><Search value={q} onChange={setQ} placeholder="Название, бренд, упражнение" /></div>}
     <div className="chips mlib-chips" role="toolbar" aria-label="Тип и фильтры">
       <button type="button" className={'chip mlib-chip' + (count ? ' chip--active' : '')} onClick={() => { setSheet(true); haptic(); }}><IconSliders size={16} />Фильтры{count > 0 && <b className="mlib-badge">{count}</b>}</button>
       {KINDS.map((k) => <button type="button" key={k.value} aria-pressed={kind === k.value} className={'chip mlib-chip' + (kind === k.value ? ' chip--active' : '')} onClick={() => { setKind(k.value); haptic(); }}>{k.value && <span className={'mlib-dot' + (k.value === 'machine' ? ' mlib-dot--accent' : '')}>{k.value === 'machine' ? <IconBench size={13} /> : <IconDumbbell size={13} />}</span>}{k.label}</button>)}
@@ -52,7 +54,13 @@ export default function MachineList({ list, onOpen, onCreate, state, setState })
         <span className="mlib-side"><span className="mlib-flags"><span className={m.photos?.length ? 'is-on' : ''} aria-label={m.photos?.length ? `${m.photos.length} фото` : 'Без фото'}><IconCamera size={15} /></span><span className={m.setup ? 'is-on' : ''} aria-label={m.setup ? 'Настройка добавлена' : 'Нет инструкции'}><IconList size={15} /></span></span><span className="mlib-free">{!m.mine ? 'общая' : !(m.uses || []).length ? 'без связей' : ''}</span></span>
       </button>;
     })}
-    {!shown.length && <><Empty icon={IconSearch} title={list.length ? 'Ничего не нашлось' : 'Пока пусто'} text={list.length ? 'Под этот поиск и фильтры карточек нет.' : 'Создайте карточку тренажёра или оборудования. Упражнения можно добавить позже.'} />{(q || kind || count) ? <button type="button" className="button button--primary button--block" onClick={reset}>Сбросить</button> : <button type="button" className="button button--primary button--block" onClick={() => setCreate(true)}>Новая карточка</button>}</>}
+    {!shown.length && <>
+      <Empty icon={IconSearch}
+        title={narrowed && scopeCount ? 'Ничего не нашлось' : scope === 'mine' ? 'Пока нет своих карточек' : 'Пока нет общих карточек'}
+        text={narrowed && scopeCount ? `В разделе «${scope === 'mine' ? 'Мои' : 'Общие'}» нет карточек под этот поиск и фильтры.` : scope === 'mine' ? 'Создайте карточку тренажёра или оборудования либо посмотрите общие карточки.' : 'Общих тренажёров и оборудования пока нет. Можно создать свою карточку.'} />
+      {narrowed && scopeCount ? <button type="button" className="button button--primary button--block" onClick={reset}>Сбросить</button> : <button type="button" className="button button--primary button--block" onClick={() => setCreate(true)}>Новая карточка</button>}
+    </>}
+
     {sheet && <Sheet title="Фильтры" className="mlib-sheet" onClose={() => setSheet(false)} action={count ? <button type="button" className="button button--ghost" onClick={() => setFilters({ ...NO_MACHINE_FILTERS, sort: filters.sort })}>Сбросить</button> : null}>
       <div className="mlib-filter"><h4>Производитель</h4><Tiles label="Производитель" value={filters.brand} onChange={(brand) => set({ brand })} values={[[ '', 'Все' ], ...brands.map((b) => [b, b]), ['—', 'Без бренда']]} />
         <h4>Мышечная группа</h4><Tiles label="Мышечная группа" value={filters.muscle} onChange={(muscle) => set({ muscle })} values={[[ '', 'Все' ], ...muscles.map((m) => [m, m])]} />
