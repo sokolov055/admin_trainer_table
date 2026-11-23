@@ -1,3 +1,4 @@
+import MachineList from './MachineList.jsx';
 import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
 import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf, planText } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
@@ -1217,11 +1218,8 @@ function Exercises() {
 
 /** FT-569: отдельный каталог и явные связи с несколькими упражнениями. */
 function Machines() {
+  const [listState, setListState] = useState({ scope: 'mine', q: '', search: false, kind: '', filters: { brand: '', muscle: '', missing: false, sort: 'recent' } });
   const { loading, data, error, reload } = useData('library.machines', {}, []);
-  const [q, setQ] = useState('');
-  const [kindOf, setKindOf] = useState('');
-  const [brandFilter, setBrandFilter] = useState('');
-  const [muscleFilter, setMuscleFilter] = useState('');
   const [open, setOpen] = useState('');
   const [form, setForm] = useState(null);
   const [exerciseQ, setExerciseQ] = useState('');
@@ -1248,6 +1246,7 @@ function Machines() {
         <p className="library__sub">Карточку можно сохранить без упражнения и привязать позже.</p>
         <MachineForm
           machine={form.machine}
+          kind={form.kind}
           canDelete={!form.machine || !!data.owner || !!form.machine.mine}
           onDone={() => { setForm(null); setOpen(''); reload(); }}
         />
@@ -1325,44 +1324,7 @@ function Machines() {
     );
   }
 
-  const nq = keyOf(q);
-  const shown = list
-    .filter((item) => !brandFilter || (brandFilter === '—' ? !item.brand : item.brand === brandFilter))
-    .filter((item) => !muscleFilter || (item.muscleGroups || []).includes(muscleFilter))
-    .filter((item) => !kindOf || item.kind === kindOf)
-    .filter((item) => !nq || keyOf(item.name).includes(nq) || keyOf(item.originalName).includes(nq) || item.uses.some((exercise) => keyOf(exercise.name).includes(nq)));
-  const kinds = [{ value: '', label: 'Все' }, { value: 'machine', label: 'Тренажёры' }, { value: 'equipment', label: 'Оборудование' }];
-
-  return (
-    <>
-      {/* Как «Новый шаблон» и «Своё блюдо» в соседних вкладках — синей
-          кнопкой во всю ширину, а не ссылкой (владелец, 14.10.2026) */}
-      <div className="library__bar">
-        <button type="button" className="button button--primary" onClick={() => { setForm({ machine: null }); haptic(); }}>Новый тренажёр</button>
-      </div>
-      <p className="library__sub">Создавайте тренажёры и оборудование отдельно, затем привязывайте каждую карточку к любому числу упражнений.</p>
-      <Search value={q} onChange={setQ} placeholder="Поиск тренажёра или оборудования" />
-      <Chips className="library__filters" items={kinds} value={kindOf} onChange={setKindOf} />
-      <label className="field"><span className="field__label">Производитель / бренд</span><select className="field__input" value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}><option value="">Все производители</option><option value="—">Не указан</option>{[...new Set(list.map((m) => m.brand).filter(Boolean))].sort().map((b) => <option key={b} value={b}>{b}</option>)}</select></label>
-      <label className="field"><span className="field__label">Мышечная группа оборудования</span><select className="field__input" value={muscleFilter} onChange={(e) => setMuscleFilter(e.target.value)}><option value="">Все группы</option>{[...new Set(list.flatMap((m) => m.muscleGroups || []))].sort().map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
-      {list.length > 0 && <div className="library__count"><p>{shown.length} {plural(shown.length, 'объект', 'объекта', 'объектов')}</p></div>}
-      {!list.length && <Empty title="Пока пусто" text="Создайте карточку тренажёра или оборудования. Упражнения можно добавить после сохранения." />}
-      {shown.map((item) => (
-        <button key={item.uid} className="item" onClick={() => { setOpen(item.uid); haptic(); }}>
-          <div className="item__top">
-            <span className="item__name">{item.name}</span>
-            {item.mine && <Tag tone="good">своё</Tag>}
-          </div>
-          <div className="item__meta">
-            <span>{item.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}</span>
-            <span>{item.uses.length ? item.uses.map((exercise) => exercise.name).join(', ') : 'пока без упражнений'}</span>
-            {item.photos.length > 0 && <Tag>{item.photos.length > 1 ? item.photos.length + ' фото' : 'фото'}</Tag>}
-            {item.setup && <Tag>описание</Tag>}
-          </div>
-        </button>
-      ))}
-    </>
-  );
+  return <MachineList state={listState} setState={setListState} list={list} onOpen={setOpen} onCreate={(kind) => setForm({ machine: null, kind })} />;
 }
 
 /**

@@ -189,7 +189,7 @@ function MachinesFull({ exercise, owner, onChanged }) {
  * фото кладётся уже к нему. Не загрузилось фото — тренажёр остаётся, форма
  * открыта: повторное «Сохранить» правит его, а не заводит второй.
  */
-export function MachineForm({ exercise = null, machine, onDone, canDelete = true }) {
+export function MachineForm({ exercise = null, machine, onDone, canDelete = true, kind: initialKind = 'machine' }) {
   const [name, setName] = useState(machine ? machine.name : '');
   const [setup, setSetup] = useState(machine ? machine.setup : '');
   // Стикеры и цифры на фото у шагов (16.11.2026)
@@ -202,7 +202,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   // округляет до него; пусто — шаг по группе мышц, как раньше
   const [weightStep, setWeightStep] = useState(machine?.weightStep ? String(machine.weightStep).replace('.', ',') : '');
   // Тренажёр или оборудование (владелец, 09.10.2026)
-  const [kind, setKind] = useState(machine && machine.kind === 'equipment' ? 'equipment' : 'machine');
+  const [kind, setKind] = useState((machine ? machine.kind : initialKind) === 'equipment' ? 'equipment' : 'machine');
   // Поля настройки (FT-760): «Сиденье», «Спинка» — общие для всех, кто на
   // этом тренажёре; значения вписывает клиент в занятии
   const [setupFields, setSetupFields] = useState(machine?.fields?.length ? machine.fields : []);
