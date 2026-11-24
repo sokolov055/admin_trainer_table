@@ -19,6 +19,7 @@ export function draftOf(e) {
     link: e.media?.kind === 'link' ? e.media.url : '',
     map: e.musclesCustom ? e.muscles || null : null,
     setup: e.setup || '',
+    setupOk: !!e.setupOk,
   };
 }
 
@@ -54,7 +55,8 @@ export function diffDrafts(was, d) {
   if (cleanLines(d.mistakes).join('\n') !== cleanLines(was.mistakes).join('\n')) out.mistakes = true;
   if (d.link.trim() !== was.link.trim()) out.link = true;
   if (!sameJson(d.map, was.map)) out.muscles = true;
-  if (d.setup.trim() !== was.setup.trim()) out.setup = true;
+  // Подготовка клиенту видна, когда опубликована (setup_ok): заполненный текст без публикации — несохранённое
+  if (d.setup.trim() !== was.setup.trim() || !!d.setup.trim() !== was.setupOk) out.setup = true;
   return out;
 }
 

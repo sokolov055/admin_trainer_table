@@ -4,7 +4,7 @@ import { draftOf, changesOf, problemOf, savePlan, moveItem, removeItem, trackPay
 
 const common = {
   id: 1, name: 'Жим штанги лёжа', shortName: 'Жим лёжа', muscle: 'Грудь', equipment: 'Штанга', common: true, mine: false,
-  notes: 'Лягте на скамью\nОпустите штангу\n', mistakes: 'Отрыв таза', setup: 'Сиденье', setupOk: false,
+  notes: 'Лягте на скамью\nОпустите штангу\n', mistakes: 'Отрыв таза', setup: 'Сиденье', setupOk: true,
   machines: [], track: { kind: 'strength', auto: true }, media: { kind: 'link', url: 'https://example.test/v' }, musclesCustom: false,
 };
 const own = { ...common, id: 2, mine: true, common: false };
@@ -70,4 +70,19 @@ test('порядок шагов и удаление: края не выходя�
   assert.deepEqual(moveItem(list, 1, -1), ['б', 'а', 'в']);
   assert.deepEqual(removeItem(list, 1), ['а', 'в']);
   assert.deepEqual(list, ['а', 'б', 'в']);
+});
+
+test('подготовка без публикации (setup_ok=0) — несохранённое: её надо опубликовать без правки текста', () => {
+  const draft = { ...common, setup: 'Сиденье — рукояти на уровне груди', setupOk: false };
+  const d = draftOf(draft);
+  assert.deepEqual(Object.keys(changesOf(draft, d)), ['setup']);
+  const { main, setup } = savePlan(draft, d, { directSetup: true });
+  assert.deepEqual(setup, { id: 1, setup: 'Сиденье — рукояти на уровне груди', ok: true });
+  assert.equal(main, null);
+});
+
+test('опубликованная подготовка без правок — не изменение; пустая без публикации — тоже', () => {
+  const published = { ...common, setup: 'Сиденье', setupOk: true };
+  assert.deepEqual(changesOf(published, draftOf(published)), {});
+  assert.deepEqual(changesOf({ ...common, setup: '', setupOk: false }, draftOf({ ...common, setup: '', setupOk: false })), {});
 });

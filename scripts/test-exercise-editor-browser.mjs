@@ -99,3 +99,25 @@ test('правка упражнения одним экраном — «Сохр
     }
   } finally { await b.close(); }
 });
+
+test('неопубликованная подготовка (setup_ok=0) — несохранённое: «Сохранить» доступно без правки текста', async () => {
+  const draftEntry = entry
+    .replace("setup:'',setupOk:false,shortName", "setup:'Сиденье — рукояти на уровне груди',setupOk:false,shortName")
+    .replace("machines:[],alternatives:[]", "machines:[],alternatives:[]");
+  const out = await build({ stdin: { contents: draftEntry, resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, outdir: '/tmp/eedit-draft', format: 'iife', define: { 'import.meta.env': '{}', 'process.env.NODE_ENV': '"production"' }, plugins: [{ name: 'stub', setup(b) { b.onResolve({ filter: /\/telegram\.js$/ }, () => ({ path: 'telegram', namespace: 'stub' })); b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: "export const haptic=()=>{}; export const getInitData=()=>''; export const environmentInfo=()=>({});" })); } }] });
+  const js = out.outputFiles.find((f) => f.path.endsWith('.js')).text;
+  const css = readFileSync('src/styles.css', 'utf8') + readFileSync('src/trainer/exercises-lib.css', 'utf8');
+  const b = await chromium.launch();
+  try {
+    const p = await b.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const errors = [];
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.setContent(`<html data-theme="light"><style>${css}</style><div id="root"></div></html>`);
+    await p.addScriptTag({ content: js });
+    await p.locator('.elib-ed__top').waitFor();
+    assert.equal(await p.locator('.elib-ed__dot').count(), 1, 'черновик подготовки — несохранённое');
+    assert.equal(await p.getByRole('button', { name: 'Сохранить', exact: true }).isEnabled(), true);
+    assert.match(await p.locator('.elib-ed__box', { hasText: 'Подготовка' }).innerText(), /Клиенты пока не видят/);
+    assert.deepEqual(errors, []);
+  } finally { await b.close(); }
+});

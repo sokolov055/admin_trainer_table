@@ -83,7 +83,7 @@ export default function ExerciseEditor({ exercise: e, owner, muscles, onSaved, o
         setFile(null);
       }
       // Сохранённое становится базой: точка и «Сохранить» гаснут сразу, даже пока перечитывание в пути
-      if (saved) { setBase(draftOf(saved)); setD(draftOf(saved)); } else if (setup) setBase(draftOf({ ...e, setup: setup.setup }));
+      if (saved) { setBase(draftOf(saved)); setD(draftOf(saved)); } else if (setup) setBase(draftOf({ ...e, setup: setup.setup, setupOk: setup.ok }));
       haptic('success');
       onSaved(saved || null);
     } catch (err) {
@@ -163,7 +163,7 @@ export default function ExerciseEditor({ exercise: e, owner, muscles, onSaved, o
 
     {!e.machines?.length && <Box title="Подготовка" tag="нет тренажёра">
       <Grow label="Подготовка к упражнению" value={d.setup} placeholder="Сиденье — рукояти на уровне груди…" onChange={(v) => set({ setup: v })} maxLength={SETUP_MAX} className="elib-ed__setup" />
-      <p className="elib-ed__hint">Клиент видит подготовку, пока к упражнению не привязан тренажёр.</p>
+      <p className="elib-ed__hint">{d.setup.trim() && !base.setupOk ? 'Клиенты пока не видят — нажмите «Сохранить».' : 'Клиент видит подготовку, пока к упражнению не привязан тренажёр.'}</p>
     </Box>}
 
     <Box title="Мышцы" action={<button type="button" className="elib-ed__link" onClick={() => setSheet('mmap')}>Настроить</button>}>
