@@ -147,6 +147,28 @@ export function addedToWeek(edits, timeline, start, id, day = 0) {
 }
 
 /**
+ * Порядок занятий недели (удержанием в списке «На неделе»): order — id занятий
+ * в нужном порядке. Дни тех, кто ещё впереди, переходят по кругу: ранний день
+ * достаётся тому, кто теперь первый; занятия без дня остаются в конце.
+ * Сделанные и на прошедших днях не двигаются
+ */
+export function reorderedWeek(edits, timeline, start, order, today = dateKey()) {
+  const list = listOf(edits, timeline, start);
+  const open = firstOpenDay(start, today);
+  const items = weekItems(weekAt(timeline, start));
+  const move = items.filter((it) => !it.done && !(it.day > 0 && it.day < open));
+  if (move.length < 2) return edits;
+  const rank = (id) => { const k = order.indexOf(id); return k < 0 ? order.length : k; };
+  const shown = [...move].sort((a, b) => (a.day || 8) - (b.day || 8) || a.idx - b.idx);
+  const want = [...shown].sort((a, b) => rank(a.id) - rank(b.id) || shown.indexOf(a) - shown.indexOf(b));
+  if (want.every((it, k) => it === shown[k])) return edits;
+  const days = shown.map((it) => it.day);
+  const taken = new Set(move.map((it) => it.idx));
+  const rest = list.filter((_, idx) => !taken.has(idx));
+  return { ...edits, [start]: [...rest, ...want.map((it, k) => ({ ...list[it.idx], day: days[k] }))] };
+}
+
+/**
  * «Вернуть неделю как в программе». Занятия, перенесённые отсюда в другие
  * недели, оттуда уходят (они снова здесь по программе); перенесённые сюда
  * из других — возвращаются туда, на день по программе. Прошедшие недели

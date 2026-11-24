@@ -8,7 +8,9 @@ export const addDays = (key, n) => dateKey(new Date(Number(key.slice(0, 4)), Num
 export const monday = (key) => addDays(key, -((new Date(key + 'T12:00:00').getDay() + 6) % 7));
 export const nextMonday = (key = dateKey()) => addDays(monday(key), 7);
 const daysBetween = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / DAY);
-const maxWeek = (blocks) => Math.max(0, ...(blocks || []).map((b) => Number(b.week) || 0));
+/** Внеплановая тренировка из библиотеки: не входит в круг программы, живёт только в правках недель */
+export const isOnce = (b) => !!b && b.load === 'once';
+const maxWeek = (blocks) => Math.max(0, ...(blocks || []).filter((b) => !isOnce(b)).map((b) => Number(b.week) || 0));
 export const programSize = (blocks, cfg) => Math.max(maxWeek(blocks), Number(cfg && cfg.length) || 0);
 export const inPause = (day, cfg) => (cfg.pauses || []).some((p) => day >= p.from && (!p.to || day <= p.to));
 
@@ -37,9 +39,10 @@ export const cleanRhythm = (rhythm) => (Array.isArray(rhythm) ? rhythm : [])
   .map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 7).slice(0, MAX_RHYTHM);
 
 /** Очередь занятий программы для ритма: неделя 1, потом 2…; занятие не переходит через неделю */
-export function sessionQueue(blocks) {
-  const weeks = [...new Set((blocks || []).map((b) => Number(b.week) || 1))].sort((a, b) => a - b);
-  return weeks.flatMap((w) => sessionsOf(blocks.filter((b) => (Number(b.week) || 1) === w)));
+export function sessionQueue(blocks, withOnce = false) {
+  const list = (blocks || []).filter((b) => withOnce || !isOnce(b));
+  const weeks = [...new Set(list.map((b) => Number(b.week) || 1))].sort((a, b) => a - b);
+  return weeks.flatMap((w) => sessionsOf(list.filter((b) => (Number(b.week) || 1) === w)));
 }
 
 /**
@@ -182,7 +185,7 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
   const sessionsById = (list) => {
     if (!index.has(list)) {
       const map = new Map();
-      sessionQueue(list || []).forEach((g) => { const id = g[0] && g[0].id; if (id && !map.has(id)) map.set(id, g); });
+      sessionQueue(list || [], true).forEach((g) => { const id = g[0] && g[0].id; if (id && !map.has(id)) map.set(id, g); });
       index.set(list, map);
     }
     return index.get(list);
@@ -216,7 +219,7 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
     const debts = !paused && !expired && previous && previous.status !== 'paused'
       ? previous.rows.filter((r) => r.missed && decide(r) === 'redo') : [];
     const startDay = v.from || first;
-    const weekBlocks = !activeDays.length ? [] : beat ? beat.groups : v.blocks.filter((b) => (Number(b.week) || 1) === week);
+    const weekBlocks = !activeDays.length ? [] : beat ? beat.groups : v.blocks.filter((b) => !isOnce(b) && (Number(b.week) || 1) === week);
     const laid = laidWeek(weekBlocks, {
       days: beat ? beat.days : settings.days, from, startDay: startDay > from && startDay <= end ? startDay : '',
       mode: FIRST_WEEK.includes(settings.firstWeek) ? settings.firstWeek : 'all', activeCount: activeDays.length,
@@ -291,7 +294,7 @@ export function scheduledPlan({ blocks = [], sessions = [], month, cfg, today = 
     const extraNeed = extras.reduce((sum, r) => sum + r.required, 0);
     const extraDone = extras.reduce((sum, r) => sum + Math.min(r.done, r.required), 0);
     const full = activeDays.length === 7;
-    const loads = new Set(own.map((b) => b.load || ''));
+    const loads = new Set(own.filter((b) => !isOnce(b)).map((b) => b.load || ''));
     weeks.push({ n, start: from, end, from: Number(from.slice(8)), to: Number(end.slice(8)),
       fromGen: new Date(from + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }).replace(/^\d+\s*/, ''),
       monthGen: new Date(end + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }).replace(/^\d+\s*/, ''),

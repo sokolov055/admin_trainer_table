@@ -2324,7 +2324,7 @@ test('отдых, свёрнутый у тренера, доживает до к
 
 /** Тренировку программы — удержанием вниз (03.10.2026): порядок меняется и сохраняется */
 test('тренировка в программе переносится удержанием', async () => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
+  const context = await browser.newContext({ viewport: { width: 390, height: 1400 }, locale: 'ru-RU' });
   const phone = await context.newPage();
   phone.on('pageerror', (error) => consoleErrors.push(String(error)));
   try {
@@ -2720,6 +2720,52 @@ test('FT-775: программа по датам переживает reload, п
     assert.equal(stored.weeks['Октябрь 2026'].pauses.length, 1);
     assert.equal(stored.weeks['Октябрь 2026'].history.length, 1);
     if (process.env.SHOT_FT775_TRAINER) await phone.screenshot({ path: process.env.SHOT_FT775_TRAINER, fullPage: true });
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('внеплановая тренировка из библиотеки и порядок недели — только тренеру', { timeout: 240000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 1400 }, locale: 'ru-RU', isMobile: true, hasTouch: true });
+  const phone = await context.newPage();
+  const errors = [];
+  phone.on('pageerror', (e) => errors.push(String(e)));
+  try {
+    await phone.goto(origin);
+    await phone.evaluate(() => {
+      const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - (now.getDay() + 6) % 7);
+      const month = 'Октябрь 2026';
+      const blocks = ['Текущая А', 'Текущая Б', 'Текущая В'].map((title, i) => ({ id: 'b' + String(i + 1).padStart(16, '0'), title, week: 1,
+        exercises: [{ name: 'Жим лёжа', sets: '3', reps: '8', weight: '40', prevWeight: '', exerciseId: null }] }));
+      localStorage.setItem('auth_token_v1', 'demo-session');
+      localStorage.setItem('ft775-program-demo', JSON.stringify({ month, blocks, weeks: { [month]: { schedule: 1, startsOn: key(start), effectiveOn: key(start), length: 2, startWeek: 1, rule: 'skip', choices: {} } } }));
+    });
+    await phone.goto(origin + '/?mockRole=trainer');
+    await phone.getByRole('button', { name: 'Меню', exact: true }).click();
+    await phone.getByRole('button', { name: /Мои тренировки/ }).click();
+    await phone.getByRole('heading', { name: 'Текущая А', exact: true }).waitFor({ timeout: 20000 });
+    const titles = () => phone.locator('#root main:not([hidden]) .plan__block .section__title').allInnerTexts();
+    const before = await titles();
+    const add = phone.getByRole('button', { name: 'Добавить из библиотеки', exact: true });
+    await add.waitFor();
+    // порядок: вторая — наверх
+    const heads = phone.locator('#root main:not([hidden]) .plan__block .pc-head');
+    const a = await heads.nth(1).boundingBox();
+    const b = await heads.first().boundingBox();
+    await phone.mouse.move(a.x + 20, a.y + a.height / 2);
+    await phone.mouse.down();
+    await phone.waitForTimeout(600);
+    await phone.mouse.move(a.x + 20, b.y + 4, { steps: 12 });
+    await phone.mouse.up();
+    await phone.waitForTimeout(600);
+    const moved = await titles();
+    assert.equal(moved[0], before[1], 'вторая стала первой');
+    // добавление
+    await add.click();
+    await phone.getByRole('heading', { name: 'Добавить из библиотеки' }).or(phone.getByText('Тренировка встанет на этой неделе')).first().waitFor();
+    await phone.locator('.sheet .item').first().click();
+    await phone.waitForTimeout(800);
+    assert.equal((await titles()).length, before.length + 1, 'тренировка добавилась на неделю');
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });

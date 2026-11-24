@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   timelineWith, weekAt, weekItems, movedToDay, movedToWeek, removedFromWeek, addedToWeek, carriedToWeek, revertedWeek, clean,
-  firstOpenDay, freeDay, crowdedDays, changedWeeks, spanShort,
+  firstOpenDay, freeDay, crowdedDays, changedWeeks, spanShort, reorderedWeek,
 } from '../src/week-edits.js';
 import { weekQueue } from '../src/plan-weeks.js';
 
@@ -106,4 +106,26 @@ test('невыполненное прошедшей недели — на тек
   assert.equal(weekAt(t2, W2).need, 4);
   assert.deepEqual(weekAt(t2, W1).sent, [{ id: C, to: W2 }]);
   assert.equal(carriedToWeek(edits, t2, W2, C, W1), edits);
+});
+
+test('порядок занятий: дни переходят по кругу, сделанные и прошедшие стоят', () => {
+  const t = tl();
+  // А (пн) — сделано: пинается; Спина (ср) и Грудь (пт) меняются
+  const done = [{ status: 'completed', month: 'Январь 2091', sourceBlockId: A, startedAt: '2091-01-15T10:00:00' }];
+  const next = reorderedWeek({}, tl({}, done), W1, [A, C, B], '2091-01-16');
+  assert.deepEqual(next[W1].map((x) => [x.id, x.day]).sort(), [[A, 1], [B, 5], [C, 3]].sort());
+  assert.deepEqual(reorderedWeek({}, t, W1, [A, B, C], W1), {});
+});
+
+test('внеплановая тренировка: в круг программы не входит, появляется только по правке недели', () => {
+  const extra = { id: id(9), title: 'Плечи', load: 'once', exercises: [] };
+  const withExtra = [...blocks, extra];
+  const base = timelineWith({ blocks: withExtra, sessions: [], month: 'Январь 2091', cfg, weekEdits: {}, until: W3, today });
+  assert.deepEqual(weekAt(base, W1).layout.map((x) => x.id), [A, B, C]);
+  assert.deepEqual(weekAt(base, W2).layout.map((x) => x.id), [A, B, C]);
+  const edits = addedToWeek({}, base, W1, extra.id, 2);
+  const t = timelineWith({ blocks: withExtra, sessions: [], month: 'Январь 2091', cfg, weekEdits: edits, until: W3, today });
+  assert.deepEqual(weekItems(weekAt(t, W1)).map((it) => it.title), ['Ноги + Кардио', 'Спина', 'Грудь', 'Плечи']);
+  assert.deepEqual(weekAt(t, W2).layout.map((x) => x.id), [A, B, C]);
+  assert.equal(weekAt(t, W1).load, '');
 });

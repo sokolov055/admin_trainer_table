@@ -13,6 +13,18 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('touchmove', (ev) => { if (dragging) ev.preventDefault(); }, { passive: false });
 }
 
+const EDGE = 90;
+const MAX_STEP = 16;
+
+/** Что прокручивается под списком: ближайший прокручиваемый предок, иначе страница */
+function scrollerOf(el) {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const y = getComputedStyle(p).overflowY;
+    if ((y === 'auto' || y === 'scroll') && p.scrollHeight > p.clientHeight) return p;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
 /**
  * e — pointerdown на строке; rows() — строки списка по порядку; onDrop(from,
  * to) — куда переставили. Нажатие сразу после перетаскивания гасится —
@@ -49,9 +61,18 @@ export function holdToReorder(e, { rows, onDrop, onStart, row: targetRow = null 
     const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 8;
     let to = from;
     row.classList.add('is-lifted');
-    const move = (ev) => {
-      if (ev.pointerId !== id) return;
-      const dy = ev.clientY - y0;
+    // У края экрана список едет сам: чем ближе палец к краю, тем быстрее
+    const scroller = scrollerOf(row);
+    const top0 = scroller.scrollTop;
+    const viewport = () => {
+      const isPage = scroller === document.scrollingElement || scroller === document.documentElement;
+      return isPage ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect();
+    };
+    let lastY = y0;
+    let raf = 0;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const update = () => {
+      const dy = lastY - y0 + (scroller.scrollTop - top0);
       const center = mid(rects[from]) + dy;
       let next = from;
       rects.forEach((r, k) => {
@@ -68,8 +89,23 @@ export function holdToReorder(e, { rows, onDrop, onStart, row: targetRow = null 
       });
       if (next !== to) { to = next; haptic('light'); }
     };
+    const tick = () => {
+      const v = viewport();
+      const up = Math.max(0, EDGE - (lastY - v.top));
+      const down = Math.max(0, EDGE - (v.bottom - lastY));
+      const step = Math.round((down - up) / EDGE * MAX_STEP * (reduce ? 0.5 : 1));
+      if (step) { scroller.scrollTop += step; update(); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      lastY = ev.clientY;
+      update();
+    };
     const finish = (ev) => {
       if (ev.pointerId !== id) return;
+      cancelAnimationFrame(raf);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);

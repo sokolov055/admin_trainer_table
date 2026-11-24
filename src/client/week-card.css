@@ -170,3 +170,5 @@ button.wc-dot:active { transform: scale(.9); }
 /* Прежний список месяца: остаток свёрнут в одну строку */
 .wc__more { display: block; margin: 8px auto 0; padding: 6px 12px; border: 1px dashed var(--border-strong); border-radius: 999px; background: transparent; color: var(--text-secondary); font: 600 var(--text-sm)/1.2 var(--font); cursor: pointer; }
 .wc__more:active { transform: scale(.97); }
+
+.plan__free-add--top { margin-top: 0; margin-bottom: var(--space-3); }

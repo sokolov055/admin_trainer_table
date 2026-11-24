@@ -2102,9 +2102,9 @@ const MOCK = {
   // настоящего сервера иначе нечем, а результат должен быть виден сразу.
   'plan.save': (params) => {
     const blocks = (params.blocks || [])
-      .map((b) => ({
+      .map((b, k) => ({
         title: b.title,
-        ...(b.id ? { id: b.id } : {}),
+        id: b.id || 'n' + Date.now().toString(16).padStart(8, '0') + String(k).padStart(8, '0'),
         ...(b.week ? { week: b.week } : {}),
         ...(b.load ? { load: b.load } : {}),
         exercises: (b.exercises || []).filter((e) => String(e.name || '').trim()),

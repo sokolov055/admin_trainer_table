@@ -3,7 +3,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
-import { dateKey, nextMonday, programSize, addDays } from '../program-timeline.js';
+import { dateKey, nextMonday, programSize, addDays, isOnce } from '../program-timeline.js';
+import { addedToWeek, freeDay, firstOpenDay, reorderedWeek } from '../week-edits.js';
 import { planExerciseForSave } from '../plan-payload.js';
 import { journalList, onOutboxChange, justSynced, localWorkouts, withLocalWeights } from '../workout-outbox.js';
 import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures } from '../offline-writes.js';
@@ -70,6 +71,7 @@ const SaveAsTemplate = lazyPage(() => import('../trainer/Library.jsx'), 'SaveAsT
 // Правка программы прямо на экране (03.10.2026) — только у тренера
 const BlockEdit = lazyPage(() => import('../trainer/PlanInline.jsx'), 'BlockEdit');
 const AddBlock = lazyPage(() => import('../trainer/PlanInline.jsx'), 'AddBlock');
+const AddFromLibrary = lazyPage(() => import('./AddFromLibrary.jsx'));
 // «Программы тренера» (FT-497) — клиенту с тренером и тренеру «глазами клиента»
 const ProgramsSection = lazyPage(() => import('./Programs.jsx'), 'ProgramsSection');
 const ProgramsShowcase = lazyPage(() => import('./Programs.jsx'), 'ProgramsShowcase');
@@ -375,6 +377,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // текущая), настройка после правки до перечитывания, закрытый лист выбора
   const [weekSel, setWeekSel] = useState(null);
   const [weeksLocal, setWeeksLocal] = useState(null); // { month, weeks }
+  const [libOpen, setLibOpen] = useState(false);
+  const [libError, setLibError] = useState('');
+  const [orderError, setOrderError] = useState('');
+  const orderBusy = useRef(false);
   const [choiceClosed, setChoiceClosed] = useState(false);
   // Редактор по неделям (FT-788, этап 3): с какой недели открыт, '' — закрыт
   const [weekEditor, setWeekEditor] = useState('');
@@ -561,7 +567,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     ? new Set(weekQueue(wplan.weeks[wplan.currentIndex]).map((r) => r.block.id)) : null;
   // Долг прошлого месяца — тренировка той программы: своей строкой над очередью, не в правке
   const foreignDebts = planTab === 'queue' ? queueBlocks.filter((b) => b.foreign) : [];
-  const visibleBlocks = (planTab === 'all' ? shownBlocks : queueBlocks).filter((b) => !b.foreign);
+  const visibleBlocks = (planTab === 'all' ? shownBlocks : queueBlocks).filter((b) => !b.foreign && !(planTab === 'all' && isOnce(b)));
   // «Выполненные» (01.10.2026) — все завершённые занятия месяца по дате
   // занятия, свежие сверху: тренировки программы (и повторы), свободные.
   // Какого месяца: открыли лист программы сами — того месяца; иначе —
@@ -616,6 +622,21 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // Недели правят тренер и сам клиент (решение владельца 13.11.2026); семья и «как видит клиент» — только смотрят
   const canWeekEdit = !!(wplan && wplan.scheduled && data.month && !familyRow && !clientView && !draft && (clientRow ? canRename : true));
 
+  const blocksForSave = (list) => list
+    .map((b) => ({
+      title: b.title,
+      ...(b.id ? { id: b.id } : {}),
+      ...(b.sourceId ? { sourceId: b.sourceId } : {}),
+      // Неделя программы и пометка (plan-weeks.js)
+      ...(b.week ? { week: b.week } : {}),
+      ...(b.load ? { load: b.load } : {}),
+      // Занятие (FT-788): вместе с предыдущей тренировкой
+      ...(b.with ? { with: true } : {}),
+      // Только то, что сервер хранит (plan-payload.js): иначе большая
+      // программа не пролезала в предел запроса
+      exercises: b.exercises.filter((e) => String(e.name || '').trim()).map(planExerciseForSave),
+    }))
+    .filter((b) => b.exercises.length);
   const unnamed = (list) => list.some((b) => !b.exercises.length || b.exercises.some((e) => !String(e.name || '').trim()));
   const push = async (list, seq, tries = 0) => {
     setSaveState('saving');
@@ -624,21 +645,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         clientRow,
         month: data.month,
         ...(weeksCfg && weeksCfg.schedule === 1 ? { effectiveOn: weeksCfg.effectiveOn > dateKey() ? weeksCfg.effectiveOn : editOn } : {}),
-        blocks: list
-          .map((b) => ({
-            title: b.title,
-            ...(b.id ? { id: b.id } : {}),
-            ...(b.sourceId ? { sourceId: b.sourceId } : {}),
-            // Неделя программы и пометка (plan-weeks.js)
-            ...(b.week ? { week: b.week } : {}),
-            ...(b.load ? { load: b.load } : {}),
-            // Занятие (FT-788): вместе с предыдущей тренировкой
-            ...(b.with ? { with: true } : {}),
-            // Только то, что сервер хранит (plan-payload.js): иначе большая
-            // программа не пролезала в предел запроса
-            exercises: b.exercises.filter((e) => String(e.name || '').trim()).map(planExerciseForSave),
-          }))
-          .filter((b) => b.exercises.length),
+        blocks: blocksForSave(list),
       });
       if (saved && Array.isArray(saved.blocks)) {
         list.filter((b) => b.exercises.some((e) => String(e.name || '').trim())).forEach((b, k) => {
@@ -732,6 +739,75 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     const tab = planTab === 'done' ? 'queue' : planTab;
     if (tab !== planTab) setPlanTab(tab);
     setOpenBlocks((prev) => ({ ...prev, [tab + ':' + (list.length - 1)]: true }));
+  };
+  // Внеплановая тренировка из библиотеки (только тренер): блок программы с
+  // пометкой once живёт вне круга, а на эту неделю встаёт правкой недели
+  const weekTrainer = canWeekEdit && canRename && !clientView && cardShown && !!week && week.editable !== false && week.end >= dateKey();
+  const addFromLibrary = async (made) => {
+    setLibError('');
+    clearTimeout(saveTimer.current);
+    editSeq.current += 1;
+    const known = new Set(shownBlocks.map((b) => b.id).filter(Boolean));
+    try {
+      const saved = await apiMutate('plan.save', {
+        clientRow,
+        month: data.month,
+        effectiveOn: weeksCfg.effectiveOn > dateKey() ? weeksCfg.effectiveOn : editOn,
+        blocks: blocksForSave([...shownBlocks, { ...made, load: 'once' }]),
+      });
+      const added = ((saved && saved.blocks) || []).find((b) => b.id && !known.has(b.id) && isOnce(b));
+      if (!added) throw new Error('Тренировка не сохранилась. Повторите.');
+      const edits = weeksCfg.weekEdits || {};
+      const today = dateKey();
+      const day = freeDay(edits[week.start] || week.layout, firstOpenDay(week.start, today));
+      const res = await apiMutate('plan.week.edit', {
+        clientRow,
+        month: data.month,
+        rev: Number(saved.weeks && saved.weeks.weekEditsRev) || 0,
+        weekEdits: addedToWeek(edits, wplan, week.start, added.id, day),
+      });
+      setWeeksLocal({ month: data.month, weeks: res.weeks });
+      setLibOpen(false);
+      setPlanTab('queue');
+      haptic('success');
+      await reload();
+    } catch (error) {
+      setLibError((error && error.message) || 'Не получилось добавить. Повторите.');
+      reload();
+      throw error;
+    }
+  };
+  // Порядок занятий недели: удержание карточки в «На неделе»
+  const weekReorder = weekTrainer && planTab === 'queue' && !week.byBookings && !selectingBlocks;
+  const headIdOf = (block) => {
+    const at = week.rows.findIndex((r) => r.block === block);
+    if (at < 0) return block.id;
+    for (let k = at; k >= 0; k -= 1) if (!week.rows[k].extra) return week.rows[k].block.id;
+    return block.id;
+  };
+  const reorderWeek = async (order) => {
+    if (orderBusy.current) return;
+    const edits = weeksCfg.weekEdits || {};
+    const ids = order.map(headIdOf).filter((id, k, all) => id && all.indexOf(id) === k);
+    const next = reorderedWeek(edits, wplan, week.start, ids, dateKey());
+    if (next === edits) return;
+    const before = weeksCfg;
+    orderBusy.current = true;
+    setOrderError('');
+    setWeeksLocal({ month: data.month, weeks: { ...before, weekEdits: next } });
+    try {
+      const res = await apiMutate('plan.week.edit', {
+        ...(clientRow ? { clientRow } : {}), month: data.month, rev: Number(before.weekEditsRev) || 0, weekEdits: next,
+      });
+      setWeeksLocal({ month: data.month, weeks: res.weeks });
+      haptic('success');
+      reload();
+    } catch (error) {
+      setWeeksLocal({ month: data.month, weeks: before });
+      setOrderError((error && error.message) || 'Порядок не сохранился. Повторите.');
+    } finally {
+      orderBusy.current = false;
+    }
   };
   const copyBlocks = (indices) => {
     commit(copyPlanBlocks(shownBlocks, indices));
@@ -1148,6 +1224,19 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
         return <LooseCardio count={loose.length} storeKey={`c${clientRow}:${data.month}`} disabled={saveState === 'saving'} onAttach={() => commit(attachedCardio(shownBlocks, loose))} />;
       })()}
 
+      {weekTrainer && planTab === 'queue' && !selectingBlocks && (
+        <button type="button" className="plan__free-add plan__free-add--top" onClick={() => { haptic(); setLibError(''); setLibOpen(true); }}>
+          <span className="plan__free-add-icon" aria-hidden="true"><IconPlus size={20} /></span>
+          Добавить из библиотеки
+        </button>
+      )}
+      {libOpen && weekTrainer && (
+        <Deferred fallback={null}>
+          <AddFromLibrary onClose={() => setLibOpen(false)} onPick={addFromLibrary} error={libError} />
+        </Deferred>
+      )}
+      {orderError && <p className="small form__error" role="alert">{orderError}</p>}
+
       {(planTab === 'queue' || planTab === 'all') && <div className={'plan__blocks' + (selectingBlocks ? ' plan__blocks--selecting' : '')} ref={blocksRef}>{grouped
         ? (
           <WeekSections
@@ -1304,8 +1393,24 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           // Проведённые стоят на месте: их не тащат и между ними не ставят —
           // переставляются только оставшиеся, на свои же места
           data-done={past.length ? '' : undefined}
-          onPointerDown={canEdit && !selectingBlocks && !past.length ? (e) => {
+          onPointerDown={(canEdit || weekReorder) && !selectingBlocks && !past.length ? (e) => {
             if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select, .pc-strip')) return;
+            if (!canEdit) {
+              // Неделя по датам: порядок занятий правкой недели, а не списком программы
+              const shown = visibleBlocks.filter((b) => !(pastOf.get(b) || []).length);
+              holdToReorder(e, {
+                row: e.currentTarget,
+                rows: () => (blocksRef.current ? [...blocksRef.current.querySelectorAll('.plan__block:not([data-done])')] : []),
+                onDrop: (from, to) => {
+                  const order = [...shown];
+                  const [moved] = order.splice(from, 1);
+                  order.splice(to, 0, moved);
+                  reorderWeek(order);
+                  setOpenBlocks({});
+                },
+              });
+              return;
+            }
             // В разделах недель порядок экрана — по неделям: перетащенная в
             // другую неделю тренировка получает неделю соседа (FT-775)
             const displayed = grouped ? weekOrder(shownBlocks, programWeeks) : shownBlocks;
