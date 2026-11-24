@@ -134,7 +134,7 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
             ? <div className="sed-hint">Нажмите на фото, где «{steps[placing].label || 'шаг ' + (placing + 1)}» — здесь встанет цифра {placing + 1}</div>
             : !steps.some((s) => s.pin) && <div className="sed-hint">Отметьте детали: «Цифра на фото» у шага</div>}
         </div>
-      ) : <p className="field__hint">Добавьте фото — на нём можно будет отметить цифрами, где каждая регулировка.</p>}
+      ) : !library && <p className="field__hint">Добавьте фото — на нём можно будет отметить цифрами, где каждая регулировка.</p>}
 
       {steps.map((s, k) => {
         const own = s.sticker && stickerById(s.sticker) ? s.sticker : '';
@@ -142,6 +142,9 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
         const words = s.label.trim() ? s.label.trim().split(/\s+/).length : 0;
         return (
           <div key={k} className={'sed-row' + (placing === k ? ' is-on' : '')}>
+            {library && <div className="mlib-stepbar"><span>Шаг {k+1}</span>              <button type="button" className="sed-btn sed-ic" disabled={!k} aria-label="Выше" onClick={() => move(k, -1)}><IconArrowUp size={15} /></button>
+              <button type="button" className="sed-btn sed-ic" disabled={k === steps.length - 1} aria-label="Ниже" onClick={() => move(k, 1)}><IconArrowDown size={15} /></button>
+              <button type="button" className="sed-btn sed-ic" disabled={steps.length < 2} aria-label={'Удалить шаг ' + (k + 1)} onClick={() => { setPlacing(-1); commit(steps.filter((_, i) => i !== k)); }}><IconTrash size={15} /></button></div>}
             <div className="sed-top">
               <button type="button" className={'sed-stk' + (own ? ' has' : '')} onClick={() => setPicking(k)} aria-label={'Стикер шага ' + (k + 1) + (own ? ': ' + stickerById(own).name : '')}>
                 <span className="ss-n">{k + 1}</span>
@@ -166,22 +169,23 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
               </button>}
               {photo && s.pin && <button type="button" className="sed-btn sed-ic" aria-label={'Убрать цифру ' + (k + 1)} onClick={() => edit(k, { pin: null })}><IconClose size={14} /></button>}
               <span className="sed-gap" />
-              <button type="button" className="sed-btn sed-ic" disabled={!k} aria-label="Выше" onClick={() => move(k, -1)}><IconArrowUp size={15} /></button>
+              {!library && <>              <button type="button" className="sed-btn sed-ic" disabled={!k} aria-label="Выше" onClick={() => move(k, -1)}><IconArrowUp size={15} /></button>
               <button type="button" className="sed-btn sed-ic" disabled={k === steps.length - 1} aria-label="Ниже" onClick={() => move(k, 1)}><IconArrowDown size={15} /></button>
-              <button type="button" className="sed-btn sed-ic" disabled={steps.length < 2} aria-label={'Удалить шаг ' + (k + 1)} onClick={() => { setPlacing(-1); commit(steps.filter((_, i) => i !== k)); }}><IconTrash size={15} /></button>
+              <button type="button" className="sed-btn sed-ic" disabled={steps.length < 2} aria-label={'Удалить шаг ' + (k + 1)} onClick={() => { setPlacing(-1); commit(steps.filter((_, i) => i !== k)); }}><IconTrash size={15} /></button></>}
             </div>
           </div>
         );
       })}
       <button type="button" className="button button--ghost sed-add" disabled={steps.length >= 20}
-        onClick={() => commit([...steps, { label: '', main: '', rest: '', sticker: '', pin: null }])}><IconPlus size={16} aria-hidden="true" /> Шаг</button>
+        onClick={() => commit([...steps, { label: '', main: '', rest: '', sticker: '', pin: null }])}><IconPlus size={16} aria-hidden="true" /> {library ? 'Добавить шаг' : 'Шаг'}</button>
 
-      <div className="field__label sed-avoid-lab">{library ? 'Частые ошибки' : 'Не делайте'}</div>
+      <section className={library ? "mlib-errors mlib-errors--edit" : undefined}><div className="field__label sed-avoid-lab">{library ? 'Частые ошибки' : 'Не делайте'}</div>
       <div className="sed-chipin">
         {avoid.map((a, i) => <button key={i} type="button" onClick={() => commit(steps, avoid.filter((_, j) => j !== i))} aria-label={'Убрать: ' + a}>{a} <IconClose size={12} aria-hidden="true" /></button>)}
         <input value={draft} onChange={(e) => setDraft(e.target.value.replace(/,/g, ' '))} placeholder="Ошибка и Enter" aria-label="Добавить ошибку"
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMark(); } }} onBlur={addMark} enterKeyHint="done" />
       </div>
+      </section>
       {tooLong && <span className="field__hint sed-warn">Текст длиннее 1500 знаков — сократите подробности, иначе конец обрежется.</span>}
       {renderPreview(<button type="button" className="button button--ghost sed-preview" onClick={() => setPreview(true)}>{library ? 'Предпросмотр инструкции' : 'Как увидит клиент'}</button>)}
 
@@ -189,11 +193,11 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
         onPick={(id) => { haptic(); edit(picking, { sticker: id }); setPicking(-1); }} />}
       {preview && (
         <Sheet title="Как увидит клиент" onClose={() => setPreview(false)} className={library ? "sed-sheet mlib-preview" : "sed-sheet"}>
-          <SetupSteps photos={[]} rows={steps.filter((s) => s.label || s.main || s.rest).map((s) => ({ label: clean(s.label).trim(), text: clean(s.main) + (s.rest ? '; ' + clean(s.rest) : '') }))}
+          {library ? <section className="mlib-section"><div className="mlib-section__head"><h3>{kind === 'equipment' ? 'Как использовать' : 'Как настроить'}</h3></div>{photo && <div className="mlib-pinned"><PreviewPhoto src={photo} steps={steps}/></div>}{steps.filter(s=>s.label || s.main || s.rest).map((s,i)=><div className="mlib-step" key={i}><span className="mlib-sticker">{(s.sticker || stickerFor(s.label,s.main)) ? <Sticker id={s.sticker || stickerFor(s.label,s.main)}/> : i+1}</span><div className="mlib-grow">{s.label && <b>{s.label}</b>}<span className="mlib-step__main">{s.main}</span>{s.rest && <p>{s.rest}</p>}</div><span className="mlib-step__num">{i+1}</span></div>)}</section> : <SetupSteps photos={[]} rows={steps.filter((s) => s.label || s.main || s.rest).map((s) => ({ label: clean(s.label).trim(), text: clean(s.main) + (s.rest ? '; ' + clean(s.rest) : '') }))}
             meta={built.meta} kind={kind}>
             {photo && <div className="ss-photos"><PreviewPhoto src={photo} steps={steps} /></div>}
             {name && <h4 className="ts-mach__name">{name}</h4>}
-          </SetupSteps>
+          </SetupSteps>}
           {avoid.length > 0 && <section className="ts-avoid"><h4>{library ? 'Частые ошибки' : 'Не делайте'}</h4><div className="ts-nos">{avoid.map((a) => <span key={a}>{a}</span>)}</div></section>}
         </Sheet>
       )}

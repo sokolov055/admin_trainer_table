@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { BackButton, Sheet, Search, Note, plural } from '../ui.jsx';
-import { IconBench, IconDumbbell, IconMore, IconLink, IconPen, IconTrash, IconCopy, IconSliders, IconAlert } from '../icons.jsx';
+import { BackButton, Sheet, Search, Note } from '../ui.jsx';
+import { IconDumbbell, IconMore, IconLink, IconPen, IconTrash, IconCopy, IconSliders, IconAlert } from '../icons.jsx';
 import { MachinePhoto } from '../media.jsx';
 import { PinnedPhoto } from '../SetupSteps.jsx';
 import { mediaUrl } from '../library.js';
@@ -21,17 +21,11 @@ export default function MachineView({ machine: m, owner, exercises, onBack, onEd
   const query = q.trim().toLocaleLowerCase('ru').replace(/ё/g,'е');
   const choices = exercises.filter(e => !group || e.muscle === group).filter((e) => !query || [e.name,e.muscle].some((s) => String(s || '').toLocaleLowerCase('ru').replace(/ё/g,'е').includes(query)))
     .sort((a,b) => Number(attached.has(b.id))-Number(attached.has(a.id)) || a.name.localeCompare(b.name,'ru'));
-  const KindIcon = m.kind === 'equipment' ? IconDumbbell : IconBench;
   const tone = muscleClass(muscleTone({group:m.muscleGroups?.[0]}));
   const photos = m.photos?.length || (m.photo ? 1 : 0);
   return <div className={'mlib-view '+tone}>
     <BackButton onClick={onBack} label="Тренажёры"/>
-    <div className="mlib-hero"><span className="mlib-hero__big" aria-hidden="true"><KindIcon size={130}/></span>
-      <div className="mlib-hero__goal">{m.muscleGroups?.join(', ') || (m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр')}</div>
-      <h2 className="mlib-hero__title">{m.name}</h2>
-      <div className="mlib-hero__pills"><span className="mlib-pill"><KindIcon size={13}/>{m.kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}</span>{m.brand && <span className="mlib-pill">{m.brand}</span>}</div>
-      <div className="mlib-hero__stats">{[[(m.uses || []).length,plural((m.uses || []).length,'упражнение','упражнения','упражнений')],[photos,'фото'],[steps.length,plural(steps.length,'шаг','шага','шагов')],[m.weightStep ? String(m.weightStep).replace('.',',') : '—','шаг, кг']].map(([n,label])=><div key={label}><b>{n}</b><span>{label}</span></div>)}</div>
-    </div>
+    <h2 className="mlib-view-title">{m.name}</h2>
     {m.originalName && <p className="mlib-desc">{m.originalName}</p>}
     {photos > 0 && <div className="mlib-pinned">
       <PinnedPhoto src={mediaUrl(m.photos?.[0] || m.photo)} pins={steps.flatMap((s,k)=>s.pin ? [{k,p:s.pin}] : [])}

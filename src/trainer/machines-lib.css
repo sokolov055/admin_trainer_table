@@ -185,3 +185,73 @@
 .mlib-editor .sed-fields .field__input { font-weight:400; border-radius:10px; padding:10px; background:var(--surface-sunken); }
 .mlib-editor .field__label { font-weight:700; color:var(--text); }
 .mlib-editor .sed-preview { min-height:48px; border:1px solid var(--border); border-radius:var(--radius-lg); }
+
+/* Финальная сверка v7: геометрия макета, только библиотека оборудования. */
+.mlib-etop { top:max(env(safe-area-inset-top,0px),var(--inset-top,0px)); border-bottom:1px solid var(--border); padding:8px 0; min-height:60px; }
+.mlib-etop button { font-size:14px; }
+.mlib-etop b { font-size:14px; justify-content:center; }
+.mlib-etop button:last-child { justify-self:end; font-size:13px; min-height:44px; }
+.mlib-editor .mlib-ename { font-size:23px; font-weight:750; line-height:1.25; margin:16px 0; }
+.mlib-characteristics { padding:12px 14px 14px; border-radius:16px; }
+.mlib-blockhead { margin:0 0 12px; }
+.mlib-blockhead b { font-size:16px; }
+.mlib-model { color:var(--text-muted); min-height:28px; margin-top:6px; }
+.mlib-pchip { min-height:36px; padding:6px 11px; font-size:13px; }
+.mlib-pass { gap:6px; }
+.mlib-sheet .sheet__body { display:flex; flex-direction:column; gap:12px; padding-top:8px; }
+.mlib-sheet .field { margin:0; }
+.mlib-sheet .field__label { font-size:12px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:5px; }
+.mlib-sheet .field__input { width:100%; min-height:44px; padding:10px; background:var(--surface-sunken); border:1px solid var(--border); border-radius:10px; font-weight:400; }
+.mlib-sheet .mlib-muscle-picker .field__label { font-size:15px; font-weight:400; color:var(--text); }
+.mlib-sheet .mlib-groups { margin:8px 0 0; gap:6px; }
+.mlib-sheet .mlib-groups button { min-height:36px; font-size:13px; padding:6px 11px; }
+.mlib-sheet .button--primary { min-height:44px; margin-top:4px; flex:none; }
+.mlib-help { width:28px; height:28px; min-height:28px; font-size:13px; font-weight:400; }
+.mlib-editor > .field { margin-top:16px; border-radius:16px; padding:12px 14px; }
+.mlib-editor > .field > .field__label { display:flex; align-items:center; justify-content:space-between; font-size:16px; margin-bottom:12px; }
+.mlib-editor .library__photo-x { width:32px; height:32px; }
+.mlib-editor .sed-row { padding:12px; border:1px solid var(--border); border-radius:16px; }
+.mlib-stepbar { display:flex; gap:5px; align-items:center; margin-bottom:10px; }
+.mlib-stepbar > span { margin-right:auto; font-size:12px; color:var(--text-muted); font-weight:750; }
+.mlib-editor .sed-top { grid-template-columns:52px minmax(0,1fr); gap:5px 10px; }
+.mlib-editor .sed-fields { display:contents; }
+.mlib-editor .sed-stk { grid-column:1; grid-row:1 / 3; align-self:center; width:52px; height:52px; border:1px solid var(--border); border-radius:10px; }
+.mlib-editor .sed-stk .ss-n { display:none; }
+.mlib-editor .mlib-field-label { grid-column:1 / -1; margin-top:10px; font-size:12px; font-weight:600; }
+.mlib-editor .mlib-field-label:first-child { grid-column:2; margin-top:0; }
+.mlib-editor .sed-fields > .field__input { grid-column:1 / -1; margin:0; font-size:15px; font-weight:400; border-color:var(--border); background:var(--surface-sunken); padding:10px; }
+.mlib-editor .sed-fields > input.field__input { grid-column:2; font-weight:700; background:var(--surface); }
+.mlib-editor .sed-ta { min-height:64px; }
+.mlib-editor .sed-bot { margin-top:12px; padding-top:10px; }
+.mlib-editor .sed-add { width:100%; min-height:44px; border:1px dashed var(--border); border-radius:12px; color:var(--accent); font-weight:650; margin:0 0 6px; }
+.mlib-editor .mlib-errors--edit { margin:0; padding:12px 14px; border:1px solid color-mix(in srgb,var(--critical) 25%,var(--border)); border-radius:13px; color:var(--critical-text); background:var(--critical-fill); }
+.mlib-editor .mlib-errors--edit .sed-avoid-lab { margin:0 0 8px; color:inherit; font-size:14px; font-weight:700; }
+.mlib-editor .sed-chipin { padding:0; border:0; background:none; gap:6px; }
+.mlib-editor .sed-chipin button { height:auto; min-height:34px; padding:7px 9px; border:1px solid color-mix(in srgb,var(--critical) 20%,var(--border)); border-radius:9px; background:var(--surface); color:var(--critical-text); font-size:13px; font-weight:400; line-height:1.35; }
+.mlib-editor .sed-chipin input { flex-basis:100%; width:100%; min-width:0; height:42px; padding:10px; box-sizing:border-box; background:var(--surface); border:1px solid var(--border); border-radius:10px; font-size:14px; }
+.mlib-editor .library__setup-fields { display:block; padding:12px 14px 14px; }
+.mlib-reg-head { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:16px; margin-bottom:12px; }
+.mlib-reg-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.mlib-reg-chips button { min-height:38px; padding:0 12px; border:0; border-radius:9px; background:var(--surface-sunken); color:var(--text); font:inherit; font-size:14px; cursor:pointer; }
+.mlib-reg-chips .mlib-reg-add { color:var(--accent); }
+.mlib-editor #mlib-preview-action > button { background:var(--surface-sunken); border-radius:10px; min-height:40px; font-size:13px; font-weight:400; }
+.mlib-preview .ts-avoid { padding:12px 14px; border:1px solid color-mix(in srgb,var(--critical) 25%,var(--border)); border-radius:13px; background:var(--critical-fill); color:var(--critical-text); }
+.mlib-preview .ts-nos span,.mlib-error-chips span { padding:7px 9px; border:1px solid var(--border); border-radius:9px; background:var(--surface); font-size:13px; font-weight:400; }
+.mlib-groups { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
+.mlib-groups button { flex:none; white-space:nowrap; }
+.mlib-muscle-picker .mlib-groups { flex-wrap:wrap; overflow:visible; }
+.mlib-editor .sed-fields textarea.sed-ta { min-height:64px; }
+.mlib-editor .sed-chipin input::placeholder { color:var(--text-muted); opacity:1; }
+.mlib-errors { border-color:color-mix(in srgb,var(--critical) 25%,var(--border)); border-radius:13px; padding:12px 14px; color:var(--critical-text); }
+.mlib-errors h4 { font-size:14px; }
+.mlib-editor .mlib-photo-head { justify-content:flex-start; gap:8px; }
+.mlib-photo-head b { flex:1; font-weight:750; }
+.mlib-photo-head small { font-size:13px; color:var(--text-muted); font-weight:400; }
+.mlib-editor .mlib-photo-head .mlib-help { margin-left:0; }
+.mlib-editor .library__machine-actions > label { font-size:13px; font-weight:400; border:1px solid var(--border); border-radius:10px; padding:0 12px; min-height:40px; background:var(--surface-sunken); }
+.mlib-etop::before { content:''; position:absolute; left:0; right:0; bottom:100%; height:max(env(safe-area-inset-top,0px),var(--inset-top,0px)); background:var(--bg); pointer-events:none; }
+.mlib-view-title { margin:16px 0; font-size:24px; line-height:1.25; font-weight:750; overflow-wrap:anywhere; }
+.mlib-view .mlib-step { align-items:flex-start; padding:14px; gap:12px; }
+.mlib-view .mlib-grow b { font-size:15px; }
+.mlib-view .mlib-step__main,.mlib-view .mlib-grow p { font-size:14px; }
+.mlib-view .mlib-section { margin-bottom:16px; border-radius:16px; }

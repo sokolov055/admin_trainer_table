@@ -223,6 +223,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
 
   const [passport, setPassport] = useState(false);
   const [help, setHelp] = useState('');
+  const [fieldEdit, setFieldEdit] = useState(-1);
   const [leaving, setLeaving] = useState(false);
   const snapshot = JSON.stringify([name, setup, meta, originalName, brand, muscleGroups, weightStep, kind, setupFields, dropped, added.map(a => a.url)]);
   const initial = useRef(snapshot);
@@ -308,6 +309,8 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     }
   };
 
+  const FieldsBox = library ? 'section' : 'fieldset';
+  const FieldsHeading = library ? 'div' : 'legend';
   const touch = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   return (
     <div className={'library__form library__machine-form' + (library ? ' mlib-editor' : '')}>
@@ -319,29 +322,29 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       </>}
       {(!library || passport) && <SheetOrInline library={library} onClose={() => setPassport(false)}>
       <div className="field">
-        <span className="field__label">Что это</span>
-        <Segmented label="Что это" items={MACHINE_KIND_ITEMS} value={kind} onChange={setKind} />
+        <span className="field__label">{library ? 'Вид' : 'Что это'}</span>
+        {library ? <select className="field__input" aria-label="Вид" value={kind} onChange={e=>setKind(e.target.value)}><option value="machine">Тренажёр</option><option value="equipment">Оборудование</option></select> : <Segmented label="Что это" items={MACHINE_KIND_ITEMS} value={kind} onChange={setKind} />}
       </div>
       {!library && <label className="field">
         <span className="field__label">Название для клиента</span>
         <input className="field__input" value={name} maxLength={80} autoFocus={!machine}
           onChange={(ev) => setName(ev.target.value)} placeholder={kind === 'equipment' ? 'Гантели, фитбол, степ-платформа…' : 'Hammer у окна, Technogym…'} />
       </label>}
-      <label className="field"><span className="field__label">Оригинальное название модели</span><input className="field__input" value={originalName} maxLength={120} onChange={(e) => setOriginalName(e.target.value)} /></label>
-      <label className="field"><span className="field__label">Производитель / бренд</span><input className="field__input" value={brand} maxLength={120} onChange={(e) => setBrand(e.target.value)} /></label>
+      <label className="field"><span className="field__label">{library ? 'Производитель' : 'Производитель / бренд'}</span><input className="field__input" aria-label="Производитель / бренд" value={brand} maxLength={120} onChange={(e) => setBrand(e.target.value)} /></label>
+      <label className="field"><span className="field__label">{library ? 'Модель' : 'Оригинальное название модели'}</span><input className="field__input" aria-label="Оригинальное название модели" placeholder={library ? 'Не указана' : ''} value={originalName} maxLength={120} onChange={(e) => setOriginalName(e.target.value)} /></label>
       {kind === 'machine' && <label className="field">
         <span className="field__label">Шаг веса, кг</span>
         <input className="field__input" inputMode="decimal" value={weightStep} maxLength={5} placeholder="например, 5"
           onChange={(e) => setWeightStep(e.target.value.replace(/[^\d.,]/g, ''))} />
-        <span className="small muted">Сколько весит одна плитка. На столько приложение прибавляет вес после «Легко» и до него округляет. Пусто — по группе мышц.</span>
+        <span className="small muted" style={library ? {display:'none'} : undefined}>Сколько весит одна плитка. На столько приложение прибавляет вес после «Легко» и до него округляет. Пусто — по группе мышц.</span>
       </label>}
-      <fieldset className="field"><legend className="field__label">Мышечные группы</legend>
-        {['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Предплечье', 'Пресс', 'Всё тело', 'Кардио'].map((g) => <label className="library__check" key={g}><input type="checkbox" checked={muscleGroups.includes(g)} onChange={(e) => setMuscleGroups(e.target.checked ? [...muscleGroups, g] : muscleGroups.filter((x) => x !== g))} />{g}</label>)}
-      </fieldset>
+      <div className={library ? 'mlib-muscle-picker' : 'field'}><div className="field__label">Мышечные группы</div>
+        <div className={library ? 'mlib-groups' : ''}>{['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Предплечье', 'Пресс', 'Всё тело', 'Кардио'].map((g) => library ? <button type="button" key={g} aria-pressed={muscleGroups.includes(g)} onClick={()=>setMuscleGroups(muscleGroups.includes(g) ? muscleGroups.filter(x=>x!==g) : [...muscleGroups,g])}>{g}</button> : <label className="library__check" key={g}><input type="checkbox" checked={muscleGroups.includes(g)} onChange={(e) => setMuscleGroups(e.target.checked ? [...muscleGroups, g] : muscleGroups.filter((x) => x !== g))} />{g}</label>)}</div>
+      </div>
       </SheetOrInline>}
       {machine && !library && <p className="small muted">Инструкция изменится во всех упражнениях с этой карточкой оборудования.</p>}
       <div className="field">
-        <span className="field__label">Фото{library && <button className="mlib-help" type="button" aria-label="О фотографиях" onClick={()=>setHelp('Первое фото — главное. Снимайте без людей в кадре. Номера шагов можно поставить и переместить на главном фото.')}>?</button>}{total ? ' · ' + total + ' из ' + MAX_MACHINE_PHOTOS : ''}</span>
+        <span className="field__label mlib-photo-head"><b>{library ? 'Фотографии' : 'Фото'}</b>{total > 0 && <small>{total} из {MAX_MACHINE_PHOTOS}</small>}{library && <button className="mlib-help" type="button" aria-label="О фотографиях" onClick={()=>setHelp('Первое фото — главное. Снимайте без людей в кадре. Номера шагов можно поставить и переместить на главном фото.')}>?</button>}</span>
         {total > 0 && (
           <div className="library__photos">
             {kept.map((u) => (
@@ -369,7 +372,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
               </label>
             )}
             <label className="button button--ghost">
-              {touch ? 'Из галереи' : total ? 'Ещё фото' : 'Выбрать фото'}
+              {touch ? 'Из галереи' : library ? '+ Добавить фото' : total ? 'Ещё фото' : 'Выбрать фото'}
               <input type="file" accept="image/*" multiple hidden onChange={pick} />
             </label>
           </div>
@@ -384,9 +387,9 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         {!library && <span className="field__hint">Без цифр в тексте: настройка у каждого клиента своя — её записывают в занятии. Стикер подбирается по подписи сам, если не выбрать.</span>}
       </div>
 
-      <fieldset className="field library__setup-fields">
-        <legend className="field__label">{library ? 'Регулировки клиента' : 'Регулировки'}{library && <button type="button" className="mlib-help" aria-label="О регулировках клиента" onClick={()=>setHelp('Здесь только названия общих полей. Значения каждый клиент записывает в занятии; личные значения не меняют карточку оборудования.')}>?</button>}</legend>
-        {setupFields.map((f, i) => (
+      <FieldsBox className="field library__setup-fields">
+        <FieldsHeading className={library ? "mlib-reg-head field__label" : "field__label"}>{library ? 'Регулировки клиента' : 'Регулировки'}{library && <button type="button" className="mlib-help" aria-label="О регулировках клиента" onClick={()=>setHelp('Здесь только названия общих полей. Значения каждый клиент записывает в занятии; личные значения не меняют карточку оборудования.')}>?</button>}</FieldsHeading>
+        {library ? <div className="mlib-reg-chips">{setupFields.map((f,i)=><button type="button" key={i} onClick={()=>setFieldEdit(i)}>{f || 'Без названия'}</button>)}{setupFields.length < 12 && <button type="button" className="mlib-reg-add" onClick={()=>{setSetupFields(v=>[...v,'']);setFieldEdit(setupFields.length);}}>+ Добавить</button>}</div> : <>{setupFields.map((f, i) => (
           <div className="library__setup-field" key={i}>
             <input className="field__input" value={f} maxLength={40} placeholder="Сиденье, спинка, высота блока…" autoFocus={!f}
               aria-label={'Регулировка ' + (i + 1)} onChange={(e) => setSetupFields((v) => v.map((x, k) => (k === i ? e.target.value : x)))} />
@@ -395,9 +398,11 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
           </div>
         ))}
         {setupFields.length < 12 && <button type="button" className="button button--ghost" onClick={() => setSetupFields((v) => [...v, ''])}>+ Регулировка</button>}
+        </>}
         {!library && <span className="field__hint">Что клиент выставляет на тренажёре: сиденье, спинка, высота блока. Цифры у каждого свои — их вписывают в занятии, текстом или числом. Клиент может добавить и свою регулировку — она только у него.</span>}
-      </fieldset>
+      </FieldsBox>
       {library && <div id="mlib-preview-action" />}
+      {library && fieldEdit >= 0 && <Sheet title="Регулировка клиента" className="mlib-sheet" onClose={()=>setFieldEdit(-1)}><label className="field"><span className="field__label">Название поля</span><input autoFocus className="field__input" aria-label={'Регулировка ' + (fieldEdit+1)} value={setupFields[fieldEdit] || ''} maxLength={40} onChange={e=>setSetupFields(v=>v.map((x,i)=>i===fieldEdit ? e.target.value : x))}/></label><button type="button" className="button button--primary button--block" onClick={()=>setFieldEdit(-1)}>Готово</button><button type="button" className="button button--ghost button--block" onClick={()=>{setSetupFields(v=>v.filter((_,i)=>i!==fieldEdit));setFieldEdit(-1);}}>Удалить регулировку</button></Sheet>}
       {help && <Sheet title="Справка" onClose={()=>setHelp('')}>{help}</Sheet>}
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       {library && leaving && <Sheet title="Выйти без сохранения?" onClose={() => setLeaving(false)}><p>Изменения карточки ещё не сохранены.</p><button type="button" className="button button--primary button--block" onClick={() => setLeaving(false)}>Продолжить редактирование</button><button type="button" className="button button--ghost button--block" onClick={() => onDone(persisted)}>Выйти без сохранения</button></Sheet>}
