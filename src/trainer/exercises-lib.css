@@ -1,4 +1,4 @@
-/* FT-820, этап 1: список упражнений по композиции Программ и Тренажёров, отдельная область elib. */
+/* этап 1: список упражнений по композиции Программ и Тренажёров, отдельная область elib. */
 .elib-bar { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); }
 .elib-scope,.elib-search { flex:1; min-width:0; }
 .elib-search .search { margin:0 0 var(--space-3); }
