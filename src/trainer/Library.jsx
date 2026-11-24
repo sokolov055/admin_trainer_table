@@ -1068,9 +1068,11 @@ function Exercises() {
   useBackGesture(() => setShowSimilar(false), !editing && showSimilar);
   useBackGesture(() => setEditing(null), !!editing);
   useBackGesture(() => setShowHidden(false), !editing && showHidden);
-  useBackGesture(() => setForm(false), !editing && !showHidden && !!open && form);
+  // Жесты — только при открытой карточке: пока перечитывание не вернуло её, на экране список
+  const openCard = data && open ? data.exercises.find((e) => e.id === open) : null;
+  useBackGesture(() => setForm(false), !editing && !showHidden && !!openCard && form);
   const back = () => { setForm(false); if (trail.length) { setOpen(trail[trail.length - 1]); setTrail(trail.slice(0, -1)); } else setOpen(null); };
-  useBackGesture(back, !editing && !showHidden && !!open && !form);
+  useBackGesture(back, !editing && !showHidden && !!openCard && !form);
   useReturnScroll(!!(editing || showHidden || open));
 
   // Смахнули или нажали в правке списка — пропадает сразу, на сервер через
@@ -1145,7 +1147,7 @@ function Exercises() {
         hiddenCount={data.hiddenCount}
         state={listState}
         setState={setListState}
-        onOpen={(id) => setOpen(id)}
+        onOpen={(id) => { setForm(false); setOpen(id); }}
         onCreate={() => setEditing({ new: true })}
         onDelete={remove}
         onSimilar={() => setShowSimilar(true)}
