@@ -282,3 +282,17 @@ test('перетаскивание в карточке клиента: голо�
   const into = [list[0], list[3], list[1], list[2]];
   assert.deepEqual(weekSessions(regroupedAfterMove(into, list[3], null, true), 1).map((g) => g.map((b) => b.id)), [['A', 'C', 'K'], ['B']]);
 });
+
+test('внеплановая тренировка (once) не меняется пометкой недели, копированием, длиной и порядком', () => {
+  const ex = [{ name: 'Жим', sets: '3', reps: '8' }];
+  const blocks = [
+    { id: 'a', title: 'А', week: 1, exercises: ex },
+    { id: 'o', title: 'Внеплановая', load: 'once', exercises: ex },
+    { id: 'b', title: 'Б', week: 2, exercises: ex },
+  ];
+  assert.equal(withWeekLoad(blocks, 1, 'light').find((b) => b.id === 'o').load, 'once');
+  assert.equal(weekLoad(blocks, 1), '');
+  assert.equal(copiedWeek(blocks, 1, 3).length, blocks.length + 1);
+  assert.equal(withLength(blocks, 3).find((b) => b.id === 'o').load, 'once');
+  assert.equal(byWeek(blocks, 2)[0].blocks.length, 1);
+});

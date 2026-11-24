@@ -4,7 +4,7 @@ import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
 import { dateKey, nextMonday, programSize, addDays, isOnce } from '../program-timeline.js';
-import { addedToWeek, freeDay, firstOpenDay, reorderedWeek } from '../week-edits.js';
+import { addedToWeek, freeDay, firstOpenDay, reorderedWeek, weekItems } from '../week-edits.js';
 import { planExerciseForSave } from '../plan-payload.js';
 import { journalList, onOutboxChange, justSynced, localWorkouts, withLocalWeights } from '../workout-outbox.js';
 import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures } from '../offline-writes.js';
@@ -743,23 +743,30 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
   // Внеплановая тренировка из библиотеки (только тренер): блок программы с
   // пометкой once живёт вне круга, а на эту неделю встаёт правкой недели
   const weekTrainer = canWeekEdit && canRename && !clientView && cardShown && !!week && week.editable !== false && week.end >= dateKey();
-  const addFromLibrary = async (made) => {
+  const addDays7 = week && weekTrainer
+    ? Array.from({ length: 7 }, (_, k) => k + 1).filter((d) => d >= firstOpenDay(week.start, dateKey())).map((d) => ({
+      day: d,
+      label: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][d - 1] + ' ' + Number(addDays(week.start, d - 1).slice(8)),
+    }))
+    : [];
+  const addFromLibrary = async (made, pickedDay) => {
     setLibError('');
     clearTimeout(saveTimer.current);
     editSeq.current += 1;
     const known = new Set(shownBlocks.map((b) => b.id).filter(Boolean));
+    const effectiveOn = weeksCfg.effectiveOn > dateKey() ? weeksCfg.effectiveOn : editOn;
+    let added = null;
     try {
       const saved = await apiMutate('plan.save', {
         clientRow,
         month: data.month,
-        effectiveOn: weeksCfg.effectiveOn > dateKey() ? weeksCfg.effectiveOn : editOn,
+        effectiveOn,
         blocks: blocksForSave([...shownBlocks, { ...made, load: 'once' }]),
       });
-      const added = ((saved && saved.blocks) || []).find((b) => b.id && !known.has(b.id) && isOnce(b));
+      added = ((saved && saved.blocks) || []).find((b) => b.id && !known.has(b.id) && isOnce(b));
       if (!added) throw new Error('Тренировка не сохранилась. Повторите.');
       const edits = weeksCfg.weekEdits || {};
-      const today = dateKey();
-      const day = freeDay(edits[week.start] || week.layout, firstOpenDay(week.start, today));
+      const day = pickedDay || freeDay(edits[week.start] || week.layout, firstOpenDay(week.start, dateKey()));
       const res = await apiMutate('plan.week.edit', {
         clientRow,
         month: data.month,
@@ -772,6 +779,10 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       haptic('success');
       await reload();
     } catch (error) {
+      // Блок уже сохранён, а на неделю не встал — убираем, иначе повтор наплодит скрытых
+      if (added) {
+        try { await apiMutate('plan.save', { clientRow, month: data.month, effectiveOn, blocks: blocksForSave(shownBlocks) }); } catch (_) { /* останется скрытым до следующей правки программы */ }
+      }
       setLibError((error && error.message) || 'Не получилось добавить. Повторите.');
       reload();
       throw error;
@@ -784,6 +795,13 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     if (at < 0) return block.id;
     for (let k = at; k >= 0; k -= 1) if (!week.rows[k].extra) return week.rows[k].block.id;
     return block.id;
+  };
+  // Двигаются занятия, что ещё впереди: сделанные, прошедшие дни и долги — нет
+  const weekMovable = (block) => {
+    if (!weekReorder) return false;
+    const id = headIdOf(block);
+    const open = firstOpenDay(week.start, dateKey());
+    return weekItems(week).some((it) => it.id === id && !it.done && !(it.day > 0 && it.day < open));
   };
   const reorderWeek = async (order) => {
     if (orderBusy.current) return;
@@ -1232,7 +1250,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
       )}
       {libOpen && weekTrainer && (
         <Deferred fallback={null}>
-          <AddFromLibrary onClose={() => setLibOpen(false)} onPick={addFromLibrary} error={libError} />
+          <AddFromLibrary onClose={() => setLibOpen(false)} onPick={addFromLibrary} days={addDays7} error={libError} />
         </Deferred>
       )}
       {orderError && <p className="small form__error" role="alert">{orderError}</p>}
@@ -1392,12 +1410,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           } : undefined}
           // Проведённые стоят на месте: их не тащат и между ними не ставят —
           // переставляются только оставшиеся, на свои же места
-          data-done={past.length ? '' : undefined}
-          onPointerDown={(canEdit || weekReorder) && !selectingBlocks && !past.length ? (e) => {
+          data-done={past.length || (!canEdit && !weekMovable(block)) ? '' : undefined}
+          onPointerDown={(canEdit || weekMovable(block)) && !selectingBlocks && !past.length ? (e) => {
             if (e.target.closest && e.target.closest('.plan-inline, input, textarea, select, .pc-strip')) return;
             if (!canEdit) {
               // Неделя по датам: порядок занятий правкой недели, а не списком программы
-              const shown = visibleBlocks.filter((b) => !(pastOf.get(b) || []).length);
+              const shown = visibleBlocks.filter((b) => !(pastOf.get(b) || []).length && weekMovable(b));
               holdToReorder(e, {
                 row: e.currentTarget,
                 rows: () => (blocksRef.current ? [...blocksRef.current.querySelectorAll('.plan__block:not([data-done])')] : []),
@@ -1413,7 +1431,9 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
             }
             // В разделах недель порядок экрана — по неделям: перетащенная в
             // другую неделю тренировка получает неделю соседа (FT-775)
-            const displayed = grouped ? weekOrder(shownBlocks, programWeeks) : shownBlocks;
+            // Внеплановые скрыты и в порядке не участвуют: индексы DOM совпадают со списком
+            const planned = shownBlocks.filter((b) => !isOnce(b));
+            const displayed = grouped ? weekOrder(planned, programWeeks) : planned;
             const movable = displayed.filter((b) => !(pastOf.get(b) || []).length);
             holdToReorder(e, {
               row: e.currentTarget.closest('.plan__block-swipe') || e.currentTarget,
@@ -1429,7 +1449,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 const next = [...displayed];
                 slots.forEach((at, k) => { next[at] = order[k]; });
                 // Занятие (FT-788): вынесенная выходит из него, брошенная внутрь — входит
-                commit(regroupedAfterMove(next, placed, followerOf(displayed, moved), !moved.with));
+                commit([...regroupedAfterMove(next, placed, followerOf(displayed, moved), !moved.with), ...shownBlocks.filter(isOnce)]);
                 setOpenBlocks({});
               },
             });
@@ -1452,7 +1472,7 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
                 ? <span className="plan__week-debt">не выполнена</span>
                 : row.carried && row.done === 0
                   ? <span className="plan__week-debt">долг с цикла {week.n - 1}</span>
-                  : null)}
+                  : isOnce(block) ? <span className="plan__week-debt plan__once">внеплановая</span> : null)}
             />
             {/* Какие мышцы в работе (FT-491) — с первого взгляда ясно, что за день */}
             <CardMuscles exercises={block.exercises} />

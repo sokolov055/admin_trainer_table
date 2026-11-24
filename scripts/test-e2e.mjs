@@ -2764,6 +2764,8 @@ test('внеплановая тренировка из библиотеки и �
     await add.click();
     await phone.getByRole('heading', { name: 'Добавить из библиотеки' }).or(phone.getByText('Тренировка встанет на этой неделе')).first().waitFor();
     await phone.locator('.sheet .item').first().click();
+    await phone.getByRole('radio', { name: 'Следующей по порядку' }).waitFor();
+    await phone.locator('.sheet').getByRole('button', { name: 'Добавить', exact: true }).click();
     await phone.waitForTimeout(800);
     assert.equal((await titles()).length, before.length + 1, 'тренировка добавилась на неделю');
     assert.deepEqual(errors, []);

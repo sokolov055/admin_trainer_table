@@ -121,6 +121,9 @@ export function programLength(blocks) {
 /** Неделя программы тренировки; без недели в программе по неделям — первая */
 export const weekOf = (block) => Number(block.week) || 1;
 
+/** В неделе программы; внеплановая (once) живёт вне недель и в них не считается */
+const inWeek = (b, week) => b.load !== 'once' && weekOf(b) === week;
+
 /** С какой недели программы начинается месяц (cfg.startWeek), в пределах длины */
 export function startWeekOf(cfg, length) {
   const s = Math.floor(Number(cfg && cfg.startWeek)) || 1;
@@ -135,7 +138,7 @@ export function decisionOf(cfg, n, block) {
 
 /** Пометка недели программы: у всех её тренировок одна — она, иначе '' */
 export function weekLoad(blocks, week) {
-  const list = (blocks || []).filter((b) => weekOf(b) === week);
+  const list = (blocks || []).filter((b) => inWeek(b, week));
   const loads = new Set(list.map((b) => b.load || ''));
   return list.length && loads.size === 1 ? [...loads][0] : '';
 }
@@ -203,7 +206,7 @@ export function weekPlan({ blocks, sessions, month, cfg, prev = null, latest = f
     const debts = prevCycle
       ? prevCycle.rows.filter((r) => r.missed > 0 && decisionOf(rules, prevCycle.n, r.block) === 'redo').map((r) => r.block)
       : carriedFromPrev;
-    const ownBlocks = list.filter((b) => weekOf(b) === week);
+    const ownBlocks = list.filter((b) => inWeek(b, week));
     const rowsOf = [...ownBlocks, ...debts.filter((b) => !ownBlocks.includes(b))];
     const rows = rowsOf.map((block) => {
       const here = (block.foreign
@@ -277,6 +280,9 @@ export function weekQueue(cycle) {
  * «Разложить по неделям» (FT-775) и «Назначить» делают именно это
  */
 export function withLength(blocks, n) {
+  // Внеплановые тренировки (once) длину не меняют и остаются как есть
+  const once = (blocks || []).filter((b) => b.load === 'once');
+  if (once.length) return [...withLength((blocks || []).filter((b) => b.load !== 'once'), n), ...once];
   const list = blocks || [];
   if (!n) return list.map(({ week: _drop, ...rest }) => rest);
   // Занятие (FT-788) не разрывается: раскладываются занятия, а не тренировки
@@ -295,8 +301,9 @@ export function withLength(blocks, n) {
 
 /** Занятия программы по порядку недель (внутри недели — как в программе) */
 function sessionUnits(list) {
+  list = list.filter((b) => b.load !== 'once');
   const weeks = [...new Set(list.map(weekOf))].sort((a, b) => a - b);
-  return weeks.flatMap((w) => sessionsOf(list.filter((b) => weekOf(b) === w)));
+  return weeks.flatMap((w) => sessionsOf(list.filter((b) => inWeek(b, w))));
 }
 
 /* --------------------------------------------------------------------------
@@ -309,7 +316,7 @@ export const isCardioBlock = (b) => !!b && (b.exercises || []).length > 0 && b.e
 
 /** Занятия недели (или программы без недель): [[силовая, кардио], [силовая]] */
 export function weekSessions(blocks, week = 0) {
-  const list = (blocks || []).filter((b) => !week || weekOf(b) === week);
+  const list = (blocks || []).filter((b) => b.load !== 'once' && (!week || weekOf(b) === week));
   return sessionsOf(list);
 }
 
@@ -392,7 +399,7 @@ export function looseCardio(blocks) {
   const list = blocks || [];
   const out = [];
   [...new Set(list.map(weekOf))].forEach((w) => {
-    const week = list.filter((b) => weekOf(b) === w);
+    const week = list.filter((b) => inWeek(b, w));
     week.forEach((b, i) => {
       if (i > 0 && !b.with && isCardioBlock(b) && !isCardioBlock(week[i - 1])) out.push(b);
     });
@@ -436,7 +443,7 @@ export function resized(blocks, n) {
 /** Тренировки по неделям: [{ week, blocks }] на все недели 1..length, порядок — как в программе */
 export function byWeek(blocks, length) {
   const list = blocks || [];
-  return Array.from({ length }, (_, i) => ({ week: i + 1, blocks: list.filter((b) => weekOf(b) === i + 1) }));
+  return Array.from({ length }, (_, i) => ({ week: i + 1, blocks: list.filter((b) => inWeek(b, i + 1)) }));
 }
 
 /** Порядок экрана: по неделям, внутри недели — как в программе */
@@ -447,7 +454,7 @@ export function weekOrder(blocks, length) {
 /** Пометка недели целиком (решение 28.10.2026: нагрузка — у недели, не у тренировки) */
 export function withWeekLoad(blocks, week, load) {
   return (blocks || []).map((b) => {
-    if (weekOf(b) !== week) return b;
+    if (!inWeek(b, week)) return b;
     const { load: _drop, ...rest } = b;
     return load ? { ...rest, load } : rest;
   });
@@ -469,7 +476,7 @@ export function movedToWeek(blocks, block, week) {
   if (group.length === 1) {
     // Одна тренировка остаётся на своём месте, если не встаёт внутрь чужого занятия
     const inPlace = list.map((b) => (b === block ? moved[0] : b));
-    const there = inPlace.filter((b) => weekOf(b) === week);
+    const there = inPlace.filter((b) => inWeek(b, week));
     const next = there[there.indexOf(moved[0]) + 1];
     if (!next || !next.with) return inPlace;
   }
@@ -483,7 +490,7 @@ export function movedToWeek(blocks, block, week) {
 export function copiedWeek(blocks, from, to) {
   const list = blocks || [];
   const load = weekLoad(list, to);
-  const copies = list.filter((b) => weekOf(b) === from).map(({ id: _id, load: _load, ...b }) => ({
+  const copies = list.filter((b) => inWeek(b, from)).map(({ id: _id, load: _load, ...b }) => ({
     ...b, week: to, ...(load ? { load } : {}),
     exercises: (b.exercises || []).map((e) => ({ ...e })),
   }));
@@ -535,6 +542,6 @@ export function assignPreview({ blocks, month, how = '', length = 0, startWeek =
   const start = startWeekOf({ startWeek }, n);
   return cycles.map((c, i) => {
     const week = ((start - 1 + i) % n) + 1;
-    return { ...c, week, titles: list.filter((b) => weekOf(b) === week).map((b) => b.title) };
+    return { ...c, week, titles: list.filter((b) => inWeek(b, week)).map((b) => b.title) };
   });
 }

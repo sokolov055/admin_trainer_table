@@ -172,3 +172,4 @@ button.wc-dot:active { transform: scale(.9); }
 .wc__more:active { transform: scale(.97); }
 
 .plan__free-add--top { margin-top: 0; margin-bottom: var(--space-3); }
+.plan__once { color: var(--accent-ink, var(--accent)); font-weight: 650; }
