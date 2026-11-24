@@ -2,9 +2,9 @@ import MachineView from './MachineView.jsx';
 import MachineList from './MachineList.jsx';
 import ExerciseList from './ExerciseList.jsx';
 import ExerciseCardView from './ExerciseCardView.jsx';
+import ExerciseEditor from './ExerciseEditor.jsx';
 import { NO_EXERCISE_FILTERS } from './exercise-list-model.js';
-import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
-import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf, planText } from '../exercise-track.js';
+import { cardioLine, trackOf, planText } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useState } from 'react';
 import { useData } from '../useData.js';
@@ -16,17 +16,15 @@ import ProgramList from './ProgramList.jsx';
 import ProgramView from './ProgramView.jsx';
 import ProgramEditor from './ProgramEditor.jsx';
 import ProgramAssign from './ProgramAssign.jsx';
-import ExerciseKind from '../ExerciseKind.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
-import { uploadVideo, monthName, shrinkPhoto, uploadMachinePhoto, mediaUrl } from '../library.js';
+import { monthName, uploadMachinePhoto } from '../library.js';
 import {
   Section, Panel, Loading, ErrorState, Empty, Tag, Chips, Search, Segmented, Field, Note, plural,
   BackButton, useLeaveGuard,
 } from '../ui.jsx';
-import { IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconClose } from '../icons.jsx';
+import { IconPlan, IconSearch, IconAlert, IconCheck, IconTrash } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
-import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachineForm } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
@@ -1110,12 +1108,11 @@ function Exercises() {
 
   if (current && form) {
     return (
-      <ExerciseForm
+      <ExerciseEditor
         exercise={current}
         owner={!!data.owner}
         muscles={data.muscles}
-        onSetup={reload}
-        onChanged={(saved) => { setOpen(saved.id); reload(); }}
+        onSaved={(saved) => { if (saved) setOpen(saved.id); reload(); }}
         onBack={() => setForm(false)}
       />
     );
@@ -1405,198 +1402,6 @@ function HiddenExercises({ onBack }) {
   );
 }
 
-/**
- * Форма правки («Изменить» в карточке): поля по касанию, открыто одно поле
- * за раз. После сохранения форма остаётся открытой. Общее упражнение при
- * сохранении становится своей версией (сервер копирует тренажёры, замены,
- * настройку и видео); подготовку общего владелец правит прямо в базе.
- * Тренажёры и замены здесь не правятся — они в карточке.
- */
-function ExerciseForm({ exercise, owner, muscles, onSetup, onChanged, onBack }) {
-  const e = exercise;
-  const [edit, setEdit] = useState('');
-  const [draft, setDraft] = useState({});
-  const [file, setFile] = useState(null);
-  const [progress, setProgress] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState(null);
-  useEffect(() => { setEdit(''); }, [e.id]);
-
-  const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
-  const open = (key, values) => { setEdit(key); setDraft(values); setFile(null); setFailure(null); haptic(); };
-  const close = () => { setEdit(''); setFailure(null); };
-  const known = e.track;
-  const directSetup = e.mine || (e.common && owner);
-  const hasFile = e.mine && e.media?.kind === 'file';
-
-  const save = async (patch, upload = null) => {
-    setBusy(true);
-    setFailure(null);
-    try {
-      const { setupOnly, ...rest } = patch;
-      let saved = e;
-      if (setupOnly && directSetup) {
-        await apiMutate('library.exercise.setup', { id: e.id, setup: rest.setup, ok: rest.setupOk });
-      } else {
-        // Название и технику сервер переписывает всегда — шлём текущие, если правят другое поле
-        saved = await apiMutate('library.exercise.save', { id: e.id, name: e.name, muscle: e.muscle || '', notes: e.notes || '', ...rest });
-      }
-      if (upload) {
-        setProgress(0);
-        await uploadVideo(saved.id, upload, setProgress);
-      }
-      haptic('success');
-      setEdit('');
-      if (saved === e) onSetup(); else onChanged(saved);
-    } catch (err) {
-      setFailure(err);
-    } finally {
-      setBusy(false);
-      setProgress(null);
-    }
-  };
-
-  const actions = (patch, ok = true, upload = null) => (
-    <>
-      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      <div className="library__actions">
-        <button className="button button--primary" disabled={busy || !ok} onClick={() => save(patch, upload)}>{busy ? 'Сохраняем…' : 'Сохранить'}</button>
-        <button className="button button--ghost" disabled={busy} onClick={close}>Отмена</button>
-      </div>
-    </>
-  );
-
-  // Поле карточки: касание открывает правку только его
-  const row = (key, label, value, start, editor, empty = 'Не заполнено') => (
-    <div className={'card-field' + (edit === key ? ' card-field--open' : '')} key={key}>
-      {edit === key
-        ? <div className="library__form"><span className="card-field__label">{label}</span>{editor()}</div>
-        : (
-          <button type="button" className="card-field__view" aria-label={'Изменить: ' + label} onClick={() => open(key, start())}>
-            <span className="card-field__label">{label}</span>
-            {value ? <span className="card-field__value">{value}</span> : <span className="card-field__value card-field__value--empty">{empty}</span>}
-          </button>
-        )}
-    </div>
-  );
-
-  // Вид — тем же меню, что в программе и занятии (ExerciseKind): снимок
-  // текущего, у «авто» — догадка сервера, чтобы чипы показывали её
-  const kindOf = () => ({ track: known ? { ...known } : { kind: 'strength', auto: true } });
-  const flip = (map, r) => {
-    const v = map || { primary: [], secondary: [] };
-    return { primary: v.primary.filter((x) => x !== r).concat(!v.primary.includes(r) && !v.secondary.includes(r) ? [r] : []), secondary: v.secondary.filter((x) => x !== r).concat(v.primary.includes(r) ? [r] : []) };
-  };
-
-  return (
-    <>
-      <Back onClick={onBack} />
-      <Panel pad>
-        {row('name', 'Название', <span className="library__title">{e.name}</span>, () => ({ name: e.name }), () => <>
-          <Field label="Название" inputMode="text" value={draft.name} onChange={(v) => set({ name: v })} />
-          {actions({ name: (draft.name || '').trim() }, (draft.name || '').trim().length >= 2)}
-        </>)}
-        {row('short', 'Коротко — в ленте программы', e.shortName, () => ({ shortName: e.shortName || '' }), () => <>
-          <ShortNameField value={draft.shortName} onChange={(v) => set({ shortName: v })} />
-          {actions({ shortName: (draft.shortName || '').trim() })}
-        </>, 'Не задано — в ленте только номер')}
-        <div className="item__meta library__meta"><span>{e.mine ? 'своё' : 'общее'}</span></div>
-        {!e.mine && <p className="small muted">Общее упражнение: сохранение любого поля создаст вашу версию с теми же тренажёрами и заменами — общая не изменится.</p>}
-
-        {/* Видео показывается само; правка — касанием по подписи */}
-        {e.media && <Media media={e.media} />}
-        {row('media', 'Видео', e.media ? (e.media.kind === 'link' ? e.media.url : e.media.kind === 'file' ? 'Своё видео' : e.media.kind === 'clip' ? 'Ролик с манекеном' : 'Анимация') : null,
-          () => ({ link: e.media?.kind === 'link' ? e.media.url : '' }), () => <>
-            <Field label="Ссылка" inputMode="url" value={draft.link} onChange={(v) => set({ link: v })} placeholder="https://…" hint="Клиент увидит кнопку «Открыть видео». Чтобы видео играло прямо в приложении, загрузите файл." />
-            <label className="field">
-              <span className="field__label">Или файлом с телефона</span>
-              <input type="file" accept="video/mp4,video/quicktime,video/webm,video/x-m4v" onChange={(ev) => setFile(ev.target.files[0] || null)} />
-              <span className="field__hint">{file ? `${file.name} · ${Math.round(file.size / 1024 / 1024)} МБ` : hasFile ? 'Загружено своё видео — новый файл заменит его' : 'До 500 МБ'}</span>
-            </label>
-            {progress !== null && (
-              <div className="library__progress" role="progressbar" aria-valuenow={Math.round(progress * 100)}>
-                <span style={{ transform: `scaleX(${progress})` }} />
-                <em>Загружаем видео… {Math.round(progress * 100)}%</em>
-              </div>
-            )}
-            {/* Пустая ссылка не стирает загруженный файл и анимацию */}
-            {actions({ ...(draft.link || e.media?.kind === 'link' || !e.media ? { link: draft.link || '' } : {}) }, true, file)}
-          </>, 'Нет — коснитесь, чтобы приложить')}
-
-        {row('muscle', 'Группа мышц', e.muscle, () => ({ muscle: e.muscle || '' }), () => <>
-          <Chips items={[{ value: '', label: 'Не указана' }, ...muscles.map((m) => ({ value: m, label: m }))]} value={draft.muscle} onChange={(v) => set({ muscle: v })} />
-          {actions({ muscle: draft.muscle })}
-        </>, 'Не указана')}
-
-        {row('load', 'Как учитывать нагрузку', known ? trackLine(known) : 'Автоматически', kindOf, () => <>
-          <ExerciseKind track={draft.track || { kind: 'strength', auto: true }} allowAuto className="exercise-kind--bare" onChange={(t) => set({ track: t })} />
-          {/* Тренажёр у кардио не выбирают (09.10.2026): настройки — в программе */}
-          {draft.track && draft.track.weightMode === 'assistance' && <p className="small muted">Прежние записи сохраняют свой способ учёта.</p>}
-          {actions({ track: !draft.track || draft.track.auto ? { auto: true } : {
-            kind: draft.track.kind, weightMode: draft.track.weightMode || undefined, machine: draft.track.machine || 'treadmill',
-            unilateral: !!draft.track.unilateral, perSide: !!draft.track.perSide,
-          } })}
-        </>)}
-
-        {e.equipment && row('equipment', 'Инвентарь', e.equipment, () => ({ equipment: e.equipment }), () => <>
-          <Field label="Инвентарь" inputMode="text" value={draft.equipment} onChange={(v) => set({ equipment: v })} hint="По нему считается шаг веса в занятии: гантели и гири — 1–2 кг, остальное — 2,5 кг и больше." />
-          {actions({ equipment: draft.equipment })}
-        </>)}
-
-        {/* Подготовка — только без тренажёра: с ним клиент видит настройку тренажёра */}
-        {!e.machines?.length && row('setup', 'Подготовка к упражнению',
-          e.setup ? <>{!e.setupOk && <Tag tone="warn">черновик — клиенты не видят</Tag>}<SetupText text={e.setup} /></> : null,
-          () => ({ setup: e.setup || '', setupOk: !!e.setupOk }), () => <>
-            <textarea className="field__input library__textarea" aria-label="Подготовка к упражнению" value={draft.setup} maxLength={1500} rows={5}
-              onChange={(ev) => set({ setup: ev.target.value, setupOk: false })}
-              placeholder={'Сиденье — рукояти на уровне груди.\nСпинка — лопатки прижаты.\nОшибка: локти выше плеч.'} />
-            <span className="field__hint">Каждый шаг — с новой строки. Клиент видит подготовку, пока к упражнению не привязан тренажёр.</span>
-            <label className="library__check"><input type="checkbox" checked={draft.setupOk} disabled={!draft.setup.trim()} onChange={(ev) => set({ setupOk: ev.target.checked })} />Проверено — показывать клиентам</label>
-            {actions({ setupOnly: true, setup: draft.setup, setupOk: draft.setupOk })}
-          </>)}
-
-        {row('notes', 'Техника выполнения', e.notes ? <span className="card-field__text">{e.notes}</span> : null, () => ({ notes: e.notes || '' }), () => <>
-          <textarea className="field__input library__textarea" aria-label="Техника выполнения" value={draft.notes} maxLength={2000} rows={6} onChange={(ev) => set({ notes: ev.target.value })} placeholder="Каждый шаг — с новой строки: исходное положение, движение, дыхание" />
-          {actions({ notes: draft.notes })}
-        </>)}
-
-        {row('mistakes', 'Частые ошибки', e.mistakes ? <span className="card-field__text">{e.mistakes}</span> : null, () => ({ mistakes: e.mistakes || '' }), () => <>
-          <textarea className="field__input library__textarea" aria-label="Частые ошибки" value={draft.mistakes} maxLength={1500} rows={4} onChange={(ev) => set({ mistakes: ev.target.value })} placeholder="Ошибка — строка" />
-          {actions({ mistakes: draft.mistakes })}
-        </>)}
-
-        {row('muscles', 'Основные и дополнительные мышцы',
-          e.musclesCustom ? <MuscleNames primary={e.muscles?.primary || []} secondary={e.muscles?.secondary || []} max={20} /> : null,
-          () => ({ map: e.musclesCustom ? e.muscles : null }), () => <>
-            <p className="small muted">Нажатие: основная, дополнительная, убрать. Без точной разметки используется группа мышц.</p>
-            <MuscleFigure primary={draft.map?.primary || []} secondary={draft.map?.secondary || []} onTap={(r) => set({ map: flip(draft.map, r) })} />
-            <MuscleNames primary={draft.map?.primary || []} secondary={draft.map?.secondary || []} max={20} />
-            <div className="chips chips--wrap">{Object.entries(LABELS).map(([id, label]) => <button className="chip" type="button" key={id} aria-pressed={!!(draft.map?.primary.includes(id) || draft.map?.secondary.includes(id))} onClick={() => set({ map: flip(draft.map, id) })}>{label}{draft.map?.primary.includes(id) ? ' · основная' : draft.map?.secondary.includes(id) ? ' · дополнительная' : ''}</button>)}</div>
-            <button className="button button--ghost" type="button" onClick={() => set({ map: null })}>Использовать группу</button>
-            {actions({ muscles: draft.map })}
-          </>, 'По группе мышц')}
-
-        {!edit && failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      </Panel>
-    </>
-  );
-}
-
-
-/** Ключевое слово упражнения (FT-792): до 20 знаков — две строки под картинкой в ленте (владелец 15.11.2026) */
-const SHORT_MAX = 20;
-function ShortNameField({ value = '', onChange }) {
-  const count = Array.from(value).length;
-  return (
-    <label className="field">
-      {/* Подпись поля — над ним в карточке; здесь только счётчик знаков */}
-      <span className="field__label library__chars" aria-hidden="true">{count} / {SHORT_MAX}</span>
-      <input className="field__input" type="text" autoComplete="off" aria-label="Коротко — в ленте программы" value={value} placeholder="Пек-дек"
-        onChange={(ev) => onChange(Array.from(ev.target.value).slice(0, SHORT_MAX).join(''))} />
-      <span className="field__hint">Видно под картинкой в карточке тренировки. Пусто — только номер.</span>
-    </label>
-  );
-}
 
 /** Новое своё упражнение: название и группа — остальное в карточке касанием */
 function NewExercise({ muscles, onSaved, onCancel }) {
@@ -1635,14 +1440,4 @@ function NewExercise({ muscles, onSaved, onCancel }) {
       </Panel>
     </>
   );
-}
-
-/** «Кардио · Беговая дорожка», «Силовое · вес с одной стороны» (+ «авто») */
-function trackLine(t) {
-  return [
-    t.weightMode === 'assistance' ? 'Вес помощи и повторения' : KIND_LABELS[t.kind],
-    t.kind === 'cardio' && MACHINE_LABELS[t.machine],
-    t.unilateral && 'повторы на сторону',
-    t.perSide && 'вес с одной стороны',
-  ].filter(Boolean).join(' · ') + (t.auto ? ' (определено само)' : '');
 }
