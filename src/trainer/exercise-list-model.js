@@ -41,3 +41,10 @@ export function shownExercises(list, { scope = 'mine', q = '', muscle = '', filt
   if (filters.sort === 'az') shown.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   return shown;
 }
+
+/** Обложка-кадр: первый кадр анимации техники (public/anim/<id>/0.jpg); у видео и ролика — значок */
+const ANIM_ID = /^[\w-]+$/;
+export function coverFrame(media, base = '/') {
+  if (!media || media.kind !== 'animation' || !ANIM_ID.test(media.url || '')) return '';
+  return `${base}anim/${media.url}/0.jpg`;
+}

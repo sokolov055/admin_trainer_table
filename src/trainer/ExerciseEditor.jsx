@@ -36,8 +36,15 @@ function Box({ title, action = null, tag = null, children }) {
   </section>;
 }
 
-function Help({ text }) {
-  return <span className="elib-ed__help" role="img" aria-label={text} title={text}>?</span>;
+/** Подпись блока и «?»: нажатие показывает подсказку под подписью (на телефоне не бывает всплывающих подсказок) */
+function Lab({ children, help, className = '' }) {
+  const [open, setOpen] = useState(false);
+  return <div className="elib-ed__labwrap">
+    <div className={'elib-ed__lab ' + className}>{children}
+      <button type="button" className="elib-ed__help" aria-expanded={open} aria-label={'Подсказка: ' + help} onClick={() => setOpen((v) => !v)}><span aria-hidden="true">?</span></button>
+    </div>
+    {open && <p className="elib-ed__tip">{help}</p>}
+  </div>;
 }
 
 /**
@@ -138,7 +145,7 @@ export default function ExerciseEditor({ exercise: e, owner, muscles, onSaved, o
     </Box>
 
     <Box title="Техника">
-      <div className="elib-ed__lab">Шаги <Help text="Исходное положение, движение, дыхание" /></div>
+      <Lab help="Исходное положение, движение, дыхание">Шаги</Lab>
       {d.steps.map((s, i) => <div key={i} className="elib-ed__step">
         <div className="elib-ed__stepbar">
           <span>Шаг {i + 1}</span>
@@ -151,7 +158,7 @@ export default function ExerciseEditor({ exercise: e, owner, muscles, onSaved, o
       <button type="button" className="elib-ed__add" onClick={() => set({ steps: [...d.steps, ''] })}><IconPlus size={16} />Добавить шаг</button>
 
       <div className="elib-ed__errbox">
-        <div className="elib-ed__lab elib-ed__lab--err"><IconAlert size={16} />Частые ошибки <Help text="Одна ошибка — одна плашка" /></div>
+        <Lab className="elib-ed__lab--err" help="Одна ошибка — одна плашка"><IconAlert size={16} />Частые ошибки</Lab>
         <div className="elib-ed__errs">
           {d.mistakes.map((m, i) => <span key={i} className="elib-ed__err">{m}<button type="button" aria-label="Убрать ошибку" onClick={() => set({ mistakes: removeItem(d.mistakes, i) })}><IconClose size={14} /></button></span>)}
         </div>

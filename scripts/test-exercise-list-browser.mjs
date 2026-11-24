@@ -63,6 +63,8 @@ test('список упражнений — поиск, фильтры, смах
       assert.equal(await first.locator('.elib-flags .is-on').count(), 2);
       assert.equal(await p.locator('.elib-card').filter({ hasText: 'Планка' }).locator('.elib-flags .is-on').count(), 0);
       assert.equal(await first.locator('.elib-cover__play').count(), 1);
+      assert.equal(await first.locator('.elib-cover__img').count(), 1, 'анимация — кадр на обложке');
+      assert.equal(await p.locator('.elib-card').filter({ hasText: 'Тяга' }).locator('.elib-cover__img').count(), 0, 'видео-клип — значок');
       assert.match(await first.innerText(), /общее/);
       assert.match(await first.innerText(), /1 тренажёр/);
       assert.match(await p.locator('.elib-card').filter({ hasText: 'Тяга' }).innerText(), /2 тренажёра/);

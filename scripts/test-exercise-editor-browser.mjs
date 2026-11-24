@@ -71,10 +71,19 @@ test('правка упражнения одним экраном — «Сохр
       assert.equal(await p.locator('.elib-ed__err', { hasText: 'Голова' }).count(), 0);
 
       // Цели касания ≥ 44 px
-      for (const sel of ['.elib-ed__cancel', '.elib-ed__save', '.elib-ed__mini', '.elib-ed__link', '.elib-ed__vbtn', '.elib-ed__add', '.elib-ed__err button']) {
+      for (const sel of ['.elib-ed__cancel', '.elib-ed__save', '.elib-ed__mini', '.elib-ed__link', '.elib-ed__vbtn', '.elib-ed__add', '.elib-ed__err button', '.elib-ed__help']) {
         const hs = await p.locator(sel).evaluateAll((es) => es.map((e) => Math.round(e.getBoundingClientRect().height)));
         assert.ok(hs.length && hs.every((h) => h >= 44), sel + ' ' + hs);
       }
+
+      // «?» открывает подсказку под подписью (на телефоне всплывающих подсказок нет)
+      const help = p.getByRole('button', { name: /Подсказка: Исходное положение/ });
+      assert.equal(await help.getAttribute('aria-expanded'), 'false');
+      await help.click();
+      assert.equal(await help.getAttribute('aria-expanded'), 'true');
+      assert.ok(await p.locator('.elib-ed__tip', { hasText: 'Исходное положение, движение, дыхание' }).isVisible());
+      await help.click();
+      assert.equal(await p.locator('.elib-ed__tip').count(), 0);
 
       // Характеристики — лист с группой, нагрузкой, инвентарём и «В ленте»
       await p.locator('.elib-box').filter({ hasText: 'Характеристики' }).getByRole('button', { name: 'Изменить' }).click();

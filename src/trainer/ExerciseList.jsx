@@ -7,7 +7,7 @@ import {
 } from '../icons.jsx';
 import { muscleTone, muscleClass } from '../data-tones.js';
 import { haptic } from '../telegram.js';
-import { NO_EXERCISE_FILTERS, LOAD_TILES, exerciseFilterCount, shownExercises, loadLabel } from './exercise-list-model.js';
+import { NO_EXERCISE_FILTERS, LOAD_TILES, exerciseFilterCount, shownExercises, loadLabel, coverFrame } from './exercise-list-model.js';
 import './exercises-lib.css';
 
 const LIMIT = 200;
@@ -62,8 +62,12 @@ export default function ExerciseList({ list, muscles, hiddenCount = 0, onOpen, o
     </div>
     {shown.map((e) => {
       const machines = (e.machines || []).length;
+      const frame = coverFrame(e.media, (import.meta.env && import.meta.env.BASE_URL) || '/');
       const card = <button type="button" className={'elib-card ' + toneOf(e)} onClick={() => { onOpen(e.id); haptic(); }}>
-        <span className="elib-cover" aria-hidden="true">{e.muscle === 'Кардио' ? <IconHeart size={28} /> : <IconBody size={28} />}{e.media && <span className="elib-cover__play"><IconPlay size={10} /></span>}</span>
+        <span className={'elib-cover' + (frame ? ' elib-cover--photo' : '')} aria-hidden="true">
+          {frame ? <img className="elib-cover__img" src={frame} alt="" loading="lazy" draggable="false" /> : (e.muscle === 'Кардио' ? <IconHeart size={28} /> : <IconBody size={28} />)}
+          {e.media && <span className="elib-cover__play"><IconPlay size={10} /></span>}
+        </span>
         <span className="elib-body"><span className="elib-name">{e.name}</span>
           {e.muscle && <span className="elib-muscle">{e.muscle}</span>}
           <span className="elib-facts"><span><IconBolt size={14} />{loadLabel(e)}</span>

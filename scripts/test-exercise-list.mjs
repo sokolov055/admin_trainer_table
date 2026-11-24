@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shownExercises, exerciseFilterCount, loadKey, loadLabel, NO_EXERCISE_FILTERS } from '../src/trainer/exercise-list-model.js';
+import { shownExercises, exerciseFilterCount, loadKey, loadLabel, coverFrame, NO_EXERCISE_FILTERS } from '../src/trainer/exercise-list-model.js';
 
 const list = [
   { id: 1, name: 'Жим штанги лёжа', muscle: 'Грудь', equipment: 'Штанга', common: true, mine: false, media: { kind: 'animation', url: 'x' }, setup: 'Лечь', machines: [{ kind: 'machine' }], track: { kind: 'strength' } },
@@ -51,4 +51,13 @@ test('подпись нагрузки: помощь отдельно, без в�
   assert.equal(loadLabel(list[2]), 'Вес помощи');
   assert.equal(loadLabel({}), 'Силовое');
   assert.equal(loadLabel(list[3]), 'На время');
+});
+
+test('обложка: кадр анимации вместо значка; видео, ролик и небезопасный id — значок', () => {
+  assert.equal(coverFrame({ kind: 'animation', url: 'Air_Bike' }), '/anim/Air_Bike/0.jpg');
+  assert.equal(coverFrame({ kind: 'animation', url: 'Air_Bike' }, '/app/'), '/app/anim/Air_Bike/0.jpg');
+  assert.equal(coverFrame({ kind: 'clip', url: 'x' }), '');
+  assert.equal(coverFrame({ kind: 'link', url: 'https://example.test/v' }), '');
+  assert.equal(coverFrame({ kind: 'animation', url: '../secret' }), '');
+  assert.equal(coverFrame(null), '');
 });
