@@ -32,7 +32,6 @@ test('правка упражнения одним экраном — «Сохр
       await p.locator('.elib-ed__top').waitFor();
       assert.equal(await save.isDisabled(), true, 'без изменений «Сохранить» недоступно');
       assert.equal(await p.locator('.elib-ed__dot').count(), 0, 'точки несохранённого нет');
-      assert.equal(await p.getByText('Общее упражнение. «Сохранить» создаст вашу версию').count(), 1);
       await noOverflow();
 
       // Закреплённая верхняя строка остаётся при прокрутке
@@ -54,9 +53,9 @@ test('правка упражнения одним экраном — «Сохр
       // Шаги: добавить, переставить, удалить — и снова без изменений
       const steps = p.locator('.elib-ed__step');
       const before = await steps.count();
-      await p.getByRole('textbox', { name: 'Новый шаг' }).fill('Держите спину прямо');
-      await p.getByRole('button', { name: 'Шаг', exact: true }).click();
+      await p.getByRole('button', { name: 'Добавить шаг', exact: true }).click();
       assert.equal(await steps.count(), before + 1);
+      await steps.nth(before).getByRole('textbox').fill('Держите спину прямо');
       await steps.nth(before).getByRole('button', { name: 'Выше' }).click();
       assert.equal(await steps.nth(before - 1).getByRole('textbox').inputValue(), 'Держите спину прямо');
       await steps.nth(before - 1).getByRole('button', { name: 'Удалить шаг' }).click();
@@ -72,7 +71,7 @@ test('правка упражнения одним экраном — «Сохр
       assert.equal(await p.locator('.elib-ed__err', { hasText: 'Голова' }).count(), 0);
 
       // Цели касания ≥ 44 px
-      for (const sel of ['.elib-ed__cancel', '.elib-ed__save', '.elib-ed__mini', '.elib-ed__link', '.elib-ed__file', '.elib-ed__err button']) {
+      for (const sel of ['.elib-ed__cancel', '.elib-ed__save', '.elib-ed__mini', '.elib-ed__link', '.elib-ed__vbtn', '.elib-ed__add', '.elib-ed__err button']) {
         const hs = await p.locator(sel).evaluateAll((es) => es.map((e) => Math.round(e.getBoundingClientRect().height)));
         assert.ok(hs.length && hs.every((h) => h >= 44), sel + ' ' + hs);
       }

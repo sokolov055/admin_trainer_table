@@ -3038,6 +3038,11 @@ export function mockApi(action, params) {
         if (action.startsWith('workout.')) err.code = err.code || 400;
         reject(err);
       }
-    }, 180);
+    }, 180 + extraDelay());
   });
+}
+
+/** Демо: задержка ответа в мс (localStorage demo_delay_ms) — проверка медленной сети */
+function extraDelay() {
+  try { return Math.max(0, Number(localStorage.getItem('demo_delay_ms')) || 0); } catch (_) { return 0; }
 }

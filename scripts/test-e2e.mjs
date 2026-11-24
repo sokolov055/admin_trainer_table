@@ -2002,12 +2002,12 @@ test('шаблон назначается клиенту, общий копир�
     const frame = tab.locator('.library__anim img').first();
     await frame.waitFor({ timeout: 5000 });
     assert.ok(await frame.evaluate((img) => img.complete && img.naturalWidth > 0), 'кадр анимации загрузился');
-    // Правка: «Изменить» внизу карточки открывает редактор; шаг — в «Новый шаг» и «Шаг» (18.10.2026): у общего сохранение создаёт свою версию
+    // Правка: «Изменить» внизу карточки открывает редактор; шаг — кнопкой «Добавить шаг» (18.10.2026): у общего сохранение создаёт свою версию
     await tab.locator('.elib-dock').getByRole('button', { name: 'Изменить', exact: true }).click();
-    await tab.getByRole('textbox', { name: 'Новый шаг' }).fill('Корпус — одна линия.');
-    await tab.getByRole('button', { name: 'Шаг', exact: true }).click();
+    await tab.getByRole('button', { name: 'Добавить шаг', exact: true }).click();
+    await tab.locator('.elib-ed__step textarea').last().fill('Корпус — одна линия.');
     await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    await assert.doesNotReject(tab.getByText('Общее упражнение. «Сохранить» создаст вашу версию').waitFor({ state: 'detached', timeout: 5000 }), 'своя версия сохранена');
+    await assert.doesNotReject(tab.waitForFunction(() => !document.querySelector('.elib-ed__dot'), null, { timeout: 5000 }), 'после сохранения несохранённого нет');
     await assert.doesNotReject(tab.waitForFunction(() => [...document.querySelectorAll('.elib-ed__step textarea')].some((t) => t.value === 'Корпус — одна линия.'), null, { timeout: 5000 }), 'после сохранения редактор открыт, шаг на месте');
     await assert.doesNotReject(tab.locator('.library__anim').waitFor({ timeout: 5000 }), 'у своей версии та же анимация');
 
@@ -2630,14 +2630,14 @@ test('ключевое слово упражнения: подпись в лен
       await tab.locator('.elib-box').filter({ hasText: 'Характеристики' }).getByRole('button', { name: 'Изменить' }).click();
       const input = tab.getByRole('textbox', { name: /Коротко — в ленте программы/ });
       await input.waitFor({ timeout: 5000 });
-      assert.match(await tab.locator('.elib-pass').innerText(), /Махи/);
+      assert.match(await tab.locator('.elib-ed__pills').innerText(), /Махи/);
       await input.fill('Махи гантелями в стороны стоя');
       assert.equal(await input.inputValue(), 'Махи гантелями в сто', 'не длиннее 20 знаков');
       await tab.getByText('20 / 20').waitFor({ timeout: 2000 });
       await input.fill('Махи вбок');
       await tab.getByRole('button', { name: 'Готово', exact: true }).click();
       await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
-      await tab.locator('.elib-pass').getByText('Махи вбок', { exact: true }).waitFor({ timeout: 5000 });
+      await tab.locator('.elib-ed__pills').getByText('Махи вбок', { exact: true }).waitFor({ timeout: 5000 });
     } finally {
       await coach.close();
     }

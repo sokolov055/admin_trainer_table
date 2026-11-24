@@ -1062,14 +1062,16 @@ function Exercises() {
   const [showHidden, setShowHidden] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   const [failure, setFailure] = useState(null);
+  // Только что сохранённая своя версия: до перечитывания её нет в данных, а экран не должен мигнуть списком
+  const [pending, setPending] = useState(null);
 
   useBackGesture(() => setShowSimilar(false), !editing && showSimilar);
   useBackGesture(() => setEditing(null), !!editing);
   useBackGesture(() => setShowHidden(false), !editing && showHidden);
-  // Жесты — только при открытой карточке: пока перечитывание не вернуло её, на экране список
-  const openCard = data && open ? data.exercises.find((e) => e.id === open) : null;
+  // Жесты — только при открытой карточке (или сохранённой версии, пока перечитывание не пришло)
+  const openCard = data && open ? (data.exercises.find((e) => e.id === open) || (pending && pending.id === open ? pending : null)) : null;
   useBackGesture(() => setForm(false), !editing && !showHidden && !!openCard && form);
-  const back = () => { setForm(false); if (trail.length) { setOpen(trail[trail.length - 1]); setTrail(trail.slice(0, -1)); } else setOpen(null); };
+  const back = () => { setForm(false); setPending(null); if (trail.length) { setOpen(trail[trail.length - 1]); setTrail(trail.slice(0, -1)); } else setOpen(null); };
   useBackGesture(back, !editing && !showHidden && !!openCard && !form);
   useReturnScroll(!!(editing || showHidden || open));
 
@@ -1094,7 +1096,7 @@ function Exercises() {
   }
 
   const all = data.exercises;
-  const current = open ? all.find((e) => e.id === open) : null;
+  const current = openCard;
 
   if (editing) {
     return (
@@ -1112,7 +1114,7 @@ function Exercises() {
         exercise={current}
         owner={!!data.owner}
         muscles={data.muscles}
-        onSaved={(saved) => { if (saved) setOpen(saved.id); reload(); }}
+        onSaved={(saved) => { if (saved) { setPending(saved); setOpen(saved.id); } reload(); }}
         onBack={() => setForm(false)}
       />
     );
@@ -1144,7 +1146,7 @@ function Exercises() {
         hiddenCount={data.hiddenCount}
         state={listState}
         setState={setListState}
-        onOpen={(id) => { setForm(false); setOpen(id); }}
+        onOpen={(id) => { setForm(false); setPending(null); setOpen(id); }}
         onCreate={() => setEditing({ new: true })}
         onDelete={remove}
         onSimilar={() => setShowSimilar(true)}

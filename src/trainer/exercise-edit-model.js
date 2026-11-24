@@ -19,7 +19,6 @@ export function draftOf(e) {
     link: e.media?.kind === 'link' ? e.media.url : '',
     map: e.musclesCustom ? e.muscles || null : null,
     setup: e.setup || '',
-    setupOk: !!e.setupOk,
   };
 }
 
@@ -40,7 +39,11 @@ const cleanLines = (list) => list.map((s) => String(s).trim()).filter(Boolean);
 
 /** Что изменилось относительно упражнения — ключи полей, без пустых изменений */
 export function changesOf(e, d) {
-  const was = draftOf(e);
+  return diffDrafts(draftOf(e), d);
+}
+
+/** Различия двух черновиков — база (последнее сохранённое) и текущий */
+export function diffDrafts(was, d) {
   const out = {};
   if (d.name.trim() !== was.name.trim()) out.name = true;
   if (d.shortName.trim() !== was.shortName.trim()) out.shortName = true;
@@ -52,7 +55,6 @@ export function changesOf(e, d) {
   if (d.link.trim() !== was.link.trim()) out.link = true;
   if (!sameJson(d.map, was.map)) out.muscles = true;
   if (d.setup.trim() !== was.setup.trim()) out.setup = true;
-  if (d.setupOk !== was.setupOk) out.setupOk = true;
   return out;
 }
 
@@ -71,11 +73,12 @@ export function problemOf(d) {
  * Подготовку владелец общего и свои упражнения пишут напрямую (setup),
  * остальные — через сохранение, которое создаст их версию.
  */
-export function savePlan(e, d, { directSetup }) {
-  const ch = changesOf(e, d);
-  const setupDirect = directSetup && (ch.setup || ch.setupOk);
-  const setup = setupDirect ? { id: e.id, setup: d.setup.trim(), ok: d.setupOk } : null;
-  const mainKeys = Object.keys(ch).filter((k) => !(setupDirect && (k === 'setup' || k === 'setupOk')));
+export function savePlan(e, d, { directSetup, was = draftOf(e) }) {
+  const ch = diffDrafts(was, d);
+  // Подготовка показывается клиенту, как только заполнена: отдельной «проверки» нет (решение владельца 24.11)
+  const setupDirect = directSetup && !!ch.setup;
+  const setup = setupDirect ? { id: e.id, setup: d.setup.trim(), ok: !!d.setup.trim() } : null;
+  const mainKeys = Object.keys(ch).filter((k) => !(setupDirect && k === 'setup'));
   if (!mainKeys.length) return { main: null, setup };
   const main = { id: e.id, name: d.name.trim(), muscle: d.muscle, notes: cleanLines(d.steps).join('\n') };
   if (ch.shortName) main.shortName = d.shortName.trim();
@@ -84,8 +87,7 @@ export function savePlan(e, d, { directSetup }) {
   if (ch.mistakes) main.mistakes = cleanLines(d.mistakes).join('\n');
   if (ch.link) main.link = d.link.trim();
   if (ch.muscles) main.muscles = d.map;
-  if (ch.setup && !setupDirect) main.setup = d.setup.trim();
-  if (ch.setupOk && !setupDirect) main.setupOk = d.setupOk;
+  if (ch.setup && !setupDirect) { main.setup = d.setup.trim(); main.setupOk = !!d.setup.trim(); }
   return { main, setup };
 }
 
