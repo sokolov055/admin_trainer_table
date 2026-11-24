@@ -29,6 +29,11 @@ const marked = (state) => !!(state && state[MARK]);
 
 export function createHistoryGuard({ win, size, onBack }) {
   const history = win.history;
+  // history.back() без своего popstate-шага браузер восстанавливает прокрутку
+  // записи, на которой встанем: она сохранена наверху (карточку открыли со
+  // сдвигом 0), и список отскакивал вверх. Прокрутку возвращают экраны сами
+  // (scroll.js, снимки в gestures.jsx), поэтому автоматику браузера отключаем
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   // После перезагрузки страница может стоять на нашей же записи
   let guarded = marked(history.state);
   let skip = 0;

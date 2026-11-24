@@ -17,6 +17,7 @@ const tick = () => new Promise((r) => setTimeout(r, 50));
 function fakeWindow() {
   const listeners = new Set();
   const entries = [{ state: null }];
+  const history = { scrollRestoration: 'auto' };
   let at = 0;
   const calls = { push: 0, back: 0 };
   const fire = () => listeners.forEach((fn) => fn({ state: entries[at].state }));
@@ -25,6 +26,8 @@ function fakeWindow() {
     addEventListener: (type, fn) => { if (type === 'popstate') listeners.add(fn); },
     removeEventListener: (type, fn) => listeners.delete(fn),
     history: {
+      get scrollRestoration() { return history.scrollRestoration; },
+      set scrollRestoration(v) { history.scrollRestoration = v; },
       get state() { return entries[at].state; },
       get length() { return entries.length; },
       pushState(state) { calls.push += 1; entries.splice(at + 1); entries.push({ state }); at += 1; },
@@ -102,4 +105,10 @@ test('перезагрузка на нашей записи при пустой 
   assert.equal(calls.back, 1);
   assert.equal(calls.push, 0);
   guard.stop();
+});
+
+test('браузер не восстанавливает прокрутку при history.back: список не отскакивает вверх', () => {
+  const { win } = fakeWindow();
+  createHistoryGuard({ win, size: () => 0, onBack: () => {} });
+  assert.equal(win.history.scrollRestoration, 'manual');
 });
