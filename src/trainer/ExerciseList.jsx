@@ -1,5 +1,5 @@
 import SwipeRow from '../SwipeRow.jsx';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search, Sheet, Segmented, Empty, plural } from '../ui.jsx';
 import {
   IconSearch, IconClose, IconPlus, IconSliders, IconBench, IconDumbbell, IconBody, IconHeart,
@@ -7,10 +7,25 @@ import {
 } from '../icons.jsx';
 import { muscleTone, muscleClass } from '../data-tones.js';
 import { haptic } from '../telegram.js';
-import { NO_EXERCISE_FILTERS, LOAD_TILES, exerciseFilterCount, shownExercises, loadLabel, coverFrame } from './exercise-list-model.js';
+import { NO_EXERCISE_FILTERS, LOAD_TILES, exerciseFilterCount, shownExercises, loadLabel, coverOf } from './exercise-list-model.js';
+import { mediaUrl } from '../library.js';
 import './exercises-lib.css';
 
 const LIMIT = 200;
+
+/** Кадр 3D-ролика: тихое видео, первый кадр; грузится, только когда обложка в экране */
+function ClipCover({ src }) {
+  const ref = useRef(null);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') { setOn(true); return undefined; }
+    const io = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setOn(true); io.disconnect(); } }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return <span ref={ref} className="elib-cover__clip">{on && <video className="elib-cover__img" src={src + '#t=0.1'} muted playsInline preload="metadata" disablePictureInPicture />}</span>;
+}
 const SCOPE_ITEMS = [{ value: 'mine', mine: true }, { value: 'public', mine: false }];
 
 function Tiles({ label, items, onToggle }) {
@@ -62,10 +77,10 @@ export default function ExerciseList({ list, muscles, hiddenCount = 0, onOpen, o
     </div>
     {shown.map((e) => {
       const machines = (e.machines || []).length;
-      const frame = coverFrame(e.media, (import.meta.env && import.meta.env.BASE_URL) || '/');
+      const cover = coverOf(e.media, (import.meta.env && import.meta.env.BASE_URL) || '/', mediaUrl);
       const card = <button type="button" className={'elib-card ' + toneOf(e)} onClick={() => { onOpen(e.id); haptic(); }}>
-        <span className={'elib-cover' + (frame ? ' elib-cover--photo' : '')} aria-hidden="true">
-          {frame ? <img className="elib-cover__img" src={frame} alt="" loading="lazy" draggable="false" /> : (e.muscle === 'Кардио' ? <IconHeart size={28} /> : <IconBody size={28} />)}
+        <span className={'elib-cover' + (cover ? ' elib-cover--photo' : '')} aria-hidden="true">
+          {cover?.type === 'clip' ? <ClipCover src={cover.src} /> : cover ? <img className="elib-cover__img" src={cover.src} alt="" loading="lazy" draggable="false" /> : (e.muscle === 'Кардио' ? <IconHeart size={28} /> : <IconBody size={28} />)}
           {e.media && <span className="elib-cover__play"><IconPlay size={10} /></span>}
         </span>
         <span className="elib-body"><span className="elib-name">{e.name}</span>

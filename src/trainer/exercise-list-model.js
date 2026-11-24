@@ -42,9 +42,15 @@ export function shownExercises(list, { scope = 'mine', q = '', muscle = '', filt
   return shown;
 }
 
-/** Обложка-кадр: первый кадр анимации техники (public/anim/<id>/0.jpg); у видео и ролика — значок */
+/**
+ * Обложка из медиа упражнения: 3D-ролик с манекеном — первый, затем обычная
+ * анимация (первый кадр public/anim/<id>/0.jpg), иначе null — значок группы.
+ * Видео и ссылки на обложке не показываем.
+ */
 const ANIM_ID = /^[\w-]+$/;
-export function coverFrame(media, base = '/') {
-  if (!media || media.kind !== 'animation' || !ANIM_ID.test(media.url || '')) return '';
-  return `${base}anim/${media.url}/0.jpg`;
+export function coverOf(media, base = '/', toUrl = (u) => u) {
+  if (!media) return null;
+  if (media.kind === 'clip' && media.url) return { type: 'clip', src: toUrl(media.url) };
+  if (media.kind === 'animation' && ANIM_ID.test(media.url || '')) return { type: 'anim', src: `${base}anim/${media.url}/0.jpg` };
+  return null;
 }

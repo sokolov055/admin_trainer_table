@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shownExercises, exerciseFilterCount, loadKey, loadLabel, coverFrame, NO_EXERCISE_FILTERS } from '../src/trainer/exercise-list-model.js';
+import { shownExercises, exerciseFilterCount, loadKey, loadLabel, coverOf, NO_EXERCISE_FILTERS } from '../src/trainer/exercise-list-model.js';
 
 const list = [
   { id: 1, name: 'Жим штанги лёжа', muscle: 'Грудь', equipment: 'Штанга', common: true, mine: false, media: { kind: 'animation', url: 'x' }, setup: 'Лечь', machines: [{ kind: 'machine' }], track: { kind: 'strength' } },
@@ -53,11 +53,12 @@ test('подпись нагрузки: помощь отдельно, без в�
   assert.equal(loadLabel(list[3]), 'На время');
 });
 
-test('обложка: кадр анимации вместо значка; видео, ролик и небезопасный id — значок', () => {
-  assert.equal(coverFrame({ kind: 'animation', url: 'Air_Bike' }), '/anim/Air_Bike/0.jpg');
-  assert.equal(coverFrame({ kind: 'animation', url: 'Air_Bike' }, '/app/'), '/app/anim/Air_Bike/0.jpg');
-  assert.equal(coverFrame({ kind: 'clip', url: 'x' }), '');
-  assert.equal(coverFrame({ kind: 'link', url: 'https://example.test/v' }), '');
-  assert.equal(coverFrame({ kind: 'animation', url: '../secret' }), '');
-  assert.equal(coverFrame(null), '');
+test('обложка: 3D-ролик первым, затем анимация; видео, ссылка и небезопасный id — значок', () => {
+  assert.deepEqual(coverOf({ kind: 'clip', url: '/media/clip/0069.mp4' }, '/', (u) => 'api' + u), { type: 'clip', src: 'api/media/clip/0069.mp4' });
+  assert.deepEqual(coverOf({ kind: 'animation', url: 'Air_Bike' }), { type: 'anim', src: '/anim/Air_Bike/0.jpg' });
+  assert.deepEqual(coverOf({ kind: 'animation', url: 'Air_Bike' }, '/app/'), { type: 'anim', src: '/app/anim/Air_Bike/0.jpg' });
+  assert.equal(coverOf({ kind: 'file', url: '/media/x.mp4' }), null);
+  assert.equal(coverOf({ kind: 'link', url: 'https://example.test/v' }), null);
+  assert.equal(coverOf({ kind: 'animation', url: '../secret' }), null);
+  assert.equal(coverOf(null), null);
 });
