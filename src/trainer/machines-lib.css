@@ -255,3 +255,9 @@
 .mlib-view .mlib-grow b { font-size:15px; }
 .mlib-view .mlib-step__main,.mlib-view .mlib-grow p { font-size:14px; }
 .mlib-view .mlib-section { margin-bottom:16px; border-radius:16px; }
+/* Системная клавиатура сама анимируется: лист с первым фокусом не уезжает под неё. */
+.mlib-field-sheet .sheet__panel {
+  bottom:var(--mlib-field-bottom,0px);
+  max-height:var(--mlib-field-height,calc(100dvh - 40px));
+  animation:none;
+}

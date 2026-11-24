@@ -79,6 +79,39 @@ test('FT-819: редактор, чистая отмена и выход посл
  await p.getByRole('button',{name:'Бренд',exact:true}).click();
  assert.equal(await p.getByLabel('Шаг веса, кг',{exact:true}).count(),0);
  await p.getByRole('button',{name:'Готово',exact:true}).click();await p.locator('.sheet').waitFor({state:'detached'});
+ // Ревью #1/#2: имя одной строкой и отмена черновика регулировки без dirty.
+ await p.evaluate(()=>window.__renderMachine({uid:'review',name:'Чистое название',kind:'machine',setup:'',fields:['Сиденье'],photos:[]}));
+ const title=p.getByRole('textbox',{name:'Название тренажёра',exact:true});await title.waitFor();
+ await title.press('End');await title.press('Enter');assert.equal(await title.inputValue(),'Чистое название');
+ assert.equal(await p.getByLabel('Есть несохранённые изменения',{exact:true}).count(),0);
+ await p.evaluate(()=>{window.__realVV=window.visualViewport;Object.defineProperty(window,'visualViewport',{configurable:true,value:Object.assign(new EventTarget(),{height:850,offsetTop:0})})});
+ for(const close of ['cross','backdrop']){
+   await p.getByRole('button',{name:'+ Добавить',exact:true}).click();
+   assert.equal(await p.getByRole('button',{name:'Готово',exact:true}).isDisabled(),true);
+   assert.equal(await p.getByRole('textbox',{name:'Регулировка 2',exact:true}).evaluate(el=>el===document.activeElement),true);
+   await p.evaluate(()=>{const v=window.visualViewport;v.height=300;v.offsetTop=80;v.dispatchEvent(new Event('resize'));v.dispatchEvent(new Event('scroll'))});
+   const rect=await p.getByRole('textbox',{name:'Регулировка 2',exact:true}).boundingBox();
+   assert.ok(rect.y>=80 && rect.y+rect.height<=380,'Поле видно над клавиатурой: '+JSON.stringify({rect,layout:await p.evaluate(()=>({h:document.documentElement.clientHeight,inner:innerHeight,bottom:document.querySelector('.mlib-field-sheet').style.cssText,panel:getComputedStyle(document.querySelector('.mlib-field-sheet .sheet__panel')).bottom}))}));
+   const doneRect=await p.getByRole('button',{name:'Готово',exact:true}).boundingBox();assert.ok(doneRect.y+doneRect.height<=380);
+   await p.screenshot({path:'/tmp/ft819-review-keyboard-'+width+'-'+theme+'.png'});
+   await p.evaluate(()=>{const v=window.visualViewport;v.height=850;v.offsetTop=0;v.dispatchEvent(new Event('resize'))});
+
+   if(close==='cross')await p.getByRole('button',{name:'Закрыть',exact:true}).click();
+   else await p.locator('.sheet__scrim').click({position:{x:5,y:5}});
+   await p.locator('.sheet').waitFor({state:'detached'});
+   assert.equal(await p.getByRole('button',{name:'Без названия',exact:true}).count(),0);
+   assert.equal(await p.getByLabel('Есть несохранённые изменения',{exact:true}).count(),0);
+ }
+ await p.evaluate(()=>Object.defineProperty(window,'visualViewport',{configurable:true,value:window.__realVV}));
+ await p.getByRole('button',{name:'Сиденье',exact:true}).click();await p.getByRole('textbox',{name:'Регулировка 1',exact:true}).fill('Черновик');
+ await p.getByRole('button',{name:'Закрыть',exact:true}).click();await p.locator('.sheet').waitFor({state:'detached'});
+ assert.equal(await p.getByRole('button',{name:'Сиденье',exact:true}).count(),1);
+ assert.equal(await p.getByLabel('Есть несохранённые изменения',{exact:true}).count(),0);
+ await p.getByRole('button',{name:'Отмена',exact:true}).click();
+ assert.equal(await p.getByRole('heading',{name:'Выйти без сохранения?',exact:true}).count(),0);
+ await title.fill('Первая\nвторая\r\nтретья');assert.equal(await title.inputValue(),'Первая вторая третья');
+ await p.getByRole('button',{name:'Сохранить',exact:true}).click();
+ assert.equal((await p.evaluate(()=>window.__writes)).at(-1).p.name,'Первая вторая третья');
  // #1: новая карточка и личная версия общей после ошибки фото возвращают сохранённый UID.
  for(const original of [null,{uid:'common',name:'Общая',kind:'machine',setup:'',photos:[]}]){
  await p.evaluate(m=>window.__renderMachine(m),original);

@@ -1,5 +1,5 @@
 import { primaryEquipment } from '../equipment-guidance.js';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useData } from '../useData.js';
@@ -191,8 +191,10 @@ function MachinesFull({ exercise, owner, onChanged }) {
  * фото кладётся уже к нему. Не загрузилось фото — тренажёр остаётся, форма
  * открыта: повторное «Сохранить» правит его, а не заводит второй.
  */
+const singleLineName = value => String(value || '').replace(/[\r\n\u2028\u2029]+/g, ' ');
+
 export function MachineForm({ exercise = null, machine, onDone, canDelete = true, kind: initialKind = 'machine', library = false }) {
-  const [name, setName] = useState(machine ? machine.name : '');
+  const [name, setName] = useState(singleLineName(machine ? machine.name : ''));
   const [setup, setSetup] = useState(machine ? machine.setup : '');
   // Стикеры и цифры на фото у шагов (16.11.2026)
   const [meta, setMeta] = useState(machine?.steps || []);
@@ -223,7 +225,14 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
 
   const [passport, setPassport] = useState(false);
   const [help, setHelp] = useState('');
-  const [fieldEdit, setFieldEdit] = useState(-1);
+  const [fieldEdit, setFieldEdit] = useState(null);
+  const editField = index => setFieldEdit({ index, value: setupFields[index] || '' });
+  const saveField = () => {
+    const value = fieldEdit?.value.trim();
+    if (!value) return;
+    setSetupFields(v => fieldEdit.index === v.length ? [...v, value] : v.map((x,i) => i === fieldEdit.index ? value : x));
+    setFieldEdit(null);
+  };
   const [leaving, setLeaving] = useState(false);
   const snapshot = JSON.stringify([name, setup, meta, originalName, brand, muscleGroups, weightStep, kind, setupFields, dropped, added.map(a => a.url)]);
   const initial = useRef(snapshot);
@@ -264,7 +273,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     let result = null;
     try {
       const r = await apiMutate(exercise ? 'library.exercise.machine.save' : 'library.machine.save', {
-        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name, setup, kind, originalName, brand, muscleGroups, setupOk, weightStep,
+        ...(exercise ? { exerciseId: saved.exerciseId } : {}), uid: saved.uid || undefined, name: singleLineName(name), setup, kind, originalName, brand, muscleGroups, setupOk, weightStep,
         setupFields: setupFields.map((f) => f.trim()).filter(Boolean),
         setupMeta: meta,
         ...(dropped.length ? { removePhotoUrls: dropped } : {}),
@@ -316,7 +325,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     <div className={'library__form library__machine-form' + (library ? ' mlib-editor' : '')}>
       {library && <>
         <div className="mlib-etop"><button type="button" disabled={busy} onClick={cancel}>Отмена</button><b>{kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{dirty && <span className="mlib-dirty" aria-label="Есть несохранённые изменения" />}</b><button type="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button></div>
-        <textarea rows={1} ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; } }} className="mlib-ename" aria-label="Название тренажёра" value={name} maxLength={80} placeholder="Название тренажёра" onChange={e => setName(e.target.value)} />
+        <textarea rows={1} ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; } }} className="mlib-ename" aria-label="Название тренажёра" value={name} maxLength={80} placeholder="Название тренажёра" onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }} onChange={e => setName(singleLineName(e.target.value))} />
         <section className="mlib-characteristics"><div className="mlib-blockhead"><b>Характеристики</b><button type="button" onClick={()=>setPassport(true)}>Изменить</button></div><div className="mlib-pass">{[muscleGroups.join(', ') || 'Мышцы', kind === 'equipment' ? 'Оборудование' : 'Тренажёр', brand || 'Бренд', ...(kind === 'machine' ? [weightStep ? weightStep + ' кг' : 'Шаг веса'] : [])].map((text, i) => <button type="button" key={i} className="mlib-pchip" onClick={() => setPassport(true)}>{text}</button>)}</div>
         <button type="button" className="mlib-model" onClick={() => setPassport(true)}>{originalName || 'Модель не указана'}</button></section>
       </>}
@@ -389,7 +398,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
 
       <FieldsBox className="field library__setup-fields">
         <FieldsHeading className={library ? "mlib-reg-head field__label" : "field__label"}>{library ? 'Регулировки клиента' : 'Регулировки'}{library && <button type="button" className="mlib-help" aria-label="О регулировках клиента" onClick={()=>setHelp('Здесь только названия общих полей. Значения каждый клиент записывает в занятии; личные значения не меняют карточку оборудования.')}>?</button>}</FieldsHeading>
-        {library ? <div className="mlib-reg-chips">{setupFields.map((f,i)=><button type="button" key={i} onClick={()=>setFieldEdit(i)}>{f || 'Без названия'}</button>)}{setupFields.length < 12 && <button type="button" className="mlib-reg-add" onClick={()=>{setSetupFields(v=>[...v,'']);setFieldEdit(setupFields.length);}}>+ Добавить</button>}</div> : <>{setupFields.map((f, i) => (
+        {library ? <div className="mlib-reg-chips">{setupFields.map((f,i)=><button type="button" key={i} onClick={()=>editField(i)}>{f || 'Без названия'}</button>)}{setupFields.length < 12 && <button type="button" className="mlib-reg-add" onClick={()=>editField(setupFields.length)}>+ Добавить</button>}</div> : <>{setupFields.map((f, i) => (
           <div className="library__setup-field" key={i}>
             <input className="field__input" value={f} maxLength={40} placeholder="Сиденье, спинка, высота блока…" autoFocus={!f}
               aria-label={'Регулировка ' + (i + 1)} onChange={(e) => setSetupFields((v) => v.map((x, k) => (k === i ? e.target.value : x)))} />
@@ -402,7 +411,9 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         {!library && <span className="field__hint">Что клиент выставляет на тренажёре: сиденье, спинка, высота блока. Цифры у каждого свои — их вписывают в занятии, текстом или числом. Клиент может добавить и свою регулировку — она только у него.</span>}
       </FieldsBox>
       {library && <div id="mlib-preview-action" />}
-      {library && fieldEdit >= 0 && <Sheet title="Регулировка клиента" className="mlib-sheet" onClose={()=>setFieldEdit(-1)}><label className="field"><span className="field__label">Название поля</span><input autoFocus className="field__input" aria-label={'Регулировка ' + (fieldEdit+1)} value={setupFields[fieldEdit] || ''} maxLength={40} onChange={e=>setSetupFields(v=>v.map((x,i)=>i===fieldEdit ? e.target.value : x))}/></label><button type="button" className="button button--primary button--block" onClick={()=>setFieldEdit(-1)}>Готово</button><button type="button" className="button button--ghost button--block" onClick={()=>{setSetupFields(v=>v.filter((_,i)=>i!==fieldEdit));setFieldEdit(-1);}}>Удалить регулировку</button></Sheet>}
+      {library && fieldEdit && <MachineFieldSheet field={fieldEdit} onClose={()=>setFieldEdit(null)}
+        onChange={value=>setFieldEdit({...fieldEdit,value})} onSave={saveField}
+        onDelete={fieldEdit.index < setupFields.length ? ()=>{setSetupFields(v=>v.filter((_,i)=>i!==fieldEdit.index));setFieldEdit(null);} : null}/>}
       {help && <Sheet title="Справка" onClose={()=>setHelp('')}>{help}</Sheet>}
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       {library && leaving && <Sheet title="Выйти без сохранения?" onClose={() => setLeaving(false)}><p>Изменения карточки ещё не сохранены.</p><button type="button" className="button button--primary button--block" onClick={() => setLeaving(false)}>Продолжить редактирование</button><button type="button" className="button button--ghost button--block" onClick={() => onDone(persisted)}>Выйти без сохранения</button></Sheet>}
@@ -423,6 +434,33 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
       ))}
     </div>
   );
+}
+
+/** Лист регулировки держится над клавиатурой уже при первом фокусе iPhone. */
+function MachineFieldSheet({ field, onClose, onChange, onSave, onDelete }) {
+  const input = useRef(null);
+  useLayoutEffect(() => {
+    const sheet = input.current?.closest('.sheet');
+    const viewport = window.visualViewport;
+    if (!sheet || !viewport) return undefined;
+    const place = () => {
+      const layout = sheet.clientHeight;
+      sheet.style.setProperty('--mlib-field-bottom', Math.max(0, layout - viewport.height - viewport.offsetTop) + 'px');
+      sheet.style.setProperty('--mlib-field-height', Math.max(120, viewport.height - 16) + 'px');
+    };
+    place();
+    viewport.addEventListener('resize', place);
+    viewport.addEventListener('scroll', place);
+    return () => {
+      viewport.removeEventListener('resize', place);
+      viewport.removeEventListener('scroll', place);
+    };
+  }, []);
+  return <Sheet title="Регулировка клиента" className="mlib-sheet mlib-field-sheet" focus="input" onClose={onClose}>
+    <label className="field"><span className="field__label">Название поля</span><input ref={input} className="field__input" aria-label={'Регулировка ' + (field.index+1)} value={field.value} maxLength={40} onChange={e=>onChange(e.target.value)}/></label>
+    <button type="button" className="button button--primary button--block" disabled={!field.value.trim()} onClick={onSave}>Готово</button>
+    {onDelete && <button type="button" className="button button--ghost button--block" onClick={onDelete}>Удалить регулировку</button>}
+  </Sheet>;
 }
 
 function SheetOrInline({ library, onClose, children }) {
