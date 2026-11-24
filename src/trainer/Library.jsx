@@ -1,6 +1,7 @@
 import MachineView from './MachineView.jsx';
 import MachineList from './MachineList.jsx';
 import ExerciseList from './ExerciseList.jsx';
+import ExerciseCardView from './ExerciseCardView.jsx';
 import { NO_EXERCISE_FILTERS } from './exercise-list-model.js';
 import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
 import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf, planText } from '../exercise-track.js';
@@ -27,7 +28,7 @@ import { IconPlan, IconSearch, IconAlert, IconCheck, IconTrash, IconClose } from
 import SwipeRow from '../SwipeRow.jsx';
 import { Media, SetupText, MachinePhoto } from '../media.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
-import { MachinesEditor, MachineForm, AlternativesEditor, extrasHint } from './MachinesEditor.jsx';
+import { MachineForm } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
 import { programLength, monthWeeks, parseMonth, monthLabelOf, defaultHow, assignPreview, workoutsOf } from '../plan-weeks.js';
 import { dateKey, nextMonday, scheduledPlan, WEEKDAY_SHORT, sessionQueue } from '../program-timeline.js';
@@ -1057,6 +1058,8 @@ function Exercises() {
   const [open, setOpen] = useState(null);
   // Переход на карточку замены — «Назад» возвращает к предыдущей карточке
   const [trail, setTrail] = useState([]);
+  // Правка открывается из карточки «Изменить» и закрывается назад в карточку
+  const [form, setForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showHidden, setShowHidden] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
@@ -1065,8 +1068,9 @@ function Exercises() {
   useBackGesture(() => setShowSimilar(false), !editing && showSimilar);
   useBackGesture(() => setEditing(null), !!editing);
   useBackGesture(() => setShowHidden(false), !editing && showHidden);
-  const back = () => { if (trail.length) { setOpen(trail[trail.length - 1]); setTrail(trail.slice(0, -1)); } else setOpen(null); };
-  useBackGesture(back, !editing && !showHidden && !!open);
+  useBackGesture(() => setForm(false), !editing && !showHidden && !!open && form);
+  const back = () => { setForm(false); if (trail.length) { setOpen(trail[trail.length - 1]); setTrail(trail.slice(0, -1)); } else setOpen(null); };
+  useBackGesture(back, !editing && !showHidden && !!open && !form);
   useReturnScroll(!!(editing || showHidden || open));
 
   // Смахнули или нажали в правке списка — пропадает сразу, на сервер через
@@ -1102,16 +1106,28 @@ function Exercises() {
     );
   }
 
+  if (current && form) {
+    return (
+      <ExerciseForm
+        exercise={current}
+        owner={!!data.owner}
+        muscles={data.muscles}
+        onSetup={() => { setForm(false); reload(); }}
+        onChanged={(saved) => { setForm(false); setOpen(saved.id); reload(); }}
+        onBack={() => setForm(false)}
+      />
+    );
+  }
+
   if (current) {
     return (
-      <ExerciseView
+      <ExerciseCardView
         exercise={current}
         owner={!!data.owner}
         all={all}
-        onSetup={reload}
-        onChanged={(saved) => { setOpen(saved.id); reload(); }}
-        muscles={data.muscles}
         onBack={back}
+        onEdit={() => setForm(true)}
+        onChanged={(saved) => { setOpen(saved.id); reload(); }}
         onOpen={(id) => { setTrail([...trail, open]); setOpen(id); window.scrollTo?.(0, 0); }}
         onRemove={() => { remove(current); setOpen(null); }}
       />
@@ -1394,7 +1410,8 @@ function HiddenExercises({ onBack }) {
  * своей версией (сервер копирует тренажёры, замены, настройку и видео);
  * подготовку общего владелец правит прямо в базе.
  */
-function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBack, onRemove, onOpen }) {
+/** Форма правки («Изменить» в карточке): поля как и раньше, по касанию; тренажёры и замены — в карточке */
+function ExerciseForm({ exercise, owner, muscles, onSetup, onChanged, onBack }) {
   const e = exercise;
   const [edit, setEdit] = useState('');
   const [draft, setDraft] = useState({});
@@ -1502,7 +1519,7 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
               </div>
             )}
             {/* Пустая ссылка не стирает загруженный файл и анимацию */}
-            {actions({ ...(draft.link || e.media?.kind === 'link' || !e.media ? { link: draft.link || '' } : {}), contentOk: false }, true, file)}
+            {actions({ ...(draft.link || e.media?.kind === 'link' || !e.media ? { link: draft.link || '' } : {}) }, true, file)}
           </>, 'Нет — коснитесь, чтобы приложить')}
 
         {row('muscle', 'Группа мышц', e.muscle, () => ({ muscle: e.muscle || '' }), () => <>
@@ -1524,8 +1541,6 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
           <Field label="Инвентарь" inputMode="text" value={draft.equipment} onChange={(v) => set({ equipment: v })} hint="По нему считается шаг веса в занятии: гантели и гири — 1–2 кг, остальное — 2,5 кг и больше." />
           {actions({ equipment: draft.equipment })}
         </>)}
-
-        <MachinesEditor exercise={e} owner={owner} onChanged={onChanged} />
 
         {/* Подготовка — только без тренажёра: с ним клиент видит настройку тренажёра */}
         {!e.machines?.length && row('setup', 'Подготовка к упражнению',
@@ -1549,11 +1564,6 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
           {actions({ mistakes: draft.mistakes })}
         </>)}
 
-        <label className="library__check">
-          <input type="checkbox" checked={!!e.contentOk} disabled={busy} onChange={(ev) => save({ contentOk: ev.target.checked })} />
-          Техника и видео проверены
-        </label>
-
         {row('muscles', 'Основные и дополнительные мышцы',
           e.musclesCustom ? <MuscleNames primary={e.muscles?.primary || []} secondary={e.muscles?.secondary || []} max={20} /> : null,
           () => ({ map: e.musclesCustom ? e.muscles : null }), () => <>
@@ -1565,23 +1575,12 @@ function ExerciseView({ exercise, owner, all, muscles, onSetup, onChanged, onBac
             {actions({ muscles: draft.map })}
           </>, 'По группе мышц')}
 
-        <AlternativesEditor exercise={e} owner={owner} all={all} onChanged={onChanged} onOpen={onOpen} />
-
         {!edit && failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-        <div className="library__actions">
-          {/* Как в правке списка: сразу, внизу «Упражнение удалено · Вернуть»,
-              без системного окна window.confirm (аудит 24.10.2026) */}
-          {e.mine && (
-            <button className="button button--ghost danger" onClick={onRemove}>Удалить</button>
-          )}
-          {e.common && (
-            <button className="button button--ghost danger" onClick={onRemove}>Убрать у себя</button>
-          )}
-        </div>
       </Panel>
     </>
   );
 }
+
 
 /** Ключевое слово упражнения (FT-792): до 20 знаков — две строки под картинкой в ленте (владелец 15.11.2026) */
 const SHORT_MAX = 20;

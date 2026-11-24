@@ -48,4 +48,38 @@
 .elib-mi__go { flex:none; transform:rotate(-90deg); color:var(--text-muted); }
 .elib-go { margin-top:var(--space-5); }
 .elib button:focus-visible,.elib-sheet button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* этап 2: карточка упражнения — просмотр по макету, правка по «Изменить» */
+.elib-view { padding-bottom:var(--space-2); }
+.elib-view button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.elib-notice { margin:0 0 var(--space-3); padding:var(--space-3); border-radius:var(--radius); background:var(--accent-wash); color:var(--accent-ink); font-size:var(--text-sm); line-height:1.4; }
+.elib-hero { position:relative; overflow:hidden; margin-bottom:var(--space-3); padding:var(--space-4); border-radius:var(--radius-lg); color:#fff; background:linear-gradient(135deg,var(--t,var(--text-muted)),var(--t2,var(--text-secondary))); }
+.elib-hero::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at 20% 0,rgba(255,255,255,.22),transparent 55%); pointer-events:none; }
+.elib-hero__big { position:absolute; right:-16px; top:-12px; opacity:.16; display:grid; }
+.elib-hero__big svg { width:120px; height:120px; stroke-width:1.5; }
+.elib-hero__g { position:relative; margin:0; font-size:var(--text-xs); font-weight:750; letter-spacing:.05em; text-transform:uppercase; opacity:.92; }
+.elib-hero__name { position:relative; margin:var(--space-1) 0 0; font-size:var(--text-xl); line-height:1.2; overflow-wrap:anywhere; }
+.elib-stats { position:relative; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--space-2); margin:var(--space-4) 0 0; }
+.elib-stats > div { min-width:0; display:flex; flex-direction:column-reverse; align-items:center; gap:2px; padding:var(--space-2) 6px; border-radius:var(--radius); background:rgba(255,255,255,.16); text-align:center; }
+.elib-stats dd { margin:0; font-size:var(--text-sm); font-weight:750; line-height:1.2; overflow-wrap:anywhere; }
+.elib-stats dt { margin:0; font-size:var(--text-xs); opacity:.88; }
+.elib-media { margin-bottom:var(--space-3); border-radius:var(--radius-lg); overflow:hidden; }
+.elib-drop { margin-bottom:var(--space-3); padding:var(--space-4); border:1.5px dashed var(--border); border-radius:var(--radius-lg); color:var(--text-muted); text-align:center; font-size:var(--text-sm); }
+.elib-drop b { display:block; margin-bottom:2px; color:var(--text); }
+.elib-box { margin-bottom:var(--space-3); padding:0 var(--space-4) var(--space-4); border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--surface); }
+.elib-box--flush { padding:var(--space-4); }
+.elib-box__h { display:flex; align-items:center; gap:var(--space-2); min-height:52px; margin:0; font-size:var(--text-md); font-weight:750; }
+.elib-box__ic { display:inline-grid; place-items:center; color:var(--accent-ink); }
+.elib-hint { margin:0 0 var(--space-3); font-size:var(--text-sm); color:var(--text-muted); line-height:1.4; }
+.elib-steps { margin:0; padding:0; list-style:none; counter-reset:elib-s; }
+.elib-steps li { counter-increment:elib-s; display:flex; gap:var(--space-3); padding:var(--space-2) 0; font-size:var(--text-base); line-height:1.4; overflow-wrap:anywhere; }
+.elib-steps li::before { content:counter(elib-s); flex:none; width:24px; height:24px; margin-top:1px; border-radius:50%; background:var(--surface-sunken); color:var(--text); font-size:var(--text-xs); font-weight:800; display:grid; place-items:center; }
+.elib-err { margin-top:var(--space-3); padding:var(--space-3); border-radius:var(--radius); background:var(--critical-fill); }
+.elib-err h4 { display:flex; align-items:center; gap:6px; margin:0 0 4px; font-size:var(--text-sm); color:var(--critical-text); }
+.elib-err ul { margin:0; padding:0; list-style:none; }
+.elib-err li { position:relative; padding:3px 0 3px 12px; font-size:var(--text-sm); line-height:1.4; overflow-wrap:anywhere; }
+.elib-err li::before { content:''; position:absolute; left:0; top:11px; width:5px; height:5px; border-radius:50%; background:var(--critical-text); }
+.elib-dock { position:sticky; bottom:var(--float-bottom); z-index:var(--z-tabbar); display:flex; gap:var(--space-2); margin-top:var(--space-3); padding:var(--space-2) 0; background:var(--bg); }
+.elib-dock__main { flex:1; min-width:0; min-height:50px; }
+.elib-dock .elib-ib { width:50px; height:50px; }
+.elib-mi--danger { color:var(--critical-text); }
 @media (prefers-reduced-motion:reduce) { .elib-ib,.elib-card { transition:none; } }

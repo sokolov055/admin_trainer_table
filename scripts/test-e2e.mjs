@@ -2002,11 +2002,12 @@ test('шаблон назначается клиенту, общий копир�
     const frame = tab.locator('.library__anim img').first();
     await frame.waitFor({ timeout: 5000 });
     assert.ok(await frame.evaluate((img) => img.complete && img.naturalWidth > 0), 'кадр анимации загрузился');
-    // Правка касанием по полю (18.10.2026): у общего сохранение создаёт свою версию
+    // Правка: «Изменить» внизу карточки открывает форму, поле — касанием (18.10.2026): у общего сохранение создаёт свою версию
+    await tab.locator('.elib-dock').getByRole('button', { name: 'Изменить', exact: true }).click();
     await tab.getByRole('button', { name: 'Изменить: Техника выполнения' }).click();
     await tab.getByLabel('Техника выполнения').fill('Корпус — одна линия.');
     await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    await assert.doesNotReject(tab.locator('.library__meta', { hasText: 'своё' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
+    await assert.doesNotReject(tab.locator('.elib-hero__g', { hasText: 'своё' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
     await assert.doesNotReject(tab.getByText('Корпус — одна линия.').waitFor({ timeout: 5000 }), 'техника на месте');
     await assert.doesNotReject(tab.locator('.library__anim').waitFor({ timeout: 5000 }), 'у своей версии та же анимация');
 
@@ -2624,6 +2625,7 @@ test('ключевое слово упражнения: подпись в лен
       await tab.getByRole('button', { name: 'Библиотека', exact: true }).click({ timeout: 20000 });
       await tab.getByRole('tab', { name: 'Упражнения', exact: true }).click();
       await tab.getByText('Махи гантелями в стороны', { exact: true }).first().click();
+      await tab.locator('.elib-dock').getByRole('button', { name: 'Изменить', exact: true }).click();
       const field = tab.getByRole('button', { name: 'Изменить: Коротко — в ленте программы' });
       await field.waitFor({ timeout: 5000 });
       assert.match(await field.innerText(), /Махи/);
@@ -2634,6 +2636,7 @@ test('ключевое слово упражнения: подпись в лен
       await tab.getByText('20 / 20').waitFor({ timeout: 2000 });
       await input.fill('Махи вбок');
       await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
+      await tab.locator('.elib-dock').getByRole('button', { name: 'Изменить', exact: true }).click();
       await tab.getByRole('button', { name: 'Изменить: Коротко — в ленте программы' }).getByText('Махи вбок').waitFor({ timeout: 5000 });
     } finally {
       await coach.close();
