@@ -20,6 +20,8 @@ export function draftOf(e) {
     map: e.musclesCustom ? e.muscles || null : null,
     setup: e.setup || '',
     setupOk: !!e.setupOk,
+    // Подготовка видна и правится только без тренажёра (клиент видит настройку тренажёра)
+    machined: (e.machines || []).length > 0,
   };
 }
 
@@ -55,8 +57,10 @@ export function diffDrafts(was, d) {
   if (cleanLines(d.mistakes).join('\n') !== cleanLines(was.mistakes).join('\n')) out.mistakes = true;
   if (d.link.trim() !== was.link.trim()) out.link = true;
   if (!sameJson(d.map, was.map)) out.muscles = true;
-  // Подготовка клиенту видна, когда опубликована (setup_ok): заполненный текст без публикации — несохранённое
-  if (d.setup.trim() !== was.setup.trim() || !!d.setup.trim() !== was.setupOk) out.setup = true;
+  // Подготовка клиенту видна, когда опубликована (setup_ok): заполненный текст без публикации — несохранённое,
+  // но только там, где блок подготовки виден (без тренажёра)
+  const unpublished = !was.machined && !!d.setup.trim() !== was.setupOk;
+  if (d.setup.trim() !== was.setup.trim() || unpublished) out.setup = true;
   return out;
 }
 

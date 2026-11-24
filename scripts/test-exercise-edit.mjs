@@ -86,3 +86,10 @@ test('опубликованная подготовка без правок — 
   assert.deepEqual(changesOf(published, draftOf(published)), {});
   assert.deepEqual(changesOf({ ...common, setup: '', setupOk: false }, draftOf({ ...common, setup: '', setupOk: false })), {});
 });
+
+test('упражнение с тренажёром: подготовка не редактируется и не публикуется — несохранённого нет', () => {
+  const machined = { ...common, machines: [{ id: 1 }], setup: 'Сиденье', setupOk: false };
+  assert.deepEqual(changesOf(machined, draftOf(machined)), {});
+  const { main, setup } = savePlan(machined, draftOf(machined), { directSetup: false });
+  assert.deepEqual({ main, setup }, { main: null, setup: null });
+});
