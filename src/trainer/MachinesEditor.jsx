@@ -199,7 +199,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const [originalName, setOriginalName] = useState(machine?.originalName || '');
   const [brand, setBrand] = useState(machine?.brand || '');
   const [muscleGroups, setMuscleGroups] = useState(machine?.muscleGroups || []);
-  const [setupOk, setSetupOk] = useState(machine?.setupOk !== false && !!machine?.setup);
+  const setupOk = !!setup.trim();
   // Шаг веса тренажёра, кг (FT-626): «Легко» прибавляет столько, пересчёт
   // округляет до него; пусто — шаг по группе мышц, как раньше
   const [weightStep, setWeightStep] = useState(machine?.weightStep ? String(machine.weightStep).replace('.', ',') : '');
@@ -222,8 +222,9 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
   const [asking, setAsking] = useState(false); // «Убрать / Удалить» — вопрос на месте
 
   const [passport, setPassport] = useState(false);
+  const [help, setHelp] = useState('');
   const [leaving, setLeaving] = useState(false);
-  const snapshot = JSON.stringify([name, setup, meta, originalName, brand, muscleGroups, setupOk, weightStep, kind, setupFields, dropped, added.map(a => a.url)]);
+  const snapshot = JSON.stringify([name, setup, meta, originalName, brand, muscleGroups, weightStep, kind, setupFields, dropped, added.map(a => a.url)]);
   const initial = useRef(snapshot);
   const dirty = snapshot !== initial.current;
   const cancel = () => { if (busy) return; if (library && dirty) setLeaving(true); else onDone(library ? persisted : null); };
@@ -312,9 +313,9 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
     <div className={'library__form library__machine-form' + (library ? ' mlib-editor' : '')}>
       {library && <>
         <div className="mlib-etop"><button type="button" disabled={busy} onClick={cancel}>Отмена</button><b>{kind === 'equipment' ? 'Оборудование' : 'Тренажёр'}{dirty && <span className="mlib-dirty" aria-label="Есть несохранённые изменения" />}</b><button type="button" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button></div>
-        <input className="mlib-ename" aria-label="Название тренажёра" value={name} maxLength={80} placeholder="Название тренажёра" onChange={e => setName(e.target.value)} />
-        <div className="mlib-pass">{[muscleGroups.join(', ') || 'Мышцы', kind === 'equipment' ? 'Оборудование' : 'Тренажёр', brand || 'Бренд', ...(kind === 'machine' ? [weightStep ? weightStep + ' кг' : 'Шаг веса'] : [])].map((text, i) => <button type="button" key={i} className="mlib-pchip" onClick={() => setPassport(true)}>{text}</button>)}</div>
-        <button type="button" className="mlib-model" onClick={() => setPassport(true)}>{originalName || 'Добавить модель'}</button>
+        <textarea rows={1} ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; } }} className="mlib-ename" aria-label="Название тренажёра" value={name} maxLength={80} placeholder="Название тренажёра" onChange={e => setName(e.target.value)} />
+        <section className="mlib-characteristics"><div className="mlib-blockhead"><b>Характеристики</b><button type="button" onClick={()=>setPassport(true)}>Изменить</button></div><div className="mlib-pass">{[muscleGroups.join(', ') || 'Мышцы', kind === 'equipment' ? 'Оборудование' : 'Тренажёр', brand || 'Бренд', ...(kind === 'machine' ? [weightStep ? weightStep + ' кг' : 'Шаг веса'] : [])].map((text, i) => <button type="button" key={i} className="mlib-pchip" onClick={() => setPassport(true)}>{text}</button>)}</div>
+        <button type="button" className="mlib-model" onClick={() => setPassport(true)}>{originalName || 'Модель не указана'}</button></section>
       </>}
       {(!library || passport) && <SheetOrInline library={library} onClose={() => setPassport(false)}>
       <div className="field">
@@ -338,20 +339,20 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
         {['Грудь', 'Спина', 'Ноги', 'Ягодицы', 'Плечи', 'Руки', 'Предплечье', 'Пресс', 'Всё тело', 'Кардио'].map((g) => <label className="library__check" key={g}><input type="checkbox" checked={muscleGroups.includes(g)} onChange={(e) => setMuscleGroups(e.target.checked ? [...muscleGroups, g] : muscleGroups.filter((x) => x !== g))} />{g}</label>)}
       </fieldset>
       </SheetOrInline>}
-      {machine && <p className="small muted">Инструкция изменится во всех упражнениях с этой карточкой оборудования.</p>}
+      {machine && !library && <p className="small muted">Инструкция изменится во всех упражнениях с этой карточкой оборудования.</p>}
       <div className="field">
-        <span className="field__label">Фото{total ? ' · ' + total + ' из ' + MAX_MACHINE_PHOTOS : ''}</span>
+        <span className="field__label">Фото{library && <button className="mlib-help" type="button" aria-label="О фотографиях" onClick={()=>setHelp('Первое фото — главное. Снимайте без людей в кадре. Номера шагов можно поставить и переместить на главном фото.')}>?</button>}{total ? ' · ' + total + ' из ' + MAX_MACHINE_PHOTOS : ''}</span>
         {total > 0 && (
           <div className="library__photos">
             {kept.map((u) => (
               <div key={u} className="library__photo">
-                <img src={mediaUrl(u)} alt="" loading="lazy" />
+                {library && u === kept[0] ? <div id="mlib-primary-photo" /> : <img src={mediaUrl(u)} alt="" loading="lazy" />}
                 <button type="button" className="library__photo-x" aria-label="Убрать фото" onClick={() => setDropped((v) => [...v, u])}><IconClose size={14} /></button>
               </div>
             ))}
             {added.map((a) => (
               <div key={a.url} className="library__photo">
-                <img src={a.url} alt="" />
+                {library && !kept.length && a === added[0] ? <div id="mlib-primary-photo" /> : <img src={a.url} alt="" />}
                 <button type="button" className="library__photo-x" aria-label="Убрать фото" onClick={() => setAdded((v) => v.filter((x) => x !== a))}><IconClose size={14} /></button>
               </div>
             ))}
@@ -373,18 +374,18 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
             </label>
           </div>
         )}
-        <span className="field__hint">Первое фото — главное. Снимайте без людей в кадре — фото увидят клиенты.</span>
+        {!library && <span className="field__hint">Первое фото — главное. Снимайте без людей в кадре — фото увидят клиенты.</span>}
       </div>
       <div className="field">
-        <span className="field__label">{library ? 'Шаги настройки' : 'Как настроить'}</span>
-        <SetupStepsEditor value={setup} meta={meta} kind={kind} name={name}
+        <span className="field__label">{library ? 'Шаги настройки' : 'Как настроить'}{library && <button type="button" className="mlib-help" aria-label="О шагах настройки" onClick={()=>setHelp('Подпись — название регулировки. Главное видно сразу, подробности раскрываются клиентом. Стикер и номер фото сохраняются у шага.')}>?</button>}</span>
+        <SetupStepsEditor library={library} value={setup} meta={meta} kind={kind} name={name}
           photo={kept.length ? mediaUrl(kept[0]) : added.length ? added[0].url : ''}
-          onChange={(text, m) => { if (text !== setup) setSetupOk(false); setSetup(text); setMeta(m); }} />
-        <span className="field__hint">Без цифр в тексте: настройка у каждого клиента своя — её записывают в занятии. Стикер подбирается по подписи сам, если не выбрать.</span>
+          onChange={(text, m) => { setSetup(text); setMeta(m); }} />
+        {!library && <span className="field__hint">Без цифр в тексте: настройка у каждого клиента своя — её записывают в занятии. Стикер подбирается по подписи сам, если не выбрать.</span>}
       </div>
-      <label className="library__check"><input type="checkbox" checked={setupOk} disabled={!setup.trim()} onChange={(e) => setSetupOk(e.target.checked)} />Инструкция оборудования проверена</label>
+
       <fieldset className="field library__setup-fields">
-        <legend className="field__label">Регулировки</legend>
+        <legend className="field__label">{library ? 'Регулировки клиента' : 'Регулировки'}{library && <button type="button" className="mlib-help" aria-label="О регулировках клиента" onClick={()=>setHelp('Здесь только названия общих полей. Значения каждый клиент записывает в занятии; личные значения не меняют карточку оборудования.')}>?</button>}</legend>
         {setupFields.map((f, i) => (
           <div className="library__setup-field" key={i}>
             <input className="field__input" value={f} maxLength={40} placeholder="Сиденье, спинка, высота блока…" autoFocus={!f}
@@ -394,8 +395,10 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
           </div>
         ))}
         {setupFields.length < 12 && <button type="button" className="button button--ghost" onClick={() => setSetupFields((v) => [...v, ''])}>+ Регулировка</button>}
-        <span className="field__hint">Что клиент выставляет на тренажёре: сиденье, спинка, высота блока. Цифры у каждого свои — их вписывают в занятии, текстом или числом. Клиент может добавить и свою регулировку — она только у него.</span>
+        {!library && <span className="field__hint">Что клиент выставляет на тренажёре: сиденье, спинка, высота блока. Цифры у каждого свои — их вписывают в занятии, текстом или числом. Клиент может добавить и свою регулировку — она только у него.</span>}
       </fieldset>
+      {library && <div id="mlib-preview-action" />}
+      {help && <Sheet title="Справка" onClose={()=>setHelp('')}>{help}</Sheet>}
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       {library && leaving && <Sheet title="Выйти без сохранения?" onClose={() => setLeaving(false)}><p>Изменения карточки ещё не сохранены.</p><button type="button" className="button button--primary button--block" onClick={() => setLeaving(false)}>Продолжить редактирование</button><button type="button" className="button button--ghost button--block" onClick={() => onDone(persisted)}>Выйти без сохранения</button></Sheet>}
       {!library && (asking ? (
@@ -418,7 +421,7 @@ export function MachineForm({ exercise = null, machine, onDone, canDelete = true
 }
 
 function SheetOrInline({ library, onClose, children }) {
-  return library ? <Sheet title="Паспорт тренажёра" className="mlib-sheet" onClose={onClose}>{children}<button type="button" className="button button--primary button--block" onClick={onClose}>Готово</button></Sheet> : <>{children}</>;
+  return library ? <Sheet title="Характеристики" className="mlib-sheet" onClose={onClose}>{children}<button type="button" className="button button--primary button--block" onClick={onClose}>Готово</button></Sheet> : <>{children}</>;
 }
 
 const MAX_MACHINE_PHOTOS = 6;

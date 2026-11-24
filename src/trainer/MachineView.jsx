@@ -14,10 +14,12 @@ export default function MachineView({ machine: m, owner, exercises, onBack, onEd
   useStickerPack();
   const [sheet, setSheet] = useState(initialSheet);
   const [q, setQ] = useState('');
+  const [group, setGroup] = useState('');
+  const groups = [...new Set(exercises.map(e => e.muscle).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
   const { steps, avoid } = parseSetup(m.setup, m.steps);
   const attached = new Set((m.uses || []).map((e) => e.id));
   const query = q.trim().toLocaleLowerCase('ru').replace(/ё/g,'е');
-  const choices = exercises.filter((e) => !query || [e.name,e.muscle].some((s) => String(s || '').toLocaleLowerCase('ru').replace(/ё/g,'е').includes(query)))
+  const choices = exercises.filter(e => !group || e.muscle === group).filter((e) => !query || [e.name,e.muscle].some((s) => String(s || '').toLocaleLowerCase('ru').replace(/ё/g,'е').includes(query)))
     .sort((a,b) => Number(attached.has(b.id))-Number(attached.has(a.id)) || a.name.localeCompare(b.name,'ru'));
   const KindIcon = m.kind === 'equipment' ? IconDumbbell : IconBench;
   const tone = muscleClass(muscleTone({group:m.muscleGroups?.[0]}));
@@ -36,12 +38,12 @@ export default function MachineView({ machine: m, owner, exercises, onBack, onEd
         onPin={(k)=>document.getElementById('mlib-step-'+k)?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'})}/>
     </div>}
     {m.photos?.length > 1 && <MachinePhoto machine={{...m,photos:m.photos.slice(1),photo:''}}/>}
-    <section className="mlib-section"><div className="mlib-section__head"><span className="mlib-section__icon"><IconSliders size={18}/></span><div><h3>{m.kind === 'equipment' ? 'Как использовать' : 'Как настроить'}</h3><small>{m.setupOk === true ? 'Инструкция проверена' : 'Пошаговая инструкция'}</small></div></div>
+    <section className="mlib-section"><div className="mlib-section__head"><span className="mlib-section__icon"><IconSliders size={18}/></span><div><h3>{m.kind === 'equipment' ? 'Как использовать' : 'Как настроить'}</h3></div></div>
       {steps.length ? steps.map((s,i)=><div className="mlib-step" id={'mlib-step-'+i} key={i}><span className="mlib-sticker">{(s.sticker || stickerFor(s.label,s.main)) ? <Sticker id={s.sticker || stickerFor(s.label,s.main)}/> : <span>{i+1}</span>}</span><div className="mlib-grow">{s.label && <b>{s.label}</b>}<span className="mlib-step__main">{s.main}</span>{s.rest && <p>{s.rest}</p>}</div><span className="mlib-step__num">{i+1}</span></div>) : <p className="mlib-section__empty">Инструкции пока нет. Добавьте её в редакторе карточки.</p>}
-      {!!avoid.length && <div className="mlib-section__empty"><b>Частые ошибки</b><p>{avoid.join(', ')}</p></div>}
+      {!!avoid.length && <section className="mlib-errors"><h4>Частые ошибки</h4><div className="mlib-error-chips">{avoid.map((a,i)=><span key={i}>{a}</span>)}</div></section>}
       {!!m.fields?.length && <div className="mlib-section__empty"><b>Регулировки</b><p>{m.fields.join(' · ')}</p></div>}
     </section>
-    <section className="mlib-section"><div className="mlib-section__head"><span className="mlib-section__icon">{attached.size}</span><div><h3>Связанные упражнения</h3><small>{attached.size} упр.</small></div></div>
+    <section className="mlib-section"><div className="mlib-section__head"><span className="mlib-section__icon"><IconLink size={18}/></span><div><h3>Связанные упражнения</h3></div></div>
       {(m.uses || []).map((e)=><div className="mlib-step" key={e.id}><span className="mlib-section__icon"><IconDumbbell size={20}/></span><div className="mlib-grow"><b>{e.name}</b>{e.muscle && <small>{e.muscle}</small>}</div></div>)}
       {!attached.size && <p className="mlib-section__empty">Упражнения можно привязать сейчас или позже.</p>}
     </section>
@@ -53,7 +55,7 @@ export default function MachineView({ machine: m, owner, exercises, onBack, onEd
     </div></Sheet>}
     {sheet === 'attach' && <Sheet title="Привязать упражнения" locked={!!busy} onClose={()=>setSheet('')}>
       {!m.mine && !owner && <p className="small muted">Изменения сохранятся в вашей личной версии карточки.</p>}
-      <Search value={q} onChange={setQ} placeholder="Поиск упражнения"/>
+      <Search value={q} onChange={setQ} placeholder="Поиск упражнения"/><div className="mlib-groups" aria-label="Мышечные группы">{['',...groups].map(g=><button type="button" key={g} aria-pressed={group === g} onClick={()=>setGroup(g)}>{g || 'Все мышцы'}</button>)}</div>
       {choices.map((e)=><button type="button" className="mlib-attach" aria-pressed={attached.has(e.id)} disabled={!!busy} key={e.id} onClick={()=>onToggle(e)}><span><b>{e.name}</b>{e.muscle && <small>{e.muscle}</small>}</span><span>{busy === e.id ? 'Сохраняем…' : attached.has(e.id) ? 'Привязано' : 'Привязать'}</span></button>)}
       {!choices.length && <p className="small muted">Упражнения не найдены.</p>}
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}

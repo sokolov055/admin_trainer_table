@@ -7,7 +7,8 @@
  * последняя строка «Ошибка: а, б»), его читают и старые сборки. Стикер и
  * цифра — setupMeta по тем же строкам.
  */
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Sheet } from '../ui.jsx';
 import { IconClose, IconSearch, IconTrash, IconArrowUp, IconArrowDown, IconPlus } from '../icons.jsx';
 import { haptic } from '../telegram.js';
@@ -76,7 +77,7 @@ function highlight(name, q) {
  * value — текст setup, meta — setupMeta, photo — адрес первого фото (для
  * цифр), kind — тренажёр или оборудование; onChange(setup, meta)
  */
-export default function SetupStepsEditor({ value, meta, photo, kind = 'machine', name = '', onChange }) {
+export default function SetupStepsEditor({ value, meta, photo, kind = 'machine', name = '', library = false, onChange }) {
   const first = useRef(null);
   if (first.current === null) first.current = parseSetup(value, meta);
   const [steps, setSteps] = useState(first.current.steps.length ? first.current.steps : [{ label: '', main: '', rest: '', sticker: '', pin: null }]);
@@ -113,11 +114,16 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
     el.onpointerup = () => { el.onpointermove = null; el.onpointerup = null; if (last) edit(k, { pin: last }); };
   };
 
+  const [photoTarget, setPhotoTarget] = useState(null);
+  const [previewTarget, setPreviewTarget] = useState(null);
+  useLayoutEffect(() => { setPhotoTarget(library ? document.getElementById('mlib-primary-photo') : null); setPreviewTarget(library ? document.getElementById('mlib-preview-action') : null); });
+  const renderPreview = node => previewTarget ? createPortal(node, previewTarget) : node;
+  const renderPhoto = node => photoTarget ? createPortal(node, photoTarget) : node;
   const built = buildSetup(steps, avoid);
   const tooLong = built.setup.length > 1500;
   return (
     <div className="sed">
-      {photo ? (
+      {photo ? renderPhoto(
         <div className={'sed-photo' + (placing >= 0 ? ' is-placing' : '')} ref={photoRef} onClick={onPhoto}>
           <img src={photo} alt="" draggable="false" />
           {steps.map((s, k) => s.pin && (
@@ -142,10 +148,13 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
                 {own ? <Sticker id={own} /> : auto ? <span className="sed-auto"><Sticker id={auto} /></span> : <em>+<br />стикер</em>}
               </button>
               <div className="sed-fields">
+                {library && <span className="mlib-field-label">Подпись</span>}
                 <input className="field__input" value={s.label} maxLength={30} placeholder="Подпись: Сиденье, Платформа…" aria-label={'Подпись шага ' + (k + 1)}
                   onChange={(e) => edit(k, { label: e.target.value })} />
+                {library && <span className="mlib-field-label">Главное</span>}
                 <textarea ref={grow} className="field__input sed-ta" rows={1} value={s.main} maxLength={120} placeholder="Главное одной строкой" aria-label={'Главное шага ' + (k + 1)}
                   onChange={(e) => edit(k, { main: e.target.value.replace(/\n/g, ' ') })} />
+                {library && <span className="mlib-field-label">Подробности — необязательно</span>}
                 <textarea ref={grow} className="field__input sed-ta sed-ta--sm" rows={1} value={s.rest} maxLength={400} placeholder="Подробности — по нажатию" aria-label={'Подробности шага ' + (k + 1)}
                   onChange={(e) => edit(k, { rest: e.target.value.replace(/\n/g, ' ') })} />
                 {words > 2 && <span className="field__hint">Подпись — 1–2 слова, иначе клиент увидит её частью текста.</span>}
@@ -167,25 +176,25 @@ export default function SetupStepsEditor({ value, meta, photo, kind = 'machine',
       <button type="button" className="button button--ghost sed-add" disabled={steps.length >= 20}
         onClick={() => commit([...steps, { label: '', main: '', rest: '', sticker: '', pin: null }])}><IconPlus size={16} aria-hidden="true" /> Шаг</button>
 
-      <div className="field__label sed-avoid-lab">Не делайте</div>
+      <div className="field__label sed-avoid-lab">{library ? 'Частые ошибки' : 'Не делайте'}</div>
       <div className="sed-chipin">
         {avoid.map((a, i) => <button key={i} type="button" onClick={() => commit(steps, avoid.filter((_, j) => j !== i))} aria-label={'Убрать: ' + a}>{a} <IconClose size={12} aria-hidden="true" /></button>)}
         <input value={draft} onChange={(e) => setDraft(e.target.value.replace(/,/g, ' '))} placeholder="Ошибка и Enter" aria-label="Добавить ошибку"
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMark(); } }} onBlur={addMark} enterKeyHint="done" />
       </div>
       {tooLong && <span className="field__hint sed-warn">Текст длиннее 1500 знаков — сократите подробности, иначе конец обрежется.</span>}
-      <button type="button" className="button button--ghost sed-preview" onClick={() => setPreview(true)}>Как увидит клиент</button>
+      {renderPreview(<button type="button" className="button button--ghost sed-preview" onClick={() => setPreview(true)}>{library ? 'Предпросмотр инструкции' : 'Как увидит клиент'}</button>)}
 
       {picking >= 0 && <StickerSheet step={steps[picking]} index={picking} onClose={() => setPicking(-1)}
         onPick={(id) => { haptic(); edit(picking, { sticker: id }); setPicking(-1); }} />}
       {preview && (
-        <Sheet title="Как увидит клиент" onClose={() => setPreview(false)} className="sed-sheet">
+        <Sheet title="Как увидит клиент" onClose={() => setPreview(false)} className={library ? "sed-sheet mlib-preview" : "sed-sheet"}>
           <SetupSteps photos={[]} rows={steps.filter((s) => s.label || s.main || s.rest).map((s) => ({ label: clean(s.label).trim(), text: clean(s.main) + (s.rest ? '; ' + clean(s.rest) : '') }))}
             meta={built.meta} kind={kind}>
             {photo && <div className="ss-photos"><PreviewPhoto src={photo} steps={steps} /></div>}
             {name && <h4 className="ts-mach__name">{name}</h4>}
           </SetupSteps>
-          {avoid.length > 0 && <section className="ts-avoid"><h4>Не делайте</h4><div className="ts-nos">{avoid.map((a) => <span key={a}>{a}</span>)}</div></section>}
+          {avoid.length > 0 && <section className="ts-avoid"><h4>{library ? 'Частые ошибки' : 'Не делайте'}</h4><div className="ts-nos">{avoid.map((a) => <span key={a}>{a}</span>)}</div></section>}
         </Sheet>
       )}
     </div>

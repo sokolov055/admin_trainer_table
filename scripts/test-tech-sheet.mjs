@@ -71,3 +71,8 @@ test('плитка «Мышцы»: без «+4» — группа, если тр
   assert.equal(muscleLine(['Икры'], 'Ноги', true), 'Икры');
   assert.equal(muscleLine(['Грудь', 'Трицепс'], '', false), 'Грудь, Трицепс');
 });
+
+test('FT-819: старый setupOk=false не скрывает сохранённые шаги оборудования', () => {
+  const model = techModel({card:{machines:[{uid:'saved',setup:'Сиденье — поднимите',setupOk:false}]}});
+  assert.ok(JSON.stringify(model).includes('поднимите'));
+});

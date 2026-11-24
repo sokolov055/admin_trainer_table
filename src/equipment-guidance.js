@@ -8,7 +8,7 @@ export function primaryEquipment(exercise) {
 export function resolveGuidance(exercise = {}) {
   const items = Array.isArray(exercise.machines) ? exercise.machines : [];
   const primary = primaryEquipment(exercise);
-  const setup = items.length ? (primary?.setupOk === false ? '' : primary?.setup || '') : (exercise.setupOk === false ? '' : exercise.setup || '');
+  const setup = items.length ? (primary?.setup || '') : (exercise.setupOk === false ? '' : exercise.setup || '');
   return { primary, setup, source: items.length ? (primary ? 'equipment' : 'unselected') : 'exercise',
     additional: items.filter((m) => m.uid !== primary?.uid), notes: exercise.notes || '', mistakes: exercise.mistakes || '', media: exercise.media || null, muscles: exercise.muscles || null };
 }

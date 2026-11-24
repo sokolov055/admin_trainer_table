@@ -34,3 +34,10 @@ test('метка шага — короткое слово до тире', () => 
   assert.deepEqual(stepLabel('Платформа: потяните ручку'), { label: 'Платформа', text: 'потяните ручку' });
   assert.equal(stepLabel('Внимание к деталям: важно').label, '', 'три слова — не подпись');
 });
+
+test('FT-819: сохранённая инструкция оборудования доступна без ручной проверки', async () => {
+  const { resolveGuidance } = await import('../src/equipment-guidance.js');
+  const machine = { uid: 'saved', setup: 'Сиденье — поднимите', setupOk: false };
+  assert.equal(resolveGuidance({ machines: [machine] }).setup, machine.setup);
+  assert.equal(resolveGuidance({ machines: [{...machine, setup: ''}] }).setup, '');
+});

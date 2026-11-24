@@ -143,7 +143,7 @@ export function MachineGuide({ info, notes = {}, trainer = false }) {
     {open && <GuideSheet title="Тренажёр" onClose={() => setOpen(false)}>
       <div className="guide">
         {list.map((m) => {
-          const setup = m.setupOk === false ? { steps: [], mistakes: [] } : instructionParts(m.setup);
+          const setup = instructionParts(m.setup);
           const note = notes[machineTarget(info, m.uid)];
           return <section key={m.uid} className="guide__machine">
             <p className="guide__machine-name">{m.name}</p>

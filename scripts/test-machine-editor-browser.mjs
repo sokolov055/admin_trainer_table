@@ -13,6 +13,8 @@ test('FT-819: редактор, чистая отмена и выход посл
  const b=await chromium.launch();try{for(const width of[320,390,430])for(const theme of['light','dark']){
  const p=await b.newPage({viewport:{width,height:850},reducedMotion:'reduce'});const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.setContent(`<html data-theme="${theme}"><style>${css}</style><main style="padding:16px" id="root"></main></html>`);await p.addScriptTag({content:js});
+ await p.getByRole('textbox',{name:'Название тренажёра',exact:true}).fill('Длинное название тренажёра для проверки переноса всех слов в несколько строк');
+ assert.ok(await p.locator('.mlib-ename').evaluate(el=>el.scrollHeight<=el.clientHeight+2));
  await p.getByRole('textbox',{name:'Название тренажёра',exact:true}).fill('Тяга новая');
  await p.getByRole('button',{name:'Отмена',exact:true}).click();
  await p.getByRole('heading',{name:'Выйти без сохранения?',exact:true}).waitFor();
@@ -29,7 +31,7 @@ test('FT-819: редактор, чистая отмена и выход посл
  await p.getByRole('textbox',{name:'Подпись шага 2',exact:true}).fill('Вес');await p.getByRole('textbox',{name:'Главное шага 2',exact:true}).fill('Проверьте вес');
  await p.getByRole('button',{name:'Выше',exact:true}).nth(1).click();assert.equal(await p.getByRole('textbox',{name:'Подпись шага 1',exact:true}).inputValue(),'Вес');
  await p.getByRole('button',{name:/Стикер шага 1/}).click();await p.getByRole('textbox',{name:'Найти стикер',exact:true}).fill('сиденье');assert.ok(await p.locator('.sed-st').count()>0);await p.locator('.sed-st').first().click();
- await p.getByRole('button',{name:'Как увидит клиент',exact:true}).click();await p.getByRole('heading',{name:'Как увидит клиент',exact:true}).waitFor();await p.getByRole('button',{name:'Закрыть',exact:true}).click();await p.locator('.sheet').waitFor({state:'detached'});
+ await p.getByRole('button',{name:'Предпросмотр инструкции',exact:true}).click();await p.getByRole('heading',{name:'Как увидит клиент',exact:true}).waitFor();await p.getByRole('button',{name:'Закрыть',exact:true}).click();await p.locator('.sheet').waitFor({state:'detached'});
  await p.getByRole('button',{name:'Удалить шаг 2',exact:true}).click();assert.equal(await p.getByRole('textbox',{name:'Подпись шага 2',exact:true}).count(),0);
  await p.evaluate(()=>window.__fail=true);
  await p.getByRole('button',{name:'Сохранить',exact:true}).click();await p.getByText('Не удалось сохранить. Повторите попытку',{exact:true}).waitFor();
@@ -39,7 +41,7 @@ test('FT-819: редактор, чистая отмена и выход посл
  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth > innerWidth),false);
  await p.screenshot({path:'/tmp/ft819-editor-'+width+'-'+theme+'.png',fullPage:true});
  await p.getByRole('button',{name:'Сохранить',exact:true}).click();await p.waitForFunction(()=>window.__done===true);
- const writes=await p.evaluate(()=>window.__writes);assert.deepEqual(writes[1].p.setupFields,['Сиденье']);assert.equal(writes[1].p.weightStep,'2,5');assert.deepEqual(writes[1].p.muscleGroups,['Спина']);assert.equal(writes[1].p.brand,'Бренд тест');assert.equal(writes[1].p.originalName,'Модель тест');assert.equal(writes[0].action,'library.machine.save');assert.match(writes[0].p.setup,/Вес — Проверьте вес/);assert.ok(writes[0].p.setupMeta[0].s);assert.deepEqual(errors,[]);
+ const writes=await p.evaluate(()=>window.__writes);assert.equal(writes[0].p.setupOk,true);assert.deepEqual(writes[1].p.setupFields,['Сиденье']);assert.equal(writes[1].p.weightStep,'2,5');assert.deepEqual(writes[1].p.muscleGroups,['Спина']);assert.equal(writes[1].p.brand,'Бренд тест');assert.equal(writes[1].p.originalName,'Модель тест');assert.equal(writes[0].action,'library.machine.save');assert.match(writes[0].p.setup,/Вес — Проверьте вес/);assert.ok(writes[0].p.setupMeta[0].s);assert.deepEqual(errors,[]);
  // #2: старый setup без meta не делает вход грязным.
  await p.evaluate(()=>window.__renderMachine({uid:'legacy',name:'Старый тренажёр',kind:'machine',setup:'Сиденье: поднимите\\nПроверьте упор',photos:[]}));
  await p.getByRole('textbox',{name:'Название тренажёра',exact:true}).waitFor();
@@ -47,6 +49,14 @@ test('FT-819: редактор, чистая отмена и выход посл
  await p.getByRole('button',{name:'Отмена',exact:true}).click();
  assert.equal(await p.getByRole('heading',{name:'Выйти без сохранения?',exact:true}).count(),0);
  assert.equal(await p.evaluate(()=>window.__doneResult),null);
+ // v7: одно главное фото с номерами, естественные пропорции без дублирования.
+ await p.evaluate(()=>window.__renderMachine({uid:'photo',name:'С фото',kind:'machine',setup:'Сиденье — поднимите',steps:[{s:'',p:[30,40]}],photos:['data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150"><rect width="300" height="150" fill="gray"/></svg>')]}));
+ await p.locator('#mlib-primary-photo .sed-photo img').waitFor();
+ assert.equal(await p.locator('.mlib-editor img').count(),1);
+ assert.equal(await p.locator('#mlib-primary-photo .ss-pin').count(),1);
+ const dims=await p.locator('#mlib-primary-photo img').evaluate(el=>({w:el.width,h:el.height}));
+ assert.ok(Math.abs(dims.w/dims.h-2)<0.03);
+ await p.screenshot({path:'/tmp/ft819-v7-editor-photo-'+width+'-'+theme+'.png',fullPage:true});
  // #3: оборудование не обещает отсутствующее поле шага веса.
  await p.evaluate(()=>window.__renderMachine({uid:'eq',name:'Скамья',kind:'equipment',setup:'',photos:[],weightStep:2.5}));
  await p.getByRole('button',{name:'Оборудование',exact:true}).waitFor();

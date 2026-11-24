@@ -73,7 +73,7 @@ export function techModel({ name = '', card = {}, muscles = null, notes = {}, ta
   const avoid = mistakeChips([...tech.mistakes, ...principle.mistakes]);
 
   const list = machines.map((m, i) => {
-    const own = m.setupOk === false ? { steps: [], mistakes: [] } : instructionParts(m.setup || '');
+    const own = instructionParts(m.setup || '');
     // Общий принцип — у основного тренажёра, после его регулировок, без повторов
     const extra = i === 0 && !prepAsSteps ? principle.steps.filter((l) => !own.steps.some((x) => same(x, l))) : [];
     const photos = m.photos && m.photos.length ? m.photos : m.photo ? [m.photo] : [];

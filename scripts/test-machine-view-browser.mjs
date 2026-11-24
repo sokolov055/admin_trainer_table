@@ -14,9 +14,15 @@ test('FT-819: карточка v5, связи, ошибка, меню, возв�
  const p=await b.newPage({viewport:{width,height:850},reducedMotion:'reduce'});const errors=[];p.on('pageerror',e=>errors.push(e.message));
  const render=async(common=false)=>{await p.setContent(`<html data-theme="${theme}"><style>${css}</style><div id="root"></div><script>window.__common=${common};window.__fail=false;</script></html>`);await p.addScriptTag({content:js});await p.getByRole('heading',{name:'Вертикальная тяга',exact:true}).waitFor();};
  await render();assert.equal(await p.locator('.mlib-hero__stats').innerText().then(t=>t.includes('1\nупражнение')),true);assert.match(await p.locator('.mlib-hero__stats').innerText(),/5\s+шагов/);assert.equal(await p.locator('.mlib-dock button').count(),2);assert.equal(await p.getByRole('tab').count(),0);assert.equal(await p.locator('.mlib-section').count(),2);
- await p.getByText('Подробное пояснение',{exact:true}).waitFor();await p.getByText('Инструкция проверена',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Шаг 1',exact:true}).count(),1);
+ await p.getByText('Подробное пояснение',{exact:true}).waitFor();assert.equal(await p.getByText('Инструкция проверена',{exact:true}).count(),0);assert.equal(await p.getByRole('button',{name:'Шаг 1',exact:true}).count(),1);
  assert.equal(await p.locator('.mlib-pinned img').count(),1);assert.equal(await p.locator('.machine__photo img').count(),1);
- await p.getByRole('button',{name:'Привязать упражнения',exact:true}).click();await p.getByRole('button',{name:/Жим/}).click();assert.match(await p.getByRole('button',{name:/Жим/}).innerText(),/Привязано/);
+ await p.getByRole('button',{name:'Привязать упражнения',exact:true}).click();
+ await p.getByRole('button',{name:'Грудь',exact:true}).click();
+ assert.equal(await p.locator('.mlib-attach').count(),1);
+ await p.getByPlaceholder('Поиск упражнения').fill('Тяга');assert.equal(await p.locator('.mlib-attach').count(),0);
+ await p.getByPlaceholder('Поиск упражнения').fill('');
+ await p.getByRole('button',{name:'Все мышцы',exact:true}).click();
+await p.getByRole('button',{name:/Жим/}).click();assert.match(await p.getByRole('button',{name:/Жим/}).innerText(),/Привязано/);
  await p.evaluate(()=>window.__fail=true);await p.getByRole('button',{name:/Жим/}).click();await p.getByText('Не удалось сохранить. Повторите попытку.',{exact:true}).waitFor();assert.match(await p.getByRole('button',{name:/Жим/}).innerText(),/Привязано/);
  await p.getByRole('button',{name:'Закрыть',exact:true}).click();await p.locator('.sheet').waitFor({state:'detached'});
  await p.getByRole('button',{name:'Ещё',exact:true}).click();await p.getByRole('button',{name:'Удалить',exact:true}).click();await p.getByRole('button',{name:'Вернуть',exact:true}).click();await p.getByRole('heading',{name:'Вертикальная тяга',exact:true}).waitFor();assert.equal(await p.evaluate(()=>!!window.__deleted),false);
