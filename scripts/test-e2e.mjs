@@ -2007,11 +2007,12 @@ test('шаблон назначается клиенту, общий копир�
     await tab.getByRole('button', { name: 'Изменить: Техника выполнения' }).click();
     await tab.getByLabel('Техника выполнения').fill('Корпус — одна линия.');
     await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    await assert.doesNotReject(tab.locator('.elib-hero__g', { hasText: 'своё' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
-    await assert.doesNotReject(tab.getByText('Корпус — одна линия.').waitFor({ timeout: 5000 }), 'техника на месте');
+    await assert.doesNotReject(tab.locator('.library__meta', { hasText: 'своё' }).waitFor({ timeout: 5000 }), 'своя версия сохранена');
+    await assert.doesNotReject(tab.getByRole('button', { name: 'Изменить: Техника выполнения' }).getByText('Корпус — одна линия.').waitFor({ timeout: 5000 }), 'после сохранения форма открыта, техника на месте');
     await assert.doesNotReject(tab.locator('.library__anim').waitFor({ timeout: 5000 }), 'у своей версии та же анимация');
 
-    // Общее убирается у себя и возвращается
+    // Общее убирается у себя и возвращается: из формы «Назад» — в карточку, ещё раз — в список
+    await tab.getByRole('button', { name: 'Назад' }).click();
     await tab.getByRole('button', { name: 'Назад' }).click();
     const burpee = visible('.elib-swipe').filter({ hasText: 'Бёрпи' });
     const box = await burpee.boundingBox();
@@ -2636,7 +2637,6 @@ test('ключевое слово упражнения: подпись в лен
       await tab.getByText('20 / 20').waitFor({ timeout: 2000 });
       await input.fill('Махи вбок');
       await tab.getByRole('button', { name: 'Сохранить', exact: true }).click();
-      await tab.locator('.elib-dock').getByRole('button', { name: 'Изменить', exact: true }).click();
       await tab.getByRole('button', { name: 'Изменить: Коротко — в ленте программы' }).getByText('Махи вбок').waitFor({ timeout: 5000 });
     } finally {
       await coach.close();
