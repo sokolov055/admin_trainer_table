@@ -42,7 +42,6 @@ export const MACHINE_COLUMNS = [
   ['muscleGroups', 'Группы мышц'],
   ['setup', 'Как настроить'],
   ['weightStep', 'Шаг веса, кг'],
-  ['setupOk', 'Настройка проверена'],
 ];
 
 // Только для чтения: в выгрузке есть, при загрузке пропускается
@@ -353,7 +352,6 @@ export function machineCells(m) {
     muscleGroups: (m.muscleGroups || []).join('; '),
     setup: m.setup || '',
     weightStep: m.weightStep ? String(m.weightStep).replace('.', ',') : '',
-    setupOk: yes(m.setupOk),
   };
 }
 

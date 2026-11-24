@@ -107,3 +107,14 @@ test('Excel: листы читаются отдельно, у каждого с�
   assert.equal(read.machines[0].brand, '12');
   assert.equal(read.machines[0].line, 3);
 });
+
+test('FT-819: у оборудования нет ручной проверки; старый столбец пропускается, у упражнений сохраняется', () => {
+  assert.ok(!machinesTable([MACHINE])[0].includes('Настройка проверена'));
+  const parsed = readSheet([['Что','Название','Как настроить','Настройка проверена'],
+    ['Оборудование','Скамья','Поставьте устойчиво','Нет'],
+    ['Упражнение','Жим','Подготовка','Нет']]);
+  assert.equal(parsed.machines[0].setup,'Поставьте устойчиво');
+  assert.equal(Object.hasOwn(parsed.machines[0],'setupOk'),false);
+  assert.equal(parsed.exercises[0].setupOk,'Нет');
+  assert.ok(exercisesTable([EXERCISE])[0].includes('Настройка проверена'));
+});
