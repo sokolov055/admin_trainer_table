@@ -3,7 +3,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useData } from '../useData.js';
 import RationSummary from '../nutrition/RationSummary.jsx';
 import { apiBatch, apiMutate, apiPublic, apiStoredAt } from '../api.js';
-import { dateKey, nextMonday, programSize } from '../program-timeline.js';
+import { dateKey, nextMonday, programSize, addDays } from '../program-timeline.js';
 import { planExerciseForSave } from '../plan-payload.js';
 import { journalList, onOutboxChange, justSynced, localWorkouts, withLocalWeights } from '../workout-outbox.js';
 import { isOffline, localWrites, onWritesChange, queueWrite, withLocalMeasures } from '../offline-writes.js';
@@ -21,7 +21,7 @@ import {
   Chips, Segmented, Field, Note, Delta, Qty,
   formatNumber, formatMoney, formatDate, formatWhen, relativeDays, daysSince, plural,
 } from '../ui.jsx';
-import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconPlus, IconCopy, IconTrash, IconUsers } from '../icons.jsx';
+import { IconRuler, IconPlan, IconProgress, IconNutrition, IconAlert, IconCheck, IconPlus, IconCopy, IconTrash, IconUsers, IconSnow } from '../icons.jsx';
 import { haptic } from '../telegram.js';
 import { captureScreen, useBackGesture } from '../gestures.jsx';
 import { blockSessions, pickBlock } from '../plan-model.js';
@@ -185,6 +185,18 @@ export function Overview({ clientRow, clientView = false, trainerClient, trainer
           onPause={mode !== 'trainer' && !pause ? () => setPauseSheet('short') : null} />
       )}
       {!online && <PackageCard data={data} mode={mode} onGo={onGo} />}
+      {!pause && mode === 'trainer' && data.program && data.program.paused && (
+        <section className="pause-soon enter" aria-label="Пауза программы">
+          <IconSnow size={20} />
+          <div className="pause-soon__text">
+            <strong>Программа на паузе</strong>
+            <span className="small">пауза стоит в настройках программы</span>
+          </div>
+          {onCardTab && <div className="pause-soon__actions">
+            <button type="button" className="button button--small" onClick={() => { haptic(); onCardTab('plan'); }}>Возобновить</button>
+          </div>}
+        </section>
+      )}
       {!pause && mode === 'trainer' && <TrainerPause pause={null} clientRow={clientRow} name={data.name} online={!!online} onChanged={reload} />}
       {pauseSheet && <PauseSheet startLong={pauseSheet === 'long'} onClose={() => setPauseSheet(null)}
         onSent={() => { setPauseSheet(null); reload(); }} />}
@@ -683,6 +695,26 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
     } catch (error) { setWeeksFailure(error.message || 'Не сохранилось. Повторите сохранение.'); }
     finally { setWeeksBusy(false); }
   };
+  // Снять идущую паузу программы с сегодняшнего дня (кнопка «Возобновить»)
+  const resumeProgram = async () => {
+    const today = dateKey();
+    const pauses = (weeksCfg.pauses || []).flatMap((p) => {
+      if (p.from > today || (p.to && p.to < today)) return [p];
+      return p.from < today ? [{ from: p.from, to: addDays(today, -1) }] : [];
+    });
+    setWeeksBusy(true); setWeeksFailure('');
+    clearTimeout(saveTimer.current);
+    editSeq.current += 1;
+    try {
+      const res = await apiMutate('plan.save', { clientRow, month: data.month, effectiveOn: today,
+        blocks: shownBlocks.map((b) => ({ ...b, exercises: b.exercises.filter((e) => String(e.name || '').trim()).map(planExerciseForSave) })),
+        weeks: { schedule: 1, pauses } });
+      setWeeksLocal({ month: data.month, weeks: res.weeks });
+      setDraft(null);
+      await reload(); haptic('success');
+    } catch (error) { setWeeksFailure(error.message || 'Не получилось возобновить. Повторите.'); }
+    finally { setWeeksBusy(false); }
+  };
   const spreadWeeks = ({ blocks: laid, ...weeks }) => applyProgram({ blocks: laid, weeks, effectiveOn: weeks.startsOn });
   const renameBlock = async (block, title) => {
     commit(shownBlocks.map((b) => (b === block ? { ...b, title } : b)));
@@ -1073,6 +1105,12 @@ export function Plan({ clientRow, clientView = false, familyRow = null }) {
           icon={IconPlan}
           title={week ? week.status === 'scheduled' ? 'Программа скоро начнётся' : week.status === 'paused' ? 'Программа на паузе' : week.status === 'expired' ? 'Программа завершена' : week.status === 'empty' ? 'Неделя отдыха' : 'Все тренировки недели проведены' : 'Все тренировки месяца проведены'}
           text={week ? ['scheduled', 'paused', 'expired', 'empty'].includes(week.status) ? 'Состав программы доступен во вкладке «Вся программа».' : 'Неделя выполнена. Следующая — в полоске недель выше.' : 'Программа пройдена целиком. Выполненные — на соседней вкладке.'}
+          action={week && week.status === 'paused' && week.current && canWeekEdit && weeksCfg && (weeksCfg.pauses || []).some((p) => p.from <= dateKey() && (!p.to || p.to >= dateKey())) ? (
+            <>
+              <button type="button" className="button button--primary" disabled={weeksBusy} onClick={resumeProgram}>{weeksBusy ? 'Возобновляю…' : 'Возобновить программу'}</button>
+              {weeksFailure && <p className="small form__error" role="alert">{weeksFailure}</p>}
+            </>
+          ) : null}
         />
       )}
 
