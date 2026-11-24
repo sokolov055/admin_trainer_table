@@ -1818,7 +1818,8 @@ test('похожие упражнения объединяются в одно',
 
     await phone.getByRole('button', { name: 'Библиотека', exact: true }).click();
     await phone.getByRole('tab', { name: 'Упражнения', exact: true }).click();
-    await phone.getByRole('button', { name: 'Похожие', exact: true }).click();
+    await phone.getByRole('button', { name: 'Фильтры', exact: false }).click();
+    await phone.getByRole('button', { name: /Похожие упражнения/ }).click();
     await phone.getByText('жим лежа со штангой').waitFor({ timeout: 10000 });
     if (process.env.SHOT_SIMILAR) await phone.screenshot({ path: process.env.SHOT_SIMILAR, fullPage: true });
 
@@ -1830,7 +1831,8 @@ test('похожие упражнения объединяются в одно',
     await phone.getByText('Объединено в «Жим лёжа»').waitFor({ timeout: 5000 });
 
     await phone.getByRole('button', { name: 'Назад' }).click();
-    await phone.getByRole('button', { name: 'Похожие', exact: true }).click();
+    await phone.getByRole('button', { name: 'Фильтры', exact: false }).click();
+    await phone.getByRole('button', { name: /Похожие упражнения/ }).click();
     await phone.getByText('Копий не найдено').waitFor({ timeout: 5000 });
   } finally {
     await context.close();
@@ -1996,7 +1998,7 @@ test('шаблон назначается клиенту, общий копир�
 
     // Упражнение: анимация, своя версия общего
     await tab.getByRole('tab', { name: 'Упражнения', exact: true }).click();
-    await visible('.item').filter({ hasText: 'Планка' }).click();
+    await visible('.elib-card').filter({ hasText: 'Планка' }).click();
     const frame = tab.locator('.library__anim img').first();
     await frame.waitFor({ timeout: 5000 });
     assert.ok(await frame.evaluate((img) => img.complete && img.naturalWidth > 0), 'кадр анимации загрузился');
@@ -2010,9 +2012,13 @@ test('шаблон назначается клиенту, общий копир�
 
     // Общее убирается у себя и возвращается
     await tab.getByRole('button', { name: 'Назад' }).click();
-    await tab.getByRole('button', { name: 'Править' }).click();
-    await visible('.library__row').filter({ hasText: 'Бёрпи' }).getByRole('button', { name: /Убрать/ }).click();
-    await tab.getByRole('button', { name: 'Убранные · 1' }).click();
+    const burpee = visible('.elib-swipe').filter({ hasText: 'Бёрпи' });
+    const box = await burpee.boundingBox();
+    await tab.mouse.move(box.x + box.width - 15, box.y + 35); await tab.mouse.down();
+    await tab.mouse.move(box.x + box.width - 155, box.y + 35, { steps: 12 }); await tab.mouse.up();
+    await burpee.getByRole('button', { name: /Убрать/ }).click();
+    await tab.getByRole('button', { name: 'Фильтры', exact: false }).click();
+    await tab.getByRole('button', { name: /Убранные/ }).click();
     await tab.getByRole('button', { name: 'Вернуть', exact: true }).click();
     await assert.doesNotReject(tab.getByText('Все упражнения на месте').waitFor({ timeout: 5000 }), 'упражнение вернулось');
   } finally {

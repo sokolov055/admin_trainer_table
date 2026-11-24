@@ -1,5 +1,7 @@
 import MachineView from './MachineView.jsx';
 import MachineList from './MachineList.jsx';
+import ExerciseList from './ExerciseList.jsx';
+import { NO_EXERCISE_FILTERS } from './exercise-list-model.js';
 import { MuscleFigure, MuscleNames, LABELS } from '../muscles/MuscleMap.jsx';
 import { KIND_LABELS, MACHINE_LABELS, cardioLine, trackOf, planText } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
@@ -1051,17 +1053,11 @@ export function SaveAsTemplate({ clientRow, month, onDone, onCancel }) {
 
 function Exercises() {
   const { loading, data, error, reload } = useData('library.exercises', {}, []);
-  const [q, setQ] = useState('');
-  const [muscle, setMuscle] = useState('');
-  const [loadKind, setLoadKind] = useState('');
-  const [gearKind, setGearKind] = useState('');
+  const [listState, setListState] = useState({ scope: 'public', q: '', search: false, muscle: '', filters: { ...NO_EXERCISE_FILTERS } });
   const [open, setOpen] = useState(null);
   // Переход на карточку замены — «Назад» возвращает к предыдущей карточке
   const [trail, setTrail] = useState([]);
   const [editing, setEditing] = useState(null);
-  const [pruning, setPruning] = useState(false);
-  // Владелец: только упражнения с черновиком «Как настроить» — пройти и проверить
-  const [reviewing, setReviewing] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   const [failure, setFailure] = useState(null);
@@ -1101,7 +1097,7 @@ function Exercises() {
       <NewExercise
         muscles={data.muscles}
         onCancel={() => setEditing(null)}
-        onSaved={(saved) => { setEditing(null); setOpen(saved.id); reload(); }}
+        onSaved={(saved) => { setEditing(null); setOpen(saved.id); setListState((st) => ({ ...st, scope: 'mine' })); reload(); }}
       />
     );
   }
@@ -1122,96 +1118,23 @@ function Exercises() {
     );
   }
 
-  const muscles = [{ value: '', label: 'Все' }, ...data.muscles.map((m) => ({ value: m, label: m })), { value: '—', label: 'Без группы' }];
-  const drafts = data.owner ? all.filter((e) => e.setup && !e.setupOk).length : 0;
-  const shown = all
-    .filter((e) => !loadKind || (loadKind === 'assistance' ? e.track?.weightMode === 'assistance' : e.track?.kind === loadKind && e.track?.weightMode !== 'assistance'))
-    .filter((e) => !gearKind || (gearKind === 'none' ? !e.machines?.length : gearKind === 'any' ? !!e.machines?.length : e.machines?.some((m) => m.kind === gearKind)))
-    .filter((e) => !reviewing || (e.setup && !e.setupOk))
-    .filter((e) => !muscle || (muscle === '—' ? !e.muscle : e.muscle === muscle))
-    .filter((e) => !q || e.name.toLowerCase().replace(/ё/g, 'е').includes(q.toLowerCase().replace(/ё/g, 'е')));
+  const visible = all.filter((e) => !del.hidden(e.id));
 
   return (
     <>
-      <div className="library__bar">
-        <button className="button button--primary" disabled={pruning} onClick={() => setEditing({ new: true })}>
-          Своё упражнение
-        </button>
-        <button className="button" aria-pressed={pruning} onClick={() => { setPruning(!pruning); haptic(); }}>
-          {pruning ? 'Готово' : 'Править'}
-        </button>
-      </div>
-      <Search value={q} onChange={setQ} placeholder="Поиск упражнения" />
-      <Chips className="library__filters" items={muscles} value={muscle} onChange={setMuscle} />
-      {/* Два фильтра в одну строку, подпись — в пустом значении самого
-          списка: с подписями сверху и во всю ширину они занимали до списка
-          ~300 px, и упражнения начинались под сгибом (QA 20.10.2026) */}
-      <div className="library__selects">
-        <select className="field__input" aria-label="Как учитывать нагрузку" value={loadKind} onChange={(e) => setLoadKind(e.target.value)}>
-          <option value="">Нагрузка: все</option>
-          {Object.entries(KIND_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          <option value="assistance">Вес помощи и повторения</option>
-        </select>
-        <select className="field__input" aria-label="Оборудование" value={gearKind} onChange={(e) => setGearKind(e.target.value)}>
-          <option value="">Оборудование: любое</option>
-          <option value="none">Без привязки</option>
-          <option value="any">С привязкой</option>
-          <option value="machine">Тренажёр</option>
-          <option value="equipment">Оборудование</option>
-        </select>
-      </div>
-
-      <div className="library__count">
-        <p>{shown.length} {plural(shown.length, 'упражнение', 'упражнения', 'упражнений')}</p>
-        <div className="library__links">
-          <button className="library__link" onClick={() => { setShowSimilar(true); setPruning(false); }}>
-            Похожие
-          </button>
-          {(drafts > 0 || reviewing) && (
-            <button className="library__link" aria-pressed={reviewing} onClick={() => { setReviewing(!reviewing); haptic(); }}>
-              {reviewing ? 'Все упражнения' : 'На проверке · ' + drafts}
-            </button>
-          )}
-          {data.hiddenCount > 0 && (
-            <button className="library__link" onClick={() => { setShowHidden(true); setPruning(false); }}>
-              Убранные · {data.hiddenCount}
-            </button>
-          )}
-        </div>
-      </div>
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-
-      {shown.filter((e) => !del.hidden(e.id)).slice(0, 200).map((e) => (
-        <Row
-          key={e.id}
-          pruning={pruning}
-          onOpen={() => { setOpen(e.id); haptic(); }}
-          onRemove={() => remove(e)}
-          removeLabel={(e.common ? 'Убрать «' : 'Удалить «') + e.name + '»'}
-          removeText={e.common ? 'Убрать' : 'Удалить'}
-        >
-          <div className="item__top">
-            <span className="item__name">{e.name}</span>
-            {e.mine && <Tag tone="good">своё</Tag>}
-          </div>
-          <div className="item__meta">
-            {[e.muscle, e.equipment].filter(Boolean).length > 0 && <span>{[e.muscle, e.equipment].filter(Boolean).join(' · ')}</span>}
-            {e.media && <Tag>{e.media.kind === 'animation' ? 'анимация' : e.media.kind === 'clip' ? 'ролик 3D' : 'видео'}</Tag>}
-            {e.setup && (e.setupOk ? <Tag>настройка</Tag> : data.owner && <Tag tone="warn">настройка на проверке</Tag>)}
-            {e.machines && e.machines.length > 0 && <Tag>{e.machines.length + ' ' + plural(e.machines.length, 'тренажёр', 'тренажёра', 'тренажёров')}</Tag>}
-          </div>
-        </Row>
-      ))}
-      {shown.length > 200 && <p className="small muted">Показаны первые 200 — уточните поиск.</p>}
-      {/* Пусто из-за фильтров — сказать об этом и дать снять их одним
-          нажатием: до 20.10.2026 список просто обрывался на «0 упражнений» */}
-      {shown.length === 0 && (q || muscle || loadKind || gearKind) && (
-        <Empty
-          title="Ничего не нашлось по фильтрам"
-          text="Попробуйте другое название, мышцу или способ учёта нагрузки."
-          action={<button className="button" onClick={() => { setQ(''); setMuscle(''); setLoadKind(''); setGearKind(''); haptic(); }}>Сбросить фильтры</button>}
-        />
-      )}
+      <ExerciseList
+        list={visible}
+        muscles={data.muscles}
+        hiddenCount={data.hiddenCount}
+        state={listState}
+        setState={setListState}
+        onOpen={(id) => setOpen(id)}
+        onCreate={() => setEditing({ new: true })}
+        onDelete={remove}
+        onSimilar={() => setShowSimilar(true)}
+        onHidden={() => setShowHidden(true)}
+      />
       {del.bar}
     </>
   );
