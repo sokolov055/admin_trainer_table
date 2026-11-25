@@ -2804,6 +2804,10 @@ const MOCK = {
     }
     return card;
   },
+  'library.template.usage': (params) => ({
+    programs: demoTemplates.filter((p) => p.kind === 'program' && (p.blocks || []).some((b) => Number(b.sourceId) === Number(params.id)))
+      .map((p) => ({ id: p.id, title: p.title, copies: 1 })),
+  }),
   'library.template.save': (params) => demoTemplateSave(params),
   'library.template.delete': (params) => {
     demoTemplates = demoTemplates.filter((t) => t.id !== Number(params.id));

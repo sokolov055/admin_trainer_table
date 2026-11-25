@@ -122,7 +122,7 @@ export default function Library({ pane, owner = false, onOpenClient = null }) {
  * Шаблоны
  * ========================================================================== */
 
-function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = null, backText = 'Программы' }) {
+function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = null, onDeletedOut = null, backText = 'Программы' }) {
   const [scope, setScope] = useState('mine');
   const [open, setOpen] = useState(initialOpen); // id шаблона
   const [inProgram, setInProgram] = useState(null); // программа, открытая из тренировки
@@ -170,6 +170,7 @@ function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = nul
   // Из карточки шаблона — обратно на то же место списка
   useReturnScroll(!!(editing || assigning || open));
 
+  // Программа из тренировки — вложенный экран: «назад» и удаление возвращают к тренировке
   if (inProgram) {
     return (
       <Templates
@@ -180,6 +181,7 @@ function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = nul
         initialOpen={inProgram}
         backText="Тренировка"
         onExit={() => { setInProgram(null); list.reload(); }}
+        onDeletedOut={(t) => { setInProgram(null); setOpen(null); remove(t); }}
       />
     );
   }
@@ -232,9 +234,7 @@ function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = nul
         onEdit={(t) => setEditing(t)}
         onAssign={(t) => setAssigning(t)}
         onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
-        onDeleted={(t) => { setOpen(null); remove(t); }}
-        onSavedWorkout={() => list.reload()}
-        onOpenClient={onOpenClient ? (c) => onOpenClient(c, 'plan') : null}
+        onDeleted={(t) => (onDeletedOut ? onDeletedOut(t) : (setOpen(null), remove(t)))}
       />
     );
   }
