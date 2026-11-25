@@ -225,6 +225,15 @@
 .plib-wk__body > div { overflow: hidden; }
 .plib-thumbs { display: flex; padding-left: 8px; }
 .plib-thumbs__i.pc-thumb { width: 28px; height: 28px; margin-left: -8px; border-radius: 8px; border: 2px solid var(--surface); }
+/* Тренировки: лента картинок и «в N программах» в подвале карточки */
+.plib-thumbs--card { padding-left: 0; flex: none; }
+.plib-thumbs--card .plib-thumbs__i.pc-thumb { margin-left: -6px; }
+.plib-thumbs--card .plib-thumbs__i.pc-thumb:first-child { margin-left: 0; }
+.plib-thumbs__more { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 5px; margin-left: -6px; border-radius: 8px; box-sizing: border-box; border: 2px solid var(--surface); background: var(--surface-active); color: var(--text-secondary); font-size: 11px; font-weight: 700; font-style: normal; }
+.plib-wfoot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: 8px; min-height: 28px; }
+.plib-wfoot .plib-author { margin: 0; }
+.plib-tag { flex: none; padding: 3px 8px; border-radius: 999px; background: var(--accent-wash); color: var(--accent-ink, var(--accent)); font-size: var(--text-xs); font-weight: 700; white-space: nowrap; }
+.plib-back { display: flex; align-items: center; gap: 6px; margin-bottom: var(--space-1); padding: 6px 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--accent-ink, var(--accent)); cursor: pointer; }
 
 .plib-exs { list-style: none; margin: 0; padding: 0; }
 .plib-ex { display: flex; align-items: center; gap: 10px; padding: 8px var(--space-3); border-top: 1px solid var(--border); }

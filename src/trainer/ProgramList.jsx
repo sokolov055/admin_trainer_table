@@ -106,7 +106,7 @@ function ProgramCard({ t }) {
  * Лист «Фильтры»
  * -------------------------------------------------------------------------- */
 
-function Tiles({ items, value, onChange, label, cols = 3 }) {
+export function Tiles({ items, value, onChange, label, cols = 3 }) {
   return (
     <div className={'plib-tiles plib-tiles--' + cols} role="radiogroup" aria-label={label}>
       {items.map((it) => (
@@ -237,6 +237,47 @@ function NewSheet({ mineList, onClose, onBlank, onCreated, onPublic }) {
  * Список
  * -------------------------------------------------------------------------- */
 
+/** Шапка списка «Библиотеки»: «Мои · Общие» со счётчиками, поиск значком, «+» */
+export function ListBar({ label, scope, onScope, counts, q, setQ, searching, setSearching, searchPlaceholder, addLabel, onAdd }) {
+  const scopeLabel = (text, n) => <>{text}{typeof n === 'number' && <em className="plib-count">{n}</em>}</>;
+  return (
+    <div className="plib-bar">
+      {searching
+        ? <div className="plib-search"><Search value={q} onChange={setQ} placeholder={searchPlaceholder} /></div>
+        : (
+          <Segmented track label={label} value={scope} onChange={(v) => { haptic(); onScope(v); }}
+            items={[{ value: 'mine', label: scopeLabel('Мои', counts && counts.mine) }, { value: 'public', label: scopeLabel('Общие', counts && counts.public) }]} />
+        )}
+      <button type="button" className="plib-ib" aria-label={searching ? 'Закрыть поиск' : 'Поиск'} aria-pressed={searching}
+        onClick={() => { haptic(); if (searching) setQ(''); setSearching(!searching); }}>
+        {searching ? <IconClose size={20} /> : <IconSearch size={20} />}
+      </button>
+      <button type="button" className="plib-ib plib-ib--add" aria-label={addLabel} onClick={() => { haptic(); onAdd(); }}>
+        <IconPlus size={22} />
+      </button>
+    </div>
+  );
+}
+
+/** Чипы «Фильтры» (с числом включённых) и цели — одна строка над списком */
+export function GoalChips({ active, onFilters, goals, goal, onGoal }) {
+  return (
+    <div className="chips plib-chips" role="toolbar" aria-label="Цель и фильтры">
+      <button type="button" className={'chip plib-chip' + (active ? ' chip--active' : '')} onClick={() => { haptic(); onFilters(); }}>
+        <IconSliders size={16} />Фильтры{active > 0 && <b className="plib-badge">{active}</b>}
+      </button>
+      {goals.length > 1 && <>
+        <button type="button" className={'chip plib-chip' + (!goal ? ' chip--active' : '')} aria-pressed={!goal} onClick={() => { haptic(); onGoal(''); }}>Все</button>
+        {goals.map((g) => (
+          <button key={g} type="button" aria-pressed={goal === g} className={'chip plib-chip' + (goal === g ? ' chip--active' : '')} onClick={() => { haptic(); onGoal(goal === g ? '' : g); }}>
+            <span className={'plib-dot plib-dot--sm plib-goal--' + goalLook(g).key}><GoalIcon goal={g} size={13} /></span>{g}
+          </button>
+        ))}
+      </>}
+    </div>
+  );
+}
+
 export default function ProgramList({ list, scope, onScope, failure, onOpen, onAssign, onRemove, hidden, bar, onBlank, onCreated }) {
   const [q, setQ] = useState('');
   const [searching, setSearching] = useState(false);
@@ -252,39 +293,11 @@ export default function ProgramList({ list, scope, onScope, failure, onOpen, onA
   const active = filterCount(filters);
   const reset = () => { setQ(''); setGoal(''); setFilters(NO_FILTERS); };
 
-  const scopeLabel = (text, n) => <>{text}{typeof n === 'number' && <em className="plib-count">{n}</em>}</>;
-
   return (
     <div className="plib">
-      <div className="plib-bar">
-        {searching
-          ? <div className="plib-search"><Search value={q} onChange={setQ} placeholder="Название или цель" /></div>
-          : (
-            <Segmented track label="Чьи программы" value={scope} onChange={(v) => { haptic(); onScope(v); }}
-              items={[{ value: 'mine', label: scopeLabel('Мои', counts && counts.mine) }, { value: 'public', label: scopeLabel('Общие', counts && counts.public) }]} />
-          )}
-        <button type="button" className="plib-ib" aria-label={searching ? 'Закрыть поиск' : 'Поиск'} aria-pressed={searching}
-          onClick={() => { haptic(); if (searching) setQ(''); setSearching(!searching); }}>
-          {searching ? <IconClose size={20} /> : <IconSearch size={20} />}
-        </button>
-        <button type="button" className="plib-ib plib-ib--add" aria-label="Новая программа" onClick={() => { haptic(); setSheet('new'); }}>
-          <IconPlus size={22} />
-        </button>
-      </div>
-
-      <div className="chips plib-chips" role="toolbar" aria-label="Цель и фильтры">
-        <button type="button" className={'chip plib-chip' + (active ? ' chip--active' : '')} onClick={() => { haptic(); setSheet('filter'); }}>
-          <IconSliders size={16} />Фильтры{active > 0 && <b className="plib-badge">{active}</b>}
-        </button>
-        {goals.length > 1 && <>
-          <button type="button" className={'chip plib-chip' + (!goal ? ' chip--active' : '')} aria-pressed={!goal} onClick={() => { haptic(); setGoal(''); }}>Все</button>
-          {goals.map((g) => (
-            <button key={g} type="button" aria-pressed={goal === g} className={'chip plib-chip' + (goal === g ? ' chip--active' : '')} onClick={() => { haptic(); setGoal(goal === g ? '' : g); }}>
-              <span className={'plib-dot plib-dot--sm plib-goal--' + goalLook(g).key}><GoalIcon goal={g} size={13} /></span>{g}
-            </button>
-          ))}
-        </>}
-      </div>
+      <ListBar label="Чьи программы" scope={scope} onScope={onScope} counts={counts} q={q} setQ={setQ} searching={searching} setSearching={setSearching}
+        searchPlaceholder="Название или цель" addLabel="Новая программа" onAdd={() => setSheet('new')} />
+      <GoalChips active={active} onFilters={() => setSheet('filter')} goals={goals} goal={goal} onGoal={setGoal} />
 
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
       {list.loading && <Loading lead={false} rows={3} />}

@@ -13,6 +13,7 @@ import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
 import PlanEditor from './PlanEditor.jsx';
 import ProgramList from './ProgramList.jsx';
+import WorkoutList from './WorkoutList.jsx';
 import ProgramView from './ProgramView.jsx';
 import ProgramEditor from './ProgramEditor.jsx';
 import ProgramAssign from './ProgramAssign.jsx';
@@ -23,8 +24,7 @@ import {
   Section, Panel, Loading, ErrorState, Empty, Tag, Chips, Search, Segmented, Field, Note, plural,
   BackButton, useLeaveGuard,
 } from '../ui.jsx';
-import { IconPlan, IconSearch, IconAlert, IconCheck, IconTrash } from '../icons.jsx';
-import SwipeRow from '../SwipeRow.jsx';
+import { IconAlert, IconCheck, IconTrash } from '../icons.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachineForm } from './MachinesEditor.jsx';
 import { useSelfCard, selfPick } from './selfCard.js';
@@ -128,12 +128,9 @@ export default function Library({ pane, owner = false, onOpenClient = null }) {
 
 function Templates({ kind, owner, onOpenClient }) {
   const [scope, setScope] = useState('mine');
-  const [q, setQ] = useState('');
-  const [goal, setGoal] = useState('');
   const [open, setOpen] = useState(null);       // id шаблона
   const [editing, setEditing] = useState(null); // шаблон или { new: true }
   const [assigning, setAssigning] = useState(null);
-  const [pruning, setPruning] = useState(false); // режим «Править список»
   const [failure, setFailure] = useState(null);
 
   const list = useData('library.templates', { scope, kind }, [scope, kind]);
@@ -145,6 +142,14 @@ function Templates({ kind, owner, onOpenClient }) {
     onError: setFailure,
   });
   const remove = (t) => { setFailure(null); del.remove(t.id, t, 'Шаблон удалён'); };
+
+  // «К себе» у чужой тренировки: копия появляется в «Мои» (как у программ)
+  const copyToMine = (t) => {
+    setFailure(null);
+    return apiMutate('library.template.copy', { id: t.id })
+      .then(() => { haptic('success'); setScope('mine'); list.reload(); })
+      .catch(setFailure);
+  };
 
   // Правка шаблона с несохранённым: смахнуть от края нельзя, стрелка и
   // системный Back спрашивают «Выйти без сохранения?» — раньше правка
@@ -248,121 +253,25 @@ function Templates({ kind, owner, onOpenClient }) {
     );
   }
 
-  const noun = kind === 'program' ? 'программы' : 'тренировки';
-  const all = list.data ? list.data.templates : [];
-  const shown = all
-    .filter((t) => !goal || t.goal === goal)
-    .filter((t) => !q || (t.title + ' ' + t.goal).toLowerCase().includes(q.toLowerCase()));
-  const goals = list.data ? list.data.goals : [];
-
-  // Один порядок во всех вкладках «Шаблонов»: действия → чьи → поиск →
-  // фильтры → сколько найдено → список. Новый шаблон сохраняется в «Мои»,
-  // поэтому кнопка есть и в «Общих» — ряд не прыгает при переключении.
-  return (
-    <>
-      <div className="library__bar">
-        <button className="button button--primary" disabled={pruning} onClick={() => setEditing({ new: true })}>
-          {kind === 'program' ? 'Новый шаблон программы' : 'Новый шаблон тренировки'}
-        </button>
-        {scope === 'mine' && all.length > 0 && (
-          <button className="button" aria-pressed={pruning} onClick={() => { setPruning(!pruning); haptic(); }}>
-            {pruning ? 'Готово' : 'Править'}
-          </button>
-        )}
-      </div>
-      <Segmented items={SCOPES} value={scope} onChange={(v) => { setScope(v); setPruning(false); haptic(); }} label="Чьи шаблоны" track />
-      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-
-      <Search value={q} onChange={setQ} placeholder="Поиск по названию и цели" />
-      {goals.length > 1 && (
-        <Chips className="library__filters" items={[{ value: '', label: 'Все цели' }, ...goals.map((g) => ({ value: g, label: g }))]} value={goal} onChange={setGoal} />
-      )}
-      {!list.loading && !list.error && shown.length > 0 && (
-        <div className="library__count">
-          <p>{shown.length} {plural(shown.length, 'шаблон', 'шаблона', 'шаблонов')}</p>
-        </div>
-      )}
-
-      {list.loading && <Loading lead={false} rows={3} />}
-      {list.error && <ErrorState error={list.error} onRetry={list.reload} />}
-
-      {/* Поиск или фильтр без совпадений — не «шаблонов пока нет»: они
-          есть, просто не под этот запрос (аудит 24.10.2026) */}
-      {!list.loading && !list.error && shown.length === 0 && all.length > 0 && (
-        <Empty
-          icon={IconSearch}
-          title="Ничего не нашлось"
-          text={q ? 'По запросу «' + q + '»' + (goal ? ' с целью «' + goal + '»' : '') + ' шаблонов нет.' : 'С целью «' + goal + '» шаблонов нет.'}
-          action={<button type="button" className="button" onClick={() => { setQ(''); setGoal(''); }}>Сбросить</button>}
-        />
-      )}
-      {!list.loading && !list.error && all.length === 0 && (
-        <Empty
-          icon={scope === 'mine' ? IconPlan : IconSearch}
-          title={scope === 'mine' ? `Своих шаблонов ${noun} пока нет` : 'Общих шаблонов пока нет'}
-          text={scope === 'mine'
-            ? 'Создайте шаблон здесь или сохраните программу клиента как шаблон — из его карточки, в разделе «Тренировки».'
-            : 'Здесь появятся шаблоны, которыми поделились другие тренеры.'}
-        />
-      )}
-
-      {shown.filter((t) => !del.hidden(t.id)).map((t) => (
-        <Row
-          key={t.id}
-          pruning={pruning && t.mine}
-          canRemove={t.mine}
-          onOpen={() => { setOpen(t.id); haptic(); }}
-          onRemove={() => remove(t)}
-          removeLabel={`Удалить «${t.title}»`}
-        >
-          <div className="item__top">
-            <span className="item__name">{t.title}</span>
-            {t.goal && <Tag>{t.goal}</Tag>}
-          </div>
-          <div className="item__meta">
-            <span>
-              {[
-                kind === 'program' && t.workouts + ' ' + plural(t.workouts, 'тренировка', 'тренировки', 'тренировок'),
-                t.exercises + ' ' + plural(t.exercises, 'упражнение', 'упражнения', 'упражнений'),
-                t.level,
-                kind === 'program' && cardLine(t),
-                !t.mine && 'автор: ' + t.author,
-              ].filter(Boolean).join(' · ')}
-            </span>
-            {t.mine && t.forClients && <Tag tone="good">клиентам</Tag>}
-            {t.mine && t.isPublic && <Tag tone="good">поделились</Tag>}
-          </div>
-        </Row>
-      ))}
-      {del.bar}
-    </>
-  );
-}
-
-/**
- * Строка списка. Своё смахивается влево — удалить, как в списках iPhone.
- * В режиме правки строка не открывается, а показывает кнопку удаления:
- * так удаляют сразу несколько, не заходя в каждое.
- */
-function Row({ pruning, canRemove = true, onOpen, onRemove, removeLabel, removeText = 'Удалить', children }) {
-  if (!pruning) {
-    const item = <button className="item" onClick={onOpen}>{children}</button>;
-    if (!canRemove || !onRemove) return item;
+  if (kind === 'workout') {
     return (
-      <SwipeRow className="item-swipe" label={removeLabel} actionText={removeText} onDelete={onRemove}>
-        {item}
-      </SwipeRow>
+      <WorkoutList
+        list={list}
+        scope={scope}
+        onScope={setScope}
+        failure={failure}
+        onOpen={(t) => setOpen(t.id)}
+        onAssign={(t) => setAssigning(t)}
+        onCopy={copyToMine}
+        onRemove={remove}
+        hidden={del.hidden}
+        bar={del.bar}
+        onBlank={() => setEditing({ new: true })}
+        onCreated={(t) => { setScope('mine'); list.reload(); setOpen(t.id); }}
+      />
     );
   }
-  return (
-    <div className="item library__row">
-      <div className="library__row-body">{children}</div>
-      <button className="button button--ghost danger library__remove" aria-label={removeLabel} onClick={onRemove}>
-        <IconTrash size={16} />
-        {removeText}
-      </button>
-    </div>
-  );
+
 }
 
 // Тот же «назад», что у остальных экранов (ui.jsx, 17 px): 14-й кегль

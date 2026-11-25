@@ -1337,6 +1337,8 @@ function demoTemplateCard(t, withBlocks) {
     ? Array.from({ length }, (_, w) => sessions(t.blocks.filter((b) => (Number(b.week) || 1) === w + 1)))
     : [t.blocks.length];
   const card = { ...t, workouts: t.blocks.length, exercises, weekSessions, ...(t.mine && t.kind === 'program' ? { clients: DEMO_TEMPLATE_USERS[t.id] || [] } : {}) };
+  // Тренировка в списке (25.11.2026): первые упражнения без картинок — значок группы мышц
+  if (t.kind === 'workout') card.thumbs = t.blocks.flatMap((b) => b.exercises).slice(0, 4).map((e) => ({ id: 0, name: e.name, shortName: e.name, media: null, muscles: null, machines: [] }));
   if (!withBlocks) delete card.blocks;
   return card;
 }

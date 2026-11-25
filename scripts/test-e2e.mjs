@@ -1898,7 +1898,9 @@ test('новый шаблон тренировки — без уровня, у �
     await tab.getByRole('button', { name: 'Библиотека', exact: true }).click();
 
     await tab.getByRole('tab', { name: 'Тренировки', exact: true }).click();
-    await tab.getByRole('button', { name: 'Новый шаблон тренировки' }).click();
+    // Список тренировок (25.11.2026): «+» — лист «Новая тренировка» → «Пустая»
+    await tab.getByRole('button', { name: 'Новая тренировка' }).click();
+    await tab.getByRole('button', { name: /Пустая/ }).click();
     await tab.getByRole('heading', { name: 'Упражнения' }).waitFor({ timeout: 5000 });
     assert.equal(await level(), 0, 'у шаблона тренировки уровня нет');
     assert.equal(await tab.getByPlaceholder('На что обратить внимание в этой тренировке').count(), 1, 'подсказка про тренировку');
@@ -1984,17 +1986,15 @@ test('шаблон назначается клиенту, общий копир�
     await tab.getByRole('button', { name: 'Программы' }).click();
     await tab.getByRole('tab', { name: 'Тренировки', exact: true }).click();
     await assert.doesNotReject(
-      visible('.item').filter({ hasText: 'Тренировка 1 — верх' }).first().waitFor({ timeout: 5000 }),
+      visible('.plib-card').filter({ hasText: 'Тренировка 1 — верх' }).first().waitFor({ timeout: 5000 }),
       'тренировка из программы появилась в «Тренировках»',
     );
 
-    // Удаление из списка: режим «Править»
-    await visible('.item').first().waitFor();
-    const before = await visible('.item').count();
-    await tab.getByRole('button', { name: 'Править' }).click();
-    await visible('.library__remove').first().click();
-    await tab.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .item').length === n - 1, before, { timeout: 5000 });
-    await tab.getByRole('button', { name: 'Готово' }).click();
+    // Удаление из списка: смахнуть карточку — «Удалить» (как у программ)
+    await visible('.plib-card').first().waitFor();
+    const before = await visible('.plib-card').count();
+    await visible('.swipe__trash').first().evaluate((el) => el.click());
+    await tab.waitForFunction((n) => document.querySelectorAll('#root main:not([hidden]) .plib-card').length === n - 1, before, { timeout: 5000 });
 
     // Упражнение: анимация, своя версия общего
     await tab.getByRole('tab', { name: 'Упражнения', exact: true }).click();

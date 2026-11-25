@@ -35,11 +35,12 @@ export default function SwipeRow({
     vanish(el, () => { onDelete(); sw.reset(); }, removeWith ? removeWith(el) : []).then(() => { firing.current = false; });
   };
   // Полное смахивание — то же, что кнопка
-  const sw = useSwipe({ disabled, onFull: () => fire(), ...(extra ? { width: 176 } : {}) });
+  // Без onDelete корзины нет — только extra (тренировки «Общие»: «К себе»)
+  const sw = useSwipe({ disabled, onFull: onDelete ? () => fire() : null, ...(extra ? { width: onDelete ? 176 : 88 } : {}) });
   return (
     <div className={'swipe ' + className} ref={root} {...(disabled ? {} : sw.bind)} {...rest}>
       {!disabled && (
-        <div className={'swipe__action' + (extra ? ' swipe__action--two' : '')} ref={sw.action} style={{ visibility: 'hidden' }}>
+        <div className={'swipe__action' + (extra && onDelete ? ' swipe__action--two' : '')} ref={sw.action} style={{ visibility: 'hidden' }}>
           {extra && (
             <button
               type="button"
@@ -54,7 +55,7 @@ export default function SwipeRow({
               </span>
             </button>
           )}
-          <button
+          {onDelete && <button
             type="button"
             className="swipe__trash"
             aria-label={label}
@@ -69,7 +70,7 @@ export default function SwipeRow({
               <IconTrash size={20} />
               <span>{actionText}</span>
             </span>
-          </button>
+          </button>}
         </div>
       )}
       <div className={'swipe__content' + (contentClassName ? ' ' + contentClassName : '')} ref={sw.content}>{children}</div>
