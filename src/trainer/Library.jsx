@@ -17,6 +17,7 @@ import WorkoutView from './WorkoutView.jsx';
 import ProgramEditor from './ProgramEditor.jsx';
 import WorkoutEditor from './WorkoutEditor.jsx';
 import ProgramAssign from './ProgramAssign.jsx';
+import WorkoutAssign from './WorkoutAssign.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
 import { monthName, uploadMachinePhoto } from '../library.js';
@@ -27,7 +28,6 @@ import {
 import { IconAlert, IconCheck, IconTrash } from '../icons.jsx';
 import { usePendingDelete } from '../pendingDelete.jsx';
 import { MachineForm } from './MachinesEditor.jsx';
-import { useSelfCard, selfPick } from './selfCard.js';
 import { programLength, monthWeeks, parseMonth, monthLabelOf, defaultHow, assignPreview, workoutsOf } from '../plan-weeks.js';
 import { dateKey, nextMonday, scheduledPlan, WEEKDAY_SHORT, sessionQueue } from '../program-timeline.js';
 import { WeekPreview, ProgramDates, DayPicker, FirstWeekPicker, firstWeekDefault, weekdayOf, RhythmPicker, sessionRows } from '../client/PlanWeeks.jsx';
@@ -203,14 +203,14 @@ function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = nul
   }
 
   // Программа — новым «Назначить клиенту» (этап 4 макета, 17.11.2026, ProgramAssign.jsx);
-  // шаблон одной тренировки — прежним AssignToClient
+  // тренировка — своим экраном (этап 4 «Тренировок», 25.11.2026, WorkoutAssign.jsx)
   if (assigning && kind === 'program') {
     return <ProgramAssign template={assigning} owner={owner} backText={open ? 'К программе' : 'Программы'} onBack={() => setAssigning(null)}
       onOpenClient={onOpenClient ? (c) => onOpenClient(c, 'plan') : null} />;
   }
 
   if (assigning) {
-    return <AssignToClient template={assigning} owner={owner} backText={open ? (kind === 'program' ? 'К программе' : 'К шаблону') : 'Программы'} onDone={() => setAssigning(null)} onCancel={() => setAssigning(null)} />;
+    return <WorkoutAssign template={assigning} owner={owner} backText={open ? 'К тренировке' : 'Тренировки'} onBack={() => setAssigning(null)} />;
   }
 
   // Программа — новым экраном (этап 2 макета, 17.11.2026, ProgramView.jsx)
@@ -550,58 +550,6 @@ const RULE_WORD = { client: `решает клиент`, redo: 'доделыва
 function nextMonthLabel(label) {
   const p = parseMonth(label);
   return p ? monthLabelOf(p.year, p.month + 1) : '';
-}
-
-function AssignToClient({ template, owner, onDone, onCancel, backText = 'К шаблону' }) {
-  const clients = useData('trainer.clients', {}, []);
-  // Себя («Мои тренировки») — первым, как в журнале: в trainer.clients
-  // карточки тренера нет, и шаблон себе было не назначить
-  const self = useSelfCard(owner);
-  const [q, setQ] = useState('');
-  const [client, setClient] = useState(null);
-  const [done, setDone] = useState(null);
-
-  if (done) {
-    return (
-      <>
-        <Back onClick={onDone}>{backText}</Back>
-        <Empty
-          icon={IconCheck}
-          title="Назначено"
-          text={self.card && done.client.row === self.card.clientRow
-            ? `«${template.title}» — в ваших тренировках, ${done.month}. Поправить можно в разделе «Мои тренировки» бокового меню.`
-            : `«${template.title}» — в программе ${done.client.name}, ${done.month}. Поправить под человека можно в его карточке, в разделе «Тренировки».`}
-        />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <Back onClick={client ? () => setClient(null) : onCancel}>{client ? 'Другой клиент' : backText}</Back>
-      <Section title={client ? client.name : 'Кому назначить'} note={`«${template.title}»`}>
-        {client ? (
-          <Panel pad>
-            <AssignForm template={template} clientRow={client.row} clientName={client.name.split(' ')[0]} onDone={(month) => setDone({ client, month })} />
-          </Panel>
-        ) : (
-          <>
-            <Search value={q} onChange={setQ} placeholder="Поиск клиента" />
-            {clients.loading && <Loading lead={false} rows={4} />}
-            {clients.error && <ErrorState error={clients.error} onRetry={clients.reload} />}
-            {clients.data && [...(selfPick(self.card) ? [selfPick(self.card)] : []), ...clients.data.clients]
-              .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
-              .map((c) => (
-                <button className="item" key={c.row} onClick={() => { setClient(c); haptic(); }}>
-                  <div className="item__top"><span className="item__name">{c.name}</span></div>
-                  {c.note && <span className="item__meta">{c.note}</span>}
-                </button>
-              ))}
-          </>
-        )}
-      </Section>
-    </>
-  );
 }
 
 /**
