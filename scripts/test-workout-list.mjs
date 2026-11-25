@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shownWorkouts, workoutFilterCount, WORKOUT_NO_FILTERS } from '../src/trainer/workout-list-model.js';
+import { shownWorkouts, scopeFilters, workoutFilterCount, WORKOUT_NO_FILTERS } from '../src/trainer/workout-list-model.js';
 
 const list = [
   { id: 1, title: 'Ноги', goal: 'Тонус', uses: 2, isPublic: false, inPrograms: [{ id: 9, title: 'Программа' }] },
@@ -25,4 +25,12 @@ test('поиск и цель сужают список, без совпаден�
 test('порядок: чаще назначаю — по числу использований', () => {
   const sorted = shownWorkouts(list, { filters: { ...WORKOUT_NO_FILTERS, sort: 'uses' } });
   assert.deepEqual(ids(sorted), [2, 1, 3]);
+});
+
+test('«В программах» не отсекает общие: на вкладке «Общие» фильтр не применяется', () => {
+  const inprog = { ...WORKOUT_NO_FILTERS, show: 'inprog' };
+  const shared = [{ id: 7, title: 'Чужая', goal: '', uses: 0, isPublic: true }];
+  assert.deepEqual(scopeFilters(inprog, 'public').show, '');
+  assert.deepEqual(ids(shownWorkouts(shared, { filters: scopeFilters(inprog, 'public') })), [7]);
+  assert.equal(scopeFilters(inprog, 'mine').show, 'inprog', 'на «Моих» фильтр остаётся');
 });

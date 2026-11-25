@@ -27,3 +27,8 @@ export function shownWorkouts(list, { q = '', goal = '', filters = WORKOUT_NO_FI
   const found = (list || []).filter((t) => matchesWorkout(t, { q, goal, show: filters.show }));
   return sorted(found, filters.sort);
 }
+
+/** «В программах» — только для своих: на «Общих» сервер состава программ не отдаёт, фильтр не применяется */
+export function scopeFilters(filters, scope) {
+  return scope === 'public' && filters.show === 'inprog' ? { ...filters, show: '' } : filters;
+}

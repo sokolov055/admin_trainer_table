@@ -8,7 +8,7 @@ import SwipeRow from '../SwipeRow.jsx';
 import { ExerciseThumb } from '../client/PlanCard.jsx';
 import { PLACES } from '../client/programs-model.js';
 import { goalLook } from './program-list-model.js';
-import { shownWorkouts, workoutFilterCount, WORKOUT_NO_FILTERS } from './workout-list-model.js';
+import { shownWorkouts, scopeFilters, workoutFilterCount, WORKOUT_NO_FILTERS } from './workout-list-model.js';
 import { GoalIcon, GoalChips, ListBar, Tiles } from './ProgramList.jsx';
 import './programs-lib.css';
 
@@ -78,14 +78,15 @@ const SORT_ITEMS = [
   { value: 'az', label: 'По алфавиту' },
 ];
 
-function FilterSheet({ filters, onChange, onClose, count }) {
+function FilterSheet({ scope, filters, onChange, onClose, count }) {
   const [f, setF] = useState(filters);
   const set = (patch) => { const next = { ...f, ...patch }; setF(next); onChange(next); };
+  const showItems = scope === 'public' ? SHOW_ITEMS.filter((i) => i.value !== 'inprog') : SHOW_ITEMS;
   return (
     <Sheet title="Фильтры" onClose={onClose} action={workoutFilterCount(f) ? <button type="button" className="button button--ghost" onClick={() => { haptic(); set({ ...WORKOUT_NO_FILTERS, sort: f.sort }); }}>Сбросить</button> : null}>
       <div className="plib-filter">
         <h4>Показать</h4>
-        <Tiles label="Показать" value={f.show} onChange={(v) => set({ show: v })} items={SHOW_ITEMS} />
+        <Tiles label="Показать" value={f.show} onChange={(v) => set({ show: v })} items={showItems} />
         <h4>Порядок</h4>
         <Tiles label="Порядок" value={f.sort} onChange={(v) => set({ sort: v || 'recent' })} items={SORT_ITEMS} />
         <button type="button" className="button button--primary button--block plib-filter__go" onClick={onClose}>
@@ -230,8 +231,9 @@ export default function WorkoutList({ list, scope, onScope, failure, onOpen, onA
   const all = list.data ? list.data.templates : [];
   const counts = list.data && list.data.counts;
   const goals = list.data ? list.data.goals : [];
-  const shown = shownWorkouts(all, { q, goal, filters }).filter((t) => !hidden(t.id));
-  const active = workoutFilterCount(filters);
+  const applied = scopeFilters(filters, scope);
+  const shown = shownWorkouts(all, { q, goal, filters: applied }).filter((t) => !hidden(t.id));
+  const active = workoutFilterCount(applied);
   const reset = () => { setQ(''); setGoal(''); setFilters(WORKOUT_NO_FILTERS); };
 
   return (
@@ -278,7 +280,7 @@ export default function WorkoutList({ list, scope, onScope, failure, onOpen, onA
       })}
       {bar}
 
-      {sheet === 'filter' && <FilterSheet filters={filters} onChange={setFilters} onClose={() => setSheet(null)} count={shownWorkouts(all, { q, goal, filters }).length} />}
+      {sheet === 'filter' && <FilterSheet scope={scope} filters={filters} onChange={setFilters} onClose={() => setSheet(null)} count={shownWorkouts(all, { q, goal, filters: applied }).length} />}
       {sheet === 'new' && (
         <NewSheet
           onClose={() => setSheet(null)}

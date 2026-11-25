@@ -6,7 +6,7 @@ import ExerciseEditor from './ExerciseEditor.jsx';
 import { NO_EXERCISE_FILTERS } from './exercise-list-model.js';
 import { cardioLine, trackOf, planText } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useData } from '../useData.js';
 import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
@@ -144,11 +144,16 @@ function Templates({ kind, owner, onOpenClient }) {
   const remove = (t) => { setFailure(null); del.remove(t.id, t, 'Шаблон удалён'); };
 
   // «К себе» у чужой тренировки: копия появляется в «Мои» (как у программ)
+  const copying = useRef(false);
+  // Двойной тап по «К себе» до ответа сервера — одна копия, не две
   const copyToMine = (t) => {
+    if (copying.current) return undefined;
+    copying.current = true;
     setFailure(null);
     return apiMutate('library.template.copy', { id: t.id })
       .then(() => { haptic('success'); setScope('mine'); list.reload(); })
-      .catch(setFailure);
+      .catch(setFailure)
+      .finally(() => { copying.current = false; });
   };
 
   // Правка шаблона с несохранённым: смахнуть от края нельзя, стрелка и
