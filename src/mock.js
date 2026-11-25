@@ -2797,6 +2797,11 @@ const MOCK = {
       const base = byName(e.name);
       return { ...e, ...demoMuscles(e.name), ...(base ? { exercise: { id: base.id, shortName: base.shortName || '', media: base.media || null, machines: base.machines || [] } } : {}) };
     }) }));
+    // Как на сервере: программы, где стоит копия тренировки
+    if (card.kind === 'workout') {
+      card.inPrograms = demoTemplates.filter((p) => p.kind === 'program' && (p.blocks || []).some((b) => Number(b.sourceId) === card.id))
+        .map((p) => ({ id: p.id, title: p.title, goal: p.goal || '' }));
+    }
     return card;
   },
   'library.template.save': (params) => demoTemplateSave(params),

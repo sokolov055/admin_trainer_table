@@ -4,7 +4,6 @@ import ExerciseList from './ExerciseList.jsx';
 import ExerciseCardView from './ExerciseCardView.jsx';
 import ExerciseEditor from './ExerciseEditor.jsx';
 import { NO_EXERCISE_FILTERS } from './exercise-list-model.js';
-import { cardioLine, trackOf, planText } from '../exercise-track.js';
 import { useReturnScroll } from '../scroll.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { useData } from '../useData.js';
@@ -15,6 +14,7 @@ import PlanEditor from './PlanEditor.jsx';
 import ProgramList from './ProgramList.jsx';
 import WorkoutList from './WorkoutList.jsx';
 import ProgramView from './ProgramView.jsx';
+import WorkoutView from './WorkoutView.jsx';
 import ProgramEditor from './ProgramEditor.jsx';
 import ProgramAssign from './ProgramAssign.jsx';
 import Dishes from './Dishes.jsx';
@@ -31,7 +31,7 @@ import { useSelfCard, selfPick } from './selfCard.js';
 import { programLength, monthWeeks, parseMonth, monthLabelOf, defaultHow, assignPreview, workoutsOf } from '../plan-weeks.js';
 import { dateKey, nextMonday, scheduledPlan, WEEKDAY_SHORT, sessionQueue } from '../program-timeline.js';
 import { WeekPreview, ProgramDates, DayPicker, FirstWeekPicker, firstWeekDefault, weekdayOf, RhythmPicker, sessionRows } from '../client/PlanWeeks.jsx';
-import { TEMPLATE_GOALS, PLACES, minutesText, timesText } from '../client/programs-model.js';
+import { TEMPLATE_GOALS, PLACES } from '../client/programs-model.js';
 
 /**
  * Библиотека тренера: шаблоны программ и тренировок, упражнения.
@@ -111,10 +111,6 @@ const PLACE_ITEMS = [{ value: '', label: 'Не указано' }, ...Object.entr
 const DAY_ITEMS = [{ value: '', label: '—' }, ...[1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) }))];
 
 /** «зал · 3 раза в неделю · ≈ 45 мин» — строкой в списке и в карточке шаблона */
-function cardLine(t) {
-  return [PLACES[t.place] && PLACES[t.place].toLowerCase(), t.days && timesText(t), minutesText(t)].filter(Boolean).join(' · ');
-}
-
 export default function Library({ pane, owner = false, onOpenClient = null }) {
   if (pane === 'foods') return owner ? <FoodCatalog /> : <Note>Общий справочник проверяет владелец сервиса.</Note>;
   if (pane === 'dishes') return <Dishes />;
@@ -126,9 +122,10 @@ export default function Library({ pane, owner = false, onOpenClient = null }) {
  * Шаблоны
  * ========================================================================== */
 
-function Templates({ kind, owner, onOpenClient }) {
+function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = null, backText = 'Программы' }) {
   const [scope, setScope] = useState('mine');
-  const [open, setOpen] = useState(null);       // id шаблона
+  const [open, setOpen] = useState(initialOpen); // id шаблона
+  const [inProgram, setInProgram] = useState(null); // программа, открытая из тренировки
   const [editing, setEditing] = useState(null); // шаблон или { new: true }
   const [assigning, setAssigning] = useState(null);
   const [failure, setFailure] = useState(null);
@@ -163,12 +160,29 @@ function Templates({ kind, owner, onOpenClient }) {
   const closeEditor = () => { setEditing(null); setEditorDirty(false); };
   const editorGuard = useLeaveGuard(editorDirty, closeEditor);
 
-  // Вложенные экраны закрываются смахиванием вправо, как всё остальное
+  // Вложенные экраны закрываются смахиванием вправо, как всё остальное.
+  // Программа, открытая из тренировки, — отдельный Templates: её правка и
+  // назначение живут там же, что и в «Программах»
+  const closeOpen = () => (onExit ? onExit() : setOpen(null));
   useBackGesture(editorGuard.leave, !!editing, null, { swipe: !editorDirty });
   useBackGesture(() => setAssigning(null), !editing && !!assigning);
-  useBackGesture(() => setOpen(null), !editing && !assigning && !!open);
+  useBackGesture(closeOpen, !editing && !assigning && !!open && !inProgram);
   // Из карточки шаблона — обратно на то же место списка
   useReturnScroll(!!(editing || assigning || open));
+
+  if (inProgram) {
+    return (
+      <Templates
+        key={inProgram}
+        kind="program"
+        owner={owner}
+        onOpenClient={onOpenClient}
+        initialOpen={inProgram}
+        backText="Тренировка"
+        onExit={() => { setInProgram(null); list.reload(); }}
+      />
+    );
+  }
 
   // Программа — новым редактором (этап 3 макета, 17.11.2026, ProgramEditor.jsx);
   // шаблон одной тренировки — прежним TemplateEditor
@@ -213,7 +227,8 @@ function Templates({ kind, owner, onOpenClient }) {
     return (
       <ProgramView
         id={open}
-        onBack={() => setOpen(null)}
+        backText={backText}
+        onBack={closeOpen}
         onEdit={(t) => setEditing(t)}
         onAssign={(t) => setAssigning(t)}
         onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
@@ -224,16 +239,17 @@ function Templates({ kind, owner, onOpenClient }) {
     );
   }
 
+  // Тренировка — экран этапа 2 макета (25.11.2026, WorkoutView.jsx)
   if (open) {
     return (
-      <TemplateView
+      <WorkoutView
         id={open}
-        onBack={() => setOpen(null)}
+        onBack={closeOpen}
         onEdit={(t) => setEditing(t)}
         onAssign={(t) => setAssigning(t)}
         onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
         onDeleted={(t) => { setOpen(null); remove(t); }}
-        onSavedWorkout={() => list.reload()}
+        onOpenProgram={(p) => setInProgram(p.id)}
       />
     );
   }
@@ -283,115 +299,6 @@ function Templates({ kind, owner, onOpenClient }) {
 // здесь выглядел сноской рядом с заголовком (аудит 24.10.2026)
 function Back({ onClick, children = 'Назад' }) {
   return <BackButton label={children} onClick={onClick} />;
-}
-
-/** Упражнение одной строкой: «Жим гантелей лёжа — 3×12, 20 кг» */
-function exerciseLine(e) {
-  // Кардио — целями, режимом и интервалами, а не «подходы × повторы»
-  if (e.cardio) return `${e.name} — ${cardioLine(e.cardio, trackOf(e))}`;
-  const volume = [e.sets, planText(e.reps)].filter(Boolean).join('×');
-  const w = planText(e.weight);
-  const extra = [volume, w && w + (/\d$/.test(w) ? ' кг' : '')].filter(Boolean).join(', ');
-  return extra ? `${e.name} — ${extra}` : e.name;
-}
-
-function BlocksPreview({ blocks, action }) {
-  return blocks.map((b, i) => (
-    <Section key={i} title={b.title} action={action ? action(b, i) : null}>
-      <Panel pad>
-        <ol className="library__exercises">
-          {b.exercises.map((e, j) => (
-            <li key={j} className={e.supersetGroup ? 'library__superset' : undefined}>{exerciseLine(e)}</li>
-          ))}
-        </ol>
-      </Panel>
-    </Section>
-  ));
-}
-
-function TemplateView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSavedWorkout }) {
-  const { loading, data, error, reload } = useData('library.template.get', { id }, [id]);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState(null);
-  const [savedBlocks, setSavedBlocks] = useState({}); // номер тренировки → сохранена
-
-  if (loading) return <><Back onClick={onBack} /><Loading rows={3} /></>;
-  if (error) return <><Back onClick={onBack} /><ErrorState error={error} onRetry={reload} /></>;
-
-  const t = data;
-
-  const act = async (fn) => {
-    setBusy(true);
-    setFailure(null);
-    try { await fn(); } catch (err) { setFailure(err); } finally { setBusy(false); }
-  };
-
-  return (
-    <>
-      <Back onClick={onBack} />
-
-      <Panel pad>
-        <h2 className="library__title">{t.title}</h2>
-        <div className="item__meta library__meta">
-          {t.goal && <Tag>{t.goal}</Tag>}
-          <span>{[t.level, t.kind === 'program' && cardLine(t), t.mine ? (t.isPublic ? 'ваш · в общем доступе' : 'ваш') : 'автор: ' + t.author].filter(Boolean).join(' · ')}</span>
-          {t.mine && t.forClients && <Tag tone="good">видят ваши клиенты</Tag>}
-        </div>
-        {t.description && <p className="small" style={{ marginTop: 0 }}>{t.description}</p>}
-
-        <div className="library__actions">
-          <button className="button button--primary" disabled={busy} onClick={() => onAssign(t)}>
-            Назначить клиенту
-          </button>
-          {t.mine && <button className="button" disabled={busy} onClick={() => onEdit(t)}>Изменить</button>}
-          {!t.mine && (
-            <button className="button" disabled={busy} onClick={() => act(async () => {
-              const copy = await apiMutate('library.template.copy', { id: t.id });
-              haptic('success');
-              onCopied(copy);
-            })}>Скопировать к себе</button>
-          )}
-          {/* Как из списка: удаляется сразу, в списке — «Шаблон удалён ·
-              Вернуть», без системного окна window.confirm (аудит 24.10.2026) */}
-          {t.mine && (
-            <button className="button button--ghost danger" disabled={busy} onClick={() => onDeleted(t)}>Удалить</button>
-          )}
-        </div>
-        {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
-      </Panel>
-
-      {t.kind === 'program' && (
-        <p className="small muted library__hint">
-          Любую тренировку программы можно сохранить отдельным шаблоном — она появится в разделе «Тренировки».
-        </p>
-      )}
-
-      <BlocksPreview
-        blocks={t.blocks}
-        action={t.kind === 'program' ? (block, i) => (
-          savedBlocks[i]
-            ? <span className="library__saved"><IconCheck size={14} />В «Тренировках»</span>
-            : (
-              <button className="button button--ghost library__save-block" disabled={busy} onClick={() => act(async () => {
-                // Своя копия тренировки: из чужого общего шаблона тоже —
-                // править её можно будет только так
-                await apiMutate('library.template.save', {
-                  kind: 'workout',
-                  title: block.title || t.title,
-                  goal: t.goal || '',
-                  level: t.level || '',
-                  description: 'Из программы «' + t.title + '»',
-                  blocks: [block],
-                });
-                haptic('success');
-                setSavedBlocks((s) => ({ ...s, [i]: true }));
-                if (onSavedWorkout) onSavedWorkout();
-              })}>В «Тренировки»</button>
-            )
-        ) : null}
-      />
-    </>
-  );
 }
 
 function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onDirty }) {

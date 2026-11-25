@@ -26,7 +26,7 @@ import './programs-lib.css';
  * свёрнуты — картинки упражнений, раскрыть — схема плашками. Внизу
  * закреплено «Назначить клиенту», ✎ и «⋯».
  *
- * Шаблон тренировки (не программы) — прежним видом, TemplateView в Library.jsx.
+ * Тренировка (не программа) — свой экран, WorkoutView.jsx.
  */
 
 function Avatar({ name, big = false }) {
@@ -60,11 +60,11 @@ function Hero({ t }) {
   );
 }
 
-function Toggle({ on, icon, children, onChange, disabled }) {
+export function Toggle({ on, icon, children, hint, onChange, disabled }) {
   return (
     <button type="button" role="switch" aria-checked={on} disabled={disabled}
-      className={'plib-tog' + (on ? ' is-on' : '')} onClick={() => { haptic(); onChange(!on); }}>
-      {icon}<span>{children}</span><span className="plib-tog__sw" aria-hidden="true" />
+      className={'plib-tog' + (hint ? ' plib-tog--wide' : '') + (on ? ' is-on' : '')} onClick={() => { haptic(); onChange(!on); }}>
+      {icon}<span>{children}{hint && <small>{hint}</small>}</span><span className="plib-tog__sw" aria-hidden="true" />
     </button>
   );
 }
@@ -95,13 +95,13 @@ function ClientsSheet({ clients, onClose, onOpenClient }) {
   );
 }
 
-function Muscles({ blocks }) {
+export function Muscles({ blocks, caption = 'вся программа' }) {
   const { tally, bars, gaps } = muscleLoad(blocks);
   if (!bars.length) return null;
   const { primary, secondary } = splitTally(tally);
   return (
     <section className="plib-box" aria-label="Нагрузка на мышцы">
-      <div className="plib-box__head">Нагрузка на мышцы<span>вся программа</span></div>
+      <div className="plib-box__head">Нагрузка на мышцы{caption && <span>{caption}</span>}</div>
       <div className="plib-mus">
         <MuscleFigure primary={primary} secondary={secondary} size="sm" />
         <div className="plib-bars">
@@ -118,7 +118,7 @@ function Muscles({ blocks }) {
   );
 }
 
-function ExerciseRow({ e }) {
+export function ExerciseRow({ e }) {
   const chips = e.cardio ? [cardioLine(e.cardio, trackOf(e))].filter(Boolean) : schemeOf(e);
   return (
     <li className={'plib-ex' + (e.supersetGroup ? ' plib-ex--ss' : '')}>
@@ -224,7 +224,7 @@ function MoreSheet({ t, busy, saved, onClose, onDuplicate, onSaveWorkout, onDele
   );
 }
 
-export default function ProgramView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSavedWorkout, onOpenClient }) {
+export default function ProgramView({ id, onBack, onEdit, onAssign, onCopied, onDeleted, onSavedWorkout, onOpenClient, backText = 'Программы' }) {
   const { loading, data, error, reload } = useData('library.template.get', { id }, [id]);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(null);
@@ -233,8 +233,8 @@ export default function ProgramView({ id, onBack, onEdit, onAssign, onCopied, on
   const [saved, setSaved] = useState({});
   const [done, setDone] = useState('');
 
-  if (loading) return <><BackButton label="Программы" onClick={onBack} /><Loading rows={3} /></>;
-  if (error) return <><BackButton label="Программы" onClick={onBack} /><ErrorState error={error} onRetry={reload} /></>;
+  if (loading) return <><BackButton label={backText} onClick={onBack} /><Loading rows={3} /></>;
+  if (error) return <><BackButton label={backText} onClick={onBack} /><ErrorState error={error} onRetry={reload} /></>;
 
   const t = { ...data, ...(flags || {}) };
   const clients = t.clients || [];
@@ -280,7 +280,7 @@ export default function ProgramView({ id, onBack, onEdit, onAssign, onCopied, on
 
   return (
     <div className="plib plib-view">
-      <BackButton label="Программы" onClick={onBack} />
+      <BackButton label={backText} onClick={onBack} />
       <Hero t={t} />
 
       {t.mine && (
