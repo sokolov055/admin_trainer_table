@@ -235,6 +235,8 @@ function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = nul
         onAssign={(t) => setAssigning(t)}
         onCopied={(t) => { setScope('mine'); setOpen(t.id); list.reload(); }}
         onDeleted={(t) => (onDeletedOut ? onDeletedOut(t) : (setOpen(null), remove(t)))}
+        onSavedWorkout={() => list.reload()}
+        onOpenClient={onOpenClient ? (c) => onOpenClient(c, 'plan') : null}
       />
     );
   }
