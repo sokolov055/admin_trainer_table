@@ -20,6 +20,9 @@ function Steps({ items }) {
   return <ol className="elib-steps">{items.map((s, i) => <li key={i}>{s}</li>)}</ol>;
 }
 
+/** Подпись на медиа — как в макете: анимация и 3D-ролик с манекеном */
+const MEDIA_CAPTION = { animation: 'Анимация', clip: 'Ролик с манекеном' };
+
 /** Карточка упражнения: только просмотр, правка — кнопкой «Изменить» внизу */
 export default function ExerciseCardView({ exercise: e, owner, all, onBack, onEdit, onOpen, onChanged, onRemove }) {
   const [menu, setMenu] = useState(false);
@@ -29,7 +32,7 @@ export default function ExerciseCardView({ exercise: e, owner, all, onBack, onEd
   const tone = muscleClass(muscleTone({ group: e.muscle }));
 
   return <div className="elib-view">
-    <BackButton label="Назад" onClick={onBack} />
+    <BackButton label="Упражнения" onClick={onBack} />
     {notice && <p className="elib-notice">{notice}</p>}
 
     <section className={'elib-hero ' + tone}>
@@ -40,7 +43,7 @@ export default function ExerciseCardView({ exercise: e, owner, all, onBack, onEd
     </section>
 
     {e.media
-      ? <div className="elib-media"><Media media={e.media} /></div>
+      ? <div className="elib-media"><Media media={e.media} />{MEDIA_CAPTION[e.media.kind] && <span className="elib-media__cap">{MEDIA_CAPTION[e.media.kind]}</span>}</div>
       : <div className="elib-drop"><b>Видео нет</b>Добавьте в «Изменить» — ссылку или файл</div>}
 
     <Box icon={<IconList size={18} />} title="Как делать">
