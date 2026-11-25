@@ -15,7 +15,7 @@
     "test:workout": "node --test scripts/test-workout.mjs",
     "test:plan": "node --test scripts/test-plan.mjs",
     "test:track": "node --test scripts/test-track.mjs",
-    "test:e2e": "node --test scripts/test-e2e.mjs",
+    "test:e2e": "node --test scripts/test-e2e.mjs scripts/test-workout-editor-browser.mjs",
     "test:offline-e2e": "node --test scripts/test-offline-e2e.mjs",
     "test:schedule-e2e": "node --test scripts/test-schedule-e2e.mjs",
     "test:transitions-e2e": "node --test scripts/test-transitions-e2e.mjs",

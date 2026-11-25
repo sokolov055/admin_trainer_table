@@ -10,12 +10,12 @@ import { useData } from '../useData.js';
 import { apiMutate, apiPublic } from '../api.js';
 import { haptic } from '../telegram.js';
 import { useBackGesture } from '../gestures.jsx';
-import PlanEditor from './PlanEditor.jsx';
 import ProgramList from './ProgramList.jsx';
 import WorkoutList from './WorkoutList.jsx';
 import ProgramView from './ProgramView.jsx';
 import WorkoutView from './WorkoutView.jsx';
 import ProgramEditor from './ProgramEditor.jsx';
+import WorkoutEditor from './WorkoutEditor.jsx';
 import ProgramAssign from './ProgramAssign.jsx';
 import Dishes from './Dishes.jsx';
 import FoodCatalog from './FoodCatalog.jsx';
@@ -31,7 +31,7 @@ import { useSelfCard, selfPick } from './selfCard.js';
 import { programLength, monthWeeks, parseMonth, monthLabelOf, defaultHow, assignPreview, workoutsOf } from '../plan-weeks.js';
 import { dateKey, nextMonday, scheduledPlan, WEEKDAY_SHORT, sessionQueue } from '../program-timeline.js';
 import { WeekPreview, ProgramDates, DayPicker, FirstWeekPicker, firstWeekDefault, weekdayOf, RhythmPicker, sessionRows } from '../client/PlanWeeks.jsx';
-import { TEMPLATE_GOALS, PLACES } from '../client/programs-model.js';
+import { TEMPLATE_GOALS } from '../client/programs-model.js';
 
 /**
  * Библиотека тренера: шаблоны программ и тренировок, упражнения.
@@ -99,16 +99,6 @@ function GoalPicker({ value, onChange }) {
     </div>
   );
 }
-const LEVELS = [
-  { value: '', label: 'Любой' },
-  { value: 'Новичок', label: 'Новичок' },
-  { value: 'Средний', label: 'Средний' },
-  { value: 'Опытный', label: 'Опытный' },
-];
-
-// Карточка программы для клиентов (FT-497): где, сколько раз в неделю
-const PLACE_ITEMS = [{ value: '', label: 'Не указано' }, ...Object.entries(PLACES).map(([value, label]) => ({ value, label }))];
-const DAY_ITEMS = [{ value: '', label: '—' }, ...[1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) }))];
 
 /** «зал · 3 раза в неделю · ≈ 45 мин» — строкой в списке и в карточке шаблона */
 export default function Library({ pane, owner = false, onOpenClient = null }) {
@@ -187,7 +177,7 @@ function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = nul
   }
 
   // Программа — новым редактором (этап 3 макета, 17.11.2026, ProgramEditor.jsx);
-  // шаблон одной тренировки — прежним TemplateEditor
+  // тренировка — новым редактором (этап 3 макета, 25.11.2026, WorkoutEditor.jsx)
   if (editing && kind === 'program') {
     return (
       <ProgramEditor
@@ -202,8 +192,7 @@ function Templates({ kind, owner, onOpenClient, initialOpen = null, onExit = nul
 
   if (editing) {
     return (
-      <TemplateEditor
-        kind={kind}
+      <WorkoutEditor
         template={editing.new ? null : editing}
         onCancel={editorGuard.leave}
         confirm={editorGuard.confirm}
@@ -303,168 +292,8 @@ function Back({ onClick, children = 'Назад' }) {
   return <BackButton label={children} onClick={onClick} />;
 }
 
-function TemplateEditor({ kind, template, onSaved, onCancel, confirm = null, onDirty }) {
-  const [title, setTitle] = useState(template ? template.title : '');
-  const [goal, setGoal] = useState(template ? template.goal : '');
-  const [level, setLevel] = useState(template ? template.level : '');
-  const [description, setDescription] = useState(template ? template.description : '');
-  const [isPublic, setPublic] = useState(template ? template.isPublic : false);
-  // Карточка для клиентов (FT-497). Минуты: пусто — сервер посчитает по
-  // упражнениям (minutesAuto), тогда в поле не подставляем посчитанное
-  const [place, setPlace] = useState(template ? template.place || '' : '');
-  const [days, setDays] = useState(template && template.days ? String(template.days) : '');
-  const [minutes, setMinutes] = useState(template && template.minutes && !template.minutesAuto ? String(template.minutes) : '');
-  const [forClients, setForClients] = useState(template ? !!template.forClients : false);
-
-  const blocks = template
-    ? template.blocks
-    : [{ title: kind === 'workout' ? 'Тренировка' : 'Тренировка № 1', exercises: [] }];
-
-  // Есть ли что терять при выходе: поля карточки против открытых значений
-  // и тренировки (PlanEditor сообщает сам)
-  const [blocksDirty, setBlocksDirty] = useState(false);
-  const [initial] = useState(() => JSON.stringify([title, goal, level, description, isPublic, place, days, minutes, forClients]));
-  const dirty = blocksDirty || JSON.stringify([title, goal, level, description, isPublic, place, days, minutes, forClients]) !== initial;
-  useEffect(() => { if (onDirty) onDirty(dirty); }, [dirty]);
-
-  // Программа собирается и из шаблонов тренировок — копиями со ссылкой
-  const workouts = useData('library.templates', { kind: 'workout' }, []);
-  const workoutList = kind === 'program' && workouts.data
-    ? workouts.data.templates.map((t) => ({ id: t.id, title: t.title }))
-    : null;
-
-  // Правка шаблона тренировки, стоящего в программах: спросить, обновить ли
-  // копии. Ответ ждёт сохранение — кнопка крутится, пока тренер решает.
-  const [ask, setAsk] = useState(null); // { programs, resolve }
-
-  const submit = async (clean, weekLength) => {
-    let propagate = false;
-    if (kind === 'workout' && template) {
-      const usage = await apiPublic('library.template.usage', { id: template.id });
-      if (usage.programs.length) {
-        propagate = await new Promise((resolve) => setAsk({ programs: usage.programs, resolve }));
-        setAsk(null);
-      }
-    }
-    return apiMutate('library.template.save', {
-      id: template ? template.id : undefined,
-      kind,
-      title: title.trim(),
-      goal,
-      level,
-      description,
-      isPublic,
-      ...(kind === 'program' ? { place, days, minutes, forClients } : {}),
-      blocks: clean,
-      weekLength,
-      propagate,
-    });
-  };
-
-  return (
-    <>
-      {/* Сверху — куда ведёт стрелка, как у соседних экранов библиотеки
-          («К шаблону», «Тренажёры»); «Отмена» была и здесь, и в плавающей
-          панели редактора — дубль убран 20.10.2026 (QA C05b) */}
-      <Back onClick={onCancel}>{template ? 'К шаблону' : 'К шаблонам'}</Back>
-      {confirm}
-
-      <Panel pad>
-        <div className="library__form">
-          <Field label="Название" inputMode="text" placeholder={kind === 'program' ? 'Похудение, 3 раза в неделю' : 'Верх тела'} value={title} onChange={setTitle} />
-          <GoalPicker value={goal} onChange={setGoal} />
-
-          {/* Уровень — у программы (владелец, 16.10.2026): у шаблона одной
-              тренировки его нет; у уже заведённого значение сохраняется */}
-          {kind === 'program' && <div>
-            <span className="field__label">Уровень</span>
-            <Segmented items={LEVELS} value={level} onChange={setLevel} label="Уровень" />
-          </div>}
-
-          {/* Метки карточки для клиентов (FT-497): «45 мин · зал · 2 раза в неделю» */}
-          {kind === 'program' && <div>
-            <span className="field__label">Где заниматься</span>
-            <Segmented items={PLACE_ITEMS} value={place} onChange={setPlace} label="Где заниматься" />
-          </div>}
-          {kind === 'program' && <div>
-            <span className="field__label">Раз в неделю</span>
-            <Segmented wrap items={DAY_ITEMS} value={days} onChange={setDays} label="Раз в неделю" />
-          </div>}
-          {kind === 'program' && (
-            <Field
-              label="Минут на тренировку"
-              inputMode="numeric"
-              value={minutes}
-              onChange={(v) => setMinutes(v.replace(/\D/g, '').slice(0, 3))}
-              placeholder={template && template.minutesAuto ? '≈ ' + template.minutes + ' — по упражнениям' : 'Посчитаем по упражнениям'}
-              hint="Пусто — посчитаем по подходам и отдыху; клиент увидит с «≈»"
-            />
-          )}
-
-          <label className="field">
-            <span className="field__label">Описание</span>
-            <textarea
-              className="field__input library__textarea"
-              value={description}
-              maxLength={1000}
-              placeholder={kind === 'program' ? 'Для кого и как вести: частота, прогрессия, на что обратить внимание' : 'На что обратить внимание в этой тренировке'}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </label>
-
-          {kind === 'program' && (
-            <label className="library__check">
-              <input type="checkbox" checked={forClients} onChange={(e) => setForClients(e.target.checked)} />
-              <span>
-                Показывать моим клиентам
-                <span className="small muted"> — в «Тренировках» → «Программы тренера»: клиент увидит карточку и состав и сможет попросить эту программу, назначаете вы</span>
-              </span>
-            </label>
-          )}
-
-          <label className="library__check">
-            <input type="checkbox" checked={isPublic} onChange={(e) => setPublic(e.target.checked)} />
-            <span>
-              Поделиться с другими тренерами
-              <span className="small muted"> — увидят с вашим именем и смогут скопировать себе</span>
-            </span>
-          </label>
-        </div>
-      </Panel>
-
-      <Section title={kind === 'program' ? 'Тренировки' : 'Упражнения'}>
-        <PlanEditor
-          blocks={blocks}
-          weekLength={template && template.weekLength || 0}
-          storeKey={template && template.id ? 'tpl' + template.id : ''}
-          single={kind === 'workout'}
-          submitLabel="Сохранить шаблон"
-          workoutTemplates={workoutList}
-          onSubmit={submit}
-          onDirty={setBlocksDirty}
-          onSaved={(saved) => { haptic('success'); onSaved(saved); }}
-        />
-        {ask && (
-          <Panel pad>
-            <div className="library__form">
-              <strong>Эта тренировка стоит в программах</strong>
-              <p className="small" style={{ margin: 0 }}>
-                {ask.programs.map((p) => '«' + p.title + '»').join(', ')}. Обновить её там тоже?
-                Программы, уже выданные клиентам, не изменятся в любом случае.
-              </p>
-              <div className="library__actions">
-                <button className="button button--primary" onClick={() => ask.resolve(true)}>Обновить в программах</button>
-                <button className="button" onClick={() => ask.resolve(false)}>Только этот шаблон</button>
-              </div>
-            </div>
-          </Panel>
-        )}
-      </Section>
-    </>
-  );
-}
-
 /* ==========================================================================
+ * Назначить клиенту
  * Назначить клиенту
  * ========================================================================== */
 

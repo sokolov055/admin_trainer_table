@@ -1890,7 +1890,6 @@ test('новый шаблон тренировки — без уровня, у �
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ru-RU' });
   const tab = await context.newPage();
   tab.on('pageerror', (error) => consoleErrors.push(String(error)));
-  const level = () => tab.locator('#root main:not([hidden]) .field__label', { hasText: /^Уровень$/ }).count();
   try {
     await tab.goto(origin + '/?mockRole=trainer');
     await tab.evaluate(() => localStorage.setItem('auth_token_v1', 'demo-session'));
@@ -1901,12 +1900,13 @@ test('новый шаблон тренировки — без уровня, у �
     // Список тренировок (25.11.2026): «+» — лист «Новая тренировка» → «Пустая»
     await tab.getByRole('button', { name: 'Новая тренировка' }).click();
     await tab.getByRole('button', { name: /Пустая/ }).click();
-    await tab.getByRole('heading', { name: 'Упражнения' }).waitFor({ timeout: 5000 });
-    assert.equal(await level(), 0, 'у шаблона тренировки уровня нет');
-    assert.equal(await tab.getByPlaceholder('На что обратить внимание в этой тренировке').count(), 1, 'подсказка про тренировку');
-    // Выход из редактора — стрелкой «К шаблонам»: «Отмены» в нём с 20.10.2026 нет
-    await tab.getByRole('button', { name: 'К шаблонам' }).first().click();
-
+    await tab.locator('.plib-etop').waitFor({ timeout: 5000 });
+    await tab.locator('.plib-sect', { hasText: 'Упражнения' }).waitFor({ timeout: 5000 });
+    assert.equal(await tab.getByRole('button', { name: 'Уровень', exact: true }).count(), 0, 'у шаблона тренировки уровня нет');
+    await tab.getByRole('button', { name: '＋ Описание' }).click();
+    assert.equal(await tab.getByPlaceholder('На что обратить внимание: темп, техника, отдых').count(), 1, 'подсказка про тренировку');
+    // Выход из редактора — «Отмена» наверху (как у программы, макет трениров. 25.11.2026)
+    await tab.locator('.plib-etop__c').click();
     await tab.getByRole('tab', { name: 'Программы', exact: true }).click();
     // Список программ с 17.11.2026: «+» — лист «Новая программа» → «С нуля»
     await tab.getByRole('button', { name: 'Новая программа' }).click();

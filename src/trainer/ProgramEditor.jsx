@@ -46,7 +46,7 @@ const HINT_KEY = 'ft.progEdit.dragHint';
 const HOLD_MS = 400;
 const SLOP = 8;
 
-function Toggle({ on, icon, title, hint, onChange }) {
+export function Toggle({ on, icon, title, hint, onChange }) {
   return (
     <button type="button" role="switch" aria-checked={on} className={'plib-tog plib-tog--wide' + (on ? ' is-on' : '')}
       onClick={() => { haptic(); onChange(!on); }}>
@@ -56,9 +56,10 @@ function Toggle({ on, icon, title, hint, onChange }) {
 }
 
 /* --------------------------------------------------------------------------
- * «О программе» — один лист: цель, уровень, где, раз в неделю и минуты
+ * «О программе» — один лист: цель, уровень, где, раз в неделю и минуты.
+ * «О тренировке» (workout) — только цель; минуты считаются по упражнениям
  * -------------------------------------------------------------------------- */
-function PassportSheet({ card, set, auto, onClose }) {
+export function PassportSheet({ card, set, auto, onClose, workout = false }) {
   const { goal, level, place, days, minutes } = card;
   const custom = !!goal && !TEMPLATE_GOALS.includes(goal);
   const [own, setOwn] = useState(custom);
@@ -66,7 +67,7 @@ function PassportSheet({ card, set, auto, onClose }) {
     <button type="button" className={'plib-tile' + (on ? ' is-on' : '')} aria-pressed={on} aria-label={label} onClick={() => { haptic(); onClick(); }}>{children}</button>
   );
   return (
-    <Sheet title="О программе" onClose={onClose} onDone={onClose}>
+    <Sheet title={workout ? 'О тренировке' : 'О программе'} onClose={onClose} onDone={onClose}>
       <div className="plib-filter">
         <h4>Цель</h4>
         <div className="plib-tiles plib-tiles--4">
@@ -76,36 +77,40 @@ function PassportSheet({ card, set, auto, onClose }) {
         </div>
         {own && <Field label="Своя цель" inputMode="text" placeholder="Например, подготовка к забегу" value={goal} onChange={(v) => set({ goal: v.slice(0, 60) })} />}
 
-        <h4>Уровень</h4>
-        <div className="plib-tiles">
-          {LEVELS.map((l) => tile(level === l, () => set({ level: level === l ? '' : l }), <><LevelBars level={l} />{l}</>, l))}
-        </div>
+        {workout && <p className="plib-gaps">Минуты — по упражнениям{auto.minutes ? ': ≈ ' + auto.minutes + ' мин' : ''}.</p>}
 
-        <h4>Где</h4>
-        <div className="plib-tiles">
-          {tile(place === 'gym', () => set({ place: 'gym' }), <><span className="plib-dot plib-dot--gym"><IconBench size={18} /></span>{PLACES.gym}</>)}
-          {tile(place === 'home', () => set({ place: 'home' }), <><span className="plib-dot plib-dot--home"><IconHome size={18} /></span>{PLACES.home}</>)}
-          {tile(!place, () => set({ place: '' }), <><b>—</b>не важно</>, 'Место не важно')}
-        </div>
+        {!workout && <>
+          <h4>Уровень</h4>
+          <div className="plib-tiles">
+            {LEVELS.map((l) => tile(level === l, () => set({ level: level === l ? '' : l }), <><LevelBars level={l} />{l}</>, l))}
+          </div>
 
-        <h4>Раз в неделю · минут</h4>
-        <div className="plib-tiles plib-tiles--4">
-          {tile(!days, () => set({ days: '' }), <><b>{auto.days ? auto.days + '×' : '—'}</b>по неделе 1</>, 'Раз в неделю — по неделе 1')}
-          {tile(!!days, () => set({ days: days || String(auto.days || 3) }), <><b>✎</b>своё</>, 'Раз в неделю — своё')}
-          {tile(!minutes, () => set({ minutes: '' }), <><b>{auto.minutes ? '≈' + auto.minutes : '—'}</b>по упражн.</>, 'Минуты — по упражнениям')}
-          {tile(!!minutes, () => set({ minutes: minutes || String(auto.minutes || 60) }), <><b>✎</b>своё</>, 'Минуты — своё')}
-        </div>
-        {!!days && (
-          <div className="plib-tiles plib-tiles--7 plib-sub" role="group" aria-label="Раз в неделю">
-            {[1, 2, 3, 4, 5, 6, 7].map((n) => tile(String(days) === String(n), () => set({ days: String(n) }), <b>{n}</b>, n + ' раз в неделю'))}
+          <h4>Где</h4>
+          <div className="plib-tiles">
+            {tile(place === 'gym', () => set({ place: 'gym' }), <><span className="plib-dot plib-dot--gym"><IconBench size={18} /></span>{PLACES.gym}</>)}
+            {tile(place === 'home', () => set({ place: 'home' }), <><span className="plib-dot plib-dot--home"><IconHome size={18} /></span>{PLACES.home}</>)}
+            {tile(!place, () => set({ place: '' }), <><b>—</b>не важно</>, 'Место не важно')}
           </div>
-        )}
-        {!!minutes && (
-          <div className="plib-sub">
-            <Field label="Минут на тренировку" inputMode="numeric" value={minutes} placeholder="60"
-              onChange={(v) => set({ minutes: v.replace(/\D/g, '').slice(0, 3) })} hint="От 10 до 240" />
+
+          <h4>Раз в неделю · минут</h4>
+          <div className="plib-tiles plib-tiles--4">
+            {tile(!days, () => set({ days: '' }), <><b>{auto.days ? auto.days + '×' : '—'}</b>по неделе 1</>, 'Раз в неделю — по неделе 1')}
+            {tile(!!days, () => set({ days: days || String(auto.days || 3) }), <><b>✎</b>своё</>, 'Раз в неделю — своё')}
+            {tile(!minutes, () => set({ minutes: '' }), <><b>{auto.minutes ? '≈' + auto.minutes : '—'}</b>по упражн.</>, 'Минуты — по упражнениям')}
+            {tile(!!minutes, () => set({ minutes: minutes || String(auto.minutes || 60) }), <><b>✎</b>своё</>, 'Минуты — своё')}
           </div>
-        )}
+          {!!days && (
+            <div className="plib-tiles plib-tiles--7 plib-sub" role="group" aria-label="Раз в неделю">
+              {[1, 2, 3, 4, 5, 6, 7].map((n) => tile(String(days) === String(n), () => set({ days: String(n) }), <b>{n}</b>, n + ' раз в неделю'))}
+            </div>
+          )}
+          {!!minutes && (
+            <div className="plib-sub">
+              <Field label="Минут на тренировку" inputMode="numeric" value={minutes} placeholder="60"
+                onChange={(v) => set({ minutes: v.replace(/\D/g, '').slice(0, 3) })} hint="От 10 до 240" />
+            </div>
+          )}
+        </>}
       </div>
     </Sheet>
   );

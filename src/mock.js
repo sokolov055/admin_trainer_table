@@ -1293,11 +1293,11 @@ let demoTemplates = [
   // По неделям, вторая тяжелее, с суперсетом — экран программы (этап 2, 17.11.2026)
   { id: 4, kind: 'program', title: 'UL [4]', goal: 'Сила', level: 'Опытный', description: 'Верх и низ по очереди, четыре тренировки в неделю.', isPublic: false, mine: true, author: 'Константин', uses: 0, weekLength: 2,
     blocks: [1, 2].flatMap((week) => demoBlocks.map((b, i) => ({
-      ...b, week, ...(week === 2 ? { load: 'heavy' } : {}),
+      ...b, week, ...(week === 2 ? { load: 'heavy' } : {}), ...(i === 1 ? { sourceId: 3 } : {}),
       exercises: b.exercises.map((e) => ({ ...e, weight: week === 2 ? (i ? '50' : '14') : (i ? '40' : '12'), supersetGroup: i === 0 ? 'A' : '' })),
     }))),
     place: 'gym', days: 4, minutes: 25, minutesAuto: true, forClients: true },
-  { id: 5, kind: 'program', title: 'Ягодицы с нуля дома', goal: 'Тонус', level: 'Новичок', description: 'Резинка и гантели, по 40 минут.', isPublic: false, mine: true, author: 'Константин', blocks: [demoBlocks[1]], uses: 0,
+  { id: 5, kind: 'program', title: 'Ягодицы с нуля дома', goal: 'Тонус', level: 'Новичок', description: 'Резинка и гантели, по 40 минут.', isPublic: false, mine: true, author: 'Константин', blocks: [{ ...demoBlocks[1], sourceId: 3 }], uses: 0,
     place: 'home', days: 2, minutes: 40, minutesAuto: false, forClients: true },
   // Силовая + кардио отдельными тренировками — старая программа: предложение прицепить (FT-788)
   { id: 6, kind: 'program', title: 'Сила + кардио', goal: 'Похудение', level: 'Средний', description: '', isPublic: false, mine: true, author: 'Константин', uses: 0,
