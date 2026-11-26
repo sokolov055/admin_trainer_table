@@ -11,17 +11,20 @@ import renderer, { act } from 'react-test-renderer';
  * счётчиками, чипы приёмов пищи с точками, карточка — обложка приёма
  * пищи + факты значками + метки значками. Смахивание влево меняет статус
  * (публикация черновика, скрытие, возврат); «Удалить» нет — сервер блюда
- * не удаляет. Сервер подменён.
+ * не удаляет. Этап 2 (26.11.2026): чип «Фильтры» открывает лист — приём
+ * пищи, время готовки, метки, порядок; «+» открывает лист «Новое блюдо» —
+ * с нуля или копия похожего. Сервер подменён.
  */
 
 const calls = [];
 let list = null;
 let reloaded = false;
 const dishes = [
-  { id: 1, name: 'Гречка с курицей', status: 'draft', meal: 'обед', minutes: 20, portions: 2, budget: true, per: { kcal: 420, protein: 34, fat: 8, carbs: 45 }, tags: ['быстро', 'бюджетно'], items: [], steps: [] },
+  { id: 1, name: 'Гречка с курицей', status: 'draft', meal: 'обед', minutes: 20, portions: 2, budget: true, per: { kcal: 420, protein: 34, fat: 8, carbs: 45 }, tags: ['быстро', 'бюджетно'], items: [{ food: 'гречка', grams: 300 }, { food: 'курица, филе', grams: 200 }], steps: ['Подготовьте продукты.'] },
   { id: 2, name: 'Овсяноблин с творогом', status: 'draft', meal: 'завтрак', minutes: 15, portions: 2, per: { kcal: 310, protein: 20, fat: 11, carbs: 20 }, tags: ['без молочного'], items: [], steps: [] },
   { id: 3, name: 'Запечённая рыба с овощами', status: 'published', meal: 'ужин', minutes: 35, portions: 2, per: { kcal: 380, protein: 38, fat: 12, carbs: 60 }, tags: ['высокобелковое'], items: [], steps: [] },
   { id: 4, name: 'Творожная запеканка', status: 'hidden', meal: 'перекус', minutes: 45, portions: 4, per: { kcal: 520, protein: 40, fat: 14, carbs: 60 }, tags: [], items: [], steps: [] },
+  { id: 5, name: 'Апельсиновый смузи', status: 'draft', meal: 'перекус', minutes: 10, portions: 1, per: { kcal: 180, protein: 4, fat: 2, carbs: 16 }, tags: ['вегетарианское'], items: [{ food: 'апельсин', grams: 200 }], steps: ['Взбейте.'] },
 ];
 globalThis.__api = async (action, params) => { calls.push([action, params]); return { id: params.id, status: params.status }; };
 globalThis.__data = (action) => {
@@ -52,13 +55,16 @@ export const ErrorState = () => null;
 export const Empty = ({ title, text }) => React.createElement('div', { className: 'state' }, title, text);
 export const Note = ({ children }) => React.createElement('div', { className: 'note' }, children);
 export const Tag = ({ children }) => React.createElement('span', null, children);
-export const Field = ({ label }) => React.createElement('label', null, label);
+export const Field = ({ label, value, inputMode, placeholder, onChange }) => React.createElement('label', null, label,
+  React.createElement('input', { value, inputMode, placeholder, onChange: (e) => onChange(e.target.value) }));
 export const BackButton = ({ label }) => React.createElement('button', null, label);
 export const Chips = ({ items, value, onChange }) => React.createElement('div', { className: 'chips' },
   items.map((it) => React.createElement('button', { key: it.value, className: 'chip' + (it.value === value ? ' chip--active' : ''), onClick: () => onChange(it.value) }, it.label)));
 export const Segmented = ({ items, value, onChange, label }) => React.createElement('div', { role: 'radiogroup', 'aria-label': label },
   items.map((it) => React.createElement('button', { key: String(it.value), role: 'radio', 'aria-checked': value === it.value, className: 'chip' + (value === it.value ? ' chip--active' : ''), onClick: () => onChange(it.value) }, it.label)));
 export const Search = ({ value, onChange, placeholder }) => React.createElement('input', { value, placeholder, onChange: (e) => onChange(e.target.value) });
+export const Sheet = ({ title, action, children }) => React.createElement('div', { className: 'sheet' },
+  React.createElement('h2', null, title), action, children);
 export function formatNumber(n) { return String(n); }
 export function plural(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 10 || b >= 20) ? few : many; }` }));
   } }] });
@@ -88,14 +94,14 @@ test('шапка: три статуса во всю ширину со счётч
   list = { dishes, foods: [] };
   const tree = await render();
   const t = text(tree.root);
-  assert.match(t, /Черновики2/);
+  assert.match(t, /Черновики3/);
   assert.match(t, /У клиентов1/);
   assert.match(t, /Скрытые1/);
   assert.match(t, /Черновики клиенты не видят\./);
   assert.equal(byAria(tree, 'Поиск блюд').length, 1);
   assert.equal(byAria(tree, 'Новое блюдо').length, 1);
   // поиск и «+» — вне строки чипов: у чипов вся ширина строки
-  const tabs = tree.root.findAll((n) => n.props && n.props.role === 'tablist');
+  const tabs = tree.root.findAll((n) => n.props && n.props.role === 'toolbar');
   assert.equal(tabs.length, 1);
   const tabBtns = tabs[0].findAll((n) => n.type === 'button');
   assert.equal(tabBtns.filter((n) => n.props['aria-label']).length, 0, 'в строке чипов нет кнопок с aria-label (поиск/+)');
@@ -177,9 +183,127 @@ test('поиск открывается в строке чипов и сужае
   assert.equal(input.length, 1);
   assert.equal(input[0].props.placeholder, 'Поиск блюда');
   // чипы заменяются полем поиска
-  assert.equal(tree.root.findAll((n) => n.props && n.props.role === 'tablist').length, 0);
+  assert.equal(tree.root.findAll((n) => n.props && n.props.role === 'toolbar').length, 0);
   await act(async () => { input[0].props.onChange({ target: { value: 'овсян' } }); });
   assert.equal(cards(tree).length, 1);
   await act(async () => { byAria(tree, 'Закрыть поиск')[0].props.onClick(); });
-  assert.equal(tree.root.findAll((n) => n.props && n.props.role === 'tablist').length, 1, 'чипы вернулись');
+  assert.equal(tree.root.findAll((n) => n.props && n.props.role === 'toolbar').length, 1, 'чипы вернулись');
+});
+test('чип «Фильтры» — первым в строке, без числа, пока фильтры пусты', async () => {
+  list = { dishes, foods: [] };
+  const tree = await render();
+  const bar = tree.root.findAll((n) => n.props && n.props.role === 'toolbar');
+  assert.equal(bar.length, 1);
+  const chips = bar[0].findAll((n) => n.type === 'button');
+  assert.equal(text(chips[0]), 'Фильтры');
+  assert.ok(!String(chips[0].props.className).includes('chip--active'), 'без фильтров чип обычный');
+  assert.ok(!text(bar[0]).includes('plib-badge'), 'числа на чипе нет, когда фильтров нет');
+});
+
+const sheetOf = (tree) => tree.root.findAll((n) => n.props && n.props.className === 'sheet');
+
+test('лист «Фильтры»: время до 15 минут отсекает долгие, кнопка закрывает лист', async () => {
+  list = { dishes, foods: [] };
+  const tree = await render();
+  await act(async () => { tree.root.findAll((n) => n.type === 'button' && text(n) === 'Фильтры')[0].props.onClick(); });
+  const sheet = tree.root.findByProps({ className: 'sheet' });
+  const t = text(sheet);
+  assert.match(t, /Приём пищи/);
+  assert.match(t, /Время готовки/);
+  assert.match(t, /Метки/);
+  assert.match(t, /Порядок/);
+  assert.ok(!text(sheet).includes('Сбросить'), 'без активных фильтров кнопки «Сбросить» нет');
+  const quick = sheet.findAll((n) => n.type === 'button' && text(n) === '15′');
+  await act(async () => { quick[0].props.onClick(); });
+  assert.match(text(sheetOf(tree)[0]), /Показать: 2/, 'до 15 минут — овсяноблин и смузи');
+  const go = sheetOf(tree)[0].findAll((n) => n.type === 'button' && text(n) === 'Показать: 2')[0];
+  await act(async () => { go.props.onClick(); });
+  assert.equal(sheetOf(tree).length, 0, 'лист закрыт');
+  assert.deepEqual(cards(tree).map((c) => text(c)), ['Овсяноблин с творогомзавтрак15310×2черновик', 'Апельсиновый смузиперекус10180черновик']);
+  // чип «Фильтры» теперь с числом
+  const bar = tree.root.findAll((n) => n.props && n.props.role === 'toolbar')[0];
+  assert.ok(String(bar.findAll((n) => n.type === 'button')[0].props.className).includes('chip--active'));
+  assert.ok(text(bar).includes('Фильтры1'));
+});
+
+test('лист «Фильтры»: несколько меток сразу — «или», сброс убирает все', async () => {
+  list = { dishes, foods: [] };
+  const tree = await render();
+  await toStatus(tree, 'У клиентов');
+  await act(async () => { tree.root.findAll((n) => n.type === 'button' && text(n) === 'Фильтры')[0].props.onClick(); });
+  let sheet = sheetOf(tree)[0];
+  const tag = (name) => sheet.findAll((n) => n.type === 'button' && text(n) === name)[0];
+  await act(async () => { tag('Высокобелковое').props.onClick(); });
+  await act(async () => { tag('Быстро').props.onClick(); });
+  sheet = sheetOf(tree)[0];
+  assert.match(text(sheet), /Показать: 1/, 'рыба подходит по обеим меткам (или)');
+  const reset = sheet.findAll((n) => n.type === 'button' && text(n) === 'Сбросить')[0];
+  await act(async () => { reset.props.onClick(); });
+  sheet = sheetOf(tree)[0];
+  assert.match(text(sheet), /Показать: 1/, 'сброс возвращает все published');
+  assert.equal(sheet.findAll((n) => n.type === 'button' && text(n) === 'Сбросить').length, 0, 'кнопка «Сбросить» пропалась');
+  assert.ok(text(sheet).includes('Быстро') && text(sheet).includes('Высокобелковое'), 'плитки меток на месте');
+});
+
+test('лист «Фильтры»: порядок «А–Я» меняет порядок карточек', async () => {
+  list = { dishes, foods: [] };
+  const tree = await render();
+  // как отдал сервер — порядок массива: смузи последний
+  assert.deepEqual(cards(tree).map((c) => text(c)), [
+    'Гречка с курицейобед20420×2черновик',
+    'Овсяноблин с творогомзавтрак15310×2черновик',
+    'Апельсиновый смузиперекус10180черновик',
+  ]);
+  await act(async () => { tree.root.findAll((n) => n.type === 'button' && text(n) === 'Фильтры')[0].props.onClick(); });
+  const az = sheetOf(tree)[0].findAll((n) => n.type === 'button' && text(n) === 'А–Я')[0];
+  await act(async () => { az.props.onClick(); });
+  const go = sheetOf(tree)[0].findAll((n) => n.type === 'button' && /^Показать: \d/.test(text(n)))[0];
+  await act(async () => { go.props.onClick(); });
+  assert.deepEqual(cards(tree).map((c) => text(c)), [
+    'Апельсиновый смузиперекус10180черновик',
+    'Гречка с курицейобед20420×2черновик',
+    'Овсяноблин с творогомзавтрак15310×2черновик',
+  ]);
+});
+
+test('лист «Новое блюдо»: «С нуля» открывает пустой редактор', async () => {
+  list = { dishes, foods: [] };
+  const tree = await render();
+  await act(async () => { byAria(tree, 'Новое блюдо')[0].props.onClick(); });
+  let sheet = sheetOf(tree)[0];
+  assert.match(text(sheet), /Новое блюдо/);
+  assert.match(text(sheet), /С нуля/);
+  assert.match(text(sheet), /Копия/);
+  await act(async () => { sheet.findAll((n) => n.type === 'button' && text(n).startsWith('С нуля'))[0].props.onClick(); });
+  const name = tree.root.findAll((n) => n.type === 'input' && n.props.placeholder === 'Гречка с курицей')[0];
+  assert.equal(name.props.value, '', 'пустое поле имени — редактор без блюда');
+  await act(async () => { tree.root.findAll((n) => n.type === 'button' && text(n) === 'Отмена')[0].props.onClick(); });
+  assert.equal(sheetOf(tree).length, 0, 'лист закрыт');
+  assert.ok(tree.root.findAll((n) => n.type === 'button' && text(n) === 'Фильтры').length, 'список вернулся');
+});
+
+test('лист «Новое блюдо»: копия — выбор похожего и редактор с его составом, сохранение без id', async () => {
+  list = { dishes, foods: [] };
+  const tree = await render();
+  await act(async () => { byAria(tree, 'Новое блюдо')[0].props.onClick(); });
+  const sheet = sheetOf(tree)[0];
+  await act(async () => { sheet.findAll((n) => n.type === 'button' && text(n).startsWith('Копия'))[0].props.onClick(); });
+  const pick = sheetOf(tree)[0];
+  assert.match(text(pick), /Копия какого блюда/);
+  const row = pick.findAll((n) => n.type === 'button' && text(n).includes('Гречка с курицей'))[0];
+  await act(async () => { row.props.onClick(); });
+  const inputs = tree.root.findAll((n) => n.type === 'input');
+  assert.equal(inputs.find((n) => n.props.placeholder === 'Гречка с курицей').props.value, 'Гречка с курицей');
+  const grams = inputs.filter((n) => n.props.inputMode === 'decimal');
+  assert.equal(grams.length, 2, 'состав скопирован: два продукта с граммами');
+  assert.equal(grams[0].props.value, '300');
+  const area = tree.root.findAll((n) => n.type === 'textarea');
+  assert.equal(area.length, 1);
+  assert.equal(area[0].props.value, 'Подготовьте продукты.');
+  await act(async () => { tree.root.findAll((n) => n.type === 'button' && text(n) === 'Сохранить')[0].props.onClick(); });
+  assert.equal(calls.at(-1)[0], 'dish.save');
+  assert.equal(calls.at(-1)[1].id, undefined, 'сохраняется как новое блюдо, не как правка исходника');
+  assert.equal(calls.at(-1)[1].name, 'Гречка с курицей');
+  assert.deepEqual(calls.at(-1)[1].items, [{ food: 'гречка', grams: 300 }, { food: 'курица, филе', grams: 200 }]);
+  assert.equal(reloaded, true, 'список перезагружен');
 });

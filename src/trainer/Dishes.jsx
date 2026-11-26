@@ -5,17 +5,19 @@ import { apiMutate } from '../api.js';
 import { haptic } from '../telegram.js';
 import {
   Panel, Chips, Segmented, Loading, ErrorState, Empty, Note, Field, Tag, Search, formatNumber, plural,
-  BackButton,
+  BackButton, Sheet,
 } from '../ui.jsx';
 import {
   IconAlert, IconNutrition, IconSearch, IconClose, IconPlus, IconEye, IconClock, IconFlame, IconSend,
   IconRefresh, IconBolt, IconMoney, IconDumbbell, IconArrowDown, IconArrowUp, IconSunrise, IconBowl,
-  IconMoon, IconNoMilk,
+  IconMoon, IconNoMilk, IconSliders, IconCopy,
 } from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { EGG_SIZES, pieceLabel, mlLabel } from '../nutrition/pieces.js';
 import { carbLevel, carbTag } from '../nutrition/carbs.js';
 import '../nutrition/carbs.css';
+import { NO_FILTERS, filterCount, shownDishes } from './dish-list-model.js';
+import { Tiles } from './ProgramList.jsx';
 /* plib-* — общий язык списков «Программ»; meal-* — приёмы пищи */
 import './programs-lib.css';
 import './dishes-lib.css';
@@ -61,6 +63,8 @@ export default function Dishes() {
   const [open, setOpen] = useState(null);
   const [editing, setEditing] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [filters, setFilters] = useState(NO_FILTERS);
+  const [sheet, setSheet] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [failure, setFailure] = useState(null);
   // Из карточки блюда — обратно на то же место списка
@@ -75,7 +79,7 @@ export default function Dishes() {
   if (editing) {
     return (
       <DishEditor
-        dish={editing.new ? null : editing}
+        dish={editing.copy ? { ...editing.copy, id: undefined } : editing.new ? null : editing}
         foods={foods}
         onCancel={() => setEditing(null)}
         onSaved={(saved) => { setEditing(null); setOpen(saved.id); reload(); }}
@@ -89,10 +93,8 @@ export default function Dishes() {
   }
 
   const count = (s) => dishes.filter((d) => d.status === s).length;
-  const shown = dishes
-    .filter((d) => d.status === status)
-    .filter((d) => !meal || d.meal === meal)
-    .filter((d) => !q || d.name.toLowerCase().includes(q.toLowerCase()));
+  const inStatus = dishes.filter((d) => d.status === status);
+  const shown = shownDishes(inStatus, { q, meal, filters });
 
   const changeStatus = async (d, next) => {
     setBusyId(d.id);
@@ -140,20 +142,25 @@ export default function Dishes() {
           {searching ? <IconClose size={20} /> : <IconSearch size={20} />}
         </button>
         <button type="button" className="plib-ib plib-ib--add" aria-label="Новое блюдо"
-          onClick={() => { haptic(); setEditing({ new: true }); }}>
+          onClick={() => { haptic(); setSheet('new'); }}>
           <IconPlus size={22} />
         </button>
       </div>
       {searching
         ? <div className="plib-search"><Search value={q} onChange={setQ} placeholder="Поиск блюда" /></div>
         : (
-          <div className="chips plib-chips" role="tablist" aria-label="Приёмы пищи">
-            <button type="button" role="tab" aria-selected={meal === ''} className={'chip plib-chip' + (meal === '' ? ' chip--active' : '')} onClick={() => { setMeal(''); haptic(); }}>Все</button>
+          <div className="chips plib-chips" role="toolbar" aria-label="Фильтры и приёмы пищи">
+            <button type="button" className={'chip plib-chip' + (filterCount(filters) > 0 ? ' chip--active' : '')}
+              onClick={() => { haptic(); setSheet('filter'); }}>
+              <IconSliders size={16} />Фильтры{filterCount(filters) > 0 && <b className="plib-badge">{filterCount(filters)}</b>}
+            </button>
+            <button type="button" className={'chip plib-chip' + (meal === '' ? ' chip--active' : '')} aria-pressed={meal === ''}
+              onClick={() => { setMeal(''); haptic(); }}>Все</button>
             {MEALS.map((m) => {
               const look = MEAL_LOOK[m] || MEAL_LOOK['перекус'];
               const MealIcon = look.icon;
               return (
-                <button key={m} type="button" role="tab" aria-selected={meal === m}
+                <button key={m} type="button" aria-pressed={meal === m}
                   className={'chip plib-chip' + (meal === m ? ' chip--active' : '')}
                   onClick={() => { setMeal(m); haptic(); }}>
                   <span className={'plib-dot plib-dot--sm plib-meal--' + look.key} aria-hidden="true"><MealIcon size={12} /></span>
@@ -187,8 +194,111 @@ export default function Dishes() {
         );
       })}
 
+      {sheet === 'filter' && (
+        <DishFilterSheet dishes={inStatus} q={q} meal={meal} filters={filters}
+          onChange={setFilters} onMeal={setMeal} onClose={() => setSheet(null)} />
+      )}
+      {sheet === 'new' && (
+        <DishNewSheet dishes={dishes}
+          onClose={() => setSheet(null)}
+          onBlank={() => { setSheet(null); setEditing({ new: true }); }}
+          onCopy={(d) => { setSheet(null); setEditing({ copy: d }); }} />
+      )}
+
       {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
     </>
+  );
+}
+
+/** Лист «Фильтры»: приём пищи, время готовки, метки, порядок (макет v4) */
+function DishFilterSheet({ dishes, q, meal, filters, onChange, onMeal, onClose }) {
+  const set = (patch) => onChange({ ...filters, ...patch });
+  const reset = () => { onChange({ ...NO_FILTERS, sort: filters.sort }); onMeal(''); };
+  const count = shownDishes(dishes, { q, meal, filters }).length;
+  return (
+    <Sheet title="Фильтры" onClose={onClose}
+      action={filterCount(filters) > 0 ? <button type="button" className="button button--ghost" onClick={reset}>Сбросить</button> : null}>
+      <div className="plib-filter">
+        <h4>Приём пищи</h4>
+        <Tiles cols={4} label="Приём пищи" value={meal} onChange={(v) => { haptic(); onMeal(v); }}
+          items={MEALS.map((m) => {
+            const look = MEAL_LOOK[m] || MEAL_LOOK['перекус'];
+            const MealIcon = look.icon;
+            return { value: m, label: m, icon: <span className={'plib-dot plib-meal--' + look.key} aria-hidden="true"><MealIcon size={18} /></span> };
+          })} />
+        <h4>Время готовки</h4>
+        <Tiles cols={3} label="Время готовки" value={filters.time} onChange={(v) => { haptic(); set({ time: v }); }}
+          items={[
+            { value: 15, label: <b>15′</b> },
+            { value: 30, label: <b>30′</b> },
+            { value: 0, label: <b>∞</b> },
+          ]} />
+        <h4>Метки</h4>
+        <div className="plib-tiles plib-tiles--4" role="group" aria-label="Метки">
+          {Object.entries(TAG_ICONS).map(([tag, look]) => {
+            const TagIcon = look.icon;
+            const on = filters.tags.includes(tag);
+            return (
+              <button key={tag} type="button" aria-pressed={on}
+                className={'plib-tile' + (on ? ' is-on' : '')}
+                onClick={() => { haptic(); set({ tags: on ? filters.tags.filter((t) => t !== tag) : [...filters.tags, tag] }); }}>
+                <span className="dish-mdot" aria-hidden="true"><TagIcon size={18} /></span>
+                {look.title}
+              </button>
+            );
+          })}
+        </div>
+        <h4>Порядок</h4>
+        <Segmented track label="Порядок" value={filters.sort} onChange={(v) => { haptic(); set({ sort: v }); }}
+          items={[{ value: 'meal', label: 'По приёму' }, { value: 'az', label: 'А–Я' }]} />
+        <button type="button" className="button button--primary button--block plib-filter__go" onClick={onClose}>
+          {count ? `Показать: ${count}` : 'Ничего не нашлось'}
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Лист «Новое блюдо»: с нуля или копия похожего («сканер штрихкода» — нет) */
+function DishNewSheet({ dishes, onClose, onBlank, onCopy }) {
+  const [step, setStep] = useState('menu');
+  const [q, setQ] = useState('');
+  const query = q.trim().toLowerCase();
+  const similar = dishes.filter((d) => !query || d.name.toLowerCase().includes(query));
+  return (
+    <Sheet title={step === 'copy' ? 'Копия какого блюда' : 'Новое блюдо'} onClose={onClose}>
+      {step === 'menu' && (
+        <div className="plib-menu">
+          <button type="button" className="plib-menu__item" onClick={() => { haptic(); onBlank(); }}>
+            <span className="plib-menu__icon"><IconPlus size={22} /></span>
+            <span><b>С нуля</b><small>Пустое блюдо</small></span>
+          </button>
+          {dishes.length > 0 && (
+            <button type="button" className="plib-menu__item" onClick={() => { haptic(); setStep('copy'); }}>
+              <span className="plib-menu__icon"><IconCopy size={22} /></span>
+              <span><b>Копия</b><small>Взять похожее и поправить</small></span>
+            </button>
+          )}
+        </div>
+      )}
+      {step === 'copy' && (
+        <div className="plib-pick">
+          <Search value={q} onChange={setQ} placeholder="Поиск блюда" />
+          {similar.map((d) => {
+            const look = MEAL_LOOK[d.meal] || MEAL_LOOK['перекус'];
+            const MealIcon = look.icon;
+            return (
+              <button key={d.id} type="button" className="plib-menu__item" onClick={() => { haptic(); onCopy(d); }}>
+                <span className={'plib-cover plib-cover--sm plib-meal--' + look.key} aria-hidden="true"><MealIcon size={18} /></span>
+                <span><b>{d.name}</b><small>{d.meal}</small></span>
+              </button>
+            );
+          })}
+          {similar.length === 0 && <p className="small muted">Блюд с таким именем нет.</p>}
+          <button type="button" className="button button--ghost button--block" onClick={() => { setStep('menu'); setQ(''); }}>Назад</button>
+        </div>
+      )}
+    </Sheet>
   );
 }
 
@@ -344,7 +454,7 @@ function DishEditor({ dish, foods, onCancel, onSaved }) {
     <>
       {/* Сверху — куда ведёт стрелка, как у шаблонов; «Отмена» — обычной
           кнопкой рядом с «Сохранить», а не стрелкой (аудит 24.10.2026) */}
-      <BackButton label={dish ? 'К блюду' : 'Блюда'} onClick={onCancel} />
+      <BackButton label={dish && dish.id ? 'К блюду' : 'Блюда'} onClick={onCancel} />
       <Panel pad>
         <div className="library__form">
           <Field label="Название" inputMode="text" value={name} onChange={setName} placeholder="Гречка с курицей" />
