@@ -1,0 +1,34 @@
+/**
+ * Блюда — список в языке «Программ» (макет v4, 26.11.2026). Классы plib-*
+ * общие, живут в programs-lib.css; здесь — приёмы пищи и мелочи списка.
+ *
+ * Палитра приёмов пищи — предложение из макета, в токенах styles.css её
+ * пока нет: если решим перекрасить — менять только здесь.
+ */
+:root {
+  --meal-zav: #d98a14; --meal-zav-e: #a86a0e;
+  --meal-ob: #15957f; --meal-ob-e: #0d6b5b;
+  --meal-uz: #2f6fe0; --meal-uz-e: #1d4cad;
+  --meal-per: #cf4577; --meal-per-e: #9c2b55;
+}
+
+/* Обложка карточки, точка в чипе и цвет названия приёма пищи */
+.plib-meal--zav { --g: var(--meal-zav); --g2: var(--meal-zav-e); }
+.plib-meal--ob { --g: var(--meal-ob); --g2: var(--meal-ob-e); }
+.plib-meal--uz { --g: var(--meal-uz); --g2: var(--meal-uz-e); }
+.plib-meal--per { --g: var(--meal-per); --g2: var(--meal-per-e); }
+.plib-dot[class*='plib-meal--'] { background: linear-gradient(140deg, var(--g), var(--g2)); }
+.plib-goalname.plib-mealtext--zav { --g: var(--meal-zav); }
+.plib-goalname.plib-mealtext--ob { --g: var(--meal-ob); }
+.plib-goalname.plib-mealtext--uz { --g: var(--meal-uz); }
+.plib-goalname.plib-mealtext--per { --g: var(--meal-per); }
+
+/* Метки карточки — только значки (меньше текста), подсказка — в title */
+.dish-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.dish-itag {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  background: var(--surface-sunken); color: var(--text-secondary);
+  display: grid; place-items: center;
+}
+.dish-itag--warm { background: var(--warning-fill); color: var(--warning-text); }
+.dish-itag--cool { background: var(--info-fill); color: var(--info-text); }

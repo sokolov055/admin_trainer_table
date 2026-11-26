@@ -7,11 +7,18 @@ import {
   Panel, Chips, Segmented, Loading, ErrorState, Empty, Note, Field, Tag, Search, formatNumber, plural,
   BackButton,
 } from '../ui.jsx';
-import { IconAlert, IconNutrition } from '../icons.jsx';
+import {
+  IconAlert, IconNutrition, IconSearch, IconClose, IconPlus, IconEye, IconClock, IconFlame, IconSend,
+  IconRefresh, IconBolt, IconMoney, IconDumbbell, IconArrowDown, IconArrowUp, IconSunrise, IconBowl,
+  IconMoon, IconNoMilk,
+} from '../icons.jsx';
 import SwipeRow from '../SwipeRow.jsx';
 import { EGG_SIZES, pieceLabel, mlLabel } from '../nutrition/pieces.js';
 import { carbLevel, carbTag } from '../nutrition/carbs.js';
 import '../nutrition/carbs.css';
+/* plib-* — общий язык списков «Программ»; meal-* — приёмы пищи */
+import './programs-lib.css';
+import './dishes-lib.css';
 
 /**
  * Блюда для рациона клиентов (Шаблоны → Блюда).
@@ -29,6 +36,23 @@ const STATUS = [
 ];
 const MEALS = ['завтрак', 'обед', 'ужин', 'перекус'];
 
+/** Обложка карточки: цвет и значок приёма пищи (макет v4, палитра — предложение) */
+const MEAL_LOOK = {
+  'завтрак': { key: 'zav', icon: IconSunrise },
+  'обед': { key: 'ob', icon: IconBowl },
+  'ужин': { key: 'uz', icon: IconMoon },
+  'перекус': { key: 'per', icon: IconNutrition },
+};
+
+/** Метки сервера — значками, без слов (меньше текста); подсказка — в title */
+const TAG_ICONS = {
+  'быстро': { icon: IconBolt, tone: 'warm', title: 'Быстро' },
+  'бюджетно': { icon: IconMoney, title: 'Бюджетное' },
+  'без молочного': { icon: IconNoMilk, title: 'Без молочного' },
+  'вегетарианское': { icon: IconNutrition, title: 'Вегетарианское' },
+  'высокобелковое': { icon: IconDumbbell, title: 'Высокобелковое' },
+};
+
 export default function Dishes() {
   const { loading, data, error, reload } = useData('dishes.list', {}, []);
   const [status, setStatus] = useState('draft');
@@ -36,6 +60,9 @@ export default function Dishes() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const [failure, setFailure] = useState(null);
   // Из карточки блюда — обратно на то же место списка
   useReturnScroll(!!(open || editing));
 
@@ -67,25 +94,75 @@ export default function Dishes() {
     .filter((d) => !meal || d.meal === meal)
     .filter((d) => !q || d.name.toLowerCase().includes(q.toLowerCase()));
 
+  const changeStatus = async (d, next) => {
+    setBusyId(d.id);
+    setFailure(null);
+    try {
+      await apiMutate('dish.status', { id: d.id, status: next });
+      haptic('success');
+      reload();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /* Смахнуть влево — действие со статусом. «Удалить» нет: сервер блюда не
+     удаляет (dish.status, dish.save), поэтому extra без onDelete — как у
+     «Общих» программ. Пока тянется тень «Опубликовать», карточка стоит на месте. */
+  const swipeExtra = (d) => {
+    if (d.status === 'draft') return { text: 'Опубликовать', label: `Опубликовать «${d.name}»`, icon: <IconSend size={20} />, onClick: () => changeStatus(d, 'published') };
+    if (d.status === 'published') return { text: 'Скрыть', label: `Скрыть «${d.name}»`, icon: <IconEye size={20} />, onClick: () => changeStatus(d, 'hidden') };
+    return { text: 'В черновики', label: `Вернуть «${d.name}» в черновики`, icon: <IconRefresh size={20} />, onClick: () => changeStatus(d, 'draft') };
+  };
+
   return (
     <>
-      {/* Порядок тот же, что в остальных вкладках «Шаблонов» (Library.jsx) */}
-      <div className="library__bar">
-        <button className="button button--primary" onClick={() => setEditing({ new: true })}>Своё блюдо</button>
-      </div>
+      {/* Блюда — в языке «Программ» (26.11.2026). Статусы — во всю ширину:
+          их три, в строке с поиском и «+» подписи не влезали. Поиск и «+» —
+          во второй строке, поле поиска открывается вместо чипов. */}
       <Segmented
-        items={STATUS.map((s) => ({ value: s.value, label: s.label + ' · ' + count(s.value) }))}
+        items={STATUS.map((s) => ({ value: s.value, label: <>{s.label}<em className="plib-count">{count(s.value)}</em></> }))}
         value={status}
         onChange={(v) => { setStatus(v); haptic(); }}
         label="Какие блюда"
         track
       />
-      <Search value={q} onChange={setQ} placeholder="Поиск блюда" />
-      <Chips className="library__filters" items={[{ value: '', label: 'Все' }, ...MEALS.map((m) => ({ value: m, label: m }))]} value={meal} onChange={setMeal} />
+      <div className="plib-bar">
+        {searching
+          ? <div className="plib-search"><Search value={q} onChange={setQ} placeholder="Поиск блюда" /></div>
+          : (
+            <div className="chips" role="tablist" aria-label="Приёмы пищи">
+              <button type="button" role="tab" aria-selected={meal === ''} className={'chip' + (meal === '' ? ' chip--active' : '')} onClick={() => { setMeal(''); haptic(); }}>Все</button>
+              {MEALS.map((m) => {
+                const look = MEAL_LOOK[m] || MEAL_LOOK['перекус'];
+                const MealIcon = look.icon;
+                return (
+                  <button key={m} type="button" role="tab" aria-selected={meal === m}
+                    className={'chip' + (meal === m ? ' chip--active' : '')}
+                    onClick={() => { setMeal(m); haptic(); }}>
+                    <span className={'plib-dot plib-dot--sm plib-meal--' + look.key} aria-hidden="true"><MealIcon size={12} /></span>
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        <button type="button" className="plib-ib" aria-label={searching ? 'Закрыть поиск' : 'Поиск'} aria-pressed={searching}
+          onClick={() => { haptic(); if (searching) setQ(''); setSearching(!searching); }}>
+          {searching ? <IconClose size={20} /> : <IconSearch size={20} />}
+        </button>
+        <button type="button" className="plib-ib plib-ib--add" aria-label="Новое блюдо"
+          onClick={() => { haptic(); setEditing({ new: true }); }}>
+          <IconPlus size={22} />
+        </button>
+      </div>
 
       {status === 'draft' && count('draft') > 0 && (
         <p className="library__hint library__hint--lead">
-          Черновики клиенты не видят. Откройте блюдо, проверьте состав и рецепт — и опубликуйте.
+          {/* Коротко: зачем статусы. Остальное видно на карточках */}
+          Черновики клиенты не видят.
         </p>
       )}
       {shown.length > 0 && (
@@ -98,20 +175,61 @@ export default function Dishes() {
         <Empty icon={IconNutrition} title="Здесь пусто" text={status === 'draft' ? 'Все черновики разобраны.' : 'Блюд с таким отбором нет.'} />
       )}
 
-      <div>
-        {shown.map((d) => (
-          <button className="item" key={d.id} onClick={() => { setOpen(d.id); haptic(); }}>
-            <div className="item__top">
-              <span className="item__name">{d.name}</span>
-              <span className="item__amount">{d.per.kcal} ккал</span>
-            </div>
-            <div className="item__meta">
-              <span>{d.meal} · {d.minutes} мин</span>
-              <span className="item__macros">Б {formatNumber(d.per.protein)} · Ж {formatNumber(d.per.fat)} · У {formatNumber(d.per.carbs)}</span>
-            </div>
+      {shown.map((d, i) => {
+        const card = (
+          <button type="button" className="plib-card" style={{ '--i': Math.min(i, 8) }} onClick={() => { setOpen(d.id); haptic(); }}>
+            <DishCard d={d} />
           </button>
-        ))}
-      </div>
+        );
+        return (
+          <SwipeRow key={d.id} className="plib-row plib-swipe" disabled={busyId === d.id} extra={swipeExtra(d)}>
+            {card}
+          </SwipeRow>
+        );
+      })}
+
+      {failure && <Note tone="critical" icon={IconAlert}>{failure.message}</Note>}
+    </>
+  );
+}
+
+/** Карточка блюда: обложка приёма пищи, факты значками, метки значками */
+function DishCard({ d }) {
+  const look = MEAL_LOOK[d.meal] || MEAL_LOOK['перекус'];
+  const MealIcon = look.icon;
+  const level = carbLevel(d.per);
+  return (
+    <>
+      <span className={'plib-cover plib-meal--' + look.key} aria-hidden="true"><MealIcon size={28} /></span>
+      <span className="plib-body">
+        <span className="plib-name">{d.name}</span>
+        <span className={'plib-goalname plib-mealtext--' + look.key}>{d.meal}</span>
+        <span className="plib-facts">
+          {d.minutes > 0 && <span title="Минут на готовку"><IconClock size={14} />{d.minutes}</span>}
+          {d.per.kcal > 0 && <span title="Ккал на порцию"><IconFlame size={14} />{formatNumber(d.per.kcal)}</span>}
+          {d.portions > 1 && <span title="Порций">×{d.portions}</span>}
+        </span>
+        {(level || d.tags.length > 0) && (
+          <span className="dish-tags" aria-hidden="true">
+            {/* Уровень углеводов считается из КБЖУ (FT-709) — средний не показываем */}
+            {level === 'low' && <span className="dish-itag dish-itag--cool" title="Углеводов мало"><IconArrowDown size={13} /></span>}
+            {level === 'high' && <span className="dish-itag dish-itag--warm" title="Углеводов много"><IconArrowUp size={13} /></span>}
+            {d.tags.map((t) => {
+              const tag = TAG_ICONS[t];
+              if (!tag) return null;
+              const TagIcon = tag.icon;
+              return <span key={t} className={'dish-itag' + (tag.tone ? ' dish-itag--' + tag.tone : '')} title={tag.title}><TagIcon size={13} /></span>;
+            })}
+          </span>
+        )}
+      </span>
+      <span className="plib-side">
+        <span className="plib-flags">
+          <span className={d.status === 'published' ? 'is-on' : ''} title={d.status === 'published' ? 'Видят клиенты' : 'Клиенты не видят'}><IconEye size={15} /></span>
+        </span>
+        {d.status === 'draft' && <span className="plib-free">черновик</span>}
+        {d.status === 'hidden' && <span className="plib-free">скрыто</span>}
+      </span>
     </>
   );
 }
