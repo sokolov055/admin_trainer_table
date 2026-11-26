@@ -92,8 +92,13 @@ test('шапка: три статуса во всю ширину со счётч
   assert.match(t, /У клиентов1/);
   assert.match(t, /Скрытые1/);
   assert.match(t, /Черновики клиенты не видят\./);
-  assert.equal(byAria(tree, 'Поиск').length, 1);
+  assert.equal(byAria(tree, 'Поиск блюд').length, 1);
   assert.equal(byAria(tree, 'Новое блюдо').length, 1);
+  // поиск и «+» — вне строки чипов: у чипов вся ширина строки
+  const tabs = tree.root.findAll((n) => n.props && n.props.role === 'tablist');
+  assert.equal(tabs.length, 1);
+  const tabBtns = tabs[0].findAll((n) => n.type === 'button');
+  assert.equal(tabBtns.filter((n) => n.props['aria-label']).length, 0, 'в строке чипов нет кнопок с aria-label (поиск/+)');
   assert.ok(!t.includes('Своё блюдо'), 'кнопка «Своё блюдо» заменена на «+»');
 });
 
@@ -167,10 +172,14 @@ test('смахнуть влево: опубликованное — «Скрыт
 test('поиск открывается в строке чипов и сужает список', async () => {
   list = { dishes, foods: [] };
   const tree = await render();
-  await act(async () => { byAria(tree, 'Поиск')[0].props.onClick(); });
+  await act(async () => { byAria(tree, 'Поиск блюд')[0].props.onClick(); });
   const input = tree.root.findAll((n) => n.type === 'input');
   assert.equal(input.length, 1);
   assert.equal(input[0].props.placeholder, 'Поиск блюда');
+  // чипы заменяются полем поиска
+  assert.equal(tree.root.findAll((n) => n.props && n.props.role === 'tablist').length, 0);
   await act(async () => { input[0].props.onChange({ target: { value: 'овсян' } }); });
   assert.equal(cards(tree).length, 1);
+  await act(async () => { byAria(tree, 'Закрыть поиск')[0].props.onClick(); });
+  assert.equal(tree.root.findAll((n) => n.props && n.props.role === 'tablist').length, 1, 'чипы вернулись');
 });

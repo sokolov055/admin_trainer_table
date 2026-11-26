@@ -32,3 +32,12 @@
 }
 .dish-itag--warm { background: var(--warning-fill); color: var(--warning-text); }
 .dish-itag--cool { background: var(--info-fill); color: var(--info-text); }
+
+/* Шапка: у статусов — своя строка во всю ширину, поиск и «+» — строкой
+   ниже справа (не перекрывают правый край чипов), чипы приёмов пищи —
+   своей строкой во всю ширину: верстка совпадает с «Упражнениями»
+   и «Тренажёрами». Поле поиска открывается на месте чипов. */
+.dish-actions { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.dish-actions > .plib-ib { margin-left: auto; }
+.dish-hint { flex: 1; min-width: 0; margin: 0; }
+.plib-search { margin-bottom: var(--space-3); }

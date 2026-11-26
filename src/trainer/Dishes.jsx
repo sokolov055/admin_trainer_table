@@ -119,9 +119,11 @@ export default function Dishes() {
 
   return (
     <>
-      {/* Блюда — в языке «Программ» (26.11.2026). Статусы — во всю ширину:
-          их три, в строке с поиском и «+» подписи не влезали. Поиск и «+» —
-          во второй строке, поле поиска открывается вместо чипов. */}
+      {/* Блюда — в языке «Программ» (26.11.2026). Статусы — своей строкой
+          во всю ширину: их три, вместе с кнопками не влезают. Поиск и «+» —
+          строкой ниже справа, чипы приёмов пищи — своей строкой во всю
+          ширину, как в «Упражнениях» и «Тренажёрах». Поле поиска открывается
+          на месте чипов (макет v4). */}
       <Segmented
         items={STATUS.map((s) => ({ value: s.value, label: <>{s.label}<em className="plib-count">{count(s.value)}</em></> }))}
         value={status}
@@ -129,27 +131,11 @@ export default function Dishes() {
         label="Какие блюда"
         track
       />
-      <div className="plib-bar">
-        {searching
-          ? <div className="plib-search"><Search value={q} onChange={setQ} placeholder="Поиск блюда" /></div>
-          : (
-            <div className="chips" role="tablist" aria-label="Приёмы пищи">
-              <button type="button" role="tab" aria-selected={meal === ''} className={'chip' + (meal === '' ? ' chip--active' : '')} onClick={() => { setMeal(''); haptic(); }}>Все</button>
-              {MEALS.map((m) => {
-                const look = MEAL_LOOK[m] || MEAL_LOOK['перекус'];
-                const MealIcon = look.icon;
-                return (
-                  <button key={m} type="button" role="tab" aria-selected={meal === m}
-                    className={'chip' + (meal === m ? ' chip--active' : '')}
-                    onClick={() => { setMeal(m); haptic(); }}>
-                    <span className={'plib-dot plib-dot--sm plib-meal--' + look.key} aria-hidden="true"><MealIcon size={12} /></span>
-                    {m}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        <button type="button" className="plib-ib" aria-label={searching ? 'Закрыть поиск' : 'Поиск'} aria-pressed={searching}
+      <div className="dish-actions">
+        {status === 'draft' && count('draft') > 0 && (
+          <p className="library__hint--lead dish-hint">Черновики клиенты не видят.</p>
+        )}
+        <button type="button" className="plib-ib" aria-label={searching ? 'Закрыть поиск' : 'Поиск блюд'} aria-pressed={searching}
           onClick={() => { haptic(); if (searching) setQ(''); setSearching(!searching); }}>
           {searching ? <IconClose size={20} /> : <IconSearch size={20} />}
         </button>
@@ -158,13 +144,26 @@ export default function Dishes() {
           <IconPlus size={22} />
         </button>
       </div>
+      {searching
+        ? <div className="plib-search"><Search value={q} onChange={setQ} placeholder="Поиск блюда" /></div>
+        : (
+          <div className="chips plib-chips" role="tablist" aria-label="Приёмы пищи">
+            <button type="button" role="tab" aria-selected={meal === ''} className={'chip plib-chip' + (meal === '' ? ' chip--active' : '')} onClick={() => { setMeal(''); haptic(); }}>Все</button>
+            {MEALS.map((m) => {
+              const look = MEAL_LOOK[m] || MEAL_LOOK['перекус'];
+              const MealIcon = look.icon;
+              return (
+                <button key={m} type="button" role="tab" aria-selected={meal === m}
+                  className={'chip plib-chip' + (meal === m ? ' chip--active' : '')}
+                  onClick={() => { setMeal(m); haptic(); }}>
+                  <span className={'plib-dot plib-dot--sm plib-meal--' + look.key} aria-hidden="true"><MealIcon size={12} /></span>
+                  {m}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-      {status === 'draft' && count('draft') > 0 && (
-        <p className="library__hint library__hint--lead">
-          {/* Коротко: зачем статусы. Остальное видно на карточках */}
-          Черновики клиенты не видят.
-        </p>
-      )}
       {shown.length > 0 && (
         <div className="library__count">
           <p>{shown.length} {plural(shown.length, 'блюдо', 'блюда', 'блюд')}</p>
